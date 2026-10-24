@@ -248,7 +248,7 @@ def _capture(cap,root):
     uri=cap['native_call']['uri']
     if (uri not in URIS or cap['contract']!='waapi-skill.runtime-read-program/v1'
             or cap['phase_reports']!=dict.fromkeys(('setup','call','teardown'),'passed')or cap['source_unchanged']is not True
-            or cap['source_context']!=runtime.program_source_context(root,flow=uri)):raise ValueError('Exact transport teardown/source required')
+            or cap['source_context']!=remaining._current_context(root,uri,cap['source_context'])):raise ValueError('Exact transport teardown/source required')
     if cap.get('transport_preservation')is not None:return _uncertain_create(cap)
     context,natives=_session(json.dumps({'calls':cap['public_calls'],'trace':cap['native_reads'],'stages':cap['transport_stages']}))
     stage=cap['transport_stage']
@@ -284,7 +284,11 @@ def _normalized_identity(branch,cap,root):
     catalog=remaining._log_catalog(root,version,host)
     schema=catalog['schemas'][uri]['argsSchema']['properties']['object']
     definition=catalog['definitions']['documents']['waapi_definitions.json']['definitions']
-    if schema.get('$ref')!='waapi_definitions.json#/definitions/objectArg':raise ValueError('Native object identity reference differs')
+    from wwise_waapi.schema_inventory import DefinitionGraph,resolve_schema_reference
+    graph=DefinitionGraph(**{k:catalog['definitions'][k]for k in ('contract','version','wwise_build','source_file_names','documents','inventory_sha256')})
+    resolved=resolve_schema_reference(schema.get('$ref',''),root_schema=catalog['schemas'][uri]['argsSchema'],graph=graph)
+    if (resolved.document_name!='waapi_definitions.json'or resolved.pointer!='/definitions/objectArg'
+            or resolved.target!=definition['objectArg']):raise ValueError('Native object identity reference differs')
     pointer=branch['pointer'];target='uniqueQualifiedName'if selector=='qualified-name'else'objectPathArg'
     if '/objectArg/anyOf/'in pointer:
         index=int(pointer.split('/objectArg/anyOf/')[1].split('/')[0])
@@ -373,6 +377,7 @@ def write_transport_bundle(output,captures,*,inventory,name_prefix=''):
             identity=branch['id'];entry=exact_entry(branch,audit.ROOT);pp='/gateway/payload/dispatch_result/result'if cap.get('transport_preservation')else'/gateway/payload/agent_result'
             program['branch_assertions'][identity]={'native_shape_sha256':branch['shape_sha256'],'native_route':branch['route'],
                 'checks':[({'pointer':pointer,'absent':True}if branch['kind']=='optional_presence'and branch['value']=='absent'
+                    else {'pointer':pointer,'cardinality':branch['value']}if branch['kind']=='collection_cardinality'
                     else {'pointer':pointer,'equals':completion.pointer_value(program,pointer)}),{'pointer':pp,'equals':completion.pointer_value(program,pp)}]}
             binding={'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'public_route':public['id'],'public_route_sha256':audit.digest(public),
                 'input':{'gateway_argv':cap['gateway']['argv'],'selector':pointer},'dispatch_pointer':'/native_call','observation_pointer':pointer,

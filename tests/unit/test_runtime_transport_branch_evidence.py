@@ -19,11 +19,14 @@ class TransportClient(_RuntimeControlDraftClient):
     """External Wwise boundary only; handles/transactions are the real product."""
     def __init__(self,path,version,host,target):
         super().__init__(path,version=version)
-        self.console=host=='wwise-console';self.target_id=target;self.rows=[];self.states={};self.trace=[]
+        self.console=host=='wwise-console';self.target_id=target;self.rows=[];self.states={};self.trace=[];self.create_ids=[0]
+        self.objects={target:{'id':target,'name':'Play_Weather','type':'Event','path':r'\Events\Default Work Unit\Play_Weather'}}
+        self.binding_target=target
     def call(self,uri,args=None,options=None):
         if uri==PREFIX+'create':
-            self.rows=[{'transport':0,'object':args['object'],'gameObject':args.get('gameObject',18446744073709551614)}]
-            self.states[0]='stopped';result={'transport':0}
+            native_id=self.create_ids.pop(0)if self.create_ids else 0
+            self.rows.append({'transport':native_id,'object':args['object'],'gameObject':args.get('gameObject',18446744073709551614)})
+            self.states[native_id]='stopped';result={'transport':native_id}
         elif uri==PREFIX+'getList':result={'list':deepcopy(self.rows)}
         elif uri==PREFIX+'getState':result={'state':self.states[args['transport']]}
         elif uri==PREFIX+'executeAction':
@@ -36,8 +39,10 @@ class TransportClient(_RuntimeControlDraftClient):
             result={}
         elif uri==PREFIX+'destroy':self.rows=[r for r in self.rows if r['transport']!=args['transport']];result={}
         elif uri in {PREFIX+'prepare',PREFIX+'useOriginals'}:result={}
+        elif uri=='ak.wwise.core.object.get'and isinstance(args,dict)and args.get('from',{}).get('id')and set(args['from']['id'])<=self.objects.keys():
+            result={'return':[deepcopy(self.objects[i])for i in args['from']['id']]}
         elif uri=='ak.wwise.core.object.get'and isinstance(args,dict)and ('path'in args.get('from',{})or 'ofType'in args.get('from',{})or args.get('waql','').startswith('from type Event')):
-            result={'return':[{'id':self.target_id,'name':'Play_Weather','type':'Event','path':r'\Events\Default Work Unit\Play_Weather'}]}
+            result={'return':[deepcopy(self.objects[self.binding_target])]}
         else:
             result=super().call(uri,args,options)
             if uri=='ak.wwise.core.getInfo':
@@ -48,9 +53,13 @@ class TransportClient(_RuntimeControlDraftClient):
         return result
 
 
-def public_lifecycle(path,version,host,originals,*,selector='id',only_bound=False):
+def public_lifecycle(path,version,host,originals,*,selector='id',only_bound=False,rich=False):
     path.mkdir(parents=True);target=originals[PREFIX+'create']['call']['args']['object']
     client=TransportClient(path,version,host,target);env=_env(path,version=version);calls=[];stages=[]
+    if rich:client.create_ids=[0xffffffff,0]
+    if PREFIX+'prepare'in originals:
+        prepare_target=originals[PREFIX+'prepare']['call']['args']['object']
+        if prepare_target not in client.objects:client.objects[prepare_target]={'id':prepare_target,'name':'Play_Prepare','type':'Event','path':r'\Events\Default Work Unit\Play_Prepare'}
     sources={u:runtime.program_source_context(flow=u)for u in originals}
     def invoke(argv):
         start=len(client.trace)
@@ -59,11 +68,13 @@ def public_lifecycle(path,version,host,originals,*,selector='id',only_bound=Fals
         calls.append({'gateway':receipt,'native_start':start,'native_end':len(client.trace)})
         assert code==0,payload
         return payload
-    def transaction(uri,fields=(),bind=False):
+    def transaction(uri,fields=(),bind=False,bound_target=None):
         first=len(calls);started=invoke(['draft-start',uri]);draft=started['draft']['draft_id'];authority=started['task_authority'];current=started
         if bind:
-            current=invoke(['draft-bind-object',draft,'--task-authority',authority,'--expected-revision',str(current['draft']['revision']),
-                '--role','target',*(['--object-id',target]if selector=='id'else ['--exact-type-name','Event','Play_Weather']if selector=='qualified-name'else [item for segment in ('Events','Default Work Unit','Play_Weather')for item in ('--object-path-segment',segment)])])
+            selected=target if bound_target is None else bound_target;client.binding_target=selected;obj=client.objects[selected]
+            binding=(['--object-id',selected]if selector=='id'else ['--exact-type-name',obj['type'],obj['name']]if selector=='qualified-name'
+                else [item for segment in obj['path'].split('\\')[1:]for item in ('--object-path-segment',segment)])
+            current=invoke(['draft-bind-object',draft,'--task-authority',authority,'--expected-revision',str(current['draft']['revision']),'--role','target',*binding])
             fields=('--target-handle',current['bound_object']['handle'],*fields)
         current=invoke(['draft-declare-runtime-control-plan',draft,'--task-authority',authority,'--expected-revision',str(current['draft']['revision']),*fields])
         current=invoke(['draft-check',draft,'--task-authority',authority,'--expected-revision',str(current['draft']['revision'])])
@@ -72,29 +83,38 @@ def public_lifecycle(path,version,host,originals,*,selector='id',only_bound=Fals
         executed=invoke(['execute',preview['transaction_id']]);verified=invoke(executed['next_command']['gateway_argv'])
         stages.append({'uri':uri,'start':first,'end':len(calls),'receipt_index':len(calls)-1})
         return verified
-    if not only_bound and PREFIX+'useOriginals'in originals:transaction(PREFIX+'useOriginals',('--audition-media','originals'))
-    if PREFIX+'prepare'in originals:transaction(PREFIX+'prepare',bind=True)
-    created=transaction(PREFIX+'create',bind=True)
-    handle=created['agent_result']['business_result']['transport_handle'];assert handle.startswith('trh1-')
-    if not only_bound:
+    def list_read():
         first=len(calls);schema=invoke(['request-schema',PREFIX+'getList'])
         listed=invoke(['typed-zero-call',PREFIX+'getList','--schema-digest',schema['schema_digest']])
         stages.append({'uri':PREFIX+'getList','start':first,'end':len(calls),'receipt_index':len(calls)-1})
-        assert listed['agent_result']['list']==client.rows
+        assert listed['agent_result']=={'list':client.rows}
+    def state_read(handle,expected):
         first=len(calls);state=invoke(['core-call',PREFIX+'getState','--transport-handle',handle])
         stages.append({'uri':PREFIX+'getState','start':first,'end':len(calls),'receipt_index':len(calls)-1})
-        assert state['agent_result']=={'transport_handle':handle,'state':'stopped'}
-        transaction(PREFIX+'executeAction',('--audition-action','play','--transport-scope','one-transport','--transport-handle',handle))
-        transaction(PREFIX+'executeAction',('--audition-action','stop','--transport-scope','one-transport','--transport-handle',handle))
-    destroyed=transaction(PREFIX+'destroy',('--transport-handle',handle));assert destroyed['verified']is True
+        assert state['agent_result']=={'transport_handle':handle,'state':expected}
+    if not only_bound and PREFIX+'useOriginals'in originals:transaction(PREFIX+'useOriginals',('--audition-media','converted'if rich else'originals'))
+    if PREFIX+'prepare'in originals:transaction(PREFIX+'prepare',bind=True,bound_target=prepare_target)
+    created=transaction(PREFIX+'create',('--game-object-id','0')if rich else(),bind=True)
+    handle=created['agent_result']['business_result']['transport_handle'];assert handle.startswith('trh1-');handles=[handle]
+    if rich:
+        second=transaction(PREFIX+'create',('--game-object-id','18446744073709551615'),bind=True)
+        handles.append(second['agent_result']['business_result']['transport_handle']);assert handles[0]!=handles[1]
+    if not only_bound:
+        list_read();state_read(handle,'stopped')
+        for i,action in enumerate(('play','pause','pause','toggle-play-stop','play-directly')if rich else('play','stop')):
+            transaction(PREFIX+'executeAction',('--audition-action',action,'--transport-scope','one-transport','--transport-handle',handle))
+            if rich and i in (0,1):state_read(handle,'playing'if i==0 else'paused')
+        if rich:transaction(PREFIX+'executeAction',('--audition-action','stop','--transport-scope','all-active'))
+    for old in handles:
+        destroyed=transaction(PREFIX+'destroy',('--transport-handle',old));assert destroyed['verified']is True
     assert client.rows==[]
-    # Retired authority must not dispatch another state/action, even if ID0 was valid.
+    if rich:list_read()
+    # Retired authority must not dispatch another state/action after cleanup.
     before=len(client.trace)
-    code,bad=gateway.execute_gateway(['--state-dir',str(path/'state'),'core-call',PREFIX+'getState','--transport-handle',handle],env=env,client_factory=lambda _:client)
-    assert code==2 and not any(r['uri']==PREFIX+'getState'for r in client.trace[before:])
-    # Rejected request is independent of the successful lifecycle receipt.
-    trace=client.trace[:before]
-    return calls,trace,stages,sources
+    for old in handles:
+        code,bad=gateway.execute_gateway(['--state-dir',str(path/'state'),'core-call',PREFIX+'getState','--transport-handle',old],env=env,client_factory=lambda _:client)
+        assert code==2 and not any(r['uri']==PREFIX+'getState'for r in client.trace[before:])
+    return calls,client.trace[:before],stages,sources
 
 
 def test_transport_2024_paired_host_lifecycle_teardown_portable_consumer(request,tmp_path):
@@ -326,4 +346,109 @@ def test_transport_list_native_valid_partial_data_never_issues_authority(request
         result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
         runtime.write_json(tmp_path/'consumer-result.json',result)
         assert {r['state']for r in result['obligations']}=={'verified'},[(r['id'],r['reasons'])for r in result['obligations']if r['state']!='verified']
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+def finalize_sessions(output,sessions,phases,nodeid):
+    paths=[]
+    for i,(calls,trace,stages,sources)in enumerate(sessions):
+        for j,stage in enumerate(stages):
+            if stage['uri']not in sources:continue
+            part=calls[stage['start']:stage['end']]
+            targets=[r for r in trace[part[-1]['native_start']:part[-1]['native_end']]if r['uri']==stage['uri']]if stage['uri'].endswith(('.getList','.getState'))else [r for r in trace[part[0]['native_start']:part[-1]['native_end']]if r['uri']==stage['uri']]
+            native,=targets;path=output/f'capture-{i}-{j}.json'
+            runtime.write_program_receipt(path,calls[stage['receipt_index']]['gateway'],{k:native[k]for k in ('uri','args','options','result')},
+                nodeid=nodeid,phase_reports=phases,source_context=sources[stage['uri']],native_reads=trace,public_calls=calls)
+            cap=json.loads(path.read_bytes());cap.update(transport_stage=stage,transport_stages=stages);runtime.write_json(path,cap);paths.append(path)
+    return paths
+
+
+@pytest.mark.parametrize('version',['2024.1','2021.1','2022.1','2023.1','2025.1'])
+def test_transport_paired_hosts_complete_branch_frontiers(request,tmp_path,version):
+    from tests.support.runtime_transport_evidence import original_transport,write_transport_bundle,write_transport_preservation_receipt,review
+    profiles={r:p for r,p in review()['profiles'].items()if r.startswith(version+'|')}
+    inventory=log_inventory(profiles);sessions=[];uncertain=[]
+    for host in ('wwise-console','wwise-authoring'):
+        originals={r.split('|')[-1]:original_transport(r)for r in profiles if r.split('|')[1]==host}
+        sessions.append(public_lifecycle(tmp_path/(host+'-actual'),version,host,originals))
+        sessions.append(public_lifecycle(tmp_path/(host+'-path-rich'),version,host,originals,selector='path',rich=True))
+        bound={u:o for u,o in originals.items()if u.endswith(('.create','.prepare'))}
+        sessions.append(public_lifecycle(tmp_path/(host+'-name'),version,host,bound,selector='qualified-name',only_bound=True))
+        for j,value in enumerate(({}, {'list':[{}]})):
+            sessions.append(public_list_result(tmp_path/(host+'-partial-'+str(j)),version,host,value))
+        uncertain.append(public_create_omission(tmp_path/(host+'-uncertain'),version,host))
+    def finalize(phases):
+        paths=finalize_sessions(tmp_path,sessions,phases,request.node.nodeid)
+        for i,(calls,trace,context,journal)in enumerate(uncertain):
+            native,=[r for r in trace if r['uri']==PREFIX+'create'];path=tmp_path/f'uncertain-{i}.json'
+            write_transport_preservation_receipt(path,calls[-1]['gateway'],{k:native[k]for k in ('uri','args','options','result')},
+                nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=trace,public_calls=calls,journal=journal);paths.append(path)
+        index=write_transport_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='transport-'+version+'-')
+        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert {r['state']for r in result['obligations']}=={'verified'},[(r['id'],r['evidence_results'])for r in result['obligations']if r['state']!='verified']
+        assert set(bindings['bindings'])=={r['id']for r in inventory['native_coverage']['obligations']}
+        own=next(r for r in profiles if r.split('|')[1]=='wwise-console'and r.endswith('.getState'))
+        damaged=deepcopy(bindings);damaged['bindings'][own+'|/resultSchema']['evidence'].pop('native')
+        rejected=completion.evaluate_coverage(audit.ROOT,inventory,damaged,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        assert all(r['state']!='verified'for r in rejected['obligations']if r['route']==own)
+        assert all(r['state']=='verified'for r in rejected['obligations']if r['route']!=own)
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_transport_list_cardinality_uses_ordinary_assertion_contract(request,tmp_path):
+    from tests.support.runtime_transport_evidence import original_transport,write_transport_bundle
+    routes=[f'2024.1|{h}|{BUILDS["2024.1"]}|function|'+PREFIX+'getList'for h in ('wwise-console','wwise-authoring')]
+    inventory=log_inventory(routes,pointers={'/resultSchema',*[f'/resultSchema/properties/list/@cardinality/{k}'for k in ('empty','single','multiple')]})
+    sessions=[]
+    for host,route in zip(('wwise-console','wwise-authoring'),routes,strict=True):
+        actual=original_transport(route)['call']['result'];second={**actual['list'][0],'transport':1}
+        for i,value in enumerate((actual,{'list':[]},{'list':[actual['list'][0],second]})):
+            sessions.append(public_list_result(tmp_path/(host+str(i)),'2024.1',host,value))
+    def finalize(phases):
+        paths=finalize_sessions(tmp_path,sessions,phases,request.node.nodeid)
+        index=write_transport_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='transport-2024.1-')
+        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert {r['state']for r in result['obligations']}=={'verified'},[(r['id'],r['evidence_results'])for r in result['obligations']if r['state']!='verified']
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_transport_namespace_composes_with_cursor_without_rewriting(request,tmp_path):
+    from tests.support.runtime_transport_evidence import original_transport,write_transport_bundle
+    from tests.support.runtime_cursor_evidence import original_cursor,write_cursor_bundle
+    from tests.unit.test_runtime_cursor_branch_evidence import cursor_read,URI as CURSOR
+    transport_route=f'2024.1|wwise-console|{BUILDS["2024.1"]}|function|'+PREFIX+'getList'
+    cursor_route=f'2025.1|wwise-authoring|{BUILDS["2025.1"]}|function|'+CURSOR
+    transport_inventory=log_inventory([transport_route],pointers={'/argsSchema','/resultSchema'})
+    cursor_inventory=log_inventory([cursor_route],pointers={'/argsSchema','/resultSchema'})
+    actual=original_transport(transport_route)['call']['result']
+    session=public_list_result(tmp_path/'transport','2024.1','wwise-console',actual)
+    cursor=original_cursor(cursor_route)
+    receipt,native,source,trace=cursor_read(tmp_path/'cursor','2025.1','wwise-authoring','capture-latest',cursor['result'])
+    assert receipt['exit_code']==0
+    # Wrong family/version/traversal names fail before allocation or evidence IO.
+    for prefix in ('cursor-2024.1-','transport-2025.1-','../transport-2024.1-',None):
+        output=tmp_path/('rejected-'+str(prefix).replace('/','_'))
+        with pytest.raises(ValueError,match='matching-version transport prefix'):
+            write_transport_bundle(output,[],inventory=transport_inventory,name_prefix=prefix)
+        assert not output.exists()
+    def finalize(phases):
+        paths=finalize_sessions(tmp_path,[session],phases,request.node.nodeid)
+        ti=write_transport_bundle(tmp_path/'transport-bundle',paths,inventory=transport_inventory,name_prefix='transport-2024.1-')
+        cp=tmp_path/'cursor-capture.json'
+        runtime.write_program_receipt(cp,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=source,
+            native_reads=trace,public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)}])
+        ci=write_cursor_bundle(tmp_path/'cursor-bundle',[cp],inventory=cursor_inventory,name_prefix='cursor-2025.1-')
+        components=[(i,json.loads((i.parent/'requirements.json').read_bytes()))for i in (ti,ci)]
+        index,policies=runtime.write_runtime_composition(tmp_path/'common',components)
+        bindings,base,_=audit.portable_binding_inputs(index,policies)
+        inventory=log_inventory([transport_route,cursor_route],pointers={'/argsSchema','/resultSchema'})
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert len(bindings['bindings'])==4 and {r['state']for r in result['obligations']}=={'verified'}
+        with pytest.raises(ValueError,match='duplicates an exact branch'):
+            runtime.write_runtime_composition(tmp_path/'duplicate',components+[components[0]])
     register_exact_evidence_finalizer(request.node,finalize)
