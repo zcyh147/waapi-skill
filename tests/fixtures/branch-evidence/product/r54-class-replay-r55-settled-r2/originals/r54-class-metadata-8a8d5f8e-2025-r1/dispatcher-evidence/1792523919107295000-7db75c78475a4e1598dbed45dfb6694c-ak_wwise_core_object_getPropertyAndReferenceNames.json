@@ -1,0 +1,26 @@
+{
+  "api": "ak.wwise.core.object.getPropertyAndReferenceNames",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2025-r1/dispatcher-evidence/1792523919107295000-7db75c78475a4e1598dbed45dfb6694c-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      "Color",
+      "ModulatorScope",
+      "OverrideColor",
+      "TimeModDuration",
+      "EnvelopeStopPlayback",
+      "EnvelopeTriggerOn",
+      "TimeModInitialDelay",
+      "TimeModLoops",
+      "TimeModPlaybackRate"
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 29.965782916988246,
+  "version": "2025.1"
+}

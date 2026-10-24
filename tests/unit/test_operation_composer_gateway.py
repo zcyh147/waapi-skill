@@ -28,11 +28,13 @@ from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImp
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     BUSINESS_DECLARATION_INPUT_MODE,
+    IDENTITY_ARGUMENT_SCHEMA,
     COMPOSER_INPUT_MODE,
     INTERNAL_CANONICAL_INPUT_MODE,
     list_operation_specs,
     operation_input_mode,
     operation_request_schema_digest,
+    operation_request_machine_contract,
 )
 from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
     expand_gateway_field_table,
@@ -330,9 +332,281 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
-    # Reviewed delta: explicit owner/ShareSet placement and Boolean reference
-    # dependency closure. Existing operation/version inventory remains unchanged.
+    # R74 adds only the generated structural Switch-child property target proof
+    # to the five setProperty machine contracts. Invert exactly that addition
+    # before retaining every reviewed prior aggregate below.
+    assert canonical_sha256(non_object_set_digests) == "b4b9f6bcc8653b91d0ae37b34a24b80cdd3d5a4bcf476688ff6dd635e20f4fd5"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("object.setProperty", version)
+        contract["optional_arguments"].remove("switch_child_context")
+        contract["argument_contract"]["optional"].remove("switch_child_context")
+        assert contract["argument_contract"]["properties"].pop("switch_child_context") == {
+            "type": "object", "description": "Gateway-generated owner/child context binding; callers use the disclosed binding handles.",
+        }
+        non_object_set_digests[f"object.setProperty@{version}"] = canonical_sha256(contract)
+    # R70 clarifies only the five setReference null-target descriptions: a
+    # directly stored clear may retain an inherited effective reference. The
+    # other 144 machine contracts are unchanged from cb8f4391.
     assert canonical_sha256(non_object_set_digests) == (
+        "dc0e1e57aa623a586b81003c955be87f7740e927eb1e3d4ae237b4ec42249b86"
+    )
+    # Restore exactly those pre-R70 lane seals before retaining every reviewed
+    # historical aggregate and its existing chained substitutions below.
+    non_object_set_digests.update({
+        "object.setReference@2021.1": "3004ce4d78ce9daa9994c6668c2e89996cd956f6f24462f7f716fc9abc14b023",
+        "object.setReference@2022.1": "5235bce690f33d2c5774997731d3042153e4beb34d50bb1278988b4283721cbd",
+        "object.setReference@2023.1": "e11667666b38d8324b0b69492fc5070f1aaf3529f60478acacd51521bbb8350c",
+        "object.setReference@2024.1": "c32f85045ab4fa3fec6ed2403ee89716ba7f3e3b5387cd2a8ca69a3f2fa00092",
+        "object.setReference@2025.1": "3e837a9dd5332f59bd03246a2ebad18e46b762f6f39deb1c7c17e55b71f564fd",
+    })
+    # Reviewed owned ControlInput construction and result bindings change only
+    # object.setRTPC in 2022.1–2025.1; the other 145 contracts are unchanged.
+    assert canonical_sha256(non_object_set_digests) == (
+        "7625144ba94c098847024fea8a5c50d7dbbe1eada00dfa54d6446368ff80851a"
+    )
+    # Exact pre-extension RTPC seals from 7f457d01. The current aggregate above
+    # protects all new fields; substituting only these four prior seals proves
+    # that every other contract and the historical aggregates stay unchanged.
+    non_object_set_digests.update({
+        "object.setRTPC@2022.1": "2f725349ef5e26108544a5e157222657e97317df1a4fe815c08afb40f7b4aa20",
+        "object.setRTPC@2023.1": "e4cf246a63cdc3103dabe67a1f48aee6edfe4741c74d24fb3c55954ecac4889d",
+        "object.setRTPC@2024.1": "f1be65816443c189c12838b817ad83a590e9addc7fa837d1af217c4a415f4ee8",
+        "object.setRTPC@2025.1": "90b6e9e5dd45924b20ad1a73b8432d47011fe5b35eac61b48208a335cb6ca793",
+    })
+    assert canonical_sha256(non_object_set_digests) == (
+        "a3d8593d2d4b0ad167c77264182de22abe49475781c031c0cd96429af874f4f9"
+    )
+    # Only four createPlugin contracts add source-proven Effect Folder placement.
+    # Invert that exact constraint before retaining every earlier reviewed seal.
+    def before_effect_folder_placement(version):
+        contract = operation_request_machine_contract("object.createPlugin", version)
+        assert contract["constraints"][6] == (
+            "independent ShareSets verify parent/class/name/fields and sibling preservation; Effect placement additionally admits a fresh source-proven Folder beneath an Effects Work Unit, while Sink and Metadata require their matching Work Unit"
+        )
+        contract["constraints"][6] = (
+            "independent Effect, Sink and Metadata ShareSets are children of a matching Effects, Audio Devices or Metadata Work Unit and verify parent/class/name/fields and sibling preservation"
+        )
+        return contract
+
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.createPlugin@{version}"] = canonical_sha256(before_effect_folder_placement(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "8a89bd2ef65432a3a4fcddcb72a5ecfa49c32d6a4497d929199a6cf4802e0191"
+    )
+    # Only the five create contracts add same-graph result bindings here.
+    # Invert the exact closed field before retaining every historical seal.
+    def before_graph_result_bindings(version):
+        contract = operation_request_machine_contract("object.create", version)
+        contract["optional_arguments"].remove("graph_result_bindings")
+        contract["argument_contract"]["optional"].remove("graph_result_bindings")
+        assert contract["argument_contract"]["properties"].pop("graph_result_bindings") == {
+            "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": True,
+            "description": "Gateway-owned declaration result bindings; no native identities or caller paths.",
+            "items": {"type": "object", "required": ["result_handle", "request_path"], "additionalProperties": False,
+                "properties": {"result_handle": {"type": "string", "pattern": r"^bnh1-[0-9a-f]{32}$"},
+                    "request_path": {"type": "string", "minLength": 1, "maxLength": 1024}}},
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(before_graph_result_bindings(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "cced6997d5ad93b10d934d95b76890cd535e55678fbd50b870cdef1fe8fa21b1"
+    )
+    # Only five internal waapi.call contracts add the history expectation proof.
+    # Remove that exact field and reuse this inverse in later historical checks.
+    def before_history_binding(version):
+        contract = operation_request_machine_contract("waapi.call", version)
+        contract["optional_arguments"].remove("history_binding")
+        contract["argument_contract"]["optional"].remove("history_binding")
+        assert contract["argument_contract"]["properties"].pop("history_binding") == {
+            "type": "object", "description": "Gateway-owned latest-history scoped expectation proof; never forwarded.",
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(before_history_binding(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "b0dd7d647d234d61ba4a4771336fe742839e1d2476712ecca09a3cf3f8b88fa3"
+    )
+    # Only object.create adds the internal documented List proof. Remove that
+    # exact property and both optional entries to retain every prior seal.
+    def before_documented_create_list_binding(version):
+        contract = before_graph_result_bindings(version)
+        contract["optional_arguments"].remove("documented_list_bindings")
+        contract["argument_contract"]["optional"].remove("documented_list_bindings")
+        assert contract["argument_contract"]["properties"].pop("documented_list_bindings") == {
+            "type": "array", "maxItems": 128, "items": {"type": "object"},
+            "description": "Gateway-owned documented List source/owner proofs; never forwarded.",
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(before_documented_create_list_binding(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "e7360fdd277786e360dd0da34e4ac9becf8b78b598384af5893be37c57c5dcec"
+    )
+    # Only the five internal waapi.call contracts add the protected provider
+    # proof. Remove that exact field before checking every historical seal.
+    def before_provider_profile_binding(version):
+        contract = before_history_binding(version)
+        contract["optional_arguments"].remove("provider_profile_binding")
+        contract["argument_contract"]["optional"].remove("provider_profile_binding")
+        assert contract["argument_contract"]["properties"].pop("provider_profile_binding") == {
+            "type": "object", "description": "Gateway-owned protected provider profile recipe; native values resolve only during dispatch.",
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(before_provider_profile_binding(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "a4f68b59f0d6b6646f5b18d09521e6b126e06364ebd1b06946e8d64e62911c82"
+    )
+    # Only the internal waapi.call contracts add the exact object-file proof.
+    # Removing that one reviewed field must retain every earlier contract seal.
+    def before_source_file_binding(version):
+        contract = before_provider_profile_binding(version)
+        contract["optional_arguments"].remove("source_control_binding")
+        contract["argument_contract"]["optional"].remove("source_control_binding")
+        assert contract["argument_contract"]["properties"].pop("source_control_binding") == {
+            "type": "object", "description": "Gateway-owned exact object-to-file scope proof; never forwarded.",
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(before_source_file_binding(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "5babd9b4fa6e0993a23a1a79267967dc59fb66e41c5b10ce4638b34c1c4507bd"
+    )
+    # Only the five Undo Group contracts add this closed cancellation choice.
+    # Remove that exact addition to retain the earlier reviewed aggregate.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("waapi.undoGroup", version)
+        assert contract["optional_arguments"] == ["failure_cancellation"]
+        contract["optional_arguments"] = []
+        assert contract["argument_contract"]["optional"] == ["failure_cancellation"]
+        contract["argument_contract"]["optional"] = []
+        assert contract["argument_contract"]["properties"].pop("failure_cancellation") == {
+            "type": "string", "enum": ["undo-changes", "preserve-changes", "native-default"],
+        }
+        non_object_set_digests[f"waapi.undoGroup@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
+        "f0cf1aaf03c0b79f218aff1f20b8e32f3ed19822896f32c39bf20d9f7cab9c33"
+    )
+    # Only the four supported Definition lanes add this reviewed Short ID
+    # resolution contract. Restore that exact addition to retain earlier seals.
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("soundbank.processDefinitionFiles", version)
+        constraint = (
+            "Event, DialogueEvent, AuxBus and Effect uint32 Short IDs resolve through a version-pinned bounded typed read; exact numeric Short ID, canonical GUID and directive type are checked independently"
+        )
+        assert contract["constraints"].count(constraint) == 1
+        contract["constraints"].remove(constraint)
+        non_object_set_digests[f"soundbank.processDefinitionFiles@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
+        "394a834d31bc4bbe49a106abdcfbb9db0998b8e9dee941817bc175cd604bb3e7"
+    )
+    # Reviewed lifecycle replacement and create null-reference additions.
+    # Restore only those exact fifteen lane deltas before checking prior seals.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        for operation in ("object.copy", "object.move"):
+            contract = operation_request_machine_contract(operation, version)
+            conflict = contract["argument_contract"]["properties"]["on_name_conflict"]
+            assert conflict["enum"] == ["fail", "rename", "replace"]
+            conflict["enum"] = ["fail", "rename"]
+            non_object_set_digests[f"{operation}@{version}"] = canonical_sha256(contract)
+        contract = before_documented_create_list_binding(version)
+        properties = contract["argument_contract"]["properties"]
+        for node in (properties, properties["children"]["items"]["properties"]):
+            target = node["references"]["items"]["properties"]["target"]
+            assert target == {"oneOf": [IDENTITY_ARGUMENT_SCHEMA, {"type": "null"}]}
+            node["references"]["items"]["properties"]["target"] = IDENTITY_ARGUMENT_SCHEMA
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
+        "38eefcd78cd9265657e74d7b0775403bf1832b382373e9ce586a09e3e3a3c2fd"
+    )
+    # Four plugin lanes add two ShareSet kinds and bound references. Restore
+    # only those reviewed additions to reproduce the previous aggregate.
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_effect_folder_placement(version)
+        plugin = contract["argument_contract"]["properties"]["plugin"]
+        plugin["optional"].remove("references")
+        assert plugin["properties"]["kind"]["enum"] == ["source", "effect", "sink", "metadata"]
+        plugin["properties"]["kind"]["enum"] = ["source", "effect"]
+        assert plugin["properties"].pop("references") == {
+            "type": "array", "maxItems": 32,
+            "items": {
+                "type": "object", "required": ["name", "target"],
+                "additionalProperties": False,
+                "properties": {
+                    "name": {"type": "string", "minLength": 1},
+                    "target": IDENTITY_ARGUMENT_SCHEMA,
+                },
+            },
+        }
+        assert contract["constraints"][6] == (
+            "independent Effect, Sink and Metadata ShareSets are children of a matching Effects, Audio Devices or Metadata Work Unit and verify parent/class/name/fields and sibling preservation"
+        )
+        contract["constraints"][6] = (
+            "standalone Effect ShareSets are children of an Effects Work Unit and verify their own parent/class/name/properties"
+        )
+        non_object_set_digests[f"object.createPlugin@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
+        "c7fb226089f3c5f610e39090d196ab13958814992f13c03f205c227339694234"
+    )
+    # The only new named contract field is the internal owned model proof.
+    # Removing that exact addition must reproduce the earlier reviewed seal.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_source_file_binding(version)
+        contract["optional_arguments"].remove("model_binding")
+        contract["argument_contract"]["optional"].remove("model_binding")
+        assert contract["argument_contract"]["properties"].pop("model_binding") == {
+            "type": "object", "description": "Gateway-owned Authoring resource and declaration proof.",
+        }
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(contract)
+    # Reviewed hierarchy delta: only the five setReference contracts change
+    # their activation guidance. Restoring that exact prior wording reproduces
+    # the previous aggregate seal, preserving every other field and pair.
+    assert canonical_sha256(non_object_set_digests) == (
+        "aa408e7b856275f9c1a6f0304997c8945d2602eb9c8d10871c5ca74f0399f577"
+    )
+    previous = dict(non_object_set_digests)
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("object.setReference", version)
+        # This older inverse rebuilds the live schema rather than reusing the
+        # substituted digest, so invert R70's exact wording here as well.
+        null_target = contract["argument_contract"]["properties"]["target"]["oneOf"][1]
+        assert null_target["description"] == (
+            "Explicitly clear the directly stored reference; an inherited reference may still apply. Omitted target is never interpreted as a clear request."
+        )
+        null_target["description"] = (
+            "Explicitly clear the reference; omitted target is never interpreted as a clear request."
+        )
+        assert contract["constraints"][2:4] == [
+            "non-null references require their live activation prerequisites already satisfied; use separate Field Handle Previews, or explicit object.set declarations on 2022.1+",
+            "childOfReference binds the chosen target parent to the exact controlling reference; explicit atomic reference changes use the declared future parent and both relationships are revalidated and verified",
+        ]
+        contract["constraints"][2:4] = [
+            "non-null references require their live Boolean activation closure already satisfied; missing prerequisites require separate Field Handle property Previews, or object.set on 2022.1+",
+        ]
+        previous[f"object.setReference@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(previous) == (
+        "e2ff2fedc414e846f092b06d03ad807952461373873ef1ed2c9d2b4ee42970de"
+    )
+    # Retain the earlier layout-proof review and its original aggregate seal.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_source_file_binding(version)
+        contract["optional_arguments"].remove("model_binding")
+        contract["argument_contract"]["optional"].remove("model_binding")
+        contract["argument_contract"]["properties"].pop("model_binding")
+        contract["optional_arguments"].remove("layout_binding")
+        contract["argument_contract"]["optional"].remove("layout_binding")
+        assert contract["argument_contract"]["properties"].pop("layout_binding") == {
+            "type": "object",
+            "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded.",
+        }
+        previous[f"waapi.call@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(previous) == (
         "4f05743e90078e3d3ca52dc525b000b2fe46bbd4376ba9a701f1fddde5ca246f"
     )
     assert {

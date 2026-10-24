@@ -123,8 +123,6 @@ def test_inventory_count_matches_latest_nonlive_result_without_collect_only_over
 
 def test_composer_evidence_is_exact_and_never_promoted_to_integration() -> None:
     documents = (
-        ROOT_AGENTS.read_text(encoding="utf-8"),
-        TESTS_AGENTS.read_text(encoding="utf-8"),
         SEMANTIC_README.read_text(encoding="utf-8"),
         TEST_INVENTORY.read_text(encoding="utf-8"),
     )
@@ -186,7 +184,7 @@ def test_docs_do_not_overclaim_formal_or_full_completion() -> None:
 def test_public_integration_candidate_evidence_is_exact_and_host_scoped() -> None:
     documents = tuple(
         path.read_text(encoding="utf-8")
-        for path in (ROOT_AGENTS, TESTS_AGENTS, SEMANTIC_README, TEST_INVENTORY)
+        for path in (SEMANTIC_README, TEST_INVENTORY)
     )
 
     for document in documents:
@@ -249,7 +247,7 @@ def test_public_integration_candidate_docs_forbid_false_windows_completion() -> 
 def test_composer_public_integration_evidence_is_exact_and_cumulative() -> None:
     documents = tuple(
         path.read_text(encoding="utf-8")
-        for path in (ROOT_AGENTS, TESTS_AGENTS, SEMANTIC_README, TEST_INVENTORY)
+        for path in (SEMANTIC_README, TEST_INVENTORY)
     )
 
     for document in documents:

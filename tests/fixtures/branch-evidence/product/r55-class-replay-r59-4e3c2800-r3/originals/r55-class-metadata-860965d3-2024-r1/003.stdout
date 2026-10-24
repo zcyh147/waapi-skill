@@ -1,0 +1,103 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "status",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 30673,
+    "url": "ws://127.0.0.1:30673/waapi"
+  },
+  "detected_version": "2024.1",
+  "is_command_line": true,
+  "calls": [
+    {
+      "api": "ak.wwise.core.getInfo",
+      "item_type": "function",
+      "category": "core",
+      "version": "2024.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2024-r1/dispatcher-evidence/1792528938342296000-b6f2819351de49a79951347fda67ec22-ak_wwise_core_getInfo.json",
+      "timeout": 29.98008112498792
+    },
+    {
+      "api": "ak.wwise.core.getProjectInfo",
+      "item_type": "function",
+      "category": "core",
+      "version": "2024.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2024-r1/dispatcher-evidence/1792528938348798000-6016fcf2f4f84a5bb6b4f085220a0d23-ak_wwise_core_getProjectInfo.json",
+      "timeout": 29.97750941698905
+    }
+  ],
+  "wwise": {
+    "apiVersion": 1,
+    "displayName": "WwiseConsole",
+    "isCommandLine": true,
+    "processId": 364,
+    "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2024.1.13.9056\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+    "sessionId": "{1354846D-9752-4411-946C-DC66CB92B14E}",
+    "version": {
+      "displayName": "v2024.1.13",
+      "year": 2024,
+      "major": 1,
+      "minor": 13,
+      "build": 9056,
+      "nickname": "",
+      "schema": 123
+    }
+  },
+  "project": {
+    "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+    "name": "SampleProject",
+    "path": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\SampleProject.wproj",
+    "displayTitle": "SampleProject* - No license key - WwiseConsole 2024.1.13 ",
+    "isDirty": true,
+    "currentLanguageId": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+    "currentPlatformId": "{9C6217D5-DD11-4795-87C1-6CE02853C541}"
+  },
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 30673,
+      "url": "ws://127.0.0.1:30673/waapi"
+    },
+    "adapter_version": "2024.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:30673/waapi",
+        "adapter_version": "2024.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  }
+}

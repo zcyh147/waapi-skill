@@ -1,0 +1,23 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r4/run-c7855db4-r2/pytest-capture/test_repeated_collector_gates_0/native/1792556945073232000-12fa90a2d05741d69cae6c3b56f04e9d-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "default": 100.0,
+    "name": "LfoDepth",
+    "restriction": {
+      "max": 100.0,
+      "min": 0.0,
+      "type": "range"
+    },
+    "type": "Real64"
+  },
+  "risk_level": "low",
+  "timeout": 9.99739012500504,
+  "version": "2021.1"
+}

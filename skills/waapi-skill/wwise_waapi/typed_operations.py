@@ -661,6 +661,7 @@ def compound_child_operations(version: str) -> Mapping[str, str]:
             spec.name not in {"waapi.call", "waapi.undoGroup"}
             and version in spec.supported_versions
             and spec.uri in allowed
+            and (spec.uri != "ak.wwise.core.object.set" or spec.name == "object.set")
         ):
             by_uri.setdefault(spec.uri, []).append(spec.name)
     result: dict[str, str] = {}

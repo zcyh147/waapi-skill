@@ -1,0 +1,73 @@
+{
+  "selection": "mf1.1792523851.0.de4e91cc4d077931ae2c7e8747c3528f87d7f1441529df648b848920182a7f09",
+  "scope": {
+    "kind": "object_type",
+    "requested": "EffectSlot",
+    "resolved": {
+      "classId": 5505040,
+      "name": "EffectSlot",
+      "type": "WObject"
+    }
+  },
+  "metadata": {
+    "type": "bool",
+    "name": "Bypass",
+    "default": false,
+    "audioEngineId": 48,
+    "supports": {
+      "rtpc": "None",
+      "randomizer": false,
+      "unlink": false
+    },
+    "display": {
+      "name": "Bypass",
+      "index": 1853,
+      "group": ""
+    },
+    "dependencies": [
+      {
+        "type": "reference",
+        "action": "Enable",
+        "property": "Effect",
+        "context": "Self",
+        "conditions": [
+          {
+            "referenceIsSet": true
+          }
+        ]
+      }
+    ],
+    "restriction": {},
+    "ui": {
+      "value": {
+        "max": 0.0,
+        "min": 0.0,
+        "decimals": 0,
+        "step": 0.0,
+        "fine": 0.0,
+        "infinity": 0.0
+      },
+      "displayAs": {
+        "lrMix": false,
+        "musicNote": false,
+        "bitfield": false
+      },
+      "dataMeaning": "None",
+      "autoUpdate": false
+    },
+    "unit": {
+      "status": "unknown",
+      "value": null
+    },
+    "availability": {
+      "type": "known",
+      "default": "known",
+      "restriction": "known",
+      "dependencies": "known",
+      "supports": "known",
+      "ui": "known"
+    }
+  },
+  "complete": true,
+  "mutation_authority": false
+}

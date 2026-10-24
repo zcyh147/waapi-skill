@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .edit_history_contracts import HISTORY_VERSIONS, history_declaration
+
 
 CORE_BUSINESS_CONTRACT = "waapi-skill.core-business/v1"
 
@@ -175,7 +177,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "execution_shape": "draft_mutation",
     },
     "ak.wwise.core.project.save": {
-        "versions": ("2023.1", "2024.1", "2025.1"),
+        "versions": ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
         "roles": (),
         "required_fields": (),
         "optional_fields": ("auto_check_out",),
@@ -223,8 +225,15 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "field_types": {
             "blend_track_handle": "bound_object_handle",
             "child_handle": "bound_object_handle",
-            "insertion_index": "nonnegative_integer",
+            "insertion_index": "integer_clamped_to_assignment_count",
             "edges": "blend_assignment_edges",
+        },
+        "field_semantics": {
+            "insertion_index": {"input": "integer_including_negative", "omitted_effect": "append",
+                                "effective_position": "clamp_to_zero_through_current_assignment_count",
+                                "preview_authority": "fresh_complete_indexed_assignments"},
+            "edges": {"effect_scope": "crossfade_GameParameter_only",
+                      "verification_boundary": "applicability_and_effect_unproved; bounded_read_observation_only"},
         },
         "execution_shape": "draft_mutation",
     },
@@ -317,7 +326,17 @@ _READ_DECLARATIONS: dict[str, dict[str, Any]] = {
     },
 }
 
+for _history_uri, _history_versions in HISTORY_VERSIONS.items():
+    _CONTRACTS[_history_uri] = {
+        "versions": _history_versions, "roles": (), "required_fields": ("history_scope",),
+        "optional_fields": ("expectation_receipt",), "field_types": {"history_scope": "latest_project_history_scope", "expectation_receipt": "owned_history_expectation_receipt"},
+        "execution_shape": "draft_mutation",
+    }
+
+
 _CATALOG_INTENTS = {
+    "ak.wwise.core.undo.undo": "undo the latest project history action with an owned state expectation",
+    "ak.wwise.core.undo.redo": "redo the latest project history action with an owned state expectation",
     "ak.wwise.core.object.setAttenuationCurve": "set one attenuation curve",
     "ak.wwise.core.object.setRandomizer": "configure one property randomizer",
     "ak.wwise.core.switchContainer.getAssignments": "read Switch Container assignments",
@@ -451,6 +470,10 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
         raise ValueError("unsupported generic Core business operation") from exc
     if version not in row["versions"]:
         raise ValueError("generic Core business operation is unavailable in this version")
+    if operation == "ak.wwise.core.project.save" and version in {"2021.1", "2022.1"}:
+        # These reflected lanes accept only an empty Save request. Keep the
+        # business lifecycle while withholding the later checkout choice.
+        row = {**row, "optional_fields": (), "field_types": {}, "field_semantics": None}
     bounded_read = row["execution_shape"] == "bounded_read"
     read_declaration = _READ_DECLARATIONS.get(operation) if bounded_read else None
     public_field_types = (
@@ -504,6 +527,8 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
         "field_types": dict(public_field_types),
         "input_forms": dict(input_forms),
     }
+    if operation in HISTORY_VERSIONS:
+        declaration["history"] = history_declaration()
     if operation == "ak.wwise.core.object.setAttenuationCurve":
         declaration["value_domains"] = attenuation_curve_value_domains(version)
     field_semantics = row.get("field_semantics")

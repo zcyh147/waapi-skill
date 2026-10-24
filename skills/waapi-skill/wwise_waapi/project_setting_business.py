@@ -44,7 +44,7 @@ def _bound(
     *,
     field: str,
     role: str,
-    object_type: str,
+    object_type: str | tuple[str, ...],
 ) -> BoundObjectHandle:
     if not isinstance(value, str):
         raise business_repair(
@@ -53,7 +53,8 @@ def _bound(
             action=f"bind the exact {role} and copy its returned handle",
         )
     bound = session.handles.resolve_object(value)
-    if bound.role != role or bound.object_type != object_type:
+    allowed_types = (object_type,) if isinstance(object_type, str) else object_type
+    if bound.role != role or bound.object_type not in allowed_types:
         raise business_repair(
             "BOUND_OBJECT_ROLE_MISMATCH",
             field=field,
@@ -114,13 +115,13 @@ def materialize_project_setting_business_request(
             plan["source_handle"],
             field="source_handle",
             role="source",
-            object_type="AudioFileSource",
+            object_type=("AudioFileSource", "Source", "SourcePlugin"),
         )
         if source.path.rsplit("\\", 1)[0].casefold() != sound.path.casefold():
             raise business_repair(
                 "PROJECT_SETTING_RELATIONSHIP_INVALID",
                 field="source_handle",
-                action="bind an AudioFileSource that is a direct child of the Sound",
+                action="bind a file or Source-plugin child of the Sound",
             )
         args: dict[str, Any] = {
             "sound": sound.object_id,

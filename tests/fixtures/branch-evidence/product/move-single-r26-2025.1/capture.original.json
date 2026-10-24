@@ -1,0 +1,15 @@
+{
+  "branch_id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.cli.moveMediaIdsToSingleFile|/resultSchema",
+  "candidate_sha256": "c14927af17e40d97fe3c56d7d5e36755b200b1cd3254d48448036cf9b6ae1f44",
+  "contract": "waapi-skill.media-id-program-capture/v1",
+  "git_candidate": "3c3423ebf8a0ed8232df4ec7769e7095eb869d2b",
+  "native_credit": false,
+  "outcome": "PASS",
+  "phase_reports": {
+    "call": "passed",
+    "setup": "passed",
+    "teardown": "passed"
+  },
+  "scope_kind": "product",
+  "source_unchanged": true
+}

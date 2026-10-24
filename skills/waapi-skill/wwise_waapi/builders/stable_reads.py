@@ -217,7 +217,7 @@ def build_profiler_voice_contributions_request(
     version: str,
     time: Any,
     voice_pipeline_id: Any,
-    bus_pipeline_ids: Sequence[Any] = (),
+    bus_pipeline_ids: Sequence[Any] | None = (),
 ) -> StableReadRequest:
     """Build a closed voice-path contribution query for all five versions."""
 
@@ -226,15 +226,15 @@ def build_profiler_voice_contributions_request(
         frozenset(SUPPORTED_WWISE_VERSION_KEYS),
         GET_VOICE_CONTRIBUTIONS_URI,
     )
-    if isinstance(bus_pipeline_ids, (str, bytes)) or not isinstance(
+    if bus_pipeline_ids is not None and (isinstance(bus_pipeline_ids, (str, bytes)) or not isinstance(
         bus_pipeline_ids, Sequence
-    ):
+    )):
         raise _input_error(
             "bus_pipeline_ids must be an ordered array of pipeline identifiers.",
             field="bus_pipeline_ids",
             actual_type=type(bus_pipeline_ids).__name__,
         )
-    if len(bus_pipeline_ids) > MAX_BUS_PIPELINE_IDS:
+    if bus_pipeline_ids is not None and len(bus_pipeline_ids) > MAX_BUS_PIPELINE_IDS:
         raise _input_error(
             "Too many bus pipeline identifiers were supplied.",
             field="bus_pipeline_ids",
@@ -243,7 +243,7 @@ def build_profiler_voice_contributions_request(
         )
     buses = [
         normalize_pipeline_id(value, field=f"bus_pipeline_ids[{index}]")
-        for index, value in enumerate(bus_pipeline_ids)
+        for index, value in enumerate(bus_pipeline_ids or ())
     ]
     if len(set(buses)) != len(buses):
         raise _input_error(
@@ -255,7 +255,7 @@ def build_profiler_voice_contributions_request(
             voice_pipeline_id,
             field="voice_pipeline_id",
         ),
-        "bussesPipelineID": buses,
+        **({"bussesPipelineID": buses} if bus_pipeline_ids is not None else {}),
         "time": normalize_profiler_time(time),
     }
     return StableReadRequest(
@@ -286,7 +286,7 @@ def normalize_profiler_game_objects_result(
     version: str,
     result: Any,
 ) -> dict[str, Any]:
-    """Project 2022 and 2023+ registration-field spellings to one shape."""
+    """Project reflected and observed registration timestamps to one shape."""
 
     _require_version(version, _GAME_OBJECT_VERSIONS, GET_GAME_OBJECTS_URI)
     payload = _require_result_mapping(GET_GAME_OBJECTS_URI, result)
@@ -305,11 +305,6 @@ def normalize_profiler_game_objects_result(
             maximum_rows=MAX_GAME_OBJECT_ROWS,
             actual_count=len(rows),
         )
-    register_field, unregister_field = (
-        ("registrationTime", "unregistrationTime")
-        if version == "2022.1"
-        else ("registerTime", "unregisterTime")
-    )
     normalized: list[dict[str, Any]] = []
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
@@ -319,53 +314,68 @@ def normalize_profiler_game_objects_result(
                 row_index=index,
                 actual_type=type(row).__name__,
             )
-        for field in ("id", "name", register_field, unregister_field):
-            if field not in row:
-                raise _result_error(
-                    GET_GAME_OBJECTS_URI,
-                    "A game-object row omitted a required stable field.",
-                    row_index=index,
-                    missing_field=field,
-                )
-        object_id = row["id"]
-        if (
+        if version != "2022.1":
+            for field in ("id", "name", "registerTime", "unregisterTime"):
+                if field not in row:
+                    raise _result_error(
+                        GET_GAME_OBJECTS_URI,
+                        "A game-object row omitted a required stable field.",
+                        row_index=index,
+                        missing_field=field,
+                    )
+        object_id = row.get("id")
+        minimum_id = 0 if version in {"2022.1", "2023.1"} else -(1 << 63)
+        if "id" in row and (
             not isinstance(object_id, int)
             or isinstance(object_id, bool)
-            or not -(1 << 63) <= object_id <= (1 << 64) - 1
+            or not minimum_id <= object_id <= (1 << 64) - 1
         ):
             raise _result_error(
                 GET_GAME_OBJECTS_URI,
                 "A game-object id was not a supported 64-bit integer.",
                 row_index=index,
                 field="id",
+                minimum=minimum_id,
+                maximum=(1 << 64) - 1,
                 actual_type=type(object_id).__name__,
             )
-        name = _bounded_result_string(
-            GET_GAME_OBJECTS_URI,
-            row["name"],
-            field="name",
-            row_index=index,
-        )
-        register_time = _int32_result(
-            GET_GAME_OBJECTS_URI,
-            row[register_field],
-            field=register_field,
-            row_index=index,
-        )
-        unregister_time = _int32_result(
-            GET_GAME_OBJECTS_URI,
-            row[unregister_field],
-            field=unregister_field,
-            row_index=index,
-        )
-        normalized.append(
-            {
-                "id": object_id,
-                "name": name,
-                "register_time": register_time,
-                "unregister_time": unregister_time,
-            }
-        )
+        projected = {
+            "id": object_id,
+            "name": (
+                _bounded_result_string(
+                    GET_GAME_OBJECTS_URI, row["name"], field="name", row_index=index,
+                )
+                if "name" in row else None
+            ),
+        }
+        for public_field, modern_field, reflected_2022_field in (
+            ("register_time", "registerTime", "registrationTime"),
+            ("unregister_time", "unregisterTime", "unregistrationTime"),
+        ):
+            fields = (
+                (reflected_2022_field, modern_field)
+                if version == "2022.1" else (modern_field,)
+            )
+            # Each 2022 field is optional independently. Validate every present
+            # alias before reconciling values; an absent partner is not a zero.
+            values = [
+                (field, _int32_result(
+                    GET_GAME_OBJECTS_URI, row[field], field=field, row_index=index,
+                ))
+                for field in fields if field in row
+            ]
+            if len(values) == 2 and values[0][1] != values[1][1]:
+                raise _result_error(
+                    GET_GAME_OBJECTS_URI,
+                    "A game-object row returned conflicting timestamp aliases.",
+                    row_index=index,
+                    conflicting_fields=[field for field, _ in values],
+                )
+            projected[public_field] = values[0][1] if values else None
+        unreported = [field for field, value in projected.items() if value is None]
+        if unreported:
+            projected["unreported_fields"] = unreported
+        normalized.append(projected)
     return {
         "count": len(normalized),
         "game_objects": normalized,
@@ -406,40 +416,30 @@ def normalize_profiler_voice_contributions_result(
             "The successful result.return value must be an object when reported.",
             actual_type=type(contribution).__name__,
         )
-    for field in ("volume", "LPF", "HPF", "objects"):
-        if field not in contribution:
-            raise _result_error(
-                GET_VOICE_CONTRIBUTIONS_URI,
-                "The reported voice contribution omitted a required stable field.",
-                missing_field=field,
-            )
-    volume = _finite_result_number(
-        GET_VOICE_CONTRIBUTIONS_URI,
-        contribution["volume"],
-        field="volume",
-    )
-    lpf = _finite_result_number(
-        GET_VOICE_CONTRIBUTIONS_URI,
-        contribution["LPF"],
-        field="LPF",
-    )
-    hpf = _finite_result_number(
-        GET_VOICE_CONTRIBUTIONS_URI,
-        contribution["HPF"],
-        field="HPF",
-    )
-    objects = contribution["objects"]
-    if not isinstance(objects, list):
+    stable_fields = ("volume", "LPF", "HPF", "objects")
+    missing = [field for field in stable_fields if field not in contribution]
+    if missing and version not in {"2021.1", "2022.1"}:
         raise _result_error(
             GET_VOICE_CONTRIBUTIONS_URI,
-            "The reported voice contribution objects field must be an array.",
-            field="objects",
-            actual_type=type(objects).__name__,
+            "The reported voice contribution omitted a required stable field.",
+            missing_field=missing[0],
         )
-    normalized_objects = _bounded_json_copy(
-        GET_VOICE_CONTRIBUTIONS_URI,
-        objects,
-    )
+    measurements = {
+        field: _finite_result_number(GET_VOICE_CONTRIBUTIONS_URI, contribution[field], field=field)
+        if field in contribution else None
+        for field in ("volume", "LPF", "HPF")
+    }
+    normalized_objects = None
+    if "objects" in contribution:
+        objects = contribution["objects"]
+        if not isinstance(objects, list):
+            raise _result_error(
+                GET_VOICE_CONTRIBUTIONS_URI,
+                "The reported voice contribution objects field must be an array.",
+                field="objects",
+                actual_type=type(objects).__name__,
+            )
+        normalized_objects = _bounded_json_copy(GET_VOICE_CONTRIBUTIONS_URI, objects)
     dsf_reported = "DSF" in contribution
     if dsf_reported and not dsf_available:
         raise _result_error(
@@ -459,15 +459,16 @@ def normalize_profiler_voice_contributions_result(
     )
     return {
         "contribution_reported": True,
-        "volume": volume,
-        "lpf": lpf,
-        "hpf": hpf,
+        "volume": measurements["volume"],
+        "lpf": measurements["LPF"],
+        "hpf": measurements["HPF"],
         "dsf": {
             "feature_available": dsf_available,
             "reported": dsf_reported,
             "value": dsf_value,
         },
         "objects": normalized_objects,
+        **({"unreported_fields": [{"LPF": "lpf", "HPF": "hpf"}.get(field, field) for field in missing]} if missing else {}),
     }
 
 

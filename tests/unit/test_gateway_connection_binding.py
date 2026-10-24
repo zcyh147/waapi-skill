@@ -82,6 +82,34 @@ class BindingClient:
         pass
 
 
+def project_save_preview(env, client):
+    """Prepare a real public save transaction without relying on undo routing."""
+    code, schema = waapi_gateway.execute_gateway(
+        ["request-schema", "ak.wwise.core.project.save"], env=env)
+    assert code == 0, schema
+    code, result = waapi_gateway.execute_gateway(
+        schema["continuation"]["gateway_argv"], env=env, client_factory=lambda _: client)
+    assert code == 0, result
+    if schema["input_shape"] == "business_declaration":
+        declaration = schema["business_adapter"]["declaration"]
+        save_fields = (["--value", "auto_check_out", "false"]
+            if "auto_check_out" in declaration["optional_fields"] else [])
+        authority = result["task_authority"]
+        for command, fields in (
+            ("draft-declare-core-plan", save_fields),
+            ("draft-check", []),
+            ("preview-from-draft", []),
+        ):
+            draft = result["draft"]
+            code, result = waapi_gateway.execute_gateway(
+                [command, draft["draft_id"], "--task-authority", authority,
+                 "--expected-revision", str(draft["revision"]), *fields],
+                env=env, client_factory=lambda _: client)
+            assert code == 0, result
+    assert isinstance(result["transaction_id"], str), result
+    return result
+
+
 @pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
 @pytest.mark.parametrize("change", ["project", "build"])
 def test_first_live_draft_binding_rejects_later_project_or_build_change(tmp_path, version, change):
@@ -104,10 +132,7 @@ def test_first_live_draft_binding_rejects_later_project_or_build_change(tmp_path
 def test_transaction_continuations_reject_configuration_change(tmp_path, version):
     env = configured_env(tmp_path, version=version)
     env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
-    code, schema = waapi_gateway.execute_gateway(["request-schema", "ak.wwise.core.project.save" if version == "2021.1" else "ak.wwise.core.undo.undo"], env=env)
-    assert code == 0, schema
-    code, preview = waapi_gateway.execute_gateway(schema["continuation"]["gateway_argv"], env=env, client_factory=lambda _: BindingClient(version))
-    assert code == 0, preview
+    preview = project_save_preview(env, BindingClient(version))
     transaction_id = preview["transaction_id"]
     code, result = waapi_gateway.execute_gateway(["config-set", "--waapi-port", "8124"], env=env)
     assert code == 0, result
@@ -179,10 +204,7 @@ def test_historical_transaction_without_configuration_requires_new_preview(tmp_p
 
     env = configured_env(tmp_path)
     env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
-    code, schema = waapi_gateway.execute_gateway(["request-schema", "ak.wwise.core.project.save"], env=env)
-    assert code == 0, schema
-    code, preview = waapi_gateway.execute_gateway(schema["continuation"]["gateway_argv"], env=env, client_factory=lambda _: BindingClient("2022.1"))
-    assert code == 0, preview
+    preview = project_save_preview(env, BindingClient("2022.1"))
     code, shown = waapi_gateway.execute_gateway(["transaction-show", preview["transaction_id"]], env=env)
     assert code == 0, shown
     legacy_artifact = dict(shown["artifact"])

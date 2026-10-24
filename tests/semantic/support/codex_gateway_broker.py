@@ -46,6 +46,7 @@ from tests.semantic.support.codex_draft_commands import (
     DRAFT_REVISION_SUBCOMMANDS,
     DRAFT_START_SUBCOMMANDS,
 )
+from tests.semantic.support.codex_source_copy_protocol import SourceCopyProofRole
 from wwise_waapi.operation_composer import (
     MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
@@ -64,6 +65,7 @@ from wwise_waapi.operation_drafts import (
     operation_draft_authority_digest,
 )
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
+from wwise_waapi.capabilities import CapabilityCatalog, CapabilityCatalogError
 from wwise_waapi.business_adapters import (
     business_adapter,
     business_adapter_operations,
@@ -73,6 +75,7 @@ from wwise_waapi.audio_import_business_contracts import (
 )
 from wwise_waapi.operation_registry import (
     OperationContractError,
+    operation_uses_business_declaration,
     parse_operation_request,
 )
 from wwise_waapi.typed_operations import (
@@ -1959,12 +1962,18 @@ class ExpectedGatewayStep:
     commutative_boolean_flags: tuple[str, ...] = ()
     allow_explicit_derived_sfx_language: bool = False
     expected_operation_request: Mapping[str, Any] | None = None
+    source_copy_proof_role: SourceCopyProofRole | None = None
 
     def __post_init__(self) -> None:
         if not self.name or not self.name.strip():
             raise ValueError("ExpectedGatewayStep.name must be non-empty")
         if not self.subcommand or not self.subcommand.strip():
             raise ValueError("ExpectedGatewayStep.subcommand must be non-empty")
+        if self.source_copy_proof_role is not None and (
+            not isinstance(self.source_copy_proof_role, SourceCopyProofRole)
+            or self.subcommand != 'continue-source-copy-proof'
+        ):
+            raise ValueError('Source-copy role is restricted to its exact continuation')
         if self.expected_operation_request is not None:
             if self.subcommand != "preview-from-draft":
                 raise ValueError(
@@ -3381,11 +3390,13 @@ def _validate_compound_undo_draft_protocol_steps(
             if owned[-1].subcommand != "preview-from-draft":
                 raise ValueError("compound Undo parent must end in one Preview")
         else:
-            if owned[-1].subcommand != "draft-check":
+            changing = [step for step in owned if step.subcommand != "draft-inspect"
+                        and not (step.subcommand == "draft-discover-fields" and "--list" in step.arguments)]
+            if changing[-1].subcommand != "draft-check":
                 raise ValueError(
                     "compound Undo child Draft must end checked without a child Preview"
                 )
-            if indexes[owned[-1].name] >= indexes[declaration.name]:
+            if indexes[changing[-1].name] >= indexes[declaration.name]:
                 raise ValueError(
                     "compound Undo children must be checked before parent declaration"
                 )
@@ -3396,12 +3407,72 @@ def _validate_compound_undo_draft_protocol_steps(
         raise ValueError("compound Undo Draft command has no owning flow")
 
 
+def partition_operation_draft_protocol_steps(
+    expected_steps: Sequence[ExpectedGatewayStep],
+) -> tuple[tuple[ExpectedGatewayStep, ...], ...]:
+    """Partition independent roots using their explicit issued-capability graph."""
+    steps = tuple(expected_steps)
+    by_name = {step.name: step for step in steps}
+    if len(by_name) != len(steps):
+        raise ValueError("Draft protocol step names must be unique")
+    starts = {step.name: step for step in steps if step.subcommand in DRAFT_START_SUBCOMMANDS}
+    roots = tuple(step.name for step in starts.values() if step.subcommand == "draft-start")
+    owners = {name: name for name in roots}
+    indexes = {step.name: index for index, step in enumerate(steps)}
+    for name, start in starts.items():
+        if start.subcommand == "draft-start":
+            continue
+        parent = start.arguments[0] if start.arguments else None
+        if (not isinstance(parent, ResponseBinding) or parent.pointer != "/draft/draft_id"
+                or parent.step not in roots or indexes[parent.step] >= indexes[name]
+                or starts[parent.step].arguments != ("waapi.undoGroup",)):
+            raise ValueError("compound child start lacks its exact prior ordinary Undo parent")
+        owners[name] = parent.step
+    if not roots:
+        raise ValueError("Draft protocol lacks an ordinary owning root")
+    step_owners: dict[str, str] = dict(owners)
+    prefixes = {name: name[:-len(".draft-start")] for name in starts if name.endswith(".draft-start")}
+    groups: dict[str, list[ExpectedGatewayStep]] = {name: [] for name in roots}
+    for step in steps:
+        owner = step_owners.get(step.name)
+        if step.subcommand in _DRAFT_SUBCOMMANDS and step.name not in starts:
+            capability = step.arguments[0] if step.arguments else None
+            if (not isinstance(capability, ResponseBinding) or capability.pointer != "/draft/draft_id"
+                    or capability.step not in starts):
+                raise ValueError("Draft command lacks its exact issued flow owner")
+            owner = owners[capability.step]
+        if owner is None:
+            matching = {name for name, prefix in prefixes.items()
+                        if step.name == prefix or step.name.startswith(prefix + ".")}
+            if matching:
+                longest = max(len(prefixes[name]) for name in matching)
+                candidates = {owners[name] for name in matching if len(prefixes[name]) == longest}
+                if len(candidates) != 1:
+                    raise ValueError("Draft protocol command has ambiguous flow ownership")
+                owner = candidates.pop()
+            else:
+                dependencies = {step_owners[argument.step] for argument in step.arguments
+                                if isinstance(argument, ResponseBinding) and argument.step in step_owners}
+                if len(dependencies) > 1:
+                    raise ValueError("Draft protocol command crosses independent root capabilities")
+                # Shared initial catalog reads belong to the first root and
+                # still pass its original protocol/payload validation.
+                owner = next(iter(dependencies), roots[0])
+        step_owners[step.name] = owner
+        groups[owner].append(step)
+    return tuple(tuple(groups[root]) for root in roots)
+
+
 def validate_operation_draft_protocol_steps(
     expected_steps: Sequence[ExpectedGatewayStep],
 ) -> None:
     """Fail closed unless every Draft flow binds authority to prior responses."""
 
     steps = tuple(expected_steps)
+    if any(step.source_copy_proof_role is not None for step in steps):
+        from tests.semantic.support.codex_source_copy_protocol import validate_source_copy_steps
+        validate_source_copy_steps(steps)
+        return
     draft_steps = tuple(step for step in steps if step.subcommand in _DRAFT_SUBCOMMANDS)
     if not draft_steps:
         return
@@ -3410,6 +3481,11 @@ def validate_operation_draft_protocol_steps(
         for step in draft_steps
         if step.subcommand in {"draft-start", "draft-start-undo-child"}
     )
+    if (sum(step.subcommand == "draft-start" for step in starts) > 1
+            and any(step.subcommand == "draft-start-undo-child" for step in starts)):
+        for group in partition_operation_draft_protocol_steps(steps):
+            validate_operation_draft_protocol_steps(group)
+        return
     if len(starts) > 1:
         if any(
             step.subcommand == "draft-declare-undo-plan" for step in draft_steps
@@ -8803,7 +8879,17 @@ def _project_operation_draft_runner(
     if value.get("contract") == "waapi-skill.typed-container-handle/v1":
         return project_disclosure_commands(value)
 
-    projected_draft = project_disclosure_commands(value)
+    # A Draft owns these control fields. Its declarations/current facts are
+    # business data, even when their keys resemble a continuation contract.
+    projected_draft = dict(value)
+    next_command = value.get("next_command")
+    if isinstance(next_command, Mapping):
+        projected_draft["next_command"] = _project_model_visible_runner(
+            next_command,
+            candidate_runner=candidate_runner,
+            invocation_runner=invocation_runner,
+            platform_name=platform_name,
+        )
     binding = value.get("next_action_binding")
     if isinstance(binding, Mapping):
         projected_draft["next_action_binding"] = (
@@ -8844,7 +8930,7 @@ def _project_model_visible_runner(
                 invocation_runner=invocation_runner,
                 platform_name=platform_name,
             )
-        if value.get("contract") in {
+        if isinstance(value.get("contract"), str) and value["contract"] in {
             "waapi-skill.operation-draft/v1",
             "waapi-skill.operation-draft-next-action/v1",
             "waapi-skill.business-draft-next-action/v1",
@@ -8856,12 +8942,18 @@ def _project_model_visible_runner(
                 invocation_runner=invocation_runner,
                 platform_name=platform_name,
             )
+        # Only Gateway-owned envelope locations may carry model commands.
+        # Native results, schemas and the exact final agent_result are opaque.
+        control_fields = {"draft", "next_command", "next_action_binding", "action_result", "continuation"}
         return {
-            key: _project_model_visible_runner(
-                nested,
-                candidate_runner=candidate_runner,
-                invocation_runner=invocation_runner,
-                platform_name=platform_name,
+            key: (
+                _project_model_visible_runner(
+                    nested,
+                    candidate_runner=candidate_runner,
+                    invocation_runner=invocation_runner,
+                    platform_name=platform_name,
+                )
+                if key in control_fields else nested
             )
             for key, nested in value.items()
         }
@@ -10864,7 +10956,9 @@ class CodexGatewayBroker:
     ) -> ExpectedGatewayStep:
         """Resolve a Draft command to its exact owning draft-start step."""
 
-        if step.subcommand in DRAFT_START_SUBCOMMANDS:
+        if step.subcommand in DRAFT_START_SUBCOMMANDS or (
+            step.source_copy_proof_role is not None and step.source_copy_proof_role.issues_save
+        ):
             return step
         binding = step.arguments[0] if step.arguments else None
         if (
@@ -10880,7 +10974,8 @@ class CodexGatewayBroker:
                 : self._execution_steps.index(step) + 1
             ]
             if candidate.name == binding.step
-            and candidate.subcommand in DRAFT_START_SUBCOMMANDS
+            and (candidate.subcommand in DRAFT_START_SUBCOMMANDS or (
+                candidate.source_copy_proof_role is not None and candidate.source_copy_proof_role.issues_save))
         )
         if len(matches) != 1:
             raise GatewayInvocationError(
@@ -12910,12 +13005,30 @@ class CodexGatewayBroker:
             ),
         )
 
+    def bind_source_copy_user_turn(self, index: int, prompt: str) -> None:
+        """Bind the existing trusted turn input for Source-choice grading only."""
+        if not any(step.source_copy_proof_role is not None for step in self.expected_steps):
+            return
+        if type(index) is not int or index < 1 or not isinstance(prompt, str) or len(prompt.encode('utf-8')) > 65536:
+            raise ValueError('Source-copy user turn is invalid')
+        self._source_copy_user_turn = (index, prompt)
+
     def _validate_step(
         self,
         step: ExpectedGatewayStep,
         actual: Sequence[str],
     ) -> tuple[str, tuple[str, ...]]:
         actual_values = tuple(str(value) for value in actual)
+        if step.source_copy_proof_role is not None and step.source_copy_proof_role.is_selection:
+            from tests.semantic.support.codex_source_copy_protocol import source_copy_decline_command
+            role = step.source_copy_proof_role
+            if getattr(self, '_source_copy_user_turn', None) != (role.user_turn, role.user_prompt):
+                raise GatewayInvocationError('Source-copy selection has no bound explicit user turn')
+            choice = self._payloads_by_step.get(role.choice_step)
+            decline = source_copy_decline_command(choice, stage=role.kind.split('_')[0])
+            selected = decline if role.is_decline else choice['next_command']
+            if tuple(selected['gateway_argv']) != actual_values:
+                raise GatewayInvocationError('Source-copy selection differs from its earlier exact disclosed command')
         supplied_version = ""
         version_selector_seen = False
         if actual_values and self.expected_wwise_version:
@@ -14165,7 +14278,7 @@ class CodexGatewayBroker:
                     raise GatewayInvocationError(
                         f"gateway payload command must be exactly {step.subcommand!r}"
                     )
-                if step.subcommand in _DRAFT_SUBCOMMANDS and not (
+                if (step.subcommand in _DRAFT_SUBCOMMANDS or step.source_copy_proof_role is not None) and not (
                     expansion_preparation and payload.get("status") == "needs_clarification"
                 ):
                     self._validate_operation_draft_payload(step, payload)
@@ -14346,6 +14459,11 @@ class CodexGatewayBroker:
     ) -> None:
         """Bind every successful Draft response to the reviewed Draft flow."""
 
+        if step.source_copy_proof_role is not None:
+            from tests.semantic.support.codex_source_copy_protocol import validate_source_copy_role_payload
+            validate_source_copy_role_payload(self, step, payload)
+            return
+
         if "task_authority" in payload and step.subcommand not in DRAFT_START_SUBCOMMANDS:
             raise GatewayInvocationError(
                 "only draft-start may disclose the task authority"
@@ -14523,6 +14641,8 @@ class CodexGatewayBroker:
     def _draft_start_operation(start: ExpectedGatewayStep) -> str:
         """Read the operation from the validated ordinary or parent-owned start."""
 
+        if start.source_copy_proof_role is not None and start.source_copy_proof_role.issues_save:
+            return 'ak.wwise.core.project.save'
         value = start.arguments[6 if start.subcommand == "draft-start-undo-child" else 0]
         if not isinstance(value, str):
             raise GatewayInvocationError("Draft start has no exact operation")
@@ -14554,6 +14674,14 @@ class CodexGatewayBroker:
             raise GatewayInvocationError(
                 "Draft response is missing its immutable start version"
             )
+        if operation_uses_business_declaration(operation, version):
+            try:
+                capability = CapabilityCatalog().authoring_ui_describe(version, operation)
+                return capability.execution_contract["effect"] == "read"
+            except (CapabilityCatalogError, KeyError) as exc:
+                raise GatewayInvocationError(
+                    "Business Draft response has no exact execution classification"
+                ) from exc
         try:
             return request_contract(version, operation).effect == "read"
         except TypedRequestError as exc:
@@ -14850,7 +14978,9 @@ class CodexGatewayBroker:
                 )
             start = self._draft_start_for_step(preview_step)
             draft_operation = (
-                start.arguments[0] if len(start.arguments) == 1 else None
+                self._draft_start_operation(start)
+                if start.source_copy_proof_role is not None and start.source_copy_proof_role.issues_save
+                else start.arguments[0] if len(start.arguments) == 1 else None
             )
             if not isinstance(draft_operation, str) or not (
                 _business_request_matches_draft_operation(
@@ -15567,6 +15697,7 @@ __all__ = [
     "dependency_free_draft_action_block",
     "reconcile_gateway_commands",
     "project_required_metadata_tokens",
+    "partition_operation_draft_protocol_steps",
     "resolve_gateway_invocation",
     "validate_operation_draft_protocol_steps",
     "validate_transaction_show_confirmation_payload",

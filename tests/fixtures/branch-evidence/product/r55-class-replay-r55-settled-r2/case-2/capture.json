@@ -1,0 +1,13 @@
+{
+  "attribution": "historical_native_current_program_not_current_native",
+  "observed_branch_ids": [
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true"
+  ],
+  "outcome": "PASS",
+  "phase_reports": {
+    "call": "passed",
+    "setup": "passed",
+    "teardown": "passed"
+  },
+  "source_unchanged": true
+}

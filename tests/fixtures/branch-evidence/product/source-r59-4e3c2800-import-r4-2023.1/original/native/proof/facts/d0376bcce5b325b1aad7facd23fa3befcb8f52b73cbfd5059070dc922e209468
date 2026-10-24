@@ -1,0 +1,48 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792540979867517000-a7ae650060d8481da7aa1218ea337a0e-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 16,
+    "default": false,
+    "dependencies": [],
+    "display": {
+      "group": "Oscillator 2",
+      "index": 1262,
+      "name": "Osc2 Invert"
+    },
+    "name": "Osc2Invert",
+    "restriction": {},
+    "supports": {
+      "randomizer": false,
+      "rtpc": "Exclusive",
+      "unlink": false
+    },
+    "type": "bool",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.989713542017853,
+  "version": "2023.1"
+}

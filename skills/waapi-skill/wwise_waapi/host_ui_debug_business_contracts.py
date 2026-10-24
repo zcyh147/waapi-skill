@@ -143,6 +143,73 @@ def host_ui_debug_business_contract_data(
                 "ak.wwise.ui.project.open",
             },
             "native_request_fields": "gateway_owned",
+            **({"no_open_project": "supported observed no-op transition; verify that no Project exists after the single close call"}
+               if operation == "ak.wwise.ui.project.close" else {}),
+            **({"creation_verification": {
+                "target": "matching project-file and parent-directory names; new regular project file only",
+                "before_execute": "freeze destination absence and existing output ancestor; reject replacement or drift",
+                "effect_observer": "bounded saved project artifact plus exact live opened-project identity/path",
+                "checked_effects": ["project GUID/name", "requested platforms", "requested languages", "first requested language is default"],
+                "explicit_empty_collections": "preserved; native default semantics remain unresolved, so never complete business verification",
+                "resource_limits": {"artifact_bytes": 8388608, "xml_nodes": 32768, "xml_depth": 64, "collection_rows": 128},
+            }} if operation == "ak.wwise.ui.project.create" else {}),
+            **({"tone_artifact_verification": {
+                "owned_output": "one exact regular file inside the existing isolated output directory",
+                "maximum_artifact_bytes": 536870912,
+                "maximum_business_plan_utf8_bytes": 131072,
+                "maximum_rendered_terminal_request_utf8_bytes": 262144,
+                "maximum_terminal_stdout_utf8_bytes": 286720,
+                "ordinary_small_terminal_stdout_utf8_bytes": 24576,
+                "maximum_riff_chunks": 4096,
+                "format_header_payload_reserve_bytes": 4096,
+                "prewrite_resource_estimate": "audio plus complete accepted format/framing and requested UTF-8 cue/label metadata; native encoding/additional chunks/rounding remain unproven",
+                "maximum_marker_count": 128,
+                "maximum_marker_list_bytes": 131072,
+                "sample_inspection": "all frames; bounded blocks; no raw audio in results",
+                "unchanged_valid_output": "observable requested state may verify; created/changed are reported separately",
+                "populated_marker_checks": "exact count/multiplicity, cue-to-label associations, integral-frame positions and ASCII labels with optional terminal null; no guessed cue order",
+                "marker_evidence": "bounded cue records and label byte digests; complete parsed-file hash; exact label text remains in the immutable request",
+                **({"anonymous_header_checks": "recognized extensible PCM16/float32, exact requested count and zero/direct-out speaker mask; anonymous overrides layout type but preserves count"}
+                   if version in {"2024.1", "2025.1"} else {}),
+                **({"anonymous_layout_override": "explicit anonymous_channels=true replaces the layout type while retaining its channel count, including count selected by Ambisonics order; genuine nonanonymous Ambisonics still requires silence"}
+                   if version in {"2024.1", "2025.1"} else {}),
+                "sine_envelope_checks": {
+                    "policy": "sine-envelope-numerical-conformance-v1",
+                    "reference": "fixed requested frequency/gain; integral-frame linear-amplitude attack n/N, sustain 1, release 1-n/N",
+                    "phase": "independent unparameterized phase per segment",
+                    "phase_relationship_checked": False,
+                    "gain_tolerance_db": 0.02, "shape_tolerance_relative": 0.002,
+                    "representation_units": 2,
+                    "not_claimed": "phase continuity/reset, bit-exact native algorithm or unique analog origin",
+                    "inconclusive": "rank-deficient, aliased or quantization-indistinguishable segments remain partial",
+                },
+                "stationary_square_checks": {
+                    "policy": "stationary-square-numerical-conformance-v1",
+                    "reference": "zero attack/release; every sample compared to +/-requested gain; independent mean-absolute gain check",
+                    "phase": "one common unparameterized phase per active channel; exact rational cadence; either limiting sign at exact discontinuities only",
+                    "gain_tolerance_db": 0.02, "shape_tolerance_relative": 0.002,
+                    "representation_units": 2,
+                    "phase_state_bound": "one interval or two endpoints per active channel; no transition window",
+                    "inconclusive": "exact cadence incompatibility (utility phase precision unspecified), fewer than two sign transitions, alias/Nyquist, quantization-indistinguishable levels or fractional rate/frames remain partial; known level/silent-channel contradictions still fail",
+                    "not_claimed": "native exact-edge polarity, bit-exact DSP algorithm/error theorem or unique analog origin",
+                },
+                "stationary_triangle_checks": {
+                    "policy": "stationary-triangle-numerical-conformance-v1",
+                    "reference": "zero attack/release; full-sample fixed requested gain/cadence; separate signed gain projection without normalization",
+                    "phase": "first frame sample divided by requested gain seeds ascending/descending triangle inverse branches; one unchanged witness per active channel",
+                    "maximum_phase_candidates_per_channel": 2,
+                    "feasibility_search_complete": False,
+                    "gain_tolerance_db": 0.02, "shape_tolerance_relative": 0.002,
+                    "representation_units": 2,
+                    "arithmetic": "exact rational cadence, samples, residual comparisons and gain sums; O(samples) time and O(channels) state",
+                    "inconclusive": "no sufficient witness is not complete phase infeasibility/native fault; fewer than two sign transitions, alias/Nyquist, quantization-indistinguishable gain or fractional rate/frames remain partial; independent level/nonfinite/silent-channel contradictions still fail",
+                    "not_claimed": "complete phase search, native numeric precision, bit-exact DSP/error theorem or unique analog origin",
+                },
+                "partial_postconditions": ["triangle envelopes and complete phase-search behavior; noise waveform/envelope; nonstationary square envelope", "fractional rate/frame rounding",
+                    "fractional marker positions, Unicode label encoding or nonzero cue chunk/block offsets",
+                    "anonymous legacy headers; nonanonymous Ambisonic or unlabelled multichannel representation"],
+                "limits_are_gateway_resources_not_native_absence": True,
+            }} if operation == 'ak.wwise.debug.generateToneWAV' else {}),
             **(
                 {
                     "discard_unsaved_default": False,
@@ -259,6 +326,15 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
         }
         if field_type == "channel_index_list":
             result["range"] = [0, 63]
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+            result["omission"] = "leave the channel selection unspecified; native default uses all channels"
+            result["explicit_empty"] = "apply the requested waveform to no channels; retain the waveform choice"
+            result["conflicting_forms"] = "empty and populated choices are mutually exclusive"
+        else:
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+            result["omission"] = "native default creates English(US)"
+            result["explicit_empty"] = "preserve an empty language request; native default semantics remain an observation obligation"
+            result["conflicting_forms"] = "empty and populated choices are mutually exclusive"
         return result
     if field_type == "platform_creation_mappings":
         return {
@@ -266,12 +342,22 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
             "arguments": [field, "<base-platform>", "<project-platform-name>"],
             "repeatable": True,
             "key_choices": list(BASE_PLATFORM_CHOICES),
+            "base_only_form": {"flag": "--item", "arguments": [field, "<base-platform>"], "repeatable": True,
+                "meaning": "request the base platform while leaving the native optional project-platform name omitted"},
+            "empty_form": {"flag": "--empty", "arguments": [field], "repeatable": False},
+            "omission": "native default creates Windows",
+            "explicit_empty": "preserve an empty platform request; native default semantics remain an observation obligation",
+            "conflicting_forms": "empty and populated choices are mutually exclusive",
         }
     if field_type == "tone_marker_list":
         return {
             "flag": "--marker",
             "arguments": ["<position-seconds>", "[exact-label]"],
             "repeatable": True,
+            "empty_form": {"flag": "--empty", "arguments": [field], "repeatable": False},
+            "omission": "leave markers unspecified",
+            "explicit_empty": "request an explicit empty marker list",
+            "conflicting_forms": "empty and populated choices are mutually exclusive",
         }
     result = {
         "flag": "--value",

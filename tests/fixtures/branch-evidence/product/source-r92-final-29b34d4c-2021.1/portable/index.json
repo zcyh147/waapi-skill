@@ -1,0 +1,43 @@
+{
+  "base": "../..",
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "entries": [
+    {
+      "bindings": {
+        "artifact": "source-r92-final-29b34d4c-2021.1/portable/bindings.json",
+        "sha256": "7f908fdcdcf16208466ef31a6c2852134083bc2f9c0260e189cec40b59eceb8c"
+      },
+      "id": "source-r92-final-29b34d4c-2021.1",
+      "origin": {
+        "bindings": {
+          "artifact": "source-r92-final-29b34d4c-2021.1/original/bindings.json",
+          "sha256": "47f04d3a4e16397fa7d9a035f73afefb922cc3180becc11e7d08d51abd222623"
+        },
+        "capture": {
+          "artifact": "source-r92-final-29b34d4c-2021.1/original/capture.json",
+          "sha256": "2edd7db1dfa73cf93042089523ba0df8d4a4a084e7dc8e0fa7e09335f5ee5af0"
+        },
+        "program": {
+          "artifact": "source-r92-final-29b34d4c-2021.1/original/program.json",
+          "sha256": "e202b65656f2f04911e945045d6728188f7657a90cb170e166c55dc0269b5895"
+        },
+        "requirements": {
+          "artifact": "source-r92-final-29b34d4c-2021.1/original/requirements.json",
+          "sha256": "9cf1c18bcc6b2bd71baf076ef5e0a8db481c207a2e66db66f2fedc16336f9e61"
+        }
+      }
+    }
+  ],
+  "source_attachments": [
+    {
+      "artifact": "source-r92-final-29b34d4c-2021.1/portable/program-attachment.json",
+      "sha256": "fe1ac14ae05fd6fa81ba73401c09369f1347fcebe8815bf3186903859bd95ef8"
+    }
+  ],
+  "source_native_attachments": [
+    {
+      "artifact": "source-r92-final-29b34d4c-2021.1/portable/native-successor.json",
+      "sha256": "c89a2a0e720ed25e1811f01da6b93693803d047dabeebfbd744746b09c0a3106"
+    }
+  ]
+}

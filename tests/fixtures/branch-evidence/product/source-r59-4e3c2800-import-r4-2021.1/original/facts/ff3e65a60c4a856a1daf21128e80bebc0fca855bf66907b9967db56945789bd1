@@ -1,0 +1,39 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/native/1792558272850537000-0837fdc7dc3f4132815b4e105ff76486-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "default": 1,
+    "name": "ModulatorScope",
+    "restriction": {
+      "type": "enum",
+      "values": [
+        {
+          "displayName": "Voice",
+          "value": 0
+        },
+        {
+          "displayName": "Note or Event",
+          "value": 1
+        },
+        {
+          "displayName": "Game Object",
+          "value": 2
+        },
+        {
+          "displayName": "Global",
+          "value": 3
+        }
+      ]
+    },
+    "type": "int32"
+  },
+  "risk_level": "low",
+  "timeout": 9.998717208014568,
+  "version": "2021.1"
+}

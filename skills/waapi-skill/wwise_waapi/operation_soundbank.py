@@ -136,12 +136,14 @@ def capture_file_proof(
     *,
     field: str,
     max_bytes: int = MAX_SOURCE_FILE_BYTES,
+    io_root: str | os.PathLike[str] | None = None,
 ) -> dict[str, Any]:
     """Capture a digest-bound proof for one absolute, non-symlink file."""
 
     if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 1:
         raise SoundBankContractError("INVALID_LIMIT", "max_bytes must be a positive integer.")
-    path, descriptor, before = _open_regular_file(value, field=field)
+    guard = prove_artifact_path(value, io_root=io_root, field=field, must_exist=True, expect_directory=False) if io_root is not None else None
+    path, descriptor, before = _open_regular_file(value, field=field, io_root=io_root)
     if before.st_size > max_bytes:
         os.close(descriptor)
         raise SoundBankContractError(
@@ -152,7 +154,11 @@ def capture_file_proof(
     digest = hashlib.sha256()
     try:
         with os.fdopen(descriptor, "rb") as opened:
+            consumed = 0
             for chunk in iter(lambda: opened.read(1024 * 1024), b""):
+                consumed += len(chunk)
+                if consumed > max_bytes or consumed > before.st_size:
+                    raise SoundBankContractError('FILE_CHANGED', f'{field} grew beyond its bounded initial extent.')
                 digest.update(chunk)
             after = os.fstat(opened.fileno())
     except OSError as exc:
@@ -162,6 +168,16 @@ def capture_file_proof(
             details={"path": str(path), "error": str(exc)},
         ) from exc
     _require_unchanged_file_stat(before, after, field=field, path=path)
+    try:
+        if guard is not None:
+            current = Path(value).stat()
+            names = ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns')
+            if any(getattr(before, name) != getattr(current, name) for name in names) or prove_artifact_path(
+                    value, io_root=io_root, field=field, must_exist=True, expect_directory=False) != guard:
+                raise SoundBankContractError('FILE_CHANGED', f'{field} path changed during its confined proof.')
+    except OSError as exc:
+        raise SoundBankContractError('FILE_CHANGED', f'{field} disappeared during its confined proof.',
+            details={'path': str(path), 'reason': str(exc)}) from exc
     body = {
         "contract": FILE_PROOF_CONTRACT,
         "path": str(path),
@@ -2355,11 +2371,17 @@ def _read_proven_bytes(
     return path, data, proof
 
 
-def _open_regular_file(
+def open_regular_artifact_file(
     value: str | os.PathLike[str],
     *,
     field: str,
+    io_root: str | os.PathLike[str] | None = None,
 ) -> tuple[Path, int, os.stat_result]:
+    """Open one regular non-link file; optional confinement is checked before content reads.
+
+    The caller owns the descriptor and its post-read identity/extent check.
+    """
+    guard = prove_artifact_path(value, io_root=io_root, field=field, must_exist=True, expect_directory=False) if io_root is not None else None
     supplied = _absolute_path(value, field=field)
     try:
         leaf_stat = supplied.lstat()
@@ -2408,8 +2430,20 @@ def _open_regular_file(
             f"{field} changed while it was opened.",
             details={"path": str(path)},
         )
+    if guard is not None:
+        try:
+            current_guard = prove_artifact_path(value, io_root=io_root, field=field, must_exist=True, expect_directory=False)
+            if current_guard != guard or str(path) != guard['resolved_path']:
+                raise SoundBankContractError('FILE_CHANGED', f'{field} confinement changed while it was opened.')
+        except BaseException:
+            os.close(descriptor)
+            raise
     return path, descriptor, opened_stat
 
+
+
+# Existing source-file proof callers share the same secure descriptor opener.
+_open_regular_file = open_regular_artifact_file
 
 def _require_unchanged_file_stat(
     before: os.stat_result,
@@ -2581,7 +2615,11 @@ def _require_io_root(value: str | os.PathLike[str]) -> Path:
             "io_root must be a real directory, not a file or symbolic link.",
             details={"path": str(supplied)},
         )
-    return supplied.resolve(strict=True)
+    try:
+        return supplied.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise SoundBankContractError('INVALID_IO_ROOT', 'io_root changed while it was resolved.',
+            details={'path': str(supplied), 'reason': str(exc)}) from exc
 
 
 def _absolute_path(value: str | os.PathLike[str] | Any, *, field: str) -> Path:

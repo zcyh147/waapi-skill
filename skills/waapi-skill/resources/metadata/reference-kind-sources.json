@@ -1,0 +1,101 @@
+{
+  "contract": "waapi-skill.reference-kind-source/v1",
+  "fields": [
+    {
+      "native_type": "Action",
+      "class_id": 327696,
+      "field": "Target",
+      "value_kind": "reference"
+    }
+  ],
+  "versions": {
+    "2021.1": {
+      "build": "2021.1.14.8108",
+      "types_sha256": "d35b51d3a4bbf06146215dec68f9a30924ad5902df59901bc4177c31fdcfd479",
+      "sdk": {
+        "member": "/wwiseobject_action.html",
+        "raw_member_sha256": "a5b3d05ed4ef42f199f65452ab9d15b410875cb6615091e9d8e4d2399adf1b72"
+      },
+      "wobjects": {
+        "sha256": "6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d",
+        "Target_line": 3730
+      },
+      "source_claim": "Action.Target is documented as Reference; target restrictions and applicability remain native-metadata owned"
+    },
+    "2022.1": {
+      "build": "2022.1.19.8584",
+      "types_sha256": "465787f842997f729944536fe7a346aa90e639a6c0a20f40d4f6539a2b0f2378",
+      "sdk": {
+        "member": "/wwiseobject_action.html",
+        "raw_member_sha256": "5f53c3f2a9dfdbd1cc98e7004c2a1cafe859fff1354059d072c52280b394955c"
+      },
+      "wobjects": {
+        "sha256": "018ddcb9e0b50c4cdc2f0849d0cc8a95d5568c169f0c888ca6f07c3f0e3266b6",
+        "Target_line": 3754
+      },
+      "source_claim": "Action.Target is documented as Reference; target restrictions and applicability remain native-metadata owned"
+    },
+    "2023.1": {
+      "build": "2023.1.19.8928",
+      "types_sha256": "51d63c58394536b21b86811af9ea79d87bcadff061baea1a5e2a1eda58ea2609",
+      "sdk": {
+        "member": "/wwiseobject_action.html",
+        "raw_member_sha256": "2494aa5ae0a4ab4e65252fe8e40d0a378b2b02084d35c1be9cdd0d81481c3651"
+      },
+      "wobjects": {
+        "sha256": "bae4d5fdd821fef226f1939d34ba1810e08bf79578fb8edc4ae3bdc3c66bd468",
+        "Target_line": 3704
+      },
+      "source_claim": "Action.Target is documented as Reference; target restrictions and applicability remain native-metadata owned"
+    },
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "types_sha256": "ce453380d932369e24ba7186f06f459f3785a19e824c123e15148689805109d8",
+      "sdk": {
+        "member": "/wwiseobject_action.html",
+        "raw_member_sha256": "f99a99f644f7e801733ac882d4ec2882f7c1cfe4ed5281024a5b4f387e507e16"
+      },
+      "wobjects": {
+        "sha256": "28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f",
+        "Target_line": 3698
+      },
+      "source_claim": "Action.Target is documented as Reference; target restrictions and applicability remain native-metadata owned"
+    },
+    "2025.1": {
+      "build": "2025.1.7.9143",
+      "types_sha256": "518f72403f7dc8e1d2adfa398a81ac607fd45a0d89d156810033a27ad51cb59d",
+      "sdk": {
+        "member": "/wwiseobject_action.html",
+        "raw_member_sha256": "6020fbf3f0886f46ed02d5a23590b0e81855308e672a992abb3d0c94de46c056"
+      },
+      "wobjects": {
+        "sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454",
+        "Target_line": 3774
+      },
+      "source_claim": "Action.Target is documented as Reference; target restrictions and applicability remain native-metadata owned"
+    }
+  },
+  "sha256": "f4e26df2216b774e3ffa07ee3598f0890d74673d9a47ae15dcde72bf8223efc1",
+  "query_read_fields": [
+    {
+      "version": "2021.1",
+      "build": "2021.1.14.8108",
+      "registered_name": "ParamControl",
+      "native_type": "RTPC",
+      "class_id": 1441808,
+      "field": "ControlInput",
+      "value_kind": "reference",
+      "sdk": {
+        "member": "/wwiseobject_paramcontrol.html",
+        "raw_member_sha256": "6c9d0b8b83998caec78590b2979b2cda2957c627f9c9560eb835e5bfd3b6e0e3",
+        "section": "<tr>\r\n<td><b>ControlInput</b></td><td>Control Input</td><td>Reference</td><td>&#160;</td><td>None</td><td>true</td><td>&#160;</td><td>&#160; </td></tr>\r\n",
+        "section_sha256": "1a68cb94b251860dd6fa1b881269380b50438817f30d486a773b3742f8d53f3d"
+      },
+      "wobjects": {
+        "sha256": "6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d",
+        "declaration": "<WwiseObject Name=\"ParamControl\" CompanyID=\"1\" PluginID=\"22\"> / Properties / Reference[@Name=\"ControlInput\"]"
+      },
+      "authority": "read field kind only; native restrictions and values unchanged; no mutation authority"
+    }
+  ]
+}

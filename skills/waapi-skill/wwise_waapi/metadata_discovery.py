@@ -30,6 +30,7 @@ from .builders.metadata import (
     parse_property_and_reference_names_result,
 )
 from .canonical import canonical_json_bytes
+from .condition_limits import MAX_CONDITION_CONTROLLERS
 
 
 METADATA_DISCOVERY_CONTRACT = "waapi-skill.metadata-discovery/v2"
@@ -46,8 +47,7 @@ MAX_METADATA_DISCOVERY_NAMES = 4_096
 MAX_METADATA_DISCOVERY_NAME_CHARS = 256
 MAX_METADATA_DISCOVERY_DETAIL_POOL = 32
 MAX_METADATA_DISCOVERY_FALLBACK_DETAIL_SCAN = 256
-MAX_METADATA_DISCOVERY_DEPENDENCIES = 16
-MAX_METADATA_DISCOVERY_DEPENDENCY_DEPTH = 2
+MAX_METADATA_DISCOVERY_DEPENDENCIES = MAX_CONDITION_CONTROLLERS
 MAX_METADATA_DISCOVERY_INFO_BYTES = 32 * 1024
 MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES = 28 * 1024
 MAX_METADATA_DISCOVERY_RESULT_BYTES = 512 * 1024
@@ -211,6 +211,17 @@ class MetadataDiscoveryResult:
                 for item in self.dependency_candidates
             ],
             "dependency_closure_complete": self.dependency_closure_complete,
+            "dependency_bounds": {
+                "unique_controller_fields": MAX_METADATA_DISCOVERY_DEPENDENCIES,
+                "maximum_simple_path_edges": MAX_METADATA_DISCOVERY_DEPENDENCIES,
+                "scope": "exact_selected_object_or_class",
+                "repeated_edges": "metadata_read_once_expansion_once_per_selected_root",
+                "projection": {
+                    "dependency_info_bytes": MAX_METADATA_DISCOVERY_INFO_BYTES,
+                    "agent_result_bytes": MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES,
+                    "detail_result_bytes": MAX_METADATA_DISCOVERY_RESULT_BYTES,
+                },
+            },
             "unresolved_dependencies": [
                 dict(item) for item in self.unresolved_dependencies
             ],
@@ -249,6 +260,7 @@ def discover_metadata(
     class_id: int | None = None,
     object: str | int | None = None,
     limit: int = DEFAULT_METADATA_DISCOVERY_LIMIT,
+    exact_field: str | None = None,
 ) -> MetadataDiscoveryResult:
     """Retrieve bounded live metadata candidates for natural-language phrases.
 
@@ -259,7 +271,10 @@ def discover_metadata(
     capped by :data:`MAX_METADATA_DISCOVERY_DETAIL_POOL`.
     """
 
-    normalized_queries = _validate_queries(queries)
+    # The exact field comes only from a freshly revalidated Gateway selection.
+    # Caller-authored lexical meanings retain their independent small limit.
+    normalized_queries = ((exact_field,) if exact_field is not None and tuple(queries) == (exact_field,)
+                          else _validate_queries(queries))
     _validate_limit(limit)
     scope, live_scope_args = _resolve_scope(
         read_call,
@@ -268,6 +283,8 @@ def discover_metadata(
         object=object,
     )
     names = _read_names(read_call, live_scope_args)
+    if exact_field is not None and (exact_field not in names or tuple(normalized_queries) != (exact_field,)):
+        raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "Selected field is no longer in the live scope; list this scope again.")
 
     def exact_label(value: str) -> str:
         return "".join(char for char in value.casefold() if char.isalnum())
@@ -309,7 +326,7 @@ def discover_metadata(
         "inspection_limit": MAX_METADATA_DISCOVERY_FALLBACK_DETAIL_SCAN,
     }
     info_by_name = {
-        name: _read_property_info(read_call, live_scope_args, name)
+        name: _read_property_info(read_call, live_scope_args, name, maximum_bytes=MAX_METADATA_DISCOVERY_RESULT_BYTES)
         for name in detail_names
     }
 
@@ -395,7 +412,7 @@ def discover_metadata(
         unresolved_dependencies=unresolved_dependencies,
         fallback_detail_scan=fallback_detail_scan,
     )
-    _require_result_size(result.as_dict())
+    _require_result_size(result.as_dict(detail=True))
     return result
 
 
@@ -432,7 +449,7 @@ def _resolve_scope(
         matches = [
             row
             for row in rows
-            if row.name.casefold() == requested.casefold()
+            if isinstance(row.name, str) and row.name.casefold() == requested.casefold()
         ]
         if len(matches) != 1:
             raise MetadataDiscoveryError(
@@ -445,6 +462,8 @@ def _resolve_scope(
                 },
             )
         match = matches[0]
+        if match.class_id is None:
+            raise MetadataDiscoveryError("OBJECT_TYPE_METADATA_INCOMPLETE", "The matched live type has no class ID for metadata discovery.", details={"requested": requested, "native_type": dict(match.raw)})
         return (
             {
                 "kind": "object_type",
@@ -500,7 +519,7 @@ def _resolve_scope(
 def _read_types(read_call: ReadCall) -> tuple[ObjectTypeMetadataRecord, ...]:
     result = _closed_read(read_call, GET_TYPES_URI, {}, {})
     try:
-        rows = parse_get_types_result(result)
+        rows = parse_get_types_result(result, require_identity=False)
     except SemanticValidationError as exc:
         raise _invalid_live_metadata(GET_TYPES_URI, exc) from exc
     if not rows:
@@ -571,6 +590,7 @@ def _read_property_info(
     read_call: ReadCall,
     scope_args: Mapping[str, Any],
     name: str,
+    *, maximum_bytes: int = MAX_METADATA_DISCOVERY_INFO_BYTES,
 ) -> PropertyInfoMetadataRecord:
     result = _closed_read(
         read_call,
@@ -579,16 +599,16 @@ def _read_property_info(
         {},
     )
     try:
-        info = parse_get_property_info_result(result)
+        info = parse_get_property_info_result(result, require_identity=False)
     except SemanticValidationError as exc:
         raise _invalid_live_metadata(GET_PROPERTY_INFO_URI, exc) from exc
-    if info.name != name:
+    if info.name is not None and info.name != name:
         raise MetadataDiscoveryError(
             "LIVE_METADATA_NAME_MISMATCH",
             "getPropertyInfo returned metadata for a different field.",
             details={"requested": name, "actual": info.name},
         )
-    payload = info.as_dict()
+    payload = info.raw
     try:
         size = len(canonical_json_bytes(payload))
     except (TypeError, ValueError) as exc:
@@ -601,7 +621,7 @@ def _read_property_info(
                 "cause_type": type(exc).__name__,
             },
         ) from exc
-    if size > MAX_METADATA_DISCOVERY_INFO_BYTES:
+    if size > maximum_bytes:
         raise MetadataDiscoveryError(
             "LIVE_METADATA_LIMIT_EXCEEDED",
             "One getPropertyInfo result exceeds the discovery size limit.",
@@ -609,7 +629,7 @@ def _read_property_info(
                 "uri": GET_PROPERTY_INFO_URI,
                 "property": name,
                 "size_bytes": size,
-                "limit_bytes": MAX_METADATA_DISCOVERY_INFO_BYTES,
+                "limit_bytes": maximum_bytes,
             },
         )
     return info
@@ -735,7 +755,7 @@ def _tokens(value: str) -> tuple[str, ...]:
 def _metadata_search_strings(
     info: PropertyInfoMetadataRecord,
 ) -> tuple[str, ...]:
-    values: list[str] = [info.type]
+    values: list[str] = [info.type] if isinstance(info.type, str) else []
     for source in (
         info.display,
         info.ui,
@@ -844,19 +864,21 @@ def _resolve_dependency_closure(
         candidate.name: [] for candidate in candidates
     }
     unresolved: list[dict[str, Any]] = []
-    queue: list[tuple[str, str, PropertyInfoMetadataRecord, int]] = [
-        (candidate.name, candidate.name, candidate.info, 0)
+    queue: list[tuple[str, str, PropertyInfoMetadataRecord]] = [
+        (candidate.name, candidate.name, candidate.info)
         for candidate in candidates
     ]
     expanded: set[tuple[str, str]] = set()
 
     while queue:
-        root_name, source_name, info, depth = queue.pop(0)
+        root_name, source_name, info = queue.pop(0)
         expansion_key = (root_name.casefold(), source_name.casefold())
         if expansion_key in expanded:
             continue
         expanded.add(expansion_key)
         for index, dependency in enumerate(info.dependencies):
+            if _is_visibility_dependency(dependency):
+                continue
             if _is_terminal_structural_dependency(dependency):
                 # Wwise 2024+ may expose a visibility predicate such as
                 # ``isMasterBus == false``.  It describes the current object
@@ -896,7 +918,7 @@ def _resolve_dependency_closure(
                 continue
             if canonical == root_name:
                 # A cyclic edge back to the selected candidate is already
-                # satisfied by the root metadata and must not consume depth.
+                # satisfied by the root metadata and needs no further read.
                 continue
             if canonical not in names_by_candidate[root_name]:
                 names_by_candidate[root_name].append(canonical)
@@ -909,18 +931,8 @@ def _resolve_dependency_closure(
             ) in expanded:
                 # The dependency metadata for this field was already expanded
                 # for the same root.  This is a closed cycle, not a reason to
-                # consume more depth or repeat a live read.
+                # repeat its expansion or a live read.
                 continue
-            if depth >= MAX_METADATA_DISCOVERY_DEPENDENCY_DEPTH:
-                raise MetadataDiscoveryError(
-                    "DEPENDENCY_LIMIT_EXCEEDED",
-                    "Live same-object metadata dependencies exceed the discovery depth limit.",
-                    details={
-                        "root_candidate": root_name,
-                        "property": canonical,
-                        "limit": MAX_METADATA_DISCOVERY_DEPENDENCY_DEPTH,
-                    },
-                )
             if len(required_by) > MAX_METADATA_DISCOVERY_DEPENDENCIES:
                 raise MetadataDiscoveryError(
                     "DEPENDENCY_LIMIT_EXCEEDED",
@@ -938,7 +950,7 @@ def _resolve_dependency_closure(
                     canonical,
                 )
                 info_by_name[canonical] = dependency_info
-            queue.append((root_name, canonical, dependency_info, depth + 1))
+            queue.append((root_name, canonical, dependency_info))
 
     dependency_payloads = tuple(
         {
@@ -958,7 +970,7 @@ def _resolve_dependency_closure(
                 required_by[name],
                 key=lambda value: (value.casefold(), value),
             ),
-            "metadata": info_by_name[name].as_dict(),
+            "metadata": dict(info_by_name[name].raw),
         }
         for name in sorted(
             (name for name in required_by if name not in root_names),
@@ -978,6 +990,25 @@ def _resolve_dependency_closure(
         not unresolved,
         unresolved_payload,
     )
+
+
+def _is_visibility_dependency(dependency: Mapping[str, Any]) -> bool:
+    from .metadata_restrictions import condition_restriction, reference_presence_condition, MetadataRestrictionError
+    if (set(dependency) != {"type", "action", "context", "property", "conditions"}
+            or dependency.get("action") != "Show"
+            or dependency.get("context") not in {"Self", "Parent", "AssocParent"}
+            or not isinstance(dependency.get("property"), str) or not dependency["property"]):
+        return False
+    try:
+        if dependency["type"] == "property":
+            condition_restriction(dependency["conditions"])
+        elif dependency["type"] == "reference":
+            reference_presence_condition(dependency["conditions"])
+        else:
+            return False
+    except MetadataRestrictionError:
+        return False
+    return True
 
 
 def _is_terminal_structural_dependency(dependency: Mapping[str, Any]) -> bool:
@@ -1016,7 +1047,7 @@ def _candidate_payload(
             if candidate.scores.get(query, 0) > 0
         ],
         "same_object_dependencies": list(same_object_dependencies),
-        "metadata": candidate.info.as_dict(),
+        "metadata": dict(candidate.info.raw),
     }
 
 
@@ -1026,6 +1057,7 @@ def _compact_candidate_payload(candidate: Mapping[str, Any]) -> dict[str, Any]:
     name = str(candidate["name"])
     metadata = candidate["metadata"]
     assert isinstance(metadata, Mapping)
+    compact = _compact_metadata(metadata)
     return {
         "name": name,
         "kind": candidate["kind"],
@@ -1037,7 +1069,8 @@ def _compact_candidate_payload(candidate: Mapping[str, Any]) -> dict[str, Any]:
             metadata,
             owner_name=name,
         ),
-        "metadata": _compact_metadata(metadata),
+        "metadata": compact,
+        **({"metadata_details_complete": False} if compact.get("detail_required") else {}),
     }
 
 
@@ -1080,13 +1113,15 @@ def _compact_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
         dict(restriction) if isinstance(restriction, Mapping) else {}
     )
     payload = {
-        "name": metadata["name"],
-        "type": metadata["type"],
-        "default": metadata.get("default"),
-        "display": compact_display,
-        "restriction": compact_restriction,
+        **{key: metadata[key] for key in ("name", "type") if key in metadata},
+        **{key: metadata[key] for key in ("default", "supports", "dependencies") if key in metadata},
+        **({"ui": {"dataMeaning": metadata["ui"]["dataMeaning"]} if isinstance(metadata["ui"], Mapping) and "dataMeaning" in metadata["ui"] else {}} if "ui" in metadata else {}),
+        **({"display": compact_display} if "display" in metadata else {}),
+        **({"restriction": metadata["restriction"]} if "restriction" in metadata else {}),
+        "unit": metadata_unit(metadata),
+        "availability": {key: "unknown" for key in ("type", "default", "restriction", "dependencies", "supports", "ui") if key not in metadata},
     }
-    typed_value_type = metadata_typed_value_type(str(metadata["type"]))
+    typed_value_type = metadata_typed_value_type(str(metadata.get("type", "")))
     if typed_value_type is not None:
         payload["typed_value_type"] = typed_value_type
     if (
@@ -1101,6 +1136,20 @@ def _compact_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
             for key in ("min", "max")
             if key in compact_restriction
         }
+    if len(canonical_json_bytes(payload)) > 2048:
+        if isinstance(restriction, Mapping):
+            payload["restriction"] = {key: restriction[key] for key in ("type", "min", "max") if key in restriction}
+            if isinstance(restriction.get("values"), list):
+                payload["restriction"]["value_count"] = len(restriction["values"])
+            if isinstance(restriction.get("restrictions"), list):
+                payload["restriction"]["restriction_count"] = len(restriction["restrictions"])
+        if isinstance(metadata.get("dependencies"), list):
+            payload.pop("dependencies", None)
+            payload["dependency_count"] = len(metadata["dependencies"])
+        for key in ("default", "display", "supports"):
+            if key in payload and len(canonical_json_bytes(payload[key])) > 1024:
+                payload[key] = {"status": "available_in_selected_detail"}
+        payload["detail_required"] = True
     return payload
 
 
@@ -1118,6 +1167,9 @@ def _compact_dependency_requirements(
     for dependency in dependencies:
         if not isinstance(dependency, Mapping):
             continue
+        if _is_visibility_dependency(dependency):
+            requirements.append({**dependency, "required_values": [], "visibility_only": True})
+            continue
         context = dependency.get("context")
         name = dependency.get("property")
         if (
@@ -1132,6 +1184,12 @@ def _compact_dependency_requirements(
         requirement["required_values"] = _dependency_required_values(
             dependency
         )
+        if dependency.get("type") == "reference":
+            from .metadata_restrictions import reference_presence_condition, MetadataRestrictionError
+            try:
+                requirement["required_presence"] = reference_presence_condition(dependency.get("conditions"))
+            except MetadataRestrictionError:
+                pass
         requirements.append(requirement)
     return requirements
 
@@ -1223,11 +1281,11 @@ def _match_evidence(
 
 def _metadata_kind(info: PropertyInfoMetadataRecord) -> str:
     if (
-        info.type.casefold() in {"reference", "objectreference"}
+        (isinstance(info.type, str) and info.type.casefold() in {"reference", "objectreference"})
         or str(info.restriction.get("type", "")).casefold() == "reference"
     ):
         return "reference"
-    return "property"
+    return "property" if info.type else "unknown"
 
 
 def _validate_queries(queries: Sequence[str]) -> tuple[str, ...]:
@@ -1323,14 +1381,14 @@ def _required_live_name(name: Any) -> str:
             "Live property/reference names must be non-empty strings.",
             details={"uri": GET_PROPERTY_AND_REFERENCE_NAMES_URI},
         )
-    if len(name) > MAX_METADATA_DISCOVERY_NAME_CHARS:
+    if len(name.encode("utf-8")) > MAX_METADATA_DISCOVERY_RESULT_BYTES:
         raise MetadataDiscoveryError(
             "LIVE_METADATA_LIMIT_EXCEEDED",
             "One live property/reference name exceeds the discovery limit.",
             details={
                 "uri": GET_PROPERTY_AND_REFERENCE_NAMES_URI,
                 "characters": len(name),
-                "limit": MAX_METADATA_DISCOVERY_NAME_CHARS,
+                "limit_bytes": MAX_METADATA_DISCOVERY_RESULT_BYTES,
             },
         )
     return name
@@ -1422,10 +1480,120 @@ __all__ = [
 ]
 
 
+def browse_metadata_types(*, read_call: ReadCall, context: Mapping[str, Any],
+                          meanings: Sequence[str] = (), page: str | None = None,
+                          page_size: int = 20, selection: str | None = None,
+                          detail_page: str | None = None, decorate: Any = None,
+                          project_detail: bool = True) -> dict[str, Any]:
+    """Lossless live type inventory, with explicit lexical filtering and pages."""
+    import hashlib
+    import time
+    if isinstance(page_size, bool) or not isinstance(page_size, int) or not 1 <= page_size <= 64:
+        raise MetadataDiscoveryError("INVALID_METADATA_PAGE_SIZE", "page size must be 1..64")
+    try:
+        records = parse_get_types_result(_closed_read(read_call, GET_TYPES_URI, {}, {}), require_identity=False)
+    except SemanticValidationError as exc:
+        raise _invalid_live_metadata(GET_TYPES_URI, exc) from exc
+    if len(records) > MAX_METADATA_DISCOVERY_TYPES:
+        raise MetadataDiscoveryError("LIVE_METADATA_LIMIT_EXCEEDED", "Live object type inventory exceeds the bounded reader limit.")
+    all_rows = [dict(record.raw) for record in records]
+    inventory_snapshot = hashlib.sha256(canonical_json_bytes([context, all_rows])).hexdigest()
+    now = issued = int(time.time())
+    def type_locator(index: int) -> str:
+        digest = hashlib.sha256(canonical_json_bytes([inventory_snapshot, issued, index])).hexdigest()
+        return f"mts1.{issued}.{index}.{digest}"
+    if selection is not None:
+        try:
+            kind, stamp, position, _digest = selection.split(".")
+            issued, index = int(stamp), int(position)
+            valid = kind == "mts1" and 0 <= index < len(all_rows) and selection == type_locator(index)
+        except (ValueError, TypeError, AttributeError):
+            valid = False
+        if not valid:
+            raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "Type inventory, host, build or session changed; list types again.")
+        if issued > now or now - issued > 900:
+            raise MetadataDiscoveryError("METADATA_SELECTION_EXPIRED", "Type selection expired; list types again.")
+        if not project_detail:
+            return {"selected_type": dict(all_rows[index])}
+        from .metadata_detail import detail_page as project_detail
+        return project_detail(all_rows[index], selection=selection, scope={"kind": "live-type-inventory"}, cursor=detail_page)
+    filters = tuple(meaning.casefold() for meaning in meanings)
+    rows = [row for row in all_rows if not filters or any(
+        any(isinstance(row.get(key), str) and meaning in row[key].casefold() for key in ("name", "type"))
+        for meaning in filters)]
+    snapshot = hashlib.sha256(canonical_json_bytes([context, all_rows, filters])).hexdigest()
+    offset = 0
+    def locator(index: int) -> str:
+        digest = hashlib.sha256(canonical_json_bytes([snapshot, issued, index])).hexdigest()
+        return f"mt1.{issued}.{index}.{digest}"
+    if page is not None:
+        try:
+            kind, stamp, position, _digest = page.split(".")
+            issued, offset = int(stamp), int(position)
+            valid = kind == "mt1" and page == locator(offset) and 0 <= offset < len(rows)
+        except (ValueError, TypeError, AttributeError):
+            valid = False
+        if not valid:
+            raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "Type inventory, lexical filters, host or version changed; list types again.")
+        if issued > now or now - issued > 900:
+            raise MetadataDiscoveryError("METADATA_SELECTION_EXPIRED", "Type page expired; list types again.")
+    end = min(len(rows), offset + page_size)
+    from .metadata_detail import bounded_native_header
+    def project(row: dict[str, Any]) -> dict[str, Any]:
+        reserved = {"selection", "details_complete", "detail_command", "query_command", "fields_command"}
+        if len(canonical_json_bytes(row)) <= 4096 and not reserved.intersection(row):
+            return {**row, "selection": type_locator(all_rows.index(row))}
+        header = bounded_native_header({key: value for key, value in row.items() if key not in reserved})
+        return {**header, "selection": type_locator(all_rows.index(row)),
+                "details_complete": False}
+    while True:
+        result = {"contract": "waapi-skill.metadata-types-page/v1", "types": [project(row) for row in rows[offset:end]],
+                  "meanings": list(meanings), "filter_kind": "case-insensitive-name-or-type-substring",
+                  "snapshot": snapshot, "available_count": len(all_rows), "total_count": len(rows),
+                  "offset": offset, "remaining_count": len(rows) - end, "complete": end == len(rows),
+                  "next_page": locator(end) if end < len(rows) else None,
+                  "expires_at": issued + 900, "mutation_authority": False}
+        try:
+            if decorate is not None:
+                decorate(result)
+            _require_result_size(result, maximum_bytes=16 * 1024, pretty=True)
+            return result
+        except MetadataDiscoveryError:
+            if end <= offset + 1:
+                raise
+            end -= 1
+
+
+def resolve_metadata_type_selection(*, read_call: ReadCall, context: Mapping[str, Any], selection: str) -> int:
+    """Resolve only a fresh inventory-bound native class ID, never caller args."""
+    result = browse_metadata_types(read_call=read_call, context=context, selection=selection)
+    # A type row's classId is a small native scalar and remains in the header.
+    class_id = result["field"].get("classId")
+    if isinstance(class_id, bool) or not isinstance(class_id, int) or not 0 <= class_id <= 0xFFFFFFFF:
+        raise MetadataDiscoveryError("METADATA_CLASS_ID_UNAVAILABLE", "Selected live type omits the class ID required for class metadata; choose an exact object scope.")
+    return class_id
+
+
+def resolve_metadata_type_name_selection(*, read_call: ReadCall, context: Mapping[str, Any], selection: str) -> str:
+    """Resolve a disclosed current inventory row without copying caller type text."""
+    result = browse_metadata_types(read_call=read_call, context=context, selection=selection,
+                                  project_detail=False)
+    name = result["selected_type"].get("name")
+    if not isinstance(name, str) or not name:
+        raise MetadataDiscoveryError("METADATA_TYPE_NAME_UNAVAILABLE", "Selected native type omits a name; select another current row.")
+    if not all(character.isalnum() or character in ("_", ".") for character in name):
+        raise MetadataDiscoveryError("METADATA_TYPE_QUERY_SYNTAX_UNAVAILABLE", "Selected native name cannot be represented by the supported WAQL type identifier; no query was dispatched.")
+    return name
+
+
 def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
                     object_type: str | None = None, class_id: int | None = None,
                     object: str | int | None = None, page_size: int = 20,
-                    page: str | None = None, selection: str | None = None) -> dict[str, Any]:
+                    page: str | None = None, selection: str | None = None,
+                    detail_page: str | None = None, complete_detail: bool = False,
+                    project_detail: bool = True, detail_view: str = "raw",
+                    select_fields: Sequence[str] | None = None,
+                    detail_item: int | None = None) -> dict[str, Any]:
     """Read an inventory page or exact detail using a read-only scoped locator.
 
     Locators are content addressed, not mutation capabilities. They bind the
@@ -1448,7 +1616,11 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
     def locator(kind: str, index: int) -> str:
         digest = hashlib.sha256(canonical_json_bytes([kind, snapshot, issued, index])).hexdigest()
         return f"{kind}.{issued}.{index}.{digest}"
-    token = selection or page
+    if select_fields is not None:
+        if not all(name in names for name in select_fields):
+            raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "A discovered field left the live scope; discover again.")
+        return {"fields": [{"name": name, "selection": locator("mf1", names.index(name))} for name in select_fields]}
+    token = selection if selection is not None else page
     if token is not None:
         try:
             kind, stamp, position, digest = token.split(".")
@@ -1464,23 +1636,41 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
     if selection is not None:
         name = names[offset]
         try:
-            info = _read_property_info(read_call, scope_args, name)
-            metadata = info.as_dict()
+            info = _read_property_info(read_call, scope_args, name, maximum_bytes=(MAX_METADATA_DISCOVERY_RESULT_BYTES if complete_detail else MAX_METADATA_DISCOVERY_INFO_BYTES))
+            metadata = dict(info.raw)
             metadata["unit"] = metadata_unit(metadata)
             metadata["availability"] = {key: "known" if key in info.raw else "unknown"
                                         for key in ("type", "default", "restriction", "dependencies", "supports", "ui")}
-            payload = {"selection": selection, "scope": scope, "metadata": metadata, "mutation_authority": False}
+            payload = {"selection": selection, "scope": scope, "metadata": metadata, "complete": True, "mutation_authority": False}
+            if complete_detail and not project_detail:
+                # Internal handoff to Field Handle acquisition. This token was
+                # selected in the freshly read, scope-bound name inventory;
+                # it is not a synthesized native getPropertyInfo.name.
+                payload["selected_field_token"] = name
+                payload["selected_field_kind"] = _metadata_kind(info)
+                return payload
+            if complete_detail:
+                from .metadata_detail import detail_page as project_detail_page
+                try:
+                    _require_result_size(payload, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
+                except MetadataDiscoveryError:
+                    return project_detail_page(metadata, selection=selection, scope=scope, cursor=detail_page, view=detail_view, item_index=detail_item)
+                if detail_page is not None or detail_view != "raw":
+                    return project_detail_page(metadata, selection=selection, scope=scope, cursor=detail_page, view=detail_view, item_index=detail_item)
             _require_result_size(payload, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
             return payload
         except MetadataDiscoveryError as exc:
+            if complete_detail and exc.error_code == "LIVE_METADATA_LIMIT_EXCEEDED":
+                raise
             if exc.error_code in {"LIVE_METADATA_LIMIT_EXCEEDED", "DISCOVERY_RESULT_LIMIT_EXCEEDED"}:
                 raise MetadataDiscoveryError("METADATA_DETAIL_TOO_LARGE", "The selected field detail exceeds the bounded detail response; no detail was truncated.", details={"field": name, "selection": selection, "scope": scope, "cause": exc.as_dict(), "repair": "Inspect another listed field; this exact field requires a separately supported larger-detail reader."}) from exc
             raise
     end = min(offset + page_size, len(names))
+    from .metadata_detail import bounded_native_header
     while True:
         result = {"contract": "waapi-skill.metadata-page/v1", "scope": scope,
                   "snapshot": snapshot, "snapshot_kind": "live-property-reference-inventory",
-                  "fields": [{"name": names[i], "selection": locator("mf1", i)} for i in range(offset, end)],
+                  "fields": [{**bounded_native_header({"name": names[i]}), "selection": locator("mf1", i)} for i in range(offset, end)],
                   "total_count": len(names), "offset": offset, "remaining_count": len(names) - end,
                   "complete": end == len(names), "next_page": locator("mp1", end) if end < len(names) else None,
                   "expires_at": issued + 900, "mutation_authority": False}

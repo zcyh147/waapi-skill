@@ -1,0 +1,14 @@
+{
+  "api": "ak.wwise.core.project.save",
+  "category": "core.project",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792541017886752000-ccc9c7e43bb44fce87002ce316d30649-ak_wwise_core_project_save.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {},
+  "risk_level": "medium",
+  "timeout": 29.686487166007282,
+  "version": "2024.1"
+}

@@ -1,0 +1,142 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 30607,
+    "url": "ws://127.0.0.1:30607/waapi"
+  },
+  "detected_version": "2025.1",
+  "is_command_line": true,
+  "operation": "detail",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 3,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2025.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2025-r1/dispatcher-evidence/1792523917250494000-33557ed0111140438c092ccd05e77c27-ak_wwise_core_object_getPropertyInfo.json",
+      "timeout": 29.9636057500029
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 30607,
+      "url": "ws://127.0.0.1:30607/waapi"
+    },
+    "adapter_version": "2025.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:30607/waapi",
+        "adapter_version": "2025.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "selection": "mf1.1792523916.0.5167e246ae0960859f102508720993590aa3bfdecf0f1e11f4e3644fa6c164f3",
+    "scope": {
+      "kind": "object_type",
+      "requested": "EffectSlot",
+      "resolved": {
+        "classId": 5505040,
+        "name": "EffectSlot",
+        "type": "WObject"
+      }
+    },
+    "metadata": {
+      "name": "Bypass",
+      "type": "bool",
+      "default": false,
+      "audioEngineId": 50,
+      "supports": {
+        "rtpc": "None",
+        "randomizer": false,
+        "unlink": false
+      },
+      "display": {
+        "name": "Bypass",
+        "index": 2057,
+        "group": ""
+      },
+      "dependencies": [
+        {
+          "type": "reference",
+          "action": "Enable",
+          "property": "Effect",
+          "context": "Self",
+          "conditions": [
+            {
+              "referenceIsSet": true
+            }
+          ]
+        }
+      ],
+      "restriction": {},
+      "ui": {
+        "value": {
+          "min": 0.0,
+          "max": 0.0,
+          "decimals": 0,
+          "step": 0.0,
+          "fine": 0.0,
+          "infinity": 0
+        },
+        "displayAs": {
+          "lrMix": false,
+          "musicNote": false,
+          "bitfield": false,
+          "percentage": false
+        },
+        "dataMeaning": "None",
+        "autoUpdate": false
+      },
+      "unit": {
+        "status": "unknown",
+        "value": null
+      },
+      "availability": {
+        "type": "known",
+        "default": "known",
+        "restriction": "known",
+        "dependencies": "known",
+        "supports": "known",
+        "ui": "known"
+      }
+    },
+    "complete": true,
+    "mutation_authority": false
+  }
+}

@@ -117,8 +117,8 @@ def test_relative_read_path_is_rejected(tmp_path: Path):
     _assert_error(
         "RELATIVE_IO_PATH",
         version=VERSION,
-        uri="ak.wwise.core.sourceControl.getStatus",
-        args={"files": ["Project/file.wwu", str(tmp_path / "absolute.wwu")]},
+        uri="ak.wwise.cli.verify",
+        args={"project": "Project/file.wproj"},
     )
 
 
@@ -699,20 +699,22 @@ def test_source_control_originals_folder_is_a_wwise_relative_selector(
 
 
 @pytest.mark.parametrize("version", SOURCE_CONTROL_VERSIONS)
-def test_reflected_source_control_file_array_remains_manifest_declared(
+def test_reflected_external_source_control_file_array_remains_manifest_declared(
     tmp_path: Path,
     version: str,
 ):
     source = tmp_path / "Project" / "file.wwu"
     audit = validate_isolated_io(
         version=version,
-        uri="ak.wwise.core.sourceControl.getStatus",
+        uri="ak.wwise.core.sourceControl.add",
         args={"files": [str(source)]},
+        io_root=str(tmp_path),
     )
 
-    assert len(audit.read_paths) == 1
-    assert audit.read_paths[0].manifest_declared is True
-    assert audit.read_paths[0].schema_ref is not None
+    assert len(audit.write_paths) == 1
+    assert audit.write_paths[0].manifest_declared is True
+    assert audit.write_paths[0].schema_ref is not None
+    assert audit.write_paths[0].within_io_root is True
 
 
 def test_project_mutating_cli_confines_the_project_path(tmp_path: Path):

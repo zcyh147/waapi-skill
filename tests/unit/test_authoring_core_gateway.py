@@ -39,7 +39,10 @@ def test_compact_catalog_reaches_all_approved_authoring_entries_offline(tmp_path
         assert code == 0, schema
         assert schema["version"] == version
     assert ("ak.wwise.ui.getSelectedFiles" in rows) is (version == "2025.1")
-    assert not any(uri.startswith(("ak.wwise.ui.layout.", "ak.wwise.ui.model.")) for uri in rows)
+    assert {uri for uri in rows if uri.startswith("ak.wwise.ui.layout.")} == {
+        "ak.wwise.ui.layout." + suffix for suffix in ("getLayoutNames", "getCurrentLayoutName", "getLayout", "getViewInstances", "getViewTypes", "getElementRectangle", "getViewHandle", "switchLayout", "setLayout", "removeLayout", "getOrCreateView", "undockView", "dockView", "moveSplitter", *(("closeView", "resetLayouts") if version == "2025.1" else ()))
+    }
+    assert {uri for uri in rows if uri.startswith("ak.wwise.ui.model.")} == {"ak.wwise.ui.model." + suffix for suffix in ("createHandle", "destroyHandle", "getState", "registerWafm", "setState")}
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
@@ -58,18 +61,13 @@ def test_every_catalog_schema_link_resolves_or_discloses_a_reviewed_boundary(tmp
             assert row["api"] == "ak.wwise.core.getInfo"
             continue
         code, result = gateway.execute_gateway(row["next_command"], env=env, client_factory=no_client)
-        if row["api"] == "ak.wwise.core.sourceControl.setProvider":
-            assert code != 0
-        else:
-            assert code == 0, (row["api"], result)
-            assert result["version"] == version
+        assert code == 0, (row["api"], result)
+        assert result["version"] == version
 
 
 @pytest.mark.parametrize("version", ("2024.1", "2025.1"))
 @pytest.mark.parametrize("suffix", (
-    "layout.getLayoutNames", "layout.setLayout", "layout.resetLayouts",
-    "model.createHandle", "model.registerWafm", "window.create",
-    "signal.emit", "cli.executeLuaScript", "cli.launch",
+    "cli.executeLuaScript", "cli.launch",
 ))
 def test_unapproved_ui_families_remain_unavailable(version, suffix):
     with pytest.raises(CapabilityNotFoundError):

@@ -13,18 +13,18 @@
       "wwise-console": {
         "function_rows": 662,
         "unique_function_uris": 167,
-        "generic_reflected_rows": 440,
-        "generic_reflected_unique_uris": 116,
-        "special_rows": 222,
-        "special_unique_uris": 51
+        "generic_reflected_rows": 439,
+        "generic_reflected_unique_uris": 115,
+        "special_rows": 223,
+        "special_unique_uris": 52
       },
       "wwise-authoring-ui": {
-        "function_rows": 689,
-        "unique_function_uris": 168,
-        "generic_reflected_rows": 459,
-        "generic_reflected_unique_uris": 117,
-        "special_rows": 230,
-        "special_unique_uris": 51
+        "function_rows": 737,
+        "unique_function_uris": 193,
+        "generic_reflected_rows": 458,
+        "generic_reflected_unique_uris": 116,
+        "special_rows": 279,
+        "special_unique_uris": 77
       }
     },
     "reviewed_generic_restrictions": {
@@ -47,6 +47,7 @@
       "ak.wwise.core.getInfo",
       "ak.wwise.core.getProjectInfo",
       "ak.wwise.core.mediaPool.get",
+      "ak.wwise.core.mediaPool.getFields",
       "ak.wwise.core.object.copy",
       "ak.wwise.core.object.create",
       "ak.wwise.core.object.delete",
@@ -86,7 +87,32 @@
       "ak.wwise.ui.commands.execute",
       "ak.wwise.ui.commands.register",
       "ak.wwise.ui.commands.unregister",
-      "ak.wwise.ui.getSelectedObjects"
+      "ak.wwise.ui.getSelectedObjects",
+      "ak.wwise.ui.layout.closeView",
+      "ak.wwise.ui.layout.dockView",
+      "ak.wwise.ui.layout.getCurrentLayoutName",
+      "ak.wwise.ui.layout.getElementRectangle",
+      "ak.wwise.ui.layout.getLayout",
+      "ak.wwise.ui.layout.getLayoutNames",
+      "ak.wwise.ui.layout.getOrCreateView",
+      "ak.wwise.ui.layout.getViewHandle",
+      "ak.wwise.ui.layout.getViewInstances",
+      "ak.wwise.ui.layout.getViewTypes",
+      "ak.wwise.ui.layout.moveSplitter",
+      "ak.wwise.ui.layout.removeLayout",
+      "ak.wwise.ui.layout.resetLayouts",
+      "ak.wwise.ui.layout.setLayout",
+      "ak.wwise.ui.layout.switchLayout",
+      "ak.wwise.ui.layout.undockView",
+      "ak.wwise.ui.model.createHandle",
+      "ak.wwise.ui.model.destroyHandle",
+      "ak.wwise.ui.model.getState",
+      "ak.wwise.ui.model.registerWafm",
+      "ak.wwise.ui.model.setState",
+      "ak.wwise.ui.signal.emit",
+      "ak.wwise.ui.window.close",
+      "ak.wwise.ui.window.create",
+      "ak.wwise.ui.window.present"
     ]
   },
   "coverage": {

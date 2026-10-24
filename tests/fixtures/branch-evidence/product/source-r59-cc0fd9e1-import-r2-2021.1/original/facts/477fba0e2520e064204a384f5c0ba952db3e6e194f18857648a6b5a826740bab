@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r2/run-cc0fd9e1-r1/pytest-capture/test_repeated_collector_gates_0/native/1792554423026295000-46afe470a38145799984ea2cb551cf10-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Osc1 Invert"
+    },
+    "name": "Osc1Invert",
+    "type": "bool"
+  },
+  "risk_level": "low",
+  "timeout": 9.993080165993888,
+  "version": "2021.1"
+}

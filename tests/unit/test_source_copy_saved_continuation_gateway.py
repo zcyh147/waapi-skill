@@ -1,0 +1,1234 @@
+"""Operation-owned persisted Source proof through normal public transactions."""
+from copy import deepcopy
+from pathlib import Path
+import xml.etree.ElementTree as ET
+import json
+import pytest
+
+from tests.unit.test_legacy_source_copy_collector import saved_copy_runtime, SOURCE, COPIED, DEST, SAVED_OWNER, SAVED_ROLES
+from tests.unit.test_field_interface_closure_gateway import PROJECT, SECOND
+from tests.semantic.support.typed_gateway_input import create_object_lifecycle_business_preview
+
+
+def saved_source_task(path, *, rename=False):
+    runtime, commands, writes, task = saved_copy_runtime(path)
+    root = task.project_file.parent
+    task.project_file.write_text(f'<WwiseDocument><Project ID="{PROJECT}" Name="Fixture"/></WwiseDocument>')
+    task.objects[PROJECT]['workunitIsDirty'] = False
+    midi_id = task.objects[SOURCE]['workunit']['id']
+    midi_path = root / 'Actor-Mixer Hierarchy/MIDI.wwu'
+    default_path = root / 'Actor-Mixer Hierarchy/Default Work Unit.wwu'
+    for identity, file in [(midi_id, midi_path), (SECOND, default_path)]:
+        task.objects[identity].update(workunitIsDirty=False, workunitType='rootFile', filePath=str(file))
+    task.objects[SAVED_OWNER].update(filePath=str(midi_path), workunit={'id': midi_id})
+    task.objects[SOURCE]['filePath'] = str(midi_path)
+    task.objects[DEST] = {'id': DEST, 'name': 'Destination', 'type': 'Sound', 'classId': 65552,
+        'path': task.objects[SECOND]['path'] + '\\Destination', 'parent': {'id': SECOND},
+        'workunit': {'id': SECOND}, 'filePath': str(default_path), 'notes': '', '@IsVoice': False}
+    default_path.write_text(f'<WwiseDocument><WorkUnit ID="{SECOND}" Name="Default Work Unit"><ChildrenList>'
+        f'<Sound ID="{DEST}" Name="Destination"/></ChildrenList></WorkUnit></WwiseDocument>')
+    retained = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/source-owned-2021-native-read-fields.json').read_text())
+    owned_fields = {}
+    for role, binding in SAVED_ROLES.items():
+        if role == 'source': continue
+        observed = retained['roles'][role]
+        assert observed['class_id'] == binding[3]
+        owned_fields[binding[0]] = owned_fields[binding[1]] = observed['metadata']
+        task.objects[binding[0]].update({'@' + name: value for name, value in observed['fields'].items()})
+    call = task.call
+    def observed(uri, args=None, options=None):
+        if (args or {}).get('object') in owned_fields:
+            fields = owned_fields[args['object']]
+            if uri.endswith('getPropertyAndReferenceNames'):
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                return {'return': list(fields)}
+            if uri.endswith('getPropertyInfo'):
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                return fields[args['property']]
+        if uri.endswith('object.get') and ' select @ControlInput ' in (args or {}).get('waql', ''):
+            identity = args['waql'].split('"')[1]
+            if identity == SAVED_ROLES['rtpc'][0]:
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                return {'return': task.project_rows([task.objects[SAVED_ROLES['control_input'][0]]], options)}
+        result = call(uri, args, options)
+        if uri.endswith('object.copy'):
+            for role, binding in SAVED_ROLES.items():
+                if role != 'source':
+                    for name in owned_fields[binding[0]]:
+                        if '@' + name in task.objects[binding[0]]:
+                            task.objects[binding[1]]['@' + name] = task.objects[binding[0]]['@' + name]
+            if rename:
+                task.objects[COPIED].update(name=task.objects[SOURCE]['name'] + '1',
+                    path=task.objects[SAVED_OWNER]['path'] + '\\' + task.objects[SOURCE]['name'] + '1')
+            task.objects[COPIED]['filePath'] = str(midi_path if rename else default_path)
+            task.objects[SECOND]['workunitIsDirty'] = True
+        if uri.endswith('project.save'):
+            if rename and COPIED in task.objects:
+                document = ET.parse(midi_path)
+                owner, = [row for row in document.iter('Sound') if row.get('ID') == SAVED_OWNER]
+                original_source, = [row for row in owner.iter('SourcePlugin') if row.get('ID') == SOURCE]
+                copied_source = deepcopy(original_source)
+                for role, binding in SAVED_ROLES.items():
+                    node, = [row for row in copied_source.iter(binding[2]) if row.get('ID') == binding[0]]
+                    node.set('ID', binding[1])
+                    if binding[5] is not None: node.set('ShortID', str(binding[5]))
+                copied_source.set('Name', task.objects[COPIED]['name'])
+                owner.find('ChildrenList').append(copied_source)
+                document.write(midi_path)
+                default = ET.parse(default_path)
+                for children in default.iter('ChildrenList'):
+                    for node in list(children):
+                        if node.get('ID') == COPIED: children.remove(node)
+                default.write(default_path)
+            for identity in (PROJECT, SECOND, midi_id): task.objects[identity]['workunitIsDirty'] = False
+        return result
+    task.call = observed
+    return runtime, writes, task
+
+
+def public_copy(task, *, parent=DEST, conflict='fail'):
+    def gateway(argv):
+        code, payload = task.run(*argv)
+        assert code == 0, payload
+        return payload
+    preview = create_object_lifecycle_business_preview(gateway, version=task.version,
+        operation='object.copy', object_id=SOURCE, parent_id=parent, name_conflict=conflict)
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx, '--summary-only'); assert code == 0, shown
+    code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token']); assert code == 0, result
+    code, result = task.run('execute', tx); assert code == 0, result
+    return tx
+
+
+def modern_saved_source_task(path, version='2022.1', *, owned_notes=None):
+    """Matching saved originals and the four Root-reviewed read-only probes.
+
+    Only fake copy/Save effects are synthesized; these are program evidence.
+    Probe receipts/hashes: /tmp/waapi-r58-source-modern-proof-map.json and the
+    Root reviews cited by the R58 handoff. No native files are runtime inputs.
+    """
+    runtime, writes, task = saved_source_task(path)
+    task.version = runtime.version = version
+    assert task.run('config-set', '--wwise-version', version)[0] == 0
+    catalog = Path(__file__).parents[2] / 'skills/waapi-skill/resources/metadata' / version / 'object-types.json'
+    task.types = json.loads(catalog.read_text())['types']
+    folder = 'Containers' if version == '2025.1' else 'Actor-Mixer Hierarchy'
+    original_file = Path(__file__).parents[1] / '_org' / version / folder / 'MIDI.wwu'
+    document = ET.parse(original_file)
+    source, = [node for node in document.iter('SourcePlugin') if node.get('ID') == SOURCE]
+    source_path = Path(task.objects[SOURCE]['filePath'])
+    source_path.write_bytes(original_file.read_bytes())
+    notes = source.findtext('Comment', '')
+    task.objects[SOURCE]['notes'] = notes.replace('\n', '\r\n') if version == '2025.1' else notes
+    old, copied_rtpc = SAVED_ROLES['rtpc'][:2]
+    control, copied_control = SAVED_ROLES['control_input'][:2]
+    curve, copied_curve = SAVED_ROLES['curve'][:2]
+    if owned_notes is not None:
+        lfo, = source.iter('ModulatorLfo')
+        ET.SubElement(lfo, 'Comment').text = owned_notes
+        document.write(source_path)
+        task.objects[control]['notes'] = owned_notes
+    task.objects[old].update({'@PropertyName': 'OutputLevel', '@ControlInput': {'id': control},
+        '@Curve': {'id': curve, 'points': [{'shape': 'Linear', 'x': 0.0, 'y': -5.67053},
+            {'shape': 'Linear', 'x': 1.0, 'y': 0.0}], '@Flags': 3}})
+    # Actual modern metadata has empty type plus explicit reference restriction.
+    metadata = {
+        'Color': {'name': 'Color', 'type': 'int16', 'default': 0},
+        'ControlInput': {'name': 'ControlInput', 'type': '', 'default': None,
+            'restriction': {'type': 'reference'}},
+        'Curve': {'name': 'Curve', 'type': '', 'default': None,
+            'restriction': {'type': 'reference'}},
+        'OverrideColor': {'name': 'OverrideColor', 'type': 'bool', 'default': False},
+        'PropertyName': {'name': 'PropertyName', 'type': 'string', 'default': ''},
+    }
+    mapping = {value[0]: value[1] for value in SAVED_ROLES.values()}
+    builds = {'2022.1': (19, 8584), '2023.1': (19, 8928), '2024.1': (13, 9056), '2025.1': (7, 9143)}
+    call = task.call
+    def observed(uri, args=None, options=None):
+        args = args or {}
+        if args.get('object') in {old, copied_rtpc}:
+            if uri.endswith('getPropertyAndReferenceNames'):
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                return {'return': list(metadata)}
+            if uri.endswith('getPropertyInfo'):
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                return deepcopy(metadata[args['property']])
+        expression = args.get('waql', '')
+        if uri.endswith('object.get') and ' select @' in expression:
+            identity = expression.split('"')[1]
+            target = ({SOURCE: old, COPIED: copied_rtpc}.get(identity) if ' select @RTPC ' in expression
+                else {old: control, copied_rtpc: copied_control}.get(identity) if ' select @ControlInput ' in expression
+                else {old: curve, copied_rtpc: copied_curve}.get(identity) if ' select @Curve ' in expression else None)
+            if target is not None:
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                return {'return': task.project_rows([task.objects[target]], options)}
+        result = call(uri, args, options)
+        if uri.endswith('getInfo'):
+            minor, build = builds[version]
+            result['version'].update(year=int(version[:4]), minor=minor, build=build,
+                displayName=f'v{version}.{minor}.{build}')
+        if uri.endswith('object.copy'):
+            for original, replacement in mapping.items():
+                task.objects[replacement]['notes'] = task.objects[original]['notes']
+            task.objects[copied_rtpc].update({'@PropertyName': task.objects[old]['@PropertyName'],
+                '@ControlInput': {'id': copied_control}, '@Curve': {**deepcopy(task.objects[old]['@Curve']), 'id': copied_curve}})
+        if uri.endswith('project.save') and COPIED in task.objects:
+            copied = deepcopy(source)
+            for node in copied.iter():
+                if node.get('ID') in mapping:
+                    node.set('ID', mapping[node.get('ID')])
+                    if 'ShortID' in node.attrib:
+                        node.set('ShortID', str(task.objects[node.get('ID')]['shortId']))
+            destination_path = Path(task.objects[DEST]['filePath'])
+            destination = ET.parse(destination_path)
+            sound, = [node for node in destination.iter('Sound') if node.get('ID') == DEST]
+            children = sound.find('ChildrenList')
+            children.clear()
+            children.append(copied)
+            destination.write(destination_path)
+        return result
+    task.call = observed
+    return runtime, writes, task
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_modern_source_copy_finishes_after_its_generated_save_with_owned_fields(tmp_path, version):
+    runtime, writes, task = modern_saved_source_task(tmp_path, version)
+    transaction = public_copy(task)
+    code, pending = task.run('verify', transaction)
+    assert code == 0 and pending['status'] == 'source_copy_saved_proof_pending', pending
+    save = final_save_preview(task, pending)
+    saved = authorize_execute_verify(task, save['transaction_id'])
+    code, final = task.run(*saved['next_command']['gateway_argv'])
+    assert code == 0 and final['verification']['verification_scope']['complete_copy_preservation'], final
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['copy', 'save']
+    assert task.run('execute', transaction)[0] == 2
+
+
+@pytest.mark.parametrize('fault', ['saturated-membership', 'missing-membership', 'Curve-hop', 'PropertyName'])
+def test_modern_source_copy_revalidates_owned_membership_references_and_property_before_dispatch(tmp_path, fault):
+    runtime, writes, task = modern_saved_source_task(tmp_path, '2025.1')
+    def gateway(argv):
+        code, payload = task.run(*argv); assert code == 0, payload
+        return payload
+    preview = create_object_lifecycle_business_preview(gateway, version='2025.1',
+        operation='object.copy', object_id=SOURCE, parent_id=DEST, name_conflict='fail')
+    shown = gateway(['transaction-show', preview['transaction_id'], '--summary-only'])
+    gateway(['confirm', preview['transaction_id'], '--confirmation-token', shown['confirmation']['token']])
+    assert not writes
+    if fault == 'PropertyName':
+        task.objects[SAVED_ROLES['rtpc'][0]]['@PropertyName'] = 'Osc1Level'
+    call = task.call
+    def drifted(uri, args=None, options=None):
+        expression = (args or {}).get('waql', '')
+        if uri.endswith('object.get') and ' select @RTPC ' in expression and fault.endswith('membership'):
+            assert expression.endswith('take 2')
+            row = {'id': SAVED_ROLES['rtpc'][0]}
+            return {'return': [row, row] if fault == 'saturated-membership' else []}
+        if uri.endswith('object.get') and ' select @Curve ' in expression and fault == 'Curve-hop':
+            return {'return': [{'id': SAVED_ROLES['control_input'][0]}]}
+        return call(uri, args, options)
+    task.call = drifted
+    code, failed = task.run('execute', preview['transaction_id'])
+    assert code == 2 and not writes, failed
+
+
+def test_modern_saved_proof_compares_owned_native_notes_exactly_after_xml_newline_binding(tmp_path):
+    runtime, writes, task = modern_saved_source_task(tmp_path, '2025.1', owned_notes='first\nsecond')
+    transaction = public_copy(task)
+    code, pending = task.run('verify', transaction); assert code == 0, pending
+    save = final_save_preview(task, pending)
+    saved = authorize_execute_verify(task, save['transaction_id'])
+    task.objects[SAVED_ROLES['control_input'][1]]['notes'] = 'first\r\nsecond'
+    code, failed = task.run(*saved['next_command']['gateway_argv'])
+    assert code == 2 and failed['status'] == 'verification_failed', failed
+    assert 'Copied native owned notes differ' in json.dumps(failed), failed
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['copy', 'save']
+
+
+def test_clean_saved_source_copy_defers_terminal_for_separate_final_save(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    task.objects['{01010101-0101-0101-0101-010101010101}'] = {'id': '{01010101-0101-0101-0101-010101010101}',
+        'name': 'Unrelated', 'type': 'WorkUnit', 'classId': 1638416,
+        'path': r'\Actor-Mixer Hierarchy\Unrelated', 'parent': None, 'notes': '',
+        'workunitIsDirty': True}  # Unrelated WWU cannot force a baseline Save.
+    tx = public_copy(task)
+    code, result = task.run('verify', tx)
+    assert code == 0 and result['state'] == 'executed_unverified', result
+    assert result['status'] == 'source_copy_saved_proof_pending', result
+    assert result['next_command']['command'] == 'continue-source-copy-proof'
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+    assert result['source_copy_saved_proof']['baseline_origin'] == 'already_clean'
+
+
+def test_clean_source_copy_finishes_only_after_owned_separately_authorized_save(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    code, child = task.run(*pending['next_command']['gateway_argv']); assert code == 0, json.dumps(child)
+    identity, authority = child['draft']['draft_id'], child['task_authority']
+    code, checked = task.run('draft-check', identity, '--task-authority', authority,
+        '--expected-revision', str(child['draft']['revision'])); assert code == 0, checked
+    code, preview = task.run('preview-from-draft', identity, '--task-authority', authority,
+        '--expected-revision', str(checked['draft']['revision'])); assert code == 0, preview
+    saved = preview['transaction_id']
+    code, denied = task.run('execute', saved); assert code == 2, denied
+    code, shown = task.run('transaction-show', saved, '--summary-only'); assert code == 0, shown
+    code, result = task.run('confirm', saved, '--confirmation-token', shown['confirmation']['token']); assert code == 0, result
+    code, result = task.run('execute', saved); assert code == 0, result
+    code, result = task.run('verify', saved); assert code == 0, result
+    assert result['next_command']['gateway_argv'] == ['verify', tx]
+    code, result = task.run(*result['next_command']['gateway_argv'])
+    assert code == 0 and result['verified'] is True, json.dumps({'status': result.get('status'), 'message': result.get('message'), 'verification_message': result.get('verification', {}).get('message'), 'failures': [x for x in result.get('verification', {}).get('assertions', []) if not x.get('passed')]})
+    scope = result['verification']['verification_scope']
+    assert scope['complete_copy_preservation'] is True and scope['owned_role_count'] == 3
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+    assert task.run('execute', tx)[0] == 2
+
+
+def final_save_preview(task, pending):
+    code, child = task.run(*pending['next_command']['gateway_argv']); assert code == 0, json.dumps(child)
+    identity, authority = child['draft']['draft_id'], child['task_authority']
+    code, checked = task.run('draft-check', identity, '--task-authority', authority,
+        '--expected-revision', str(child['draft']['revision'])); assert code == 0, json.dumps(checked)
+    code, preview = task.run('preview-from-draft', identity, '--task-authority', authority,
+        '--expected-revision', str(checked['draft']['revision'])); assert code == 0, json.dumps(preview)
+    return preview
+
+
+def test_declined_unexecuted_allowed_save_finalizes_live_scope_and_blocks_stale_execution(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    assert task.run('config-set', '--project-modification-policy', 'allow_changes')[0] == 0
+    preview = final_save_preview(task, pending)
+    assert preview['state'] == 'policy_authorized'
+    code, declined = task.run(*disclosed_decline(pending, 'final'))
+    assert code == 0 and declined['state'] == 'verified', declined
+    scope = declined['verification']['verification_scope']
+    assert scope['complete_copy_preservation'] is False
+    assert scope['saved_proof_incomplete_reason'] == 'final_Save_declined'
+    code, result = task.run('execute', preview['transaction_id'])
+    assert code == 2 and [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy'], result
+    before = task.run('transaction-show', tx, '--summary-only')[1]
+    assert task.run('verify', tx)[0] == 2
+    after = task.run('transaction-show', tx, '--summary-only')[1]
+    assert after['state'] == 'verified' and after['events'] == before['events']
+
+
+def test_refusal_cannot_finalize_parent_while_owned_save_is_executing(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    assert task.run('config-set', '--project-modification-policy', 'allow_changes')[0] == 0
+    preview = final_save_preview(task, pending)
+    started, release = Event(), Event()
+    original = task.call
+    def blocked(uri, args=None, options=None):
+        if uri.endswith('project.save'):
+            started.set()
+            assert release.wait(10), 'Test must release its one owned Save'
+        return original(uri, args, options)
+    task.call = blocked
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        execution = executor.submit(task.run, 'execute', preview['transaction_id'])
+        try:
+            assert started.wait(5)
+            code, refusal = task.run(*disclosed_decline(pending, 'final'))
+            assert code == 2 and refusal['error_code'] == 'TRANSACTION_EXECUTION_IN_PROGRESS', refusal
+            code, parent = task.run('transaction-show', tx, '--summary-only')
+            assert code == 0 and parent['state'] == 'executed_unverified'
+        finally:
+            release.set()
+        code, result = execution.result(timeout=5)
+        assert code == 0, result
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+    assert task.run(*disclosed_decline(pending, 'final'))[0] == 2
+
+
+def checked_dirty_parent(task):
+    task.objects[PROJECT]['workunitIsDirty'] = True
+    class Checked(Exception): pass
+    result = {}
+    def gateway(argv):
+        code, payload = task.run(*argv); assert code == 0, payload
+        if argv[0] == 'draft-check':
+            result.update(payload)
+            raise Checked()
+        return payload
+    try:
+        create_object_lifecycle_business_preview(gateway, version='2021.1', operation='object.copy',
+            object_id=SOURCE, parent_id=DEST, name_conflict='fail')
+    except Checked:
+        return result
+    raise AssertionError('Expected public check boundary')
+
+
+def authorize_execute_verify(task, tx):
+    code, shown = task.run('transaction-show', tx, '--summary-only'); assert code == 0, shown
+    if shown['state'] != 'policy_authorized':
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token']); assert code == 0, confirmed
+    code, executed = task.run('execute', tx); assert code == 0, executed
+    code, verified = task.run('verify', tx); assert code == 0, verified
+    return verified
+
+
+def disclosed_decline(payload, stage):
+    """Select the public refusal; never append a flag to an accepted command."""
+    choice = payload['continuation']
+    assert choice['contract'] == 'waapi-skill.source-copy-save-choice/v1'
+    assert choice['stage'] == stage
+    assert choice['selection_source'] == 'explicit_decline_otherwise_existing_policy'
+    assert choice['first_true_choice_is_the_only_next_action'] is True
+    assert choice['evaluate_in_order'] == [
+        {'choice': 'decline_save', 'condition': 'user_explicitly_declines_save',
+         'command_pointer': '/continuation/next_command'},
+        {'choice': 'prepare_save', 'condition': 'otherwise_continue_under_existing_policy',
+         'command_pointer': '/next_command'},
+    ]
+    assert choice['decline_outcome']['complete_copy_preservation'] is False
+    assert choice['decline_outcome']['executes_save'] is False
+    command = choice['next_command']
+    assert command['contract'] == payload['next_command']['contract']
+    assert command['copy_exactly'] is True
+    assert command['gateway_argv'][-1] == '--decline-save'
+    assert not payload['next_command'].get('requires_explicit_user_confirmation')
+    assert not payload['next_command'].get('requires_later_user_message')
+    return command['gateway_argv']
+
+
+@pytest.mark.parametrize('stage', ['baseline', 'final'])
+def test_optional_source_save_discloses_exact_refusal_valid_after_child_issue(tmp_path, stage):
+    runtime, writes, task = saved_source_task(tmp_path)
+    if stage == 'baseline':
+        pending = checked_dirty_parent(task)
+    else:
+        tx = public_copy(task)
+        code, pending = task.run('verify', tx)
+        assert code == 0, pending
+    decline = disclosed_decline(pending, stage)
+    code, child = task.run(*pending['next_command']['gateway_argv'])
+    assert code == 0, child
+    assert child['source_copy_saved_proof']['decline_choice_source'] == {
+        'response': 'earlier_source_copy_save_choice',
+        'command_pointer': '/continuation/next_command',
+        'may_use_prior_command': True,
+        'current_backend_guards_apply': True,
+        'valid_only_before_save_attempt': True,
+    }
+    # The previously issued command remains valid after child issuance. Child
+    # projection itself must not disclose the private baseline parent token.
+    if stage == 'baseline':
+        parent_token = decline[decline.index('--task-authority') + 1]
+        assert parent_token not in json.dumps(child)
+    code, refused = task.run(*decline)
+    assert code == 0, refused
+    if stage == 'baseline':
+        code, checked = task.run(*refused['next_command']['gateway_argv'])
+        assert code == 0, checked
+        code, preview = task.run(*checked['next_command']['gateway_argv'])
+        assert code == 0, preview
+        refused = authorize_execute_verify(task, preview['transaction_id'])
+    assert refused['verified'] is True
+    assert refused['verification']['verification_scope']['complete_copy_preservation'] is False
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+@pytest.mark.parametrize('policy', ['read_only', 'ask_before_changes', 'allow_changes'])
+def test_disclosed_choice_preserves_save_preview_policy_and_exact_incomplete_refusal(tmp_path, policy):
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    assert task.run('config-set', '--project-modification-policy', policy)[0] == 0
+    code, pending = task.run('verify', tx)
+    assert code == 0, pending
+    decline = disclosed_decline(pending, 'final')
+    code, child = task.run(*pending['next_command']['gateway_argv'])
+    assert code == 0, child
+    code, checked = task.run(*child['next_command']['gateway_argv'])
+    assert code == 0, checked
+    code, preview = task.run(*checked['next_command']['gateway_argv'])
+    if policy == 'read_only':
+        assert code == 2, preview
+    else:
+        assert code == 0, preview
+        assert preview['state'] == ('policy_authorized' if policy == 'allow_changes' else 'awaiting_confirmation')
+        if policy == 'ask_before_changes':
+            assert task.run('execute', preview['transaction_id'])[0] == 2
+    code, scoped = task.run(*decline)
+    assert code == 0 and scoped['verified'], scoped
+    assert scoped['verification']['verification_scope']['complete_copy_preservation'] is False
+    if policy != 'read_only':
+        assert task.run('execute', preview['transaction_id'])[0] == 2
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+@pytest.mark.parametrize('field', ['owner', 'authority', 'revision'])
+def test_tampered_disclosed_baseline_refusal_cannot_change_parent_or_execute_save(tmp_path, field):
+    runtime, writes, task = saved_source_task(tmp_path)
+    pending = checked_dirty_parent(task)
+    decline = disclosed_decline(pending, 'baseline')
+    code, child = task.run(*pending['next_command']['gateway_argv'])
+    assert code == 0, child
+    tampered = list(decline)
+    if field == 'owner':
+        tampered[1] = 'od1-' + '0' * 32
+    elif field == 'authority':
+        tampered[tampered.index('--task-authority') + 1] = 'da1-' + '0' * 40
+    else:
+        index = tampered.index('--expected-revision') + 1
+        tampered[index] = str(int(tampered[index]) + 1)
+    code, rejected = task.run(*tampered)
+    assert code == 2 and 'next_command' not in rejected, rejected
+    # The original exact command is still valid: tampering neither changed its
+    # parent binding nor cancelled the operation-owned child on another scope.
+    code, refused = task.run(*decline)
+    assert code == 0 and refused['draft']['draft_id'] == pending['draft']['draft_id'], refused
+    assert writes == []
+
+
+def test_dirty_baseline_save_returns_exact_parent_after_gateway_restart_then_completes_copy(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    public_calls, native_trace = [], []
+    phase = ['fixture']
+    native_call = task.call
+    def traced(uri, args=None, options=None):
+        native_trace.append({'phase': phase[0], 'uri': uri, 'args': deepcopy(args or {}), 'options': deepcopy(options or {})})
+        return native_call(uri, args, options)
+    task.call = traced
+    invoke = task.run
+    def measured(*argv):
+        phase[0] = f'{len(public_calls):02d}:' + argv[0]
+        code, payload = invoke(*argv)
+        public_calls.append((list(argv), len(json.dumps(payload, ensure_ascii=False).encode('utf-8'))))
+        return code, payload
+    task.run = measured
+    checked = checked_dirty_parent(task)
+    assert checked['next_command']['command'] == 'continue-source-copy-proof', checked
+    save = final_save_preview(task, checked)
+    receipt = authorize_execute_verify(task, save['transaction_id'])
+    # Every task.run is a separate public Gateway invocation; only durable child
+    # state can return the parent capability after baseline Save.
+    code, parent = task.run(*receipt['next_command']['gateway_argv']); assert code == 0, parent
+    code, resumed = task.run(*receipt['next_command']['gateway_argv']); assert code == 0, resumed
+    assert resumed['next_command'] == parent['next_command'] and resumed['draft']['revision'] == parent['draft']['revision']
+    assert parent['draft']['draft_id'] == checked['draft']['draft_id']
+    assert parent['draft']['revision'] > checked['draft']['revision']
+    code, checked_parent = task.run(*parent['next_command']['gateway_argv']); assert code == 0, checked_parent
+    code, copy = task.run(*checked_parent['next_command']['gateway_argv']); assert code == 0, copy
+    pending = authorize_execute_verify(task, copy['transaction_id'])
+    assert pending['source_copy_saved_proof']['baseline_origin'] == 'authorized_baseline_Save'
+    final = final_save_preview(task, pending)
+    saved = authorize_execute_verify(task, final['transaction_id'])
+    code, result = task.run(*saved['next_command']['gateway_argv']); assert code == 0, result
+    assert result['verification']['verification_scope']['complete_copy_preservation'] is True
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['save', 'copy', 'save']
+    native = list(Path(task.env['WWISE_EVIDENCE_DIR']).rglob('*.json'))
+    budget = {'public_calls': len(public_calls), 'reply_bytes': sum(size for argv, size in public_calls),
+        'max_reply_bytes': max(size for argv, size in public_calls), 'native_files': len(native),
+        'native_bytes': sum(path.stat().st_size for path in native)}
+    assert budget['public_calls'] <= 128 and budget['max_reply_bytes'] <= 4 * 1024 * 1024
+    (tmp_path / 'production-budget.json').write_text(json.dumps(budget))
+    (tmp_path / 'production-native-trace.json').write_text(json.dumps(native_trace))
+    print('R54 production dirty protocol budget:', json.dumps(budget))
+
+
+def test_saved_proof_rejects_live_owned_scalar_corruption_even_with_equal_saved_xml(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    preview = final_save_preview(task, pending)
+    saved = authorize_execute_verify(task, preview['transaction_id'])
+    task.objects[SAVED_ROLES['curve'][1]]['@Flags'] = 4
+    code, failed = task.run(*saved['next_command']['gateway_argv'])
+    assert code == 2 and failed['status'] == 'verification_failed', failed
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+
+
+@pytest.mark.parametrize('field', ['draft_id', 'task_authority', 'source_revision'])
+def test_private_baseline_return_cannot_redirect_or_revive_parent(tmp_path, field):
+    from wwise_waapi.canonical import canonical_sha256, canonical_json_bytes
+    runtime, writes, task = saved_source_task(tmp_path)
+    checked = checked_dirty_parent(task)
+    code, child = task.run(*checked['next_command']['gateway_argv']); assert code == 0, child
+    save = final_save_preview(task, {'next_command': {'gateway_argv': checked['next_command']['gateway_argv']}})
+    receipt = authorize_execute_verify(task, save['transaction_id'])
+    parent_file = tmp_path / 'state/operation-drafts-v1/records' / (checked['draft']['draft_id'] + '.json')
+    parent_before = parent_file.read_bytes()
+    child_file = tmp_path / 'state/operation-drafts-v1/records' / (child['draft']['draft_id'] + '.json')
+    record = json.loads(child_file.read_text())
+    envelope = record['composition']['source_copy_parent_return']
+    if field == 'draft_id': envelope[field] = 'od1-' + '1' * 32
+    elif field == 'task_authority': envelope[field] = 'da1-' + '2' * 40
+    else: envelope[field] += 1
+    # Recompute the nonsecret file integrity digest so this reaches the actual
+    # parent/origin/capability binding rather than only damaged-file detection.
+    record.pop('record_digest')
+    record['record_digest'] = canonical_sha256({'contract': 'waapi-skill.operation-draft-record-digest/v1', 'record': record})
+    child_file.write_bytes(canonical_json_bytes(record))
+    code, failed = task.run(*receipt['next_command']['gateway_argv'])
+    assert code == 2 and 'next_command' not in failed, failed
+    assert parent_file.read_bytes() == parent_before
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['save']
+
+
+def test_baseline_refusal_invalidates_previously_allowed_save_and_keeps_ordinary_copy_usable(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    checked = checked_dirty_parent(task)
+    assert task.run('config-set', '--project-modification-policy', 'allow_changes')[0] == 0
+    save = final_save_preview(task, checked)
+    code, refusal = task.run(*disclosed_decline(checked, 'baseline'))
+    assert code == 0, refusal
+    assert task.run('execute', save['transaction_id'])[0] == 2
+    code, parent = task.run(*refusal['next_command']['gateway_argv']); assert code == 0, parent
+    code, preview = task.run(*parent['next_command']['gateway_argv']); assert code == 0, preview
+    result = authorize_execute_verify(task, preview['transaction_id'])
+    assert result['verified'] and not result['verification']['verification_scope']['complete_copy_preservation']
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+@pytest.mark.parametrize('fault', ['point-value', 'point-order', 'alias', 'missing-member', 'short-id'])
+def test_saved_graph_corruption_cannot_finish_or_downgrade_copy(tmp_path, fault):
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    save = final_save_preview(task, pending)
+    authorize_execute_verify(task, save['transaction_id'])
+    model = task.project_file.parent / 'Actor-Mixer Hierarchy/Default Work Unit.wwu'
+    tree = ET.parse(model)
+    source, = list(tree.iter('SourcePlugin'))
+    curve = source.find('.//Curve')
+    if fault == 'point-value': curve.find('PointList/Point/YPos').text = '99'
+    elif fault == 'point-order': curve.find('PointList')[:] = list(reversed(curve.find('PointList')))
+    elif fault == 'alias': curve.set('ID', source.find('.//RTPC').get('ID'))
+    elif fault == 'missing-member': source.find('.//Reference/Custom').clear()
+    else: task.objects[SAVED_ROLES['control_input'][1]]['shortId'] += 1
+    tree.write(model)
+    code, failed = task.run(*disclosed_decline(pending, 'final'))
+    assert code == 2, failed  # Save already ran: refusal cannot claim prevention.
+    code, failed = task.run('verify', tx)
+    assert code == 2 and failed['status'] == 'verification_failed', failed
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+
+
+def test_baseline_refusal_is_atomic_with_owned_save_execution(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    runtime, writes, task = saved_source_task(tmp_path)
+    checked = checked_dirty_parent(task)
+    assert task.run('config-set', '--project-modification-policy', 'allow_changes')[0] == 0
+    preview = final_save_preview(task, checked)
+    started, release = Event(), Event()
+    original = task.call
+    def blocked(uri, args=None, options=None):
+        if uri.endswith('project.save'):
+            started.set(); assert release.wait(10)
+        return original(uri, args, options)
+    task.call = blocked
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        execution = executor.submit(task.run, 'execute', preview['transaction_id'])
+        try:
+            assert started.wait(5)
+            code, refusal = task.run(*disclosed_decline(checked, 'baseline'))
+            assert code == 2 and refusal['error_code'] == 'TRANSACTION_EXECUTION_IN_PROGRESS', refusal
+        finally:
+            release.set()
+        code, result = execution.result(timeout=5); assert code == 0, result
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['save']
+    assert task.run(*disclosed_decline(checked, 'baseline'))[0] == 2
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_saved_observer_version_boundary_preserves_ordinary_copy_and_read_only_policy(tmp_path, version):
+    runtime, writes, task = saved_source_task(tmp_path)
+    task.version = version
+    if version == '2021.1':
+        observed_call = task.call
+        def authoring(uri, args=None, options=None):
+            result = observed_call(uri, args, options)
+            if uri.endswith('getInfo'): result['isCommandLine'] = False
+            return result
+        task.call = authoring
+    task.run('config-set', '--wwise-version', version)
+    def gateway(argv):
+        code, payload = task.run(*argv); assert code == 0, payload
+        return payload
+    preview = create_object_lifecycle_business_preview(gateway, version=version,
+        operation='object.copy', object_id=SOURCE, parent_id=DEST, name_conflict='fail')
+    result = authorize_execute_verify(task, preview['transaction_id'])
+    assert result['verified'] and not result['verification']['verification_scope']['complete_copy_preservation']
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+    # A read-only policy still blocks any ordinary copy Preview, independent of
+    # saved observer availability. No Save or policy override is synthesized.
+    task.objects.pop(COPIED)
+    task.run('config-set', '--project-modification-policy', 'read_only')
+    responses = []
+    def blocked(argv):
+        code, payload = task.run(*argv); responses.append((code, payload))
+        if code: raise ValueError(payload)
+        return payload
+    with pytest.raises(ValueError):
+        create_object_lifecycle_business_preview(blocked, version=version,
+            operation='object.copy', object_id=SOURCE, parent_id=DEST, name_conflict='fail')
+    assert responses[-1][0] == 2 and [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+def test_read_only_final_save_offer_cannot_dispatch_and_decline_keeps_exact_live_scope(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    assert task.run('config-set', '--project-modification-policy', 'read_only')[0] == 0
+    code, child = task.run(*pending['next_command']['gateway_argv']); assert code == 0, child
+    code, checked = task.run(*child['next_command']['gateway_argv']); assert code == 0, checked
+    code, denied = task.run(*checked['next_command']['gateway_argv']); assert code == 2, denied
+    code, scoped = task.run(*disclosed_decline(pending, 'final'))
+    assert code == 0 and scoped['verified'] and not scoped['verification']['verification_scope']['complete_copy_preservation'], scoped
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+def test_clean_baseline_dirty_drift_blocks_copy_before_any_write(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    def gateway(argv):
+        code, payload = task.run(*argv); assert code == 0, payload
+        return payload
+    preview = create_object_lifecycle_business_preview(gateway, version='2021.1', operation='object.copy',
+        object_id=SOURCE, parent_id=DEST, name_conflict='fail')
+    tx = preview['transaction_id']
+    shown = task.run('transaction-show', tx, '--summary-only')[1]
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    task.objects[SECOND]['workunitIsDirty'] = True
+    code, failed = task.run('execute', tx)
+    assert code == 2 and not writes, failed
+
+
+def test_final_save_continuation_resumes_same_sealed_child_after_lost_reply(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    preview = final_save_preview(task, pending)
+    code, resumed = task.run(*pending['next_command']['gateway_argv']); assert code == 0, resumed
+    assert resumed['next_command']['gateway_argv'] == ['transaction-show', preview['transaction_id'], '--summary-only']
+    authorize_execute_verify(task, preview['transaction_id'])
+    code, resumed = task.run(*pending['next_command']['gateway_argv']); assert code == 0, resumed
+    assert resumed['next_command']['gateway_argv'] == ['verify', tx]
+    code, result = task.run(*resumed['next_command']['gateway_argv']); assert code == 0 and result['verified'], result
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+
+
+def test_rechecking_parent_invalidates_baseline_child_before_native_save(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    checked = checked_dirty_parent(task)
+    assert task.run('config-set', '--project-modification-policy', 'allow_changes')[0] == 0
+    save = final_save_preview(task, checked)
+    argv = checked['next_command']['gateway_argv']
+    code, rechecked = task.run('draft-check', *argv[1:]); assert code == 0, rechecked
+    assert rechecked['draft']['revision'] > checked['draft']['revision']
+    code, failed = task.run('execute', save['transaction_id'])
+    assert code == 2 and writes == [], failed
+
+
+def test_generated_save_start_association_survives_origin_stripping(tmp_path):
+    from wwise_waapi.canonical import canonical_sha256, canonical_json_bytes
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    code, child = task.run(*pending['next_command']['gateway_argv']); assert code == 0, child
+    identity = child['draft']['draft_id']
+    file = tmp_path / 'state/operation-drafts-v1/records' / (identity + '.json')
+    record = json.loads(file.read_text())
+    record['composition'].pop('source_copy_save_origin')
+    record.pop('record_digest')
+    record['record_digest'] = canonical_sha256({'contract': 'waapi-skill.operation-draft-record-digest/v1', 'record': record})
+    file.write_bytes(canonical_json_bytes(record))
+    code, blocked = task.run('draft-inspect', identity, '--task-authority', child['task_authority'])
+    assert code == 2 and [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy'], blocked
+
+
+def test_old_ordinary_save_id_matching_new_namespace_stays_ordinary(tmp_path):
+    from wwise_waapi.canonical import canonical_sha256, canonical_json_bytes
+    runtime, writes, task = saved_source_task(tmp_path)
+    code, ordinary = task.run('draft-start', 'ak.wwise.core.project.save'); assert code == 0, ordinary
+    old = ordinary['draft']['draft_id']
+    directory = tmp_path / 'state/operation-drafts-v1/records'
+    record = json.loads((directory / (old + '.json')).read_text())
+    legacy = 'od1-f54c50' + old[-26:]
+    record['draft_id'] = legacy
+    previous = ''
+    for event in record['audit']:
+        event.update(draft_id=legacy, previous_event_hash=previous)
+        event.pop('event_hash')
+        event['event_hash'] = previous = canonical_sha256(event)
+    record.pop('record_digest')
+    record['record_digest'] = canonical_sha256({'contract': 'waapi-skill.operation-draft-record-digest/v1', 'record': record})
+    (directory / (legacy + '.json')).write_bytes(canonical_json_bytes(record))
+    (directory / (legacy + '.json')).chmod(0o600)
+    code, inspected = task.run('draft-inspect', legacy, '--task-authority', ordinary['task_authority'])
+    assert code == 0 and inspected['draft']['draft_id'] == legacy, inspected
+    assert not writes
+
+
+@pytest.mark.parametrize('fault', ['missing-original-file', 'corrupt-original-point'])
+def test_decline_distinguishes_unavailable_optional_file_from_observed_graph_corruption(tmp_path, fault):
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    file = task.project_file.parent / 'Actor-Mixer Hierarchy/MIDI.wwu'
+    if fault == 'missing-original-file': file.rename(file.with_suffix('.held'))
+    else:
+        tree = ET.parse(file)
+        source, = [row for row in tree.iter('SourcePlugin') if row.get('ID') == SOURCE]
+        source.find('.//Curve/PointList/Point/YPos').text = '99'
+        tree.write(file)
+    code, result = task.run(*disclosed_decline(pending, 'final'))
+    if fault == 'missing-original-file':
+        assert code == 0 and result['verified'], result
+        scope = result['verification']['verification_scope']
+        assert not scope['complete_copy_preservation'] and scope['declined_saved_observation']['status'] == 'read_authority_unavailable'
+    else:
+        assert code == 2 and result['status'] == 'verification_failed', result
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+def test_baseline_save_rejects_selected_file_membership_drift_before_write(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    checked = checked_dirty_parent(task)
+    assert task.run('config-set', '--project-modification-policy', 'allow_changes')[0] == 0
+    save = final_save_preview(task, checked)
+    task.objects[SOURCE]['filePath'] = str(task.project_file.parent / 'Actor-Mixer Hierarchy/Default Work Unit.wwu')
+    code, failed = task.run('execute', save['transaction_id'])
+    assert code == 2 and not writes, failed
+
+
+def test_dirty_baseline_save_does_not_reject_other_valid_source_shapes(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    file = task.project_file.parent / 'Actor-Mixer Hierarchy/MIDI.wwu'
+    tree = ET.parse(file)
+    source, = [row for row in tree.iter('SourcePlugin') if row.get('ID') == SOURCE]
+    prop = source.find("PropertyList/Property[@Name='OutputLevel']")
+    prop.remove(prop.find('RTPCList'))  # An ordinary Synth without this owned graph is outside the first full shape.
+    tree.write(file)
+    for role, binding in SAVED_ROLES.items():
+        if role != 'source': task.objects.pop(binding[0])
+    checked = checked_dirty_parent(task)
+    save = final_save_preview(task, checked)
+    receipt = authorize_execute_verify(task, save['transaction_id'])
+    code, parent = task.run(*receipt['next_command']['gateway_argv']); assert code == 0, parent
+    code, checked = task.run(*parent['next_command']['gateway_argv']); assert code == 0, checked
+    assert checked['next_command']['command'] == 'preview-from-draft'
+    code, preview = task.run(*checked['next_command']['gateway_argv']); assert code == 0, preview
+    assert preview['state'] == 'awaiting_confirmation'
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['save']
+
+
+def test_large_sound_childset_keeps_ordinary_copy_without_claiming_complete_saved_proof(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    for index in range(128):
+        identity = '{' + f'{index + 1:08X}' + '-0101-0101-0101-010101010101}'
+        task.objects[identity] = {'id': identity, 'name': f'Retained {index}', 'type': 'SourcePlugin',
+            'classId': 9699330, 'parent': {'id': SAVED_OWNER}, 'notes': '',
+            'path': task.objects[SAVED_OWNER]['path'] + f'\\Retained {index}'}
+    tx = public_copy(task)
+    code, result = task.run('verify', tx)
+    assert code == 0 and result['verified'], result
+    scope = result['verification']['verification_scope']
+    assert not scope['complete_copy_preservation'] and 'owner_childsets_over_observation_budget' in scope['unobserved']
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+def test_saved_same_sound_rename_preserves_source_and_owned_graph_with_new_root_name(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path, rename=True)
+    tx = public_copy(task, parent=SAVED_OWNER, conflict='rename')
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    save = final_save_preview(task, pending)
+    result = authorize_execute_verify(task, save['transaction_id'])
+    code, verified = task.run(*result['next_command']['gateway_argv'])
+    assert code == 0 and verified['verification']['verification_scope']['complete_copy_preservation'], verified
+    assert task.objects[COPIED]['name'] == 'Wwise Synth One1'
+    assert task.objects[SOURCE]['name'] == 'Wwise Synth One'
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+
+
+@pytest.mark.parametrize('owner', [SAVED_OWNER, DEST])
+def test_missing_owner_voice_flag_keeps_copy_partial_without_saved_proof(owner, tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    task.objects[owner].pop('@IsVoice')
+    tx = public_copy(task)
+    code, result = task.run('verify', tx)
+    assert code == 0 and result['verified'], result
+    scope = result['verification']['verification_scope']
+    assert not scope['complete_copy_preservation'] and 'owner_is_voice_unavailable' in scope['unobserved']
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+def independent_save(task):
+    code, started = task.run('draft-start', 'ak.wwise.core.project.save'); assert code == 0, started
+    identity, authority = started['draft']['draft_id'], started['task_authority']
+    code, declared = task.run('draft-declare-core-plan', identity, '--task-authority', authority,
+        '--expected-revision', str(started['draft']['revision'])); assert code == 0, declared
+    code, checked = task.run('draft-check', identity, '--task-authority', authority,
+        '--expected-revision', str(declared['draft']['revision'])); assert code == 0, checked
+    code, preview = task.run('preview-from-draft', identity, '--task-authority', authority,
+        '--expected-revision', str(checked['draft']['revision'])); assert code == 0, preview
+    return authorize_execute_verify(task, preview['transaction_id'])
+
+
+@pytest.mark.parametrize('fault', [None, ('control_input', 'LfoDepth', 91), ('rtpc', 'Color', 1)])
+def test_decline_after_independent_save_never_waives_observed_copied_owned_scalar_drift(tmp_path, fault):
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0 and pending['state'] == 'executed_unverified', pending
+    independent_save(task)
+    if fault:
+        role, field, value = fault
+        task.objects[SAVED_ROLES[role][1]]['@' + field] = value
+    code, result = task.run(*disclosed_decline(pending, 'final'))
+    if fault:
+        assert code == 2 and result['status'] == 'verification_failed', result
+    else:
+        assert code == 0 and result['verified'], result
+        scope = result['verification']['verification_scope']
+        assert not scope['complete_copy_preservation'] and scope['declined_saved_observation']['status'] == 'available_observations_preserved'
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+
+
+@pytest.mark.parametrize('fault', ['malformed-project', 'wrong-project-id', 'wrong-workunit-id'])
+def test_invalid_existing_dirty_document_does_not_offer_proof_save_but_keeps_ordinary_copy(tmp_path, fault):
+    runtime, writes, task = saved_source_task(tmp_path)
+    if fault == 'malformed-project':
+        task.project_file.write_text('<WwiseDocument><Project')
+    elif fault == 'wrong-project-id':
+        task.project_file.write_text(f'<WwiseDocument><Project ID="{DEST}"/></WwiseDocument>')
+    else:
+        file = task.project_file.parent / 'Actor-Mixer Hierarchy/Default Work Unit.wwu'
+        tree = ET.parse(file)
+        tree.find('.//WorkUnit').set('ID', DEST)
+        tree.write(file)
+    checked = checked_dirty_parent(task)
+    assert checked['next_command']['command'] == 'preview-from-draft', checked
+    code, preview = task.run(*checked['next_command']['gateway_argv'])
+    assert code == 0 and preview['state'] == 'awaiting_confirmation', preview
+    assert not writes
+
+
+@pytest.mark.parametrize('document', ['project', 'workunit'])
+def test_baseline_save_rejects_same_path_document_replacement_after_preview(tmp_path, document):
+    runtime, writes, task = saved_source_task(tmp_path)
+    checked = checked_dirty_parent(task)
+    assert task.run('config-set', '--project-modification-policy', 'allow_changes')[0] == 0
+    save = final_save_preview(task, checked)
+    file = task.project_file if document == 'project' else task.project_file.parent / 'Actor-Mixer Hierarchy/MIDI.wwu'
+    file.write_bytes(file.read_bytes() + b'\n')  # Valid XML, same GUIDs/path, different sealed bytes.
+    code, failed = task.run('execute', save['transaction_id'])
+    assert code == 2 and not writes, failed
+    assert 'disk changes block' in json.dumps(failed).lower(), failed
+
+
+def test_dirty_baseline_save_allows_live_source_not_yet_serialized_in_valid_workunit(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    file = task.project_file.parent / 'Actor-Mixer Hierarchy/MIDI.wwu'
+    tree = ET.parse(file)
+    for children in tree.iter('ChildrenList'):
+        for node in list(children):
+            if node.get('ID') == SOURCE: children.remove(node)
+    tree.write(file)
+    checked = checked_dirty_parent(task)
+    assert checked['next_command']['command'] == 'continue-source-copy-proof', checked
+    save = final_save_preview(task, checked)
+    assert save['state'] == 'awaiting_confirmation' and not writes, save
+
+
+def repeated_saved_source_task(tmp_path):
+    """Two property-local copies of genuine 2021 RTPC/LFO/Curve XML and metadata."""
+    import uuid
+    runtime, writes, task = saved_source_task(tmp_path)
+    source_path = Path(task.objects[SOURCE]['filePath'])
+    document = ET.parse(source_path)
+    source, = [node for node in document.iter('SourcePlugin') if node.get('ID') == SOURCE]
+    original = source.find("PropertyList/Property[@Name='OutputLevel']/RTPCList")
+    other_property = source.find("PropertyList/Property[@Name='Osc1Level']")
+    additional = deepcopy(original)
+    other_property.append(additional)
+    mappings = {binding[0]: binding[1] for binding in SAVED_ROLES.values()}
+    extra_objects, prototypes = {}, {}
+    for index, (role, binding) in enumerate(SAVED_ROLES.items()):
+        if role == 'source': continue
+        old, copied, tag, *_ = binding
+        added = '{' + str(uuid.UUID(int=0x57000000000000000000000000000000 + index)).upper() + '}'
+        cloned = '{' + str(uuid.UUID(int=0x58000000000000000000000000000000 + index)).upper() + '}'
+        node, = [node for node in additional.iter(tag) if node.get('ID') == old]
+        node.set('ID', added)
+        if 'ShortID' in node.attrib: node.set('ShortID', str(57000 + index))
+        extra_objects[added] = deepcopy(task.objects[old])
+        extra_objects[added].update(id=added, shortId=57000 + index)
+        prototypes[added] = prototypes[cloned] = old
+        mappings[added] = cloned
+    extra_ids = list(extra_objects)
+    extra_objects[extra_ids[1]]['owner'] = {'id': extra_ids[0]}
+    extra_objects[extra_ids[2]]['owner'] = {'id': extra_ids[0]}
+    task.objects.update(extra_objects)
+    document.write(source_path)
+    hops = {SAVED_ROLES['rtpc'][0]: SAVED_ROLES['control_input'][0], extra_ids[0]: extra_ids[1]}
+    call = task.call
+    def observed(uri, args=None, options=None):
+        args = args or {}
+        if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')) and args.get('object') in prototypes:
+            return call(uri, {**args, 'object': prototypes[args['object']]}, options)
+        if uri.endswith('object.get') and ' select @ControlInput ' in args.get('waql', ''):
+            identity = args['waql'].split('"')[1]
+            mapped_hops = {**hops, **{mappings[key]: mappings[value] for key, value in hops.items()}}
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': task.project_rows([task.objects[mapped_hops[identity]]], options)}
+        result = call(uri, args, options)
+        if uri.endswith('object.copy'):
+            for identity, row in extra_objects.items():
+                clone = deepcopy(row)
+                clone.update(id=mappings[identity], shortId=row['shortId'] + 1000)
+                clone['owner'] = {'id': mappings[clone['owner']['id']]}
+                task.objects[clone['id']] = clone
+        if uri.endswith('project.save') and COPIED in task.objects:
+            copied = deepcopy(source)
+            for node in copied.iter():
+                if node.get('ID') in mappings:
+                    node.set('ID', mappings[node.get('ID')])
+                    if 'ShortID' in node.attrib: node.set('ShortID', str(task.objects[node.get('ID')]['shortId']))
+            destination_path = Path(task.objects[DEST]['filePath'])
+            destination = ET.parse(destination_path)
+            saved_owner, = [node for node in destination.iter('Sound') if node.get('ID') == DEST]
+            saved_owner.find('ChildrenList')[:] = [copied]
+            destination.write(destination_path)
+        return result
+    task.call = observed
+    return runtime, writes, task, mappings
+
+
+def test_property_generic_repeated_owned_graph_finishes_through_separate_save(tmp_path):
+    runtime, writes, task, mapping = repeated_saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx)
+    assert code == 0 and pending['state'] == 'executed_unverified', json.dumps(pending.get('verification', pending))
+    saved = final_save_preview(task, pending)
+    result = authorize_execute_verify(task, saved['transaction_id'])
+    code, result = task.run(*result['next_command']['gateway_argv'])
+    assert code == 0 and result['verified'] is True, result
+    scope = result['verification']['verification_scope']
+    assert scope['complete_copy_preservation'] is True
+    assert scope['owned_role_count'] == 6 and scope['ordered_point_count'] == 4
+    assert scope['owned_guid_mapping'] == mapping
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+
+
+@pytest.mark.parametrize('fault', ['duplicate', 'cross-tag-alias', 'original-alias', 'owner', 'class', 'field', 'point-order'])
+def test_repeated_owned_graph_corruption_cannot_become_complete_copy(tmp_path, fault):
+    runtime, writes, task, mapping = repeated_saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    saved = final_save_preview(task, pending)
+    authorize_execute_verify(task, saved['transaction_id'])
+    extra = [identity for identity in mapping if identity not in {row[0] for row in SAVED_ROLES.values()}]
+    rtpc, lfo, curve = [mapping[identity] for identity in extra]
+    if fault in {'owner', 'class', 'field'}:
+        if fault == 'owner': task.objects[lfo]['owner'] = {'id': SAVED_ROLES['rtpc'][1]}
+        elif fault == 'class': task.objects[lfo]['classId'] += 1
+        else: task.objects[lfo]['@LfoFrequency'] = 99
+    else:
+        path = Path(task.objects[DEST]['filePath'])
+        document = ET.parse(path)
+        source, = [node for node in document.iter('SourcePlugin') if node.get('ID') == COPIED]
+        node, = [node for node in source.iter('Curve') if node.get('ID') == curve]
+        if fault == 'point-order': node.find('PointList')[:] = reversed(list(node.find('PointList')))
+        elif fault == 'cross-tag-alias':
+            ET.SubElement(document.find('.//WorkUnit/ChildrenList'), 'Sound', {'ID': curve, 'Name': 'Aliased unrelated declaration'})
+        elif fault == 'original-alias': node.set('ID', extra[2])
+        else: node.set('ID', SAVED_ROLES['curve'][1])
+        document.write(path)
+    code, failed = task.run('verify', tx)
+    assert code == 2 and failed['state'] == 'verification_failed', failed
+    assert failed['verification']['ok'] is False
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+    assert task.run('execute', tx)[0] == 2
+
+
+def test_obsolete_saved_graph_format_blocks_new_save_child_before_any_write(tmp_path):
+    from wwise_waapi.canonical import canonical_sha256, canonical_json_bytes
+    runtime, writes, task = saved_source_task(tmp_path)
+    checked = checked_dirty_parent(task)
+    path = tmp_path / 'state/operation-drafts-v1/records' / (checked['draft']['draft_id'] + '.json')
+    record = json.loads(path.read_text())
+    # Model the previously sealed file authority, independently of damaged-file
+    # detection: obsolete proof state has no owned-graph format discriminator.
+    record['check']['source_copy_file_binding'].pop('graph_format', None)
+    record.pop('record_digest')
+    record['record_digest'] = canonical_sha256({'contract': 'waapi-skill.operation-draft-record-digest/v1', 'record': record})
+    path.write_bytes(canonical_json_bytes(record))
+    code, blocked = task.run(*checked['next_command']['gateway_argv'])
+    assert code == 2 and 'next_command' not in blocked and writes == [], blocked
+    assert 'new object.copy Draft' in json.dumps(blocked), blocked
+
+
+@pytest.mark.parametrize('encoding', ['ObjectRef', 'unknown-reference'])
+def test_unclassified_graph_references_keep_ordinary_copy_explicitly_partial(tmp_path, encoding):
+    runtime, writes, task, mapping = repeated_saved_source_task(tmp_path)
+    path = Path(task.objects[SOURCE]['filePath'])
+    document = ET.parse(path)
+    source, = [node for node in document.iter('SourcePlugin') if node.get('ID') == SOURCE]
+    if encoding == 'ObjectRef': ET.SubElement(source, 'ObjectRef', {'ID': DEST})
+    else: source.find('.//Reference').set('Name', 'UnknownReference')
+    document.write(path)
+    tx = public_copy(task)
+    code, result = task.run('verify', tx)
+    assert code == 0 and result['verified'] is True, result
+    assert result['verification']['verification_scope']['complete_copy_preservation'] is False
+    assert 'next_command' not in result
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+@pytest.mark.parametrize('pointer_tag', ['ObjectRef', 'AudioNodeRef'])
+def test_known_pointer_outside_source_does_not_alias_owned_declaration(tmp_path, pointer_tag):
+    runtime, writes, task, mapping = repeated_saved_source_task(tmp_path)
+    path = Path(task.objects[SOURCE]['filePath'])
+    document = ET.parse(path)
+    # Reuse an actual 2021 pointer element encoding. Its occurrence is outside
+    # the copied Source and does not create a second object declaration.
+    retained = document if pointer_tag == 'ObjectRef' else ET.parse(
+        Path(__file__).parents[1] / '_org/2021.1/Dynamic Dialogue/Dialogue.wwu')
+    pointer = deepcopy(next(node for node in retained.iter(pointer_tag)))
+    pointer.set('ID', SOURCE)
+    pointer.set('Name', task.objects[SOURCE]['name'])
+    document.find('.//WorkUnit/ChildrenList').append(pointer)
+    document.write(path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx)
+    assert code == 0 and pending['state'] == 'executed_unverified', pending
+    saved = final_save_preview(task, pending)
+    result = authorize_execute_verify(task, saved['transaction_id'])
+    code, verified = task.run(*result['next_command']['gateway_argv'])
+    assert code == 0 and verified['verification']['verification_scope']['complete_copy_preservation'] is True, verified
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+
+
+@pytest.mark.parametrize('unreviewed', ['new-tag', 'same-tag-wrong-class'])
+def test_unreviewed_owned_class_keeps_source_copy_partial(tmp_path, unreviewed):
+    runtime, writes, task, mapping = repeated_saved_source_task(tmp_path)
+    identity = SAVED_ROLES['control_input'][0]
+    path = Path(task.objects[SOURCE]['filePath'])
+    document = ET.parse(path)
+    node, = [node for node in document.iter('ModulatorLfo') if node.get('ID') == identity]
+    if unreviewed == 'new-tag':
+        node.tag = task.objects[identity]['type'] = 'ModulatorEnvelope'
+        task.objects[identity]['classId'] = 4259856  # Matching packaged 2021 type catalog.
+        node.find('PropertyList').clear()
+        # Valid complete typed scalar observations at the fake-native boundary;
+        # matching XML/live type and readable values do not certify a new class.
+        call = task.call
+        def observed(uri, args=None, options=None):
+            args = args or {}
+            if args.get('object') == identity:
+                if uri.endswith('getPropertyAndReferenceNames'):
+                    return {'return': ['Color', 'OverrideColor']}
+                if uri.endswith('getPropertyInfo'):
+                    return {'name': args['property'], 'type': 'bool' if args['property'] == 'OverrideColor' else 'int16'}
+            return call(uri, args, options)
+        task.call = observed
+    else:
+        task.objects[identity]['classId'] += 1
+    document.write(path)
+    tx = public_copy(task)
+    code, result = task.run('verify', tx)
+    assert code == 0 and result['state'] == 'verified', result
+    assert result['verification']['verification_scope']['complete_copy_preservation'] is False
+    assert 'next_command' not in result
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_modern_saved_source_parser_retains_versioned_list_and_both_custom_references(version):
+    """Pinned saved syntax is evidence for parsing, never native selector support."""
+    from wwise_waapi.source_copy_proof import source_nodes, graph_edges
+    folder = 'Containers' if version == '2025.1' else 'Actor-Mixer Hierarchy'
+    path = Path(__file__).parents[1] / '_org' / version / folder / 'MIDI.wwu'
+    nodes = source_nodes({str(path): ET.parse(path)}, SOURCE, SAVED_OWNER, version=version)
+    assert [(node.tag, node.get('ID')) for node in nodes.values()] == [
+        ('SourcePlugin', SOURCE),
+        ('RTPC', '{CE99046D-D354-422D-A7BB-F1305FF00B2F}'),
+        ('ModulatorLfo', '{E323F786-253F-48C6-86B9-AB0335804E9F}'),
+        ('Curve', '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}'),
+    ]
+    owners, controls = graph_edges(nodes)
+    roles = {node.tag: role for role, node in nodes.items()}
+    assert owners == {roles['RTPC']: 'source', roles['ModulatorLfo']: roles['RTPC'],
+        roles['Curve']: roles['RTPC']}
+    assert controls == {roles['RTPC']: roles['ModulatorLfo']}
+
+
+@pytest.mark.parametrize('saved_version,claimed_version', [
+    ('2021.1', '2022.1'), ('2025.1', '2022.1'), ('2022.1', '2025.1'),
+])
+def test_saved_source_parser_rejects_another_versions_wrapper_family(saved_version, claimed_version):
+    from wwise_waapi.source_copy_proof import source_nodes, UnsupportedSavedShape
+    folder = 'Containers' if saved_version == '2025.1' else 'Actor-Mixer Hierarchy'
+    path = Path(__file__).parents[1] / '_org' / saved_version / folder / 'MIDI.wwu'
+    with pytest.raises(UnsupportedSavedShape):
+        source_nodes({str(path): ET.parse(path)}, SOURCE, SAVED_OWNER, version=claimed_version)
+
+
+def test_modern_source_parser_rejects_an_owned_curve_outside_its_canonical_reference():
+    from wwise_waapi.source_copy_proof import source_nodes, UnsupportedSavedShape
+    path = Path(__file__).parents[1] / '_org/2025.1/Containers/MIDI.wwu'
+    document = ET.parse(path)
+    source, = [node for node in document.iter('SourcePlugin') if node.get('ID') == SOURCE]
+    rtpc, = source.iter('RTPC')
+    extra = deepcopy(next(rtpc.iter('Curve')))
+    extra.set('ID', '{58585858-5858-4858-8858-585858585858}')
+    rtpc.append(extra)
+    with pytest.raises(UnsupportedSavedShape):
+        source_nodes({str(path): document}, SOURCE, SAVED_OWNER, version='2025.1')
+
+
+@pytest.mark.parametrize('version,minor,build', [
+    ('2022.1', 19, 8584), ('2023.1', 19, 8928), ('2024.1', 13, 9056), ('2025.1', 7, 9143),
+])
+def test_saved_source_origin_validates_only_the_exact_modern_runtime(tmp_path, version, minor, build):
+    from wwise_waapi.source_copy_proof import final_origin, validate_origin, supported, SavedCopyProofError
+    from wwise_waapi.transactions import TransactionStore
+    runtime, writes, task = saved_source_task(tmp_path)
+    transaction = TransactionStore(runtime.state_dir).load_snapshot(public_copy(task))
+    origin = deepcopy(final_origin(transaction))
+    origin['version'] = version
+    guard = origin['context']['project_guard']
+    guard['version'] = version
+    guard['wwise']['version'].update(year=int(version[:4]), minor=minor, build=build, displayName='v' + version + f'.{minor}.{build}')
+    validate_origin(origin, version)
+    assert supported({'project_guard': guard})
+    guard['wwise']['version']['build'] += 1
+    assert not supported({'project_guard': guard})
+    with pytest.raises(SavedCopyProofError):
+        validate_origin(origin, version)
+
+
+def test_final_source_origin_preserves_its_parent_version(tmp_path):
+    from dataclasses import replace
+    from wwise_waapi.source_copy_proof import final_origin
+    from wwise_waapi.transactions import TransactionStore
+    runtime, writes, task = saved_source_task(tmp_path)
+    transaction = TransactionStore(runtime.state_dir).load_snapshot(public_copy(task))
+    # Isolate the origin constructor's version propagation; no modern live claim.
+    artifact = deepcopy(transaction.preview.artifact)
+    artifact['request']['version'] = '2025.1'
+    parent = replace(transaction, preview=replace(transaction.preview, artifact=artifact))
+    assert final_origin(parent)['version'] == '2025.1'
+
+
+def test_baseline_source_decision_preserves_its_exact_modern_version_binding(tmp_path):
+    from wwise_waapi.operation_drafts import OperationDraftStore
+    from wwise_waapi.source_copy_proof import ORIGIN, validate_origin, validate_decision
+    runtime, writes, task = saved_source_task(tmp_path)
+    checked = checked_dirty_parent(task)
+    code, child = task.run(*checked['next_command']['gateway_argv']); assert code == 0, child
+    record = OperationDraftStore(runtime.state_dir).inspect(child['draft']['draft_id'], task_authority=child['task_authority'])
+    origin = deepcopy(record.composition[ORIGIN])
+    origin['version'] = origin['context']['project_guard']['version'] = '2023.1'
+    origin['context']['project_guard']['wwise']['version'].update(year=2023, minor=19, build=8928)
+    validate_origin(origin, '2023.1')
+    validate_decision({'status': 'declined', 'request_digest': origin['parent']['request_digest'],
+        'origin': origin, 'receipt': None})

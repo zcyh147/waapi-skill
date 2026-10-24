@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 from .audio_import_business_contracts import audio_import_business_contract_data
+from .authoring_model_business import MODEL_OPERATIONS, model_business_contract, materialize_model_business
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, layout_business_contract_data, materialize_layout_business_request
 from .authoring_ui_business_contracts import authoring_ui_business_contract_data
 from .exact_artifact_business_contracts import (
     exact_artifact_business_contract_data,
@@ -449,6 +451,7 @@ class BusinessAdapter:
         session: BusinessDeclarationSession,
         *,
         allow_cleaned_file_evidence: bool = False,
+        history_state_dir=None,
     ) -> Mapping[str, Any]:
         if allow_cleaned_file_evidence:
             if self._cleaned_file_evidence_materializer is None:
@@ -456,6 +459,9 @@ class BusinessAdapter:
                     f"{self.operation} does not accept cleaned file evidence"
                 )
             return self._cleaned_file_evidence_materializer(self.operation, session)
+        if self._materializer is _materialize_core_business:
+            from .core_business import materialize_core_business_request
+            return materialize_core_business_request(self.operation, session, history_state_dir=history_state_dir)
         return self._materializer(self.operation, session)
 
     def accepts_update_command(self, command: str) -> bool:
@@ -630,6 +636,7 @@ _OBJECT_RTPC_DEFINITION = {
         "cancel",
     ),
     "supports_field_discovery": True,
+    "supports_type_discovery": True,
     "auto_apply_preview": True,
 }
 
@@ -643,6 +650,8 @@ _OBJECT_SET_BUSINESS_DEFINITION = {
             "draft-business-configure",
             "draft-clear-object-list",
             "draft-declare-existing",
+            "draft-declare-field-change",
+            "draft-declare-rtpc",
             "draft-declare-new",
             "draft-remove-declaration",
             "draft-revise-declaration",
@@ -657,6 +666,8 @@ _OBJECT_SET_BUSINESS_DEFINITION = {
         "discover-fields",
         "discover-types",
         "declare-existing",
+        "declare-field-change",
+        "declare-rtpc",
         "declare-new",
         "revise-declaration",
         "remove-declaration",
@@ -992,7 +1003,24 @@ def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdap
     return BusinessAdapter(operation=operation, **values)
 
 
+_LAYOUT_BUSINESS_DEFINITION = {
+    "family": "authoring-layout-business", "contract_builder": layout_business_contract_data,
+    "materializer": materialize_layout_business_request,
+    "update_commands": frozenset({"draft-declare-layout-plan"}),
+    "initial_projection_actions": ("declare-layout-plan", "inspect", "cancel"),
+    "active_projection_actions": ("declare-layout-plan", "check", "inspect", "cancel"),
+    "auto_apply_preview": True, "settings_are_complete_declaration": True,
+}
+
+_MODEL_BUSINESS_DEFINITION = {**_LAYOUT_BUSINESS_DEFINITION, "family": "authoring-model-business",
+    "contract_builder": model_business_contract, "materializer": materialize_model_business,
+    "update_commands": frozenset({"draft-declare-model-plan"}),
+    "initial_projection_actions": ("declare-model-plan", "inspect", "cancel"),
+    "active_projection_actions": ("declare-model-plan", "check", "inspect", "cancel")}
+
 _BUSINESS_ADAPTERS = {
+    **{op: _bind_adapter(op, {**_MODEL_BUSINESS_DEFINITION, "auto_apply_preview": op != "ak.wwise.ui.model.getState"}) for op in MODEL_OPERATIONS},
+    **{operation: _bind_adapter(operation, _LAYOUT_BUSINESS_DEFINITION) for operation in LAYOUT_MUTATION_URIS},
     **{
         operation: _bind_adapter(operation, _HOST_UI_DEBUG_DEFINITION)
         for operation in HOST_UI_DEBUG_DRAFT_OPERATIONS

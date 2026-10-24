@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from typing import Any, Mapping
 
 from .business_declaration_state import (
@@ -13,10 +14,15 @@ from .business_declarations import (
     BusinessDeclarationError,
     ExistingObjectTarget,
     NewDescendantTarget,
+    AnonymousListTarget,
+    OwnedRtpcTarget,
     business_repair,
     resolve_semantic_kind,
+    require_bound_name_mutability,
 )
 from .object_graph_business_contracts import object_graph_business_contract_data
+from .documented_list_fields import resolve_list_choice, resolve_planned_list_evidence
+from .planned_references import compile_result_reference, graph_result_bindings, order_result_rows
 from .business_fields import ACTION_DURATION_FIELDS, OBJECT_BUSINESS_FIELD_TYPES
 from .operation_object import (
     DEFAULT_MAX_CHILDREN_PER_NODE,
@@ -24,12 +30,17 @@ from .operation_object import (
     DEFAULT_MAX_FIELDS_PER_NODE,
     DEFAULT_MAX_NAME_LENGTH,
     DEFAULT_MAX_NODES,
+    OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
+    RTPC_POINT_SHAPES,
     normalize_object_list_name,
+    normalize_curve_points,
 )
 from .operation_plugin import (
     MAX_PLUGIN_NAME_LENGTH,
     MAX_PLUGIN_NOTES_LENGTH,
     MAX_PLUGIN_PROPERTIES,
+    PLUGIN_KINDS,
+    PLUGIN_TYPE_CATEGORIES,
 )
 from .object_capabilities import (
     object_child_capability,
@@ -54,36 +65,26 @@ _CREATE_SETTINGS = frozenset(
 )
 _SET_NODE_EXTENSION_FIELDS = frozenset(
     {
+        "clear_object_lists",
         "language",
         "list_behavior",
         "media_files",
         "object_list",
         "platform",
+        "plugin_placement",
     }
 )
 _RTPC_FIELDS = frozenset(
     {
         "control_input_handle",
+        "new_control_input",
         "curve_points",
         "field_handle",
         "mode",
         "notes",
     }
 )
-_RTPC_SHAPES = frozenset(
-    {
-        "Constant",
-        "Linear",
-        "Log3",
-        "Log2",
-        "Log1",
-        "InvertedSCurve",
-        "SCurve",
-        "Exp1",
-        "Exp2",
-        "Exp3",
-    }
-)
+_RTPC_SHAPES = RTPC_POINT_SHAPES
 
 
 def _validate_declaration_graph_limits(
@@ -102,7 +103,7 @@ def _validate_declaration_graph_limits(
         isinstance(row.target, ExistingObjectTarget)
         for row in session.declarations
     )
-    node_count = len(new_rows) + (existing_count if include_existing_targets else 0)
+    node_count = len(new_rows) + sum(isinstance(row.target, OwnedRtpcTarget) for row in session.declarations) + (existing_count if include_existing_targets else 0)
     if node_count > DEFAULT_MAX_NODES:
         raise _repair(
             session,
@@ -303,6 +304,18 @@ def _compile_object_set_import(
     return {"files": files}
 
 
+def _compile_list_name(session, value, *, owner_handle):
+    if not isinstance(value, str) or not value.startswith("bfh1-"):
+        value = normalize_object_list_name(value, request_path="$.business.object_list")
+    planned = any(row.result_handle == owner_handle and isinstance(row.target, NewDescendantTarget)
+        for row in session.declarations)
+    if planned:
+        return resolve_planned_list_evidence(session, value, owner_handle=owner_handle)["declaration"]["name"]
+    if value.startswith("bfh1-"):
+        return resolve_list_choice(session, value, owner_id=session.handles.resolve_object(owner_handle).object_id).token
+    return normalize_object_list_name(value, request_path="$.business.object_list")
+
+
 def _compile_set_new_node(
     session: BusinessDeclarationSession,
     declaration: BusinessDeclaration,
@@ -323,8 +336,23 @@ def _compile_set_new_node(
     node = {
         "type": _resolve_native_object_type(session, declaration.target.kind),
         "name": declaration.target.name,
-        **_compile_create_fields(session, base),
+        **_compile_create_fields(session, base,
+            allow_reference_arrays=session.context.wwise_version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
+            allow_inline_curve=True),
     }
+    placement = extension_fields.get("plugin_placement")
+    if placement is not None:
+        kind = session.handles.resolve_type(declaration.target.kind)
+        role = kind.type_category.casefold()
+        if role not in {"effect", "source"} or placement not in ({"owner"} if role == "source" else {"shareset", "owner"}):
+            raise _repair(session, "TYPE_HANDLE_ROLE_MISMATCH", field="plugin_placement", action="select an Effect Type Handle with a disclosed placement or a Source Type Handle with owner placement")
+        node["plugin"] = {"kind": role, "placement": placement, "name": declaration.target.name,
+            "class_id": kind.class_id, "properties": node.get("properties", []),
+            **({"notes": node["notes"]} if "notes" in node else {})}
+    if isinstance(declaration.target, AnonymousListTarget):
+        if extension_fields.get("object_list") is None:
+            raise _repair(session, "ANONYMOUS_LIST_PLACEMENT_INVALID", field="object_list", action="select the certified owning List Field Handle")
+        node["anonymous"] = True
     platform = extension_fields.get("platform")
     if platform is not None:
         if not isinstance(platform, str) or not platform.strip():
@@ -343,7 +371,7 @@ def _compile_set_new_node(
             not isinstance(language, str)
             or not language
             or language.casefold() == "sfx"
-            or not is_sound
+            or (not is_sound and node.get("plugin", {}).get("kind") != "source")
             or semantic_kind == "sound-sfx"
         ):
             raise _repair(
@@ -352,14 +380,12 @@ def _compile_set_new_node(
                 field="language",
                 action="provide one exact non-SFX Project language for a Sound Voice",
             )
-        node["language"] = language
-    elif declaration.target.kind == "sound-voice":
-        raise _repair(
-            session,
-            "OBJECT_SET_VOICE_LANGUAGE_REQUIRED",
-            field="language",
-            action="provide the exact Project language for the new Sound Voice",
-        )
+        if node.get("plugin", {}).get("kind") == "source":
+            node["plugin"]["language"] = language
+        else:
+            node["language"] = language
+    if node.get("plugin", {}).get("kind") == "source" and platform is not None:
+        node["plugin"]["platform"] = platform
     if "media_files" in extension_fields:
         node["import"] = _compile_object_set_import(
             session,
@@ -368,11 +394,10 @@ def _compile_set_new_node(
     object_list = extension_fields.get("object_list")
     if object_list is not None:
         try:
-            object_list = normalize_object_list_name(
-                object_list,
-                request_path="$.business.object_list",
-            )
-        except Exception as exc:
+            object_list = _compile_list_name(session, object_list, owner_handle=declaration.target.parent_handle)
+        except BusinessDeclarationError:
+            raise
+        except (ValueError, TypeError) as exc:
             raise _repair(
                 session,
                 "OBJECT_SET_LIST_NAME_INVALID",
@@ -388,7 +413,27 @@ def _compile_set_new_node(
             choices=["append", "replace-all"],
             action="choose one disclosed per-target object-list outcome",
         )
-    if list_behavior is not None and object_list is None:
+    clears = extension_fields.get("clear_object_lists")
+    if clears is not None:
+        if not isinstance(clears, list) or not 1 <= len(clears) <= DEFAULT_MAX_CHILDREN_PER_NODE:
+            raise _repair(session, "OBJECT_SET_LIST_CLEAR_LIMIT_INVALID", field="clear_object_lists",
+                          action="name a bounded nonempty set of owned lists to clear")
+        if list_behavior != "replace-all":
+            raise _repair(session, "OBJECT_SET_EMPTY_LIST_REQUIRES_REPLACE", field="list_behavior",
+                          action="choose replace-all before clearing an owned list")
+        names = []
+        for name in clears:
+            try:
+                names.append(_compile_list_name(session, name, owner_handle=declaration.result_handle))
+            except BusinessDeclarationError:
+                raise
+            except (ValueError, TypeError) as exc:
+                raise _repair(session, "OBJECT_SET_LIST_NAME_INVALID", field="clear_object_lists",
+                              action="provide exact owned-list names without an @ prefix") from exc
+        if len({name.casefold() for name in names}) != len(names):
+            raise _repair(session, "OBJECT_SET_LIST_DUPLICATE", field="clear_object_lists", action="name each list once")
+        node["lists"] = [{"name": name, "objects": []} for name in names]
+    if list_behavior is not None and object_list is None and clears is None:
         raise _repair(
             session,
             "OBJECT_SET_LIST_NAME_REQUIRED",
@@ -452,7 +497,8 @@ def _resolve_native_object_type(
                     "or the metadata operations"
                 ),
             )
-        return native_type
+        bound = session.handles.resolve_type(kind_name)
+        return {"effect": "Effect", "source": "Source"}.get(bound.type_category.casefold(), native_type)
     version = session.context.wwise_version
     kind = resolve_semantic_kind(kind_name, version=version)
     if kind.name in {"sound-sfx", "sound-voice"}:
@@ -460,9 +506,72 @@ def _resolve_native_object_type(
     return kind.native_object_type
 
 
+def _compile_graph_field_reference(session: BusinessDeclarationSession, field: Any, value: Any, *,
+                                   allow_arrays: bool, allow_inline_curve: bool) -> dict[str, Any]:
+    if isinstance(value, list) and not allow_arrays:
+        raise _repair(session, "NATIVE_VALUE_UNION_UNAVAILABLE", field="field_values",
+                      action="string reference arrays require the pinned object.set 2023.1-2025.1 alternative; choose one bound reference or null in this lane")
+    if isinstance(value, list) and field.field_kind != "list":
+        raise _repair(session, "REFERENCE_LIST_EVIDENCE_REQUIRED", field="field_values",
+                      action="discover this exact class's documented Lists; scalar Reference metadata does not certify array assignment")
+    if field.field_kind == "list" and not isinstance(value, list):
+        raise _repair(session, "LIST_VALUE_REQUIRES_BOUND_OBJECT_ARRAY", field="field_values",
+                      action="use an array of selected existing Object Handles, or the owned-list construction/clear declaration")
+    if isinstance(value, Mapping) and not allow_inline_curve:
+        raise _repair(session, "NATIVE_VALUE_UNION_UNAVAILABLE", field="field_values",
+                      action="object.create accepts one bound reference or null; complex reference values belong to available object.set lanes")
+    if isinstance(value, Mapping):
+        if set(value) == {"new_control_input_business"}:
+            if field.scope_kind != "object" or field.field_kind != "reference" or field.token != "ControlInput":
+                raise _repair(session, "INVALID_CONTROL_INPUT_PLACEMENT", field="field_values",
+                    action="select the exact existing RTPC Control Input Reference Field Handle")
+            from .owned_control_inputs import compile_owned_control_input
+            return {"name": field.token, "target": compile_owned_control_input(session, value["new_control_input_business"])}
+        if set(value) != {"curve_points"}:
+            raise _repair(session, "INLINE_CURVE_INPUT_INVALID", field="field_values",
+                          action="provide only curve_points; native type, IDs and field tokens remain Gateway-owned")
+        points = normalize_curve_points(value["curve_points"], request_path="$.business.curve_points")
+        return {"name": field.token, "target": {"curve_points": [point.as_dict() for point in points]}}
+    if value is None:
+        return {"name": field.token, "target": None}
+    values = value if isinstance(value, list) else [value]
+    if len(values) > DEFAULT_MAX_FIELDS_PER_NODE:
+        raise _repair(session, "OBJECT_GRAPH_REFERENCE_LIMIT_EXCEEDED", field="field_values",
+                      action="split the reference array into a bounded request")
+    identities = []
+    for item in values:
+        if isinstance(item, str) and item.startswith("bnh1-") and field.field_kind == "reference":
+            identities.append(compile_result_reference(session, field, item, native_type=_resolve_native_object_type))
+            continue
+        handle = (session.handles.resolve_object(item).handle if field.field_kind == "list"
+                  else session.handles.validate_field_value(field, item))
+        target = session.handles.resolve_object(handle)
+        identities.append({"kind": "id", "value": target.object_id})
+    return {"name": field.token, "target": identities if isinstance(value, list) else identities[0]}
+
+
+def _apply_sound_kind_fields(session, declaration, properties):
+    """Bind Voice meaning to its documented Sound scalar, not a wire alias."""
+    target = declaration.target
+    if not isinstance(target, NewDescendantTarget) or target.kind.startswith("bth1-"):
+        return
+    kind = resolve_semantic_kind(target.kind, version=session.context.wwise_version).name
+    if kind not in {"sound-sfx", "sound-voice"}:
+        return
+    voice = kind == "sound-voice"
+    explicit = [row for row in properties if row["name"].casefold() == "isvoice"]
+    if any(row["value"] is not voice for row in explicit):
+        raise _repair(session, "SOUND_KIND_FIELD_CONFLICT", field="field_values",
+            action="choose a Sound kind consistent with the explicitly selected IsVoice value")
+    if voice and not explicit:
+        properties.append({"name": "IsVoice", "value": True})
+
+
 def _compile_create_fields(
     session: BusinessDeclarationSession,
     declaration: BusinessDeclaration,
+    *, allow_reference_arrays: bool = False,
+    allow_inline_curve: bool = False,
 ) -> dict[str, Any]:
     fields = dict(declaration.fields)
     unexpected = sorted(set(fields) - _CREATE_FIELDS)
@@ -568,7 +677,12 @@ def _compile_create_fields(
         properties.append(
             {"name": "IgnoreParentMaxSoundInstance", "value": value}
         )
-    if "output_bus" in fields:
+    if "output_bus" in fields and isinstance(fields["output_bus"], str) and fields["output_bus"].startswith("bnh1-"):
+        from types import SimpleNamespace
+        reference = compile_result_reference(session, SimpleNamespace(token="OutputBus"), fields["output_bus"],
+            native_type=_resolve_native_object_type, allowed_types=["Bus", "AudioBus", "AuxBus", "AuxiliaryBus"])
+        references.append({"name": "OutputBus", "target": reference})
+    elif "output_bus" in fields:
         bus = session.handles.resolve_object(fields["output_bus"])
         if bus.object_type.casefold().replace(" ", "") not in {
             "bus",
@@ -623,6 +737,8 @@ def _compile_create_fields(
                 rejected_handle=field.handle,
                 action="discover the field for this exact declared object kind",
             )
+        if isinstance(business_value, Mapping) and "new_control_input_business" in business_value:
+            raise _repair(session, "INVALID_CONTROL_INPUT_PLACEMENT", field="field_values", action="bind the exact existing RTPC for an owned Control Input replacement")
         if field.token in used_tokens:
             raise _repair(
                 session,
@@ -631,17 +747,13 @@ def _compile_create_fields(
                 action="set one business meaning through one field only",
             )
         used_tokens.add(field.token)
-        normalized = session.handles.validate_field_value(field, business_value)
         if field.field_kind == "property":
+            normalized = session.handles.validate_field_value(field, business_value)
             properties.append({"name": field.token, "value": normalized})
         else:
-            target = session.handles.resolve_object(normalized)
-            references.append(
-                {
-                    "name": field.token,
-                    "target": {"kind": "id", "value": target.object_id},
-                }
-            )
+            references.append(_compile_graph_field_reference(session, field, business_value,
+                allow_arrays=allow_reference_arrays, allow_inline_curve=allow_inline_curve))
+    _apply_sound_kind_fields(session, declaration, properties)
     _validate_compiled_field_limit(
         session,
         properties=properties,
@@ -751,17 +863,6 @@ def _materialize_create(
                 field="target",
                 action="object.create accepts only named new-object declarations",
             )
-        if row.target.kind == "sound-voice":
-            raise _repair(
-                session,
-                "OBJECT_CREATE_VOICE_UNAVAILABLE",
-                field="kind",
-                choices=["audio.import", "object.set"],
-                action=(
-                    "use audio.import for a media outcome or object.set with an "
-                    "exact Project language for a new Sound Voice"
-                ),
-            )
         parent_handle = row.target.parent_handle
         if parent_handle in declarations:
             children.setdefault(parent_handle, []).append(row)
@@ -777,13 +878,46 @@ def _materialize_create(
             action="declare exactly one new root and its descendants",
         )
 
+    node_result_handles = {}
+
     def compile_node(row: BusinessDeclaration) -> dict[str, Any]:
         assert isinstance(row.target, NewDescendantTarget)
+        fields = dict(row.fields)
+        object_list = fields.pop("object_list", None)
+        if object_list is not None and row is not roots[0]:
+            raise _repair(
+                session,
+                "OBJECT_CREATE_DESCENDANT_LIST_UNAVAILABLE",
+                field="object_list",
+                action="object.create accepts list placement only on its root; use object.set for recursive owned lists",
+            )
+        base = BusinessDeclaration(
+            declaration_id=row.declaration_id,
+            result_handle=row.result_handle,
+            target=row.target,
+            fields=fields,
+        )
         node = {
             "type": _resolve_native_object_type(session, row.target.kind),
             "name": row.target.name,
-            **_compile_create_fields(session, row),
+            **_compile_create_fields(session, base),
         }
+        node_result_handles[id(node)] = row.result_handle
+        if object_list is not None:
+            try:
+                node["list"] = (resolve_list_choice(session, object_list,
+                    owner_id=session.handles.resolve_object(row.target.parent_handle).object_id).token
+                    if object_list.startswith("bfh1-") else normalize_object_list_name(
+                        object_list, request_path="$.business.object_list"))
+            except BusinessDeclarationError:
+                raise
+            except (ValueError, TypeError) as exc:
+                raise _repair(
+                    session,
+                    "OBJECT_CREATE_LIST_NAME_INVALID",
+                    field="object_list",
+                    action="provide one exact Wwise object-list name without an @ prefix",
+                ) from exc
         child_rows = children.get(row.result_handle, [])
         if child_rows:
             for child in child_rows:
@@ -808,11 +942,22 @@ def _materialize_create(
         **root_node,
         **_compile_create_settings(session),
     }
-    _validate_specialized_relationship(
-        session,
-        parent_type=parent.object_type,
-        child_type=root_node["type"],
-    )
+    result_bindings = graph_result_bindings([(root_node, "$")], node_result_handles)
+    if result_bindings:
+        arguments["graph_result_bindings"] = result_bindings
+    if "list" in root_node:
+        matches = [field for field in session.handles.as_dict()["fields"]
+            if field["field_kind"] == "list" and field["scope_kind"] == "object"
+            and field["scope_value"] == parent.object_id and field["token"] == root_node["list"]]
+        if matches:
+            field = resolve_list_choice(session, root_node["list"], owner_id=parent.object_id)
+            arguments["documented_list_bindings"] = [dict(field.restrictions["documented_list"])]
+    if "list" not in root_node:
+        _validate_specialized_relationship(
+            session,
+            parent_type=parent.object_type,
+            child_type=root_node["type"],
+        )
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",
@@ -864,18 +1009,16 @@ def _materialize_create_plugin(
             action="use only the disclosed plug-in business fields",
         )
     role = fields["plugin_role"]
-    if role not in {"source", "effect"}:
+    if role not in PLUGIN_KINDS:
         raise _repair(
             session,
             "FIELD_VALUE_UNAVAILABLE",
             field="plugin_role",
-            choices=["source", "effect"],
+            choices=["source", "effect", "sink", "metadata"],
             action="choose the requested Wwise plug-in role",
         )
     type_handle = session.handles.resolve_type(fields["plugin_type_handle"])
-    accepted_categories = (
-        {"source"} if role == "source" else {"effect", "audiodevice"}
-    )
+    accepted_categories = {PLUGIN_TYPE_CATEGORIES[role].casefold()}
     if type_handle.type_category.casefold() not in accepted_categories:
         raise _repair(
             session,
@@ -969,12 +1112,13 @@ def _materialize_create_plugin(
             action="provide one bounded Field Handle to business value map",
         )
     properties: list[dict[str, Any]] = []
+    references: list[dict[str, Any]] = []
     for handle, business_value in dynamic.items():
         field = session.handles.bound_field(handle)
         if (
             field.scope_kind != "class"
             or field.scope_value not in {type_handle.class_id, type_handle.name}
-            or field.field_kind != "property"
+            or field.field_kind not in {"property", "reference"}
         ):
             raise _repair(
                 session,
@@ -983,16 +1127,13 @@ def _materialize_create_plugin(
                 rejected_handle=field.handle,
                 action="discover the property for the selected plug-in type",
             )
-        properties.append(
-            {
-                "name": field.token,
-                "value": session.handles.validate_field_value(
-                    field,
-                    business_value,
-                ),
-            }
-        )
-    if len(properties) > MAX_PLUGIN_PROPERTIES:
+        value = session.handles.validate_field_value(field, business_value)
+        if field.field_kind == "reference":
+            chosen = session.handles.resolve_object(value)
+            references.append({"name": field.token, "target": {"kind": "id", "value": chosen.object_id}})
+        else:
+            properties.append({"name": field.token, "value": value})
+    if len(properties) + len(references) > MAX_PLUGIN_PROPERTIES:
         raise _repair(
             session,
             "PLUGIN_PROPERTY_LIMIT_EXCEEDED",
@@ -1003,6 +1144,8 @@ def _materialize_create_plugin(
         )
     if properties:
         plugin["properties"] = properties
+    if references:
+        plugin["references"] = references
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",
@@ -1029,6 +1172,7 @@ def _compile_existing_set_fields(
         "clear_object_lists",
         "list_behavior",
         "media_files",
+        "name_conflict",
         "new_name",
         "platform",
     }
@@ -1049,6 +1193,7 @@ def _compile_existing_set_fields(
             "field_values",
             "list_behavior",
             "media_files",
+            "name_conflict",
             "new_name",
             "platform",
         }
@@ -1059,8 +1204,22 @@ def _compile_existing_set_fields(
         target=declaration.target,
         fields=stable_fields,
     )
-    compiled = _compile_create_fields(session, stable_declaration)
+    compiled = _compile_create_fields(session, stable_declaration,
+        allow_reference_arrays=session.context.wwise_version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
+        allow_inline_curve=True)
+    if "name_conflict" in fields:
+        conflict = fields["name_conflict"]
+        if conflict not in {"fail", "rename", "merge", "replace"}:
+            raise _repair(
+                session,
+                "FIELD_VALUE_UNAVAILABLE",
+                field="name_conflict",
+                choices=["fail", "rename", "merge", "replace"],
+                action="choose one disclosed collision outcome for this target's new children and list members",
+            )
+        compiled["on_name_conflict"] = conflict
     if "new_name" in fields:
+        require_bound_name_mutability(source)
         semantics = object_identity_semantics(source.object_type)
         if not semantics.mutable_intrinsic_name:
             raise _repair(
@@ -1135,10 +1294,10 @@ def _compile_existing_set_fields(
         names: list[str] = []
         for index, value in enumerate(raw_clears):
             try:
-                name = normalize_object_list_name(
-                    value,
-                    request_path=f"$.business.clear_object_lists[{index}]",
-                )
+                name = (resolve_list_choice(session, value, owner_id=source.object_id).token
+                    if value.startswith("bfh1-") else normalize_object_list_name(value, request_path="$.business.clear_object_lists"))
+            except BusinessDeclarationError:
+                raise
             except Exception as exc:
                 raise _repair(
                     session,
@@ -1187,6 +1346,8 @@ def _compile_existing_set_fields(
                 rejected_handle=field.handle,
                 action="discover each field for its exact bulk-set target",
             )
+        if isinstance(business_value, Mapping) and "new_control_input_business" in business_value and source.object_type != "RTPC":
+            raise _repair(session, "INVALID_CONTROL_INPUT_PLACEMENT", field="field_values", action="bind the exact existing RTPC for an owned Control Input replacement")
         if field.token in used_tokens:
             raise _repair(
                 session,
@@ -1197,17 +1358,13 @@ def _compile_existing_set_fields(
         used_tokens.add(field.token)
         if field.platform is not None:
             platforms.add(field.platform)
-        normalized = session.handles.validate_field_value(field, business_value)
         if field.field_kind == "property":
+            normalized = session.handles.validate_field_value(field, business_value)
             properties.append({"name": field.token, "value": normalized})
         else:
-            target = session.handles.resolve_object(normalized)
-            references.append(
-                {
-                    "name": field.token,
-                    "target": {"kind": "id", "value": target.object_id},
-                }
-            )
+            references.append(_compile_graph_field_reference(session, field, business_value,
+                allow_arrays=session.context.wwise_version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
+                allow_inline_curve=True))
     _validate_compiled_field_limit(
         session,
         properties=properties,
@@ -1267,36 +1424,54 @@ def _materialize_set(
         else:
             root_new.append(row)
 
-    def compile_node(
-        row: BusinessDeclaration,
-        *,
-        allow_object_list: bool,
-    ) -> tuple[dict[str, Any], str | None, str | None]:
+    node_result_handles = {}
+
+    def compile_rtpc(row):
+        rtpc_args = _materialize_set_rtpc(replace(session, declarations=(row,)), planned_owners=new_by_result)["arguments"]
+        node = {"rtpc": {key: rtpc_args[key] for key in ("property", "control_input", "points", "notes") if key in rtpc_args},
+            "rtpc_mode": rtpc_args["mode"]}
+        node_result_handles[id(node)] = row.result_handle
+        new_input = node["rtpc"]["control_input"].get("new_control_input")
+        if new_input is not None:
+            from .canonical import canonical_sha256
+            node_result_handles[id(new_input)] = "bnh1-" + canonical_sha256({"owned_control_input_of": row.result_handle})[:32]
+        return node
+
+    def compile_node(row: BusinessDeclaration) -> tuple[dict[str, Any], str | None, str | None]:
         assert isinstance(row.target, NewDescendantTarget)
         node, object_list, list_behavior = _compile_set_new_node(session, row)
-        if not allow_object_list and object_list is not None:
-            raise _repair(
-                session,
-                "OBJECT_SET_NESTED_LIST_UNAVAILABLE",
-                field="object_list",
-                action="put object-list roots directly under one bound existing owner",
-            )
+        node_result_handles[id(node)] = row.result_handle
         descendants = planned_children.get(row.result_handle, [])
         if descendants:
             for child in descendants:
                 assert isinstance(child.target, NewDescendantTarget)
-                _validate_specialized_relationship(
-                    session,
-                    parent_type=node["type"],
-                    child_type=_resolve_native_object_type(
-                        session,
-                        child.target.kind,
-                    ),
-                )
-            node["children"] = [
-                compile_node(child, allow_object_list=False)[0]
-                for child in descendants
-            ]
+                child_node, child_list, child_behavior = compile_node(child)
+                if child_behavior is not None:
+                    if list_behavior is not None and list_behavior != child_behavior:
+                        raise _repair(session, "OBJECT_SET_LIST_BEHAVIOR_CONFLICT", field="list_behavior",
+                                      action="use one inherited per-target list behavior for this graph")
+                    list_behavior = child_behavior
+                if child_list is None:
+                    if "plugin" not in child_node:
+                        _validate_specialized_relationship(session, parent_type=node["type"], child_type=child_node["type"])
+                    elif child_node["plugin"]["kind"] == "source":
+                        if node["type"] != "Sound":
+                            raise _repair(session, "INVALID_SOURCE_TARGET", field="parent_handle", action="attach the Source plugin to a planned Sound or Voice")
+                        if child_node["plugin"].get("language") is not None and not any(
+                                prop["name"].casefold() == "isvoice" and prop["value"] is True for prop in node.get("properties", [])):
+                            raise _repair(session, "PLUGIN_LANGUAGE_UNAVAILABLE", field="language", action="select a Voice owner for a localized Source")
+                    node.setdefault("children", []).append(child_node)
+                else:
+                    lists = node.setdefault("lists", [])
+                    descriptor = next((item for item in lists if item["name"] == child_list), None)
+                    if descriptor is None:
+                        descriptor = {"name": child_list, "objects": []}
+                        lists.append(descriptor)
+                    descriptor["objects"].append(child_node)
+        rtpcs = [item for item in session.declarations if isinstance(item.target, OwnedRtpcTarget)
+            and item.target.owner_handle == row.result_handle]
+        if rtpcs:
+            node.setdefault("lists", []).append({"name": "RTPC", "objects": [compile_rtpc(item) for item in rtpcs]})
         return node, object_list, list_behavior
 
     rows: list[dict[str, Any]] = []
@@ -1317,6 +1492,11 @@ def _materialize_set(
             "object": {"kind": "id", "value": source.object_id},
             **_compile_existing_set_fields(session, declaration),
         }
+        for reference in row.get("references", []):
+            owned_input = reference["target"].get("new_control_input") if isinstance(reference["target"], Mapping) else None
+            if owned_input is not None:
+                from .canonical import canonical_sha256
+                node_result_handles[id(owned_input)] = "bnh1-" + canonical_sha256({"owned_control_input_of": declaration.result_handle})[:32]
         rows_by_handle[handle] = row
         rows.append(row)
     for declaration in root_new:
@@ -1328,19 +1508,13 @@ def _materialize_set(
             row = {"object": {"kind": "id", "value": parent.object_id}}
             rows_by_handle[parent_handle] = row
             rows.append(row)
-        node, object_list, list_behavior = compile_node(
-            declaration,
-            allow_object_list=True,
-        )
-        _validate_specialized_relationship(
-            session,
-            parent_type=parent.object_type,
-            child_type=node["type"],
-        )
+        node, object_list, list_behavior = compile_node(declaration)
+        _apply_row_list_behavior(session, row, list_behavior)
         if object_list is None:
+            if "plugin" not in node:
+                _validate_specialized_relationship(session, parent_type=parent.object_type, child_type=node["type"])
             row.setdefault("children", []).append(node)
         else:
-            _apply_row_list_behavior(session, row, list_behavior)
             lists = row.setdefault("lists", [])
             existing = next(
                 (item for item in lists if item["name"] == object_list),
@@ -1350,6 +1524,25 @@ def _materialize_set(
                 existing = {"name": object_list, "objects": []}
                 lists.append(existing)
             existing["objects"].append(node)
+    for declaration in session.declarations:
+        if not isinstance(declaration.target, OwnedRtpcTarget):
+            continue
+        owner_handle = declaration.target.owner_handle
+        if owner_handle in new_by_result:
+            continue
+        owner = session.handles.resolve_object(owner_handle)
+        node = compile_rtpc(declaration)
+        row = rows_by_handle.get(owner_handle)
+        if row is None:
+            row = {"object": {"kind": "id", "value": owner.object_id}}
+            rows_by_handle[owner_handle] = row
+            rows.append(row)
+        lists = row.setdefault("lists", [])
+        descriptor = next((item for item in lists if item["name"] == "RTPC"), None)
+        if descriptor is None:
+            descriptor = {"name": "RTPC", "objects": []}
+            lists.append(descriptor)
+        descriptor["objects"].append(node)
     for row in rows:
         if set(row) <= {"object", "list_mode"}:
             raise _repair(
@@ -1359,7 +1552,10 @@ def _materialize_set(
                 action="give every exact target at least one requested outcome",
             )
     settings = dict(session.settings)
-    allowed_settings = {"add_to_source_control", "list_behavior", "name_conflict"}
+    allowed_settings = {"add_to_source_control", "list_behavior", "name_conflict", "platform", "voice_source_completion"}
+    if "voice_source_completion" in settings and settings["voice_source_completion"] not in {"separate-previews", "atomic-required"}:
+        raise _repair(session, "FIELD_VALUE_UNAVAILABLE", field="voice_source_completion",
+            action="select separate-previews for explicitly staged Voice/Source completion")
     unexpected_settings = sorted(set(settings) - allowed_settings)
     if unexpected_settings:
         raise _repair(
@@ -1368,14 +1564,75 @@ def _materialize_set(
             field=unexpected_settings[0],
             action="use one disclosed object.set batch setting",
         )
+    rows = order_result_rows(rows, node_result_handles, revision=session.revision)
     arguments: dict[str, Any] = {"objects": rows}
+    documented_bindings = []
+    for row in rows:
+        for descriptor in row.get("lists", []):
+            matches = [field for field in session.handles.as_dict()["fields"]
+                if field["field_kind"] == "list" and field["scope_kind"] == "object"
+                and field["scope_value"] == row["object"]["value"] and field["token"] == descriptor["name"]]
+            if matches:
+                field = resolve_list_choice(session, descriptor["name"], owner_id=row["object"]["value"])
+                evidence = dict(field.restrictions["documented_list"])
+                if evidence not in documented_bindings:
+                    documented_bindings.append(evidence)
+        for descriptor in row.get("references", []):
+            candidates = [field for field in session.handles.as_dict()["fields"]
+                if field["field_kind"] == "list" and field["scope_kind"] == "object"
+                and field["scope_value"] == row["object"]["value"] and field["token"] == descriptor["name"]]
+            if candidates:
+                field = resolve_list_choice(session, descriptor["name"], owner_id=row["object"]["value"])
+                evidence = {**dict(field.restrictions["documented_list"]),
+                    "reference_targets": [target["value"] for target in descriptor["target"]]}
+                if evidence not in documented_bindings:
+                    documented_bindings.append(evidence)
+    def bind_planned_occurrences(node, request_path):
+        owner_handle = node_result_handles.get(id(node))
+        if owner_handle is not None:
+            for descriptor in node.get("lists", []):
+                evidence = resolve_planned_list_evidence(session, descriptor["name"], owner_handle=owner_handle)
+                documented_bindings.append({**evidence, "planned_owner": {
+                    "result_handle": owner_handle, "request_path": request_path}})
+            # Only this declaration's validated class-scoped List selections
+            # certify arrays. Another class may expose a scalar with this token
+            # (Sound.Metadata List versus MetadataSlot.Metadata Reference).
+            declared_fields = [session.handles.bound_field(handle)
+                for handle in (new_by_result[owner_handle].fields.get("field_values", {}) if owner_handle in new_by_result else {})]
+            for reference in node.get("references", []):
+                fields = [field for field in declared_fields if field.field_kind == "list"
+                    and field.scope_kind == "class" and field.token == reference["name"]]
+                if fields and isinstance(reference["target"], list):
+                    evidence = resolve_planned_list_evidence(session, reference["name"], owner_handle=owner_handle)
+                    documented_bindings.append({**evidence, "reference_targets": [target["value"] for target in reference["target"]],
+                        "planned_owner": {"result_handle": owner_handle, "request_path": request_path}})
+        for index, child in enumerate(node.get("children", [])):
+            bind_planned_occurrences(child, f"{request_path}.children[{index}]")
+        for index, descriptor in enumerate(node.get("lists", [])):
+            for member_index, member in enumerate(descriptor["objects"]):
+                bind_planned_occurrences(member, f"{request_path}.lists[{index}].objects[{member_index}]")
+    for index, row in enumerate(rows):
+        bind_planned_occurrences(row, f"$.objects[{index}]")
+    result_bindings = graph_result_bindings([(row, f"$.objects[{index}]") for index, row in enumerate(rows)], node_result_handles)
+    if result_bindings:
+        arguments["graph_result_bindings"] = result_bindings
+    if documented_bindings:
+        arguments["documented_list_bindings"] = documented_bindings
+    if "platform" in settings:
+        platform = settings["platform"]
+        if not isinstance(platform, str) or not platform.strip():
+            raise _repair(
+                session, "FIELD_VALUE_TYPE_MISMATCH", field="platform",
+                action="provide one exact user-requested Wwise platform",
+            )
+        arguments["platform"] = platform
     conflict = settings.get("name_conflict", "fail")
-    if conflict not in {"fail", "rename", "merge"}:
+    if conflict not in {"fail", "rename", "merge", "replace"}:
         raise _repair(
             session,
             "FIELD_VALUE_UNAVAILABLE",
             field="name_conflict",
-            choices=["fail", "rename", "merge"],
+            choices=["fail", "rename", "merge", "replace"],
             action="choose one disclosed child collision outcome",
         )
     if conflict != "fail":
@@ -1415,6 +1672,7 @@ def _materialize_set(
 
 def _materialize_set_rtpc(
     session: BusinessDeclarationSession,
+    *, planned_owners=None,
 ) -> dict[str, Any]:
     if len(session.declarations) != 1:
         raise _repair(
@@ -1425,16 +1683,13 @@ def _materialize_set_rtpc(
             action="declare exactly one RTPC curve outcome",
         )
     declaration = session.declarations[0]
-    if not isinstance(declaration.target, ExistingObjectTarget):
-        raise _repair(
-            session,
-            "TARGET_FORM_INVALID",
-            field="object_handle",
-            action="bind the exact RTPC owner object",
-        )
+    if not isinstance(declaration.target, (ExistingObjectTarget, OwnedRtpcTarget)):
+        raise _repair(session, "TARGET_FORM_INVALID", field="object_handle", action="bind the exact RTPC owner")
     fields = dict(declaration.fields)
-    required = {"control_input_handle", "curve_points", "field_handle"}
-    optional = {"mode", "notes"}
+    required = {"curve_points", "field_handle"}
+    optional = {"mode", "notes", "control_input_handle", "new_control_input"}
+    if ("control_input_handle" in fields) == ("new_control_input" in fields):
+        raise _repair(session, "CONTROL_INPUT_CHOICE_REQUIRED", field="control_input_handle", action="choose one existing or one new owned Control Input")
     missing = sorted(required - set(fields))
     unexpected = sorted(set(fields) - required - optional)
     if missing:
@@ -1452,14 +1707,19 @@ def _materialize_set_rtpc(
             field=unexpected[0],
             action="use only the disclosed RTPC business fields",
         )
-    target = session.handles.resolve_object(declaration.target.object_handle)
-    control = session.handles.resolve_object(fields["control_input_handle"])
+    owner_handle = (declaration.target.owner_handle if isinstance(declaration.target, OwnedRtpcTarget)
+        else declaration.target.object_handle)
+    planned = (planned_owners or {}).get(owner_handle)
+    target = None if planned else session.handles.resolve_object(owner_handle)
+    from .owned_control_inputs import compile_owned_control_input
+    owned_input = compile_owned_control_input(session, fields["new_control_input"]) if "new_control_input" in fields else None
+    control = None if owned_input is not None else session.handles.resolve_object(fields["control_input_handle"])
     control_token = "".join(
         character
-        for character in control.object_type.casefold()
+        for character in (control.object_type.casefold() if control is not None else "")
         if character.isalnum()
     )
-    if control_token not in {
+    if control is not None and control_token not in {
         "gameparameter",
         "midiparameter",
         "modulatorlfo",
@@ -1474,11 +1734,13 @@ def _materialize_set_rtpc(
             action="choose a bound Game Parameter, MIDI parameter, or Modulator",
         )
     field = session.handles.bound_field(fields["field_handle"])
-    if (
-        field.scope_kind != "object"
-        or str(field.scope_value).upper() != target.object_id.upper()
-        or field.field_kind != "property"
-    ):
+    if planned:
+        evidence = resolve_planned_list_evidence(session if len(session.declarations) > 1 else replace(session,
+            declarations=(*tuple((planned_owners or {}).values()), *session.declarations)), "RTPC", owner_handle=owner_handle)
+        valid_scope = field.scope_kind == "class" and field.scope_value == evidence["scope"]["class_id"]
+    else:
+        valid_scope = field.scope_kind == "object" and str(field.scope_value).upper() == target.object_id.upper()
+    if not valid_scope or field.field_kind != "property":
         raise _repair(
             session,
             "FIELD_HANDLE_SCOPE_MISMATCH",
@@ -1542,9 +1804,9 @@ def _materialize_set_rtpc(
             action="choose whether an exact existing curve may be updated",
         )
     arguments: dict[str, Any] = {
-        "object": {"kind": "id", "value": target.object_id},
+        "object": {"kind": "id", "value": owner_handle if planned else target.object_id},
         "property": field.token,
-        "control_input": {"kind": "id", "value": control.object_id},
+        "control_input": owned_input if owned_input is not None else {"kind": "id", "value": control.object_id},
         "points": points,
         "mode": "add" if mode == "add-only" else "add_or_replace",
     }
@@ -1558,6 +1820,16 @@ def _materialize_set_rtpc(
                 action="provide exact RTPC notes or omit them",
             )
         arguments["notes"] = notes
+    if isinstance(declaration.target, OwnedRtpcTarget):
+        return {"arguments": arguments}
+    if owned_input is not None:
+        from .canonical import canonical_sha256
+        path = "$.objects[0].lists[0].objects[0]"
+        rtpc_handle = "bnh1-" + canonical_sha256({"owned_rtpc_of": declaration.result_handle})[:32]
+        arguments["graph_result_bindings"] = [
+            {"result_handle": rtpc_handle, "request_path": path},
+            {"result_handle": "bnh1-" + canonical_sha256({"owned_control_input_of": rtpc_handle})[:32],
+             "request_path": path + ".control_input"}]
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",
@@ -1567,6 +1839,19 @@ def _materialize_set_rtpc(
         },
         expected_version=session.context.wwise_version,
     ).as_dict()
+
+
+def validate_object_graph_draft(operation, session):
+    """Validate editable facts without requiring a not-yet-declared List.
+
+    This produces no request. Check/Preview always use the strict materializer
+    with the original settings, so pending replaceAll never becomes append.
+    """
+    validation = session
+    if (operation == "object.set" and session.settings.get("list_behavior") == "replace-all"
+            and not any(isinstance(row.target, OwnedRtpcTarget) or "object_list" in row.fields or "clear_object_lists" in row.fields for row in session.declarations)):
+        validation = replace(session, settings={**session.settings, "list_behavior": "append"})
+    materialize_object_graph_business_request(operation, validation)
 
 
 def materialize_object_graph_business_request(
@@ -1585,8 +1870,9 @@ def materialize_object_graph_business_request(
     if operation == "object.setRTPC":
         return _materialize_set_rtpc(session)
     if operation == "object.set":
-        return _materialize_set(session)
+        from .voice_source_staging import lower
+        return lower(_materialize_set(session), session)
     raise ValueError("object graph business operation is not migrated yet")
 
 
-__all__ = ["materialize_object_graph_business_request"]
+__all__ = ["materialize_object_graph_business_request", "validate_object_graph_draft"]

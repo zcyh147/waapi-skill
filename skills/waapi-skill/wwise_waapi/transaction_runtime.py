@@ -12,6 +12,7 @@ from .authorization import (
     AUTHORIZATION_MODE_POLICY,
     accepted_authorization_modes_for_operation,
 )
+from .console_project_operations import CLI_PROJECT_FILE_URIS
 from .canonical import canonical_sha256, sha256_hex
 from .execution_contracts import (
     CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS,
@@ -275,6 +276,8 @@ def build_transaction_preview_artifact(
     read_call: ReadCall,
     project_guard: Mapping[str, Any],
     skill_root: Path,
+    history_resolver=None,
+    copy_proof_context=None,
     now: datetime | None = None,
     ttl_seconds: int = DEFAULT_PREVIEW_TTL_SECONDS,
 ) -> TransactionArtifact:
@@ -289,7 +292,7 @@ def build_transaction_preview_artifact(
     if ttl_seconds <= 0:
         raise ValueError("ttl_seconds must be greater than zero")
     request = parse_operation_request(request_payload, expected_version=live_version)
-    prepared = prepare_operation(request, read_call=read_call)
+    prepared = prepare_operation(request, read_call=read_call, history_resolver=history_resolver, copy_proof_context=copy_proof_context)
     post_execution_project_guard_policy = _prepared_post_execution_project_guard_policy(
         prepared
     )
@@ -423,12 +426,17 @@ def validate_transaction_context_runtime_guards(
         }
         or not isinstance(verification_plan, Mapping)
         or dict(verification_plan)
-        != {
+        != ({
+            "kind": "console-project-process",
+            "uri": api,
+            "version": version,
+            "base_result_strategy": "result_schema",
+        } if api in CLI_PROJECT_FILE_URIS else {
             "kind": "result-schema",
             "uri": api,
             "version": version,
             "strategy": "result_schema",
-        }
+        })
         or not isinstance(sealed_contract, Mapping)
     ):
         raise TransactionGuardError(

@@ -1,0 +1,24 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "r54-class-replay-r59-4e3c2800-r3/case-10/attachment-0.json",
+      "sha256": "635bb8f0c42a9ed9683947979d3442e1d31b2d6334f2649bb0ac45473415b90a"
+    },
+    {
+      "artifact": "r54-class-replay-r59-4e3c2800-r3/case-10/attachment-1.json",
+      "sha256": "011315366f4e3b105345c3cd289530d387808c2c5a195af41c1fe6a78c993045"
+    },
+    {
+      "artifact": "r54-class-replay-r59-4e3c2800-r3/case-10/attachment-2.json",
+      "sha256": "2c6deb678c4782bb6faadf1735945a51f268be71960a3908c1c4753e2936e280"
+    },
+    {
+      "artifact": "r54-class-replay-r59-4e3c2800-r3/case-10/attachment-3.json",
+      "sha256": "75f0890590948342b4c64d2d53c5567e239da2ac1e267f15bedb7ee1b13ba4de"
+    },
+    {
+      "artifact": "r54-class-replay-r59-4e3c2800-r3/case-10/attachment-4.json",
+      "sha256": "cbfd25406894bf66733bc35f13ea04dc76115e5912b97007cc782d0dd83e599c"
+    }
+  ]
+}

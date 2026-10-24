@@ -1,0 +1,73 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2025-r1/dispatcher-evidence/1792523915862316000-09767fb3a3854d8da3a2a151eb6bc7a8-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 4294967295,
+    "default": 50.0,
+    "dependencies": [
+      {
+        "action": "Show",
+        "conditions": [
+          {
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "displayName": "1",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        ],
+        "context": "Parent",
+        "property": "RandomOrSequence",
+        "type": "property"
+      }
+    ],
+    "display": {
+      "group": "Random",
+      "index": 1517,
+      "name": "Weight"
+    },
+    "name": "Weight",
+    "restriction": {
+      "max": 100.0,
+      "min": 0.001,
+      "type": "range"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "None",
+      "unlink": true
+    },
+    "type": "Real64",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false,
+        "percentage": false
+      },
+      "value": {
+        "decimals": 3,
+        "fine": 0.001,
+        "infinity": 0,
+        "max": 100.0,
+        "min": 0.0010000000474974513,
+        "step": 1.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.962553707999177,
+  "version": "2025.1"
+}

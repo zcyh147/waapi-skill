@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import importlib.util
+import io
 import json
 import math
 import os
@@ -14,9 +16,11 @@ import time
 import uuid
 import wave
 import xml.etree.ElementTree as ET
+from contextlib import nullcontext
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Sequence
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 import pytest  # pyright: ignore[reportMissingImports]
 
@@ -33,8 +37,11 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     resolve_sample_project_source,
 )
 from tests.destructive.support.category_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
+    EVIDENCE_ROOT,
+    current_evidence_platform,
     exact_git_candidate,
 )
+from tests.destructive.support.console_file_observation import observe_console_file, ConsoleModelImageIndex  # noqa: E402
 from tests.destructive.support.exact_real_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     finalize_exact_real_evidence,
 )
@@ -66,6 +73,7 @@ from tests.support.host_path_relatives import (  # pyright: ignore[reportMissing
 from tests.semantic.support.codex_filesystem_security import (  # noqa: E402
     binary_file_open_flags,
     path_is_link_or_reparse,
+    read_bounded_exclusive_regular_file,
 )
 from tests.semantic.support.codex_project_prelaunch_v3 import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     ProjectPrelaunchRequest,
@@ -76,6 +84,8 @@ from wwise_waapi.headless import HeadlessLifecycle  # pyright: ignore[reportMiss
 from wwise_waapi.operation_registry import OPERATION_REQUEST_CONTRACT  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.transactions import TransactionState, TransactionStore  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS  # pyright: ignore[reportMissingImports]  # noqa: E402
+from wwise_waapi.host_paths import localize_waapi_host_path  # noqa: E402
+from wwise_waapi.operation_soundbank import prove_artifact_path  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -110,14 +120,19 @@ class _WorkflowSandboxRuntime:
     env: dict[str, str]
     candidate: str
     category_results: list[dict[str, Any]]
+    source_copy_prelaunch: dict[str, Any] | None = None
+    namespaced_query_prelaunch: dict[str, Any] | None = None
 
     @property
     def port(self) -> int:
         assert self.lifecycle.port is not None
         return self.lifecycle.port
 
-    def gateway(self, command: Sequence[str], *, live: bool) -> dict[str, Any]:
+    def gateway(self, command: Sequence[str], *, live: bool, receipt_sink: dict[str, Any] | None = None) -> dict[str, Any]:
         exit_code, payload = self.raw_gateway(command)
+        if receipt_sink is not None:
+            receipt_sink[command[0]] = payload
+            receipt_sink[command[0] + "_exit_code"] = exit_code
         assert exit_code == 0, json.dumps(payload, ensure_ascii=False, sort_keys=True)
         assert payload["ok"] is True, payload
         if live:
@@ -132,6 +147,8 @@ class _WorkflowSandboxRuntime:
     def raw_gateway(
         self,
         command: Sequence[str],
+        *,
+        stream_sink: Callable[[Mapping[str, Any]], None] | None = None,
     ) -> tuple[int, dict[str, Any]]:
         argv = [
             "--timeout",
@@ -140,7 +157,7 @@ class _WorkflowSandboxRuntime:
             str(self.state_dir),
             *command,
         ]
-        exit_code, payload = waapi_gateway.execute_gateway(argv, env=self.env)
+        exit_code, payload = waapi_gateway.execute_gateway(argv, env=self.env, stream_sink=stream_sink)
         assert isinstance(payload, dict), payload
         return exit_code, payload
 
@@ -172,6 +189,24 @@ class _WorkflowSandboxRuntime:
         assert payload["command"] == "status"
         assert payload["detected_version"] == self.version
         return payload
+
+    def packaged_topic_producer(self, command: Sequence[str]) -> tuple[int, dict[str, Any]]:
+        """Keep the observer's txaio loop isolated from the fixed producer peer."""
+        from tests.semantic.support.codex_expansion_reconciliation import run_owned_gateway
+
+        assert len(command) == 2 and command[0] in {'execute', 'verify'}, command
+        producer_env = {**self.env, 'PYTHONIOENCODING': 'utf-8:strict', 'PYTHONUTF8': '1'}
+        completed = run_owned_gateway(
+            [sys.executable, str(REPO_ROOT / 'skills/waapi-skill/scripts/run.py'), 'gateway.py',
+                '--timeout', '10', '--state-dir', str(self.state_dir), *command],
+            environment=producer_env, timeout_seconds=30,
+            cwd=REPO_ROOT / 'skills/waapi-skill',
+        )
+        assert len(completed.stdout.encode('utf-8')) <= 256 * 1024, 'Notes producer stdout bound exceeded'
+        assert len(completed.stderr.encode('utf-8')) <= 16 * 1024, 'Notes producer stderr bound exceeded'
+        payload = json.loads(completed.stdout)
+        assert isinstance(payload, dict), payload
+        return completed.returncode, payload
 
 
 @dataclass(slots=True)
@@ -281,8 +316,24 @@ def _update_business_draft(
 def _complete_business_draft(
     runtime: _WorkflowSandboxRuntime,
     draft: _BusinessDraft,
+    *,
+    inspect_preview=None,
+    phase_receipt: dict[str, Any] | None = None,
+    execute_verify=None,
 ) -> dict[str, Mapping[str, Any]]:
-    _update_business_draft(runtime, draft, "draft-check", live=True)
+    # Opt-in bounded, fixed phase receipt. Preserve replies before gateway
+    # assertions raise; unrelated callers retain their existing completion path.
+    def phase(command, *, live):
+        if phase_receipt is None:
+            return runtime.gateway(command, live=live)
+        phase_receipt["phase"] = command[0]
+        return _WorkflowSandboxRuntime.gateway(runtime, command, live=live, receipt_sink=phase_receipt)
+    if phase_receipt is not None:
+        phase_receipt["phase"] = "draft-check"
+    checked = _update_business_draft(runtime, draft, "draft-check", live=True)
+    if phase_receipt is not None:
+        phase_receipt["draft-check"] = checked
+        phase_receipt["phase"] = "preview-from-draft"
     preview = _update_business_draft(
         runtime,
         draft,
@@ -290,19 +341,26 @@ def _complete_business_draft(
         live=True,
     )
     transaction_id = _required_string(preview, "transaction_id")
-    shown = runtime.gateway(
+    if phase_receipt is not None:
+        phase_receipt.update(preview=preview, transaction_id=transaction_id, phase="inspect-preview")
+    if inspect_preview is not None:
+        inspect_preview(preview)
+    shown = phase(
         ["transaction-show", transaction_id, "--summary-only"],
         live=False,
     )
     confirmation = shown.get("confirmation")
     assert isinstance(confirmation, Mapping), shown
     token = _required_string(confirmation, "token")
-    runtime.gateway(
+    phase(
         ["confirm", transaction_id, "--confirmation-token", token],
         live=False,
     )
-    executed = runtime.gateway(["execute", transaction_id], live=True)
-    verified = runtime.gateway(["verify", transaction_id], live=True)
+    if execute_verify is None:
+        executed = phase(["execute", transaction_id], live=True)
+        verified = phase(["verify", transaction_id], live=True)
+    else:
+        executed, verified = execute_verify(transaction_id)
     assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
     assert verified["state"] == TransactionState.VERIFIED.value, verified
     assert verified["verification"]["business_state_verified"] is True, verified
@@ -312,10 +370,20 @@ def _complete_business_draft(
 def _complete_core_result_schema_draft(
     runtime: _WorkflowSandboxRuntime,
     draft: _BusinessDraft,
+    *,
+    allow_verified_setup: bool = False,
+    phase_receipt: dict[str, Any] | None = None,
 ) -> dict[str, Mapping[str, Any]]:
     """Execute one Core business Draft and retain its explicit weak boundary."""
 
-    _update_business_draft(runtime, draft, "draft-check", live=True)
+    def phase(command, *, live):
+        if phase_receipt is None:
+            return runtime.gateway(command, live=live)
+        phase_receipt['phase'] = command[0]
+        return _WorkflowSandboxRuntime.gateway(runtime, command, live=live, receipt_sink=phase_receipt)
+    checked = _update_business_draft(runtime, draft, "draft-check", live=True)
+    if phase_receipt is not None:
+        phase_receipt.update({'draft-check': checked, 'phase': 'preview-from-draft'})
     preview = _update_business_draft(
         runtime,
         draft,
@@ -323,13 +391,15 @@ def _complete_core_result_schema_draft(
         live=True,
     )
     transaction_id = _required_string(preview, "transaction_id")
-    shown = runtime.gateway(
+    if phase_receipt is not None:
+        phase_receipt.update(preview=preview, transaction_id=transaction_id)
+    shown = phase(
         ["transaction-show", transaction_id, "--summary-only"],
         live=False,
     )
     confirmation = shown.get("confirmation")
     assert isinstance(confirmation, Mapping), shown
-    runtime.gateway(
+    phase(
         [
             "confirm",
             transaction_id,
@@ -338,9 +408,12 @@ def _complete_core_result_schema_draft(
         ],
         live=False,
     )
-    executed = runtime.gateway(["execute", transaction_id], live=True)
-    verified = runtime.gateway(["verify", transaction_id], live=True)
+    executed = phase(["execute", transaction_id], live=True)
+    verified = phase(["verify", transaction_id], live=True)
     assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
+    if allow_verified_setup and verified["state"] == TransactionState.VERIFIED.value:
+        assert verified["verification"]["business_state_verified"] is True, verified
+        return {"preview": preview, "execute": executed, "verify": verified}
     assert verified["state"] == "result_schema_checked", verified
     verification = verified.get("verification")
     assert isinstance(verification, Mapping), verified
@@ -500,6 +573,225 @@ def _query_exact_path_id(
     assert len(rows) == 1 and isinstance(rows[0], Mapping), rows
     assert rows[0].get("path") == expected_path, rows[0]
     return _required_string(rows[0], "id")
+
+
+INLINE_WAV_BASE64 = "UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAAA"
+INLINE_WAV_SHA256 = "0588c6a627c6603830a9e5d87ab258d4977c02876b9bac8f9598fccef098c1cf"
+
+
+def _inline_wav_current_binding() -> dict[str, Any]:
+    """Bind current acceptance without borrowing the separate historical pin."""
+    from tests.semantic.support.codex_harness import (
+        WORKSPACE_SKILL_EXCLUDED_NAMES, workspace_skill_tree_sha256,
+    )
+    return {
+        "current_skill_sha256": workspace_skill_tree_sha256(
+            REPO_ROOT / "skills/waapi-skill", exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+        ),
+        "test_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    }
+
+
+def _persist_inline_wav_receipt(runtime: _WorkflowSandboxRuntime, receipt: dict[str, Any]) -> None:
+    target = runtime.state_dir.parent / "inline-wav-probe.json"
+    encoded = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+    assert len(encoded) <= 2 * 1024 * 1024, "inline diagnostic evidence bound exceeded"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(".tmp")
+    temporary.write_bytes(encoded)
+    temporary.replace(target)
+
+
+class _InlineWavReceiptGateway:
+    """Retain every public response before the ordinary Draft helpers assert."""
+
+    def __init__(self, runtime: _WorkflowSandboxRuntime, receipt: dict[str, Any]):
+        self.runtime, self.receipt = runtime, receipt
+
+    def raw_gateway(self, command: Sequence[str]) -> tuple[int, dict[str, Any]]:
+        row: dict[str, Any] = {"argv": list(command)}
+        self.receipt["calls"].append(row)
+        try:
+            code, payload = self.runtime.raw_gateway(command)
+            row.update(exit_code=code, payload=payload)
+            return code, payload
+        except Exception as exc:
+            row["exception"] = {"type": type(exc).__name__, "message": str(exc)}
+            raise
+        finally:
+            _persist_inline_wav_receipt(self.runtime, self.receipt)
+
+    def gateway(self, command: Sequence[str], *, live: bool) -> dict[str, Any]:
+        code, payload = self.raw_gateway(command)
+        assert code == 0 and payload.get("ok") is True, payload
+        return payload
+
+
+def _run_inline_wav_probe(
+    runtime: _WorkflowSandboxRuntime,
+    parent_id: str,
+    sound_name: str,
+    receipt: dict[str, Any],
+) -> None:
+    """One public object.set execution; failures never authorize another write."""
+    gateway = _InlineWavReceiptGateway(runtime, receipt)
+    receipt.update(native_outcome="not_executed", media_effect="not_observed")
+    inline_wav = sound_name + ".wav|" + INLINE_WAV_BASE64
+    receipt["source"] = {"inline_wav": inline_wav, "bytes": 48, "sha256": INLINE_WAV_SHA256}
+    try:
+        empty_parent = gateway.gateway([
+            "query-object", "--exact-id", parent_id, "--relationship", "children", "--max-results", "2",
+        ], live=True)
+        assert empty_parent["count"] == 0 and empty_parent["objects"] == [], empty_parent
+        expected_original = runtime.sandbox.sandbox_path / "Originals" / "SFX" / (sound_name + ".wav")
+        prove_artifact_path(expected_original, io_root=runtime.sandbox.sandbox_path, field="new inline Originals WAV", expect_directory=False)
+        assert not expected_original.exists(), expected_original
+        receipt["original_absent_before"] = str(expected_original)
+        draft = _start_business_draft(gateway, "object.set")
+        parent_handle = _bind_business_object(gateway, draft, object_id=parent_id)
+        _update_business_draft(gateway, draft, "draft-declare-new", [
+            "--declaration-id", "inline-sound", "--parent-handle", parent_handle,
+            "--name", sound_name, "--kind", "sound-sfx",
+        ], live=False)
+        _update_business_draft(gateway, draft, "draft-add-media", [
+            "--declaration-id", "inline-sound", "--inline-wav", inline_wav,
+            "--kind", "sound-sfx", "--language", "SFX",
+        ], live=False)
+        _update_business_draft(gateway, draft, "draft-check", live=True)
+        preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
+        transaction_id = _required_string(preview, "transaction_id")
+        receipt.update(transaction_id=transaction_id, preview_hash=preview["artifact_hash"])
+        if "lifecycle_final_reference" in receipt:
+            receipt["lifecycle_final_reference"]["transaction_id"] = transaction_id
+        shown = gateway.gateway(["transaction-show", transaction_id], live=False)
+        native = shown["artifact"]["prepared_operation"]["dispatch"]
+        receipt["compiled_native_request"] = native
+        # Check an exact leaf without manufacturing the native request.
+        files = native["args"]["objects"][0]["children"][0]["import"]["files"]
+        assert len(files) == 1 and files[0]["audioFileBase64"] == inline_wav, native
+        assert native["uri"] == "ak.wwise.core.object.set", native
+        _persist_inline_wav_receipt(runtime, receipt)
+        gateway.gateway(["confirm", transaction_id, "--confirmation-token", shown["confirmation"]["token"]], live=False)
+        receipt["native_outcome"] = "indeterminate"
+        code, executed = gateway.raw_gateway(["execute", transaction_id])
+        receipt["gateway_terminal_state"] = executed.get("state")
+        receipt["native_response"] = executed.get("dispatch_result")
+        if code != 0 or executed.get("ok") is not True:
+            receipt["native_outcome"] = (
+                "rejected" if executed.get("state") == "execution_failed" else "indeterminate"
+            )
+            return
+        assert executed.get("state") == "executed_unverified", executed
+        dispatch_result = executed.get("dispatch_result")
+        assert isinstance(dispatch_result, Mapping) and dispatch_result.get("ok") is True, executed
+        receipt.update(native_outcome="accepted", media_effect="incomplete")
+        # Even a failed verifier cannot erase acceptance or justify replay.
+        verify_code, verified = gateway.raw_gateway(["verify", transaction_id])
+        receipt["gateway_verification"] = {
+            "exit_code": verify_code, "ok": verified.get("ok"), "state": verified.get("state"),
+            "business_state_verified": verified.get("verification", {}).get("business_state_verified"),
+        }
+        children = gateway.gateway([
+            "query-object", "--exact-id", parent_id, "--relationship", "children", "--max-results", "2",
+        ], live=True)
+        rows = children["objects"]
+        assert children["count"] == 1 and len(rows) == 1, children
+        sound = rows[0]
+        assert sound["type"] == "Sound" and sound["name"] == sound_name, sound
+        sound_id = _required_string(sound, "id")
+        exact_sound = gateway.gateway([
+            "query-object", "--exact-id", sound_id, "--include", "active-source", "--max-results", "1",
+        ], live=True)
+        assert exact_sound["count"] == 1 and len(exact_sound["objects"]) == 1, exact_sound
+        sound_row = exact_sound["objects"][0]
+        assert all(sound_row.get(key) == sound.get(key) for key in ("id", "name", "type", "path")), exact_sound
+        source_id = _required_string(sound_row["active_source"], "id")
+        sources = gateway.gateway([
+            "query-object", "--exact-id", sound_id, "--relationship", "children", "--max-results", "2",
+        ], live=True)
+        assert sources["count"] == 1 and len(sources["objects"]) == 1, sources
+        assert sources["objects"][0]["id"] == source_id and sources["objects"][0]["type"] == "AudioFileSource", sources
+        exact_source = gateway.gateway([
+            "query-object", "--exact-id", source_id, "--include", "parent",
+            "--include", "original-file-path", "--include", "source-language", "--max-results", "1",
+        ], live=True)
+        assert exact_source["count"] == 1 and len(exact_source["objects"]) == 1, exact_source
+        source = exact_source["objects"][0]
+        assert source["id"] == source_id and source["type"] == "AudioFileSource", source
+        assert source["parent"]["id"] == sound_id, source
+        language = source["source_language"]
+        assert isinstance(language, Mapping) and language.get("name") == "SFX", source
+        assert uuid.UUID(_required_string(language, "id")).int != 0, source
+        assert source["path"] == sound_row["path"] + "\\" + sound_name, source
+        original = Path(localize_waapi_host_path(source["original_file_path"]))
+        originals = runtime.sandbox.sandbox_path / "Originals"
+        # Refuse converted/cache media and any path outside this private project.
+        prove_artifact_path(original, io_root=originals, field="inline imported Originals WAV", must_exist=True, expect_directory=False)
+        assert original == expected_original, original
+        snapshot = read_bounded_exclusive_regular_file(original, max_bytes=48, require_private_posix_mode=False)
+        receipt["original_wav"] = {
+            "path": str(original), "size": len(snapshot.raw), "sha256": hashlib.sha256(snapshot.raw).hexdigest(),
+            "hex": snapshot.raw.hex(), "sound_id": sound_id, "source_id": source_id,
+        }
+        assert receipt["original_wav"]["sha256"] == INLINE_WAV_SHA256, receipt["original_wav"]
+        with wave.open(io.BytesIO(snapshot.raw), "rb") as wav:
+            pcm = {"channels": wav.getnchannels(), "sample_width_bytes": wav.getsampwidth(),
+                   "sample_rate_hz": wav.getframerate(), "frame_count": wav.getnframes()}
+        receipt["original_wav"]["pcm"] = pcm
+        assert pcm == {"channels": 1, "sample_width_bytes": 2, "sample_rate_hz": 44100, "frame_count": 2}, pcm
+        receipt["media_effect"] = "proven"
+    except Exception as exc:
+        receipt["diagnostic_error"] = {"type": type(exc).__name__, "message": str(exc)}
+        raise
+    finally:
+        _persist_inline_wav_receipt(runtime, receipt)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_object_set_canonical_unpadded_inline_wav_acceptance(workflow_sandbox_runtime) -> None:
+    """Require current Gateway verification and independent exact Originals proof."""
+    runtime = workflow_sandbox_runtime
+    if runtime.version not in {"2023.1", "2024.1", "2025.1"}:
+        pytest.skip("object.set inline WAV compatibility applies to 2023.1–2025.1")
+    configured_evidence = runtime.env.get("WWISE_CATEGORY_EVIDENCE_PATH")
+    if configured_evidence is None and sys.platform == "darwin":
+        configured_evidence = runtime.env.get("WWISE_MACOS_CATEGORY_EVIDENCE_PATH")
+    lifecycle_path = (Path(configured_evidence).expanduser().resolve(strict=False)
+                      if configured_evidence else
+                      REPO_ROOT / EVIDENCE_ROOT / (current_evidence_platform() + "-category-evidence.jsonl"))
+    receipt: dict[str, Any] = {
+        "category": "object-set-unpadded-inline-wav-acceptance", "status": "FAIL",
+        "verifier_strength": "gateway_verified_plus_independent_sound_source_originals_bytes",
+        "candidate": runtime.candidate, **_inline_wav_current_binding(),
+        "version": runtime.version, "calls": [],
+        "config_sha256": hashlib.sha256(Path(runtime.env["WAAPI_SKILL_CONFIG_PATH"]).read_bytes()).hexdigest(),
+        "endpoint": {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url},
+        "build": runtime.sandbox.metadata.get_info_version,
+        "receipt_path": str(runtime.state_dir.parent / "inline-wav-probe.json"),
+        "lifecycle_final_reference": {
+            "path": str(lifecycle_path), "contract": "waapi-skill.host-category-evidence/v3",
+            "phase": "final", "candidate": runtime.candidate,
+            "category": "object-set-unpadded-inline-wav-acceptance", "transaction_id": None,
+            "cleanup_status": "unresolved_until_final_row",
+        },
+        "lifecycle_acceptance": "Requires the final host-category-evidence/v3 row with this candidate, transaction_id and category; prepared/PENDING is not cleanup success. That final row binds source before/after hash/mtime and residual process cleanup.",
+    }
+    runtime.category_results.append(receipt)
+    _persist_inline_wav_receipt(runtime, receipt)
+    root_segments = CONTAINERS_PARENT_SEGMENTS if runtime.version == "2025.1" else ACTOR_MIXER_PARENT_SEGMENTS
+    suffix = uuid.uuid4().hex[:12]
+    try:
+        parent_id = _create_object(runtime, parent="\\" + "\\".join(root_segments), object_type="ActorMixer", name="WAAPI_INLINE_PARENT_" + suffix)
+        receipt["owned_parent_id"] = parent_id
+        _run_inline_wav_probe(runtime, parent_id, "WAAPI_INLINE_" + suffix, receipt)
+        assert receipt["native_outcome"] == "accepted" and receipt["media_effect"] == "proven", receipt
+        assert receipt["gateway_verification"] == {
+            "exit_code": 0, "ok": True, "state": "verified", "business_state_verified": True,
+        }, receipt
+        receipt["status"] = "PASS"
+    finally:
+        _persist_inline_wav_receipt(runtime, receipt)
 
 
 @pytest.mark.live
@@ -711,6 +1003,48 @@ def _restart_workflow_host_after_transport_loss(
     runtime.lifecycle = replacement
 
 
+def _capture_workflow_pre_teardown_process(lifecycle: HeadlessLifecycle, state_dir: Path, *, version: str, candidate: str) -> None:
+    """Snapshot only the owned launch handle before cleanup can change its state."""
+    record = {"contract": "waapi-skill.workflow-pre-teardown-process/v1", "phase": "before_owned_shutdown",
+        "captured_at_unix_ns": time.time_ns(), "candidate": candidate, "version": version,
+        "owned_launch_pid": None, "observed_exit_code": None, "process_state": "unobserved",
+        "capture_errors": []}
+    def error(stage, exc):
+        record["capture_errors"].append({"stage": stage, "type": type(exc).__name__,
+            "message": str(exc).encode("utf-8", errors="replace")[:512].decode("utf-8", errors="ignore")})
+    try:
+        process = lifecycle.process
+        if process is None:
+            record["process_state"] = "not-started"
+        else:
+            pid = process.pid
+            if type(pid) is not int or pid <= 0:
+                raise ValueError("Owned launch PID must be a positive integer")
+            record["owned_launch_pid"] = pid
+            code = process.poll()  # No probe, process inventory, wait, signal or retry.
+            if code is not None and type(code) is not int:
+                raise ValueError("Owned poll result must be an exit integer or None")
+            record.update(observed_exit_code=code, process_state="running" if code is None else "exited")
+    except Exception as exc:
+        error("owned_process_poll", exc)
+    for stream in ("stdout", "stderr"):
+        try:
+            tail = lifecycle.output.tail(stream, max_lines=20)
+            if not isinstance(tail, str):
+                raise ValueError("Owned process output tail must be text")
+            encoded = tail.encode("utf-8", errors="replace")
+            record[stream + "_tail"] = encoded[-4096:].decode("utf-8", errors="ignore")
+            record[stream + "_truncated"] = len(encoded) > 4096
+        except Exception as exc:
+            error(stream + "_tail", exc)
+    record["capture_status"] = "partial" if record["capture_errors"] else "complete"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    output = state_dir / "workflow-pre-teardown-process.json"
+    temporary = output.with_suffix(".tmp")
+    temporary.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(output)
+
+
 @pytest.fixture(scope="module")
 def workflow_sandbox_runtime(
     request: pytest.FixtureRequest,
@@ -723,6 +1057,17 @@ def workflow_sandbox_runtime(
             f"WWISE_VERSION must select one of {SUPPORTED_WWISE_VERSION_KEYS!r}; got {version!r}"
         )
 
+    from tests.destructive.support.source_copy_fixture import PROFILE as REPEATED_PROFILE
+    from tests.destructive.support.namespaced_query_fixture import PROFILE as NAMESPACED_QUERY_PROFILE
+    selection = getattr(request, 'param', ())
+    source_profile = selection if isinstance(selection, str) else None
+    assert source_profile in {None, REPEATED_PROFILE, NAMESPACED_QUERY_PROFILE}, 'Unknown closed workflow fixture profile'
+    if source_profile == REPEATED_PROFILE and version != '2021.1':
+        pytest.skip('Native-donor repeated Source fixture is pinned to2021.1.14.8108')
+    if source_profile == NAMESPACED_QUERY_PROFILE and version != '2025.1':
+        pytest.skip('Namespaced query fixture is initially selected for2025.1.7.9143')
+    source_copy_prelaunch = None
+    namespaced_query_prelaunch = None
     lock = LiveSandboxLock(_safe_lock_root(env))
     sandbox: SandboxProject | None = None
     lifecycle: HeadlessLifecycle | None = None
@@ -752,7 +1097,7 @@ def workflow_sandbox_runtime(
         source_tree_before = _source_tree_inventory(sandbox.source_root)
         source_mtime_before_ns = sandbox.source_project.stat().st_mtime_ns
         assert source_hash_before[1] > 0, "immutable SampleProject source has no regular files to hash"
-        extra_languages = getattr(request, "param", ())
+        extra_languages = () if source_profile else selection
         if extra_languages:
             # Fixture setup only, before Wwise starts, on the disposable copy.
             # No user/source project or live WAAPI operation uses this path.
@@ -792,6 +1137,28 @@ def workflow_sandbox_runtime(
                 )
             else:
                 assert prelaunch.auro_soundbank_isolation is not None
+        if source_profile == REPEATED_PROFILE:
+            from tests.destructive.support.source_copy_fixture import prepare_repeated_source_fixture
+            source_fixture_io = case_sandbox_root / 'source-copy-prelaunch-io'
+            source_fixture_io.mkdir(exist_ok=False)
+            source_copy_prelaunch = prepare_repeated_source_fixture(sandbox, owned_root=case_sandbox_root, io_root=source_fixture_io)
+        if source_profile == NAMESPACED_QUERY_PROFILE:
+            from tests.destructive.support.namespaced_query_fixture import prepare_namespaced_query_fixture
+            custom_fixture_io = case_sandbox_root / 'namespaced-query-prelaunch-io'
+            custom_fixture_io.mkdir(exist_ok=False)
+            namespaced_query_prelaunch = prepare_namespaced_query_fixture(sandbox, owned_root=case_sandbox_root, io_root=custom_fixture_io)
+        from tests.destructive.support.console_profiler_probe import NODEID as console_probe_node, DIAGNOSTIC_NODEID, OLDER_NODEID, BATCH_NODEID, ADDITIONAL_NODEID
+        selected_console = [item.nodeid for item in request.session.items
+            if Path(item.path).resolve() == Path(__file__).resolve()]
+        if any(node in selected_console for node in (console_probe_node, DIAGNOSTIC_NODEID, OLDER_NODEID, BATCH_NODEID, ADDITIONAL_NODEID)):
+            assert len(selected_console) == 1, 'Console probe requires one exact node'
+            assert (version in ('2021.1', '2022.1', '2023.1', '2024.1') if selected_console[0] == OLDER_NODEID
+                else version in ('2023.1','2024.1','2025.1') if selected_console[0] == ADDITIONAL_NODEID
+                else version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1') if selected_console[0] == BATCH_NODEID
+                else version == '2025.1'), 'Console probe node/version mismatch'
+            from tests.destructive.support.profiler_capture import stage_owned_capture_read_media
+            state_dir.mkdir(parents=True, exist_ok=True)
+            stage_owned_capture_read_media(sandbox, state_dir, version=version)
         lifecycle = launch_sandboxed_wwise(sandbox, env)
         assert lifecycle.port is not None
         assert sandbox.metadata.selected_port == lifecycle.port
@@ -830,12 +1197,22 @@ def workflow_sandbox_runtime(
             env=gateway_env,
             candidate=candidate,
             category_results=category_results,
+            source_copy_prelaunch=source_copy_prelaunch,
+            namespaced_query_prelaunch=namespaced_query_prelaunch,
         )
         yield runtime
     finally:
         active_error = sys.exc_info()[1]
         active_lifecycle = runtime.lifecycle if runtime is not None else lifecycle
         if active_lifecycle is not None and sandbox is not None:
+            try:
+                _capture_workflow_pre_teardown_process(active_lifecycle, state_dir, version=version, candidate=candidate)
+            except BaseException as exc:  # diagnostics must not replace the verdict or skip cleanup
+                try:
+                    message = str(exc).encode("utf-8", errors="replace")[:512].decode("utf-8", errors="ignore")
+                    print(f"pre-teardown process diagnostic capture failed: {type(exc).__name__}: {message}", file=sys.stderr)
+                except BaseException:
+                    pass
             try:
                 shutdown_sandboxed_wwise(active_lifecycle, sandbox)
             except BaseException as exc:  # noqa: BLE001 - every teardown guard must still run
@@ -1630,6 +2007,235 @@ def test_remaining_core_business_effect_families_on_2025(
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_profiler_remaining_minus_two_input_native_observation(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Signed cursor setter is reflected only on2025.1')
+    from tests.destructive.support.profiler_input_shapes import collect_signed_cursor_inputs
+    collect_signed_cursor_inputs(workflow_sandbox_runtime, remaining_minus_two=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_profiler_signed_cursor_input_native_observations(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Signed cursor setter is reflected only on2025.1')
+    from tests.destructive.support.profiler_input_shapes import collect_signed_cursor_inputs
+    collect_signed_cursor_inputs(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_profiler_enablement_input_shape_native_observations(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    from tests.destructive.support.profiler_input_shapes import collect_enablement_inputs
+    collect_enablement_inputs(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_log_clear_schema_acknowledgement(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Old Console clear proves availability and ACK, never a removal effect."""
+    runtime = workflow_sandbox_runtime
+    builds = {'2023.1': (2023, 1, 19, 8928), '2024.1': (2024, 1, 13, 9056)}
+    if runtime.version not in builds:
+        pytest.skip('This ACK-only observation targets Console2023/24')
+    runtime.state_dir.mkdir(parents=True, exist_ok=True)
+    output = runtime.state_dir / 'console-log-clear-schema-acknowledgement.json'
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'transaction': {}}
+    category = {'category': 'console-log-clear-schema-acknowledgement', 'status': 'FAIL',
+        'verifier_strength': 'result_schema_only', 'effect_observed': False,
+        'receipt_path': str(output), 'transaction_ids': []}
+    runtime.category_results.append(category)
+    try:
+        status = runtime.gateway(['status'], live=True)
+        receipt['host'] = status['wwise']
+        assert status['wwise']['isCommandLine'] is True, status
+        assert tuple(status['wwise']['version'][key] for key in ('year', 'major', 'minor', 'build')) == builds[runtime.version], status
+        assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), status
+        draft = _start_business_draft(runtime, 'ak.wwise.core.log.clear')
+        _update_business_draft(runtime, draft, 'draft-declare-runtime-control-plan',
+            ['--log-channel', 'general'], live=True)
+        result = _complete_core_result_schema_draft(runtime, draft, phase_receipt=receipt['transaction'])
+        dispatch = result['execute']['dispatch_result']
+        assert dispatch['ok'] is True and dispatch['result'] == {}, dispatch
+        assert 'log_item_observation' not in dispatch, dispatch
+        scope = result['verify']['verification']['verification_scope']['log_observation']
+        assert scope['effect_observed'] is False and scope['outcome'] == 'console_log_unobservable', scope
+        receipt['observation_boundary'] = scope
+        category['status'] = 'PASS'
+    finally:
+        if receipt['transaction'].get('transaction_id'):
+            category['transaction_ids'] = [receipt['transaction']['transaction_id']]
+        output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+@pytest.mark.parametrize('message_kind', ('empty', 'edge-whitespace'))
+def test_console_log_exact_message_addition(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime, message_kind: str,
+) -> None:
+    """Observe each exact message once in the shared owned2025 Console host."""
+    runtime = workflow_sandbox_runtime
+    if runtime.version != '2025.1':
+        pytest.skip('Exact message effect observation requires Console2025')
+    assert message_kind in {'empty', 'edge-whitespace'}
+    message = '' if message_kind == 'empty' else ' \tWAAPI owned exact message ' + uuid.uuid4().hex + '\n '
+    runtime.state_dir.mkdir(parents=True, exist_ok=True)
+    output = runtime.state_dir / ('console-log-exact-message-' + message_kind + '.json')
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'message_kind': message_kind,
+        'expected': {'channel': 'general', 'message': message, 'severity': 'Message'}, 'transaction': {}}
+    category = {'category': 'console-log-exact-message-addition:' + message_kind, 'status': 'FAIL',
+        'verifier_strength': 'same_execute_process_bounded_addition_event_then_durable_verification',
+        'receipt_path': str(output), 'transaction_ids': []}
+    runtime.category_results.append(category)
+    try:
+        status = runtime.gateway(['status'], live=True)
+        receipt['host'] = status['wwise']
+        assert status['wwise']['isCommandLine'] is True, status
+        assert tuple(status['wwise']['version'][key] for key in ('year', 'major', 'minor', 'build')) == (2025, 1, 7, 9143), status
+        assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), status
+        draft = _start_business_draft(runtime, 'ak.wwise.core.log.addItem')
+        _update_business_draft(runtime, draft, 'draft-declare-runtime-control-plan',
+            ['--message', message, '--log-channel', 'general', '--severity', 'message'], live=True)
+        result = _complete_business_draft(runtime, draft, phase_receipt=receipt['transaction'])
+        shown = runtime.gateway(['transaction-show', result['preview']['transaction_id']], live=False)
+        execution, = [event['details']['dispatch_result'] for event in shown['events']
+            if event['event_type'] == 'execution_completed']
+        assert execution == result['execute']['dispatch_result'], shown
+        assert execution['ok'] is True and execution['result'] == {}, execution
+        observation = execution['log_item_observation']
+        receipt['durable_observation'] = observation
+        assert observation['subscribed'] is True and observation['outcome'] == 'matched', observation
+        assert observation['cleanup']['status'] == 'unsubscribed', observation
+        assert 1 <= observation['events_observed'] <= 64, observation
+        event = observation['event']
+        assert event['channel'] == 'general' and event['item']['message'] == message and event['item']['severity'] == 'Message', event
+        scope = result['verify']['verification']['verification_scope']['log_observation']
+        assert scope['outcome'] == 'matching_item_event' and scope['effect_observed'] is True, scope
+        assert scope['execution_observation'] == observation, scope
+        assert scope['exclusive_causation_verified'] is False and scope['continuing_channel_state_verified'] is False, scope
+        category['status'] = 'PASS'
+    finally:
+        if receipt['transaction'].get('transaction_id'):
+            category['transaction_ids'] = [receipt['transaction']['transaction_id']]
+        output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_log_addition_observer(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Observe one owned addition; optionally prove the supported getter/clear path."""
+    runtime = workflow_sandbox_runtime
+    builds = {'2023.1': (2023, 1, 19, 8928), '2024.1': (2024, 1, 13, 9056),
+        '2025.1': (2025, 1, 7, 9143)}
+    if runtime.version not in builds:
+        pytest.skip('Console log.addItem is reflected only on the three modern lanes')
+    runtime.state_dir.mkdir(parents=True, exist_ok=True)
+    output = runtime.state_dir / 'console-log-addition-observer.json'
+    message = 'WAAPI owned Console addition ' + uuid.uuid4().hex
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version,
+        'expected': {'channel': 'general', 'message': message, 'severity': 'Message'},
+        'transaction': {}}
+    category = {'category': 'console-log-addition-observer', 'status': 'FAIL',
+        'verifier_strength': 'same_execute_process_bounded_addition_event_then_durable_verification',
+        'receipt_path': str(output), 'transaction_ids': []}
+    runtime.category_results.append(category)
+    try:
+        status = runtime.gateway(['status'], live=True)
+        receipt['host'] = status['wwise']
+        assert status['wwise']['isCommandLine'] is True, status
+        build = status['wwise']['version']
+        assert tuple(build[key] for key in ('year', 'major', 'minor', 'build')) == builds[runtime.version], status
+        assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), status
+        getter_mode = os.getenv('WWISE_CONSOLE_LOG_GETTER_WORKFLOW')
+        if getter_mode:
+            assert getter_mode == 'owned-get-clear-v1' and runtime.version == '2025.1'
+            assert not os.getenv('WWISE_CONSOLE_LOG_DIAGNOSTIC') and not os.getenv('WWISE_CONSOLE_LOG_PEER_DIAGNOSTIC')
+            receipt['getter_workflow'] = {'receipt_bytes': 3 * 1024 * 1024}
+        draft = _start_business_draft(runtime, 'ak.wwise.core.log.addItem')
+        _update_business_draft(runtime, draft, 'draft-declare-runtime-control-plan',
+            ['--message', message, '--log-channel', 'general', '--severity', 'message'], live=True)
+        diagnostic = nullcontext()
+        if os.getenv('WWISE_CONSOLE_LOG_DIAGNOSTIC'):
+            from tests.destructive.support.console_log_diagnostic import decoded_log_diagnostic
+            diagnostic = decoded_log_diagnostic(waapi_gateway, receipt, version=runtime.version)
+        execute_verify = None
+        if os.getenv('WWISE_CONSOLE_LOG_PEER_DIAGNOSTIC'):
+            from tests.destructive.support.console_log_peer import observe_peer_execution
+            assert runtime.version == '2023.1' and os.getenv('WWISE_CONSOLE_LOG_PEER_DIAGNOSTIC') == 'independent-session-v1'
+            assert not os.getenv('WWISE_CONSOLE_LOG_DIAGNOSTIC'), 'Select one diagnostic mode'
+            execute_verify = lambda tx: observe_peer_execution(runtime, tx, receipt, output)
+        with diagnostic:
+            result = _complete_business_draft(runtime, draft, phase_receipt=receipt['transaction'], execute_verify=execute_verify)
+        transaction_id = result['preview']['transaction_id']
+        category['transaction_ids'] = [transaction_id]
+        shown = runtime.gateway(['transaction-show', transaction_id], live=False)
+        execution, = [event['details']['dispatch_result'] for event in shown['events']
+            if event['event_type'] == 'execution_completed']
+        assert execution == result['execute']['dispatch_result'], shown
+        assert execution['ok'] is True and execution['result'] == {}, execution
+        observation = execution['log_item_observation']
+        receipt['durable_observation'] = observation
+        assert observation['subscribed'] is True and observation['outcome'] == 'matched', observation
+        assert observation['cleanup']['status'] == 'unsubscribed', observation
+        assert 1 <= observation['events_observed'] <= 64, observation
+        event = observation['event']
+        assert event['channel'] == 'general' and event['item']['message'] == message and event['item']['severity'] == 'Message', event
+        scope = result['verify']['verification']['verification_scope']['log_observation']
+        assert scope['outcome'] == 'matching_item_event' and scope['effect_observed'] is True, scope
+        assert scope['execution_observation'] == observation, scope
+        assert scope['exclusive_causation_verified'] is False and scope['continuing_channel_state_verified'] is False, scope
+        if getter_mode:
+            observed = receipt['getter_workflow']
+            def require_owned(channel):
+                assert (channel.get('outcome') == 'complete' if 'outcome' in channel else channel.get('truncated') is False), channel
+                assert any(item.get('message') == message and item.get('severity') == 'Message'
+                    for item in channel['items']), channel
+            observed['post_add'] = runtime.gateway(['core-call', 'ak.wwise.core.log.get',
+                '--log-channel', 'general', '--max-results', '1000'], live=True)['agent_result']
+            require_owned(observed['post_add'])
+            clear = _start_business_draft(runtime, 'ak.wwise.core.log.clear')
+            _update_business_draft(runtime, clear, 'draft-declare-runtime-control-plan',
+                ['--log-channel', 'general'], live=True)
+            receipt['clear_transaction'] = {}
+            def require_clear_prestate(preview):
+                artifact = runtime.gateway(['transaction-show', preview['transaction_id']], live=False)['artifact']
+                observed['clear_prestate'] = artifact['prepared_operation']['pre_state']['log_channel_before']
+                require_owned(observed['clear_prestate'])
+            cleared = _complete_business_draft(runtime, clear, inspect_preview=require_clear_prestate,
+                phase_receipt=receipt['clear_transaction'])
+            observed['post_clear'] = cleared['verify']['verification']['verification_scope']['log_observation']['post_channel']
+            assert observed['post_clear']['outcome'] == 'complete', observed['post_clear']
+            assert not any(item.get('message') == message for item in observed['post_clear']['items']), observed['post_clear']
+        category['status'] = 'PASS'
+    finally:
+        # Preserve partial execute/verify replies before a failed assertion reaches
+        # the existing lifecycle finalizer; no new Wwise process or replay.
+        if 'peer_diagnostic' in receipt:
+            category['peer_diagnostic'] = {'classification': receipt['peer_diagnostic']['classification'],
+                'complete': receipt['peer_diagnostic']['complete']}
+        category['transaction_ids'] = [receipt[key]['transaction_id']
+            for key in ('transaction', 'clear_transaction') if receipt.get(key, {}).get('transaction_id')]
+        raw = json.dumps(receipt, ensure_ascii=False, indent=None if 'peer_diagnostic' in receipt else 2)
+        if 'peer_diagnostic' in receipt:
+            assert len(raw.encode('utf-8')) <= receipt['peer_diagnostic']['limits']['receipt_bytes'], 'Console peer receipt byte bound exceeded'
+        if 'getter_workflow' in receipt:
+            assert len(raw.encode('utf-8')) <= receipt['getter_workflow']['receipt_bytes'], 'Console getter receipt byte bound exceeded'
+        output.write_text(raw, encoding='utf-8')
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_runtime_inspection_business_profiler_and_transport_lifecycle(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
@@ -1862,8 +2468,198 @@ def test_cli_console_business_object_dump(
             "category": "cli-console-object-dump",
             "status": "PASS",
             "verifier_strength": "result_schema_plus_exact_file_oracle",
+            "requested_content": "property_sets",
+            "include_session_objects": False,
+            "artifact_observation": observe_console_file(dump_file, io_root=runtime.sandbox.sandbox_root),
         }
     )
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_cli_console_media_id_file_observation(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    _check_cli_media_id_storage(workflow_sandbox_runtime, migrate_before_capture=False)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_cli_console_media_id_migrated_project_acceptance(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    _check_cli_media_id_storage(workflow_sandbox_runtime, migrate_before_capture=True)
+
+
+def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_before_capture: bool) -> None:
+    """Verify central storage against the saved private sandbox's media rows.
+
+    Run this terminal CLI node in its own lifecycle. The setup save establishes
+    the baseline after normal fixture normalization and Wwise serialization;
+    it grants no coverage credit to the media operation.
+    """
+    project = runtime.sandbox.sandbox_project
+    mapping = project.with_suffix(".mediaid")
+    observation = {
+        "category": ("cli-media-id-migrated-project" if migrate_before_capture
+                     else "cli-media-id-file-format-observation"), "status": "FAIL",
+        "verifier_strength": "gateway_exact_mapping_and_independent_saved_media_pairs",
+        "baseline_setup": ("public_gateway_save_then_migrate_then_reopen_then_save_before_capture" if migrate_before_capture
+                           else "public_gateway_project_save_before_capture"),
+    }
+    runtime.category_results.append(observation)
+    if migrate_before_capture and runtime.version not in {"2023.1", "2024.1", "2025.1"}:
+        observation.update(status="blocked", reason="The selected console.project.open route is absent from this pinned lane; migrated-media preparation needs owned lifecycle fixture work",
+            selected_reopen_uri="ak.wwise.console.project.open",
+            unassessed_alternative="ak.wwise.ui.project.open is reflected; its Console host eligibility and effect semantics need separate assessment",
+            boundary="legacy_migrated_project_reopen_fixture", media_effect="not_executed")
+        raise AssertionError({"setup_boundary": observation["boundary"], "category": observation})
+    _save_sandbox_project(runtime)
+    if migrate_before_capture:
+        setup_stage = "setup_migration"
+        try:
+            observation[setup_stage] = {"status": "preparing", "coverage_credit": "none; baseline preparation only"}
+            setup = _start_business_draft(runtime, "ak.wwise.cli.migrate")
+            observation[setup_stage]["draft_id"] = setup.draft_id
+            _update_business_draft(runtime, setup, "draft-declare-cli-console-plan",
+                ["--value", "project_file", str(project)], live=True)
+            migration = _complete_core_result_schema_draft(runtime, setup, allow_verified_setup=True)
+            observation[setup_stage].update(status="complete", transaction_id=migration["verify"]["transaction_id"],
+                state=migration["verify"]["state"],
+                business_state_verified=migration["verify"]["verification"]["business_state_verified"], responses=migration)
+            # Native migrate closes the project without ending this Console
+            # instance. Reopen through a separately authorized public operation;
+            # neither restart nor schema-only setup can certify the live identity.
+            setup_stage = "setup_reopen"
+            observation[setup_stage] = {"status": "preparing", "project_file": str(project),
+                "coverage_credit": "none; baseline preparation only"}
+            reopen = _start_business_draft(runtime, "ak.wwise.console.project.open")
+            observation[setup_stage]["draft_id"] = reopen.draft_id
+            _update_business_draft(runtime, reopen, "draft-declare-cli-console-plan",
+                ["--value", "project_file", str(project)], live=True)
+            reopened = _complete_business_draft(runtime, reopen)
+            observation[setup_stage].update(status="complete", transaction_id=reopened["verify"]["transaction_id"],
+                state=reopened["verify"]["state"], business_state_verified=reopened["verify"]["verification"]["business_state_verified"],
+                verification=reopened["verify"]["verification"], responses=reopened)
+            # Reopening can materialize newly loaded in-memory objects. Save that
+            # loaded state before any disk-authority baseline or media Preview.
+            setup_stage = "setup_reopen_save"
+            observation[setup_stage] = {"status": "preparing",
+                "coverage_credit": "none; baseline preparation only"}
+            saved = _save_sandbox_project(runtime)
+            observation[setup_stage].update(status="complete", transaction_id=saved["verify"]["transaction_id"],
+                state=saved["verify"]["state"],
+                business_state_verified=saved["verify"]["verification"]["business_state_verified"], responses=saved)
+        except AssertionError as exc:
+            observation[setup_stage]["status"] = "FAIL"
+            observation[setup_stage]["failure"] = (exc.args[0] if exc.args and isinstance(exc.args[0], Mapping) else str(exc))
+            raise
+    assert not mapping.exists(), "This case requires the original Work Unit storage fixture"
+    image_root = runtime.state_dir.parent / ("cli-media-id-images-" + uuid.uuid4().hex)
+    image_root.mkdir(parents=True, exist_ok=False)
+    images = observation["model_images"] = {"root": str(image_root), "before": {}, "after": {},
+        "business_effect_verified": False}
+    before = ConsoleModelImageIndex(root=image_root, project=project, phase="before", link=images["before"])
+    sample = sample_observation = None
+    expected, work_units = [], []
+    path = project
+    try:
+        before.save(project, observe_console_file(project, io_root=project.parent))
+        for path in project.parent.rglob("*"):
+            if not path.name.casefold().endswith(".wwu"):
+                continue
+            work_units.append(path)
+            assert len(work_units) <= before.MAX_WORK_UNITS, "Console model Work Unit count exceeded"
+        work_units.sort()
+        for path in work_units:
+            candidate = observe_console_file(path, io_root=project.parent)
+            raw = before.save(path, candidate)
+            for owner in ET.fromstring(raw).iter():
+                for media in owner.findall("./MediaIDList/MediaID"):
+                    assert owner.get("ID") and media.get("ID")
+                    expected.append([owner.attrib["ID"].upper(), media.attrib["ID"]])
+                    assert len(expected) <= 100000
+                    if sample is None:
+                        sample, sample_observation = path, candidate
+        assert sample is not None, "A media-ID-free project cannot establish migration effects"
+        before.finish()
+    except Exception as exc:
+        before.error(path, exc)
+        try:
+            before.finish()
+        except Exception as retention_error:
+            images["before"].update(complete=False, finalization_error=str(retention_error)[:2048])
+        raise
+    observation.update(source_work_unit=sample_observation, baseline_media_pairs=sorted(expected))
+    try:
+        draft = _start_business_draft(runtime, "ak.wwise.cli.moveMediaIdsToSingleFile")
+        _update_business_draft(runtime, draft, "draft-declare-cli-console-plan",
+            ["--value", "project_file", str(project)], live=True)
+        def bind_retained_baseline(preview):
+            transaction_id = _required_string(preview, "transaction_id")
+            stored = TransactionStore(runtime.state_dir).load_preview(transaction_id)
+            prepared = stored.artifact["prepared_operation"]
+            effect = prepared["pre_state"]["cli_project_effect"]
+            files = {Path(relative).as_posix(): row for relative, row in effect["model_before"]["files"].items()}
+            observation["transaction_id"] = transaction_id
+            images["preview_binding"] = {"transaction_id": transaction_id,
+                "artifact_hash": stored.artifact_hash, "matches_before_images": False}
+            assert (prepared["dispatch"]["uri"] == "ak.wwise.cli.moveMediaIdsToSingleFile"
+                and images["before"]["complete"] and set(files) == set(before.files)
+                and all(row["status"] == "captured" and row["file_proof"] == files[relative]["proof"]
+                    for relative, row in before.files.items())), "MEDIA_BASELINE_PREVIEW_MISMATCH"
+            images["preview_binding"]["matches_before_images"] = True
+        result = _complete_business_draft(runtime, draft, inspect_preview=bind_retained_baseline)
+        observation["transaction_id"] = result["verify"]["transaction_id"]
+        captured = observe_console_file(mapping, io_root=project.parent)
+        document = ET.fromstring(base64.b64decode(captured["content_base64"], validate=True))
+        actual = [[owner.attrib["ID"].upper(), media.attrib["ID"]]
+            for owner in document.findall("./MediaIDInfo/MediaIDs/Language/File/WObject")
+            for media in owner.findall("MediaID")]
+        assert sorted(actual) == sorted(expected), "Saved source/media multiset differs from central mapping"
+        observation["status"] = "PASS"
+    finally:
+        capture_errors = []
+        after = None
+        try:
+            after = ConsoleModelImageIndex(root=image_root, project=project, phase="after", link=images["after"])
+            after_paths = set(work_units)
+            try:
+                for path in project.parent.rglob("*"):
+                    if not path.name.casefold().endswith(".wwu"):
+                        continue
+                    after_paths.add(path)
+                    assert len(after_paths) <= after.MAX_WORK_UNITS, "Console after-image path count exceeded"
+            except Exception as exc:
+                after.error(None, exc)
+                capture_errors.append("after_enumeration")
+            for path in [project, *sorted(after_paths)[:after.MAX_WORK_UNITS]]:
+                try:
+                    candidate = observe_console_file(path, io_root=project.parent)
+                    raw = after.save(path, candidate)
+                    if path != project and ET.fromstring(raw).findall(".//MediaIDList/MediaID"):
+                        capture_errors.append("work_unit_media_ids_remain:" + path.relative_to(project.parent).as_posix())
+                except Exception as exc:
+                    after.error(path, exc)
+                    capture_errors.append("after_capture:" + path.relative_to(project.parent).as_posix())
+            after.finish()
+        except Exception as exc:
+            if after is not None:
+                after.error(None, exc)
+            images["after"].update(complete=False, finalization_error=str(exc)[:2048])
+            capture_errors.append("after_finalization")
+        if capture_errors:
+            observation["status"] = "FAIL"
+        # Preserve diagnostic bytes even when Gateway verification rejects the
+        # result. This is local artifact capture, never another native attempt.
+        for key, path in (("mapping_file", mapping), ("source_work_unit_after", sample)):
+            try:
+                observation[key] = observe_console_file(path, io_root=project.parent)
+            except Exception as exc:
+                observation[key] = {"capture_error": str(exc)}
+                capture_errors.append(key)
+                observation["status"] = "FAIL"
+    assert not capture_errors, capture_errors
 
 
 @pytest.mark.live
@@ -1942,6 +2738,241 @@ def test_host_ui_debug_business_schema_read(
             "verifier_strength": "real_result_schema_and_bounded_projection",
         }
     )
+
+
+def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Retain four exact native observations; do not certify a signal algorithm."""
+    return _collect_tone_characterization(runtime)
+
+
+def _collect_tone_waveform_envelope_characterization(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Collect six missing signal observations; no guessed waveform/envelope oracle."""
+    assert runtime.version == '2025.1', 'This source-reviewed successor is limited to Console 2025.1'
+    return _collect_tone_characterization(runtime, remaining_shapes=True)
+
+
+def _collect_tone_anonymous_count_characterization(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Observe one source-backed anonymous override; native admission is unproven."""
+    assert runtime.version == '2025.1', 'This source-reviewed anonymous-count probe is limited to Console 2025.1'
+    return _collect_tone_characterization(runtime, anonymous_count=True)
+
+
+def _collect_tone_characterization(runtime: _WorkflowSandboxRuntime, *, remaining_shapes=False, anonymous_count=False) -> dict[str, Any]:
+    from wwise_waapi.operation_soundbank import capture_file_proof
+    from wwise_waapi.native_catalog import load_native_catalog
+    from wwise_waapi.canonical import canonical_sha256
+    assert runtime.version in {'2023.1', '2024.1', '2025.1'}, 'Tone is absent from the pinned older routes'
+    catalog = load_native_catalog(runtime.version, 'wwise-console')
+    assert 'ak.wwise.debug.generateToneWAV' in catalog['functions']
+    assert 'ak.wwise.debug.generateToneWAV' in catalog['schemas']
+    catalog_identity = {'host': 'wwise-console', 'version': runtime.version,
+        'build': catalog['provenance']['build'], 'content_sha256': catalog['content_sha256']}
+    assert not (remaining_shapes and anonymous_count), 'Tone collections have distinct fixed case rosters'
+    label = 'tone-anonymous-count' if anonymous_count else 'tone-waveform-envelope' if remaining_shapes else 'tone-stationary'
+    layout = 'Ambisonics 5th order' if anonymous_count else '1.0'
+    cases = ([('anonymous-36-sine-envelope', 'sine', 'float32', -6, .005, .01, .0075)] if anonymous_count else [
+        ('triangle-stationary', 'triangle', 'float32', -6, 0, .25, 0),
+        ('square-stationary', 'square', 'float32', -6, 0, .25, 0),
+        ('white-noise-stationary', 'white_noise', 'float32', -6, 0, .25, 0),
+        ('sine-attack-only', 'sine', 'float32', -6, .05, .10, 0),
+        ('sine-release-only', 'sine', 'float32', -6, 0, .10, .075),
+        ('sine-attack-release', 'sine', 'float32', -6, .05, .10, .075),
+    ] if remaining_shapes else [(depth + '-' + str(abs(level)) + 'db', 'sine', depth, level, 0, .25, 0)
+        for depth, level in [('int16', 0), ('int16', -6), ('float32', 0), ('float32', -6)]])
+    output = runtime.state_dir / (label + '-characterization.json')
+    assert not output.exists(), 'Never overwrite an original Tone characterization'
+    runtime.state_dir.mkdir(parents=True, exist_ok=True)
+    artifacts = runtime.state_dir / (label + '-artifacts'); artifacts.mkdir(exist_ok=False)
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
+    prior_native = set(native_root.glob('*.json'))
+    tone_root = runtime.sandbox.sandbox_root / (label + '-output'); tone_root.mkdir(exist_ok=False)
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH'])
+    config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+    lifecycle_path = runtime.env.get('WWISE_CATEGORY_EVIDENCE_PATH')
+    if lifecycle_path is None and sys.platform == 'darwin':
+        lifecycle_path = runtime.env.get('WWISE_MACOS_CATEGORY_EVIDENCE_PATH')
+    lifecycle_path = Path(lifecycle_path).expanduser().resolve(strict=False) if lifecycle_path else (
+        REPO_ROOT / EVIDENCE_ROOT / (current_evidence_platform() + '-category-evidence.jsonl'))
+    category = {'category': label + '-characterization', 'status': 'FAIL',
+        'diagnostic_only': True, 'business_effect_verified': False, 'coverage_credit': 'none; characterization only',
+        'verifier_strength': ('characterization_only; exact_native_bytes_and_public_receipts; existing_sine_envelope_conformance_reported_separately'
+            if anonymous_count else 'exact_native_file_bytes_and_public_receipts_only; signal_oracle_unimplemented'),
+        'observation_path': str(output), 'reason': 'collection incomplete'}
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {'contract': 'waapi-skill.' + label + '-characterization/v1',
+        'candidate': runtime.candidate, 'version': runtime.version, 'native_catalog': catalog_identity, 'calls': [], 'phases': [],
+        'native_schema_sha256': canonical_sha256(catalog['schemas']['ak.wwise.debug.generateToneWAV']),
+        'native_evidence': [], 'collection_complete': False, 'business_effect_verified': False,
+        'coverage_credit': 'none; characterization only', 'config_sha256': config_hash,
+        'source_project': str(runtime.sandbox.source_project),
+        'endpoint': {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url},
+        'lifecycle_final_reference': {'path': str(lifecycle_path), 'contract': 'waapi-skill.host-category-evidence/v3',
+            'phase': 'final', 'candidate': runtime.candidate, 'category': category['category'],
+            'transaction_ids': [], 'cleanup_status': 'unresolved_until_final_row'},
+        'lifecycle_acceptance': 'Requires the matching final category row with every collected transaction ID, source before/after hash/mtime/tree and residual process cleanup; prepared/PENDING is not cleanup success.',
+        'limits': {'calls': 16 if anonymous_count else 64 if remaining_shapes else 48, 'reply_bytes': 256 * 1024, 'total_reply_bytes': 8 * 1024 * 1024,
+            'wav_files': len(cases), 'file_bytes': 8 * 1024 * 1024, 'native_files': 512,
+            'native_bytes': 32 * 1024 * 1024, 'archive_bytes': 72 * 1024 * 1024,
+            'receipt_bytes': 256 * 1024}, 'archive_bytes': 0, 'total_reply_bytes': 0}
+    attempted: set[str] = set()
+    def persist():
+        raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(raw) <= receipt['limits']['receipt_bytes'], 'Tone receipt exceeds its bound'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+    def archive(name, raw):
+        assert len(raw) <= receipt['limits']['file_bytes'], 'Tone archived file exceeds its bound'
+        assert receipt['archive_bytes'] + len(raw) <= receipt['limits']['archive_bytes'], 'Tone archive exceeds its bound'
+        path = artifacts / name
+        prove_artifact_path(path, io_root=artifacts, field='Tone archive', expect_directory=False)
+        descriptor = os.open(path, binary_file_open_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+            | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+        with os.fdopen(descriptor, 'wb') as stream:
+            stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+        proof = capture_file_proof(path, field='Tone archive', max_bytes=receipt['limits']['file_bytes'], io_root=artifacts)
+        assert proof['sha256'] == hashlib.sha256(raw).hexdigest() and proof['size'] == len(raw), proof
+        receipt['archive_bytes'] += len(raw)
+        return {'path': str(path), 'sha256': proof['sha256'], 'size': len(raw), 'proof': proof}
+    class Gateway:
+        def call(self, argv, *, live, allow_failure=False):
+            assert len(receipt['calls']) < receipt['limits']['calls'], 'Tone public call bound exceeded'
+            if argv[0] == 'execute':
+                assert argv[1] not in attempted, 'Never retry a Tone execution'
+                attempted.add(argv[1])
+            row: dict[str, Any] = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                raw = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+                assert len(raw) <= receipt['limits']['reply_bytes'], 'Tone reply exceeds its bound'
+                receipt['total_reply_bytes'] += len(raw)
+                assert receipt['total_reply_bytes'] <= receipt['limits']['total_reply_bytes'], 'Tone replies exceed their bound'
+                row.update(exit_code=code, reply=archive('reply-' + str(len(receipt['calls'])) + '.json', raw))
+                if not allow_failure: assert code == 0 and payload.get('ok') is True, payload
+                if live:
+                    assert payload.get('detected_version') == runtime.version, payload
+                    assert payload.get('endpoint') == receipt['endpoint'], payload
+                return code, payload
+            except Exception as exc:
+                row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            return self.call(argv, live=live)[1]
+    gateway = Gateway()
+    def capture_wave(phase):
+        if 'wav' in phase: return
+        observed = observe_console_file(Path(phase['output_path']), io_root=tone_root)
+        raw = base64.b64decode(observed['content_base64'], validate=True)
+        copied = archive(phase['name'] + '.wav', raw)
+        phase['wav'] = {'archive_path': copied['path'], 'archive_proof': copied['proof'],
+            'native_file_proof': observed['file_proof'], 'representation': 'uninterpreted_native_file_bytes'}
+        persist()
+    persist()
+    try:
+        status = gateway.gateway(['status'], live=True)
+        info_call = next(row for row in status['calls'] if row['api'] == 'ak.wwise.core.getInfo')
+        info_observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
+        info_evidence = json.loads(base64.b64decode(info_observed['content_base64'], validate=True))
+        receipt['get_info'] = info_evidence['result']
+        assert receipt['get_info']['isCommandLine'] is True, 'Characterization requires WwiseConsole'
+        version = receipt['get_info']['version']
+        assert tuple(version[k] for k in ('year', 'major', 'minor', 'build')) == tuple(
+            int(part) for part in catalog_identity['build'].split('.')), version
+        gateway.gateway(['request-schema', 'ak.wwise.debug.generateToneWAV'], live=False)
+        for name, waveform, depth, level, attack, sustain, release in cases:
+            phase = {'name': name, 'bit_depth': depth, 'sustain_db': level,
+                'business_values': {'waveform': waveform, 'frequency_hz': 440, 'channel_layout': layout,
+                    'bit_depth': depth, 'sample_rate_hz': 48000, 'attack_seconds': attack,
+                    'sustain_seconds': sustain, 'release_seconds': release, 'sustain_db': level,
+                    **({'anonymous_channels': True} if anonymous_count else {})},
+                'output_path': str(tone_root / (name + '.wav')),
+                'execution_attempted': False, 'signal_verified': False}
+            receipt['phases'].append(phase); persist()
+            try:
+                draft = _start_business_draft(gateway, 'ak.wwise.debug.generateToneWAV')
+                _update_business_draft(gateway, draft, 'draft-declare-host-plan', [
+                    '--value', 'output_file', phase['output_path'], '--value', 'waveform', waveform,
+                    '--value', 'frequency_hz', '440', '--value', 'channel_layout', layout,
+                    '--value', 'bit_depth', depth, '--value', 'sample_rate_hz', '48000',
+                    '--value', 'attack_seconds', str(attack), '--value', 'sustain_seconds', str(sustain),
+                    '--value', 'release_seconds', str(release), '--value', 'sustain_db', str(level),
+                    *(['--toggle', 'anonymous_channels', 'enable'] if anonymous_count else [])], live=True)
+                _update_business_draft(gateway, draft, 'draft-check', live=True)
+                preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+                tx = phase['transaction_id'] = preview['transaction_id']
+                ids = receipt['lifecycle_final_reference']['transaction_ids']
+                assert tx not in ids; ids.append(tx)
+                shown = gateway.gateway(['transaction-show', tx], live=False)
+                phase['preview_transaction'] = receipt['calls'][-1]['reply']
+                gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+                phase['execution_attempted'] = True; persist()
+                executed = gateway.gateway(['execute', tx], live=True)
+                phase['execute_state'] = executed.get('state')
+                assert executed.get('state') == 'executed_unverified', executed
+                capture_wave(phase)  # Retain bytes before a partial/failed verifier can stop the collector.
+                code, verified = gateway.call(['verify', tx], live=True, allow_failure=True)
+                phase['verification'] = {'exit_code': code, 'state': verified.get('state'),
+                    'business_state_verified': verified.get('verification', {}).get('business_state_verified'),
+                    'verification_strength': verified.get('verification_strength')}
+            finally:
+                if phase['execution_attempted'] and 'wav' not in phase and Path(phase['output_path']).exists():
+                    capture_wave(phase)
+                if phase.get('transaction_id'):
+                    gateway.gateway(['transaction-show', phase['transaction_id']], live=False)
+                    phase['transaction'] = receipt['calls'][-1]['reply']
+                persist()
+        final_status = gateway.gateway(['status'], live=True)
+        assert final_status['wwise'] == status['wwise'], 'Tone host context changed during characterization'
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, 'Tone diagnostic configuration changed'
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        raise
+    finally:
+        try:
+            paths = sorted(set(native_root.glob('*.json')) - prior_native)
+            assert len(paths) <= receipt['limits']['native_files'], 'Tone native evidence count bound exceeded'
+            total = 0
+            for index, path in enumerate(paths):
+                observed = observe_console_file(path, io_root=native_root)
+                raw = base64.b64decode(observed['content_base64'], validate=True)
+                total += len(raw); assert total <= receipt['limits']['native_bytes'], 'Tone native evidence byte bound exceeded'
+                receipt['native_evidence'].append({'native_path': str(path), **archive('native-' + str(index) + '.json', raw)})
+        except Exception as exc:
+            receipt['archive_failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+            category.update(status='FAIL', reason='native evidence archive incomplete')
+            raise
+        finally:
+            persist()
+    receipt['collection_complete'] = True
+    category.update(status='blocked', reason=f'{len(cases)} native files collected; requested signal effects and other host/version evidence remain unfinished')
+    persist()
+    return category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_stationary_tone_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    category = _collect_stationary_tone_characterization(workflow_sandbox_runtime)
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True, category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_tone_waveform_envelope_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('This source-reviewed Tone signal collection targets only Console 2025.1.7.9143')
+    category = _collect_tone_waveform_envelope_characterization(workflow_sandbox_runtime)
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True, category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_tone_anonymous_count_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('This source-reviewed anonymous-count probe targets only Console 2025.1.7.9143')
+    category = _collect_tone_anonymous_count_characterization(workflow_sandbox_runtime)
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True, category
 
 
 @pytest.mark.live
@@ -3308,7 +4339,7 @@ def test_rtpc_empty_create_update_delete_recreate_across_selected_version(
             _delete_if_present_via_transaction(runtime, control_id)
 
 
-def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
+def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> dict[str, Mapping[str, Any]]:
     """Persist prior sandbox mutations before a file-authority operation."""
 
     api = "ak.wwise.core.project.save"
@@ -3321,19 +4352,22 @@ def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
             "copy_exactly": True,
             "append_arguments": "forbidden",
         }, continuation
+        declaration = schema["business_adapter"]["declaration"]
+        save_fields = (["--value", "auto_check_out", "false"]
+            if "auto_check_out" in declaration["optional_fields"] else [])
         draft = _start_business_draft(runtime, api)
         _update_business_draft(
             runtime,
             draft,
             "draft-declare-core-plan",
-            ["--value", "auto_check_out", "false"],
+            save_fields,
             live=True,
         )
         saved = _complete_core_result_schema_draft(runtime, draft)
         assert saved["verify"]["state"] == (
             TransactionState.RESULT_SCHEMA_CHECKED.value
         ), saved
-        return
+        return saved
 
     continuation = schema.get("continuation")
     assert isinstance(continuation, Mapping), schema
@@ -3367,6 +4401,8 @@ def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
         TransactionState.VERIFIED.value,
         TransactionState.RESULT_SCHEMA_CHECKED.value,
     }, verified
+
+    return {"preview": preview, "execute": executed, "verify": verified}
 
 
 def _create_object(
@@ -3676,3 +4712,6927 @@ def _source_tree_inventory(root: Path) -> tuple[str, int]:
             digest.update(os.readlink(path).encode("utf-8"))
             digest.update(b"\0")
     return digest.hexdigest(), len(paths)
+
+
+def _collect_rtpc_curve_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Observe existing RTPC.Curve through public bounded reads; never create one."""
+    from wwise_waapi.object_query_outputs import available_query_outputs
+
+    points_available = "curve-points" in available_query_outputs(runtime.version)
+    output = runtime.state_dir / "rtpc-curve-metadata-observation.json"
+    evidence_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
+    previous_evidence = set(evidence_root.glob("*.json"))
+    observation: dict[str, Any] = {
+        "contract": "waapi-skill.rtpc-curve-metadata-observation/v1",
+        "candidate": runtime.candidate, "version": runtime.version,
+        "endpoint": {"host": runtime.lifecycle.host, "port": runtime.port,
+                     "url": runtime.lifecycle.waapi_url},
+        "config_path": runtime.env["WAAPI_SKILL_CONFIG_PATH"],
+        "config_sha256": hashlib.sha256(Path(runtime.env["WAAPI_SKILL_CONFIG_PATH"]).read_bytes()).hexdigest(),
+        "dispatcher_evidence_directory": str(evidence_root),
+        "calls": [], "native_evidence": [], "boundaries": [],
+        "mutation_authority": False, "business_effect_verified": False,
+    }
+    category: dict[str, Any] = {
+        "category": "rtpc-curve-native-metadata-observation", "status": "FAIL",
+        "verifier_strength": "read_only_metadata_and_reference_observation_only",
+        "observation_path": str(output), "reason": "observation incomplete",
+    }
+    runtime.category_results.append(category)
+
+    def retain() -> None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        body = json.dumps(observation, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= 2 * 1024 * 1024, "Curve observation exceeded retained byte bound"
+        output.write_bytes(body)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+
+    def read(stage: str, argv: Sequence[str]) -> dict[str, Any]:
+        assert len(observation["calls"]) < 64, "Curve observation exceeded public call bound"
+        code, payload = runtime.raw_gateway(argv)
+        observation["calls"].append({"stage": stage, "gateway_argv": list(argv),
+                                     "exit_code": code, "payload": payload})
+        retain()
+        if code == 0 and payload.get("ok") is True and argv[0] not in {"config-show", "query-schema"}:
+            assert payload.get("endpoint") == observation["endpoint"], payload
+            assert payload.get("detected_version") == runtime.version, payload
+        if code != 0 or payload.get("ok") is not True:
+            observation["boundaries"].append({"stage": stage, "reason": "public_read_rejected",
+                                               "error_code": payload.get("error_code")})
+        return payload
+
+    def pages(stage: str, argv: Sequence[str], field: str) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        command = list(argv)
+        for _ in range(8):
+            payload = read(stage, command)
+            if payload.get("ok") is not True:
+                return rows
+            result = payload["agent_result"]
+            rows.extend(result.get(field, []))
+            if result.get("complete") is True:
+                return rows
+            next_command = result.get("next_command", {}).get("gateway_argv")
+            assert isinstance(next_command, list) and next_command[0] == "metadata", payload
+            command = next_command
+        observation["boundaries"].append({"stage": stage, "reason": "eight_page_bound_reached"})
+        return rows
+
+    def curve_metadata(stage: str, scope: Sequence[str]) -> None:
+        fields = pages(stage + "-names", ["metadata", "list", *scope, "--page-size", "64"], "fields")
+        matches = [row for row in fields if row.get("name") == "Curve"]
+        if len(matches) != 1:
+            observation["boundaries"].append({"stage": stage, "reason": "Curve_not_uniquely_listed",
+                                               "matching_count": len(matches)})
+            return
+        command = ["metadata", "detail", *scope, "--selection", matches[0]["selection"]]
+        for _ in range(8):
+            payload = read(stage + "-detail", command)
+            if payload.get("ok") is not True or payload["agent_result"].get("complete") is True:
+                return
+            command = payload["agent_result"]["next_command"]["gateway_argv"]
+            assert command[0] == "metadata", payload
+        observation["boundaries"].append({"stage": stage, "reason": "eight_detail_page_bound_reached"})
+
+    try:
+        if not points_available:
+            observation["boundaries"].append({"stage": "Curve-points-contract",
+                "reason": "curve_points_output_unavailable_in_public_version",
+                "native_availability": "not_inferred"})
+        read("configuration", ["config-show"])
+        read("host-and-project", ["status"])
+        types = pages("live-types", ["metadata", "types", "--meaning", "RTPC",
+                                     "--meaning", "Curve", "--page-size", "64"], "types")
+        selected = {name: [row for row in types if row.get("name") == name]
+                    for name in ("RTPC", "Curve")}
+        observation["selected_types"] = selected
+        if any(len(rows) != 1 for rows in selected.values()):
+            observation["boundaries"].append({"stage": "live-types", "reason": "type_not_uniquely_observed"})
+        if len(selected["RTPC"]) == 1:
+            rtpc_selection = selected["RTPC"][0]["selection"]
+            curve_metadata("RTPC-class-Curve", ["--type-selection", rtpc_selection])
+            candidates = read("existing-RTPCs", ["query-object", "--type-selection", rtpc_selection,
+                                                 "--max-results", "2"])
+            owners = candidates.get("objects", []) if candidates.get("ok") is True else []
+            assert isinstance(owners, list) and len(owners) <= 2, candidates
+            observation["selected_RTPCs"] = owners
+            if not owners:
+                observation["boundaries"].append({"stage": "existing-RTPCs", "reason": "no_existing_RTPC_observed"})
+            else:
+                read("advanced-read-contract", ["query-schema", "--advanced"])
+            for index, owner in enumerate(owners):
+                owner_id = _required_string(owner, "id")
+                assert owner.get("type") == "RTPC", owner
+                assert owner_id.casefold() == ("{" + str(uuid.UUID(owner_id)) + "}").casefold(), owner
+                curve_metadata(f"RTPC-{index}-Curve", ["--exact-id", owner_id])
+                # The business relationship list has no outward reference hop.
+                # The existing advanced read contract owns URI/projection/take.
+                curve = read(f"RTPC-{index}-Curve-value", [
+                    "query-object", "--advanced-waql", f'from object "{owner_id}" select @Curve',
+                    "--max-results", "1", "--include", "class-id",
+                    *(["--include", "curve-points"] if points_available else []),
+                ])
+                rows = curve.get("objects", []) if curve.get("ok") is True else []
+                assert isinstance(rows, list) and len(rows) <= 1, curve
+                for row in rows:
+                    curve_id = _required_string(row, "id")
+                    assert curve_id.casefold() == ("{" + str(uuid.UUID(curve_id)) + "}").casefold(), row
+                    exact = read(f"RTPC-{index}-Curve-exact-ID", [
+                        "query-object", "--exact-id", curve_id, "--include", "class-id",
+                        *(["--include", "curve-points"] if points_available else []),
+                    ])
+                    exact_rows = exact.get("objects", []) if exact.get("ok") is True else []
+                    if len(exact_rows) != 1 or exact_rows[0].get("id") != curve_id or exact_rows[0].get("type") != "Curve":
+                        observation["boundaries"].append({"stage": f"RTPC-{index}-Curve-exact-ID",
+                                                           "reason": "Curve_exact_identity_type_not_observed"})
+                if not rows or any(row.get("type") != "Curve" or points_available and "curve_points" not in row for row in rows):
+                    observation["boundaries"].append({"stage": f"RTPC-{index}-Curve-value",
+                                                       "reason": "typed_Curve_points_not_observed"})
+        category["status"] = "blocked" if observation["boundaries"] else "PASS"
+        category["reason"] = ("bounded observation has explicit gaps" if observation["boundaries"]
+                              else "native metadata and points observed; eligibility requires separate review")
+        return category
+    finally:
+        completed_status = category["status"]
+        completed_reason = category["reason"]
+        category.update(status="FAIL", reason="observation evidence retention incomplete")
+        new_evidence = sorted(set(evidence_root.glob("*.json")) - previous_evidence)
+        assert len(new_evidence) <= 512, "Curve dispatcher evidence exceeded file bound"
+        total_bytes = 0
+        for path in new_evidence:
+            body = path.read_bytes()
+            total_bytes += len(body)
+            assert total_bytes <= 32 * 1024 * 1024, "Curve dispatcher evidence exceeded byte bound"
+            observation["native_evidence"].append({"path": str(path), "bytes": len(body),
+                                                    "sha256": hashlib.sha256(body).hexdigest()})
+        retain()
+        category.update(status=completed_status, reason=completed_reason)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_read_only_rtpc_curve_native_metadata_observation(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Read existing sample RTPC/Curve facts on the selected one of five versions."""
+    category = _collect_rtpc_curve_metadata_probe(workflow_sandbox_runtime)
+    if category["status"] == "blocked":
+        pytest.skip(f"RTPC.Curve observation incomplete; retained exact evidence: {category}")
+    assert category["status"] == "PASS", category
+
+
+def _collect_owned_list_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Observe a tiny existing graph through public reads, without mutation credit."""
+    sdk_build = {"2021.1": "2021.1.14.8108", "2022.1": "2022.1.19.8584",
+                 "2023.1": "2023.1.19.8928", "2024.1": "2024.1.13.9056",
+                 "2025.1": "2025.1.7.9143"}[runtime.version]
+    sdk_members = ["wwiseobject_sound.html", "waql_reference.html"]
+    if runtime.version >= "2022.1":
+        sdk_members.append("ak_wwise_core_object_get_example_gets_the_rtpc_ids_from_a_sound_s_rtpc_list.html")
+    if runtime.version >= "2023.1":
+        sdk_members.append("wwiseobject_musicswitchcontainer.html")
+    if runtime.version == "2025.1":
+        sdk_members.append("wwiseobject_musicargumentsslot.html")
+    output = runtime.state_dir / "owned-list-metadata-observation.json"
+    evidence_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
+    previous = set(evidence_root.glob("*.json"))
+    config = Path(runtime.env["WAAPI_SKILL_CONFIG_PATH"])
+    observation: dict[str, Any] = {
+        "contract": "waapi-skill.owned-list-metadata-observation/v1",
+        "candidate": runtime.candidate, "version": runtime.version,
+        "endpoint": {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url},
+        "config_path": str(config), "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
+        "source_evidence": {"research": "/tmp/full-coverage-180-owned-discovery-research.md",
+            "installed_source_report": "/tmp/full-coverage-180-installed-owned-sources.md",
+            "sdk_archive": f"/Applications/Audiokinetic/Wwise{sdk_build}/SDK/Help/WwiseSDK-Windows.chm",
+            "sdk_members": sdk_members,
+            "scope": "matching version; 2021 RTPC is an observation candidate, not a documented List-type claim"},
+        "bounds": {"calls": 96, "pages_per_metadata_read": 8, "rows": 2048,
+                   "members_per_hop": 4, "owner_rows": 16, "observation_bytes": 8 * 1024 * 1024},
+        "calls": [], "boundaries": [], "native_evidence": [], "relationships": [], "owner_comparisons": [],
+        "complete_owned_list_discovery_proven": False, "field_cardinality_permission_proven": False,
+        "mutation_authority": False, "business_effect_verified": False,
+    }
+    category = {"category": "owned-list-native-metadata-observation", "status": "FAIL",
+                "verifier_strength": "bounded_sample_metadata_list_and_owner_observation_only",
+                "observation_path": str(output), "reason": "observation incomplete",
+                "business_effect_verified": False, "complete_owned_list_discovery_proven": False}
+    runtime.category_results.append(category)
+    total_rows = 0
+
+    def retain() -> None:
+        body = json.dumps(observation, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= observation["bounds"]["observation_bytes"], "Owned-list observation byte bound exceeded"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(body)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+
+    def boundary(stage: str, reason: str, **facts: Any) -> None:
+        observation["boundaries"].append({"stage": stage, "reason": reason, **facts})
+
+    def read(stage: str, argv: Sequence[str]) -> dict[str, Any]:
+        assert len(observation["calls"]) < 96, "Owned-list public call bound exceeded"
+        code, payload = runtime.raw_gateway(argv)
+        observation["calls"].append({"stage": stage, "gateway_argv": list(argv), "exit_code": code, "payload": payload})
+        retain()
+        if code != 0 or payload.get("ok") is not True:
+            boundary(stage, "public_read_rejected", error_code=payload.get("error_code"))
+        elif argv[0] not in {"config-show", "query-schema"}:
+            assert payload.get("endpoint") == observation["endpoint"], payload
+            assert payload.get("detected_version") == runtime.version, payload
+        return payload
+
+    def count(rows: list[Any]) -> None:
+        nonlocal total_rows
+        total_rows += len(rows)
+        assert total_rows <= 2048, "Owned-list cumulative row bound exceeded"
+
+    def pages(stage: str, argv: Sequence[str], field: str | None = None) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        command = list(argv)
+        for _ in range(8):
+            payload = read(stage, command)
+            if payload.get("ok") is not True:
+                return []
+            result = payload["agent_result"]
+            if field:
+                batch = result.get(field)
+                assert isinstance(batch, list) and len(batch) <= 64, payload
+                count(batch)
+                rows.extend(batch)
+            if result.get("complete") is True:
+                return rows
+            command = result.get("next_command", {}).get("gateway_argv")
+            assert isinstance(command, list) and command[0] == "metadata", payload
+        boundary(stage, "metadata_page_bound_reached")
+        return []
+
+    def canonical(value: Any) -> str:
+        assert isinstance(value, str) and value.casefold() == ("{" + str(uuid.UUID(value)) + "}").casefold(), value
+        return value
+
+    def query(stage: str, source: Sequence[str], *, maximum: int = 5, sample: bool = False) -> list[dict[str, Any]]:
+        payload = read(stage, ["query-object", *source, "--max-results", str(maximum),
+                               "--include", "parent", "--include", "owner", "--include", "class-id"])
+        if payload.get("ok") is not True:
+            return []
+        if payload.get("projection_complete") is False or payload.get("status") == "partial":
+            boundary(stage, "query_projection_incomplete")
+            return []
+        rows = payload.get("objects", payload.get("agent_result"))
+        assert isinstance(rows, list) and len(rows) <= maximum, payload
+        count(rows)
+        if not sample and (len(rows) == maximum or payload.get("limit_reached") is True):
+            boundary(stage, "query_row_bound_reached", maximum=maximum)
+            return []
+        for row in rows:
+            canonical(row.get("id"))
+            assert isinstance(row.get("type"), str) and row["type"], row
+            if "class_id" not in row:
+                boundary(stage, "class_id_output_missing", object_id=row["id"])
+            elif not isinstance(row["class_id"], int) or isinstance(row["class_id"], bool):
+                boundary(stage, "class_id_output_not_integer", object_id=row["id"], value=row["class_id"])
+            for key in ("parent", "owner"):
+                if key not in row:
+                    boundary(stage, "relationship_output_missing", field=key, object_id=row["id"])
+                elif row[key] is not None:
+                    assert isinstance(row[key], Mapping), row
+                    canonical(row[key].get("id"))
+        if len({row["id"].casefold() for row in rows}) != len(rows):
+            boundary(stage, "duplicate_query_identity")
+            return []
+        return rows
+
+    def metadata(owner: str, fields: Sequence[str]) -> None:
+        listed = pages(owner + "-names", ["metadata", "list", "--exact-id", owner, "--page-size", "64"], "fields")
+        for field in fields:
+            selected = [row for row in listed if row.get("name") == field]
+            if len(selected) != 1:
+                boundary(owner + "." + field, "field_not_uniquely_listed_gateway_discovery_boundary", matching_count=len(selected))
+                continue
+            pages(owner + "." + field + "-detail", ["metadata", "detail", "--exact-id", owner,
+                                                       "--selection", selected[0]["selection"]])
+
+    def hop(owner: str, field: str) -> list[dict[str, Any]]:
+        rows = query(owner + "." + field, ["--advanced-waql", f'from object "{owner}" select @{field}'])
+        observation["relationships"].append({"owner_id": owner, "field": field, "members": rows})
+        for row in rows:
+            exact = query(row["id"] + "-exact", ["--exact-id", row["id"]], maximum=2)
+            if len(exact) != 1 or any(exact[0].get(key) != row.get(key) for key in ("id", "type", "class_id", "parent", "owner")):
+                boundary(row["id"], "exact_readback_relationship_changed")
+        return rows
+
+    def compare(owner: str, known: Sequence[Mapping[str, Any]]) -> None:
+        actual = query(owner + "-from-project-owner", ["--advanced-waql", f'from project where owner.id = "{owner}"'], maximum=17)
+        expected = {row["id"] for row in known if isinstance(row.get("owner"), Mapping)
+                    and row["owner"].get("id", "").casefold() == owner.casefold()}
+        actual_ids = {row["id"] for row in actual}
+        missing = sorted(expected - actual_ids)
+        observation["owner_comparisons"].append({"owner_id": owner, "owner_rows": actual,
+            "known_owned_ids": sorted(expected), "missing_known_owned_ids": missing,
+            "additional_owner_ids": sorted(actual_ids - expected), "scope": "this sample only; no list labels/order or exhaustive discovery proof"})
+        if missing:
+            boundary(owner, "owner_query_missed_known_owned_members", missing_ids=missing)
+        if any(not isinstance(row.get("owner"), Mapping) or row["owner"].get("id", "").casefold() != owner.casefold() for row in actual):
+            boundary(owner, "owner_filter_readback_mismatch")
+
+    try:
+        read("configuration", ["config-show"])
+        read("host-and-project", ["status"])
+        read("advanced-read-contract", ["query-schema", "--advanced"])
+        kinds = ("Sound", "RTPC", *(["MusicSwitchContainer"] if runtime.version >= "2023.1" else []))
+        types = pages("live-types", ["metadata", "types", *[token for kind in kinds for token in ("--meaning", kind)], "--page-size", "64"], "types")
+        selected = {kind: [row for row in types if row.get("name") == kind] for kind in kinds}
+        observation["selected_types"] = selected
+        for kind in kinds:
+            if len(selected[kind]) != 1:
+                boundary("live-types", "type_not_uniquely_observed", name=kind)
+        sounds = query("sample-Sound-with-RTPC", ["--advanced-waql", 'from type RTPC select owner where type = "Sound"'], maximum=1, sample=True) if len(selected["RTPC"]) == 1 else []
+        if not sounds and len(selected["Sound"]) == 1:
+            sounds = query("sample-Sound", ["--type-selection", selected["Sound"][0]["selection"]], maximum=1, sample=True)
+        if sounds:
+            sound = sounds[0]
+            assert sound["type"] == "Sound", sound
+            owner = sound["id"]
+            fields = ("OutputBus", "RTPC", "Effect0" if runtime.version < "2023.1" else "Effects")
+            metadata(owner, fields)
+            related = [row for field in fields for row in hop(owner, field)]
+            if not any(row["type"] == "RTPC" for row in related):
+                boundary(owner, "no_populated_RTPC_list_observed")
+            compare(owner, related)
+        else:
+            boundary("sample-Sound", "no_existing_Sound_observed")
+        if runtime.version >= "2023.1" and len(selected["MusicSwitchContainer"]) == 1:
+            music = query("sample-MusicSwitchContainer", ["--type-selection", selected["MusicSwitchContainer"][0]["selection"]], maximum=1, sample=True)
+            if not music:
+                boundary("sample-MusicSwitchContainer", "no_existing_MusicSwitchContainer_observed")
+            else:
+                owner = music[0]["id"]
+                assert music[0]["type"] == "MusicSwitchContainer", music[0]
+                metadata(owner, ("Arguments",))
+                arguments = hop(owner, "Arguments")
+                if not arguments:
+                    boundary(owner, "no_populated_Arguments_list_observed")
+                expected = {"MusicArgumentsSlot"} if runtime.version == "2025.1" else {"SwitchGroup", "StateGroup"}
+                if any(row["type"] not in expected for row in arguments):
+                    boundary(owner, "Arguments_member_type_differs_from_matching_source")
+                if runtime.version == "2025.1":
+                    for slot in arguments:
+                        if slot["type"] == "MusicArgumentsSlot":
+                            metadata(slot["id"], ("Argument",))
+                            targets = hop(slot["id"], "Argument")
+                            if len(targets) != 1 or targets[0]["type"] not in {"SwitchGroup", "StateGroup"}:
+                                boundary(slot["id"], "slot_Argument_scalar_target_not_observed")
+                compare(owner, arguments)
+        category.update(status="blocked" if observation["boundaries"] else "PASS",
+                        reason="observation has explicit gaps" if observation["boundaries"] else "bounded sample observed; discovery/cardinality completeness requires separate review")
+        return category
+    finally:
+        status, reason = category["status"], category["reason"]
+        category.update(status="FAIL", reason="observation retention incomplete")
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == observation["config_sha256"], "Probe config changed"
+        new_evidence = sorted(set(evidence_root.glob("*.json")) - previous)
+        assert len(new_evidence) <= 512, "Owned-list dispatcher file bound exceeded"
+        total = 0
+        for path in new_evidence:
+            body = path.read_bytes()
+            total += len(body)
+            assert total <= 32 * 1024 * 1024, "Owned-list dispatcher byte bound exceeded"
+            observation["native_evidence"].append({"path": str(path), "bytes": len(body), "sha256": hashlib.sha256(body).hexdigest()})
+        retain()
+        category.update(status=status, reason=reason)
+
+
+def _collect_new_result_scalar_reference_acceptance(
+    runtime: _WorkflowSandboxRuntime, *, root_name: str, compound_exact_rename_history: bool = False,
+) -> dict[str, Any]:
+    """One public graph write; source scalar value must equal a new target's actual GUID."""
+    operation = "object.create" if runtime.version == "2021.1" or compound_exact_rename_history else "object.set"
+    if compound_exact_rename_history:
+        assert runtime.version == '2025.1', 'Compound exact-rename characterization is Console2025-only'
+    observation_path = runtime.state_dir / ('compound-exact-rename-history-acceptance.json' if compound_exact_rename_history
+        else 'new-result-scalar-reference-acceptance.json')
+    category = {"category": "compound-exact-rename-history" if compound_exact_rename_history else "same-graph-new-result-scalar-reference", "status": "FAIL",
+        "verifier_strength": "gateway_verified_plus_independent_exact_guid_class_parent_and_scalar_reference",
+        "observation_path": str(observation_path), "operation": operation}
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {"candidate": runtime.candidate, "version": runtime.version,
+        "operation": operation, "calls": [], "native_outcome": "not_executed",
+        "reference_effect": "not_observed", "business_effect_verified": False,
+        "lifecycle_acceptance": "Requires this node's final host-category-evidence/v3 PASS; prepared/PENDING grants no cleanup or source-integrity credit."}
+
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url} if compound_exact_rename_history else None
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR']) if compound_exact_rename_history else None
+    native_before = set(native_root.glob('*.json')) if native_root is not None else set()
+    if compound_exact_rename_history:
+        category['verifier_strength'] = 'compound_source_receipt_plus_independent_exact_rename_graph_notes_undo_redo'
+        receipt.update(transactions=[], native_evidence=[], complete=False, setup_coverage_credit=False,
+            stack_head_observed=False, outside_scope_preservation_observed=False,
+            scope='one2025_exact_existing_rename_dependent_ordinary_graph_and_receipt_bound_undo_redo', endpoint=endpoint)
+
+    def persist():
+        encoded = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(encoded) <= (16 if compound_exact_rename_history else 2) * 1024 * 1024, "graph scalar-reference receipt bound exceeded"
+        observation_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = observation_path.with_suffix(".tmp")
+        temporary.write_bytes(encoded)
+        temporary.replace(observation_path)
+
+    class ReceiptGateway:
+        def raw_gateway(self, command):
+            assert len(receipt["calls"]) < (128 if compound_exact_rename_history else 32), "graph scalar-reference public call bound exceeded"
+            row = {"argv": list(command)}
+            receipt["calls"].append(row)
+            try:
+                code, payload = runtime.raw_gateway(command)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row["exception"] = {"type": type(exc).__name__, "message": str(exc)}
+                raise
+            finally:
+                persist()
+
+        def gateway(self, command, *, live):
+            code, payload = self.raw_gateway(command)
+            assert code == 0 and payload.get("ok") is True, payload
+            if live and compound_exact_rename_history:
+                assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
+            return payload
+
+    gateway = ReceiptGateway()
+
+    def exact_row(command):
+        payload = gateway.gateway(command, live=True)
+        rows = payload.get("objects")
+        assert payload.get("count") == 1 and isinstance(rows, list) and len(rows) == 1, payload
+        assert isinstance(rows[0], Mapping), payload
+        if compound_exact_rename_history:
+            assert payload.get('status') != 'partial' and payload.get('projection_complete') is not False, payload
+            assert payload.get('limit_reached') is not True, payload
+        uuid_value = uuid.UUID(_required_string(rows[0], "id"))
+        assert uuid_value.int != 0, rows[0]
+        return rows[0]
+
+    segments = ("Busses" if runtime.version == "2025.1" else "Master-Mixer Hierarchy", "Default Work Unit")
+    projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
+    def query(selector):
+        payload = gateway.gateway(['query-object', *selector, *projection], live=True)
+        rows = payload.get('objects')
+        assert isinstance(rows, list) and payload.get('count') == len(rows), payload
+        assert payload.get('status') != 'partial' and payload.get('projection_complete') is not False, payload
+        assert payload.get('limit_reached') is not True, payload
+        assert len(rows) < 65 and len({uuid.UUID(row['id']) for row in rows}) == len(rows), payload
+        return sorted(rows, key=lambda row: uuid.UUID(row['id']))
+    def exact_identity(identity):
+        rows = query(['--exact-id', identity]); assert len(rows) == 1 and rows[0]['id'] == identity, rows
+        assert type(rows[0].get('class_id')) is int and isinstance(rows[0].get('notes'), str), rows
+        return rows[0]
+    def children(identity):
+        return query(['--exact-id', identity, '--relationship', 'children', '--max-results', '65'])
+    def path(components):
+        return query([value for segment in components for value in ('--path-segment', segment)])
+    def complete(draft, role):
+        phase = {'role': role, 'native_outcome': 'not_executed'}; receipt['transactions'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        tx = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', tx], live=False)
+        phase.update(transaction_id=tx, artifact_hash=preview['artifact_hash'], immutable_preview=shown['artifact'])
+        gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = executed
+        if code != 0 or executed.get('ok') is not True:
+            phase['native_outcome'] = 'rejected' if executed.get('state') == 'execution_failed' else 'indeterminate'
+        assert code == 0 and executed.get('ok') is True, executed
+        assert executed.get('automatic_retry') is False and executed.get('state') == 'executed_unverified', executed
+        phase['native_outcome'] = 'accepted'
+        verified = gateway.gateway(['verify', tx], live=True); phase['verify'] = verified
+        assert verified.get('verified') is True and verified.get('verification', {}).get('business_state_verified') is True, verified
+        if role in {'undo', 'redo'}: assert verified.get('verification_strength') == 'scoped_history_effect_readback', verified
+        phase['transaction'] = gateway.gateway(['transaction-show', tx], live=False)
+        assert phase['transaction']['artifact'] == phase['immutable_preview'], 'Transaction mutated its original Preview'
+        return phase
+    def owned_child(parent, operation):
+        started = _update_business_draft(gateway, parent, 'draft-start-undo-child', ['--operation', operation], live=False)
+        row = started['draft']
+        return _BusinessDraft(row['draft_id'], started['task_authority'], int(row['revision']))
+    def history(source_id, direction):
+        draft = _start_business_draft(gateway, 'ak.wwise.core.undo.' + direction)
+        _update_business_draft(gateway, draft, 'draft-declare-core-plan', ['--value', 'history_scope', 'latest_project_history',
+            '--value', 'expectation_receipt', source_id], live=True)
+        return draft
+    try:
+        if compound_exact_rename_history:
+            status = gateway.gateway(['status'], live=True)
+            assert status.get('wwise', {}).get('isCommandLine') is True, status
+            receipt['host_and_project'] = status
+            placement, = path(segments)
+            assert exact_identity(placement['id']) == placement and placement['type'] == 'WorkUnit', placement
+            setup_ids = {}
+            for role, name in (('setup-owner', root_name + '_Original'), ('setup-sibling', root_name + '_Preserved')):
+                setup = _start_business_draft(gateway, 'object.create')
+                parent = _bind_business_object(gateway, setup, object_id=placement['id'])
+                kind = _discover_business_type(gateway, setup, meaning='Bus', role='object', expected_label='Bus')
+                _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', 'setup', '--parent-handle', parent,
+                    '--kind', kind, '--name', name], live=False)
+                setup_ids[role] = _created_object_id(complete(setup, role)['execute'])
+            owner_id, sibling_id = setup_ids['setup-owner'], setup_ids['setup-sibling']
+            before = receipt['before'] = {'owner': exact_identity(owner_id), 'sibling': exact_identity(sibling_id), 'parent': exact_identity(placement['id']),
+                'owner_children': children(owner_id), 'placement_children': children(placement['id'])}
+            assert before['owner']['type'] == before['sibling']['type'] == 'Bus' and owner_id != sibling_id, before
+            assert before['owner']['name'] == root_name + '_Original' and before['sibling']['name'] == root_name + '_Preserved', before
+            for role in ('owner', 'sibling'):
+                assert before[role]['class_id'] == 1376272 and before[role]['path'] == '\\' + '\\'.join((*segments, before[role]['name'])), before
+            assert before['owner_children'] == [] and before['owner']['parent']['id'] == before['sibling']['parent']['id'] == placement['id'], before
+            requested_name = receipt['requested_name'] = root_name + '_Renamed'
+            assert path((*segments, requested_name)) == [], 'Exact requested rename path is already occupied'
+            parent_draft = _start_business_draft(gateway, 'waapi.undoGroup')
+            notes_child = owned_child(parent_draft, 'object.setNotes')
+            _bind_business_object(gateway, notes_child, object_id=owner_id)
+            requested_notes = receipt['requested_notes'] = 'Prior declared compound notes ' + root_name
+            _update_business_draft(gateway, notes_child, 'draft-declare-object-change', ['--notes', requested_notes], live=False)
+            _update_business_draft(gateway, notes_child, 'draft-check', live=True)
+            rename_child = owned_child(parent_draft, 'object.set')
+            owner = _bind_business_object(gateway, rename_child, object_id=owner_id)
+            _update_business_draft(gateway, rename_child, 'draft-declare-existing', ['--declaration-id', 'rename', '--object-handle', owner,
+                '--field', 'new_name', requested_name], live=False)
+            _update_business_draft(gateway, rename_child, 'draft-check', live=True)
+            draft = owned_child(parent_draft, operation)
+            parent_handle = _bind_business_object(gateway, draft, object_id=owner_id)
+        else:
+            draft = _start_business_draft(gateway, operation)
+            parent_handle = _bind_business_object(gateway, draft, path_segments=segments)
+        types = {name: _discover_business_type(gateway, draft, meaning=name, role="object", expected_label=name)
+            for name in ("Bus", "AuxBus")}
+        # Browse names before binding: the human display meaning also matches HPF/LPF fields.
+        page = None
+        seen_pages = set()
+        selected_field = None
+        for _ in range(4):
+            listed = _update_business_draft(gateway, draft, "draft-discover-fields",
+                ["--type-handle", types["AuxBus"], "--list", "--page-size", "64",
+                    *(["--page", page] if page is not None else [])], live=True)
+            listing = listed["agent_result"]
+            matches = [field for field in listing["fields"] if field.get("name") == "UserAuxSend0"]
+            assert len(matches) <= 1, listing
+            if matches:
+                selected_field = matches[0]
+                break
+            if listing.get("complete") is True:
+                break
+            # --page is the public opaque continuation; never derive its contents or offset.
+            page = _required_string(listing, "next_page")
+            assert page not in seen_pages, "repeated field-list page"
+            seen_pages.add(page)
+        assert selected_field is not None, "UserAuxSend0 was not disclosed within four field-list pages"
+        field_name = _required_string(selected_field, "name")
+        discovered = _update_business_draft(gateway, draft, "draft-discover-fields",
+            ["--type-handle", types["AuxBus"], "--selection", _required_string(selected_field, "selection")], live=True)
+        field_handle = discovered_business_field_handle(discovered, field_name)
+        root = _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", "root",
+            "--parent-handle", parent_handle, "--name", root_name, "--kind", types["Bus"]], live=False)
+        root_handle = declared_business_object_handle(root, "root")
+        target = _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", "target",
+            "--parent-handle", root_handle, "--name", "Destination", "--kind", types["AuxBus"]], live=False)
+        target_handle = declared_business_object_handle(target, "target")
+        _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", "source",
+            "--parent-handle", root_handle, "--name", "Sender", "--kind", types["AuxBus"],
+            "--field-value", field_handle, target_handle], live=False)
+        if compound_exact_rename_history:
+            _update_business_draft(gateway, draft, 'draft-check', live=True)
+            child_args = [value for child in (notes_child, rename_child, draft)
+                for value in ('--child-draft', child.draft_id, child.task_authority)]
+            _update_business_draft(gateway, parent_draft, 'draft-declare-undo-plan',
+                ['--display-name', 'Exact rename dependent graph ' + root_name, *child_args], live=False)
+            source_phase = complete(parent_draft, 'source')
+            transaction_id = source_phase['transaction_id']
+            executed, verified = source_phase['execute'], source_phase['verify']
+            verify_code = 0
+            actual_owner = exact_identity(owner_id)
+            assert actual_owner['id'] == owner_id and actual_owner['name'] == requested_name, actual_owner
+            assert actual_owner['notes'] == requested_notes, actual_owner
+            assert actual_owner['path'] == before['owner']['path'].rsplit('\\', 1)[0] + '\\' + actual_owner['name'], actual_owner
+            graph_segments = (*segments, actual_owner['name'], root_name)
+            category['transaction_id'] = transaction_id
+            receipt.update(transaction_id=transaction_id, native_outcome='accepted', gateway_verification=verified)
+        else:
+            _update_business_draft(gateway, draft, "draft-check", live=True)
+            preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
+            transaction_id = _required_string(preview, "transaction_id")
+            category["transaction_id"] = receipt["transaction_id"] = transaction_id
+            receipt["artifact_hash"] = preview["artifact_hash"]
+            shown = gateway.gateway(["transaction-show", transaction_id], live=False)
+            receipt["compiled_native_request"] = shown["artifact"]["prepared_operation"]["dispatch"]
+            gateway.gateway(["confirm", transaction_id, "--confirmation-token", shown["confirmation"]["token"]], live=False)
+            receipt["native_outcome"] = "indeterminate"
+            execute_code, executed = gateway.raw_gateway(["execute", transaction_id])
+            receipt["native_response"] = executed
+            if execute_code != 0 or executed.get("ok") is not True:
+                receipt["native_outcome"] = "rejected" if executed.get("state") == "execution_failed" else "indeterminate"
+                return category
+            assert executed.get("state") == "executed_unverified" and executed.get("automatic_retry") is False, executed
+            receipt["native_outcome"] = "accepted"
+            verify_code, verified = gateway.raw_gateway(["verify", transaction_id])
+            receipt["gateway_verification"] = {"exit_code": verify_code, "payload": verified}
+            receipt["reference_effect"] = "incomplete"
+            graph_segments = (*segments, root_name)
+        # Select by closed fixture names, then independently re-read every exact GUID.
+        independently_found = {}
+        for name, child_segments in (("root", ()), ("target", ("Destination",)), ("source", ("Sender",))):
+            path_segments = (*graph_segments, *child_segments)
+            found = exact_row(["query-object", *(value for segment in path_segments for value in ("--path-segment", segment))])
+            exact = exact_row(["query-object", "--exact-id", found["id"], "--include", "class-id", "--include", "parent",
+                *(["--include-field", field_name] if name == "source" else []),
+                *(['--include', 'notes'] if compound_exact_rename_history else [])])
+            assert all(found.get(key) == exact.get(key) for key in ("id", "name", "type", "path")), (found, exact)
+            receipt["independent_" + name] = exact
+            independently_found[name] = exact
+        root_row, target_row, source_row = (independently_found[name] for name in ("root", "target", "source"))
+        assert len({row["id"] for row in (root_row, target_row, source_row)}) == 3, independently_found
+        for row, expected_class, expected_type in ((root_row, 1376272, "Bus"), (target_row, 3997712, "AuxBus"), (source_row, 3997712, "AuxBus")):
+            assert type(row.get("class_id")) is int and row["class_id"] == expected_class and row["type"] == expected_type, row
+        assert target_row.get("parent", {}).get("id") == root_row["id"], target_row
+        assert source_row.get("parent", {}).get("id") == root_row["id"], source_row
+        reference = source_row.get("references", {}).get("UserAuxSend0")
+        actual_target_id = reference.get("id") if isinstance(reference, Mapping) else reference
+        assert actual_target_id == target_row["id"], {"source_reference": reference, "independent_target": target_row}
+        assert verify_code == 0 and verified.get("state") == "verified" and verified.get("verified") is True, verified
+        assert verified.get("verification", {}).get("business_state_verified") is True, verified
+        if compound_exact_rename_history:
+            assert root_row['parent']['id'] == owner_id, root_row
+            def observed_state():
+                rows = {role: exact_identity(identity) for role, identity in (('owner', owner_id), ('sibling', sibling_id), ('parent', placement['id']))}
+                assert rows['sibling'] == before['sibling'] and rows['parent'] == before['parent'], rows
+                assert {key: value for key, value in rows['owner'].items() if key not in {'name', 'path', 'notes'}} == {
+                    key: value for key, value in before['owner'].items() if key not in {'name', 'path', 'notes'}}, rows
+                rows['owner_children'] = children(owner_id)
+                rows['placement_children'] = children(placement['id'])
+                expected_siblings = [rows['owner'] if row['id'] == owner_id else row for row in before['placement_children']]
+                assert rows['placement_children'] == expected_siblings, rows
+                rows['graph'] = {name: exact_row(['query-object', '--exact-id', row['id'], *projection,
+                    *(['--include-field', field_name] if name == 'source' else [])]) for name, row in independently_found.items()}
+                rows['graph_children'] = children(root_row['id'])
+                assert rows['owner_children'] == [rows['graph']['root']], rows
+                assert rows['graph_children'] == sorted([rows['graph']['target'],
+                    {key: value for key, value in rows['graph']['source'].items() if key != 'references'}], key=lambda row: uuid.UUID(row['id'])), rows
+                return rows
+            source_state = receipt['source_state'] = observed_state()
+            assert source_state['graph'] == independently_found, source_state
+            assert path((*segments, before['owner']['name'])) == [], 'Original owner path survived rename'
+            assert path((*segments, requested_name)) == [source_state['owner']], 'Exact requested rename path differs'
+            complete(history(transaction_id, 'undo'), 'undo')
+            undo_state = receipt['undo_state'] = {'owner': exact_identity(owner_id), 'sibling': exact_identity(sibling_id), 'parent': exact_identity(placement['id']),
+                'owner_children': children(owner_id), 'placement_children': children(placement['id'])}
+            assert undo_state == before, undo_state
+            for row in independently_found.values(): assert query(['--exact-id', row['id']]) == [], row
+            assert path(graph_segments) == path((*segments, before['owner']['name'], root_name)) == [], 'Created graph path survived undo'
+            complete(history(transaction_id, 'redo'), 'redo')
+            receipt['redo_state'] = observed_state()
+            assert receipt['redo_state'] == source_state, (source_state, receipt['redo_state'])
+            assert path((*segments, before['owner']['name'])) == []
+            receipt.update(complete=True, source_receipt=transaction_id)
+        receipt.update(reference_effect="proven", business_effect_verified=True)
+        category["status"] = "PASS"
+        return category
+    except Exception as exc:
+        receipt["failure"] = {"type": type(exc).__name__, "message": str(exc)}
+        raise
+    finally:
+        if native_root is not None:
+            status = category['status']; category['status'] = 'FAIL'
+            archive = runtime.state_dir / 'compound-exact-rename-native-archive'; archive.mkdir(parents=True, exist_ok=True)
+            paths = sorted(set(native_root.glob('*.json')) - native_before)
+            assert len(paths) <= 512, 'Compound exact-rename native evidence file bound exceeded'
+            total = 0
+            for index, native in enumerate(paths):
+                body = read_bounded_exclusive_regular_file(native, max_bytes=32 * 1024 * 1024 - total,
+                    require_private_posix_mode=False).raw
+                total += len(body)
+                assert total <= 32 * 1024 * 1024, 'Compound exact-rename native evidence byte bound exceeded'
+                target = archive / f'{index:04d}-{native.name}'; target.write_bytes(body)
+                receipt['native_evidence'].append({'native_path': str(native), 'archive_path': str(target),
+                    'bytes': len(body), 'sha256': hashlib.sha256(body).hexdigest()})
+            persist()
+            category['observation_sha256'] = hashlib.sha256(observation_path.read_bytes()).hexdigest()
+            category['status'] = status
+        else:
+            persist()
+
+
+def _collect_existing_bus_send_acceptance(
+    runtime: _WorkflowSandboxRuntime, *, root_name: str, root_sources: bool = False,
+) -> dict[str, Any]:
+    """Existing-source writes in one owned lifecycle, with independent effect reads."""
+    output = runtime.state_dir / ("old-root-bus-send-acceptance.json" if root_sources else "existing-bus-send-acceptance.json")
+    category = {"category": "old-root-bus-user-send" if root_sources else "existing-bus-user-send", "status": "FAIL",
+        "verifier_strength": "gateway_verified_plus_independent_exact_identity_parent_reference_scalar_and_notes",
+        "observation_path": str(output)}
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {"candidate": runtime.candidate, "version": runtime.version,
+        "calls": [], "transactions": [], "business_effect_verified": False,
+        "setup_coverage_credit": False,
+        "lifecycle_acceptance": "Requires this node's final host-category-evidence/v3 PASS; no cleanup or source-integrity credit before finalization."}
+
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= 8 * 1024 * 1024, "existing user-send receipt byte bound exceeded"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix(".tmp")
+        temporary.write_bytes(body)
+        temporary.replace(output)
+
+    class ReceiptGateway:
+        def raw_gateway(self, command):
+            assert len(receipt["calls"]) < 192, "existing user-send public call bound exceeded"
+            row = {"argv": list(command)}
+            receipt["calls"].append(row)
+            try:
+                code, payload = runtime.raw_gateway(command)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row["exception"] = {"type": type(exc).__name__, "message": str(exc)}
+                raise
+            finally:
+                persist()
+
+        def gateway(self, command, *, live):
+            code, payload = self.raw_gateway(command)
+            assert code == 0 and payload.get("ok") is True, payload
+            return payload
+
+    gateway = ReceiptGateway()
+    segments = ("Busses" if runtime.version == "2025.1" else "Master-Mixer Hierarchy", "Default Work Unit")
+    names = {"root": root_name, "target": "Destination",
+        "source": root_name + "_Sender" if root_sources else "Sender",
+        "batch_source": root_name + "_BatchSender" if root_sources else "BatchSender"}
+    receipt["placement"] = "old_root_bus_sources" if root_sources else "aux_bus_children"
+
+    def exact(command):
+        payload = gateway.gateway(command, live=True)
+        rows = payload.get("objects")
+        assert payload.get("count") == 1 and isinstance(rows, list) and len(rows) == 1, payload
+        row = rows[0]
+        assert isinstance(row, Mapping) and uuid.UUID(_required_string(row, "id")).int != 0, payload
+        return row
+
+    def read(identity, role):
+        row = exact(["query-object", "--exact-id", identity, "--include", "class-id", "--include", "parent",
+            "--include", "notes", *(["--include-field", "UserAuxSend0", "--include-field", "UserAuxSendVolume0"]
+                if role in {"source", "batch_source"} else [])])
+        kind, class_id = (("WorkUnit", 1638416) if role == "placement_parent" else
+            ("Bus", 1376272) if role == "root" or (root_sources and role in {"source", "batch_source"}) else
+            ("AuxBus", 3997712))
+        assert type(row.get("class_id")) is int and row["class_id"] == class_id, row
+        assert row["type"] == kind, row
+        assert isinstance(row.get("notes"), str), row
+        if role in {"source", "batch_source"}:
+            assert "UserAuxSend0" in row.get("references", {}), row
+            value = row.get("properties", {}).get("UserAuxSendVolume0")
+            assert type(value) in {int, float} and math.isfinite(value), row
+        return row
+
+    def reference_id(row):
+        value = row["references"]["UserAuxSend0"]
+        return value.get("id") if isinstance(value, Mapping) else value
+
+    def select(draft, owner, token, *, kind=None):
+        page = None
+        seen = set()
+        scope = ["--type-handle", kind] if kind is not None else ["--object-handle", owner]
+        for _ in range(4):
+            listed = _update_business_draft(gateway, draft, "draft-discover-fields",
+                [*scope, "--list", "--page-size", "64",
+                    *(["--page", page] if page is not None else [])], live=True)["agent_result"]
+            matches = [row for row in listed["fields"] if row.get("name") == token]
+            assert len(matches) <= 1, listed
+            if matches:
+                selected = _update_business_draft(gateway, draft, "draft-discover-fields",
+                    [*scope, "--selection", _required_string(matches[0], "selection")], live=True)
+                return discovered_business_field_handle(selected, token)
+            if listed.get("complete") is True:
+                break
+            page = _required_string(listed, "next_page")
+            assert page not in seen, "repeated field-list page"
+            seen.add(page)
+        raise AssertionError(f"{token} not disclosed within four exact field-list pages")
+
+    def complete(draft, label, *, existing_merge=None):
+        phase: dict[str, Any] = {"phase": label, "native_outcome": "not_executed", "effect_verified": False}
+        receipt["transactions"].append(phase)
+        _update_business_draft(gateway, draft, "draft-check", live=True)
+        preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
+        identity = _required_string(preview, "transaction_id")
+        phase.update(transaction_id=identity, artifact_hash=preview["artifact_hash"])
+        shown = gateway.gateway(["transaction-show", identity], live=False)
+        prepared = shown["artifact"]["prepared_operation"]
+        phase["compiled_native_request"] = prepared["dispatch"]
+        if existing_merge is not None:
+            phase["expected_existing_merge"] = existing_merge
+            nodes = prepared["verification_plan"]["nodes"]
+            assert len(nodes) == 1 and nodes[0]["preexisting_id"] == existing_merge["id"], nodes
+            node = nodes[0]
+            assert node["class_id"] == existing_merge["class_id"] and node["canonical_type"] == existing_merge["type"], node
+            assert all(node["pre_state"].get(field) == existing_merge.get(field)
+                for field in ("id", "name", "type", "path", "parent", "notes")), (node, existing_merge)
+            assert node["pre_state"]["classId"] == existing_merge["class_id"], node
+            before = node["pre_state"]
+            for token in ("UserAuxSend0", "UserAuxSendVolume0"):
+                assert token in before or "@" + token in before, node
+                value = before.get(token, before.get("@" + token))
+                assert ((value.get("id") if isinstance(value, Mapping) else value) == reference_id(existing_merge)
+                    if token == "UserAuxSend0" else value == existing_merge["properties"][token]), (node, existing_merge)
+            args = prepared["dispatch"]["args"]
+            assert args["parent"] == existing_merge["parent"]["id"] and args["name"] == existing_merge["name"], args
+            assert args["type"] == existing_merge["type"] and args["onNameConflict"] == "merge", args
+        gateway.gateway(["confirm", identity, "--confirmation-token", shown["confirmation"]["token"]], live=False)
+        phase["native_outcome"] = "indeterminate"
+        code, executed = gateway.raw_gateway(["execute", identity])
+        phase["execute"] = {"exit_code": code, "payload": executed}
+        if code != 0 or executed.get("ok") is not True:
+            phase["native_outcome"] = "rejected" if executed.get("state") == "execution_failed" else "indeterminate"
+            raise AssertionError(f"{label} failed; no verification or retry: {executed}")
+        assert executed.get("state") == "executed_unverified" and executed.get("automatic_retry") is False, executed
+        phase["native_outcome"] = "accepted"
+        code, verified = gateway.raw_gateway(["verify", identity])
+        phase["verify"] = {"exit_code": code, "payload": verified}
+        assert code == 0 and verified.get("state") == "verified" and verified.get("verified") is True, verified
+        assert verified.get("verification", {}).get("business_state_verified") is True, verified
+        return phase
+
+    try:
+        assert not root_sources or runtime.version in {"2021.1", "2022.1", "2023.1"}, (
+            "Root-Bus witness is limited to the pinned 2021–2023 class-source scope; "
+            "2024–2025 retain their explicit non-master placement boundary.")
+        placement_parent = None
+        if root_sources:
+            found = exact(["query-object", *(arg for segment in segments for arg in ("--path-segment", segment))])
+            placement_parent = read(found["id"], "placement_parent")
+            assert all(found.get(key) == placement_parent.get(key) for key in ("id", "name", "type", "path")), (found, placement_parent)
+            assert placement_parent["name"] == segments[-1] and placement_parent["path"] == "\\" + "\\".join(segments), placement_parent
+            receipt["placement_parent"] = placement_parent
+        setup = _start_business_draft(gateway, "object.create")
+        parent = _bind_business_object(gateway, setup, **({"object_id": placement_parent["id"]}
+            if placement_parent is not None else {"path_segments": segments}))
+        types = {name: _discover_business_type(gateway, setup, meaning=name, role="object", expected_label=name)
+            for name in ("Bus", "AuxBus")}
+        root = _update_business_draft(gateway, setup, "draft-declare-new", ["--declaration-id", "root",
+            "--parent-handle", parent, "--name", root_name, "--kind", types["Bus"], "--field", "notes", "Keep routing"], live=False)
+        root_handle = declared_business_object_handle(root, "root")
+        for role in (("target",) if root_sources else ("target", "source", "batch_source")):
+            _update_business_draft(gateway, setup, "draft-declare-new", ["--declaration-id", role,
+                "--parent-handle", root_handle, "--name", names[role], "--kind", types["AuxBus"],
+                "--field", "notes", "Keep " + names[role]], live=False)
+        setup_phases = [complete(setup, "setup_no_coverage_credit")]
+        if root_sources:
+            # 2021 permits one create root. Keep the sibling root Busses in separate
+            # closed Previews; none of these setup effects grants user-send credit.
+            for role in ("source", "batch_source"):
+                setup = _start_business_draft(gateway, "object.create")
+                parent = _bind_business_object(gateway, setup, object_id=placement_parent["id"])
+                kind = _discover_business_type(gateway, setup, meaning="Bus", role="object", expected_label="Bus")
+                _update_business_draft(gateway, setup, "draft-declare-new", ["--declaration-id", role,
+                    "--parent-handle", parent, "--name", names[role], "--kind", kind,
+                    "--field", "notes", "Keep " + names[role]], live=False)
+                setup_phases.append(complete(setup, "setup_" + role + "_no_coverage_credit"))
+        baseline = {}
+        for role, name in names.items():
+            path = (*segments, name) if root_sources and role in {"source", "batch_source"} else (
+                *segments, root_name, *([] if role == "root" else [name]))
+            found = exact(["query-object", *(arg for segment in path for arg in ("--path-segment", segment))])
+            row = read(found["id"], role)
+            assert all(found.get(key) == row.get(key) for key in ("id", "name", "type", "path")), (found, row)
+            assert row["name"] == name and row["path"] == "\\" + "\\".join(path), row
+            assert row["notes"] == ("Keep routing" if role == "root" else "Keep " + name), row
+            baseline[role] = row
+        assert len({row["id"] for row in baseline.values()}) == 4, baseline
+        for role in (("root", "source", "batch_source") if root_sources else ()):
+            assert baseline[role].get("parent", {}).get("id") == placement_parent["id"], baseline
+        for role in (("target",) if root_sources else ("target", "source", "batch_source")):
+            assert baseline[role].get("parent", {}).get("id") == baseline["root"]["id"], baseline
+            assert baseline[role]["path"] == baseline["root"]["path"] + "\\" + names[role], baseline
+        for role in ("source", "batch_source"):
+            assert reference_id(baseline[role]) is None, baseline[role]
+        receipt["baseline"] = baseline
+        for phase in setup_phases:
+            phase["effect_verified"] = True
+        expected = json.loads(json.dumps(baseline))
+        phases = [("standalone_reference", "object.setReference", "source", {"UserAuxSend0": "target"}),
+            ("standalone_scalar", "object.setProperty", "source", {"UserAuxSendVolume0": -9}),
+            ("samebatch_reference_scalar", "object.create" if runtime.version == "2021.1" else "object.set",
+                "batch_source", {"UserAuxSend0": "target", "UserAuxSendVolume0": -12})]
+        for label, operation, role, values in phases:
+            draft = _start_business_draft(gateway, operation)
+            owner = _bind_business_object(gateway, draft, object_id=baseline[role]["id"])
+            kind = None
+            if operation == "object.create":
+                kind = _discover_business_type(gateway, draft, meaning=baseline[role]["type"],
+                    role="object", expected_label=baseline[role]["type"])
+                parent = _bind_business_object(gateway, draft, object_id=baseline[role]["parent"]["id"])
+                _update_business_draft(gateway, draft, "draft-business-configure", ["--name-conflict", "merge"], live=False)
+            fields = []
+            for token, value in values.items():
+                field = select(draft, owner, token, kind=kind)
+                bound = _bind_business_object(gateway, draft, object_id=baseline["target"]["id"]) if token == "UserAuxSend0" else str(value)
+                if operation in {"object.set", "object.create"}:
+                    fields.extend(("--field-value", field, bound))
+                else:
+                    _update_business_draft(gateway, draft, "draft-declare-field-change", ["--object-handle", owner,
+                        "--field-handle", field, "--target-handle" if token == "UserAuxSend0" else "--business-value", bound], live=False)
+            if operation == "object.set":
+                _update_business_draft(gateway, draft, "draft-declare-existing", ["--declaration-id", "source",
+                    "--object-handle", owner, *fields], live=False)
+            elif operation == "object.create":
+                _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", "source",
+                    "--parent-handle", parent, "--name", baseline[role]["name"], "--kind", kind, *fields], live=False)
+            phase = complete(draft, label, existing_merge=baseline[role] if operation == "object.create" else None)
+            for token, value in values.items():
+                expected[role]["references" if token == "UserAuxSend0" else "properties"][token] = (
+                    {"id": baseline["target"]["id"]} if token == "UserAuxSend0" else value)
+            observed = {key: read(row["id"], key) for key, row in baseline.items()}
+            phase["independent_effect"] = observed
+            if placement_parent is not None:
+                actual_parent = read(placement_parent["id"], "placement_parent")
+                phase["independent_placement_parent"] = actual_parent
+                assert actual_parent == placement_parent, (label, placement_parent, actual_parent)
+            for key, row in observed.items():
+                for field in ("id", "name", "type", "path", "class_id", "parent", "notes"):
+                    assert row.get(field) == expected[key].get(field), (label, key, field, expected[key], row)
+                if key in {"source", "batch_source"}:
+                    assert reference_id(row) == reference_id(expected[key]), (label, key, row, expected[key])
+                    assert row["properties"]["UserAuxSendVolume0"] == expected[key]["properties"]["UserAuxSendVolume0"], (label, key, row, expected[key])
+            phase["effect_verified"] = True
+        receipt["completed_mutation_phases"] = [phase[0] for phase in phases]
+        receipt["business_effect_verified"] = True
+        category["status"] = "PASS"
+        return category
+    except Exception as exc:
+        receipt["failure"] = {"type": type(exc).__name__, "message": str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_existing_bus_send_reference_scalar_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """One lifecycle; each legal phase independently previewed and executed once."""
+    category = _collect_existing_bus_send_acceptance(workflow_sandbox_runtime,
+        root_name="WAAPI_EXISTING_SEND_" + uuid.uuid4().hex[:12])
+    assert category["status"] == "PASS", category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_old_root_bus_send_reference_scalar_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """2021–2023 root sources route to an AuxBus below a different root Bus."""
+    if workflow_sandbox_runtime.version not in {"2021.1", "2022.1", "2023.1"}:
+        pytest.skip("Old root-Bus witness only; 2024–2025 require their non-master placement proof")
+    category = _collect_existing_bus_send_acceptance(workflow_sandbox_runtime,
+        root_name="WAAPI_ROOT_SEND_" + uuid.uuid4().hex[:12], root_sources=True)
+    assert category["status"] == "PASS", category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_same_graph_new_result_scalar_reference_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """2021 create and 2022–2025 set share one isolated lifecycle, never a retry."""
+    category = _collect_new_result_scalar_reference_acceptance(workflow_sandbox_runtime,
+        root_name="WAAPI_RESULT_REFERENCE_" + uuid.uuid4().hex[:12])
+    assert category["status"] == "PASS", category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_compound_exact_rename_graph_history_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('One2025 exact-rename graph/history case; other lanes remain separate')
+    category = _collect_new_result_scalar_reference_acceptance(workflow_sandbox_runtime,
+        root_name='WAAPI_EXACT_GRAPH_' + uuid.uuid4().hex[:10], compound_exact_rename_history=True)
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_read_only_owned_list_native_metadata_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """Observe existing members and owner-query correspondence in the module sandbox."""
+    category = _collect_owned_list_metadata_probe(workflow_sandbox_runtime)
+    if category["status"] == "blocked":
+        pytest.skip(f"Owned-list observation incomplete; retained exact evidence: {category}")
+    assert category["status"] == "PASS", category
+
+
+def _collect_short_id_native_probe(runtime: _WorkflowSandboxRuntime, *, diagnostic: bool = False) -> dict[str, Any]:
+    """Reuse the original read body inside this module's already-owned sandbox."""
+    from tests.support.short_id_native_observation import collect_short_id_typed_read_observations, collect_short_id_diagnostic_observations
+
+    output = runtime.state_dir / ("short-id-native-diagnostic.json" if diagnostic else "short-id-native-observations.json")
+    config = Path(runtime.env["WAAPI_SKILL_CONFIG_PATH"])
+    config_sha256 = hashlib.sha256(config.read_bytes()).hexdigest()
+    evidence_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
+    previous = set(evidence_root.glob("*.json"))
+    endpoint = {"host": runtime.lifecycle.host, "port": runtime.port,
+                "url": runtime.lifecycle.waapi_url}
+    evidence: dict[str, Any] = {
+        "agent_started": False, "project_mutation_count": 0, "version": runtime.version,
+        "scope": ("read-only Short ID hypotheses; collection success is not resolver or Definition acceptance" if diagnostic else
+                  "typed Short ID read observations only; no Definition mutation acceptance"),
+        "candidate": runtime.candidate, "endpoint": endpoint,
+        "config_path": str(config), "config_sha256": config_sha256,
+        "receipts": [], "observations": [], "native_evidence": [],
+        "mutation_authority": False, "business_effect_verified": False,
+    }
+    category = {"category": "short-id-native-diagnostic" if diagnostic else "short-id-native-read-observation", "status": "FAIL",
+                "verifier_strength": "diagnostic_collection_no_functional_acceptance" if diagnostic else "bounded_typed_short_id_read_and_exact_guid_observation_only",
+                "observation_path": str(output), "reason": "observation incomplete"}
+    runtime.category_results.append(category)
+
+    def read(command: Sequence[str]) -> dict[str, Any]:
+        assert command[0] in ({"status", "query-object", "query-schema"} if diagnostic else {"status", "query-object"}), command
+        assert len(evidence["receipts"]) < (10 if diagnostic else 7), "Short ID observation public call bound exceeded"
+        code, payload = runtime.raw_gateway(command)
+        evidence["receipts"].append({"argv": list(command), "exit_code": code, "payload": payload})
+        if diagnostic and "--advanced-waql" in command and code == 2:
+            return payload  # Retain the complete bounded rejection; never retry it.
+        assert code == 0 and payload.get("ok") is True, payload
+        if diagnostic and command == ["query-schema", "--advanced"]:
+            return payload  # Offline disclosure has no live endpoint.
+        assert payload.get("endpoint") == endpoint, payload
+        assert payload.get("detected_version") == runtime.version, payload
+        return payload
+
+    status, reason = "FAIL", "Short ID native observation did not finish"
+    try:
+        collector = collect_short_id_diagnostic_observations if diagnostic else collect_short_id_typed_read_observations
+        collector(read, evidence=evidence)
+        status, reason = "PASS", ("bounded read-only diagnostic collection complete; no functional acceptance" if diagnostic else
+                                  "public bounded typed Short ID reads and exact-ID readbacks succeeded")
+        return category
+    except BaseException as exc:
+        reason = f"{type(exc).__name__}: {exc}"
+        evidence["error"] = reason
+        raise
+    finally:
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_sha256, "Short ID observation changed config"
+        paths = sorted(set(evidence_root.glob("*.json")) - previous)
+        assert len(paths) <= 512, "Short ID dispatcher evidence exceeded file bound"
+        total_bytes = 0
+        for path in paths:
+            body = path.read_bytes()
+            total_bytes += len(body)
+            assert total_bytes <= 32 * 1024 * 1024, "Short ID dispatcher evidence exceeded byte bound"
+            evidence["native_evidence"].append({"path": str(path), "bytes": len(body),
+                                                 "sha256": hashlib.sha256(body).hexdigest()})
+        body = json.dumps(evidence, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= 8 * 1024 * 1024, "Short ID retained observation byte bound exceeded"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(body)
+        category.update(status=status, reason=reason,
+                        observation_sha256=hashlib.sha256(body).hexdigest())
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_read_only_short_id_native_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """Observe Event/DialogueEvent Short IDs without a second lifecycle or config write."""
+    category = _collect_short_id_native_probe(workflow_sandbox_runtime)
+    assert category["status"] == "PASS", category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_read_only_short_id_native_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """Explicitly selected hypothesis probes within the existing owned lifecycle."""
+    category = _collect_short_id_native_probe(workflow_sandbox_runtime, diagnostic=True)
+    assert category["status"] == "PASS", category
+
+
+def _collect_prospective_group_default_native_acceptance(
+    runtime: _WorkflowSandboxRuntime, family: str,
+) -> dict[str, Any]:
+    """One closed create plus independent reads inside the existing sandbox owner."""
+    import gzip
+    from types import SimpleNamespace
+
+    assert family in {"Switch", "State"}
+    output = runtime.state_dir / f"prospective-group-default-{family}.json"
+    config = Path(runtime.env["WAAPI_SKILL_CONFIG_PATH"])
+    config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+    dispatcher = Path(runtime.env["WWISE_EVIDENCE_DIR"])
+    previous = set(dispatcher.glob("*.json"))
+    endpoint = {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}
+    category = {"category": "prospective-group-default-" + family, "status": "FAIL",
+        "verifier_strength": "gateway_verified_create_plus_independent_exact_identity_and_two_references",
+        "observation_path": str(output), "reason": "acceptance incomplete", "transaction_id": None}
+    runtime.category_results.append(category)
+    evidence: dict[str, Any] = {"candidate": runtime.candidate, "version": runtime.version,
+        "build": runtime.sandbox.metadata.get_info_version, "family": family, "endpoint": endpoint,
+        "config_path": str(config), "config_sha256": config_hash, "receipts": [], "native_evidence": [],
+        "lifecycle_final_reference": {"contract": "waapi-skill.host-category-evidence/v3", "phase": "final",
+            "candidate": runtime.candidate, "category": category["category"], "transaction_id": None,
+            "cleanup_status": "unresolved_until_final_row"},
+        "lifecycle_acceptance": "Requires the final host-category-evidence/v3 row for this candidate, category and transaction; the existing workflow lifecycle seals source hashes/mtime and process cleanup. Collector completion alone is not cleanup success."}
+
+    def call(command: Sequence[str], *, live: bool) -> dict[str, Any]:
+        assert len(evidence["receipts"]) < 32, "Prospective reference public call bound exceeded"
+        code, payload = runtime.raw_gateway(command)
+        evidence["receipts"].append({"argv": list(command), "exit_code": code, "payload": payload})
+        if command[0] == "preview-from-draft" and payload.get("transaction_id"):
+            category["transaction_id"] = payload["transaction_id"]
+            evidence["lifecycle_final_reference"]["transaction_id"] = payload["transaction_id"]
+        assert code == 0 and payload.get("ok") is True, payload
+        if live:
+            assert payload.get("endpoint") == endpoint, payload
+            assert payload.get("detected_version") == runtime.version, payload
+        return payload
+
+    # Reuse the existing business-Draft helpers; this view only records their
+    # public commands and has no client, configuration or lifecycle of its own.
+    commands = SimpleNamespace(gateway=call)
+
+    def one(source: Sequence[str], *outputs: str) -> dict[str, Any]:
+        payload = call(["query-object", *source, "--max-results", "1", *outputs], live=True)
+        assert payload.get("projection_complete") is not False and payload.get("status") != "partial", payload
+        rows = payload.get("objects", payload.get("agent_result"))
+        assert isinstance(rows, list) and len(rows) == 1, payload
+        row = rows[0]
+        assert all(isinstance(row.get(key), str) and row[key] for key in ("id", "name", "type", "path")), row
+        canonical(row["id"])
+        return row
+
+    def canonical(value: Any) -> str:
+        identity = value.get("id") if isinstance(value, Mapping) else value
+        assert isinstance(identity, str) and identity.casefold() == ("{" + str(uuid.UUID(identity)) + "}").casefold(), value
+        assert uuid.UUID(identity).int != 0, value
+        return identity.casefold()
+
+    try:
+        source_path = REPO_ROOT / "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz"
+        sources = json.loads(gzip.decompress(source_path.read_bytes()))["files"]
+        matches = [(key, document) for key, document in sources.items()
+                   if key.startswith(runtime.version + ".") and key.endswith("|condition|WObjects/WObjects.xml")]
+        assert len(matches) == 1, [key for key, _ in matches]
+        key, document = matches[0]
+        raw = base64.b64decode(document["bytes_base64"])
+        assert hashlib.sha256(raw).hexdigest() == document["sha256"]
+        definition = ET.fromstring(raw).find('./WwiseObject[@Name="SwitchContainer"]/Properties/Reference[@Name="DefaultSwitchOrState"]')
+        assert definition is not None
+        assert definition.find('./Restrictions/IsChildOfReferenceRestriction/Reference').attrib == {"Name": SWITCH_GROUP_REFERENCE}
+        assert definition.find('./Dependencies/ReferenceDependency').attrib == {"Name": SWITCH_GROUP_REFERENCE, "Action": "Enable"}
+        assert definition.find('./Dependencies/ReferenceDependency/Condition/ReferenceIsSet').attrib == {"Value": "true"}
+        evidence["source_rule"] = {"version": runtime.version, "key": key, "sha256": document["sha256"],
+            "fixture": str(source_path), "field_xml": ET.tostring(definition, encoding="unicode")}
+        sample = one(["--custom-kind", family], "--include", "parent")
+        assert sample["type"] == family, sample
+        target = one(["--exact-id", sample["id"]], "--include", "parent")
+        assert target == sample, {"sample": sample, "exact": target}
+        group_id = canonical(target["parent"])
+        group = one(["--exact-id", group_id])
+        assert group["type"] == family + "Group", group
+        evidence.update(selected_target=target, selected_group=group)
+        draft = _start_business_draft(commands, "object.create")
+        segments = CONTAINERS_PARENT_SEGMENTS if runtime.version == "2025.1" else ACTOR_MIXER_PARENT_SEGMENTS
+        parent_row = one([token for segment in segments for token in ("--path-segment", segment)])
+        parent = _bind_business_object(commands, draft, object_id=parent_row["id"])
+        target_handle = _bind_business_object(commands, draft, object_id=target["id"])
+        group_handle = _bind_business_object(commands, draft, object_id=group["id"])
+        kind = _discover_business_type(commands, draft, meaning="SwitchContainer", role="object", expected_label="SwitchContainer")
+        fields = []
+        # Deliberately declare the dependent first: the same-create condition
+        # must resolve against the complete field set, not argument order.
+        for meaning, handle in (("DefaultSwitchOrState", target_handle), (SWITCH_GROUP_REFERENCE, group_handle)):
+            found = _update_business_draft(commands, draft, "draft-discover-fields",
+                ["--type-handle", kind, "--meaning", meaning], live=True)
+            fields.extend(["--field-value", discovered_business_field_handle(found, meaning), handle])
+        name = "WAAPI_PROSPECTIVE_" + family + "_" + uuid.uuid4().hex[:12]
+        _update_business_draft(commands, draft, "draft-declare-new",
+            ["--declaration-id", "container", "--parent-handle", parent, "--name", name, "--kind", kind, *fields], live=False)
+        completed = _complete_business_draft(commands, draft)
+        created = _created_object_id(completed["execute"])
+        row = one(["--exact-id", created], "--include", "parent",
+                  "--include-field", SWITCH_GROUP_REFERENCE, "--include-field", "DefaultSwitchOrState")
+        assert row["name"] == name and row["type"] == "SwitchContainer", row
+        assert row["path"] == "\\" + "\\".join((*segments, name)), row
+        assert canonical(row["id"]) == canonical(created)
+        assert canonical(row["parent"]) == canonical(parent_row["id"]), row
+        references = row["references"]
+        assert canonical(references[SWITCH_GROUP_REFERENCE]) == canonical(group["id"]), row
+        assert canonical(references["DefaultSwitchOrState"]) == canonical(target["id"]), row
+        assert one(["--exact-id", target["id"]], "--include", "parent") == target
+        assert one(["--exact-id", group["id"]]) == group
+        evidence["independent_readback"] = row
+        category.update(status="PASS", reason="one public create verified; independent identity, group/default references and original target/group preserved")
+        return category
+    except BaseException as exc:
+        category["reason"] = f"{type(exc).__name__}: {exc}"
+        evidence["error"] = category["reason"]
+        raise
+    finally:
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, "Prospective reference acceptance changed config"
+        paths = sorted(set(dispatcher.glob("*.json")) - previous)
+        assert len(paths) <= 512
+        total_bytes = 0
+        for path in paths:
+            body = path.read_bytes()
+            total_bytes += len(body)
+            assert total_bytes <= 32 * 1024 * 1024
+            evidence["native_evidence"].append({"path": str(path), "bytes": len(body), "sha256": hashlib.sha256(body).hexdigest()})
+        body = json.dumps(evidence, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= 8 * 1024 * 1024
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(body)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+@pytest.mark.parametrize("family", ("Switch", "State"))
+def test_prospective_group_default_native_acceptance(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime, family: str,
+) -> None:
+    """Create one container with explicit group/default in the existing sandbox."""
+    category = _collect_prospective_group_default_native_acceptance(workflow_sandbox_runtime, family)
+    assert category["status"] == "PASS", category
+
+
+def _collect_reference_enabled_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Observe one existing non-master AuxBus reference; never infer a new-object default."""
+    from wwise_waapi.documented_list_fields import load_catalog
+    output = runtime.state_dir / 'reference-enabled-metadata-observation.json'
+    evidence_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
+    prior_evidence = set(evidence_root.glob('*.json'))
+    category = {'category': 'reference-enabled-metadata-observation', 'status': 'FAIL',
+        'observation_path': str(output), 'verifier_strength': 'read_only_exact_existing_object_field_state'}
+    runtime.category_results.append(category)
+    observation = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [],
+        'endpoint': {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url},
+        'config_path': runtime.env['WAAPI_SKILL_CONFIG_PATH'],
+        'config_sha256': hashlib.sha256(Path(runtime.env['WAAPI_SKILL_CONFIG_PATH']).read_bytes()).hexdigest(),
+        'native_evidence': [], 'mutation_authority': False, 'prospective_authority': False,
+        'business_effect_verified': False, 'outcome': 'incomplete'}
+
+    def retain():
+        body = json.dumps(observation, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 2 * 1024 * 1024, 'Reference observer receipt bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp')
+        temporary.write_bytes(body)
+        temporary.replace(output)
+
+    def raw(command):
+        assert len(observation['calls']) < 64
+        row = {'argv': list(command)}
+        observation['calls'].append(row)
+        try:
+            code, payload = runtime.raw_gateway(command)
+            row.update(exit_code=code, payload=payload)
+            return code, payload
+        finally:
+            retain()
+
+    def read(command):
+        code, payload = raw(command)
+        assert code == 0 and payload.get('ok') is True, payload
+        return payload
+
+    def exact(identity):
+        result = read(['query-object', '--exact-id', identity, '--include', 'class-id', '--include', 'parent'])
+        assert result.get('count') == 1 and len(result.get('objects', [])) == 1, result
+        row = result['objects'][0]
+        assert row['id'].upper() == identity.upper(), row
+        return row
+
+    def field_inventory(scope):
+        rows, page, pages = [], None, set()
+        for _ in range(4):
+            result = read(['metadata', 'list', *scope, '--page-size', '64', *(['--page', page] if page else [])])['agent_result']
+            rows.extend(result['fields'])
+            if result.get('complete') is True:
+                return rows
+            page = _required_string(result, 'next_page')
+            assert page not in pages
+            pages.add(page)
+        raise AssertionError('Exact field inventory not complete within four disclosed pages; no absence claim')
+
+    try:
+        types = read(['metadata', 'types', '--meaning', 'Bus', '--meaning', 'Platform', '--page-size', '64'])['agent_result']
+        assert types.get('complete') is True, 'Filtered type inventory incomplete'
+        aux_rows = [row for row in types['types'] if row.get('name') == 'AuxBus']
+        platform_rows = [row for row in types['types'] if row.get('name') == 'Platform']
+        assert len(aux_rows) == len(platform_rows) == 1
+        source = load_catalog(runtime.version)
+        classes = {row['name']: row for row in source['classes'] if row['name'] in {'AuxBus', 'Bus'}}
+        aux = aux_rows[0]
+        assert type(aux.get('classId')) is int and aux['classId'] == classes['AuxBus']['class_id']
+        observation['source_class'] = {'catalog_sha256': source['catalog_sha256'],
+            'class': {key: classes['AuxBus'][key] for key in ('name', 'class_id', 'source_member', 'source_sha256')}}
+        candidates = read(['query-object', '--type-selection', aux['selection'], '--max-results', '20',
+            '--include', 'class-id', '--include', 'parent'])
+        chosen = None
+        for candidate in candidates.get('objects') or []:
+            if candidate.get('type') != 'AuxBus' or candidate.get('class_id') != aux['classId']:
+                continue
+            parent_id = (candidate.get('parent') or {}).get('id')
+            if not isinstance(parent_id, str):
+                continue
+            parent = exact(parent_id)
+            if parent.get('type') in classes and parent.get('class_id') == classes[parent['type']]['class_id']:
+                chosen = exact(candidate['id'])
+                assert all(chosen.get(key) == candidate.get(key) for key in ('id', 'name', 'type', 'path', 'class_id', 'parent')), (chosen, candidate)
+                observation['parent'] = parent
+                break
+        if chosen is None:
+            category.update(status='blocked', reason='No source/class/parent-proven non-master AuxBus in first 20 candidates')
+            return category
+        observation['object'] = chosen
+        platforms = read(['query-object', '--type-selection', platform_rows[0]['selection'], '--max-results', '20'])
+        assert platforms.get('objects'), 'No explicit project platform available'
+        platform = platforms['objects'][0]
+        assert platform['type'] == 'Platform' and platform.get('name')
+        platform_exact = read(['query-object', '--exact-id', platform['id']])
+        assert platform_exact.get('count') == 1 and platform_exact['objects'] == [platform], platform_exact
+        observation['platform'] = platform
+        object_scope = ['--exact-id', chosen['id']]
+        class_scope = ['--type-selection', aux['selection']]
+        object_names, class_names = field_inventory(object_scope), field_inventory(class_scope)
+        observation['controller_name_absence'] = {
+            'object': not any(row['name'] == 'OverrideUserAuxSends' for row in object_names),
+            'class': not any(row['name'] == 'OverrideUserAuxSends' for row in class_names),
+            'object_complete_names': [row['name'] for row in object_names], 'class_complete_names': [row['name'] for row in class_names]}
+        selections = []
+        for label, scope, names in [('object', object_scope, object_names), ('class', class_scope, class_names)]:
+            selected, = [row for row in names if row['name'] == 'UserAuxSend0']
+            detail = read(['metadata', 'detail', *scope, '--selection', selected['selection']])['agent_result']
+            observation[label + '_field'] = detail
+            assert detail.get('metadata', {}).get('name') == 'UserAuxSend0', detail
+            selections.append(selected['selection'])
+        code, result = raw(['metadata', 'property-state', *object_scope, '--selection', selections[0], '--platform', platform['id']])
+        observation['enabled_response'] = {'exit_code': code, 'payload': result}
+        if code != 0 or result.get('ok') is not True:
+            observation['outcome'] = 'native_or_observation_failure'
+            return category
+        state = result['agent_result']
+        assert state['field'] == 'UserAuxSend0' and state['kind'] == 'reference' and type(state['enabled']) is bool, state
+        assert state['mutation_authority'] is False
+        observation.update(outcome='observed_existing_reference_state', observed_enabled=state['enabled'])
+        category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        observation['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        paths = sorted(set(evidence_root.glob('*.json')) - prior_evidence)
+        assert len(paths) <= 512
+        total = 0
+        for path in paths:
+            body = path.read_bytes()
+            total += len(body)
+            assert total <= 32 * 1024 * 1024
+            observation['native_evidence'].append({'path': str(path), 'bytes': len(body), 'sha256': hashlib.sha256(body).hexdigest()})
+        retain()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_read_only_reference_enabled_native_metadata_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    category = _collect_reference_enabled_metadata_probe(workflow_sandbox_runtime)
+    if category['status'] == 'blocked':
+        pytest.skip(f'Existing reference observation blocked; receipt retained: {category}')
+    assert category['status'] == 'PASS', category
+
+
+def _collect_2021_rtpc_representation_diagnostic(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Inspect two source-pinned identities; no RTPC construction or effect claim."""
+    assert runtime.version == '2021.1', 'This diagnostic is pinned to the2021 sample and catalog'
+    output = runtime.state_dir / 'rtpc-2021-representation-diagnostic.json'
+    assert not output.exists(), 'An earlier diagnostic must never be overwritten'
+    evidence_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
+    prior_evidence = set(evidence_root.glob('*.json'))
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH'])
+    report: dict[str, Any] = {
+        'contract': 'waapi-skill.rtpc-2021-representation-diagnostic/v1',
+        'candidate': runtime.candidate, 'version': runtime.version,
+        'endpoint': {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url},
+        'config_path': str(config), 'config_sha256': hashlib.sha256(config.read_bytes()).hexdigest(),
+        'source': {'sdk_build': '2021.1.14.8108',
+            'authority_report': '/tmp/full-coverage-180-rtpc-2021-authority.md',
+            'sdk_archive': '/Applications/Audiokinetic/Wwise2021.1.14.8108/SDK/Help/WwiseSDK-Windows.chm',
+            'sdk_members': ['ak_wwise_core_object_create.html', 'wwiseobject_curve.html'],
+            'saved_model': 'tests/_org/2021.1/Actor-Mixer Hierarchy/Car Engine.wwu',
+            'saved_model_sha256': '499654bb8ab436ae52ef74067d14beb7fe4335009b1ff2cea380aabfada9d214',
+            'scope': 'saved identities only; no live class/list/field token inferred from saved XML'},
+        'bounds': {'calls': 32, 'name_pages_per_object': 4, 'names_per_page': 64,
+            'detail_fields': 6, 'detail_pages_per_field': 2, 'relationship_reads': 2,
+            'reply_bytes': 256 * 1024, 'total_reply_bytes': 2 * 1024 * 1024,
+            'receipt_bytes': 4 * 1024 * 1024, 'native_evidence_files': 512,
+            'native_evidence_bytes': 32 * 1024 * 1024},
+        'calls': [], 'objects': [], 'field_details': [], 'relationship_reads': [],
+        'boundaries': [], 'native_evidence': [], 'collection_complete': False,
+        'mutation_authority': False, 'business_effect_verified': False, 'native_absence_proven': False,
+    }
+    category = {'category': 'rtpc-2021-representation-diagnostic', 'status': 'FAIL',
+        'diagnostic_only': True, 'business_effect_verified': False, 'observation_path': str(output),
+        'verifier_strength': 'read_only_source_guid_identity_and_disclosed_metadata_observation',
+        'reason': 'diagnostic collection incomplete'}
+    runtime.category_results.append(category)
+    total_bytes = 0
+
+    def retain() -> None:
+        body = json.dumps(report, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+        assert len(body) <= report['bounds']['receipt_bytes'], 'RTPC diagnostic receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp')
+        temporary.write_bytes(body)
+        temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+
+    def boundary(stage: str, reason: str, **facts: Any) -> None:
+        report['boundaries'].append({'stage': stage, 'reason': reason, **facts})
+
+    def read(stage: str, command: Sequence[str]) -> dict[str, Any] | None:
+        nonlocal total_bytes
+        assert len(report['calls']) < report['bounds']['calls'], 'RTPC diagnostic public call bound exceeded'
+        entry = {'stage': stage, 'gateway_argv': list(command)}
+        report['calls'].append(entry)
+        try:
+            code, payload = runtime.raw_gateway(command)
+            entry.update(exit_code=code, payload=payload)
+            size = len(json.dumps(payload, ensure_ascii=False, separators=(',', ':')).encode('utf-8'))
+            total_bytes += size
+            assert size <= report['bounds']['reply_bytes'] and total_bytes <= report['bounds']['total_reply_bytes'], 'RTPC diagnostic reply byte bound exceeded'
+            if code != 0 or payload.get('ok') is not True:
+                boundary(stage, 'public_read_rejected', error_code=payload.get('error_code'))
+                return None
+            if command[0] not in {'config-show', 'query-schema'}:
+                assert payload.get('endpoint') == report['endpoint'], 'RTPC diagnostic endpoint changed'
+                assert payload.get('detected_version') == runtime.version, 'RTPC diagnostic version changed'
+            return payload
+        except Exception as exc:
+            entry['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+            raise
+        finally:
+            retain()
+
+    def query(stage: str, source: Sequence[str]) -> list[dict[str, Any]]:
+        payload = read(stage, ['query-object', *source, '--max-results', '2',
+            '--include', 'class-id', '--include', 'parent', '--include', 'owner'])
+        if payload is None:
+            return []
+        rows = payload.get('objects')
+        assert isinstance(rows, list) and len(rows) <= 1, 'Exact diagnostic query returned ambiguous rows'
+        assert payload.get('projection_complete') is not False and payload.get('status') != 'partial', 'RTPC diagnostic projection is incomplete'
+        return rows
+
+    def canonical(value: Any) -> bool:
+        try:
+            return isinstance(value, str) and value.casefold() == ('{' + str(uuid.UUID(value)) + '}').casefold()
+        except ValueError:
+            return False
+
+    def names(item: dict[str, Any]) -> list[dict[str, Any]]:
+        fields, seen_pages, page = [], set(), None
+        for _ in range(report['bounds']['name_pages_per_object']):
+            command = ['metadata', 'list', '--exact-id', item['requested_id'], '--page-size', '64']
+            if page is not None:
+                command += ['--page', page]
+            payload = read(item['role'] + '-names', command)
+            if payload is None:
+                return []
+            result = payload['agent_result']
+            batch = result.get('fields')
+            assert isinstance(batch, list) and len(batch) <= 64, 'RTPC diagnostic name row bound exceeded'
+            for field in batch:
+                name = field.get('name')
+                assert isinstance(name, str) and name and name not in item['field_names'], 'Malformed or duplicate disclosed field name'
+                item['field_names'].append(name)
+                assert isinstance(field.get('selection'), str) and field['selection'], 'Disclosed field lacks scoped selection'
+                fields.append(field)
+            page = result.get('next_page')
+            if page is None:
+                assert result.get('complete') is True and result.get('total_count') == len(fields), 'Incomplete RTPC diagnostic name inventory'
+                item['names_complete'] = True
+                return fields
+            assert isinstance(page, str) and page and page not in seen_pages, 'Repeated or malformed metadata page'
+            seen_pages.add(page)
+        raise AssertionError('RTPC diagnostic metadata exceeds four pages; no complete inventory or absence claim')
+
+    def detail(item: dict[str, Any], field: Mapping[str, Any]) -> dict[str, Any] | None:
+        record = {'object_id': item['requested_id'], 'disclosed_field': field['name'], 'pages': []}
+        report['field_details'].append(record)
+        command = ['metadata', 'detail', '--exact-id', item['requested_id'], '--selection', field['selection']]
+        for _ in range(report['bounds']['detail_pages_per_field']):
+            payload = read(item['role'] + '-' + field['name'] + '-detail', command)
+            if payload is None:
+                return None
+            result = payload['agent_result']
+            record['pages'].append(result)
+            if result.get('complete') is True:
+                return result.get('metadata') if len(record['pages']) == 1 else None
+            command = result.get('next_command', {}).get('gateway_argv')
+            assert isinstance(command, list) and command[:2] == ['metadata', 'detail'], 'Metadata detail continuation unavailable'
+        boundary(item['role'], 'detail_page_bound_reached', disclosed_field=field['name'])
+        return None
+
+    def follow(stage: str, identity: Any, *, source: Sequence[str] | None = None) -> None:
+        assert len(report['relationship_reads']) < 2, 'RTPC diagnostic relationship bound exceeded'
+        if source is None and not canonical(identity):
+            boundary(stage, 'disclosed_relationship_identity_missing_or_malformed', value=identity)
+            return
+        rows = query(stage, source or ['--exact-id', identity])
+        report['relationship_reads'].append({'stage': stage, 'source_id': identity, 'identity_rows': rows})
+        if rows and source is not None:
+            returned = rows[0].get('id')
+            if not canonical(returned):
+                boundary(stage, 'returned_relationship_identity_missing_or_malformed', value=returned)
+                return
+            exact = query(stage + '-exact-id', ['--exact-id', returned])
+            report['relationship_reads'][-1]['exact_identity_rows'] = exact
+            if exact != rows:
+                boundary(stage, 'relationship_exact_readback_changed')
+        elif rows and rows[0].get('id', '').casefold() != identity.casefold():
+            boundary(stage, 'exact_relationship_identity_mismatch')
+
+    try:
+        read('configuration', ['config-show'])
+        status = read('host-and-project', ['status'])
+        assert status is not None, 'Exact2021 host/project status unavailable'
+        report['runtime_version_observed'] = status.get('wwise', {}).get('version')
+        observed = report['runtime_version_observed']
+        assert (isinstance(observed, Mapping)
+            and all(type(observed.get(key)) is int for key in ('year', 'major', 'minor', 'build'))
+            and [observed[key] for key in ('year', 'major', 'minor', 'build')] == [2021, 1, 14, 8108]), 'Exact2021.1.14.8108 source/SDK build differs from observed host'
+        read('disclosed-read-contract', ['query-schema', '--advanced'])
+        for role, identity in [('Sound', '{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}'),
+                               ('saved-internal-RTPC', '{A809A571-6012-42BE-A00D-D8E7C89D1248}')]:
+            item = {'role': role, 'requested_id': identity, 'identity_rows': [], 'field_names': [], 'names_complete': False}
+            report['objects'].append(item)
+            item['identity_rows'] = query(role + '-exact-id', ['--exact-id', identity])
+            if not item['identity_rows']:
+                boundary(role, 'exact_internal_identity_not_observed', requested_id=identity,
+                    meaning='zero/error observation only; no native absence or construction conclusion')
+                continue
+            row = item['identity_rows'][0]
+            if not canonical(row.get('id')) or row['id'].casefold() != identity.casefold():
+                boundary(role, 'exact_identity_mismatch')
+                continue
+            for key in ('name', 'type', 'path', 'class_id', 'parent', 'owner'):
+                if key not in row:
+                    boundary(role, 'identity_output_omitted', field=key)
+            fields = names(item)
+            for field in fields:
+                if not any(word in field['name'].casefold() for word in ('rtpc', 'curve', 'controlinput', 'property', 'owner')):
+                    continue
+                if len(report['field_details']) == 6:
+                    report['detail_limit_reached'] = True
+                    break
+                metadata = detail(item, field)
+                restriction = metadata.get('restriction', {}) if isinstance(metadata, Mapping) else {}
+                if (role == 'saved-internal-RTPC' and field['name'] == 'Curve'
+                        and isinstance(restriction, Mapping) and restriction.get('type') == 'reference'):
+                    follow('disclosed-RTPC-Curve', identity,
+                        source=['--advanced-waql', f'from object "{identity}" select @{field["name"]}'])
+            if role == 'saved-internal-RTPC' and isinstance(row.get('owner'), Mapping):
+                follow('returned-RTPC-owner', row['owner'].get('id'))
+        report['collection_complete'] = True
+        category.update(status='blocked', reason='Read-only diagnostic only; no construction, mutation, absence or business effect credit')
+        return category
+    except Exception as exc:
+        report['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        raise
+    finally:
+        completed_status, completed_reason = category['status'], category['reason']
+        category.update(status='FAIL', reason='Diagnostic evidence retention incomplete')
+        try:
+            paths = sorted(set(evidence_root.glob('*.json')) - prior_evidence)
+            assert len(paths) <= 512, 'RTPC diagnostic dispatcher evidence file bound exceeded'
+            total = 0
+            for path in paths:
+                assert path.stat().st_size <= 32 * 1024 * 1024 - total, 'RTPC diagnostic dispatcher evidence byte bound exceeded'
+                body = path.read_bytes()
+                total += len(body)
+                assert total <= 32 * 1024 * 1024, 'RTPC diagnostic dispatcher evidence byte bound exceeded'
+                report['native_evidence'].append({'path': str(path), 'bytes': len(body), 'sha256': hashlib.sha256(body).hexdigest()})
+        except Exception as exc:
+            report['retention_failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+            retain()
+            raise
+        retain()
+        category.update(status=completed_status, reason=completed_reason)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_gateway_2021_rtpc_representation_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """Developer-only collection can complete; its category never grants effect credit."""
+    category = _collect_2021_rtpc_representation_diagnostic(workflow_sandbox_runtime)
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True, category
+
+
+def _collect_existing_effect_slot_exact_member_acceptance(runtime: _WorkflowSandboxRuntime, *, sound_name: str) -> dict[str, Any]:
+    """Exact-ID anonymous-member edits; never inline List name-merge acceptance."""
+    output = runtime.state_dir / "existing-effect-slot-exact-member-acceptance.json"
+    category = {"category": "existing-effect-slot-exact-member", "status": "FAIL",
+        "verifier_strength": "gateway_verified_plus_independent_ordered_membership_class_owner_reference_and_scalar_reads",
+        "observation_path": str(output)}
+    runtime.category_results.append(category)
+    receipt = {"candidate": runtime.candidate, "version": runtime.version, "calls": [], "transactions": [],
+        "setup_coverage_credit": False, "business_effect_verified": False, "inline_list_merge_verified": False,
+        "inline_list_boundary": "Anonymous List construction and ambiguous empty-name collision merging remain separate unfinished branches",
+        "lifecycle_acceptance": "Requires the existing host-category-evidence/v3 finalizer; no source/cleanup acceptance before teardown"}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 8 * 1024 * 1024, 'EffectSlot receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+    class ReceiptGateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 192, 'EffectSlot public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            return payload
+    gateway = ReceiptGateway()
+    def query(argv, *, count=None):
+        result = gateway.gateway(['query-object', *argv], live=True)
+        rows = result.get('objects')
+        assert isinstance(rows, list) and result.get('projection_complete') is not False, result
+        assert result.get('limit_reached') is not True and result.get('status') != 'partial', result
+        if count is not None:
+            assert result.get('count') == len(rows) == count, result
+        assert len(rows) <= 3 and len({row['id'] for row in rows}) == len(rows), rows
+        for row in rows:
+            assert uuid.UUID(row['id']).int != 0 and isinstance(row.get('path'), str), row
+        return rows
+    projection = ['--include', 'class-id', '--include', 'owner', '--include', 'parent', '--include', 'notes']
+    def exact(identity, fields=()):
+        row = query(['--exact-id', identity, *projection,
+            *(arg for field in fields for arg in ('--include-field', field))], count=1)[0]
+        assert row['id'] == identity and type(row.get('class_id')) is int, row
+        return row
+    def members(owner, *, count):
+        return query(['--advanced-waql', f'from object "{owner}" select @Effects', '--max-results', '3', *projection], count=count)
+    def field_names(identity, required=()):
+        page, names, selected = None, [], []
+        for _ in range(4):
+            result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page is not None else [])], live=True)['agent_result']
+            for field in result['fields']:
+                name = field.get('name')
+                assert isinstance(name, str) and name not in names, result
+                names.append(name)
+                if not required or name in required:
+                    selected.append((name, field['selection']))
+            if result['complete'] is True:
+                assert len(names) == result['total_count'], result
+                break
+            next_page = _required_string(result, 'next_page')
+            assert next_page != page, result
+            page = next_page
+        else:
+            raise AssertionError('EffectSlot metadata exceeds four pages')
+        assert set(required).issubset(names), (identity, required, names)
+        assert len(selected) <= 8, 'Private effect metadata exceeds eight-field preservation bound'
+        details = []
+        for name, selection in selected:
+            result = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', selection], live=True)['agent_result']
+            assert result.get('complete') is True, result
+            details.append({'name': name, 'detail': result})
+        receipt.setdefault('metadata', {})[identity] = {'names': names, 'details': details}
+        return [name for name, _ in selected]
+    def reference(row):
+        value = row.get('references', {}).get('Effect')
+        identity = value.get('id') if isinstance(value, Mapping) else value
+        assert isinstance(identity, str) and uuid.UUID(identity).int != 0, row
+        return identity
+    def snapshot(owner, known, effect_fields):
+        sound = exact(owner)
+        assert sound['type'] == 'Sound' and sound['class_id'] == 65552, sound
+        rows = members(owner, count=2)
+        assert [row['id'] for row in rows] == known, (known, rows)
+        slots, effects = [], []
+        for listed in rows:
+            row = exact(listed['id'], ('Effect', 'Bypass', 'Render'))
+            assert all((key in row) == (key in listed) and row.get(key) == listed.get(key)
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes')), (listed, row)
+            assert row['name'] == '' and row['class_id'] == 5505040, row
+            assert row.get('owner', {}).get('id') == owner, row
+            if 'parent' in row:
+                assert isinstance(row['parent'], Mapping) and row['parent'].get('id') == owner, row
+                assert 'parent' not in row.get('unavailable_fields', []), row
+            else:
+                assert 'parent' in row.get('unavailable_fields', []), row
+            assert all(type(row.get('properties', {}).get(token)) is bool for token in ('Bypass', 'Render')), row
+            identity = reference(row)
+            effect = exact(identity, effect_fields[identity])
+            assert effect['type'] == 'Effect', effect
+            # Match the existing plugin verifier's observed representation, not
+            # an invented hierarchy. Embedded Effects have immediate slot owner
+            # with no parent; a present hierarchy parent is retained explicitly.
+            if 'parent' in effect:
+                assert isinstance(effect['parent'], Mapping) and effect['parent'].get('id') == row['id'], effect
+                assert 'parent' not in effect.get('unavailable_fields', []), effect
+                expected_effect_owner = owner
+            else:
+                assert 'parent' in effect.get('unavailable_fields', []), effect
+                expected_effect_owner = row['id']
+            assert effect.get('owner', {}).get('id') == expected_effect_owner, effect
+            slots.append(row); effects.append(effect)
+        assert len({row['id'] for row in [sound, *slots, *effects]}) == 5, (slots, effects)
+        return {'owner': sound, 'slots': slots, 'effects': effects}
+    def complete(draft, label, *, before=None, known=None, effect_fields=None, value=None, renamed=None):
+        phase = {'phase': label, 'native_outcome': 'not_executed', 'effect_verified': False}
+        receipt['transactions'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        prepared = shown['artifact']['prepared_operation']
+        phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'], compiled_native_request=prepared['dispatch'])
+        if before is not None:
+            selected = before['slots'][0]
+            nodes = prepared['verification_plan']['nodes']
+            node = next(row for row in nodes if row.get('target_id') == selected['id'])
+            assert node['existing_target'] is True and node['pre_state']['id'] == selected['id'], node
+            assert node['pre_state']['name'] == '' and node['pre_state']['path'] == selected['path'], node
+            assert any(row.get('name') == 'Effect' and row.get('condition_guard') is True
+                and row.get('target_id') == reference(selected) for row in node['references']), node
+            args = prepared['dispatch']['args']
+            assert prepared['dispatch']['uri'] == 'ak.wwise.core.object.set', prepared
+            expected = [{'object': selected['id'], '@Bypass': value}]
+            if renamed is not None:
+                expected.insert(0, {'object': before['owner']['id'], 'name': renamed})
+            assert args['objects'] == expected, args
+            assert '@Effects' not in json.dumps(args) and '@Effect"' not in json.dumps(args), args
+            # Collector-owned independent prestate, not an invented durable
+            # membership seal inside the generic exact-ID transaction artifact.
+            phase['collector_prestate'] = snapshot(before['owner']['id'], known, effect_fields)
+            assert phase['collector_prestate'] == before, (before, phase['collector_prestate'])
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        assert code == 0 and executed.get('ok') is True, executed
+        assert executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('verified') is True and verified.get('state') == 'verified', verified
+        assert verified.get('verification', {}).get('business_state_verified') is True, verified
+        return phase
+    try:
+        assert runtime.version in {'2023.1', '2024.1', '2025.1'}, 'Modern anonymous-slot witness excludes no legacy scalar outcome'
+        gateway.gateway(['query-schema', '--advanced'], live=False)
+        types = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'EffectSlot', '--meaning', 'Wwise Gain', '--page-size', '64'], live=True)['agent_result']
+        assert types.get('complete') is True, types
+        classes = {}
+        for name in ('Sound', 'EffectSlot', 'Wwise Gain'):
+            matches = [row for row in types['types'] if row.get('name') == name]
+            assert len(matches) == 1 and type(matches[0].get('classId')) is int, matches
+            classes[name] = matches[0]['classId']
+        assert classes['Sound'] == 65552 and classes['EffectSlot'] == 5505040, classes
+        receipt['live_classes'] = classes
+        segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        setup = _start_business_draft(gateway, 'object.create')
+        parent = _bind_business_object(gateway, setup, path_segments=segments)
+        kind = _discover_business_type(gateway, setup, meaning='Sound', role='object', expected_label='Sound')
+        _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', 'sound', '--parent-handle', parent,
+            '--name', sound_name, '--kind', kind, '--field', 'notes', 'Keep sound'], live=False)
+        complete(setup, 'setup_sound_no_credit')
+        found = query([*(arg for segment in (*segments, sound_name) for arg in ('--path-segment', segment))], count=1)[0]
+        owner = found['id']
+        assert members(owner, count=0) == []
+        known = []
+        for index in range(2):
+            setup = _start_business_draft(gateway, 'object.createPlugin')
+            target = _bind_business_object(gateway, setup, object_id=owner)
+            plugin = _discover_business_type(gateway, setup, meaning='Wwise Gain', role='effect', expected_label='Wwise Gain')
+            _update_business_draft(gateway, setup, 'draft-declare-existing', ['--declaration-id', 'gain', '--object-handle', target,
+                '--field', 'plugin_role', 'effect', '--field', 'plugin_placement', 'owner',
+                '--field', 'plugin_name', f'Gain{index}', '--field', 'plugin_type_handle', plugin,
+                '--field', 'notes', f'Keep effect{index}'], live=False)
+            complete(setup, f'setup_effect_{index}_no_credit')
+            rows = members(owner, count=index + 1)
+            assert [row['id'] for row in rows[:index]] == known, rows
+            added = set(row['id'] for row in rows) - set(known)
+            assert len(added) == 1, rows
+            known.append(added.pop())
+        effect_fields = {}
+        for identity in known:
+            field_names(identity, ('Effect', 'Bypass', 'Render'))
+            slot = exact(identity, ('Effect', 'Bypass', 'Render'))
+            effect_id = reference(slot)
+            effect_fields[effect_id] = field_names(effect_id)
+        before = snapshot(owner, known, effect_fields)
+        receipt['baseline'] = before
+        assert all(row['properties']['Bypass'] is False for row in before['slots']), before
+        assert all(row['class_id'] == classes['Wwise Gain'] for row in before['effects']), before
+        for label, value, renamed in [('exact_member_bypass', True, None),
+                ('owner_rename_and_exact_member_bypass', False, sound_name + '_Renamed')]:
+            # Always rebind the second phase to a fresh post-first observation.
+            fresh = snapshot(owner, known, effect_fields)
+            assert fresh == before, (before, fresh)
+            draft = _start_business_draft(gateway, 'object.set')
+            if renamed is not None:
+                target = _bind_business_object(gateway, draft, object_id=owner)
+                _update_business_draft(gateway, draft, 'draft-declare-existing', ['--declaration-id', 'owner',
+                    '--object-handle', target, '--field', 'new_name', renamed], live=False)
+            target = _bind_business_object(gateway, draft, object_id=known[0])
+            listed = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target, '--list'], live=True)['agent_result']
+            selected = [row for row in listed['fields'] if row.get('name') == 'Bypass']
+            assert len(selected) == 1, listed
+            field = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target,
+                '--selection', selected[0]['selection']], live=True)
+            handle = discovered_business_field_handle(field, 'Bypass')
+            _update_business_draft(gateway, draft, 'draft-declare-existing', ['--declaration-id', 'slot',
+                '--object-handle', target, '--field-value', handle, 'true' if value else 'false'], live=False)
+            phase = complete(draft, label, before=fresh, known=known, effect_fields=effect_fields, value=value, renamed=renamed)
+            expected = json.loads(json.dumps(fresh))
+            if renamed is not None:
+                old_path = fresh['owner']['path']; new_path = old_path.rsplit('\\', 1)[0] + '\\' + renamed
+                def renamed_observation(item):
+                    if isinstance(item, dict):
+                        result = {key: renamed_observation(child) for key, child in item.items()}
+                        if item.get('id') == owner and 'name' in item: result['name'] = renamed
+                        if isinstance(item.get('path'), str) and (item['path'] == old_path or item['path'].startswith(old_path + '\\')):
+                            result['path'] = new_path + item['path'][len(old_path):]
+                        return result
+                    return [renamed_observation(child) for child in item] if isinstance(item, list) else item
+                expected = renamed_observation(expected)
+            expected['slots'][0]['properties']['Bypass'] = value
+            observed = snapshot(owner, known, effect_fields)
+            phase['independent_effect'] = observed
+            assert observed == expected, (label, expected, observed)
+            phase['effect_verified'] = True
+            before = observed
+        receipt['business_effect_verified'] = True
+        category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_existing_effect_slot_exact_member_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """Shared setup, two exact-ID edits; no anonymous inline List merge credit."""
+    if workflow_sandbox_runtime.version not in {'2023.1', '2024.1', '2025.1'}:
+        pytest.skip('2021–2022 scalar EffectN fields remain a separate witness')
+    category = _collect_existing_effect_slot_exact_member_acceptance(workflow_sandbox_runtime,
+        sound_name='WAAPI_SLOT_' + uuid.uuid4().hex[:12])
+    assert category['status'] == 'PASS', category
+
+
+def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: str,
+        owned_time_first: bool = False) -> dict[str, Any]:
+    """Five graph effects, or the separate first named owned-Time witness."""
+    import math
+    from copy import deepcopy
+    category_name = 'named-owned-time-control-input-first' if owned_time_first else 'rtpc-graph-acceptance'
+    output = runtime.state_dir / (category_name + '.json')
+    category = {'category': category_name, 'status': 'FAIL', 'observation_path': str(output),
+        'verifier_strength': 'gateway_verified_plus_independent_complete_ordered_pairs_and_exact_curve_points'}
+    runtime.category_results.append(category)
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'effects': [],
+        'setup_coverage_credit': False, 'business_effect_verified': False, 'complete': False, 'metadata': {},
+        'exclusive': {'status': 'pending', 'reason': 'No legal active source-backed Exclusive field proved'},
+        'lifecycle_acceptance': 'Existing host-category-evidence/v3 finalizer owns source, host and cleanup proof'}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 16 * 1024 * 1024, 'RTPC graph receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+    class Gateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 384, 'RTPC graph public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            return payload
+    gateway = Gateway()
+    projection = ['--include', 'class-id', '--include', 'owner', '--include', 'parent', '--include', 'notes']
+    def query(argv, *, count=None):
+        payload = gateway.gateway(['query-object', *argv], live=True)
+        rows = payload.get('objects')
+        assert isinstance(rows, list) and len(rows) <= 8, payload
+        assert payload.get('limit_reached') is not True and payload.get('projection_complete') is not False, payload
+        assert payload.get('status') != 'partial' and len({row['id'] for row in rows}) == len(rows), payload
+        if count is not None: assert payload.get('count') == len(rows) == count, payload
+        for row in rows:
+            assert uuid.UUID(row['id']).int != 0 and isinstance(row.get('path'), str), row
+        return rows
+    def exact(identity, fields=(), *, curve=False):
+        rows = query(['--exact-id', identity, *projection,
+            *(arg for field in fields for arg in ('--include-field', field)),
+            *(['--include', 'curve-points'] if curve else [])], count=1)
+        assert rows[0]['id'] == identity and type(rows[0].get('class_id')) is int, rows
+        return rows[0]
+    def inventory(identity, wanted):
+        names, choices, page = [], {}, None
+        for _ in range(4):
+            result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page else [])], live=True)['agent_result']
+            for field in result['fields']:
+                assert isinstance(field.get('name'), str) and field['name'] not in names, result
+                names.append(field['name'])
+                if field['name'] in wanted: choices[field['name']] = field['selection']
+            if result.get('complete') is True:
+                assert len(names) == result['total_count'], result
+                break
+            page = _required_string(result, 'next_page')
+        else: raise AssertionError('RTPC graph names exceed four complete pages')
+        details = {}
+        for token, selection in choices.items():
+            result = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', selection], live=True)['agent_result']
+            assert result.get('complete') is True, result
+            details[token] = {'selection': selection, 'metadata': result['metadata']}
+        receipt['metadata'][identity] = {'names': names, 'details': details}
+        return details
+    def ref(row, token):
+        value = row.get('references', {}).get(token)
+        identity = value.get('id') if isinstance(value, Mapping) else value
+        assert isinstance(identity, str) and uuid.UUID(identity).int != 0, (token, row)
+        return identity
+    def membership(owner):
+        return query(['--advanced-waql', f'from object "{owner}" select @RTPC', '--max-results', '8', *projection])
+    def snapshot(owner):
+        if owner not in receipt['metadata']:
+            inventory(owner, tuple(field_details))
+        selected = tuple(receipt['metadata'][owner]['details'])
+        sound = exact(owner, selected)
+        assert set(sound.get('properties', {})) == set(selected), sound
+        assert sound['type'] == 'Sound' and sound['class_id'] == classes['Sound'], sound
+        listed = membership(owner)
+        members = []
+        for candidate in listed:
+            if candidate['id'] not in receipt['metadata']:
+                details = inventory(candidate['id'], ('PropertyName', 'ControlInput', 'Curve'))
+                assert set(details) == {'PropertyName', 'ControlInput', 'Curve'}, details
+            row = exact(candidate['id'], ('PropertyName', 'ControlInput', 'Curve'))
+            assert {key: row[key] for key in candidate} == candidate, (candidate, row)
+            assert row['type'] == 'RTPC' and row['name'] == '' and row['class_id'] == classes['RTPC'], row
+            assert row.get('owner', {}).get('id') == owner, row
+            assert isinstance(row.get('properties', {}).get('PropertyName'), str), row
+            control = ref(row, 'ControlInput')
+            if owned_time_first:
+                input_row = exact(control, ('TimeModDuration', 'EnvelopeStopPlayback'))
+                assert input_row['type'] == 'ModulatorTime' and input_row['class_id'] == classes['ModulatorTime'], input_row
+                assert input_row['name'] == 'TimeMod' and input_row.get('owner', {}).get('id') == row['id'], input_row
+                assert input_row['notes'] == 'New time control', input_row
+                assert input_row['properties'] == {'TimeModDuration': 5, 'EnvelopeStopPlayback': False}, input_row
+                assert type(input_row['properties']['EnvelopeStopPlayback']) is bool, input_row
+            else:
+                assert control in controls_by_id, row
+                assert exact(control, ('Min', 'Max')) == controls_by_id[control]['object'], row
+            curve_id = ref(row, 'Curve')
+            hopped = query(['--advanced-waql', f'from object "{row["id"]}" select @Curve', '--max-results', '2',
+                *projection, '--include', 'curve-points'], count=1)[0]
+            curve = exact(curve_id, curve=True)
+            assert hopped == curve and curve['id'] == curve_id and curve['type'] == 'Curve', (hopped, curve)
+            # The canonical Curve hop proves the reference, not an invented
+            # immediate owner/parent hierarchy. Preserve actual optional facts.
+            assert curve['class_id'] == classes['Curve'], curve
+            points = curve.get('curve_points')
+            assert isinstance(points, list) and 1 <= len(points) <= 256, curve
+            assert all(set(point) == {'x', 'y', 'shape'} and all(type(point[key]) in (int, float)
+                and math.isfinite(point[key]) for key in ('x', 'y')) for point in points), curve
+            members.append({'object': row, 'curve': curve, 'pair': [row['properties']['PropertyName'], control]})
+            if owned_time_first: members[-1]['control_input'] = input_row
+        assert len({tuple(row['pair']) for row in members}) == len(members), members
+        return {'owner': sound, 'members': members}
+    def selected_field(draft, token, *, owner=None, kind=None):
+        scope = ['--object-handle', owner] if owner else ['--type-handle', kind]
+        # The token came from the complete source-backed metadata inventory;
+        # do not assume it lies on the first Draft list page.
+        result = _update_business_draft(gateway, draft, 'draft-discover-fields', [*scope, '--meaning', token], live=True)
+        return discovered_business_field_handle(result, token)
+    def declare(draft, owner_handle, token, control_id, points, declaration, *, kind=None):
+        control = _bind_business_object(gateway, draft, object_id=control_id)
+        field = selected_field(draft, token, owner=owner_handle if kind is None else None, kind=kind)
+        _update_business_draft(gateway, draft, 'draft-declare-rtpc', ['--declaration-id', declaration,
+            '--object-handle', owner_handle, '--field-handle', field, '--control-input-handle', control,
+            '--notes', 'Keep ' + declaration,
+            *(arg for point in points for arg in ('--point', str(point['x']), str(point['y']), point['shape']))], live=False)
+    def points(token, control_id, offset):
+        bounds = controls_by_id[control_id]['source_range']
+        restriction = field_details[token]['metadata']['restriction']
+        low, high = restriction.get('min'), restriction.get('max')
+        assert all(type(value) in (int, float) and math.isfinite(value) for value in (low, high)) and low < high, restriction
+        return [{'x': bounds['minimum'], 'y': low + (high - low) * offset, 'shape': 'Linear'},
+            {'x': bounds['maximum'], 'y': low + (high - low) * (offset + 0.25), 'shape': 'Linear'}]
+    def complete(draft, label, *, effect=True):
+        phase = {'phase': label, 'effect_verified': False, 'native_outcome': 'not_executed'}
+        (receipt['effects'] if effect else receipt.setdefault('setup', [])).append(phase)
+        phase_category = {'category': 'rtpc-graph-' + label, 'status': 'FAIL', 'observation_path': str(output),
+            'setup_coverage_credit': False,
+            'verifier_strength': ('gateway_verified_plus_independent_complete_ordered_pairs_and_exact_curve_points'
+                if effect else 'gateway_verified_setup_only_no_effect_coverage_credit')}
+        runtime.category_results.append(phase_category)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        assert shown['artifact']['prepared_operation']['dispatch']['uri'] == 'ak.wwise.core.object.set', shown
+        phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'],
+            compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
+        if owned_time_first:
+            phase['public_operation'] = shown['artifact']['request']['operation']
+            assert phase['public_operation'] == ('object.setRTPC' if effect else 'object.set'), shown
+            if effect:
+                proofs = [node['owned_control_input']['constructor_authority'] for node in
+                    shown['artifact']['prepared_operation']['pre_state']['object_set_nodes'] if node.get('owned_control_input')]
+                phase['constructor_authority'], = proofs
+                assert phase['constructor_authority']['version'] == runtime.version, proofs
+                assert phase['constructor_authority']['build'] == receipt['witness_build'], proofs
+                state = shown['artifact']['prepared_operation']['pre_state']
+                spec, = [node for node in state['object_set_nodes'] if node.get('collection') == 'ControlInput']
+                fact = state['planned_reference_context']['facts'][spec['request_path']]
+                assert fact['request_path'] == spec['request_path'] and fact['type'] == 'ModulatorTime', fact
+                assert fact['class_id'] == 5111824 and fact['relation'] == 'owner' and fact['path'] is None, fact
+                _required_string(fact, 'result_handle')
+                rtpc_fact, = [item for item in state['planned_reference_context']['facts'].values()
+                    if item['result_handle'] == fact['parent_identity']]
+                assert rtpc_fact['type'] == 'RTPC' and rtpc_fact['rtpc_property'] == 'Volume', rtpc_fact
+                assert rtpc_fact['parent_identity'] == owner, rtpc_fact
+                phase['sealed_control_input_occurrence'] = deepcopy(fact)
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        assert code == 0 and executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('verified') is True and verified.get('verification', {}).get('business_state_verified') is True, verified
+        if owned_time_first:
+            final = gateway.gateway(['transaction-show', identity], live=False)
+            phase['final_transaction'] = final
+            assert final['artifact'] == shown['artifact'], 'Stored immutable Preview changed'
+            phase['artifact_unchanged'] = True
+        return phase, phase_category
+    def admit(phase, phase_category, observed):
+        phase['independent_effect'] = observed
+        phase['effect_verified'] = True
+        phase_category['status'] = 'PASS'
+    def check_pairs(observed, expected):
+        assert [row['pair'] for row in observed['members']] == [row['pair'] for row in expected], (expected, observed)
+        for actual, wanted in zip(observed['members'], expected, strict=True):
+            assert actual['curve']['curve_points'] == wanted['points'], (wanted, actual)
+            assert actual['object']['notes'] == wanted['notes'], (wanted, actual)
+    try:
+        assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}, 'No fabricated 2021 RTPC graph construction'
+        if owned_time_first:
+            assert runtime.version == '2022.1', 'First owned-Time witness is pinned to2022.1'
+            observed = runtime.sandbox.metadata.get_info_version
+            receipt['observed_lifecycle_version'] = deepcopy(observed)
+            expected = {'year': 2022, 'major': 1, 'minor': 19, 'build': 8584}
+            assert isinstance(observed, Mapping) and all(type(observed.get(key)) is int
+                and observed[key] == value for key, value in expected.items()), 'First owned-Time witness requires2022.1.19.8584'
+            receipt['witness_build'] = '.'.join(str(observed[key]) for key in expected)
+        schema = gateway.gateway(['query-schema', '--output', 'curve-points'], live=False)
+        assert 'curve-points' in json.dumps(schema) and 'points' in json.dumps(schema), schema
+        gateway.gateway(['query-schema', '--advanced'], live=False)
+        input_type = 'ModulatorTime' if owned_time_first else 'GameParameter'
+        reflected = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', input_type,
+            '--meaning', 'RTPC', '--meaning', 'Curve', '--page-size', '64'], live=True)['agent_result']
+        assert reflected.get('complete') is True, reflected
+        classes = {}
+        for token in ('Sound', input_type, 'RTPC', 'Curve'):
+            match, = [row for row in reflected['types'] if row.get('name') == token]
+            assert type(match.get('classId')) is int, match
+            classes[token] = match['classId']
+        receipt['live_classes'] = classes
+        if owned_time_first:
+            assert classes == {'Sound': 65552, 'ModulatorTime': 5111824, 'RTPC': 1441808, 'Curve': 917520}, classes
+        actor_segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        input_segments = ('Game Parameters', 'Default Work Unit')
+        def by_path(segments):
+            row, = query([*(arg for segment in segments for arg in ('--path-segment', segment)), *projection], count=1)
+            certified = exact(row['id'])
+            assert certified == row, (row, certified)
+            return certified
+        def children(parent):
+            rows = query(['--advanced-waql', f'from object "{parent}" select children', '--max-results', '8', *projection])
+            return sorted(rows, key=lambda row: row['id'])
+        if owned_time_first:
+            parent_before = by_path(actor_segments)
+            children_before = children(parent_before['id'])
+            receipt['parent_before_setup'] = {'object': parent_before, 'children': children_before}
+        setup = _start_business_draft(gateway, 'object.set')
+        actor = _bind_business_object(gateway, setup, path_segments=actor_segments)
+        sound_kind = _discover_business_type(gateway, setup, meaning='Sound', role='object', expected_label='Sound')
+        declarations = [('owner', actor, name, sound_kind)]
+        if not owned_time_first:
+            parameters = _bind_business_object(gateway, setup, path_segments=input_segments)
+            input_kind = _discover_business_type(gateway, setup, meaning='GameParameter', role='object', expected_label='GameParameter')
+            declarations.extend([('input-a', parameters, name + '_A', input_kind), ('input-b', parameters, name + '_B', input_kind)])
+        for declaration, parent, label, kind in declarations:
+            _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', declaration,
+                '--parent-handle', parent, '--name', label, '--kind', kind, '--field', 'notes', 'Keep ' + declaration], live=False)
+        setup_phase, setup_category = complete(setup, 'setup_no_credit', effect=False)
+        owner = by_path((*actor_segments, name))['id']
+        controls_by_id = {}
+        for suffix in (() if owned_time_first else ('_A', '_B')):
+            identity = by_path((*input_segments, name + suffix))['id']
+            details = inventory(identity, ('Min', 'Max'))
+            assert set(details) == {'Min', 'Max'}, details
+            row = exact(identity, ('Min', 'Max'))
+            minimum, maximum = row['properties']['Min'], row['properties']['Max']
+            assert all(type(value) in (int, float) and math.isfinite(value) for value in (minimum, maximum)) and minimum < maximum, row
+            assert row['type'] == 'GameParameter' and row['class_id'] == classes['GameParameter'], row
+            controls_by_id[identity] = {'object': row, 'source_range': {'minimum': minimum, 'maximum': maximum}}
+        receipt['controls'] = list(controls_by_id.values())
+        if not owned_time_first: a, b = controls_by_id
+        field_details = inventory(owner, ('Volume',) if owned_time_first else ('Volume', 'Pitch', 'CenterPercentage'))
+        assert ({'Volume'} if owned_time_first else {'Volume', 'Pitch'}).issubset(field_details), field_details
+        assert field_details['Volume']['metadata'].get('supports', {}).get('rtpc') in {'Additive', 'Multiplicative'}, field_details
+        status = gateway.gateway(['status'], live=True)
+        receipt['host_and_project'] = {'wwise': status.get('wwise'), 'project': status.get('project'), 'endpoint': status.get('endpoint')}
+        platform = status.get('project', {}).get('currentPlatformId')
+        assert isinstance(platform, str) and uuid.UUID(platform).int != 0, status
+        def enabled(token, *, require_observation=False):
+            code, payload = gateway.raw_gateway(['metadata', 'property-state', '--exact-id', owner,
+                '--selection', field_details[token]['selection'], '--platform', platform])
+            receipt.setdefault('enabled_observations', []).append({'field': token, 'exit_code': code, 'payload': payload})
+            observed = payload.get('agent_result', {}).get('enabled')
+            if require_observation:
+                assert code == 0 and type(observed) is bool, payload
+            return code == 0 and observed is True
+        assert enabled('Volume'), 'Selected Volume is not observed enabled on the actual current platform'
+        if owned_time_first:
+            draft = _start_business_draft(gateway, 'object.set')
+            target = _bind_business_object(gateway, draft, object_id=owner)
+            lists = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target,
+                '--field-source', 'documented-lists', '--list'], live=True)['agent_result']
+            selected_list, = [row for row in lists['items'] if row.get('name') == 'RTPC']
+            assert selected_list.get('field_kind') == 'list' and selected_list.get('element_classes') == [
+                {'name': 'RTPC', 'class_id': classes['RTPC']}], selected_list
+            disclosed = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target,
+                '--field-source', 'documented-lists', '--selection', selected_list['selection']], live=True)
+            receipt['documented_list'] = disclosed['meaning_results'][0]['candidates'][0]
+            assert receipt['documented_list']['evidence']['kind'] == 'documented-list', disclosed
+            initial = snapshot(owner)
+            assert initial['members'] == [], initial
+            parent_after_setup = {'object': exact(parent_before['id']), 'children': children(parent_before['id'])}
+            assert parent_after_setup['object'] == parent_before, parent_after_setup
+            assert {row['id']: row for row in parent_after_setup['children']} == {
+                **{row['id']: row for row in children_before}, owner: exact(owner)}, parent_after_setup
+            setup_phase['independent_effect'] = initial
+            setup_category['status'] = 'PASS'
+            restriction = field_details['Volume']['metadata']['restriction']
+            low, high = restriction.get('min'), restriction.get('max')
+            assert all(type(value) in (int, float) and math.isfinite(value) for value in (low, high)), restriction
+            assert low <= -20 < 0 <= high, restriction
+            draft = _start_business_draft(gateway, 'object.setRTPC')
+            target = _bind_business_object(gateway, draft, object_id=owner)
+            field = selected_field(draft, 'Volume', owner=target)
+            kind = _discover_business_type(gateway, draft, meaning='ModulatorTime', role='object', expected_label='ModulatorTime')
+            duration = selected_field(draft, 'TimeModDuration', kind=kind)
+            stop = selected_field(draft, 'EnvelopeStopPlayback', kind=kind)
+            # A new explicit intent on the documented seconds axis, not a reinterpretation
+            # of the retained native attempt that changed its requested endpoint 1000 to 5.
+            wanted_points = [{'x': 0, 'y': -20, 'shape': 'Linear'}, {'x': 5, 'y': 0, 'shape': 'Linear'}]
+            receipt['time_axis_intent'] = {'unit': 'seconds', 'explicit_duration': 5, 'requested_x': [0, 5],
+                'policy': 'interim_intent_preservation', 'native_domain_complete': False,
+                'prior_1000_to_5_attempt': 'retained_failure_not_reinterpreted'}
+            _update_business_draft(gateway, draft, 'draft-declare-rtpc', ['--object-handle', target,
+                '--field-handle', field, '--new-control-input-kind', kind, '--new-control-input-name', 'TimeMod',
+                '--new-control-input-notes', 'New time control', '--new-control-input-field-value', duration, '5',
+                '--new-control-input-field-value', stop, 'false',
+                *(arg for point in wanted_points for arg in ('--point', str(point['x']), str(point['y']), point['shape']))], live=False)
+            phase, phase_category = complete(draft, 'named_new_time')
+            observed = snapshot(owner)
+            member, = observed['members']
+            assert member['pair'] == ['Volume', member['control_input']['id']], member
+            assert member['curve']['curve_points'] == wanted_points and member['object']['notes'] == '', member
+            assert observed['owner'] == initial['owner'], (initial, observed)
+            identities = [member['object']['id'], member['control_input']['id'], member['curve']['id']]
+            assert len(set(identities)) == 3 and not set(identities).intersection({owner, parent_before['id'],
+                *[row['id'] for row in children_before]}), identities
+            verification, = [event['details']['verification'] for event in phase['final_transaction']['events']
+                if event['event_type'] == 'verification_recorded']
+            bound, = [check['evidence'] for check in verification['assertions']
+                if check.get('kind') == 'verified_owned_control_input_identity' and check.get('passed') is True]
+            sealed = phase['sealed_control_input_occurrence']
+            assert bound.get('result_handle') == sealed['result_handle'] and bound.get('request_path') == sealed['request_path'], 'Journal identity must match the sealed ControlInput occurrence'
+            assert bound['object']['id'] == member['control_input']['id'] and bound['owner_id'] == member['object']['id'], bound
+            phase['parent_before'] = parent_after_setup
+            phase['parent_after'] = {'object': exact(parent_before['id']), 'children': children(parent_before['id'])}
+            assert phase['parent_after'] == phase['parent_before'], phase
+            admit(phase, phase_category, observed)
+            receipt['business_effect_verified'] = receipt['complete'] = True
+            category['status'] = 'PASS'
+            return category
+        active = {token: enabled(token) for token in ('Pitch', 'CenterPercentage') if token in field_details
+            and field_details[token]['metadata'].get('supports', {}).get('rtpc') in {'Additive', 'Multiplicative', 'Exclusive'}}
+        candidates = [token for token in ('Pitch', 'CenterPercentage') if active.get(token)]
+        assert candidates, 'No second legal source-backed RTPC field observed'
+        second = next((token for token in candidates if field_details[token]['metadata']['supports']['rtpc'] == 'Exclusive'), candidates[0])
+        exclusive_selected = field_details[second]['metadata']['supports']['rtpc'] == 'Exclusive'
+        if exclusive_selected:
+            receipt['exclusive'].update(status='active_selected', field=second, platform=platform,
+                reason='Actual initially enabled Exclusive field selected; later scalar state is observation only',
+                metadata=field_details[second]['metadata'])
+        draft = _start_business_draft(gateway, 'object.set')
+        target = _bind_business_object(gateway, draft, object_id=owner)
+        lists = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target,
+            '--field-source', 'documented-lists', '--list'], live=True)['agent_result']
+        selected_list, = [row for row in lists['items'] if row.get('name') == 'RTPC']
+        assert selected_list.get('field_kind') == 'list' and selected_list.get('element_classes') == [
+            {'name': 'RTPC', 'class_id': classes['RTPC']}], selected_list
+        disclosed = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target,
+            '--field-source', 'documented-lists', '--selection', selected_list['selection']], live=True)
+        receipt['documented_list'] = disclosed['meaning_results'][0]['candidates'][0]
+        assert receipt['documented_list']['evidence']['kind'] == 'documented-list', disclosed
+        initial = snapshot(owner)
+        assert initial['members'] == [], initial
+        setup_phase['independent_effect'] = {'owner': initial, 'controls': receipt['controls']}
+        setup_category['status'] = 'PASS'
+        wanted = [{'pair': ['Volume', a], 'points': points('Volume', a, 0.25), 'notes': 'Keep volume-a'},
+            {'pair': [second, a], 'points': points(second, a, 0.25), 'notes': 'Keep second-a'}]
+        for token, control, declaration in [('Volume', a, 'volume-a'), (second, a, 'second-a')]:
+            declare(draft, target, token, control, points(token, control, 0.25), declaration)
+        phase, phase_category = complete(draft, 'two_new_pairs')
+        first = snapshot(owner); check_pairs(first, wanted)
+        assert first['owner'] == initial['owner'], (initial, first)
+        admit(phase, phase_category, first)
+        draft = _start_business_draft(gateway, 'object.set')
+        target = _bind_business_object(gateway, draft, object_id=owner)
+        declare(draft, target, second, a, points(second, a, 0.5), 'second-a')
+        declare(draft, target, 'Volume', b, points('Volume', b, 0.25), 'volume-b')
+        if exclusive_selected:
+            current = gateway.gateway(['status'], live=True)
+            assert current.get('project', {}).get('currentPlatformId') == platform, current
+            # isPropertyEnabled describes the base scalar's dependency state.
+            # Updating this already observed RTPC's Curve is a distinct operation;
+            # its metadata, pair, capacity and execution guards remain Gateway-owned.
+            receipt['exclusive']['base_property_enabled_before_curve_update'] = enabled(
+                second, require_observation=True)
+        phase, phase_category = complete(draft, 'exact_update_and_append')
+        expected_update = first['members'][1]['object']['id']
+        native = phase['compiled_native_request']['args']['objects']
+        assert any(row.get('object') == expected_update and '@Curve' in row for row in native), native
+        wanted[1]['points'] = points(second, a, 0.5)
+        wanted.append({'pair': ['Volume', b], 'points': points('Volume', b, 0.25), 'notes': 'Keep volume-b'})
+        after = snapshot(owner); check_pairs(after, wanted)
+        assert after['owner'] == first['owner'] and after['members'][0] == first['members'][0], (first, after)
+        assert after['members'][1]['object']['id'] == expected_update, after
+        admit(phase, phase_category, after)
+        if exclusive_selected:
+            rejected = _start_business_draft(gateway, 'object.set')
+            target = _bind_business_object(gateway, rejected, object_id=owner)
+            declare(rejected, target, second, b, points(second, b, 0.25), 'exclusive-conflict')
+            code, payload = gateway.raw_gateway(['draft-check', rejected.draft_id, '--task-authority', rejected.task_authority,
+                '--expected-revision', str(rejected.revision)])
+            receipt['exclusive']['rejection'] = {'exit_code': code, 'payload': payload}
+            assert code != 0 and payload.get('error_code') == 'RTPC_EXCLUSIVE_CONFLICT', payload
+            assert snapshot(owner) == after
+            receipt['exclusive']['status'] = 'observed_and_conflict_rejected'
+        else:
+            runtime.category_results.append({'category': 'rtpc-graph-exclusive-cardinality', 'status': 'blocked',
+                'reason': receipt['exclusive']['reason'], 'observation_path': str(output),
+                'verifier_strength': 'unobserved_exclusive_property_no_effect_credit'})
+        nested_name = name + '_Nested'
+        def planned(*, merge, value):
+            draft = _start_business_draft(gateway, 'object.set')
+            parent = _bind_business_object(gateway, draft, path_segments=actor_segments)
+            kind = _discover_business_type(gateway, draft, meaning='Sound', role='object', expected_label='Sound')
+            if merge: _update_business_draft(gateway, draft, 'draft-business-configure', ['--name-conflict', 'merge'], live=False)
+            declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'nested',
+                '--parent-handle', parent, '--name', nested_name, '--kind', kind, '--field', 'notes', 'Keep nested'], live=False)
+            target = declared['draft']['declared_object']['result_handle']
+            declare(draft, target, 'Volume', a, points('Volume', a, value), 'nested-volume', kind=kind)
+            return draft
+        phase, phase_category = complete(planned(merge=False, value=0.25), 'planned_owner')
+        assert phase['compiled_native_request']['args']['onNameConflict'] == 'fail', phase
+        nested_id = by_path((*actor_segments, nested_name))['id']
+        nested = snapshot(nested_id)
+        check_pairs(nested, [{'pair': ['Volume', a], 'points': points('Volume', a, 0.25), 'notes': 'Keep nested-volume'}])
+        admit(phase, phase_category, nested)
+        phase, phase_category = complete(planned(merge=True, value=0.5), 'merged_planned_owner')
+        assert phase['compiled_native_request']['args']['onNameConflict'] == 'merge', phase
+        merged = snapshot(nested_id)
+        check_pairs(merged, [{'pair': ['Volume', a], 'points': points('Volume', a, 0.5), 'notes': 'Keep nested-volume'}])
+        assert merged['owner'] == nested['owner'] and merged['members'][0]['object']['id'] == nested['members'][0]['object']['id'], (nested, merged)
+        assert any(row.get('object') == nested['members'][0]['object']['id'] for row in phase['compiled_native_request']['args']['objects']), phase
+        admit(phase, phase_category, merged)
+        assert snapshot(owner) == after
+        draft = _start_business_draft(gateway, 'object.set')
+        target = _bind_business_object(gateway, draft, object_id=owner)
+        _update_business_draft(gateway, draft, 'draft-business-configure', ['--list-behavior', 'replace-all'], live=False)
+        declare(draft, target, 'Volume', b, points('Volume', b, 0.5), 'replacement')
+        declare(draft, target, second, a, points(second, a, 0.25), 'replacement-second')
+        phase, phase_category = complete(draft, 'replace_all')
+        assert phase['compiled_native_request']['args']['listMode'] == 'replaceAll', phase
+        replaced = snapshot(owner)
+        check_pairs(replaced, [{'pair': ['Volume', b], 'points': points('Volume', b, 0.5), 'notes': 'Keep replacement'},
+            {'pair': [second, a], 'points': points(second, a, 0.25), 'notes': 'Keep replacement-second'}])
+        assert replaced['owner'] == after['owner'] and snapshot(nested_id) == merged, (after, replaced)
+        old_ids = [row['object']['id'] for row in after['members']]
+        assert not set(row['object']['id'] for row in replaced['members']).intersection(old_ids), replaced
+        for identity in old_ids: assert query(['--exact-id', identity], count=0) == []
+        phase['removed_member_ids'] = old_ids
+        admit(phase, phase_category, replaced)
+        receipt['business_effect_verified'] = True
+        receipt['complete'] = True
+        category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        completed_status = category['status']
+        category['status'] = 'FAIL'
+        persist()
+        category['status'] = completed_status
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+@pytest.mark.skipif(os.environ.get('WWISE_VERSION') != '2022.1', reason='First owned-Time witness is pinned to2022.1')
+def test_named_owned_time_control_input_first_2022_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    assert workflow_sandbox_runtime.version == '2022.1', 'This first native witness requires matching2022.1'
+    category = _collect_rtpc_graph_acceptance(workflow_sandbox_runtime,
+        name='WAAPI_OWNED_TIME_' + uuid.uuid4().hex[:12], owned_time_first=True)
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_rtpc_graph_acceptance_across_selected_version(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version == '2021.1':
+        pytest.skip('2021 RTPC construction remains separate; no modern object.set is fabricated')
+    category = _collect_rtpc_graph_acceptance(workflow_sandbox_runtime, name='WAAPI_RTPC_' + uuid.uuid4().hex[:12])
+    assert category['status'] == 'PASS', category
+
+
+def _collect_compound_render_rename_history(gateway, receipt, *, version, owner_id, selected_id,
+        field, renamed, snapshot, metadata_scopes):
+    """One owned compound change and receipt-bound history, using the caller's oracle."""
+    from wwise_waapi.canonical import canonical_sha256
+    assert version in {'2022.1', '2025.1'}, version
+    def call_reference(payload):
+        index = len(receipt['calls']) - 1
+        assert type(index) is int and 0 <= index < len(receipt['calls'])
+        call = receipt['calls'][index]
+        assert call['payload'] == payload, 'Phase reference must retain its exact original call payload'
+        return {'call_index': index, 'call_canonical_sha256': canonical_sha256(call)}
+    def metadata():
+        result = {}
+        for identity, required in metadata_scopes:
+            names, selections, page = [], {}, None
+            for _ in range(4):
+                listed = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                    *(['--page', page] if page else [])], live=True)['agent_result']
+                for item in listed['fields']:
+                    assert item['name'] not in names, listed
+                    names.append(item['name'])
+                    if item['name'] in required: selections[item['name']] = item['selection']
+                if listed.get('complete') is True:
+                    assert len(names) == listed['total_count'] <= 256, listed
+                    break
+                next_page = _required_string(listed, 'next_page'); assert next_page != page, listed
+                page = next_page
+            else: raise AssertionError('Render history metadata exceeds four pages')
+            assert set(selections) == set(required), (required, names)
+            details = {}
+            for name, selection in selections.items():
+                detail = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', selection], live=True)['agent_result']
+                assert detail.get('complete') is True, detail
+                facts = detail.get('metadata', detail.get('entries'))
+                assert isinstance(facts, (dict, list)), detail
+                details[name] = facts
+            result[identity] = {'names': names, 'details': details}
+        return result
+    def observe():
+        return {'state': snapshot(), 'metadata': metadata()}
+    def complete(draft, role):
+        phase = {'phase': role, 'setup_no_credit': False, 'native_outcome': 'not_executed', 'effect_verified': False}
+        receipt['transactions'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        tx = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', tx], live=False)
+        phase.update(transaction_id=tx, artifact_hash=preview['artifact_hash'], preview_call=call_reference(shown),
+            compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
+        if role == 'source':
+            calls = shown['artifact']['prepared_operation']['pre_state']['execution_plan']['calls']
+            assert len(calls) == 2, calls
+            assert [(call['prepared_operation']['dispatch']['uri'], call['args']) for call in calls] == [
+                ('ak.wwise.core.object.setName', {'object': owner_id, 'value': renamed}),
+                ('ak.wwise.core.object.setProperty', {'object': selected_id, 'property': field, 'value': True})], calls
+        else:
+            dispatch = shown['artifact']['prepared_operation']['dispatch']
+            assert dispatch['uri'] == 'ak.wwise.core.undo.' + role and dispatch['args'] == {}, dispatch
+        phase['collector_prestate'] = snapshot()
+        assert phase['collector_prestate'] == receipt['history_before' if role in {'source', 'redo'} else 'history_after']['state'], phase
+        gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code, 'call': call_reference(executed)}
+        assert code == 0 and executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code, 'call': call_reference(verified)}
+        assert code == 0 and verified.get('verified') is True and verified.get('verification', {}).get('business_state_verified') is True, verified
+        if role != 'source': assert verified.get('verification_strength') == 'scoped_history_effect_readback', verified
+        final = gateway.gateway(['transaction-show', tx], live=False)
+        assert final['artifact'] == shown['artifact'], 'History flow changed an immutable Preview'
+        phase['transaction_call'] = call_reference(final)
+        return phase
+    receipt.update(history_complete=False, stack_head_observed=False, outside_scope_preservation_observed=False,
+        history_scope='existing_chain_exact_owner_rename_and_stored_Render_not_rendered_audio')
+    before = receipt['history_before'] = observe()
+    assert before['state']['owner']['id'] == owner_id
+    expected = json.loads(json.dumps(before))
+    old_path = expected['state']['owner']['path']
+    new_path = old_path.rsplit('\\', 1)[0] + '\\' + renamed
+    def project(value):
+        if isinstance(value, dict):
+            result = {key: project(item) for key, item in value.items()}
+            if value.get('id') == owner_id and 'name' in value: result['name'] = renamed
+            if isinstance(value.get('path'), str) and (value['path'] == old_path or value['path'].startswith(old_path + '\\')):
+                result['path'] = new_path + value['path'][len(old_path):]
+            return result
+        return [project(item) for item in value] if isinstance(value, list) else value
+    expected['state'] = project(expected['state'])
+    if version == '2025.1':
+        assert [row['properties']['Render'] for row in before['state']['slots']] == [False, False]
+        for row in expected['state']['slots']: row['properties']['Render'] = True
+    else:
+        assert all(before['state']['owner']['properties'][f'RenderEffect{i}'] is False for i in range(4))
+        for i in range(2): expected['state']['owner']['properties'][f'RenderEffect{i}'] = True
+    parent = _start_business_draft(gateway, 'waapi.undoGroup')
+    children = []
+    for operation in ('object.setName', 'object.setProperty'):
+        started = _update_business_draft(gateway, parent, 'draft-start-undo-child', ['--operation', operation], live=False)
+        row = started['draft']; child = _BusinessDraft(row['draft_id'], started['task_authority'], int(row['revision']))
+        bound = _bind_business_object(gateway, child, object_id=owner_id if operation == 'object.setName' else selected_id)
+        if operation == 'object.setName':
+            _update_business_draft(gateway, child, 'draft-declare-object-change', ['--new-name', renamed], live=False)
+        else:
+            matches, page = [], None
+            for _ in range(4):
+                listed = _update_business_draft(gateway, child, 'draft-discover-fields', ['--object-handle', bound,
+                    '--list', '--page-size', '64', *(['--page', page] if page else [])], live=True)['agent_result']
+                matches.extend(item for item in listed['fields'] if item['name'] == field)
+                if listed.get('complete') is True: break
+                next_page = _required_string(listed, 'next_page'); assert next_page != page, listed
+                page = next_page
+            else: raise AssertionError('Render field discovery exceeds four pages')
+            assert len(matches) == 1, matches
+            chosen = _update_business_draft(gateway, child, 'draft-discover-fields', ['--object-handle', bound, '--selection', matches[0]['selection']], live=True)
+            handle = discovered_business_field_handle(chosen, field)
+            _update_business_draft(gateway, child, 'draft-declare-field-change', ['--object-handle', bound,
+                '--field-handle', handle, '--business-value', 'true'], live=False)
+        _update_business_draft(gateway, child, 'draft-check', live=True); children.append(child)
+    _update_business_draft(gateway, parent, 'draft-declare-undo-plan', ['--display-name', 'Owned Render exact rename',
+        *[arg for child in children for arg in ('--child-draft', child.draft_id, child.task_authority)]], live=False)
+    phase = complete(parent, 'source')
+    source_id = phase['transaction_id']
+    after = receipt['history_after'] = observe(); phase['independent_effect'] = after
+    assert after == expected, (expected, after)
+    phase['effect_verified'] = True
+    for direction in ('undo', 'redo') if version == '2025.1' else ('undo',):
+        draft = _start_business_draft(gateway, 'ak.wwise.core.undo.' + direction)
+        _update_business_draft(gateway, draft, 'draft-declare-core-plan', ['--value', 'history_scope', 'latest_project_history',
+            '--value', 'expectation_receipt', source_id], live=True)
+        phase = complete(draft, direction)
+        observed = receipt['history_' + direction] = observe(); phase['independent_effect'] = observed
+        assert observed == (before if direction == 'undo' else after), observed
+        phase['effect_verified'] = True
+    receipt['history_complete'] = True
+
+
+def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str,
+        render_suffix_diagnostic: bool = False, compound_render_history: bool = False) -> dict[str, Any]:
+    """Three modern new-List effects inside the existing owned workflow lifecycle."""
+    assert not (render_suffix_diagnostic and compound_render_history)
+    output = runtime.state_dir / ('compound-render-history-acceptance.json' if compound_render_history else 'effect-render-suffix-observation.json' if render_suffix_diagnostic else 'anonymous-effect-slot-construction-acceptance.json')
+    category = {'category': 'compound-render-history' if compound_render_history else 'effect-render-suffix-observation' if render_suffix_diagnostic else 'anonymous-effect-slot-construction', 'status': 'FAIL',
+        'verifier_strength': 'gateway_verified_plus_independent_complete_ordered_membership_exact_guid_class_owner_reference_fields_and_preservation',
+        'observation_path': str(output)}
+    if render_suffix_diagnostic:
+        category.update(diagnostic_only=True, business_effect_verified=False,
+            verifier_strength='diagnostic_stored_Render_suffix_and_complete_preservation_observation_no_business_credit')
+    if compound_render_history:
+        category['verifier_strength'] = 'receipt_bound_compound_source_undo_redo_plus_independent_full_chain_target_metadata_preservation'
+    runtime.category_results.append(category)
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
+        'setup_coverage_credit': False, 'business_effect_verified': False,
+        'scope': 'stored_Render_suffix_observation_not_business_acceptance' if render_suffix_diagnostic else 'new_anonymous_EffectSlot_construction_not_existing_member_name_merge',
+        'lifecycle_acceptance': 'existing host-category-evidence/v3 finalizer owns source/cleanup acceptance'}
+    if render_suffix_diagnostic: receipt.update(diagnostic_complete=False, classification='not_observed')
+    if compound_render_history: receipt['scope'] = 'existing_modern_chain_exact_owner_rename_and_receipt_bound_history'
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=None if compound_render_history else 2,
+            separators=(',', ':') if compound_render_history else None).encode('utf-8')
+        assert len(body) <= 8 * 1024 * 1024, 'Anonymous EffectSlot receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        if render_suffix_diagnostic: category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+    class ReceiptGateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 256, 'Anonymous EffectSlot public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}, payload
+                assert payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = ReceiptGateway()
+    projection = ['--include', 'class-id', '--include', 'owner', '--include', 'parent', '--include', 'notes']
+    def query(argv, *, count=None):
+        result = gateway.gateway(['query-object', *argv, *projection], live=True)
+        rows = result.get('objects')
+        assert isinstance(rows, list) and len(rows) <= 8, result
+        assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
+        assert result.get('count') == len(rows) and len({row['id'] for row in rows}) == len(rows), result
+        if count is not None: assert len(rows) == count, result
+        for row in rows:
+            assert uuid.UUID(row['id']).int != 0 and isinstance(row.get('path'), str), row
+        return rows
+    def exact(identity, fields=()):
+        row = query(['--exact-id', identity, *(arg for name in fields for arg in ('--include-field', name))], count=1)[0]
+        assert row['id'] == identity and type(row.get('class_id')) is int, row
+        return row
+    def at(segments):
+        return query([*(arg for segment in segments for arg in ('--path-segment', segment))], count=1)[0]
+    def members(owner):
+        return query(['--advanced-waql', f'from object "{owner}" select @Effects', '--max-results', '8'])
+    def children(owner):
+        return query(['--advanced-waql', f'from object "{owner}" select children', '--max-results', '8'])
+    def guid(value, *, nullable=False):
+        identity = value.get('id') if isinstance(value, Mapping) else value
+        if nullable and (identity is None or (isinstance(identity, str) and uuid.UUID(identity).int == 0)):
+            return None
+        assert isinstance(identity, str) and uuid.UUID(identity).int != 0, value
+        return identity
+    def gain_fields(identity):
+        names, page = [], None
+        for _ in range(4):
+            result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page is not None else [])], live=True)['agent_result']
+            for field in result['fields']:
+                name = field['name']
+                assert isinstance(name, str) and name not in names, result
+                names.append(name)
+            if result['complete'] is True:
+                assert len(names) == result['total_count'] and len(names) <= 8, result
+                return names
+            next_page = _required_string(result, 'next_page')
+            assert next_page != page, result
+            page = next_page
+        raise AssertionError('Gain metadata exceeds four pages')
+    def gain(identity, *, parent=None, owner=None):
+        names = gain_fields(identity)
+        row = exact(identity, names)
+        assert row['type'] == 'Effect' and row['class_id'] == classes['Wwise Gain'], row
+        if parent is not None:
+            assert guid(row.get('parent')) == parent, row
+            if 'owner' in row: assert guid(row['owner'], nullable=True) is None, row
+            else: assert 'owner' in row.get('unavailable_fields', []), row
+        else:
+            assert guid(row.get('owner')) == owner, row
+            assert 'parent' not in row and 'parent' in row.get('unavailable_fields', []), row
+        return row
+    def selected_fields(draft, kind):
+        listed = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--type-handle', kind, '--list'], live=True)['agent_result']
+        selected = {}
+        for name in ('Effect', 'Bypass', 'Render'):
+            rows = [row for row in listed['fields'] if row.get('name') == name]
+            assert len(rows) == 1, (name, listed)
+            result = _update_business_draft(gateway, draft, 'draft-discover-fields',
+                ['--type-handle', kind, '--selection', rows[0]['selection']], live=True)
+            selected[name] = discovered_business_field_handle(result, name)
+        return selected
+    def list_field(draft, owner, *, planned=False):
+        scope = ['--type-handle' if planned else '--object-handle', owner]
+        listed = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            [*scope, '--field-source', 'documented-lists', '--list'], live=True)['agent_result']
+        matches = [row for row in listed['items'] if row['name'] == 'Effects']
+        assert len(matches) == 1, listed
+        result = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            [*scope, '--field-source', 'documented-lists', '--selection', matches[0]['selection']], live=True)
+        return result['meaning_results'][0]['candidates'][0]['handle']
+    def declare_slots(draft, owner, effects, kind, fields, targets):
+        handles = []
+        for index, target in enumerate(targets):
+            values = ['--field-value', fields['Bypass'], 'false' if render_suffix_diagnostic or index == 0 else 'true',
+                '--field-value', fields['Render'], 'false' if compound_render_history else 'true' if render_suffix_diagnostic or index == 0 else 'false']
+            if target is not None: values += ['--field-value', fields['Effect'], target]
+            declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', f'slot{index}',
+                '--parent-handle', owner, '--kind', kind, '--field', 'object_list', effects, *values], live=False)
+            handles.append(_required_string(declared['draft']['declared_object'], 'result_handle'))
+        return handles
+    def complete(draft, label, *, setup=False):
+        phase = {'phase': label, 'setup_no_credit': setup, 'native_outcome': 'not_executed', 'effect_verified': False}
+        receipt['transactions'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'],
+            compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        assert code == 0 and executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('verified') is True and verified.get('state') == 'verified', verified
+        assert verified.get('verification', {}).get('business_state_verified') is True, verified
+        return phase
+    def slot_snapshot(owner, expected_targets, *, old=(), observing_suffix=False, field_names=None):
+        sound = exact(owner)
+        assert sound['type'] == 'Sound' and sound['class_id'] == classes['Sound'], sound
+        listed = members(owner)
+        assert len(listed) == len(old) + len(expected_targets), listed
+        assert [row['id'] for row in listed[:len(old)]] == list(old), listed
+        fresh = listed[len(old):]
+        assert not set(row['id'] for row in fresh).intersection(old), listed
+        slots = []
+        for index, candidate in enumerate(fresh):
+            names = field_names[candidate['id']] if field_names is not None else ('Effect', 'Bypass', 'Render')
+            row = exact(candidate['id'], names)
+            if field_names is not None:
+                observed = set(row.get('properties', {})) | set(row.get('references', {}))
+                assert set(names) <= observed, (names, row)
+            assert row['name'] == '' and row['type'] == 'EffectSlot' and row['class_id'] == classes['EffectSlot'], row
+            assert guid(row.get('owner')) == owner, row
+            assert 'parent' not in row and 'parent' in row.get('unavailable_fields', []), row
+            assert guid(row.get('references', {}).get('Effect')) == expected_targets[index], row
+            assert row.get('properties', {}).get('Bypass') is (index != 0 and not render_suffix_diagnostic), row
+            assert type(row.get('properties', {}).get('Render')) is bool, row
+            if not observing_suffix:
+                assert row['properties']['Render'] is (render_suffix_diagnostic or index == 0), row
+            slots.append(row)
+        return {'owner': sound, 'slots': slots, 'ordered_ids': [row['id'] for row in listed]}
+    def preserved(*, new_child=None):
+        actual = {'folder': exact(folder['id']), 'targets': [gain(row['id'], parent=folder['id']) for row in targets],
+            'owner': exact(sound['id']), 'parents': {key: exact(row['id']) for key, row in parents.items()}}
+        assert actual == preserved_before, (preserved_before, actual)
+        actual_children = children(folder['id'])
+        by_id = {row['id']: row for row in actual_children}
+        assert all(by_id.get(row['id']) == row for row in before_children), (before_children, actual_children)
+        assert set(by_id) - {row['id'] for row in before_children} == ({new_child} if new_child else set()), actual_children
+        return {**actual, 'children': actual_children}
+    def suffix_metadata(identity):
+        names, selected, page = [], [], None
+        for _ in range(4):
+            result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page else [])], live=True)['agent_result']
+            for field in result['fields']:
+                name = field.get('name')
+                assert isinstance(name, str) and name not in names, result
+                names.append(name)
+                selected.append((name, field['selection']))
+            if result.get('complete') is True:
+                assert len(names) == result['total_count'] and len(names) <= 8, result
+                break
+            next_page = _required_string(result, 'next_page'); assert next_page != page, result
+            page = next_page
+        else: raise AssertionError('Suffix metadata exceeds four pages')
+        assert {'Effect', 'Bypass', 'Render'} <= set(names), names
+        details = {}
+        for name, selection in selected:
+            result = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', selection], live=True)['agent_result']
+            assert result.get('complete') is True, result
+            facts = result.get('metadata', result.get('entries'))
+            assert isinstance(facts, (dict, list)), result
+            details[name] = facts
+        return {'names': names, 'details': details}
+    def observe_suffix():
+        assert runtime.version in {'2023.1', '2024.1', '2025.1'}, 'Modern suffix diagnostic excludes legacy EffectN lanes'
+        target_ids = [row['id'] for row in targets]
+        listed = members(sound['id'])
+        assert len(listed) == 2 and len({row['id'] for row in listed}) == 2, listed
+        metadata = {row['id']: suffix_metadata(row['id']) for row in listed}
+        receipt['suffix_metadata_before'] = metadata
+        field_names = {identity: proof['names'] for identity, proof in metadata.items()}
+        before = slot_snapshot(sound['id'], target_ids, field_names=field_names)
+        assert before['ordered_ids'] == [row['id'] for row in listed], (listed, before)
+        receipt['suffix_before'] = before
+        draft = _start_business_draft(gateway, 'object.setProperty')
+        first_id = before['ordered_ids'][0]
+        bound = _bind_business_object(gateway, draft, object_id=first_id)
+        listed = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            ['--object-handle', bound, '--list'], live=True)['agent_result']
+        selected = [row for row in listed['fields'] if row.get('name') == 'Render']
+        assert len(selected) == 1, listed
+        field = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            ['--object-handle', bound, '--selection', selected[0]['selection']], live=True)
+        receipt['clear_selected_field'] = field
+        handle = discovered_business_field_handle(field, 'Render')
+        _update_business_draft(gateway, draft, 'draft-declare-field-change',
+            ['--object-handle', bound, '--field-handle', handle, '--business-value', 'false'], live=False)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        phase = {'phase': 'observe_clear_first_Render_once', 'diagnostic_only': True,
+            'transaction_id': identity, 'artifact_hash': preview['artifact_hash'],
+            'compiled_native_request': shown['artifact']['prepared_operation']['dispatch'],
+            'native_outcome': 'not_executed', 'effect_verified': False}
+        receipt['transactions'].append(phase)
+        assert phase['compiled_native_request']['uri'] == 'ak.wwise.core.object.setProperty'
+        assert phase['compiled_native_request']['args'] == {'object': first_id, 'property': 'Render', 'value': False}
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        if code != 0 or executed.get('ok') is not True:
+            phase['native_outcome'] = 'rejected' if executed.get('state') == 'execution_failed' else 'indeterminate'
+            phase['original_durable_state'] = executed.get('state')
+            native = executed.get('dispatch_result', {})
+            explicit_error_response = (isinstance(native, Mapping) and native.get('api') == 'ak.wwise.core.object.setProperty'
+                and native.get('version') == runtime.version and native.get('ok') is False
+                and native.get('waapi_error_uri') == 'ak.wwise.invalid_arguments')
+            # An explicit native error response is an observed fact even though
+            # e2 conservatively journals a failed named write as indeterminate.
+            # Neither classification establishes a no-mutation/effect outcome.
+            phase['native_response_class'] = 'explicit_invalid_arguments' if explicit_error_response else 'unresolved_failure'
+            receipt['classification'] = 'native_error_response' if explicit_error_response else 'indeterminate'
+            receipt['diagnostic_complete'] = explicit_error_response
+            phase['effects_unknown'] = receipt['effects_unknown'] = True
+            phase['native_error_code'] = native.get('waapi_error_uri', native.get('error_code'))
+            category.update(status='blocked' if receipt['diagnostic_complete'] else 'FAIL',
+                classification=receipt['classification'], diagnostic_complete=receipt['diagnostic_complete'],
+                reason='Original execution failure retained; no verify, read-after or retry; no business credit')
+            return category
+        assert executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('state') == 'verified' and verified.get('verified') is True, verified
+        # The e2 single-field verifier says nothing about the later flag. Its
+        # original result is retained, while this independent oracle checks it.
+        after = slot_snapshot(sound['id'], target_ids, observing_suffix=True, field_names=field_names)
+        receipt['suffix_after'] = after
+        assert after['ordered_ids'] == before['ordered_ids'] and after['owner'] == before['owner'], (before, after)
+        assert after['slots'][0]['properties']['Render'] is False, after
+        for old, actual in zip(before['slots'], after['slots'], strict=True):
+            expected = json.loads(json.dumps(old))
+            expected['properties']['Render'] = actual['properties']['Render']
+            assert actual == expected, (old, actual)  # only the two Render booleans may differ
+        actual_metadata = {row['id']: suffix_metadata(row['id']) for row in after['slots']}
+        receipt['suffix_metadata_after'] = actual_metadata
+        assert actual_metadata == metadata, (metadata, actual_metadata)
+        receipt['preserved_after'] = preserved()
+        receipt['classification'] = 'retained' if after['slots'][1]['properties']['Render'] else 'cleared'
+        receipt['diagnostic_complete'] = True
+        category.update(status='blocked', diagnostic_complete=True, classification=receipt['classification'],
+            reason='Complete stored suffix diagnostic only; test PASS grants no business/route/native-absence credit')
+        return category
+    try:
+        assert runtime.version in {'2023.1', '2024.1', '2025.1'}, 'Anonymous modern List witness gives no2021/22 credit'
+        gateway.gateway(['query-schema', '--advanced'], live=False)
+        result = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'Folder', '--meaning', 'WorkUnit',
+            '--meaning', 'EffectSlot', '--meaning', 'Wwise Gain', '--page-size', '64'], live=True)['agent_result']
+        assert result.get('complete') is True, result
+        classes = {}
+        for name in ('Sound', 'Folder', 'WorkUnit', 'EffectSlot', 'Wwise Gain'):
+            matches = [row for row in result['types'] if row.get('name') == name]
+            assert len(matches) == 1 and type(matches[0].get('classId')) is int, (name, result)
+            classes[name] = matches[0]['classId']
+        receipt['live_classes'] = classes
+        sound_segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        effect_segments = ('Effects', 'Default Work Unit')
+        parents = {'effects': at(effect_segments), 'sound': at(sound_segments)}
+        assert all(row['type'] == 'WorkUnit' and row['class_id'] == classes['WorkUnit'] for row in parents.values()), parents
+        # Already-supported multi-root graph; Folder and Sound are independent
+        # setup only, and each actual identity/class/parent is reread below.
+        draft = _start_business_draft(gateway, 'object.set')
+        for label, segments, name, kind_name in [('folder', effect_segments, prefix + '_Folder', 'Folder'),
+                ('sound', sound_segments, prefix + '_Sound', 'Sound')]:
+            parent = _bind_business_object(gateway, draft, path_segments=segments)
+            kind = _discover_business_type(gateway, draft, meaning=kind_name, role='object', expected_label=kind_name)
+            _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', label, '--parent-handle', parent,
+                '--name', name, '--kind', kind, '--field', 'notes', 'Keep ' + label], live=False)
+        complete(draft, 'setup_folder_and_sound_no_credit', setup=True)
+        folder = at((*effect_segments, prefix + '_Folder')); sound = at((*sound_segments, prefix + '_Sound'))
+        folder = exact(folder['id']); sound = exact(sound['id'])
+        assert folder['type'] == 'Folder' and folder['class_id'] == classes['Folder'] and guid(folder.get('parent')) == parents['effects']['id'], folder
+        assert sound['type'] == 'Sound' and sound['class_id'] == classes['Sound'] and guid(sound.get('parent')) == parents['sound']['id'], sound
+        assert members(sound['id']) == []
+        targets = []
+        for index in range(2):
+            draft = _start_business_draft(gateway, 'object.createPlugin')
+            parent = _bind_business_object(gateway, draft, object_id=folder['id'])
+            plugin = _discover_business_type(gateway, draft, meaning='Wwise Gain', role='effect', expected_label='Wwise Gain')
+            _update_business_draft(gateway, draft, 'draft-declare-existing', ['--declaration-id', 'gain', '--object-handle', parent,
+                '--field', 'plugin_role', 'effect', '--field', 'plugin_placement', 'shareset', '--field', 'plugin_name', prefix + f'_Gain{index}',
+                '--field', 'plugin_type_handle', plugin, '--field', 'notes', 'Keep target' + str(index)], live=False)
+            complete(draft, f'setup_shareset_{index}_no_credit', setup=True)
+            target = at((*effect_segments, prefix + '_Folder', prefix + f'_Gain{index}'))
+            targets.append(gain(target['id'], parent=folder['id']))
+        preserved_before = {'folder': folder, 'targets': targets, 'owner': sound, 'parents': parents}
+        before_children = children(folder['id'])
+        assert {row['id'] for row in before_children} == {row['id'] for row in targets}, before_children
+        receipt['baseline'] = {**preserved_before, 'children': before_children}
+        previous = []
+        for mode, target_order in [('append', targets), ('replace-all', list(reversed(targets)))]:
+            draft = _start_business_draft(gateway, 'object.set')
+            owner = _bind_business_object(gateway, draft, object_id=sound['id'])
+            kind = _discover_business_type(gateway, draft, meaning='EffectSlot', role='object', expected_label='EffectSlot')
+            fields = selected_fields(draft, kind); effects = list_field(draft, owner)
+            handles = [_bind_business_object(gateway, draft, object_id=row['id']) for row in target_order]
+            declare_slots(draft, owner, effects, kind, fields, handles)
+            if mode == 'replace-all': _update_business_draft(gateway, draft, 'draft-business-configure', ['--list-behavior', mode], live=False)
+            phase = complete(draft, 'setup_rendered_chain_no_credit' if render_suffix_diagnostic else 'append_existing_sharesets' if mode == 'append' else 'replace_all_population',
+                setup=render_suffix_diagnostic or compound_render_history)
+            if render_suffix_diagnostic:
+                return observe_suffix()
+            if compound_render_history:
+                assert runtime.version == '2025.1', runtime.version
+                ordered_ids = [row['id'] for row in members(sound['id'])]
+                assert len(ordered_ids) == 2, ordered_ids
+                target_fields = {row['id']: gain_fields(row['id']) for row in targets}
+                def history_snapshot():
+                    return {**slot_snapshot(sound['id'], [row['id'] for row in targets], observing_suffix=True),
+                        'targets': [exact(row['id'], target_fields[row['id']]) for row in targets],
+                        'folder': exact(folder['id']), 'parents': {key: exact(row['id']) for key, row in parents.items()}}
+                _collect_compound_render_rename_history(gateway, receipt, version=runtime.version, owner_id=sound['id'],
+                    selected_id=ordered_ids[1], field='Render', renamed=prefix + '_Renamed', snapshot=history_snapshot,
+                    metadata_scopes=[*[(identity, ('Effect', 'Bypass', 'Render')) for identity in ordered_ids],
+                        *[(row['id'], target_fields[row['id']]) for row in targets]])
+                receipt['business_effect_verified'] = True; category['status'] = 'PASS'
+                return category
+            observed = slot_snapshot(sound['id'], [row['id'] for row in target_order])
+            assert observed['owner'] == sound, (sound, observed)
+            assert not set(observed['ordered_ids']).intersection(previous), observed
+            for removed in previous: assert query(['--exact-id', removed], count=0) == []
+            phase['independent_effect'] = {'members': observed, 'preserved': preserved()}
+            phase['effect_verified'] = True
+            previous = observed['ordered_ids']
+            last_snapshot = observed
+        draft = _start_business_draft(gateway, 'object.set')
+        folder_handle = _bind_business_object(gateway, draft, object_id=folder['id'])
+        plugin = _discover_business_type(gateway, draft, meaning='Wwise Gain', role='effect', expected_label='Wwise Gain')
+        declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'new-share', '--parent-handle', folder_handle,
+            '--name', prefix + '_NewShare', '--kind', plugin, '--field', 'plugin_placement', 'shareset', '--field', 'notes', 'Keep new ShareSet'], live=False)
+        shared = _required_string(declared['draft']['declared_object'], 'result_handle')
+        parent = _bind_business_object(gateway, draft, path_segments=sound_segments)
+        sound_kind = _discover_business_type(gateway, draft, meaning='Sound', role='object', expected_label='Sound')
+        declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'new-sound', '--parent-handle', parent,
+            '--name', prefix + '_PlannedSound', '--kind', sound_kind, '--field', 'notes', 'Keep planned Sound'], live=False)
+        planned_owner = _required_string(declared['draft']['declared_object'], 'result_handle')
+        kind = _discover_business_type(gateway, draft, meaning='EffectSlot', role='object', expected_label='EffectSlot')
+        handles = declare_slots(draft, planned_owner, list_field(draft, sound_kind, planned=True), kind,
+            selected_fields(draft, kind), [shared, None])
+        _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'local', '--parent-handle', handles[1],
+            '--name', prefix + '_LocalGain', '--kind', plugin, '--field', 'plugin_placement', 'owner', '--field', 'notes', 'Keep local Effect'], live=False)
+        phase = complete(draft, 'planned_owner_shareset_and_inline_effect')
+        planned = at((*sound_segments, prefix + '_PlannedSound'))
+        new_share = gain(at((*effect_segments, prefix + '_Folder', prefix + '_NewShare'))['id'], parent=folder['id'])
+        listed = members(planned['id']); assert len(listed) == 2, listed
+        # Slot GUIDs come only from ordered membership; the owning relationship
+        # independently identifies the inline Effect, never matching postvalues.
+        local_slot = exact(listed[1]['id'], ('Effect',))
+        local = gain(guid(local_slot.get('references', {}).get('Effect')), owner=local_slot['id'])
+        observed = slot_snapshot(planned['id'], [new_share['id'], local['id']])
+        assert observed['owner']['name'] == prefix + '_PlannedSound' and observed['owner']['notes'] == 'Keep planned Sound', observed
+        assert guid(observed['owner'].get('parent')) == parents['sound']['id'], observed
+        assert new_share['notes'] == 'Keep new ShareSet' and local['notes'] == 'Keep local Effect', (new_share, local)
+        assert len({row['id'] for row in [planned, new_share, local, *observed['slots']]}) == 5, observed
+        retained = slot_snapshot(sound['id'], [row['id'] for row in reversed(targets)])
+        assert retained == last_snapshot, (last_snapshot, retained)
+        phase['independent_effect'] = {'members': observed, 'new_share': new_share, 'local_effect': local,
+            'preserved': preserved(new_child=new_share['id']), 'retained_previous_owner': retained}
+        phase['effect_verified'] = True
+        receipt['business_effect_verified'] = True; category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_anonymous_effect_slot_construction_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version not in {'2023.1', '2024.1', '2025.1'}:
+        pytest.skip('Modern anonymous Effects List constructor witness excludes legacy EffectN lanes')
+    category = _collect_anonymous_effect_slot_construction_acceptance(workflow_sandbox_runtime,
+        prefix='WAAPI_ANON_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
+def _collect_voice_creation_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    """Empty Voice identity effects in the existing owned host lifecycle."""
+    output = runtime.state_dir / 'voice-creation-acceptance.json'
+    category = {'category': 'sound-voice-creation', 'status': 'FAIL',
+        'verifier_strength': 'gateway_verified_plus_independent_exact_guid_class_parent_name_notes_volume_and_actual_boolean_voice',
+        'observation_path': str(output)}
+    runtime.category_results.append(category)
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
+        'business_effect_verified': False, 'scope': 'empty_Voice_containers_no_localized_media_or_Source_effect_claim',
+        'applicable_effects': ['ordinary_root_voice', 'ordinary_nested_voice',
+            *(['graph_empty_voice'] if runtime.version != '2021.1' else [])],
+        'lifecycle_acceptance': 'Requires final host-category-evidence/v3 source-integrity and cleanup acceptance'}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 4 * 1024 * 1024, 'Voice receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+    class ReceiptGateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 96, 'Voice public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}, payload
+                assert payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = ReceiptGateway()
+    projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
+    def one(argv):
+        payload = gateway.gateway(['query-object', *argv, *projection], live=True)
+        rows = payload.get('objects')
+        assert payload.get('count') == 1 and isinstance(rows, list) and len(rows) == 1, payload
+        assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', payload
+        row = rows[0]
+        assert uuid.UUID(_required_string(row, 'id')).int != 0 and type(row.get('class_id')) is int, row
+        return row
+    def exact(identity, *, voice=False):
+        row = one(['--exact-id', identity, *(['--include-field', 'IsVoice', '--include-field', 'Volume'] if voice else [])])
+        assert row['id'] == identity, row
+        return row
+    def at(segments, *, voice=False):
+        found = one([*(arg for segment in segments for arg in ('--path-segment', segment))])
+        row = exact(found['id'], voice=voice)
+        assert all(row.get(key) == found.get(key) for key in ('id', 'name', 'type', 'path')), (found, row)
+        return row
+    def parent_id(row):
+        reference = row.get('parent')
+        assert isinstance(reference, Mapping) and uuid.UUID(_required_string(reference, 'id')).int != 0, row
+        return reference['id']
+    def complete(draft, phase):
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'],
+            compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        assert code == 0 and executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('state') == 'verified' and verified.get('verified') is True, verified
+        assert verified.get('verification', {}).get('business_state_verified') is True, verified
+    try:
+        container_type = 'PropertyContainer' if runtime.version == '2025.1' else 'ActorMixer'
+        disclosed = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', container_type,
+            '--meaning', 'WorkUnit', '--page-size', '64'], live=True)['agent_result']
+        assert disclosed.get('complete') is True, disclosed
+        classes = {}
+        for name in ('Sound', container_type, 'WorkUnit'):
+            matches = [row for row in disclosed['types'] if row.get('name') == name and row.get('type') == 'WObject']
+            assert len(matches) == 1 and type(matches[0].get('classId')) is int, (name, disclosed)
+            classes[name] = matches[0]['classId']
+        assert classes['Sound'] == 65552, classes  # All five pinned Sound class pages.
+        receipt['live_classes'] = classes
+        segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        parent = at(segments)
+        assert parent['type'] == 'WorkUnit' and parent['class_id'] == classes['WorkUnit'], parent
+        receipt['parent_before'] = parent
+        observed_ids = set()
+        for index, label in enumerate(receipt['applicable_effects']):
+            nested = label == 'ordinary_nested_voice'
+            operation = 'object.set' if label == 'graph_empty_voice' else 'object.create'
+            name = 'NestedVoice' if nested else prefix + ('_GraphVoice' if operation == 'object.set' else '_RootVoice')
+            volume, notes = -6 - index, 'Keep ' + label
+            expected = {'name': name, 'volume': volume, 'notes': notes, 'parent_id': parent['id']}
+            phase = {'phase': label, 'operation': operation, 'expected': expected,
+                'native_outcome': 'not_executed', 'effect_verified': False}
+            receipt['transactions'].append(phase)
+            draft = _start_business_draft(gateway, operation)
+            handle = _bind_business_object(gateway, draft, object_id=parent['id'])
+            voice_segments = segments
+            if nested:
+                declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'container',
+                    '--parent-handle', handle, '--kind', 'actor-mixer', '--name', prefix + '_Container',
+                    '--field', 'notes', 'Keep Voice container'], live=False)
+                handle = declared_business_object_handle(declared, 'container')
+                voice_segments = (*segments, prefix + '_Container')
+            _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'voice', '--parent-handle', handle,
+                '--kind', 'sound-voice', '--name', name, '--field', 'notes', notes, '--field', 'volume_db', str(volume)], live=False)
+            complete(draft, phase)
+            if nested:
+                container = at(voice_segments)
+                phase['independent_container'] = container
+                assert container['type'] == container_type and container['class_id'] == classes[container_type], container
+                assert parent_id(container) == parent['id'] and container['notes'] == 'Keep Voice container', container
+                assert container['id'] not in observed_ids and container['id'] != parent['id'], container
+                observed_ids.add(container['id']); expected['parent_id'] = container['id']
+            voice = at((*voice_segments, name), voice=True)
+            phase['independent_voice'] = voice
+            assert voice['type'] == 'Sound' and voice['class_id'] == classes['Sound'], voice
+            assert voice['id'] not in observed_ids and voice['id'] != parent['id'], voice
+            assert parent_id(voice) == expected['parent_id'] and voice['name'] == name and voice['notes'] == notes, voice
+            assert voice.get('properties', {}).get('IsVoice') is True, voice
+            actual_volume = voice.get('properties', {}).get('Volume')
+            assert type(actual_volume) in (int, float) and actual_volume == volume, voice
+            observed_ids.add(voice['id'])
+            assert exact(parent['id']) == parent, parent
+            phase['effect_verified'] = True
+        receipt['business_effect_verified'] = True; category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_sound_voice_creation_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    category = _collect_voice_creation_acceptance(workflow_sandbox_runtime, prefix='WAAPI_VOICE_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
+
+def _collect_ordinary_existing_source_case(runtime, gateway, receipt, *, prefix, parent, complete, persist):
+    """One ordinary Source append, using the shared Source collector and lifecycle."""
+    from wwise_waapi.builders.query import MAX_STRUCTURED_RETURN_FIELDS
+    types = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'AudioFileSource',
+        '--meaning', 'Wwise Tone Generator', '--page-size', '64'], live=True)['agent_result']
+    assert types.get('complete') is True, types
+    classes = {}
+    for name, category in [('Sound', 'WObject'), ('AudioFileSource', 'WObject'), ('Wwise Tone Generator', 'Source')]:
+        selected, = [row for row in types['types'] if row.get('name') == name and row.get('type') == category]
+        assert type(selected.get('classId')) is int, selected
+        classes[name] = selected['classId']
+    receipt['live_classes'] = classes
+    base = ['--include', 'class-id', '--include', 'parent', '--include', 'owner', '--include', 'notes']
+    def rows(argv, *, fields=(), source=False, file=False):
+        payload = gateway.gateway(['query-object', *argv, *base,
+            *(['--include', 'source-language'] if source else []),
+            *(['--include', 'original-file-path'] if file else []),
+            *(arg for field in fields for arg in ('--include-field', field)), '--max-results', '8'], live=True)
+        assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', payload
+        values = payload['objects']; assert isinstance(values, list) and payload['count'] == len(values) < 8, payload
+        assert len({uuid.UUID(row['id']) for row in values}) == len(values), values
+        return values
+    def exact(identity, **view):
+        row, = rows(['--exact-id', identity], **view)
+        assert uuid.UUID(row['id']) == uuid.UUID(identity), row
+        return deepcopy(row)
+    def children(identity):
+        return sorted(rows(['--exact-id', identity, '--relationship', 'children']), key=lambda row: uuid.UUID(row['id']))
+    parent_before = exact(parent['id'])
+    assert all((key in parent_before) == (key in parent) and parent_before.get(key) == parent.get(key)
+        for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'notes')), (parent_before, parent)
+    receipt['parent_before'] = parent_before
+    def metadata(identity):
+        names, fields, page = [], [], None
+        while True:  # The shared public-call/byte limits bound all pages.
+            listed = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page else [])], live=True)['agent_result']
+            for field in listed['fields']:
+                assert isinstance(field.get('name'), str) and field['name'] not in names, listed
+                names.append(field['name'])
+                # Expiring selection authority is retained in full calls, but
+                # is not a property fact that must equal a later observation.
+                fields.append({key: value for key, value in field.items() if key != 'selection'})
+            if listed.get('complete') is True:
+                assert listed['total_count'] == len(names), listed
+                return names, fields
+            next_page = _required_string(listed, 'next_page'); assert next_page != page, listed
+            page = next_page
+    def snapshot(owner_id):
+        owner = exact(owner_id, fields=['IsVoice'])
+        assert owner['type'] == 'Sound' and owner['class_id'] == classes['Sound'], owner
+        assert type(owner['properties']['IsVoice']) is bool and owner['properties']['IsVoice'] is False, owner
+        result = {'owner': owner, 'children': children(owner_id), 'sources': [], 'metadata': {}}
+        for child in result['children']:
+            file = child['type'] == 'AudioFileSource'
+            assert child['class_id'] == classes['AudioFileSource' if file else 'Wwise Tone Generator'], child
+            assert file or child['type'] in {'Source', 'SourcePlugin'}, child
+            assert child['parent']['id'] == owner_id, child
+            names, details = metadata(child['id']); result['metadata'][child['id']] = details
+            # Query includes 4 mandatory and 4 identity fields, Source locale,
+            # and optionally the original file path; repeat that exact frame.
+            # Existing business field discovery admits eight meanings per call.
+            width = min(8, MAX_STRUCTURED_RETURN_FIELDS - 8 - 1 - int(file))
+            row = exact(child['id'], source=True, file=file, fields=names[:width])
+            for start in range(width, len(names), width):
+                page = exact(child['id'], source=True, file=file, fields=names[start:start + width])
+                assert {key: value for key, value in page.items() if key not in {'properties', 'references', 'unavailable_fields'}} == {
+                    key: value for key, value in row.items() if key not in {'properties', 'references', 'unavailable_fields'}}, (row, page)
+                for key in ('properties', 'references'):
+                    if key in page: row.setdefault(key, {}).update(page[key])
+                if 'unavailable_fields' in page:
+                    row['unavailable_fields'] = sorted(set(row.get('unavailable_fields', [])) | set(page['unavailable_fields']))
+            assert all((key in child) == (key in row) and child.get(key) == row.get(key)
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes')), (child, row)
+            result['sources'].append(row)
+        return result
+    def phase(label):
+        result = {'case': label, 'setup_no_credit': label.startswith('setup-'), 'execution_attempted': False, 'effect_verified': False}
+        receipt['phases'].append(result); persist()
+        return result
+    def tone_fields(draft):
+        kind = _discover_business_type(gateway, draft, meaning='Wwise Tone Generator', role='source', expected_label='Wwise Tone Generator')
+        found = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--type-handle', kind, '--meaning', 'Start Frequency'], live=True)
+        field, = [candidate for meaning in found['meaning_results'] for candidate in meaning['candidates']
+            if candidate.get('metadata', {}).get('name') == 'StartFreq' and candidate.get('field_kind') == 'property'
+            and candidate.get('value_type') == 'number' and candidate['metadata'].get('type') == 'Real32'
+            and candidate['metadata'].get('display', {}).get('name') == 'Start Frequency']
+        return kind, field
+    name = prefix + '_Sound'
+    setup = phase('setup-import')
+    audio = _write_fixture_wav(runtime.sandbox.sandbox_path / (prefix + '_Audio'), 'Retained recording')
+    receipt['fixture_input'] = {'path': str(audio), 'bytes': audio.stat().st_size, 'sha256': hashlib.sha256(audio.read_bytes()).hexdigest()}
+    draft = _start_business_draft(gateway, 'audio.import')
+    bound = _bind_business_object(gateway, draft, object_id=parent['id'])
+    _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'sound', '--parent-handle', bound,
+        '--name', name, '--kind', 'sound-sfx', '--field', 'media_file', str(audio), '--field', 'language', 'SFX',
+        '--field', 'notes', 'Keep existing Sound'], live=False)
+    complete(draft, setup, lambda prepared: None)
+    owner, = rows([arg for segment in (*('Containers', 'Default Work Unit'), name) for arg in ('--path-segment', segment)], fields=['IsVoice'])
+    assert owner['type'] == 'Sound' and owner['class_id'] == classes['Sound'] and owner['parent']['id'] == parent['id'], owner
+    assert owner['notes'] == 'Keep existing Sound' and type(owner['properties']['IsVoice']) is bool and owner['properties']['IsVoice'] is False, owner
+    file, = children(owner['id']); assert file['type'] == 'AudioFileSource' and file['class_id'] == classes['AudioFileSource'], file
+    setup['effect_verified'] = True
+    setup = phase('setup-retained-tone')
+    draft = _start_business_draft(gateway, 'object.createPlugin')
+    bound = _bind_business_object(gateway, draft, object_id=owner['id'])
+    kind, field = tone_fields(draft)
+    _update_business_draft(gateway, draft, 'draft-declare-existing', ['--declaration-id', 'retained', '--object-handle', bound,
+        '--field', 'plugin_role', 'source', '--field', 'plugin_type_handle', kind, '--field', 'plugin_name', 'Retained Tone',
+        '--field', 'plugin_placement', 'owner', '--field', 'notes', 'Keep retained Tone', '--field-value', field['handle'], '660'], live=False)
+    complete(draft, setup, lambda prepared: None)
+    before = receipt['before'] = snapshot(owner['id'])
+    assert len(before['sources']) == 2 and before['owner'] == owner, before
+    retained, = [row for row in before['sources'] if row['id'] != file['id']]
+    assert retained['name'] == 'Retained Tone' and retained['notes'] == 'Keep retained Tone' and retained['properties']['StartFreq'] == 660, retained
+    setup['effect_verified'] = True
+    target = phase('ordinary-existing-source')
+    draft = _start_business_draft(gateway, 'object.set')
+    bound = _bind_business_object(gateway, draft, object_id=owner['id'])
+    kind, field = tone_fields(draft)
+    _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'new-source', '--parent-handle', bound,
+        '--name', 'New Tone', '--kind', kind, '--field', 'plugin_placement', 'owner', '--field', 'notes', 'New ordinary Tone',
+        '--field-value', field['handle'], '440'], live=False)
+    def inspect(prepared):
+        native, = prepared['dispatch']['args']['objects']; source, = native['children']
+        assert native == {'object': owner['id'], 'children': [source]}, native
+        assert source == {'type': 'Source', 'classId': classes['Wwise Tone Generator'], 'name': 'New Tone',
+            'notes': 'New ordinary Tone', '@StartFreq': 440}, source
+        assert prepared['dispatch']['args']['onNameConflict'] == 'fail'
+    complete(draft, target, inspect)
+    after = receipt['after'] = snapshot(owner['id'])
+    assert after['owner'] == before['owner'], 'Ordinary Source append changed the existing owner'
+    assert len(after['sources']) == 3, after
+    for source in before['sources']:
+        assert source == next(row for row in after['sources'] if row['id'] == source['id']), 'Ordinary append changed a retained Source'
+        assert before['metadata'][source['id']] == after['metadata'][source['id']], 'Ordinary append changed retained Source metadata'
+    for child in before['children']:
+        assert child in after['children'], 'Ordinary append changed the retained complete childset'
+    new, = [row for row in after['sources'] if row['id'] not in {source['id'] for source in before['sources']}]
+    receipt['new_source'] = new
+    assert new['id'] not in {owner['id'], parent['id']} and new['name'] == 'New Tone' and new['notes'] == 'New ordinary Tone', new
+    assert new['class_id'] == classes['Wwise Tone Generator'] and new['parent']['id'] == owner['id'] and new['path'] == owner['path'] + '\\New Tone', new
+    assert new['properties']['StartFreq'] == 440, new
+    assert exact(parent['id']) == parent_before, 'Ordinary Source work changed the parent'
+    target['effect_verified'] = True
+
+
+def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *, prefix: str,
+        staged_voice_source_language: bool = False, gateway_staged_completion: bool = False,
+        ordinary_existing_source: bool = False) -> dict[str, Any]:
+    """Explicit atomic, staged, or ordinary existing-owner Source collection."""
+    from wwise_waapi.native_catalog import load_native_catalog
+    assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}
+    assert sum((staged_voice_source_language, gateway_staged_completion, ordinary_existing_source)) <= 1, 'Source modes are explicit and exclusive'
+    if ordinary_existing_source: assert runtime.version == '2025.1', 'Ordinary existing Source acceptance is explicitly2025-only'
+    if gateway_staged_completion:
+        assert runtime.version == '2025.1', 'Initial Gateway staged acceptance is Console2025-only'
+    catalog = load_native_catalog(runtime.version, 'wwise-console')
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
+    output = runtime.state_dir / ('ordinary-existing-source-acceptance.json' if ordinary_existing_source else 'gateway-staged-voice-source.json' if gateway_staged_completion else
+        'staged-voice-source-language.json' if staged_voice_source_language else 'planned-source-characterization.json')
+    assert not output.exists(), 'Never overwrite original Source evidence'
+    output.parent.mkdir(parents=True, exist_ok=True)
+    artifacts = runtime.state_dir / ('ordinary-existing-source-artifacts' if ordinary_existing_source else 'gateway-staged-voice-source-artifacts' if gateway_staged_completion else
+        'staged-voice-source-artifacts' if staged_voice_source_language else 'planned-source-artifacts'); artifacts.mkdir(exist_ok=False)
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
+    previous_native = set(native_root.glob('*.json'))
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH'])
+    config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+    transactions: list[str] = []
+    category = {'category': 'planned-source-construction', 'status': 'FAIL', 'transaction_ids': transactions,
+        'observation_path': str(output), 'scope': 'three_exact_creation_cases_on_matching_Console_version',
+        'verifier_strength': 'Gateway_verification_plus_exact_GUID_class_parent_fields_language_childset_and_retained_state'}
+    if staged_voice_source_language:
+        category.update(category='staged-voice-source-language', scope='staged_existing_Voice_Source_language',
+            diagnostic_only=True, atomic_Source_language_unresolved=True)
+    if gateway_staged_completion:
+        category.update(category='gateway-staged-voice-localized-source',
+            scope='one_Gateway_combined_Draft_completed_by_two_set_Previews', atomic_Source_language_unresolved=True)
+    if ordinary_existing_source:
+        category.update(category='ordinary-existing-source', scope='one_2025_ordinary_object_set_Source_append_with_retained_file_and_plugin_Source')
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {'contract': 'waapi-skill.planned-source-characterization/v1',
+        'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'phases': [], 'native_evidence': [],
+        'collection_complete': False, 'business_effect_verified': False, 'config_sha256': config_hash,
+        'native_catalog': {'build': catalog['provenance']['build'], 'content_sha256': catalog['content_sha256']},
+        'source_project': str(runtime.sandbox.source_project), 'endpoint': endpoint,
+        'lifecycle_final_reference': {'contract': 'waapi-skill.host-category-evidence/v3', 'phase': 'final',
+            'candidate': runtime.candidate, 'category': category['category'], 'transaction_ids': transactions,
+            'path': runtime.env.get('WWISE_CATEGORY_EVIDENCE_PATH') or runtime.env.get('WWISE_MACOS_CATEGORY_EVIDENCE_PATH'),
+            'cleanup_status': 'unresolved_until_final_row'},
+        'lifecycle_acceptance': 'Requires exact final category row source hash/mtime/tree and owned-process/sandbox cleanup; body completion alone is not final acceptance.',
+        'scope_exclusions': ['other_versions', '2021_alternative', 'Source_language_inheritance', 'activeSource_switch', 'Tone_audio_effect'],
+        'limits': {'calls': 74, 'receipt_bytes': 8 * 1024 * 1024, 'reply_bytes': 1024 * 1024,
+            'native_files': 1024, 'native_bytes': 128 * 1024 * 1024}}
+    if staged_voice_source_language:
+        receipt.update(scope=category['scope'], diagnostic_only=True, atomic_Source_language_unresolved=True)
+        receipt['scope_exclusions'].append('atomic_Voice_Source_language')
+    if gateway_staged_completion:
+        receipt.update(scope=category['scope'], atomic_Source_language_unresolved=True, planned_public_calls=34)
+        receipt['scope_exclusions'].append('atomic_Voice_Source_language')
+    if ordinary_existing_source:
+        receipt.update(scope=category['scope'], setup_coverage_credit=False)
+        receipt['scope_exclusions'] += ['other_Source_classes', 'nonfail_collision_modes', 'staged_origin', 'media_content_or_existence_claim']
+    attempted: set[str] = set()
+    def persist():
+        raw = json.dumps(receipt, ensure_ascii=False, indent=None if ordinary_existing_source else 2,
+            separators=(',', ':') if ordinary_existing_source else None).encode('utf-8')
+        assert len(raw) <= receipt['limits']['receipt_bytes'], 'Source receipt exceeds bound'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+    class Gateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < receipt['limits']['calls'], 'Source public call bound exceeded'
+            if argv[0] == 'execute':
+                assert argv[1] not in attempted, 'Never retry a Source transaction'
+                attempted.add(argv[1])
+            row: dict[str, Any] = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                assert len(json.dumps(payload, ensure_ascii=False).encode('utf-8')) <= receipt['limits']['reply_bytes']
+                # Preserve the exact boundary result even when a later oracle
+                # merges normalized observations from several read pages.
+                row.update(exit_code=code, payload=deepcopy(payload))
+                return code, payload
+            except Exception as exc:
+                row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = Gateway()
+    def call_reference(payload):
+        from wwise_waapi.canonical import canonical_sha256
+        index = len(receipt['calls']) - 1
+        assert type(index) is int and 0 <= index < len(receipt['calls'])
+        call = receipt['calls'][index]; assert call['payload'] == payload
+        return {'call_index': index, 'call_canonical_sha256': canonical_sha256(call)}
+    def query(argv, *, source=False, voice=False, language=None, source_field=None):
+        projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
+        if source:
+            assert source_field == 'StartFreq', 'Source observation must retain the selected real field'
+            projection += ['--include', 'owner', '--include', 'source-language', '--include-field', source_field]
+        if voice: projection += ['--include-field', 'IsVoice', '--include', 'active-source']
+        payload = gateway.gateway(['query-object', *argv, *projection,
+            *(['--language', language] if language is not None else []), '--max-results', '8'], live=True)
+        assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', payload
+        assert isinstance(payload.get('objects'), list) and payload.get('count') == len(payload['objects']), payload
+        return payload['objects']
+    def exact(identity, **view):
+        rows = query(['--exact-id', identity], **view)
+        assert len(rows) == 1 and uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
+        return rows[0]
+    retained: list[dict[str, Any]] = []
+    def retained_rows():
+        return [{'owner': exact(row['owner']['id'], voice=True),
+            'source': exact(row['source']['id'], source=True, language=row['language'], source_field=row['field']),
+            'children': query(['--exact-id', row['owner']['id'], '--relationship', 'children'], language=row['language'])} for row in retained]
+    def complete_staged(draft, phase, inspect_preview):
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        tx = phase['transaction_id'] = preview['transaction_id']
+        assert tx not in transactions; transactions.append(tx)
+        try:
+            shown = gateway.gateway(['transaction-show', tx], live=False)
+            phase['preview_call' if ordinary_existing_source else 'immutable_preview'] = call_reference(shown) if ordinary_existing_source else shown['artifact']
+            if ordinary_existing_source:
+                phase['artifact_hash'] = preview['artifact_hash']
+                assert 'voice_source_staging' not in shown['artifact']['request']['arguments']
+            inspect_preview(shown['artifact']['prepared_operation'])
+            gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+            phase['execution_attempted'] = True; persist()
+            code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code,
+                'call' if ordinary_existing_source else 'payload': call_reference(executed) if ordinary_existing_source else executed}
+            assert code == 0 and executed.get('state') == 'executed_unverified', executed
+            code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code,
+                'call' if ordinary_existing_source else 'payload': call_reference(verified) if ordinary_existing_source else verified}
+            assert code == 0 and verified.get('state') == 'verified' and verified.get('verification', {}).get('business_state_verified') is True, verified
+            return executed
+        finally:
+            final = gateway.gateway(['transaction-show', tx], live=False)
+            if ordinary_existing_source:
+                assert final['artifact'] == shown['artifact'], 'Source flow changed an immutable Preview'
+                phase['transaction_call'] = call_reference(final)
+            else: phase['final_transaction'] = final
+            persist()
+    persist()
+    try:
+        status = gateway.gateway(['status'], live=True)
+        info_call = next(row for row in status['calls'] if row['api'] == 'ak.wwise.core.getInfo')
+        observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
+        receipt['get_info'] = json.loads(base64.b64decode(observed['content_base64'], validate=True))['result']
+        assert receipt['get_info']['isCommandLine'] is True
+        version = receipt['get_info']['version']
+        assert tuple(version[key] for key in ('year', 'major', 'minor', 'build')) == tuple(
+            int(part) for part in catalog['provenance']['build'].split('.')), version
+        project_call, = [row for row in status['calls'] if row['api'] == 'ak.wwise.core.getProjectInfo']
+        project_observation = observe_console_file(Path(project_call['evidence_path']), io_root=native_root)
+        project_info = json.loads(base64.b64decode(project_observation['content_base64'], validate=True))['result']
+        project_languages = project_info['languages']
+        assert isinstance(project_languages, list) and 0 < len(project_languages) <= 64, project_languages
+        project_language_keys = {(uuid.UUID(row['id']), row['name']) for row in project_languages}
+        assert len(project_language_keys) == len(project_languages) and all(isinstance(name, str) and name for _, name in project_language_keys), project_languages
+        receipt['project_language_authority'] = {'project_id': project_info['id'], 'languages': project_languages,
+            'native_evidence_path': project_call['evidence_path'], 'file_proof': project_observation['file_proof']}
+        if ordinary_existing_source:
+            # This SFX case makes no locale selection; status already retained
+            # the native Project authority, so no Language object lookup is needed.
+            choices = sorted(project_languages, key=lambda row: row['name'])
+        else:
+            listed = gateway.gateway(['metadata', 'types', '--meaning', 'Language', '--page-size', '64'], live=True)['agent_result']
+            language_type, = [row for row in listed['types'] if row.get('name') == 'Language']
+            languages = gateway.gateway(language_type['query_command']['gateway_argv'], live=True)
+            assert languages.get('status') != 'partial' and languages.get('limit_reached') is not True, languages
+            choices = sorted((row for row in languages['objects'] if row.get('type') == 'Language'
+                and (uuid.UUID(row['id']), row.get('name')) in project_language_keys), key=lambda row: row['name'])
+        assert len(choices) == len(project_languages) and len({uuid.UUID(row['id']) for row in choices}) == len(choices), choices
+        receipt['language_choices'] = choices
+        construction_language = choices[0]['name']
+        one_stage_case = staged_voice_source_language or gateway_staged_completion or ordinary_existing_source
+        source_language = choices[1 if not one_stage_case and len(choices) > 1 else 0]['name']
+        receipt['distinct_language_disambiguation'] = not one_stage_case and len(choices) > 1
+        receipt['distinct_language_prerequisite'] = ('not_exercised_staged_no_construction_context' if one_stage_case
+            else 'established' if len(choices) > 1 else 'second_existing_language_absent_no_cross_language_credit')
+        if ordinary_existing_source:
+            receipt['distinct_language_prerequisite'] = 'not_exercised_SFX_case_no_locale_selection'
+        root_segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        parent_rows = query([value for segment in root_segments for value in ('--path-segment', segment)])
+        assert len(parent_rows) == 1, parent_rows
+        parent = parent_rows[0]
+        seen = {uuid.UUID(parent['id'])}
+        if ordinary_existing_source:
+            _collect_ordinary_existing_source_case(runtime, gateway, receipt, prefix=prefix, parent=parent,
+                complete=complete_staged, persist=persist)
+            assert len(transactions) == len(attempted) == 3
+        if staged_voice_source_language:
+            name = prefix + '_existing-voice'
+            empty_phase = {'case': 'empty-voice', 'execution_attempted': False, 'effect_verified': False,
+                'construction_language': None, 'source_language': None}
+            receipt['phases'].append(empty_phase); persist()
+            draft = _start_business_draft(gateway, 'object.set')
+            owner_parent = _bind_business_object(gateway, draft, object_id=parent['id'])
+            _update_business_draft(gateway, draft, 'draft-declare-new', [
+                '--declaration-id', 'owner', '--parent-handle', owner_parent, '--name', name,
+                '--kind', 'sound-voice', '--field', 'notes', 'Keep staged Voice'], live=False)
+            def inspect_empty(prepared):
+                native, = prepared['dispatch']['args']['objects'][0]['children']
+                assert native['type'] == 'Sound' and native['@IsVoice'] is True, native
+                assert 'language' not in native and not native.get('children'), native
+                owner_spec, = [row for row in prepared['pre_state']['object_set_nodes'] if row['requested_name'] == name]
+                empty_phase['owner_class_id'] = owner_spec['class_id']
+            executed = complete_staged(draft, empty_phase, inspect_empty)
+            root_result, = executed['dispatch_result']['result']['objects']
+            owner_result, = root_result['children']
+            owner_id = owner_result['id']
+            assert uuid.UUID(owner_id) not in seen and not owner_result.get('children'), owner_result
+            actual_owner = empty_phase['independent_owner'] = exact(owner_id, voice=True)
+            assert actual_owner['name'] == name and actual_owner['type'] == 'Sound' and actual_owner['class_id'] == empty_phase['owner_class_id'], actual_owner
+            assert actual_owner['parent']['id'] == parent['id'] and actual_owner['notes'] == 'Keep staged Voice', actual_owner
+            assert type(actual_owner['properties']['IsVoice']) is bool and actual_owner['properties']['IsVoice'] is True, actual_owner
+            empty_phase['independent_children'] = query(['--exact-id', owner_id, '--relationship', 'children'])
+            assert empty_phase['independent_children'] == [], 'Staged Source requires an independently empty existing Voice'
+            empty_phase['effect_verified'] = True; persist()
+            phase = {'case': 'existing-voice-explicit-source', 'execution_attempted': False, 'effect_verified': False,
+                'source_language': source_language, 'owner_before': actual_owner, 'construction_language': None}
+            receipt['phases'].append(phase); persist()
+            draft = _start_business_draft(gateway, 'object.createPlugin')
+            owner_handle = _bind_business_object(gateway, draft, object_id=owner_id)
+            kind = _discover_business_type(gateway, draft, meaning='Wwise Tone Generator', role='source', expected_label='Wwise Tone Generator')
+            fields = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--type-handle', kind, '--meaning', 'Frequency'], live=True)
+            meaning, = fields['meaning_results']
+            assert meaning['meaning'] == 'Frequency' and fields['candidate_count'] == len(meaning['candidates']), fields
+            selected = [row for row in meaning['candidates'] if row.get('label') == 'Start Frequency'
+                and row.get('field_kind') == 'property' and row.get('value_type') == 'number'
+                and row.get('metadata', {}).get('name') == 'StartFreq' and row['metadata'].get('type') == 'Real32'
+                and row['metadata'].get('display', {}).get('name') == 'Start Frequency']
+            assert len(selected) == 1, 'Start Frequency must have one exact disclosed metadata candidate'
+            field = phase['frequency_field'] = selected[0]
+            _update_business_draft(gateway, draft, 'draft-declare-existing', [
+                '--declaration-id', 'source', '--object-handle', owner_handle,
+                '--field', 'plugin_role', 'source', '--field', 'plugin_type_handle', kind,
+                '--field', 'plugin_name', 'Tone', '--field', 'plugin_placement', 'owner',
+                '--field', 'language', source_language, '--field', 'notes', 'Keep staged Source',
+                '--field-value', field['handle'], '440'], live=False)
+            def inspect_source(prepared):
+                native, = prepared['dispatch']['args']['objects']
+                assert native['object'] == owner_id and 'language' not in native and '@IsVoice' not in native, native
+                source, = native['children']
+                assert source['type'] == 'Source' and source['classId'] == 6684674, source
+                assert source['language'] == source_language and source['@' + field['metadata']['name']] == 440, source
+                phase['source_class_id'] = source['classId']
+            executed = complete_staged(draft, phase, inspect_source)
+            root_result, = executed['dispatch_result']['result']['objects']
+            assert uuid.UUID(root_result['id']) == uuid.UUID(owner_id), root_result
+            source_result, = root_result['children']
+            source_id = source_result['id']
+            assert uuid.UUID(source_id) not in {*seen, uuid.UUID(owner_id)}, source_result
+            source = phase['independent_source'] = exact(source_id, source=True, language=source_language, source_field=field['metadata']['name'])
+            assert source['name'] == 'Tone' and source['type'] in {'Source', 'SourcePlugin'} and source['class_id'] == phase['source_class_id'], source
+            assert source['parent']['id'] == owner_id and source['path'] == actual_owner['path'] + '\\Tone', source
+            assert source.get('owner') is None or source['owner'].get('id') == owner_id, source
+            assert source['notes'] == 'Keep staged Source' and source['properties'][field['metadata']['name']] == 440, source
+            assert source['source_language']['name'] == source_language, source
+            phase['independent_owner'] = exact(owner_id, voice=True)
+            assert all(phase['independent_owner'].get(key) == actual_owner.get(key)
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'notes', 'properties')), 'Separate Source creation changed the proven Voice'
+            children = phase['independent_children'] = query(['--exact-id', owner_id, '--relationship', 'children'], language=source_language)
+            assert len(children) == 1 and all(children[0].get(key) == source.get(key)
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'notes')), children
+            assert exact(parent['id']) == parent, 'Separate Source creation changed the bound parent'
+            phase['effect_verified'] = True; persist()
+            assert len(transactions) == 2
+        if gateway_staged_completion:
+            name = prefix + '_voice'
+            empty_phase = {'case': 'Gateway-Voice-stage', 'execution_attempted': False, 'effect_verified': False,
+                'construction_language': None, 'source_language': source_language}
+            receipt['phases'].append(empty_phase); persist()
+            draft = _start_business_draft(gateway, 'object.set')
+            original_draft_id = draft.draft_id
+            owner_parent = _bind_business_object(gateway, draft, object_id=parent['id'])
+            owner = _update_business_draft(gateway, draft, 'draft-declare-new', [
+                '--declaration-id', 'owner', '--parent-handle', owner_parent, '--name', name,
+                '--kind', 'sound-voice', '--field', 'notes', 'Keep Gateway staged Voice'], live=False)
+            owner_handle = owner['draft']['declared_object']['result_handle']
+            kind = _discover_business_type(gateway, draft, meaning='Wwise Tone Generator', role='source', expected_label='Wwise Tone Generator')
+            fields = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--type-handle', kind, '--meaning', 'Frequency'], live=True)
+            meaning, = fields['meaning_results']
+            assert meaning['meaning'] == 'Frequency' and fields['candidate_count'] == len(meaning['candidates']), fields
+            selected = [row for row in meaning['candidates'] if row.get('label') == 'Start Frequency'
+                and row.get('field_kind') == 'property' and row.get('value_type') == 'number'
+                and row.get('metadata', {}).get('name') == 'StartFreq' and row['metadata'].get('type') == 'Real32'
+                and row['metadata'].get('display', {}).get('name') == 'Start Frequency']
+            assert len(selected) == 1, 'Start Frequency must have one exact disclosed metadata candidate'
+            field = selected[0]
+            _update_business_draft(gateway, draft, 'draft-declare-new', [
+                '--declaration-id', 'source', '--parent-handle', owner_handle, '--name', 'Tone', '--kind', kind,
+                '--field', 'plugin_placement', 'owner', '--field', 'language', source_language,
+                '--field', 'notes', 'Keep Gateway staged Source', '--field-value', field['handle'], '440'], live=False)
+            code, choice = gateway.raw_gateway(['draft-check', draft.draft_id, '--task-authority', draft.task_authority,
+                '--expected-revision', str(draft.revision)])
+            receipt['default_choice'] = choice
+            assert code == 2 and choice.get('error_code') == 'VOICE_SOURCE_STAGED_COMPLETION_REQUIRED', choice
+            assert not transactions and not attempted and choice['staged_completion']['declarations_preserved'] is True
+            configure = choice['next_command']
+            assert configure['command'] == 'draft-business-configure'
+            configured = gateway.gateway(configure['gateway_argv'], live=False)
+            assert configured['draft']['draft_id'] == original_draft_id
+            draft.revision = int(configured['draft']['revision'])
+            def inspect_gateway_voice(prepared):
+                request = empty_phase['immutable_preview']['request']
+                assert request['operation'] == 'object.set' and request['arguments']['voice_source_staging']['stage'] == 'voice'
+                native, = prepared['dispatch']['args']['objects'][0]['children']
+                assert native['type'] == 'Sound' and native['@IsVoice'] is True and 'language' not in native and not native.get('children'), native
+                owner_spec, = [row for row in prepared['pre_state']['object_set_nodes'] if row['requested_name'] == name]
+                empty_phase['owner_class_id'] = owner_spec['class_id']
+            executed = complete_staged(draft, empty_phase, inspect_gateway_voice)
+            verified = empty_phase['verify']['payload']
+            assert verified['staged_completion']['complete'] is False
+            assert verified['staged_completion']['current_stage'] == 'voice_created_source_pending'
+            root_result, = executed['dispatch_result']['result']['objects']
+            owner_result, = root_result['children']
+            owner_id = owner_result['id']
+            assert uuid.UUID(owner_id) not in seen and not owner_result.get('children'), owner_result
+            actual_owner = empty_phase['independent_owner'] = exact(owner_id, voice=True)
+            assert actual_owner['name'] == name and actual_owner['type'] == 'Sound' and actual_owner['class_id'] == empty_phase['owner_class_id'], actual_owner
+            assert actual_owner['parent']['id'] == parent['id'] and actual_owner['notes'] == 'Keep Gateway staged Voice', actual_owner
+            assert type(actual_owner['properties']['IsVoice']) is bool and actual_owner['properties']['IsVoice'] is True, actual_owner
+            empty_phase['independent_children'] = query(['--exact-id', owner_id, '--relationship', 'children'])
+            assert empty_phase['independent_children'] == [], 'Gateway Source completion requires independently empty Voice'
+            empty_phase['effect_verified'] = True; persist()
+            continuation = verified['next_command']
+            assert continuation['command'] == 'continue-voice-source'
+            generated = receipt['generated_source_draft'] = gateway.gateway(continuation['gateway_argv'], live=True)
+            assert generated['staged_completion']['complete'] is False
+            draft = _BusinessDraft(draft_id=generated['draft']['draft_id'], task_authority=generated['task_authority'],
+                revision=int(generated['draft']['revision']))
+            assert draft.draft_id != original_draft_id
+            phase = {'case': 'Gateway-Source-stage', 'execution_attempted': False, 'effect_verified': False,
+                'source_language': source_language, 'construction_language': None, 'owner_before': actual_owner, 'frequency_field': field}
+            receipt['phases'].append(phase); persist()
+            def inspect_gateway_source(prepared):
+                request = phase['immutable_preview']['request']
+                assert request['operation'] == 'object.set' and request['arguments']['voice_source_staging']['stage'] == 'source'
+                native, = prepared['dispatch']['args']['objects']
+                assert uuid.UUID(native['object']) == uuid.UUID(owner_id) and 'language' not in native and '@IsVoice' not in native
+                source, = native['children']
+                assert source['type'] == 'Source' and source['classId'] == 6684674 and source['language'] == source_language
+                assert source['@' + field['metadata']['name']] == 440, source
+                source_spec, = [row for row in prepared['pre_state']['object_set_nodes'] if 'source_plugin' in row]
+                phase['selected_locale'] = source_spec['source_language']['selected']
+                assert uuid.UUID(phase['selected_locale']['id']) == uuid.UUID(choices[0]['id'])
+                assert phase['selected_locale']['name'] == choices[0]['name']
+                phase['source_class_id'] = source_spec['structural_class_id']
+                assert phase['source_class_id'] == source['classId'] and source_spec['source_plugin']['preexisting_plugin_ids'] == []
+            executed = complete_staged(draft, phase, inspect_gateway_source)
+            assert phase['verify']['payload']['staged_completion']['complete'] is True
+            root_result, = executed['dispatch_result']['result']['objects']
+            assert uuid.UUID(root_result['id']) == uuid.UUID(owner_id)
+            source_result, = root_result['children']
+            source_id = source_result['id']
+            assert uuid.UUID(source_id) not in {*seen, uuid.UUID(owner_id)}, source_result
+            source = phase['independent_source'] = exact(source_id, source=True, language=source_language, source_field=field['metadata']['name'])
+            assert source['name'] == 'Tone' and source['type'] in {'Source', 'SourcePlugin'} and source['class_id'] == phase['source_class_id']
+            assert source['parent']['id'] == owner_id and source['path'] == actual_owner['path'] + '\\Tone', source
+            assert source.get('owner') is None or source['owner'].get('id') == owner_id, source
+            assert source['notes'] == 'Keep Gateway staged Source' and source['properties'][field['metadata']['name']] == 440
+            assert source['source_language']['name'] == source_language
+            if source['source_language'].get('id') is not None:
+                assert uuid.UUID(source['source_language']['id']) == uuid.UUID(phase['selected_locale']['id'])
+            phase['independent_owner'] = exact(owner_id, voice=True)
+            assert all(phase['independent_owner'].get(key) == actual_owner.get(key)
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'notes', 'properties')), 'Gateway Source stage changed the verified Voice'
+            children = phase['independent_children'] = query(['--exact-id', owner_id, '--relationship', 'children'], language=source_language)
+            assert len(children) == 1 and all(children[0].get(key) == source.get(key)
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'notes')), children
+            assert exact(parent['id']) == parent, 'Gateway Source stage changed the bound parent'
+            phase['effect_verified'] = True; persist()
+            assert len(transactions) == len(attempted) == 2
+        for case in (() if staged_voice_source_language or gateway_staged_completion or ordinary_existing_source else ('sfx', 'voice-explicit-source', 'voice-default-source')):
+            phase: dict[str, Any] = {'case': case, 'construction_language': None if case == 'sfx' else construction_language,
+                'source_language': source_language if case == 'voice-explicit-source' else None,
+                'source_language_effect': 'explicit_exact_name' if case == 'voice-explicit-source' else 'observed_default_only_no_inheritance_claim',
+                'retained_before': retained_rows(), 'execution_attempted': False}
+            receipt['phases'].append(phase); persist()
+            assert phase['retained_before'] == [{'owner': row['owner'], 'source': row['source'], 'children': row['children']} for row in retained]
+            draft = _start_business_draft(gateway, 'object.set')
+            owner_parent = _bind_business_object(gateway, draft, object_id=parent['id'])
+            name = prefix + '_' + case
+            owner = _update_business_draft(gateway, draft, 'draft-declare-new', [
+                '--declaration-id', 'owner', '--parent-handle', owner_parent, '--name', name,
+                '--kind', 'sound-sfx' if case == 'sfx' else 'sound-voice', '--field', 'notes', 'Keep ' + case,
+                *(['--field', 'language', construction_language] if case != 'sfx' else [])], live=False)
+            owner_handle = declared_business_object_handle(owner, 'owner')
+            kind = _discover_business_type(gateway, draft, meaning='Wwise Tone Generator', role='source', expected_label='Wwise Tone Generator')
+            fields = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--type-handle', kind, '--meaning', 'Frequency'], live=True)
+            meaning, = fields['meaning_results']
+            assert meaning['meaning'] == 'Frequency' and fields['candidate_count'] == len(meaning['candidates']), fields
+            selected = [row for row in meaning['candidates'] if row.get('label') == 'Start Frequency'
+                and row.get('field_kind') == 'property' and row.get('value_type') == 'number'
+                and row.get('metadata', {}).get('name') == 'StartFreq' and row['metadata'].get('type') == 'Real32'
+                and row['metadata'].get('display', {}).get('name') == 'Start Frequency']
+            assert len(selected) == 1, 'Start Frequency must have one exact disclosed metadata candidate'
+            field = phase['frequency_field'] = selected[0]
+            frequency = field['handle']
+            _update_business_draft(gateway, draft, 'draft-declare-new', [
+                '--declaration-id', 'source', '--parent-handle', owner_handle, '--name', 'Tone', '--kind', kind,
+                '--field', 'plugin_placement', 'owner', '--field', 'notes', 'Keep Source ' + case,
+                '--field-value', frequency, '440',
+                *(['--field', 'language', source_language] if case == 'voice-explicit-source' else [])], live=False)
+            _update_business_draft(gateway, draft, 'draft-check', live=True)
+            preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+            tx = phase['transaction_id'] = preview['transaction_id']; assert tx not in transactions; transactions.append(tx)
+            try:
+                shown = gateway.gateway(['transaction-show', tx], live=False)
+                phase['immutable_preview'] = shown['artifact']
+                prepared = shown['artifact']['prepared_operation']
+                specs = prepared['pre_state']['object_set_nodes']
+                owner_spec, = [row for row in specs if row['requested_name'] == name]
+                source_spec, = [row for row in specs if 'source_plugin' in row]
+                assert source_spec['structural_class_id'] == source_spec['source_plugin']['descriptor']['class_id'] == 6684674, 'Selected field must belong to the observed Wwise Tone Generator class'
+                assert any(prop['name'] == field['metadata']['name'] and prop['value'] == 440 for prop in source_spec['properties']), source_spec
+                phase['preexisting_source_ids'] = source_spec['source_plugin']['preexisting_plugin_ids']
+                assert phase['preexisting_source_ids'] == [], 'All three cases construct new owners, not merged owners'
+                gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+                phase['execution_attempted'] = True; persist()
+                code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code, 'payload': executed}
+                assert code == 0 and executed.get('state') == 'executed_unverified', executed
+                code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code, 'payload': verified}
+                assert code == 0 and verified.get('state') == 'verified' and verified.get('verification', {}).get('business_state_verified') is True, verified
+                root_result, = executed['dispatch_result']['result']['objects']
+                owner_result, = root_result['children']; source_result, = owner_result['children']
+                owner_id, source_id = owner_result['id'], source_result['id']
+                assert uuid.UUID(owner_id) not in seen and uuid.UUID(source_id) not in seen and uuid.UUID(owner_id) != uuid.UUID(source_id), 'New constructor returned a retained GUID'
+                actual_owner = phase['independent_owner'] = exact(owner_id, voice=True)
+                actual_source = phase['independent_source'] = exact(source_id, source=True, language=phase['source_language'], source_field=field['metadata']['name'])
+                assert actual_owner['name'] == name and actual_owner['type'] == 'Sound' and actual_owner['class_id'] == owner_spec['class_id'], actual_owner
+                assert actual_owner['parent']['id'] == parent['id'] and actual_owner['notes'] == 'Keep ' + case, actual_owner
+                assert type(actual_owner['properties']['IsVoice']) is bool and actual_owner['properties']['IsVoice'] is (case != 'sfx'), actual_owner
+                assert actual_source['name'] == 'Tone' and actual_source['type'] in {'Source', 'SourcePlugin'} and actual_source['class_id'] == source_spec['structural_class_id'], actual_source
+                assert actual_source['parent']['id'] == owner_id and actual_source['path'] == actual_owner['path'] + '\\Tone', actual_source
+                assert actual_source.get('owner') is None or actual_source['owner'].get('id') == owner_id, actual_source
+                assert actual_source['notes'] == 'Keep Source ' + case and actual_source['properties'][field['metadata']['name']] == 440, actual_source
+                if phase['source_language'] is not None:
+                    assert actual_source['source_language']['name'] == phase['source_language'], actual_source
+                children = phase['independent_children'] = query(['--exact-id', owner_id, '--relationship', 'children'], language=phase['source_language'])
+                assert len(children) == 1 and all(children[0].get(key) == actual_source.get(key)
+                    for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'notes')), children
+                phase['retained_after'] = retained_rows()
+                assert phase['retained_after'] == phase['retained_before'], 'A later construction changed the original owner/Source'
+                assert exact(parent['id']) == parent, 'Construction changed the bound parent'
+                seen.update((uuid.UUID(owner_id), uuid.UUID(source_id)))
+                retained.append({'owner': actual_owner, 'source': actual_source, 'children': children, 'language': phase['source_language'], 'field': field['metadata']['name']})
+                phase['effect_verified'] = True
+            finally:
+                phase['final_transaction'] = gateway.gateway(['transaction-show', tx], live=False)
+                persist()
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, 'Source configuration changed'
+        final = gateway.gateway(['status'], live=True)
+        assert final['wwise'] == status['wwise'], 'Source host context changed'
+        receipt.update(collection_complete=True, business_effect_verified=True)
+        category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        raise
+    finally:
+        try:
+            paths = sorted(set(native_root.glob('*.json')) - previous_native)
+            assert len(paths) <= receipt['limits']['native_files']
+            total = 0
+            for index, path in enumerate(paths):
+                observed = observe_console_file(path, io_root=native_root)
+                raw = base64.b64decode(observed['content_base64'], validate=True)
+                total += len(raw); assert total <= receipt['limits']['native_bytes'] and len(raw) <= 4 * 1024 * 1024
+                target = artifacts / ('native-' + str(index) + '.json')
+                prove_artifact_path(target, io_root=artifacts, field='Source archive', expect_directory=False)
+                descriptor = os.open(target, binary_file_open_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL) | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+                with os.fdopen(descriptor, 'wb') as stream:
+                    stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+                assert target.read_bytes() == raw
+                receipt['native_evidence'].append({'native_path': str(path), 'archive_path': str(target),
+                    'sha256': hashlib.sha256(raw).hexdigest(), 'size': len(raw), 'native_file_proof': observed['file_proof']})
+        except Exception as exc:
+            receipt.update(collection_complete=False, business_effect_verified=False,
+                archive_failure={'type': type(exc).__name__, 'message': str(exc)[:2048]})
+            category['status'] = 'FAIL'
+            raise
+        finally:
+            persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_ordinary_existing_source_append_preservation_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('One explicitly scoped2025 ordinary Source append; other lanes remain separate')
+    category = _collect_planned_source_characterization(workflow_sandbox_runtime,
+        prefix='WAAPI_EXISTING_SOURCE_' + uuid.uuid4().hex[:10], ordinary_existing_source=True)
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_planned_source_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Initial atomic Source characterization is Console2025-only; other lanes remain unproven')
+    category = _collect_planned_source_characterization(workflow_sandbox_runtime, prefix='WAAPI_SOURCE_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_staged_voice_source_language_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Staged Voice Source-language observation is Console2025-only')
+    category = _collect_planned_source_characterization(workflow_sandbox_runtime,
+        prefix='WAAPI_STAGED_SOURCE_' + uuid.uuid4().hex[:10], staged_voice_source_language=True)
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_gateway_staged_voice_localized_source_console_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Initial Gateway staged Voice/localized Source acceptance is Console2025-only')
+    category = _collect_planned_source_characterization(workflow_sandbox_runtime,
+        prefix='WAAPI_GATEWAY_STAGED_SOURCE_' + uuid.uuid4().hex[:10], gateway_staged_completion=True)
+    assert category['status'] == 'PASS', category
+
+
+def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRuntime, *, name: str,
+        null_source_only_diagnostic: bool = False) -> dict[str, Any]:
+    """Ordinary created fields, then latest-project undo/redo with the owned receipt."""
+    assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}, 'No pinned native history route in 2021.1'
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
+    if null_source_only_diagnostic:
+        assert runtime.version == '2022.1', 'Null-only minimization is pinned2022; other native lanes remain independent'
+    output = runtime.state_dir / ('created-null-source-diagnostic.json' if null_source_only_diagnostic else 'created-fields-history-acceptance.json')
+    category = {'category': 'created-null-source-diagnostic' if null_source_only_diagnostic else 'created-fields-history-acceptance', 'status': 'FAIL',
+        'observation_path': str(output), 'verifier_strength': 'owned_source_receipt_plus_independent_created_fields_absence_and_restoration'}
+    runtime.category_results.append(category)
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'endpoint': endpoint, 'calls': [], 'setup': [], 'effects': [],
+        'setup_coverage_credit': False, 'business_effect_verified': False, 'complete': False,
+        'stack_head_observed': False, 'outside_scope_preservation_observed': False,
+        'preserved_target_scope': 'exact_identity_class_parent_and_notes',
+        'lifecycle_acceptance': 'Existing host-category-evidence/v3 finalizer owns source, host and cleanup proof'}
+    if null_source_only_diagnostic:
+        receipt.update(diagnostic_only=True, history_acceptance_credit=False,
+            scope='fresh_setup_then_full_null_source_creation_without_undo_or_redo')
+        category.update(diagnostic_only=True, history_acceptance_credit=False,
+            verifier_strength='diagnostic_full_null_source_stored_fields_without_history_acceptance_credit')
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 16 * 1024 * 1024, 'Created history receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+    class Gateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 256, 'Created history public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == endpoint, payload
+                assert payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = Gateway()
+    projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
+    required_fields = ('IsLoopingEnabled', 'IsLoopingInfinite', 'Volume', 'Attenuation')
+    fields = required_fields
+    def query(selector, *, sound=False):
+        payload = gateway.gateway(['query-object', *selector, *projection, *(['--platform', platform] if sound else []),
+            *(arg for field in (fields if sound else ()) for arg in ('--include-field', field))], live=True)
+        rows = payload.get('objects')
+        assert isinstance(rows, list) and payload.get('count') == len(rows) <= 1, payload
+        assert payload.get('limit_reached') is not True and payload.get('projection_complete') is not False, payload
+        assert payload.get('status') != 'partial', payload
+        return rows
+    def exact(identity, *, sound=False):
+        rows = query(['--exact-id', identity], sound=sound)
+        assert len(rows) == 1 and rows[0]['id'] == identity and type(rows[0].get('class_id')) is int, rows
+        return rows[0]
+    def by_path(segments, *, sound=False):
+        return query([arg for segment in segments for arg in ('--path-segment', segment)], sound=sound)
+    def complete(draft, label, *, setup=False, expected_root=None, expected_fields=None):
+        phase = {'phase': label, 'effect_verified': False, 'native_outcome': 'not_executed'}
+        receipt['setup' if setup else 'effects'].append(phase)
+        phase_category = {'category': 'created-fields-history-' + label, 'status': 'FAIL',
+            'observation_path': str(output), 'setup_coverage_credit': False,
+            'verifier_strength': 'verified_setup_no_created_history_effect_credit' if setup else 'scoped_history_and_independent_state_readback'}
+        if null_source_only_diagnostic:
+            phase_category.update(diagnostic_only=True, history_acceptance_credit=False)
+        runtime.category_results.append(phase_category)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'], immutable_preview=shown['artifact'])
+        if expected_root is not None:
+            binding = shown['artifact']['prepared_operation']['pre_state']['history_binding']
+            observed_fields = [row for row in binding['observations'] if row.get('kind') == 'creation_field']
+            assert len(observed_fields) == len(expected_fields) and {row['field'] for row in observed_fields} == set(expected_fields), binding
+            assert {row['object_id'] for row in observed_fields} == {expected_root}, binding
+            assert all(isinstance(row['field_info'].get('raw'), Mapping) for row in observed_fields), binding
+            root, = [row for row in binding['observations'] if row['kind'] == 'creation_presence']
+            assert root['object']['id'] == expected_root and root['platform'] == platform, binding
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        executed = gateway.gateway(['execute', identity], live=True)
+        phase['execute'] = executed; phase['native_outcome'] = 'accepted'
+        verified = gateway.gateway(['verify', identity], live=True); phase['verify'] = verified
+        assert executed.get('automatic_retry') is False and verified.get('verified') is True, (executed, verified)
+        assert verified.get('verification', {}).get('business_state_verified') is True, verified
+        if not setup and label.endswith(('-undo', '-redo')):
+            assert verified['verification_strength'] == 'scoped_history_effect_readback', verified
+        return phase, phase_category
+    def admit(phase, phase_category, observation):
+        phase['independent_effect'] = observation; phase['effect_verified'] = True; phase_category['status'] = 'PASS'
+    def history(source_id, direction):
+        draft = _start_business_draft(gateway, 'ak.wwise.core.undo.' + direction)
+        _update_business_draft(gateway, draft, 'draft-declare-core-plan', ['--value', 'history_scope', 'latest_project_history',
+            '--value', 'expectation_receipt', source_id], live=True)
+        return draft
+    try:
+        status = gateway.gateway(['status'], live=True)
+        assert status.get('wwise', {}).get('isCommandLine') is True, status
+        platform = status.get('project', {}).get('currentPlatformId')
+        assert isinstance(platform, str) and uuid.UUID(platform).int != 0, status
+        receipt['host_and_project'] = status
+        actor_segments = CONTAINERS_PARENT_SEGMENTS if runtime.version == '2025.1' else ACTOR_MIXER_PARENT_SEGMENTS
+        parent_rows = by_path(actor_segments)
+        assert len(parent_rows) == 1 and exact(parent_rows[0]['id']) == parent_rows[0], parent_rows
+        parent = parent_rows[0]
+        setup = _start_business_draft(gateway, 'object.create')
+        attenuation_parent = _bind_business_object(gateway, setup, path_segments=('Attenuations', 'Default Work Unit'))
+        attenuation_type = _discover_business_type(gateway, setup, meaning='Attenuation', role='object', expected_label='Attenuation')
+        _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', 'target', '--parent-handle', attenuation_parent,
+            '--kind', attenuation_type, '--name', name + '_Target', '--field', 'notes', 'Preserve history reference target'], live=False)
+        phase, setup_category = complete(setup, 'setup-target', setup=True)
+        target_id = _created_object_id(phase['execute'])
+        target = exact(target_id)
+        assert target['type'] == 'Attenuation' and target['name'] == name + '_Target', target
+        phase['independent_setup'] = target; setup_category['status'] = 'PASS'
+        for case in (('null',) if null_source_only_diagnostic else ('existing', 'null')):
+            source_name = name + '_' + case
+            source_segments = (*actor_segments, source_name)
+            draft = _start_business_draft(gateway, 'object.create')
+            parent_handle = _bind_business_object(gateway, draft, object_id=parent['id'])
+            target_handle = _bind_business_object(gateway, draft, object_id=target_id)
+            _update_business_draft(gateway, draft, 'draft-business-configure', ['--platform', platform], live=False)
+            handles = {}
+            for token in ('Volume', 'Attenuation'):
+                disclosed = _update_business_draft(gateway, draft, 'draft-discover-fields',
+                    ['--semantic-kind', 'sound-sfx', '--meaning', token], live=True)
+                handles[token] = discovered_business_field_handle(disclosed, token)
+            _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'source', '--parent-handle', parent_handle,
+                '--kind', 'sound-sfx', '--name', source_name, '--field', 'notes', 'Created history ' + case,
+                '--field', 'loop', 'infinite', '--field-value', handles['Volume'], '-6.0',
+                '--field-value', handles['Attenuation'], target_handle if case == 'existing' else 'null'], live=False)
+            phase, phase_category = complete(draft, case + '-source')
+            source_id, created_id = phase['transaction_id'], _created_object_id(phase['execute'])
+            node, = phase['immutable_preview']['prepared_operation']['pre_state']['object_create_nodes']
+            materialized_properties = {row['name']: row['value'] for row in node['properties']}
+            materialized_references = {row['name']: row['target_id'] for row in node['references']}
+            fields = (*materialized_properties, *materialized_references)
+            assert len(set(fields)) == len(fields) and set(required_fields) <= set(fields), node
+            original = exact(created_id, sound=True)
+            for token, expected in materialized_properties.items():
+                actual = original.get('properties', {}).get(token)
+                assert (type(actual) is bool and actual is expected) if type(expected) is bool else (
+                    type(actual) in (int, float) and actual == expected), (token, expected, original)
+            props = original.get('properties', {})
+            assert original['type'] == 'Sound' and original['name'] == source_name, original
+            assert original['path'] == '\\' + '\\'.join(source_segments), original
+            assert original.get('notes') == 'Created history ' + case and original.get('parent', {}).get('id') == parent['id'], original
+            assert original['class_id'] == phase['immutable_preview']['prepared_operation']['pre_state']['object_create_nodes'][0]['class_id'], original
+            assert props.get('IsLoopingEnabled') is True and props.get('IsLoopingInfinite') is True, original
+            assert type(props.get('Volume')) in (int, float) and props['Volume'] == -6.0, original
+            assert 'Attenuation' in original.get('references', {}), original
+            reference = original['references']['Attenuation']
+            reference_id = reference.get('id') if isinstance(reference, Mapping) else reference
+            if isinstance(reference, Mapping):
+                assert 'id' in reference and not set(reference) - {'id', 'name', 'type', 'path'}, original
+                assert all(isinstance(value, str) for value in reference.values()), original
+            explicit_null = reference is None or (isinstance(reference_id, str)
+                and reference_id == '{00000000-0000-0000-0000-000000000000}')
+            assert (explicit_null if case == 'null' else isinstance(reference_id, str)
+                and uuid.UUID(reference_id) == uuid.UUID(target_id)), original
+            assert exact(target_id) == target and exact(parent['id']) == parent, 'Source changed its target or parent'
+            admit(phase, phase_category, original)
+            if null_source_only_diagnostic:
+                phase_category['status'] = 'blocked'
+                receipt.update(complete=True, classification='created_and_independently_observed')
+                category.update(status='blocked', classification=receipt['classification'],
+                    reason='Diagnostic null creation only; no undo/redo performed and no full history acceptance credit')
+                return category
+            phase, phase_category = complete(history(source_id, 'undo'), case + '-undo', expected_root=created_id, expected_fields=fields)
+            absence = {'id': query(['--exact-id', created_id]), 'path': by_path(source_segments), 'target': exact(target_id)}
+            assert absence['id'] == absence['path'] == [] and absence['target'] == target, absence
+            admit(phase, phase_category, absence)
+            if runtime.version != '2022.1':
+                phase, phase_category = complete(history(source_id, 'redo'), case + '-redo', expected_root=created_id, expected_fields=fields)
+                restored = exact(created_id, sound=True)
+                assert json.dumps(restored, sort_keys=True) == json.dumps(original, sort_keys=True), (original, restored)
+                assert by_path(source_segments, sound=True) == [restored] and exact(target_id) == target, restored
+                assert exact(parent['id']) == parent, 'History changed its original parent'
+                admit(phase, phase_category, restored)
+        receipt.update(complete=True, business_effect_verified=True)
+        category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_created_leaf_fields_history_receipt_native_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """2022 undo; 2023–25 undo/redo; no GUI or native stack-entry ID claim."""
+    assert workflow_sandbox_runtime.version != '2021.1', '2021.1 has no pinned standalone undo/redo route'
+    category = _collect_created_leaf_fields_history_acceptance(workflow_sandbox_runtime,
+        name='WAAPI_HISTORY_' + uuid.uuid4().hex[:12])
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_created_null_source_only_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """One fresh setup and the full null source request; never precede it with undo."""
+    if workflow_sandbox_runtime.version != '2022.1':
+        pytest.skip('Null-source-only crash minimization is pinned2022; no other-version acceptance inference')
+    category = _collect_created_leaf_fields_history_acceptance(workflow_sandbox_runtime,
+        name='WAAPI_NULL_ONLY_' + uuid.uuid4().hex[:12], null_source_only_diagnostic=True)
+    assert category.get('classification') == 'created_and_independently_observed', category
+    assert category['status'] == 'blocked' and category['history_acceptance_credit'] is False, category
+
+
+def _collect_effect_render_suffix_observation(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    return _collect_anonymous_effect_slot_construction_acceptance(runtime, prefix=prefix, render_suffix_diagnostic=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_effect_render_suffix_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version not in {'2023.1', '2024.1', '2025.1'}:
+        pytest.skip('Stored suffix observation excludes legacy EffectN lanes; each modern version requires its own observation')
+    category = _collect_effect_render_suffix_observation(workflow_sandbox_runtime, prefix='WAAPI_SUFFIX_' + uuid.uuid4().hex[:10])
+    assert category.get('diagnostic_complete') is True, category
+    # A diagnosed native error response remains a failed attempt with a retained
+    # sandbox under the existing finalizer, never a business acceptance PASS.
+    assert category.get('classification') in {'cleared', 'retained'}, category
+
+
+def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str,
+        compound_render_history: bool = False) -> dict[str, Any]:
+    """Legacy owner Render with media/immutable structure, in the existing lifecycle."""
+    assert runtime.version in {'2021.1', '2022.1'}, runtime.version
+    if compound_render_history: assert runtime.version == '2022.1', runtime.version
+    output = runtime.state_dir / ('compound-render-history-acceptance.json' if compound_render_history else 'legacy-import-render-acceptance.json')
+    view_scope = ('current_default_view_only_unobserved_platform_identity' if runtime.version == '2021.1'
+        else 'actual_preview_read_view_certificate_no_cross_platform_claim')
+    category = {'category': 'compound-render-history' if compound_render_history else 'legacy-import-render', 'status': 'FAIL', 'read_view_scope': view_scope,
+        'verifier_strength': 'gateway_verified_plus_independent_full_owner_chain_actual_identity_source_ownership_media_hash_and_effect_preservation',
+        'observation_path': str(output)}
+    if compound_render_history:
+        category['verifier_strength'] = 'receipt_bound_compound_source_undo_plus_independent_full_legacy_chain_target_metadata_preservation'
+    runtime.category_results.append(category)
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
+        'setup_coverage_credit': False, 'shareset_construction_verified': False, 'business_effect_verified': False,
+        'read_view_scope': view_scope, 'tsv_media_verified': False,
+        'lifecycle_acceptance': 'Requires existing host-category-evidence/v3 source-integrity and cleanup finalizer'}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=None if compound_render_history else 2,
+            separators=(',', ':') if compound_render_history else None).encode('utf-8')
+        assert len(body) <= 8 * 1024 * 1024, 'Legacy import receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+    class ReceiptGateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 256, 'Legacy import public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('detected_version') == runtime.version, payload
+                assert payload.get('endpoint') == {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}, payload
+            return payload
+    gateway = ReceiptGateway()
+    projection = ['--include', 'class-id', '--include', 'parent', '--include', 'owner', '--include', 'notes']
+    chain = ['OverrideEffect', *[name for i in range(4) for name in (f'Effect{i}', f'RenderEffect{i}', f'BypassEffect{i}')]]
+    def one(argv, fields=()):
+        result = gateway.gateway(['query-object', *argv, *projection,
+            *(arg for field in fields for arg in ('--include-field', field))], live=True)
+        rows = result.get('objects')
+        assert result.get('count') == 1 and isinstance(rows, list) and len(rows) == 1, result
+        assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
+        row = rows[0]
+        assert uuid.UUID(_required_string(row, 'id')).int != 0 and type(row.get('class_id')) is int, row
+        return row
+    def exact(identity, fields=()):
+        row = one(['--exact-id', identity], fields[:8])
+        assert row['id'] == identity, row
+        for start in range(8, len(fields), 8):
+            extra = one(['--exact-id', identity], fields[start:start + 8])
+            for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes'):
+                assert (key in extra) == (key in row) and extra.get(key) == row.get(key), (row, extra)
+            for kind in ('properties', 'references'):
+                if kind in extra: row.setdefault(kind, {}).update(extra[kind])
+        return row
+    def at(segments, fields=()):
+        found = one([*(arg for segment in segments for arg in ('--path-segment', segment))])
+        row = exact(found['id'], fields)
+        assert all(row.get(key) == found.get(key) for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner')), (found, row)
+        return row
+    def guid(value):
+        identity = value.get('id') if isinstance(value, Mapping) else value
+        assert isinstance(identity, str) and uuid.UUID(identity).int != 0, value
+        return identity
+    def metadata(identity, *, detail=False):
+        names, page = [], None
+        for _ in range(4):
+            result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page is not None else [])], live=True)['agent_result']
+            for field in result['fields']:
+                assert isinstance(field.get('name'), str) and field['name'] not in names, result
+                names.append(field['name'])
+                assert len(names) <= 64, 'Legacy Effect metadata field cap exceeded'
+                if detail:
+                    info = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', field['selection']], live=True)['agent_result']
+                    assert info.get('complete') is True, info
+                    receipt.setdefault('target_metadata', {}).setdefault(identity, []).append(info)
+            if result.get('complete') is True:
+                assert result['total_count'] == len(names), result
+                return names
+            next_page = _required_string(result, 'next_page'); assert next_page != page, result
+            page = next_page
+        raise AssertionError('Legacy Effect metadata exceeds four pages')
+    def target_snapshot(identity, fields):
+        assert metadata(identity) == fields, identity
+        result = exact(identity)
+        for start in range(0, len(fields), 16):
+            row = exact(identity, fields[start:start + 16])
+            for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes'):
+                assert (key in row) == (key in result) and row.get(key) == result.get(key), (result, row)
+            for kind in ('properties', 'references'):
+                if kind in row: result.setdefault(kind, {}).update(row[kind])
+        return result
+    def field_handles(draft, required):
+        names, selections, page = [], {}, None
+        for _ in range(4):
+            listed = _update_business_draft(gateway, draft, 'draft-discover-fields',
+                ['--semantic-kind', 'sound-sfx', '--list', '--page-size', '64', *(['--page', page] if page else [])], live=True)['agent_result']
+            for item in listed['fields']:
+                assert item['name'] not in names, listed
+                names.append(item['name'])
+                if item['name'] in required: selections[item['name']] = item['selection']
+            if listed.get('complete') is True:
+                assert len(names) == listed['total_count'], listed
+                break
+            next_page = _required_string(listed, 'next_page'); assert next_page != page, listed
+            page = next_page
+        else: raise AssertionError('Legacy Sound discovery exceeds four pages')
+        assert set(required) == set(selections), (required, names)
+        handles = {}
+        for name, selection in selections.items():
+            selected = _update_business_draft(gateway, draft, 'draft-discover-fields',
+                ['--semantic-kind', 'sound-sfx', '--selection', selection], live=True)
+            candidates = selected['meaning_results'][0]['candidates']
+            assert len(candidates) == 1 and candidates[0].get('metadata', {}).get('name') == name, selected
+            handles[name] = discovered_business_field_handle(selected, name)
+        return handles
+    def complete(draft, phase):
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        artifact = shown['artifact']; view = artifact['prepared_operation']['pre_state'].get('field_read_platform')
+        phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'],
+            compiled_native_request=artifact['prepared_operation']['dispatch'], read_view=view)
+        if not phase['setup']:
+            assert isinstance(view, Mapping) and view.get('status') in {'certified', 'unobserved'}, view
+            if runtime.version == '2021.1': assert view['status'] == 'unobserved', view
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        assert code == 0 and executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('verified') is True and verified.get('state') == 'verified', verified
+        assert verified.get('verification', {}).get('business_state_verified') is True, verified
+    try:
+        # Pinned2021 SDK calls class16 AudioSource; actual object.get still
+        # returns AudioFileSource. Keep catalog and object projection distinct.
+        source_class_name = 'AudioSource' if runtime.version == '2021.1' else 'AudioFileSource'
+        disclosed = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'WorkUnit',
+            '--meaning', 'Folder', '--meaning', 'Wwise Delay', '--meaning', source_class_name, '--page-size', '64'], live=True)['agent_result']
+        assert disclosed.get('complete') is True, disclosed
+        classes = {}
+        for name in ('Sound', 'WorkUnit', 'Folder', 'Wwise Delay', 'AudioFileSource'):
+            native_name = source_class_name if name == 'AudioFileSource' else name
+            matches = [row for row in disclosed['types'] if row.get('name') == native_name]
+            assert len(matches) == 1 and type(matches[0].get('classId')) is int, (name, disclosed)
+            classes[name] = matches[0]['classId']
+        assert classes['Sound'] == 65552, classes
+        if runtime.version == '2021.1':
+            assert classes['AudioFileSource'] == 16, classes  # Exact2021 AudioSource SDK class authority.
+        receipt['source_class_discovery'] = {'name': source_class_name, 'class_id': classes['AudioFileSource']}
+
+        receipt['live_classes'] = classes
+        segments = ('Actor-Mixer Hierarchy', 'Default Work Unit')
+        parent = at(segments)
+        assert parent['type'] == 'WorkUnit' and parent['class_id'] == classes['WorkUnit'], parent
+        effects_parent = at(('Effects', 'Factory Effects'))
+        folder = at(('Effects', 'Factory Effects', 'Delay'))
+        assert effects_parent['type'] == 'WorkUnit' and effects_parent['class_id'] == classes['WorkUnit'], effects_parent
+        assert folder['type'] == 'Folder' and folder['class_id'] == classes['Folder'] and guid(folder.get('parent')) == effects_parent['id'], folder
+        targets, target_fields = [], {}
+        for name in ('Echo', 'The_Slap'):
+            target = at(('Effects', 'Factory Effects', 'Delay', name))
+            assert target['type'] == 'Effect' and target['class_id'] == classes['Wwise Delay'] and guid(target.get('parent')) == folder['id'], target
+            assert 'owner' not in target or target['owner'] is None, target  # Not a ShareSet certificate; ordinary Gateway target validation still applies.
+            fields = metadata(target['id'], detail=True); target_fields[target['id']] = fields
+            targets.append(target_snapshot(target['id'], fields))
+        assert targets[0]['id'] != targets[1]['id'], targets
+        receipt['baseline'] = {'parent': parent, 'effects_parent': effects_parent, 'folder': folder, 'targets': targets}
+        def preserved():
+            observed = {'parent': exact(parent['id']), 'effects_parent': exact(effects_parent['id']),
+                'folder': exact(folder['id']), 'targets': [target_snapshot(row['id'], target_fields[row['id']]) for row in targets]}
+            assert observed == receipt['baseline'], observed
+            return observed
+        def owner_at(name, *, rendered):
+            row = at((*segments, name), [*chain, 'Volume', 'IsVoice'])
+            assert row['type'] == 'Sound' and row['class_id'] == classes['Sound'] and guid(row.get('parent')) == parent['id'], row
+            assert row['notes'] == 'Keep legacy ' + name and row['properties']['IsVoice'] is False, row
+            assert row['properties']['Volume'] == -9, row
+            assert row['properties']['OverrideEffect'] is True, row
+            for i in range(4):
+                assert row['properties'][f'RenderEffect{i}'] is (rendered and i < 2), row
+                assert row['properties'][f'BypassEffect{i}'] is False, row
+                value = row['references'][f'Effect{i}']
+                if i < 2: assert guid(value) == targets[i]['id'], row
+                else: assert value is None or isinstance(value, Mapping) and uuid.UUID(value['id']).int == 0, row
+            return row
+        def selected_source(owner):
+            children = None
+            if runtime.version == '2021.1':
+                result = gateway.gateway(['query-object', '--exact-id', owner['id'], '--relationship', 'children',
+                    '--max-results', '100', '--language', 'SFX', *projection], live=True)
+                children = result.get('objects')
+                assert isinstance(children, list) and result.get('count') == len(children) < 100, result
+                assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', {'reason': 'source_child_page_incomplete', 'result': result}
+                assert len({row['id'] for row in children}) == len(children), children
+                for child in children:
+                    assert isinstance(child.get('type'), str) and type(child.get('class_id')) is int and guid(child.get('parent')) == owner['id'], child
+                    assert (child['type'] == 'AudioFileSource') == (child['class_id'] == classes['AudioFileSource']), child
+                candidates = [child for child in children if child['type'] == 'AudioFileSource']
+                assert len(candidates) == 1, {'reason': 'source_child_cardinality', 'children': children}
+                selected = candidates[0]
+                source_id = selected['id']
+            else:
+                selected = one(['--exact-id', owner['id'], '--include', 'active-source'])
+                source_id = guid(selected.get('active_source'))
+            source = one(['--exact-id', source_id, '--include', 'original-file-path', '--include', 'source-language',
+                *(['--language', 'SFX'] if runtime.version == '2021.1' else [])])
+            assert source['type'] == 'AudioFileSource' and source['class_id'] == classes['AudioFileSource'] and guid(source.get('parent')) == owner['id'], source
+            assert isinstance(source.get('source_language'), Mapping) and source['source_language'].get('name') == 'SFX', source
+            selection = {'selected': selected}
+            if children is not None:
+                selection.update(children=children, scope='complete_unique_source_child_and_matching_sound_wav',
+                    generic_active_source_mapping=False)
+            if runtime.version == '2021.1':
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes'):
+                    assert (key in selected) == (key in source) and selected.get(key) == source.get(key), (selected, source)
+                sound_file = one(['--exact-id', owner['id'], '--include', 'original-file-path', '--language', 'SFX'])
+                assert sound_file['id'] == owner['id'] and sound_file['type'] == 'Sound', sound_file
+                assert isinstance(source.get('original_file_path'), str) and source['original_file_path'] == sound_file.get('original_file_path'), (sound_file, source)
+                selection['sound_file'] = sound_file
+            return source, selection
+        existing_name = prefix + '_Existing'
+        completed_media = []
+        for index, phase_name in enumerate(('setup_existing_sound_no_credit', 'existing_media_render', 'new_media_refs_render', 'immutable_tsv_structure_render')):
+            setup, tsv = index == 0, index == 3
+            if runtime.version == '2021.1' and not setup:
+                # The 2021 LanguageList authority is the clean saved project.
+                prerequisite = {'before_phase': phase_name, 'coverage_credit': False}
+                receipt.setdefault('prerequisites', []).append(prerequisite)
+                prerequisite['save'] = _save_sandbox_project(gateway)
+                persist()
+            existing = index == 1
+            name = existing_name if index < 2 else prefix + ('_TSV' if tsv else '_New')
+            phase = {'phase': phase_name, 'setup': setup, 'native_outcome': 'not_executed', 'effect_verified': False}
+            receipt['transactions'].append(phase)
+            operation = 'audio.importTabDelimited' if tsv else 'audio.import'
+            draft = _start_business_draft(gateway, operation)
+            if tsv:
+                location = _bind_business_object(gateway, draft, role='import_location', object_id=parent['id'])
+                table = runtime.sandbox.sandbox_path / (prefix + '.tsv')
+                table.write_text('Object Path\tObject Type\tNotes\tProperty[Volume]\tProperty[OverrideEffect]\tReference[Effect0]\tReference[Effect1]\tProperty[RenderEffect1]\n'
+                    + '<Sound SFX>' + name + '\tSound SFX\tKeep legacy ' + name + '\t-9\ttrue\t'
+                    + targets[0]['id'] + '\t' + targets[1]['id'] + '\ttrue\n', encoding='utf-8', newline='\n')
+                table_before = table.read_bytes(); phase['table'] = {'path': str(table), 'sha256': hashlib.sha256(table_before).hexdigest()}
+                _update_business_draft(gateway, draft, 'draft-declare-artifact-plan',
+                    ['--table-file', str(table), '--location-handle', location, '--language', 'SFX'], live=False)
+            else:
+                bound = _bind_business_object(gateway, draft, object_id=existing_owner['id'] if existing else parent['id'])
+                required = ['RenderEffect1'] if existing else ['OverrideEffect', 'Effect0', 'Effect1', 'RenderEffect1']
+                fields = field_handles(draft, required)
+                values = {'RenderEffect1': 'false' if setup else 'true'}
+                if not existing:
+                    values.update(OverrideEffect='true', **{f'Effect{i}': _bind_business_object(gateway, draft, object_id=row['id']) for i, row in enumerate(targets)})
+                args = ['--object-handle', bound] if existing else ['--parent-handle', bound, '--name', name, '--kind', 'sound-sfx']
+                args += ['--field', 'notes', 'Keep legacy ' + name, '--field', 'volume_db', '-9']
+                if not setup:
+                    audio = _write_fixture_wav(runtime.sandbox.sandbox_path / 'GatewayLegacyImportAudio', name, frequency=440 + index * 110)
+                    args += ['--field', 'media_file', str(audio)]
+                    phase['media'] = {'input': str(audio), 'input_size': audio.stat().st_size,
+                        'input_sha256': hashlib.sha256(audio.read_bytes()).hexdigest()}
+                args += [arg for field, value in values.items() for arg in ('--field-value', fields[field], value)]
+                _update_business_draft(gateway, draft, 'draft-declare-existing' if existing else 'draft-declare-new',
+                    ['--declaration-id', 'sound', *args], live=False)
+            complete(draft, phase)
+            owner = owner_at(name, rendered=not setup); phase['independent_owner'] = owner
+            result = _imported_object(phase['execute']['payload'], '\\' + '\\'.join((*segments, name)))
+            assert result['id'] == owner['id'], (result, owner)
+            if setup: existing_owner = owner
+            if setup and compound_render_history:
+                def history_snapshot():
+                    return {'owner': exact(owner['id'], [*chain, 'Volume', 'IsVoice']), 'preserved': preserved()}
+                _collect_compound_render_rename_history(gateway, receipt, version=runtime.version, owner_id=owner['id'],
+                    selected_id=owner['id'], field='RenderEffect1', renamed=prefix + '_Renamed', snapshot=history_snapshot,
+                    metadata_scopes=[(owner['id'], chain), *[(row['id'], target_fields[row['id']]) for row in targets]])
+                receipt['business_effect_verified'] = True; category['status'] = 'PASS'
+                return category
+            if existing: assert owner['id'] == existing_owner['id'], owner
+            if not setup and not existing: assert owner['id'] != existing_owner['id'], owner
+            if index in (1, 2):
+                source, selection = selected_source(owner)
+                source_id = source['id']
+                phase['independent_source'] = source
+                phase['source_selection'] = selection
+                source_result = _imported_object(phase['execute']['payload'], '\\' + '\\'.join((*segments, name, audio.stem)))
+                assert source_result['id'] == source_id and guid(source_result.get('parent')) == owner['id'], source_result
+                copied_path = Path(localize_waapi_host_path(_required_string(source, 'original_file_path')))
+                assert not path_is_link_or_reparse(copied_path), copied_path
+                copied = copied_path.resolve(strict=True)
+                assert copied.is_file() and not copied.is_symlink() and path_is_under(copied, runtime.sandbox.sandbox_path.resolve()), copied
+                assert copied.stat().st_size == phase['media']['input_size'] <= 16 * 1024, copied
+                assert audio.stat().st_size == phase['media']['input_size'] and hashlib.sha256(audio.read_bytes()).hexdigest() == phase['media']['input_sha256'], audio
+                phase['media'].update(copied=str(copied), copied_sha256=hashlib.sha256(copied.read_bytes()).hexdigest())
+                assert phase['media']['copied_sha256'] == phase['media']['input_sha256'], phase['media']
+            if tsv: assert table.read_bytes() == table_before, phase['table']
+            phase['preserved_media'] = []
+            for previous in completed_media:
+                previous_owner = owner_at(previous['owner']['name'], rendered=True)
+                assert previous_owner == previous['owner'], (previous, previous_owner)
+                prior_source, prior_selection = selected_source(previous_owner)
+                assert prior_source == previous['source'], (previous, prior_source)
+                assert prior_selection == previous['selection'], (previous, prior_selection)
+                prior_path = Path(localize_waapi_host_path(_required_string(prior_source, 'original_file_path')))
+                assert not path_is_link_or_reparse(prior_path), prior_path
+                assert prior_path.resolve(strict=True) == Path(previous['media']['copied']), prior_source
+                assert prior_path.stat().st_size == previous['media']['input_size'] <= 16 * 1024, previous
+                assert hashlib.sha256(prior_path.read_bytes()).hexdigest() == previous['media']['copied_sha256'], previous
+                input_path = Path(previous['media']['input'])
+                assert input_path.stat().st_size == previous['media']['input_size'] and hashlib.sha256(input_path.read_bytes()).hexdigest() == previous['media']['input_sha256'], previous
+                phase['preserved_media'].append(previous)
+            if index in (1, 2): completed_media.append({'owner': owner, 'source': source, 'selection': selection, 'media': phase['media']})
+            phase['preserved'] = preserved()
+            phase['effect_verified'] = not setup
+        receipt['business_effect_verified'] = True; category['status'] = 'PASS'
+        category['read_views'] = [row['read_view'] for row in receipt['transactions'] if not row['setup']]
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_legacy_import_render_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    assert workflow_sandbox_runtime.version in {'2021.1', '2022.1'}, 'Legacy owner Render applies only to 2021/2022'
+    category = _collect_legacy_import_render_acceptance(workflow_sandbox_runtime, prefix='WAAPI_LEGACY_IMPORT_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
+def _collect_compound_render_history_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    assert runtime.version in {'2022.1', '2025.1'}, runtime.version
+    collector = (_collect_legacy_import_render_acceptance if runtime.version == '2022.1'
+        else _collect_anonymous_effect_slot_construction_acceptance)
+    return collector(runtime, prefix=prefix, compound_render_history=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_compound_render_exact_owner_rename_history_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version not in {'2022.1', '2025.1'}:
+        pytest.skip('Two distinct native shapes: legacy2022 source/undo and modern2025 source/undo/redo')
+    category = _collect_compound_render_history_acceptance(workflow_sandbox_runtime,
+        prefix='WAAPI_RENDER_HISTORY_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
+def _multisource_saved_xml_oracle(raw: bytes, cases: Sequence[Mapping[str, Any]], *, work_unit_id: str,
+                                  platform_choices=None) -> dict[str, Any]:
+    """Independent saved-model expectation, never a public/runtime active-source resolver."""
+    assert len(raw) <= 8 * 1024 * 1024 and b'<!DOCTYPE' not in raw.upper(), 'Unsafe saved XML'
+    root = ET.fromstring(raw)
+    pending, count = [(root, 0)], 0
+    while pending:
+        node, depth = pending.pop(); count += 1
+        assert count <= 32768 and depth <= 64, 'Saved XML node/depth bound exceeded'
+        pending.extend((child, depth + 1) for child in node)
+    def guid(value):
+        if isinstance(value, Mapping): value = value.get('id')
+        assert isinstance(value, str) and uuid.UUID(value).int != 0, value
+        return '{' + str(uuid.UUID(value)).upper() + '}'
+    units = [node for node in root.iter('WorkUnit') if guid(node.get('ID')) == guid(work_unit_id)]
+    assert len(units) == 1, 'Saved Work Unit identity missing or duplicated'
+    direct = units[0].find('ChildrenList')
+    assert direct is not None, 'Saved Work Unit has no ChildrenList'
+    result = {}
+    for case in cases:
+        owner, children, language = case['owner'], case['children'], case['language']
+        matches = [node for node in root.iter('Sound') if guid(node.get('ID')) == guid(owner['id'])]
+        assert len(matches) == 1 and matches[0] in list(direct), 'Saved Sound is missing, duplicated or reparented'
+        sound = matches[0]
+        assert sound.get('Name') == owner['name'], 'Saved Sound name differs from exact public identity'
+        sources = sound.find('ChildrenList')
+        assert sources is not None and len(sources) == 2 and all(node.tag == 'AudioFileSource' for node in sources), 'Saved two-source cardinality missing'
+        by_id = {guid(row['id']): row for row in children}
+        assert len(by_id) == 2 and {guid(node.get('ID')) for node in sources} == set(by_id), 'Saved/public source GUID sets differ'
+        for node in sources:
+            actual = by_id[guid(node.get('ID'))]
+            assert actual['type'] == 'AudioFileSource' and actual['class_id'] == 16, 'Unproven public source class'
+            assert guid(actual['parent']) == guid(owner['id']), 'Public source parent differs'
+            assert actual['path'] == owner['path'] + '\\' + node.get('Name', ''), 'Saved/public source paths differ'
+            assert node.get('Name') == actual['name'] and node.findtext('Language') == language, 'Saved source name/language differs'
+            assert actual['source_language']['name'] == language, 'Public source language differs'
+            assert node.findtext('AudioFile') == Path(localize_waapi_host_path(actual['original_file_path'])).name, 'Saved/public original filename differs'
+        active = sound.find('ActiveSourceList')
+        if platform_choices is not None:
+            assert active is not None and 1 <= len(active) <= 3, 'Saved platform choices missing or unbounded'
+            entries = [dict(node.attrib) for node in active]
+            assert all(node.tag == 'ActiveSource' and guid(node.get('ID')) in by_id and
+                node.get('Name') == by_id[guid(node.get('ID'))]['name'] for node in active), 'Saved platform choice identity differs'
+            assert len({entry.get('Platform') for entry in entries}) == len(entries), 'Duplicated saved platform choices'
+            known_keys = {'Linked', *(choice[key] for choice in platform_choices for key in ('name', 'id'))}
+            assert all(entry.get('Platform') in known_keys for entry in entries), 'Unreviewed saved platform key'
+            selected = {}
+            for choice in platform_choices:
+                specific = [entry for entry in entries if entry.get('Platform') in {choice['id'], choice['name']}]
+                candidates = specific or [entry for entry in entries if entry.get('Platform') == 'Linked']
+                assert len(candidates) == 1 and guid(candidates[0]['ID']) == guid(choice['source_id']), 'Saved platform active choice differs'
+                selected[choice['name']] = guid(candidates[0]['ID'])
+            assert len(set(selected.values())) == 2, 'Platform choices did not diverge'
+            result[case['label']] = {'active_ids': selected, 'active_source_entries': entries,
+                'document_attributes': dict(root.attrib), 'sound_attributes': dict(sound.attrib)}
+            continue
+        assert active is not None and len(active) == 1, 'Saved active-source oracle is missing or ambiguous'
+        selected = active[0]
+        assert selected.tag == 'ActiveSource' and selected.get('Platform') == 'Linked', 'Unreviewed saved active platform representation'
+        active_id = guid(selected.get('ID'))
+        assert active_id in by_id and selected.get('Name') == by_id[active_id]['name'], 'Saved active GUID/name is not one of the two observed sources'
+        public_order = [guid(row['id']) for row in children]
+        xml_order = [guid(node.get('ID')) for node in sources]
+        result[case['label']] = {'active_id': active_id, 'public_order': public_order, 'xml_order': xml_order,
+            'public_active_index': public_order.index(active_id), 'xml_active_index': xml_order.index(active_id),
+            'platform': 'Linked', 'language': language, 'class_authority': 'live AudioSource class16 plus saved AudioFileSource tag'}
+    if platform_choices is not None:
+        return {'cases': result, 'platform_choices_diverge': True}
+    sfx = [result[label] for label in ('sfx_reverse_1', 'sfx_reverse_2')]
+    ordering = {kind: len({row[kind + '_active_index'] for row in sfx}) == 2 for kind in ('public', 'xml')}
+    return {'cases': result, 'ordering_counterexample': ordering, 'ordering_discrimination': any(ordering.values())}
+
+
+def _collect_2021_multisource_active_selection_diagnostic(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    return _collect_multisource_active_selection_diagnostic(runtime, prefix=prefix)
+
+
+def _collect_multisource_active_selection_diagnostic(runtime: _WorkflowSandboxRuntime, *, prefix: str,
+                                                    platform_characterization: bool = False) -> dict[str, Any]:
+    """Prepare only through public transactions; compare three two-source fixtures with saved XML."""
+    from wwise_waapi.operation_soundbank import capture_file_proof
+    assert runtime.version == ('2022.1' if platform_characterization else '2021.1'), runtime.version
+    output = runtime.state_dir / ('platform-active-source-characterization.json' if platform_characterization else 'multisource-active-selection-diagnostic.json')
+    # Direct business helpers: Save9, import(1start+1bind+6rows+6completion),
+    # copy(1start+2bind+1declare+6completion), delete(2queries+1start+1bind+1declare+6completion).
+    budgets = {'readiness': 5, 'save_initial': 9, 'import_setup': 14, 'initial_sources': 24,
+        'copy_setup': 3 * 10, 'cardinality': 3 * 4, 'save_final': 9, 'saved_oracle': 1,
+        'observations': 3 * 6, 'cleanup': 6 * 11}
+    if platform_characterization:
+        budgets = {'readiness': 6, 'save_initial': 9, 'import_setup': 10, 'initial_sources': 8,
+            'copy_setup': 10, 'cardinality': 4, 'select_active': 20, 'save_final': 9, 'saved_oracle': 1,
+            'observations': 12, 'cleanup': 22}
+    category = {'category': '2021-multisource-active-selection-diagnostic', 'status': 'FAIL',
+        'coverage_credit': 'none', 'business_effect_verified': False, 'observation_path': str(output),
+        'verifier_strength': 'public_setup_plus_saved_xml_active_guid_diagnostic_only'}
+    if platform_characterization:
+        category['category'] = '2022-platform-active-source-serialization-characterization'
+    runtime.category_results.append(category)
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
+        'outcome': 'pending', 'stage': 'readiness', 'collection_complete': False,
+        'generic_active_source_mapping': False, 'native_absence_proven': False, 'business_effect_verified': False,
+        'setup_coverage_credit': False, 'model_images': {}, 'call_counts': {key: 0 for key in budgets},
+        'limits': {'public_calls': sum(budgets.values()), 'phase_calls': budgets, 'reply_bytes': 1024 * 1024,
+            'total_reply_bytes': 8 * 1024 * 1024, 'receipt_bytes': 8 * 1024 * 1024,
+            'input_files': 2 if platform_characterization else 6, 'input_bytes_each': 16 * 1024, 'xml_files': 1, 'xml_bytes': 8 * 1024 * 1024,
+            'xml_nodes': 32768, 'xml_depth': 64},
+        'lifecycle_acceptance': 'Requires existing host-category-evidence/v3 full source hash/mtime/tree and cleanup finalizer'}
+    reply_bytes = 0
+    active_phase = None
+    root_ids, input_proofs = [], []
+    def persist():
+        raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(raw) <= receipt['limits']['receipt_bytes'], 'Diagnostic receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+    def stop(outcome, message):
+        receipt['outcome'] = outcome
+        raise RuntimeError(message)
+    def stage(name):
+        receipt['stage'] = name
+    def guid(value):
+        if isinstance(value, Mapping): value = value.get('id')
+        assert isinstance(value, str) and uuid.UUID(value).int != 0, value
+        return '{' + str(uuid.UUID(value)).upper() + '}'
+    class Gateway:
+        def raw_gateway(self, argv):
+            nonlocal reply_bytes
+            key = receipt['stage']
+            assert receipt['call_counts'][key] < budgets[key], ('Public phase call bound exceeded', key)
+            receipt['call_counts'][key] += 1
+            row = {'stage': key, 'argv': list(argv)}; receipt['calls'].append(row)
+            if argv[0] == 'execute' and active_phase is not None:
+                active_phase['native_outcome'] = 'indeterminate'
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                size = len(json.dumps(payload, ensure_ascii=False).encode('utf-8'))
+                reply_bytes += size
+                assert size <= receipt['limits']['reply_bytes'] and reply_bytes <= receipt['limits']['total_reply_bytes'], 'Public result byte bound exceeded'
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+                if argv[0] == 'execute': receipt['outcome'] = 'execution_indeterminate'
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            if code or payload.get('ok') is not True:
+                if argv[0] == 'execute':
+                    dispatch = payload.get('dispatch_result')
+                    recovery = payload.get('recovery') or {}
+                    if payload.get('native_dispatch_attempted') is False or (
+                            not isinstance(dispatch, Mapping) and recovery.get('project_write_outcome') == 'no_project_write_in_this_invocation'):
+                        outcome = 'skill_preparation_rejected'
+                    elif isinstance(dispatch, Mapping) and dispatch.get('waapi_error_uri') == 'ak.wwise.invalid_arguments':
+                        # Report the native rejection, retaining Gateway's possibly indeterminate delivery/effects state.
+                        outcome = 'native_copy_rejection_reported' if active_phase and active_phase['operation'] == 'object.copy' else 'native_rejection_reported'
+                    else:
+                        outcome = 'execution_indeterminate'
+                else:
+                    outcome = 'skill_preparation_rejected' if receipt['stage'] in {'import_setup', 'copy_setup', 'select_active'} and argv[0] != 'verify' else 'observation_or_verification_blocked'
+                stop(outcome, json.dumps(payload, ensure_ascii=False)[:2048])
+            if live and (payload.get('detected_version') != runtime.version or payload.get('endpoint') != {
+                    'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}):
+                stop('execution_indeterminate' if argv[0] == 'execute' else 'observation_or_setup_blocked', 'Public endpoint/version binding differs')
+            return payload
+    gateway = Gateway()
+    projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
+    def rows(argv, *, language=None, source=False, sound=False, extra=(), platform=None):
+        view = ['--platform', platform or receipt['platform']['id']] if 'platform' in receipt else []
+        if language is not None: view += ['--language', language]
+        outputs = ['--include', 'original-file-path', '--include', 'source-language'] if source else []
+        if sound: outputs += ['--include', 'original-file-path', '--include', 'work-unit', '--include-field', 'IsVoice']
+        result = gateway.gateway(['query-object', *argv, *projection, *view, *outputs, *extra], live=True)
+        found = result.get('objects')
+        assert isinstance(found, list) and result.get('count') == len(found), 'Malformed public object page'
+        assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', 'Incomplete public object page'
+        assert len({guid(row['id']) for row in found}) == len(found), 'Duplicated public identities'
+        return found
+    def one(argv, **kwargs):
+        found = rows(argv, **kwargs)
+        assert len(found) == 1, ('Expected one exact public identity', found)
+        return found[0]
+    def exact(identity, **kwargs):
+        found = one(['--exact-id', identity], **kwargs)
+        assert guid(found['id']) == guid(identity), ('Exact identity changed', found)
+        return found
+    def source_children(owner, language, expected, *, platform=None):
+        found = rows(['--exact-id', owner['id'], '--relationship', 'children', '--max-results', '3'], language=language, source=True, platform=platform)
+        if len(found) != expected:
+            stop('setup_cardinality_blocked', 'Required exact direct-source cardinality not established')
+        for row in found:
+            assert row['type'] == 'AudioFileSource' and row['class_id'] == 16 and guid(row['parent']) == guid(owner['id']), row
+            assert row['source_language']['name'] == language, row
+        return found
+    def media_proof(path):
+        return capture_file_proof(path, field='Diagnostic WAV', max_bytes=16 * 1024, io_root=runtime.sandbox.sandbox_path)
+    def complete(draft, phase):
+        nonlocal active_phase
+        active_phase = phase
+        receipt['transactions'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        phase.update(transaction_id=preview['transaction_id'], artifact_hash=preview['artifact_hash'])
+        shown = gateway.gateway(['transaction-show', preview['transaction_id']], live=False)
+        gateway.gateway(['confirm', preview['transaction_id'], '--confirmation-token', shown['confirmation']['token']], live=False)
+        executed = gateway.gateway(['execute', preview['transaction_id']], live=True)
+        if executed.get('state') != 'executed_unverified' or executed.get('automatic_retry') is not False:
+            stop('execution_indeterminate', 'Execution acknowledgement or non-retry binding is incomplete')
+        phase['native_outcome'] = 'accepted'
+        verified = gateway.gateway(['verify', preview['transaction_id']], live=True)
+        assert verified.get('state') == 'verified' and verified.get('verification', {}).get('business_state_verified') is True, verified
+        phase['verified'] = True
+        active_phase = None
+        return executed
+    def lifecycle(operation, identity, *, parent=None):
+        nonlocal active_phase
+        phase = {'operation': operation, 'object_id': identity, 'parent_id': parent, 'native_outcome': 'not_executed'}
+        active_phase = phase
+        draft = _start_business_draft(gateway, operation)
+        _bind_business_object(gateway, draft, role='object', object_id=identity)
+        if parent is not None: _bind_business_object(gateway, draft, role='parent', object_id=parent)
+        _update_business_draft(gateway, draft, 'draft-declare-object-change', ['--name-conflict', 'fail'] if parent is not None else [], live=False)
+        return complete(draft, phase)
+    try:
+        source_kind = 'AudioFileSource' if platform_characterization else 'AudioSource'
+        types = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', source_kind, '--meaning', 'WorkUnit', '--meaning', 'Platform', '--page-size', '64'], live=True)['agent_result']
+        assert types.get('complete') is True, 'Class discovery incomplete'
+        classes = {}
+        for name in ('Sound', source_kind, 'WorkUnit', 'Platform'):
+            candidates = [row for row in types['types'] if row['name'] == name and row['type'] == 'WObject']
+            assert len(candidates) == 1 and type(candidates[0]['classId']) is int, name
+            classes[name] = candidates[0]
+        assert classes['Sound']['classId'] == 65552 and classes[source_kind]['classId'] == 16
+        platforms = rows(['--type-selection', classes['Platform']['selection'], '--max-results', '20'])
+        platform_candidates = [row for row in platforms if row['name'] == 'Mac' and row['type'] == 'Platform']
+        assert len(platform_candidates) == 1, 'Exact Mac platform unavailable'
+        receipt['platform'] = exact(platform_candidates[0]['id'])
+        if platform_characterization:
+            windows = [row for row in platforms if row['name'] == 'Windows' and row['type'] == 'Platform']
+            assert len(windows) == 1, 'Exact Windows platform unavailable'
+            receipt['other_platform'] = exact(windows[0]['id'])
+        parent = one([arg for segment in ACTOR_MIXER_PARENT_SEGMENTS for arg in ('--path-segment', segment)])
+        parent = exact(parent['id'])
+        assert parent['type'] == 'WorkUnit' and parent['class_id'] == classes['WorkUnit']['classId']
+        receipt['parent_before'] = parent
+        stage('save_initial'); receipt['initial_save'] = _save_sandbox_project(gateway)
+        stage('import_setup')
+        draft = _start_business_draft(gateway, 'audio.import')
+        bound = _bind_business_object(gateway, draft, object_id=parent['id'])
+        cases = []
+        fixtures = (('platform_pair', 'SFX', ('Original_A', 'Copied_B')),) if platform_characterization else (
+            ('sfx_reverse_1', 'SFX', ('Zeta_1', 'Alpha_1')), ('sfx_reverse_2', 'SFX', ('Alpha_2', 'Zeta_2')),
+            ('voice', 'English(US)', ('Voice_A', 'Voice_B')))
+        for index, (label, language, stems) in enumerate(fixtures):
+            case = {'label': label, 'language': language, 'sounds': []}; cases.append(case)
+            for offset, stem in enumerate(stems):
+                name = prefix + '_' + label + ('_Target' if offset == 0 else '_Donor')
+                path = _write_fixture_wav(runtime.sandbox.sandbox_path / (prefix + '_Audio'), stem, frequency=330 + index * 220 + offset * 110)
+                proof = media_proof(path); input_proofs.append(proof)
+                case['sounds'].append({'name': name, 'input': proof})
+                _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', label + str(offset),
+                    '--parent-handle', bound, '--name', name, '--kind', 'sound-sfx' if language == 'SFX' else 'sound-voice',
+                    '--field', 'media_file', str(path), '--field', 'language', language], live=False)
+        receipt['fixtures'] = cases
+        complete(draft, {'operation': 'audio.import', 'native_outcome': 'not_executed'})
+        stage('initial_sources')
+        for case in cases:
+            for sound in case['sounds']:
+                owner = one([arg for segment in (*ACTOR_MIXER_PARENT_SEGMENTS, sound['name']) for arg in ('--path-segment', segment)], language=case['language'], sound=True)
+                owner = exact(owner['id'], language=case['language'], sound=True)
+                root_ids.append(owner['id']); sound['owner'] = owner
+                assert owner['type'] == 'Sound' and owner['class_id'] == 65552 and guid(owner['parent']) == guid(parent['id'])
+                assert owner['properties']['IsVoice'] is (case['language'] != 'SFX')
+                child = source_children(owner, case['language'], 1)[0]
+                source = exact(child['id'], language=case['language'], source=True)
+                assert source == child, 'Initial source changed during exact readback'
+                sound['source'] = source
+                proof = media_proof(Path(localize_waapi_host_path(source['original_file_path'])))
+                assert (proof['size'], proof['sha256']) == (sound['input']['size'], sound['input']['sha256'])
+                sound['original'] = proof
+        for case in cases:
+            target, donor = case['sounds']
+            stage('copy_setup'); lifecycle('object.copy', donor['source']['id'], parent=target['owner']['id'])
+            stage('cardinality')
+            children = source_children(target['owner'], case['language'], 2)
+            actual = [exact(row['id'], language=case['language'], source=True) for row in children]
+            assert actual == children, 'Two-source readback drifted'
+            assert guid(target['source']['id']) in {guid(row['id']) for row in children} and guid(donor['source']['id']) not in {guid(row['id']) for row in children}, 'Copy did not preserve/freshen source identity'
+            preserved = [row for row in children if guid(row['id']) == guid(target['source']['id'])]
+            assert preserved == [target['source']], 'Copy changed the existing target source'
+            assert exact(donor['source']['id'], language=case['language'], source=True) == donor['source'], 'Donor source changed'
+            paths = [row['original_file_path'] for row in children]
+            assert len(set(paths)) == 2, 'Two-source original paths are not distinct'
+            proofs = [media_proof(Path(localize_waapi_host_path(path))) for path in paths]
+            assert len({proof['sha256'] for proof in proofs}) == 2, 'Two-source bytes are not distinct'
+            assert {(p['size'], p['sha256']) for p in proofs} == {(s['original']['size'], s['original']['sha256']) for s in case['sounds']}
+            case.update(owner=target['owner'], children=children, copied_media=proofs)
+        if platform_characterization:
+            target = cases[0]
+            original_id = guid(target['sounds'][0]['source']['id'])
+            copied = [row for row in target['children'] if guid(row['id']) != original_id]
+            assert len(copied) == 1, 'Copied source identity is not unique'
+            receipt['platform_choices'] = [
+                {'name': receipt['platform']['name'], 'id': receipt['platform']['id'], 'source_id': copied[0]['id']},
+                {'name': receipt['other_platform']['name'], 'id': receipt['other_platform']['id'], 'source_id': original_id}]
+            stage('select_active')
+            for choice in receipt['platform_choices']:
+                operation = 'ak.wwise.core.sound.setActiveSource'
+                draft = _start_business_draft(gateway, operation)
+                owner_handle = _bind_business_object(gateway, draft, object_id=target['owner']['id'], role='sound')
+                source_handle = _bind_business_object(gateway, draft, object_id=choice['source_id'], role='source')
+                _update_business_draft(gateway, draft, 'draft-declare-project-setting-plan',
+                    ['--sound-handle', owner_handle, '--source-handle', source_handle, '--platform-name', choice['name']], live=False)
+                complete(draft, {'operation': operation, 'platform': choice, 'native_outcome': 'not_executed'})
+        stage('save_final'); receipt['final_save'] = _save_sandbox_project(gateway)
+        stage('saved_oracle')
+        unit = exact(parent['id'], extra=['--include', 'file-path'])
+        path = Path(localize_waapi_host_path(unit['file_path']))
+        assert path.suffix.casefold() == '.wwu' and path_is_under(path, runtime.sandbox.sandbox_path) and not path_is_link_or_reparse(path), 'Unowned saved Work Unit'
+        image_root = runtime.state_dir / 'multisource-model'; image_root.mkdir(exist_ok=False)
+        image = ConsoleModelImageIndex(root=image_root, project=runtime.sandbox.sandbox_project, phase='after', link=receipt['model_images'].setdefault('after', {}))
+        observed = observe_console_file(path, io_root=runtime.sandbox.sandbox_path)
+        raw = image.save(path, observed); image.finish()
+        receipt['oracle'] = _multisource_saved_xml_oracle(raw, cases, work_unit_id=parent['id'],
+            platform_choices=receipt.get('platform_choices'))
+        stage('observations')
+        observations = [(case, choice) for case in cases for choice in receipt['platform_choices']] if platform_characterization else [(case, None) for case in cases]
+        for case, choice in observations:
+            platform_id = choice['id'] if choice else None
+            owner = exact(case['owner']['id'], language=case['language'], sound=True, platform=platform_id,
+                extra=['--include', 'active-source'] if choice else ())
+            assert guid(owner['work_unit']) == guid(parent['id']), 'Sound owning Work Unit differs'
+            for key in ('id', 'name', 'type', 'path', 'class_id', 'notes', 'properties'):
+                assert owner.get(key) == case['owner'].get(key), ('Copy changed target Sound', key)
+            assert guid(owner['parent']) == guid(case['owner']['parent']), 'Copy reparented the target Sound'
+            children = source_children(owner, case['language'], 2, platform=platform_id)
+            assert {guid(row['id']): row for row in children} == {guid(row['id']): row for row in case['children']}, 'Source collection changed after Save'
+            for child in children: assert exact(child['id'], language=case['language'], source=True, platform=platform_id) == child
+            matches = ['{' + str(uuid.UUID(row['id'])).upper() + '}' for row in children
+                if row['original_file_path'] == owner.get('original_file_path')]
+            expected = receipt['oracle']['cases'][case['label']]['active_ids'][choice['name']] if choice else receipt['oracle']['cases'][case['label']]['active_id']
+            comparison = {'sound_file': owner.get('original_file_path'), 'field_present': 'original_file_path' in owner,
+                'matching_source_ids': matches, 'saved_active_guid': expected}
+            if choice:
+                comparison['platform'] = choice
+                assert guid(owner.get('active_source')) == expected, 'Native active edge differs from saved platform oracle'
+                case.setdefault('platform_path_comparisons', []).append(comparison)
+            else:
+                case['path_comparison'] = comparison
+            assert matches == [expected], 'Sound WAV path does not uniquely match the saved active GUID'
+            assert exact(owner['id'], language=case['language'], sound=True, platform=platform_id,
+                extra=['--include', 'active-source'] if choice else ()) == owner, 'Sound observation drifted'
+            assert {guid(row['id']): row for row in source_children(owner, case['language'], 2, platform=platform_id)} == {guid(row['id']): row for row in children}, 'Source collection drifted'
+        assert observe_console_file(path, io_root=runtime.sandbox.sandbox_path)['file_proof'] == observed['file_proof'], 'Saved XML changed during public observations'
+        receipt['input_after'] = [media_proof(Path(proof['path'])) for proof in input_proofs]
+        assert receipt['input_after'] == input_proofs, 'Diagnostic inputs changed'
+        receipt['path_join_matches_saved_oracle'] = True
+        if not platform_characterization and not receipt['oracle']['ordering_discrimination']:
+            stop('ordering_counterexample_unproven', 'No opposite actual active-source child positions observed; no order inference or replay')
+        stage('cleanup')
+        for identity in reversed(root_ids):
+            assert exact(identity)['id'] == identity
+            lifecycle('object.delete', identity)
+            assert rows(['--exact-id', identity]) == [], 'Created Sound cleanup incomplete'
+        receipt.update(outcome='diagnostic_complete', collection_complete=True, object_cleanup='verified')
+        category['status'] = 'PASS'
+    except Exception as exc:
+        if receipt['outcome'] == 'pending':
+            receipt['outcome'] = ('saved_oracle_blocked' if receipt['stage'] == 'saved_oracle' else
+                'setup_cardinality_blocked' if receipt['stage'] == 'cardinality' else
+                'cleanup_failed' if receipt['stage'] == 'cleanup' else 'observation_or_setup_blocked')
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        receipt.setdefault('object_cleanup', 'not_attempted_or_incomplete_preserve_failed_sandbox')
+        category.update(status='blocked', reason=receipt['outcome'])
+    finally:
+        persist()
+    return category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_2021_multisource_active_selection_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2021.1':
+        pytest.skip('The source-bound active-selection diagnostic is2021-only')
+    category = _collect_2021_multisource_active_selection_diagnostic(workflow_sandbox_runtime,
+        prefix='WAAPI_MULTI_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_platform_active_source_serialization_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2022.1':
+        pytest.skip('The platform serialization characterization is2022-only')
+    category = _collect_multisource_active_selection_diagnostic(workflow_sandbox_runtime,
+        prefix='WAAPI_PLATFORM_' + uuid.uuid4().hex[:10], platform_characterization=True)
+    assert category['status'] == 'PASS', category
+
+
+def _collect_soundcaster_dump_observation(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Observe one closed dump; token occurrences never certify session values."""
+    from wwise_waapi.operation_soundbank import capture_file_proof
+    from wwise_waapi.console_project_operations import inspect_object_dump_artifact, MAX_OBJECT_DUMP_JSON_DEPTH
+    assert runtime.version == '2024.1', 'This source-bound diagnostic is only for the retained 2024 fixture'
+    sessions = [('MIDI', '{9C02096E-8E29-4029-9D49-778F85015C87}'),
+        ('Minigun', '{1C5BA931-9550-4DC8-B1C7-13689B8AE813}'),
+        ('Music', '{F4B8069C-3C15-4157-B570-8A41AB2463C2}')]
+    project = runtime.sandbox.sandbox_project
+    output = runtime.state_dir / 'soundcaster-dump-observation.json'
+    artifacts = runtime.state_dir / 'soundcaster-dump-artifacts'
+    artifacts.mkdir(parents=True, exist_ok=False)
+    model_root = artifacts / 'model'; model_root.mkdir()
+    dump_root = project.parent / ('soundcaster-dump-' + uuid.uuid4().hex)
+    dump_root.mkdir(exist_ok=False)
+    dump_file = dump_root / 'objects.json'
+    category = {'category': 'soundcaster-dump-diagnostic', 'status': 'FAIL',
+        'verifier_strength': 'diagnostic_artifact_and_exact_guid_occurrences_only_no_session_value_or_business_credit',
+        'coverage_credit': 'none', 'observation_path': str(output)}
+    runtime.category_results.append(category)
+    receipt = {'contract': 'waapi-skill.soundcaster-dump-diagnostic/v1', 'candidate': runtime.candidate,
+        'version': runtime.version, 'calls': [], 'collection_complete': False, 'transaction': {},
+        'business_preservation_verified': False, 'session_values_observed': False, 'semantic_absence_proven': False,
+        'media_operation_executed': False, 'saved_model_preserved': None, 'model_images': {},
+        'limits': {'public_calls': 12, 'reply_bytes': 256 * 1024, 'total_reply_bytes': 2 * 1024 * 1024,
+            'report_bytes': 128 * 1024, 'dump_bytes': 8 * 1024 * 1024,
+            'json_work': 'linear_in_bounded_artifact_bytes',
+            'json_depth': MAX_OBJECT_DUMP_JSON_DEPTH, 'source_bindings': 128, 'session_occurrence_paths': 32}}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= receipt['limits']['report_bytes'], 'Dump diagnostic report byte bound exceeded'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+    def archive(path, raw):
+        prove_artifact_path(path, io_root=artifacts, field='dump diagnostic archive', must_exist=False, expect_directory=False)
+        descriptor = os.open(path, binary_file_open_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL) | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+        with os.fdopen(descriptor, 'wb') as stream:
+            stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+        proof = capture_file_proof(path, field='dump diagnostic archive', max_bytes=8 * 1024 * 1024, io_root=artifacts)
+        assert proof['sha256'] == hashlib.sha256(raw).hexdigest() and proof['size'] == len(raw), proof
+        return proof
+    class Gateway:
+        def gateway(self, argv, *, live):
+            assert len(receipt['calls']) < 12, 'Dump diagnostic public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            if argv[0] == 'execute': receipt['transaction']['execution_attempted'] = True
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+                assert len(body) <= 256 * 1024, 'Dump diagnostic reply byte bound exceeded'
+                receipt['total_reply_bytes'] = receipt.get('total_reply_bytes', 0) + len(body)
+                assert receipt['total_reply_bytes'] <= 2 * 1024 * 1024, 'Dump diagnostic total reply bound exceeded'
+                path = artifacts / ('reply-' + str(len(receipt['calls'])) + '.json')
+                proof = archive(path, body)
+                row.update(exit_code=code, reply_path=str(path), reply_sha256=proof['sha256'], reply_bytes=len(body))
+                if payload.get('transaction_id'): receipt['transaction']['id'] = payload['transaction_id']
+                assert code == 0 and payload.get('ok') is True, payload
+                if live:
+                    assert payload.get('detected_version') == runtime.version, payload
+                    assert payload.get('endpoint') == {'host': runtime.lifecycle.host, 'port': runtime.port,
+                        'url': runtime.lifecycle.waapi_url}, payload
+                return payload
+            except Exception as exc:
+                row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+                raise
+            finally:
+                persist()
+    gateway = Gateway()
+    def guid(value):
+        assert isinstance(value, str) and len(value) in (36, 38), value
+        parsed = uuid.UUID(value)
+        assert parsed.int != 0, value
+        return '{' + str(parsed).upper() + '}'
+    def model(phase, *, parse=False):
+        link = receipt['model_images'][phase] = {}
+        index = ConsoleModelImageIndex(root=model_root, project=project, phase=phase, link=link)
+        paths, pending, entries = [project], [(project.parent, 0)], 0
+        definitions, selected = {}, {}
+        try:
+            while pending:
+                directory, depth = pending.pop()
+                assert depth <= 64, 'Saved model directory depth bound exceeded'
+                with os.scandir(directory) as children:
+                    for entry in children:
+                        entries += 1
+                        assert entries <= 4096, 'Saved model directory entry bound exceeded'
+                        path = Path(entry.path)
+                        assert not path_is_link_or_reparse(path), path
+                        if entry.is_dir(follow_symlinks=False): pending.append((path, depth + 1))
+                        elif path.name.casefold().endswith('.wwu'):
+                            paths.append(path)
+                            assert len(paths) <= 513, 'Saved model Work Unit bound exceeded'
+            for path in sorted(paths):
+                raw = index.save(path, observe_console_file(path, io_root=project.parent))
+                if not parse: continue
+                assert b'<!DOCTYPE' not in raw.upper(), 'Unexpected XML document type'
+                tree = ET.fromstring(raw)
+                stack, count = [(tree, None, 0)], 0
+                while stack:
+                    node, group, depth = stack.pop(); count += 1
+                    assert count <= 32768 and depth <= 64, 'Saved XML node/depth bound exceeded'
+                    if node.tag in {'StateGroup', 'SwitchGroup'}: group = (node.tag, guid(node.get('ID')))
+                    if node.tag in {'GameParameter', 'State', 'Switch', 'StateGroup', 'SwitchGroup'}:
+                        identity = guid(node.get('ID'))
+                        assert identity not in definitions, ('Duplicate source definition', identity)
+                        definitions[identity] = {'type': node.tag, 'name': node.get('Name'),
+                            'group_id': group[1] if group and node.tag in {'State', 'Switch'} else None}
+                    if node.tag == 'SoundcasterSession' and node.get('ID', '').upper() in dict(sessions).values():
+                        identity = guid(node.get('ID'))
+                        assert identity not in selected, ('Duplicate source session', identity)
+                        selected[identity] = (node, path.relative_to(project.parent).as_posix())
+                    stack.extend((child, group, depth + 1) for child in reversed(list(node)))
+            index.finish()
+            return index, definitions, selected
+        except Exception as exc:
+            index.error(None, exc)
+            raise
+    def source_oracle(definitions, selected):
+        assert set(selected) == {identity for _, identity in sessions}, 'Source session identities missing or ambiguous'
+        result, binding_count = [], 0
+        for name, identity in sessions:
+            node, relative = selected[identity]
+            assert node.get('Name') == name, (name, node.attrib)
+            row = {'id': identity, 'name': name, 'source_file': relative, 'rtpc': [], 'states': [], 'switches': [], 'show_all': {}}
+            for tag, field, member, reference, kind in (
+                ('RTPCValueList', 'rtpc', 'RTPCValue', 'GameParameterRef', 'GameParameter'),
+                ('CurrentStateList', 'states', 'CurrentStateRef', None, 'State'),
+                ('CurrentSwitchList', 'switches', 'CurrentSwitchRef', None, 'Switch')):
+                lists = node.findall(tag)
+                assert len(lists) == 1 and lists[0].get('ShowAll') in {'true', 'false'}, (identity, tag)
+                row['show_all'][field] = lists[0].get('ShowAll')
+                seen = set()
+                for item in lists[0]:
+                    assert item.tag == member, item.tag
+                    target = item.find(reference) if reference else item
+                    target_id = guid(target.get('ID'))
+                    assert target_id not in seen, ('Duplicate saved selection', target_id)
+                    seen.add(target_id)
+                    definition = definitions[target_id]
+                    assert definition['type'] == kind and definition['name'] == target.get('Name'), (target.attrib, definition)
+                    value = {'target_id': target_id, 'target_name': definition['name']}
+                    if reference:
+                        values = item.findall('Value')
+                        assert len(values) == 1 and len(values[0].text or '') <= 64, item.attrib
+                        value['value_text'] = values[0].text
+                        assert math.isfinite(float(value['value_text'])), value
+                    else:
+                        group_id = definition['group_id']
+                        assert group_id in definitions and definitions[group_id]['type'] == kind + 'Group', definition
+                        value['group_id'] = group_id
+                    row[field].append(value); binding_count += 1
+                    assert binding_count <= 128, 'Source saved-value binding bound exceeded'
+            result.append(row)
+        assert binding_count > 0, 'Fixture must contain real stored selections'
+        receipt['source_binding_count'] = binding_count
+        return result
+    def retain_dump():
+        captured = observe_console_file(dump_file, io_root=dump_root)
+        raw = base64.b64decode(captured['content_base64'], validate=True)
+        archived = artifacts / 'native-objects.json'
+        proof = archive(archived, raw)
+        receipt['dump_artifact'] = {'native_path': str(dump_file), 'native_file_proof': captured['file_proof'],
+            'archive_path': str(archived), 'archive_proof': proof, 'semantic_schema': 'unobserved'}
+        return raw
+    try:
+        before, definitions, selected = model('before', parse=True)
+        receipt['source_sessions'] = source_oracle(definitions, selected)
+        persist()
+        draft = _start_business_draft(gateway, 'ak.wwise.cli.dumpObjects')
+        _update_business_draft(gateway, draft, 'draft-declare-cli-console-plan', [
+            '--value', 'project_file', str(project), '--value', 'output_file', str(dump_file),
+            '--value', 'content', 'property_sets', '--toggle', 'include_session_objects', 'enable'], live=True)
+        transaction = _complete_core_result_schema_draft(gateway, draft)
+        receipt['transaction'].update(id=transaction['preview']['transaction_id'],
+            execute_state=transaction['execute']['state'], verify_state=transaction['verify']['state'],
+            business_state_verified=transaction['verify']['verification']['business_state_verified'])
+        raw = retain_dump()
+        dumped, json_observation = inspect_object_dump_artifact(raw)
+        targets = {identity for _, identity in sessions}
+        for row in receipt['source_sessions']:
+            for field in ('rtpc', 'states', 'switches'):
+                for binding in row[field]:
+                    targets.add(binding['target_id'])
+                    if 'group_id' in binding: targets.add(binding['group_id'])
+        counts = receipt['guid_occurrence_counts'] = {identity: 0 for identity in sorted(targets)}
+        occurrences = receipt['session_guid_occurrences'] = []
+        receipt['occurrence_paths_complete'] = True
+        session_ids = {identity for _, identity in sessions}
+        stack = [(iter(((None, dumped),)), [], False)]
+        def observe(value, path, location):
+            if type(value) is not str or len(value) not in (36, 38): return
+            try: identity = guid(value)
+            except (ValueError, AssertionError): return
+            if identity not in counts: return
+            counts[identity] += 1
+            if identity in session_ids:
+                if len(occurrences) < 32 and len(json.dumps(path).encode('utf-8')) <= 2048:
+                    occurrences.append({'id': identity, 'json_path_segments': path, 'match_in': location,
+                        'interpretation': 'token_occurrence_only_not_session_or_value_binding'})
+                else: receipt['occurrence_paths_complete'] = False
+        while stack:
+            children, parent_path, mapping = stack[-1]
+            try:
+                key, item = next(children)
+            except StopIteration:
+                stack.pop()
+                continue
+            path = parent_path if key is None else [*parent_path, key]
+            if mapping: observe(key, path, 'key')
+            if isinstance(item, dict):
+                stack.append((iter(item.items()), path, True))
+            elif isinstance(item, list):
+                stack.append((enumerate(item), path, False))
+            else: observe(item, path, 'value')
+        receipt['dump_json_nodes'] = json_observation['json_nodes']
+        receipt['dump_json_depth'] = json_observation['json_depth']
+        receipt['missing_session_guid_tokens'] = [identity for _, identity in sessions if not counts[identity]]
+        after, _, _ = model('after')
+        receipt['saved_model_preserved'] = (set(before.files) == set(after.files) and all(
+            row['file_proof'] == after.files[name]['file_proof'] for name, row in before.files.items()))
+        assert receipt['saved_model_preserved'], 'Dump changed saved project/Work Unit identities or bytes'
+        receipt['collection_complete'] = True
+        category['status'] = 'blocked'
+        category['reason'] = 'Diagnostic only; native session/value representation requires independent review'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        raise
+    finally:
+        try:
+            if dump_file.exists() and 'dump_artifact' not in receipt: retain_dump()
+            if receipt['model_images'].get('before', {}).get('complete') and 'after' not in receipt['model_images']:
+                model('after')
+        except Exception as exc:
+            receipt['finalization_error'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_soundcaster_dump_metadata_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    category = _collect_soundcaster_dump_observation(workflow_sandbox_runtime)
+    assert category['status'] == 'blocked', category
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['collection_complete'] and receipt['saved_model_preserved'], receipt
+    assert receipt['session_values_observed'] is receipt['business_preservation_verified'] is False
+
+
+def _collect_source_plugin_selection_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str,
+        explicit_current_platform: bool = False) -> dict[str, Any]:
+    """Prove one observed A→B Source-plugin selection, never a sole-source no-op."""
+    from wwise_waapi.native_catalog import load_native_catalog
+    assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}
+    assert not explicit_current_platform or runtime.version == '2022.1'
+    catalog = load_native_catalog(runtime.version, 'wwise-console')
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
+    output = runtime.state_dir / 'source-plugin-selection.json'
+    assert not output.exists(), 'Never overwrite original Source selection evidence'
+    output.parent.mkdir(parents=True, exist_ok=True)
+    artifacts = runtime.state_dir / 'source-plugin-selection-artifacts'; artifacts.mkdir(exist_ok=False)
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR']); previous_native = set(native_root.glob('*.json'))
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH']); config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+    transactions: list[str] = []
+    category = {'category': 'source-plugin-active-selection', 'status': 'FAIL', 'transaction_ids': transactions,
+        'observation_path': str(output), 'scope': 'one_actual_SourcePlugin_A_to_B_on_matching_Console_current_view',
+        'verifier_strength': 'Gateway_verification_plus_independent_GUID_change_class_parent_fields_complete_childset_and_preservation'}
+    if explicit_current_platform:
+        category.update(scope='one_2022_SourcePlugin_A_to_B_explicit_current_platform_alternative')
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {'contract': 'waapi-skill.source-plugin-selection/v1', 'candidate': runtime.candidate,
+        'version': runtime.version, 'endpoint': endpoint, 'transaction_ids': transactions, 'phases': [], 'calls': [],
+        'native_evidence': [], 'collection_complete': False, 'business_effect_verified': False,
+        'config_sha256': config_hash, 'source_project': str(runtime.sandbox.source_project),
+        'native_catalog': {'build': catalog['provenance']['build'], 'content_sha256': catalog['content_sha256']},
+        'scope_exclusions': ['other_versions_and_hosts', 'Voice_or_language_semantics', 'platform_isolation_or_unlink', 'Tone_audio_effect'],
+        'limits': {'calls': 72 if explicit_current_platform else 70, 'receipt_bytes': 8 * 1024 * 1024, 'reply_bytes': 1024 * 1024,
+                   'native_files': 1024, 'native_bytes': 128 * 1024 * 1024},
+        'lifecycle_final_reference': {'contract': 'waapi-skill.host-category-evidence/v3', 'phase': 'final',
+            'candidate': runtime.candidate, 'category': category['category'], 'transaction_ids': transactions,
+            'path': runtime.env.get('WWISE_CATEGORY_EVIDENCE_PATH') or runtime.env.get('WWISE_MACOS_CATEGORY_EVIDENCE_PATH'),
+            'cleanup_status': 'unresolved_until_final_row'},
+        'lifecycle_acceptance': 'Body completion requires matching final v3 category source/hash/mtime/tree and owned-process/sandbox cleanup.'}
+    platform: dict[str, Any] | None = None
+    if explicit_current_platform:
+        receipt['alternative_mode'] = 'explicit_current_platform'
+    attempted: set[str] = set()
+    def persist():
+        raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(raw) <= receipt['limits']['receipt_bytes'], 'Selection receipt exceeds bound'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+    class Gateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < receipt['limits']['calls'], 'Source selection public call bound exceeded'
+            if argv[0] == 'execute':
+                assert argv[1] not in attempted, 'Never retry Source selection or setup'
+                attempted.add(argv[1])
+            row: dict[str, Any] = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                assert len(json.dumps(payload, ensure_ascii=False).encode('utf-8')) <= receipt['limits']['reply_bytes']
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = Gateway()
+    def query(argv, *, source=False, sound=False):
+        projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
+        if source:
+            projection += [item for token in ('StartFreq', 'WaveType') for item in ('--include-field', token)]
+        if sound: projection += ['--include-field', 'IsVoice', '--include', 'active-source']
+        payload = gateway.gateway(['query-object', *argv, *projection, *(['--platform', platform['id']] if platform else []),
+            '--max-results', '8'], live=True)
+        assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', payload
+        rows = payload.get('objects'); assert isinstance(rows, list) and payload.get('count') == len(rows), payload
+        ids = [uuid.UUID(row['id']) for row in rows]; assert len(set(ids)) == len(ids), rows
+        return rows
+    def exact(identity, **view):
+        rows = query(['--exact-id', identity], **view); assert len(rows) == 1, rows
+        assert uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
+        return rows[0]
+    def children(identity):
+        return sorted(query(['--exact-id', identity, '--relationship', 'children']), key=lambda row: uuid.UUID(row['id']))
+    def active(row):
+        value = row.get('active_source'); assert isinstance(value, Mapping) and isinstance(value.get('id'), str), row
+        return str(uuid.UUID(value['id']))
+    def preserved_sound(row):
+        result = {key: value for key, value in row.items() if key != 'active_source'}
+        if 'unavailable_fields' in result:
+            fields = [field for field in result['unavailable_fields'] if field != 'active_source']
+            if fields:
+                result['unavailable_fields'] = fields
+            else:
+                del result['unavailable_fields']
+        return result
+    def complete(draft, label):
+        phase: dict[str, Any] = {'phase': label, 'execution_attempted': False}; receipt['phases'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        tx = phase['transaction_id'] = preview['transaction_id']; assert tx not in transactions; transactions.append(tx)
+        try:
+            shown = gateway.gateway(['transaction-show', tx], live=False); phase['immutable_preview'] = shown['artifact']
+            gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+            if explicit_current_platform and label == 'select_other_source':
+                current = phase['platform_before_execute'] = gateway.gateway(['status'], live=True)
+                assert current['wwise'] == status['wwise'], 'Source selection host context changed'
+                assert all(current['project'].get(key) == status['project'].get(key)
+                    for key in ('id', 'path', 'currentPlatformId')), 'Current platform/project changed before selection'
+            phase['execution_attempted'] = True; persist()
+            code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code, 'payload': executed}
+            assert code == 0 and executed.get('state') == 'executed_unverified', executed
+            code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code, 'payload': verified}
+            assert code == 0 and verified.get('state') == 'verified' and verified.get('verification', {}).get('business_state_verified') is True, verified
+            return phase
+        finally:
+            phase['final_transaction'] = gateway.gateway(['transaction-show', tx], live=False); persist()
+    def field(payload, label, token):
+        rows = payload.get('field_candidates')
+        if rows is None:
+            rows = [candidate for result in payload.get('meaning_results', []) for candidate in result.get('candidates', [])]
+        matches = {row['handle']: row for row in rows if row.get('label') == label and row.get('metadata', {}).get('name') == token}
+        assert len(matches) == 1, {'label': label, 'token': token, 'candidates': rows}
+        return next(iter(matches.values()))
+    persist()
+    try:
+        status = gateway.gateway(['status'], live=True)
+        info_call = next(row for row in status['calls'] if row['api'] == 'ak.wwise.core.getInfo')
+        observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
+        receipt['get_info'] = json.loads(base64.b64decode(observed['content_base64'], validate=True))['result']
+        assert receipt['get_info']['isCommandLine'] is True
+        version = receipt['get_info']['version']
+        assert tuple(version[key] for key in ('year', 'major', 'minor', 'build')) == tuple(int(p) for p in catalog['provenance']['build'].split('.')), version
+        if explicit_current_platform:
+            current = status.get('project', {}).get('currentPlatformId')
+            assert isinstance(current, str) and uuid.UUID(current).int != 0, 'Explicit-platform setup needs an observed current platform'
+            selected_platform = exact(current)
+            assert selected_platform['type'] == 'Platform', selected_platform
+            name = selected_platform['name']
+            assert isinstance(name, str) and name and name == name.strip(), selected_platform
+            platform = receipt['platform'] = selected_platform
+        segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        rows = query([item for segment in segments for item in ('--path-segment', segment)])
+        parent, = rows; receipt['parent_before'] = parent
+        draft = _start_business_draft(gateway, 'object.set')
+        parent_handle = _bind_business_object(gateway, draft, object_id=parent['id'])
+        for label in ('target', 'sentinel'):
+            _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', label,
+                '--parent-handle', parent_handle, '--name', prefix + '_' + label, '--kind', 'sound-sfx',
+                '--field', 'notes', 'Keep ' + label], live=False)
+        setup = complete(draft, 'empty_sounds')
+        root, = setup['execute']['payload']['dispatch_result']['result']['objects']
+        created = root['children']; assert len(created) == 2 and len({uuid.UUID(row['id']) for row in created}) == 2, created
+        target_id, = [row['id'] for row in created if row['name'] == prefix + '_target']
+        sentinel_id, = [row['id'] for row in created if row['name'] == prefix + '_sentinel']
+        target, sentinel = exact(target_id, sound=True), exact(sentinel_id, sound=True)
+        specs = setup['immutable_preview']['prepared_operation']['pre_state']['object_set_nodes']
+        for label, row in (('target', target), ('sentinel', sentinel)):
+            spec, = [s for s in specs if s['requested_name'] == prefix + '_' + label]
+            assert row['type'] == 'Sound' and row['class_id'] == spec['class_id'] and row['parent']['id'] == parent['id'], row
+            assert row['notes'] == 'Keep ' + label and row['properties']['IsVoice'] is False and row.get('active_source') is None, row
+            assert children(row['id']) == [], row
+        sources = []
+        for index, frequency in enumerate((440, 660), 1):
+            draft = _start_business_draft(gateway, 'object.createPlugin')
+            owner = _bind_business_object(gateway, draft, object_id=target_id)
+            kind = _discover_business_type(gateway, draft, meaning='Wwise Tone Generator', role='source', expected_label='Wwise Tone Generator')
+            fields = _update_business_draft(gateway, draft, 'draft-discover-fields',
+                ['--type-handle', kind, '--meaning', 'Start Frequency', '--meaning', 'Waveform'], live=True)
+            start, wave = field(fields, 'Start Frequency', 'StartFreq'), field(fields, 'Waveform', 'WaveType')
+            sine, = [row['value'] for row in wave['metadata']['restriction']['values'] if row['displayName'] == 'Sine']
+            assert type(sine) is int and 20 <= frequency <= 20000
+            receipt['metadata_selection'] = {'frequency': start, 'waveform': wave, 'sine_value': sine}
+            _update_business_draft(gateway, draft, 'draft-declare-existing', ['--declaration-id', 'source', '--object-handle', owner,
+                '--field', 'plugin_role', 'source', '--field', 'plugin_placement', 'owner', '--field', 'plugin_name', 'Tone' + str(index),
+                '--field', 'plugin_type_handle', kind, '--field', 'notes', 'Keep Source ' + str(index),
+                '--field-value', start['handle'], str(frequency), '--field-value', wave['handle'], str(sine)], live=False)
+            phase = complete(draft, 'source_' + str(index))
+            owner_result, = phase['execute']['payload']['dispatch_result']['result']['objects']
+            source_result, = owner_result['children']; assert uuid.UUID(owner_result['id']) == uuid.UUID(target_id)
+            source = exact(source_result['id'], source=True)
+            descriptor = phase['immutable_preview']['prepared_operation']['verification_plan']['descriptor']
+            assert source['type'] in {'Source', 'SourcePlugin'} and source['class_id'] == descriptor['class_id'], source
+            assert source['parent']['id'] == target_id and source['path'] == target['path'] + '\\Tone' + str(index), source
+            assert source['notes'] == 'Keep Source ' + str(index) and source['properties'] == {'StartFreq': frequency, 'WaveType': sine}, source
+            assert uuid.UUID(source['id']) not in {uuid.UUID(row['id']) for row in (parent, target, sentinel, *sources)}, 'Source returned a retained GUID'
+            for retained in sources: assert exact(retained['id'], source=True) == retained, 'Source setup changed a retained Source'
+            sources.append(source); phase['independent_source'] = source
+        def preservation():
+            current_target = exact(target_id, sound=True)
+            return {'sound': preserved_sound(current_target),
+                'sources': [exact(row['id'], source=True) for row in sources], 'children': children(target_id),
+                'sentinel': exact(sentinel_id, sound=True), 'sentinel_children': children(sentinel_id), 'parent': exact(parent['id'])}, current_target
+        before, owner = preservation()
+        assert before['sources'] == sources and before['sentinel'] == sentinel and before['parent'] == parent
+        assert before['sound'] == preserved_sound(target), 'Source setup changed the original Sound fields'
+        assert before['sentinel_children'] == [], 'Source setup changed the unrelated Sound child set'
+        assert len(before['children']) == 2 and {uuid.UUID(row['id']) for row in before['children']} == {uuid.UUID(row['id']) for row in sources}, before
+        initial = active(owner); assert initial in {str(uuid.UUID(row['id'])) for row in sources}, owner
+        selected, = [row for row in sources if str(uuid.UUID(row['id'])) != initial]
+        receipt['selection'] = {'before_active_id': initial, 'requested_active_id': str(uuid.UUID(selected['id'])),
+            'preserved_before': before, 'platform_scope': ('explicit_observed_current_platform_existing_linkage_no_isolation_claim'
+                if platform else 'current_default_view_existing_linkage_no_isolation_claim')}
+        draft = _start_business_draft(gateway, 'ak.wwise.core.sound.setActiveSource')
+        sound_handle = _bind_business_object(gateway, draft, object_id=target_id, role='sound')
+        source_handle = _bind_business_object(gateway, draft, object_id=selected['id'], role='source')
+        _update_business_draft(gateway, draft, 'draft-declare-project-setting-plan',
+            ['--sound-handle', sound_handle, '--source-handle', source_handle,
+                *(['--platform-name', platform['name']] if platform else [])], live=True)
+        selection = complete(draft, 'select_other_source')
+        args = selection['immutable_preview']['prepared_operation']['dispatch']['args']
+        assert args == {'sound': target_id, 'source': selected['id'],
+            **({'platform': platform['name']} if platform else {})}, args
+        after, owner = preservation(); receipt['selection'].update(preserved_after=after, after_active_id=active(owner))
+        assert receipt['selection']['after_active_id'] == receipt['selection']['requested_active_id'] != initial, receipt['selection']
+        assert after == before, 'Selection changed preserved Source/owner/sentinel fields or child membership'
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, 'Source selection configuration changed'
+        final = gateway.gateway(['status'], live=True); assert final['wwise'] == status['wwise'], 'Source selection host context changed'
+        if explicit_current_platform:
+            receipt['platform_final'] = final
+            assert all(final['project'].get(key) == status['project'].get(key)
+                for key in ('id', 'path', 'currentPlatformId')), 'Current platform/project changed during selection'
+        receipt.update(collection_complete=True, business_effect_verified=True); category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        raise
+    finally:
+        try:
+            paths = sorted(set(native_root.glob('*.json')) - previous_native); assert len(paths) <= receipt['limits']['native_files']
+            total = 0
+            for index, path in enumerate(paths):
+                observed = observe_console_file(path, io_root=native_root); raw = base64.b64decode(observed['content_base64'], validate=True)
+                total += len(raw); assert total <= receipt['limits']['native_bytes'] and len(raw) <= 4 * 1024 * 1024
+                target = artifacts / ('native-' + str(index) + '.json')
+                prove_artifact_path(target, io_root=artifacts, field='Source selection archive', expect_directory=False)
+                fd = os.open(target, binary_file_open_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL) | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+                with os.fdopen(fd, 'wb') as stream: stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+                assert target.read_bytes() == raw
+                receipt['native_evidence'].append({'native_path': str(path), 'archive_path': str(target),
+                    'sha256': hashlib.sha256(raw).hexdigest(), 'size': len(raw), 'native_file_proof': observed['file_proof']})
+        except Exception as exc:
+            receipt.update(collection_complete=False, business_effect_verified=False,
+                archive_failure={'type': type(exc).__name__, 'message': str(exc)[:2048]}); category['status'] = 'FAIL'
+            raise
+        finally:
+            persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_source_plugin_active_selection_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version not in {'2022.1', '2023.1', '2024.1', '2025.1'}:
+        pytest.skip('SourcePlugin A-to-B acceptance requires the pinned 2022.1–2025.1 Console setter; 2021.1 remains unresolved')
+    category = _collect_source_plugin_selection_acceptance(workflow_sandbox_runtime, prefix='WAAPI_SRC_SELECT_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_source_plugin_explicit_current_platform_alternative(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2022.1':
+        pytest.skip('This explicit-current-platform alternative diagnostic is pinned to Console2022.1')
+    category = _collect_source_plugin_selection_acceptance(workflow_sandbox_runtime,
+        prefix='WAAPI_SRC_EXPLICIT_' + uuid.uuid4().hex[:10], explicit_current_platform=True)
+    assert category['status'] == 'PASS', category
+
+
+def _legacy_saved_source_nodes(images, source_id, owner_id):
+    """Read only the retained 2021 Synth shape; unknown owned declarations fail closed."""
+    def guid(value):
+        assert isinstance(value, str) and uuid.UUID(value).int, 'Missing saved GUID'
+        return '{' + str(uuid.UUID(value)).upper() + '}'
+    assert 1 <= len(images) <= 2, 'Only exact Source/destination Work Units are observed'
+    matches, known_declarations = [], []
+    for raw in images:
+        assert len(raw) <= ConsoleModelImageIndex.MAX_FILE_BYTES and b'<!DOCTYPE' not in raw.upper(), 'Unsafe saved XML'
+        root = ET.fromstring(raw)
+        stack, count, parents = [(root, 0)], 0, {}
+        while stack:
+            node, depth = stack.pop(); count += 1
+            assert count <= 32768 and depth <= 64, 'Saved XML node/depth bound exceeded'
+            for child in node:
+                parents[child] = node; stack.append((child, depth + 1))
+        known_declarations.extend(node for node in root.iter() if node.tag in {'SourcePlugin', 'RTPC', 'ModulatorLfo', 'Curve'})
+        for node in root.iter('SourcePlugin'):
+            if guid(node.get('ID')) != guid(source_id): continue
+            children = parents.get(node); owner = parents.get(children)
+            assert children is not None and children.tag == 'ChildrenList' and owner is not None and owner.tag == 'Sound', 'Saved Source parent shape changed'
+            assert guid(owner.get('ID')) == guid(owner_id), 'Saved Source owner differs'
+            matches.append(node)
+    assert len(matches) == 1, 'Saved Source missing or duplicated'
+    source = matches[0]
+    paths = {'rtpc': "PropertyList/Property[@Name='OutputLevel']/RTPCList/RTPC",
+        'control_input': "PropertyList/Property[@Name='OutputLevel']/RTPCList/RTPC/ReferenceList/Reference[@Name='ControlInput']/Custom/ModulatorLfo",
+        'curve': "PropertyList/Property[@Name='OutputLevel']/RTPCList/RTPC/Curve"}
+    nodes = {'source': source}
+    for role, path in paths.items():
+        rows = source.findall(path)
+        assert len(rows) == 1, 'Missing or ambiguous saved owned member: ' + role
+        nodes[role] = rows[0]
+    declarations = [node for node in source.iter() if 'ID' in node.attrib and node.tag != 'ObjectRef']
+    assert set(declarations) == set(nodes.values()), 'Unclassified saved owned declaration'
+    ids = [guid(node.get('ID')) for node in declarations]
+    assert len(set(ids)) == 4, 'Saved owned identities alias'
+    assert all(sum(guid(node.get('ID')) == identity for node in known_declarations) == 1 for identity in ids), 'Saved owned GUID aliases another declaration'
+    return nodes
+
+
+def _legacy_saved_source_copy_oracle(before_images, after_images, *, source_id, copied_id,
+        original_owner_id, destination_id, before_live, copied_live):
+    """Fixture-only complete saved subtree comparison, never production copy authority."""
+    def guid(value):
+        if isinstance(value, Mapping): value = value.get('id')
+        assert isinstance(value, str) and uuid.UUID(value).int, 'Missing live/saved GUID'
+        return '{' + str(uuid.UUID(value)).upper() + '}'
+    before = _legacy_saved_source_nodes(before_images, source_id, original_owner_id)
+    retained = _legacy_saved_source_nodes(after_images, source_id, original_owner_id)
+    copied = _legacy_saved_source_nodes(after_images, copied_id, destination_id)
+    roles = {'source': ('SourcePlugin', 9699330), 'rtpc': ('RTPC', 1441808),
+        'control_input': ('ModulatorLfo', 4194320), 'curve': ('Curve', 917520)}
+    expected_original = {'source': '{95DDA32B-B666-4269-A54C-5ABF4E201C99}',
+        'rtpc': '{CE99046D-D354-422D-A7BB-F1305FF00B2F}',
+        'control_input': '{E323F786-253F-48C6-86B9-AB0335804E9F}',
+        'curve': '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}'}
+    old_ids = {role: guid(node.get('ID')) for role, node in before.items()}
+    new_ids = {role: guid(node.get('ID')) for role, node in copied.items()}
+    assert old_ids == expected_original, 'Retained fixture owned identities changed'
+    assert set(old_ids.values()).isdisjoint(new_ids.values()), 'Copied owned GUID aliases original graph'
+    mapping = {old_ids[role]: new_ids[role] for role in roles}
+    assert len(mapping) == len(set(mapping.values())) == 4, 'Owned GUID mapping must be bijective'
+    for nodes, live, owner_id, ids in ((before, before_live, original_owner_id, old_ids),
+            (copied, copied_live, destination_id, new_ids)):
+        assert set(live) == set(roles), 'Independent live owned bindings incomplete'
+        for role, (tag, cls) in roles.items():
+            node, row = nodes[role], live[role]
+            assert node.tag == tag and row['class_id'] == cls and guid(row['id']) == ids[role], 'Saved/live class or GUID differs'
+            assert row['type'] in ({'Source', 'SourcePlugin'} if role == 'source' else {tag}), 'Saved/live object type differs'
+            owner = owner_id if role == 'source' else ids['source' if role == 'rtpc' else 'rtpc']
+            assert guid(row.get('parent' if role == 'source' else 'owner')) == guid(owner), 'Saved/live owner differs'
+            assert row['name'] == node.get('Name') and row.get('notes', '') == node.findtext('Comment', ''), 'Saved/live name or notes differs'
+            if 'ShortID' in node.attrib:
+                short = row.get('short_id')
+                assert type(short) is int and 0 <= short <= 0xffffffff and str(short) == node.get('ShortID'), 'Serialized ShortID lacks matching independent live binding'
+    def canonical(node, *, ids=None):
+        attributes = dict(node.attrib)
+        if ids:
+            if node in ids['nodes'].values():
+                role = next(role for role, value in ids['nodes'].items() if value is node)
+                attributes['ID'] = 'owned:' + role
+                if 'ShortID' in attributes: attributes['ShortID'] = 'live-bound:' + role
+            elif node.tag == 'ObjectRef' and 'ID' in attributes:
+                identity = guid(attributes['ID'])
+                attributes['ID'] = ids['roles'].get(identity, identity)
+        # Only formatting whitespace may disappear. Preserve unknown attributes,
+        # semantic text/tails, all child order and every ordered Curve point.
+        text = node.text
+        if len(node) and text is not None and not text.strip() and '\n' in text: text = None
+        tail = node.tail
+        if tail is not None and not tail.strip() and '\n' in tail: tail = None
+        return (node.tag, sorted(attributes.items()), text, tail,
+            [canonical(child, ids=ids) for child in node])
+    assert canonical(before['source']) == canonical(retained['source']), 'Original saved Source/owned state changed'
+    old_tokens = {identity: 'owned:' + role for role, identity in old_ids.items()}
+    new_tokens = {identity: 'owned:' + role for role, identity in new_ids.items()}
+    assert canonical(before['source'], ids={'nodes': before, 'roles': old_tokens}) == canonical(
+        copied['source'], ids={'nodes': copied, 'roles': new_tokens}), 'Copied serialized fields/references/ordered points differ'
+    points = before['curve'].findall('PointList/Point')
+    assert len(points) == 2, 'Retained genuine Curve point cardinality changed'
+    return {'original_preserved': True, 'owned_guid_mapping': mapping, 'ordered_point_count': len(points),
+        'serialized_subtree_preserved': True, 'external_references': 'exact; only proven internal ObjectRef IDs map',
+        'object_ref_count': sum(1 for node in before['source'].iter('ObjectRef')),
+        'short_ids': {role: {'original': before_live[role]['short_id'], 'copied': copied_live[role]['short_id']}
+            for role in roles if 'ShortID' in before[role].attrib},
+        'short_id_classification': 'serialized declaration identity bound independently to live short_id',
+        'scope': 'one retained 2021 Synth Source serialized graph; no production/history authority'}
+
+
+def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *, prefix: str,
+        owned_read_only: bool = False, saved_copy: bool = False,
+        saved_copy_protocol: str | None = None, fixture_profile: str | None = None,
+        selected_owned_probe: bool = False) -> dict[str, Any]:
+    """Historical diagnostic plus an explicit generated-Save-child successor."""
+    from wwise_waapi.builders.query import MAX_STRUCTURED_RETURN_FIELDS
+    from wwise_waapi.dispatcher import MAX_LIVE_RESULT_JSON_BYTES
+    from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_QUERIES
+    from wwise_waapi.native_catalog import load_native_catalog
+
+    from tests.destructive.support.source_copy_fixture import MODERN_PROFILE, MODERN_ORIGINALS
+    modern = fixture_profile == MODERN_PROFILE
+    assert selected_owned_probe or modern or runtime.version == '2021.1', 'This fixture and alternative are pinned to 2021.1'
+    assert not selected_owned_probe or (runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'} and not (owned_read_only or saved_copy or saved_copy_protocol)), 'Selected Source probe is read-only and pinned to modern versions'
+    assert not (owned_read_only and saved_copy)
+    assert saved_copy_protocol in {None, 'gateway-owned-save-children/v1'}, 'Unknown saved-copy protocol'
+    from tests.destructive.support.source_copy_fixture import PROFILE as REPEATED_PROFILE
+    assert fixture_profile in {None, REPEATED_PROFILE, MODERN_PROFILE}, 'Unknown closed Source fixture profile'
+    repeated = fixture_profile == REPEATED_PROFILE
+    selected_fixture = repeated or modern
+    assert not modern or (runtime.version in MODERN_ORIGINALS and saved_copy and saved_copy_protocol and not (owned_read_only or selected_owned_probe)), 'Modern collector requires its matching generated Save profile'
+    successor = saved_copy_protocol is not None
+    assert not repeated or (successor and saved_copy), 'Repeated fixture requires generated Save children'
+    indexed_native = not owned_read_only
+    assert not successor or saved_copy, 'Save-child protocol requires saved-copy collection'
+    catalog = load_native_catalog(runtime.version, 'wwise-console')
+    source_id = '{95DDA32B-B666-4269-A54C-5ABF4E201C99}'
+    original_owned_ids = ['{CE99046D-D354-422D-A7BB-F1305FF00B2F}',
+        '{E323F786-253F-48C6-86B9-AB0335804E9F}', '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}']
+    stem = 'legacy-source-owned-read' if owned_read_only else 'legacy-source-copy-feasibility'
+    if selected_owned_probe: stem = 'selected-source-owned-probe'
+    if saved_copy: stem = 'source-copy-save-children' if successor else 'legacy-source-saved-copy'
+    if repeated: stem = 'repeated-source-copy-save-children'
+    if modern: stem = 'modern-source-copy-save-children'
+    output = runtime.state_dir / (stem + '.json')
+    assert not output.exists(), 'Never replace an earlier feasibility attempt'
+    output.parent.mkdir(parents=True, exist_ok=True)
+    artifacts = runtime.state_dir / (stem + '-artifacts' if saved_copy else
+        'legacy-source-owned-read-artifacts' if owned_read_only else
+        'selected-source-owned-probe-artifacts' if selected_owned_probe else 'legacy-source-copy-artifacts')
+    artifacts.mkdir(exist_ok=False)
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR']); old_native = set(native_root.glob('*.json'))
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH']); config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+    transactions: list[str] = []
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
+    category = {'category': 'legacy-source-only-copy-feasibility', 'status': 'FAIL', 'diagnostic_only': True,
+        'business_effect_verified': False, 'coverage_credit': 'none; native feasibility diagnostic',
+        'verifier_strength': 'diagnostic_class_parent_live_fields_owner_frames_and_owned_topology; no_complete_copy_credit',
+        'transaction_ids': transactions, 'observation_path': str(output)}
+    if owned_read_only:
+        category.update(category='legacy-original-source-owned-read',
+            coverage_credit='none; original read-only metadata diagnostic',
+            verifier_strength='read_only_original_live_metadata_fields_and_owned_edges; no_copy_or_curve_points_credit')
+    if saved_copy:
+        category.update(category='legacy-source-saved-copy-oracle',
+            coverage_credit='none; fixture-scoped diagnostic, no production copy authority',
+            verifier_strength='independent_saved_subtree_all_fields_ordered_points_bijective_owned_IDs_live_class_owner_ShortID_ControlInput')
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {'contract': 'waapi-skill.legacy-source-copy-feasibility/v1',
+        'candidate': runtime.candidate, 'version': runtime.version, 'diagnostic_only': True,
+        'business_effect_verified': False, 'native_admission_verified': False, 'collection_complete': False,
+        'transaction_ids': transactions, 'calls': [], 'phases': [], 'native_evidence': [], 'endpoint': endpoint,
+        'source_project': str(runtime.sandbox.source_project), 'config_sha256': config_hash,
+        'fixture_topology': {'file': 'tests/_org/2021.1/Actor-Mixer Hierarchy/MIDI.wwu',
+            'source_line': 12173, 'source_id': source_id, 'owned_ids': original_owned_ids,
+            'shape': 'OutputLevel RTPC owns Curve and custom ControlInput ModulatorLfo; copied IDs may differ'},
+        'scope_exclusions': ['deep_owned_copy_mapping', 'all_plugin_copy_business_coverage',
+            'all_owner_properties', 'known_owned_fields', 'empty_project_constructor', 'Tone_constructor',
+            'other_versions', 'audio_effect', 'locale_or_platform_changes'],
+        'lifecycle_final_reference': {'contract': 'waapi-skill.host-category-evidence/v3', 'phase': 'final',
+            'candidate': runtime.candidate, 'category': category['category'], 'transaction_ids': transactions,
+            'path': runtime.env.get('WWISE_CATEGORY_EVIDENCE_PATH') or runtime.env.get('WWISE_MACOS_CATEGORY_EVIDENCE_PATH'),
+            'cleanup_status': 'unresolved_until_final_row'},
+        'limits': {'calls': 128, 'reply_bytes': MAX_LIVE_RESULT_JSON_BYTES, 'total_reply_bytes': 16 * 1024 * 1024,
+            'receipt_bytes': 256 * 1024, 'archive_bytes': 64 * 1024 * 1024, 'native_files': 512},
+        'archive_bytes': 0, 'total_reply_bytes': 0}
+    if not saved_copy and not owned_read_only:
+        receipt.update(contract='waapi-skill.legacy-source-copy-feasibility/v2',
+            native_evidence_storage='indexed-native-file-proofs/v1')
+    if owned_read_only:
+        receipt.update(contract='waapi-skill.legacy-source-owned-read/v1', read_only=True,
+            curve_points={'status': 'unavailable_in_2021_public_contract',
+                'native_getter': 'not established; inspect actual metadata, no guessed Points accessor'},
+            scope_exclusions=['copy_admission', 'copied_owned_mapping', 'curve_points', 'history', 'audio_effect',
+                'Source_RTPC_membership', 'Source_field_reobservation'])
+    if saved_copy:
+        receipt.update(contract='waapi-skill.legacy-source-saved-copy/v1', model_images={}, saved_copy_verified=False,
+            scope_exclusions=['production_copy_authority', 'history', 'all_plugin_copy_business_coverage',
+                'all_owner_properties', 'empty_project_constructor', 'other_versions', 'audio_effect'])
+    if successor:
+        category.update(category='source-copy-save-children-oracle',
+            coverage_credit='none; fixed 2021 graph collector, no broad-family or native credit')
+        receipt.update(contract='waapi-skill.source-copy-save-children-collector/v1',
+            continuation_links=[], scope_exclusions=['history', 'all_plugin_copy_business_coverage',
+                'all_owner_properties', 'empty_project_constructor', 'other_versions', 'audio_effect'])
+        receipt['limits'].update(receipt_bytes=1024 * 1024, native_files=1024)
+        receipt['lifecycle_final_reference']['category'] = category['category']
+    if repeated:
+        from tests.destructive.support.source_copy_fixture import REPEATED_COLLECTOR_LIMITS
+        receipt['limits'].update(REPEATED_COLLECTOR_LIMITS)
+        receipt['fixture_profile_limit_scope'] = 'developer-only repeated seven-declaration fixture; public Gateway and historical profile limits unchanged'
+        category.update(category='repeated-source-copy-save-children-oracle', coverage_credit='none; synthetic input requires exact native acceptance and copy oracle')
+        receipt.update(contract='waapi-skill.repeated-source-copy-save-children-collector/v1', fixture_profile=fixture_profile)
+        receipt['lifecycle_final_reference']['category'] = category['category']
+    if selected_owned_probe:
+        category.update(category='selected-source-owned-probe',
+            coverage_credit='none; read-only selected graph diagnostic',
+            verifier_strength='independent_pinned_XML_and_public_read_observations; no_copy_effect')
+        receipt.update(contract='waapi-skill.selected-source-owned-probe/v1', read_only=True,
+            scope_exclusions=['copy_admission', 'copy_effect', 'Save_effect', 'constructors', 'audio_effect',
+                '2021.1 retains its original diagnostic and native evidence'])
+        receipt['lifecycle_final_reference']['category'] = category['category']
+    if modern:
+        category.update(category='modern-source-copy-save-children-oracle', coverage_credit='none; exact modern fixture requires native copy/Save oracle')
+        receipt.update(contract='waapi-skill.modern-source-copy-save-children-collector/v1', fixture_profile=fixture_profile,
+            scope_exclusions=['history', 'other_Source_classes', 'shared_ObjectRefs', 'Voice', 'constructors', 'media', 'audio_effect'])
+        receipt['lifecycle_final_reference']['category'] = category['category']
+        # Root-approved closed modern fixture envelope after the retained128/1004 failure.
+        # Historical/public/byte limits remain unchanged.
+        receipt['limits'].update(calls=160, native_files=1280)
+        receipt['fixture_profile_limit_scope'] = 'developer-only modern four-transaction original fixture; historical/public/byte limits unchanged'
+    attempted: set[str] = set()
+    active_save = None
+    saved_model_indexes = []
+    accepted_fields, accepted_root_order = None, None
+    def persist():
+        if (successor or selected_owned_probe) and 'budget' in receipt:
+            # Include the final receipt itself, including this size field.
+            while True:
+                raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+                if receipt['budget']['receipt_bytes'] == len(raw): break
+                receipt['budget']['receipt_bytes'] = len(raw)
+        else:
+            raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(raw) <= receipt['limits']['receipt_bytes'], 'Diagnostic receipt bound exceeded'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+    def archive(name, raw):
+        assert len(raw) <= MAX_LIVE_RESULT_JSON_BYTES and receipt['archive_bytes'] + len(raw) <= receipt['limits']['archive_bytes']
+        path = artifacts / name
+        prove_artifact_path(path, io_root=artifacts, field='Source copy archive', expect_directory=False)
+        fd = os.open(path, binary_file_open_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL) | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+        with os.fdopen(fd, 'wb') as stream: stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+        assert path.read_bytes() == raw
+        receipt['archive_bytes'] += len(raw)
+        return {'path': str(path), 'sha256': hashlib.sha256(raw).hexdigest(), 'size': len(raw)}
+    class Gateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < receipt['limits']['calls'], 'Diagnostic public call bound exceeded'
+            if selected_owned_probe:
+                assert argv[0] in {'status', 'config-show', 'query-object'} or argv[:2] in (
+                    ['metadata', 'list'], ['metadata', 'detail']) or argv[:3] == [
+                    '--version', runtime.version, 'query-schema'], 'Selected Source diagnostic permits only sealed reads'
+            if owned_read_only:
+                assert argv[0] in {'status', 'query-object'} or argv[:2] in (
+                    ['metadata', 'types'], ['metadata', 'list'], ['metadata', 'detail']), 'Owned diagnostic permits only reads'
+            if argv[0] == 'execute':
+                assert argv[1] not in attempted, 'Never retry setup or Source-only copy'
+                attempted.add(argv[1])
+                if active_save:
+                    phase, = [phase for phase in receipt['phases'] if phase['transaction_id'] == argv[1]]
+                    phase['execution_attempted'] = True
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                raw = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+                receipt['total_reply_bytes'] += len(raw)
+                assert receipt['total_reply_bytes'] <= receipt['limits']['total_reply_bytes']
+                row.update(exit_code=code, reply=archive('reply-' + str(len(receipt['calls'])) + '.json', raw))
+                if active_save and argv[0] in {'typed-zero-call', 'preview-from-draft'}:
+                    if argv[0] == 'preview-from-draft':
+                        summary = payload.get('preview_summary', {})
+                        request = summary.get('request', {})
+                        assert request.get('operation') == 'waapi.call' and request.get('arguments', {}).get('api') == 'ak.wwise.core.project.save' and summary.get('dispatch', {}).get('uri') == 'ak.wwise.core.project.save', 'Active Save Preview must identify exact project.save operation'
+                    tx = payload.get('transaction_id')
+                    assert code == 0 and tx and tx not in transactions, payload
+                    transactions.append(tx)
+                    receipt['phases'].append({'name': active_save, 'transaction_id': tx, 'execution_attempted': False})
+                if active_save and argv[0] in {'execute', 'verify'}:
+                    phase, = [phase for phase in receipt['phases'] if phase['transaction_id'] == argv[1]]
+                    phase[argv[0] + '_state'] = payload.get('state')
+                return code, payload
+            except Exception as exc:
+                row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}; raise
+            finally: persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live: assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = Gateway()
+    def query(identity, *, relation=None, fields=(), extra=()):
+        result = gateway.gateway(['query-object', '--exact-id', identity,
+            *(['--relationship', relation] if relation else []), '--include', 'class-id', '--include', 'parent',
+            '--include', 'owner', '--include', 'notes', *(['--include', 'short-id'] if saved_copy else []),
+            *extra, *[arg for field in fields for arg in ('--include-field', field)],
+            '--max-results', '128' if relation else '2'], live=True)
+        assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
+        rows = result['objects']; assert result['count'] == len(rows), result
+        assert len({uuid.UUID(row['id']) for row in rows}) == len(rows), rows
+        return sorted(rows, key=lambda row: uuid.UUID(row['id']))
+    def exact(identity, *, extra=()):
+        rows = query(identity, extra=extra); assert len(rows) == 1 and uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
+        return rows[0]
+    def owner_frame(identity):
+        rows = query(identity, fields=['IsVoice'])
+        assert len(rows) == 1 and uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
+        row = rows[0]
+        assert row['type'] == 'Sound' and row['class_id'] == 65552, row
+        assert type(row.get('properties', {}).get('IsVoice')) is bool, 'Owner needs its actual Boolean IsVoice'
+        return {'identity': row, 'scope': 'identity/class/parent/name/notes/IsVoice only; other owner properties unobserved'}
+    def snapshot(identity, *, details=False, identity_row=None):
+        row = exact(identity) if identity_row is None else identity_row
+        names, page, selections = [], None, {}
+        while True:
+            result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page else [])], live=True)['agent_result']
+            for field in result['fields']:
+                name = field['name']; assert isinstance(name, str) and name and name not in names, result
+                names.append(name)
+                if details: selections[name] = field['selection']
+            if result['complete']:
+                assert len(names) == result['total_count'], result
+                break
+            next_page = result['next_page']; assert next_page and next_page != page, result
+            page = next_page
+        readable_names = list(names)
+        unavailable_names = []
+        if details:
+            for name in names:
+                result = gateway.gateway(['metadata', 'detail', '--exact-id', identity,
+                    '--selection', selections[name]], live=True)['agent_result']
+                assert result.get('complete') is True and result['metadata']['name'] == name, result
+                metadata = result['metadata']
+                # Same unknown-kind boundary as live custom-field discovery;
+                # detail does not expose the internal selected_field_kind key.
+                if not metadata.get('type') and metadata.get('restriction', {}).get('type') != 'reference':
+                    readable_names.remove(name); unavailable_names.append(name)
+            if unavailable_names:
+                receipt.setdefault('metadata_unreadable_fields', {})[identity] = unavailable_names
+        pages = []
+        # Public custom outputs first traverse bounded lexical discovery. The
+        # native projection ceiling alone cannot size this public request.
+        size = min(MAX_METADATA_DISCOVERY_QUERIES, waapi_gateway.MAX_QUERY_CUSTOM_OUTPUTS,
+            MAX_STRUCTURED_RETURN_FIELDS - 8)
+        for offset in range(0, len(readable_names), size):
+            rows = query(identity, fields=readable_names[offset:offset + size]); assert len(rows) == 1, rows
+            assert all(rows[0].get(key) == row.get(key) for key in ('id', 'name', 'type', 'path', 'parent', 'owner', 'class_id', 'notes')), rows
+            if owned_read_only:
+                assert set(rows[0].get('properties', {})) | set(rows[0].get('references', {})) == set(readable_names[offset:offset + size]), rows
+            pages.append(rows[0])
+        return {'identity': row, 'field_names': names, 'field_pages': pages,
+            **({'unreadable_field_names': unavailable_names} if details else {})}
+    observation_start = 0
+    def save_observation(name, value):
+        nonlocal observation_start
+        # Replies are already archived once. Retain call references and the
+        # normalized comparison digest rather than serializing them again.
+        receipt.setdefault('observations', {})[name] = {
+            'preceding_call_indexes': list(range(observation_start, len(receipt['calls']))),
+            'normalized_sha256': hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()}
+        observation_start = len(receipt['calls'])
+        return value
+    def known_owned():
+        observations = {}
+        for identity in original_owned_ids:
+            rows = query(identity)
+            assert len(rows) <= 1 and (not rows or uuid.UUID(rows[0]['id']) == uuid.UUID(identity)), rows
+            observations[identity] = {'identity_rows': rows, 'scope':
+                'observed topology/class/notes only; fields and copied GUID mapping unverified' if rows else
+                'fixture-owned ID not independently resolvable; no owned-state preservation claim'}
+        return observations
+    def owned_hop(identity, token, bound, *, extra=()):
+        # The fixed ControlInput hop follows matching SDK reference semantics;
+        # its acceptance on 2021 is precisely the pending native observation.
+        result = gateway.gateway(['query-object', '--advanced-waql', f'from object "{identity}" select @{token}',
+            '--max-results', str(bound), '--include', 'class-id', '--include', 'owner',
+            '--include', 'parent', '--include', 'notes', *(['--include', 'short-id'] if saved_copy else []), *extra], live=True)
+        assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
+        rows = result['objects']; assert result['count'] == len(rows) and len(rows) < bound, result
+        assert len({uuid.UUID(row['id']) for row in rows}) == len(rows), rows
+        return rows
+    def original_owned_read():
+        # R50 rejected Source select @RTPC. The retained exact member GUID/class
+        # and Source-owner edge bind this read without any list-completeness claim.
+        rtpc_id = original_owned_ids[0]
+        bound = save_observation('original-rtpc-binding', exact(rtpc_id))
+        assert bound['class_id'] == 1441808 and bound.get('owner', {}).get('id') == source_id, 'Retained RTPC class/Source-owner binding changed'
+        rtpc = save_observation('original-rtpc', snapshot(rtpc_id, details=True, identity_row=bound))
+        assert 'ControlInput' in rtpc['field_names'], 'Live RTPC metadata must disclose ControlInput'
+        # Genuine 2021 metadata can leave this field untyped. Use the SDK's
+        # reference hop, without inventing a metadata reference restriction.
+        control_id, curve_id = original_owned_ids[1:]
+        control = save_observation('original-control-input-binding', exact(control_id))
+        assert control['class_id'] == 4194320 and control.get('owner', {}).get('id') == rtpc_id, 'Retained LFO class/RTPC-owner binding changed'
+        lfo = save_observation('original-control-input', snapshot(control_id, details=True, identity_row=control))
+        curve_binding = save_observation('original-curve-binding', exact(curve_id))
+        assert curve_binding['class_id'] == 917520 and curve_binding.get('owner', {}).get('id') == rtpc_id, 'Retained Curve class/RTPC-owner binding changed'
+        curve = save_observation('original-curve', snapshot(curve_id, details=True, identity_row=curve_binding))
+        receipt['owned_observation'] = {'rtpc_id': rtpc_id, 'control_input_id': control_id,
+            'curve_id': curve_id, 'rtpc_field_names': rtpc['field_names'],
+            'control_input_field_names': lfo['field_names'], 'curve_field_names': curve['field_names'],
+            'source_membership_complete': False, 'binding': 'retained exact RTPC GUID/class/Source-owner edge',
+            'control_input_hop': 'attempted',
+            'mapping_scope': 'original owner edges only; no copied graph or curve point observation'}
+        persist()
+        # Read all retained objects first. Only ControlInput has matching SDK
+        # reference semantics; no speculative @Curve hop precedes Curve metadata.
+        controls = owned_hop(rtpc_id, 'ControlInput', 2)
+        assert len(controls) == 1 and controls[0] == lfo['identity'], controls
+        receipt['owned_observation']['control_input_hop'] = 'canonical_id_read_verified'
+    def explicit_save(label):
+        nonlocal active_save
+        # status.path is the Wwise hierarchy path, not a filesystem authority.
+        # Rebind the actual project file before each separately previewed Save.
+        project = exact(status['project']['id'], extra=['--include', 'file-path'])
+        assert project['type'] == 'Project', project
+        current = Path(localize_waapi_host_path(project['file_path']))
+        assert current.resolve() == runtime.sandbox.sandbox_project.resolve() and path_is_under(
+            current, runtime.sandbox.sandbox_path) and not path_is_link_or_reparse(current), 'Save requires the exact owned sandbox project'
+        active_save = label
+        try:
+            saved = _save_sandbox_project(gateway)
+            assert saved['preview']['transaction_id'] in transactions
+            # Result-schema checking is not the saved-file effect oracle.
+            assert saved['verify']['state'] in {'verified', 'result_schema_checked'}, saved
+        finally:
+            active_save = None
+    def model_images(phase, identities):
+        paths = set()
+        for identity in identities:
+            row = exact(identity, extra=['--include', 'work-unit'])
+            unit = exact(row['work_unit']['id'], extra=['--include', 'file-path'])
+            assert unit['type'] == 'WorkUnit' and unit['class_id'] == 1638416, unit
+            path = Path(localize_waapi_host_path(unit['file_path']))
+            assert path.suffix.casefold() == '.wwu' and path_is_under(path, runtime.sandbox.sandbox_path) and not path_is_link_or_reparse(path), 'Unowned saved Work Unit'
+            paths.add(path)
+        root = artifacts / 'model-images'; root.mkdir(exist_ok=True)
+        index = ConsoleModelImageIndex(root=root, project=runtime.sandbox.sandbox_project, phase=phase,
+            link=receipt['model_images'].setdefault(phase, {}))
+        images = []
+        try:
+            for path in sorted(paths):
+                observed = observe_console_file(path, io_root=runtime.sandbox.sandbox_path)
+                assert receipt['archive_bytes'] + observed['file_proof']['size'] <= receipt['limits']['archive_bytes'], 'Model images exceed diagnostic archive bound'
+                images.append(index.save(path, observed)); receipt['archive_bytes'] += len(images[-1])
+            index.finish()
+            saved_model_indexes.append(index)
+            receipt['archive_bytes'] += index.link['size']
+            assert receipt['archive_bytes'] <= receipt['limits']['archive_bytes'], 'Model index exceeds diagnostic archive bound'
+            persist()
+            return images
+        except Exception as exc:
+            index.error(None, exc); raise
+    def saved_copy_result(before_images, copied, old_owner, before_live):
+        if not successor: explicit_save('save_final')
+        after_images = model_images('after', [source_id, copied['id']])
+        if modern:
+            from tests.destructive.support.source_copy_fixture import source_graph, repeated_copy_oracle, saved_midi, validate_scalars
+            after_index, = [index for index in saved_model_indexes if index.phase == 'after']
+            unit = saved_midi(after_images, index=after_index, relative=source_archive_identity, work_unit_id=source_unit_id, root_children=setup_children)
+            assert [(node.tag, dict(node.attrib)) for node in unit.find('ChildrenList')] == accepted_root_order, 'Saved MIDI root order changed'
+            nodes = source_graph(after_images, copied['id'], destination_id, version=runtime.version)
+            live, fields = repeated_live(nodes, fields=True, owner_id=destination_id)
+            retained = source_graph(after_images, source_id, old_owner, version=runtime.version)
+            retained_live, retained_fields = repeated_live(retained, fields=True)
+            assert retained_live == before_live and scalar_facts(retained_fields) == scalar_facts(accepted_fields), 'Original native typed graph changed'
+            assert validate_scalars(nodes, fields, allow_references=True) == validate_scalars(loaded_nodes, loaded_fields, allow_references=True), 'Copied serialized scalar authority differs'
+            receipt['oracle'] = repeated_copy_oracle(before_images, after_images, source_id=source_id, copied_id=copied['id'], original_owner_id=old_owner, destination_id=destination_id, before_live=before_live, copied_live=live, version=runtime.version)
+            mapping = receipt['oracle']['owned_guid_mapping']
+            expected_fields = scalar_facts(accepted_fields)
+            for snapshot in expected_fields.values():
+                for name, value in snapshot['values'].items():
+                    if snapshot['metadata'][name].get('restriction', {}).get('type') == 'reference':
+                        value['id'] = mapping[value['id']]
+            assert scalar_facts(fields) == expected_fields, 'Copied native typed scalar/reference fields changed'
+            receipt['oracle'].update(saved_file_identity=source_archive_identity, saved_work_unit_id=source_unit_id,
+                persisted_root_child_ids=sorted(row['id'] for row in setup_children),
+                original_native_fields_preserved=True, copied_native_fields_preserved=True,
+                native_notes_comparison='exact before/after; CRLF-to-LF equivalence only against parsed XML Comment')
+            receipt['copied_scalar_observation'] = archive('copied-live-fields.json', json.dumps(fields, ensure_ascii=False).encode('utf-8'))
+            receipt['retained_scalar_observation'] = archive('retained-live-fields.json', json.dumps(retained_fields, ensure_ascii=False).encode('utf-8'))
+            assert query(source_unit_id, relation='children') == setup_children, 'Copy changed MIDI root childset'
+            receipt['saved_copy_verified'] = True
+            return retained_live
+        if repeated:
+            from tests.destructive.support.source_copy_fixture import source_graph, repeated_copy_oracle, saved_midi
+            after_index, = [index for index in saved_model_indexes if index.phase == 'after']
+            saved_midi(after_images, index=after_index, relative=source_archive_identity, work_unit_id=source_unit_id, root_children=setup_children)
+            nodes = source_graph(after_images, copied['id'], destination_id)
+            live = {role: exact(node.get('ID')) for role, node in nodes.items()}
+            for prop in ('OutputLevel', 'Osc1Level'):
+                assert owned_hop(live[prop + '.rtpc']['id'], 'ControlInput', 2) == [live[prop + '.control']], 'Copied repeated ControlInput differs'
+            receipt['oracle'] = repeated_copy_oracle(before_images, after_images, source_id=source_id, copied_id=copied['id'], original_owner_id=old_owner, destination_id=destination_id, before_live=before_live, copied_live=live)
+            receipt['oracle'].update(saved_file_identity=source_archive_identity, saved_work_unit_id=source_unit_id,
+                persisted_root_child_ids=sorted(row['id'] for row in setup_children))
+            assert query(source_unit_id, relation='children') == setup_children, 'Copy changed MIDI root childset'
+            receipt['saved_copy_verified'] = True
+            return
+        nodes = _legacy_saved_source_nodes(after_images, copied['id'], destination_id)
+        live = {role: exact(node.get('ID')) for role, node in nodes.items()}
+        controls = owned_hop(live['rtpc']['id'], 'ControlInput', 2)
+        assert controls == [live['control_input']], 'Copied ControlInput hop differs from independently bound LFO'
+        receipt['oracle'] = _legacy_saved_source_copy_oracle(before_images, after_images,
+            source_id=source_id, copied_id=copied['id'], original_owner_id=old_owner,
+            destination_id=destination_id, before_live=before_live, copied_live=live)
+        receipt['independent_copied_control_input'] = 'canonical reference hop equals exact live LFO class/owner/ShortID frame'
+        # Independent XML proof does not confer production/runtime authority.
+        receipt['saved_copy_verified'] = True
+    def complete(preview, label):
+        tx = preview['transaction_id']; assert tx not in transactions; transactions.append(tx)
+        phase = {'name': label, 'transaction_id': tx, 'execution_attempted': False}; receipt['phases'].append(phase)
+        shown = gateway.gateway(['transaction-show', tx, '--summary-only'], live=False)
+        gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['execution_attempted'] = True; persist()
+        code, result = gateway.raw_gateway(['execute', tx])
+        phase['execute_exit_code'] = code; phase['native_outcome'] = result.get('state', result.get('status'))
+        assert code == 0 and result.get('state') == 'executed_unverified', result
+        verified = gateway.gateway(['verify', tx], live=True)
+        if successor:
+            phase['verify_call_index'] = len(receipt['calls']) - 1
+            terminal = gateway.gateway(['transaction-show', tx, '--summary-only'], live=False)
+            assert terminal['transaction_id'] == tx and terminal['state'] == verified['state'], 'Transaction terminal receipt changed'
+            executed_event, = [row for row in terminal['events'] if row['event_type'] == 'execution_completed']
+            assert len([row for row in terminal['events'] if row['event_type'] == 'execution_started']) == 1, 'Transaction execution is not unique'
+            assert any(row['event_type'] in {'confirmed', 'policy_authorized'} for row in terminal['events']), 'Transaction lacks authorization'
+            phase['authority_receipt'] = {'transaction_id': tx, 'artifact_hash': terminal['artifact_hash'],
+                'execution_event_hash': executed_event['event_hash']}
+            if label != 'copy_source_only':
+                verified_event, = [row for row in terminal['events'] if row['event_type'] == 'verification_recorded']
+                phase['authority_receipt']['verification_event_hash'] = verified_event['event_hash']
+            phase['terminal_call_index'] = len(receipt['calls']) - 1
+        if successor and label == 'copy_source_only':
+            assert verified.get('state') == 'executed_unverified' and verified.get('verified') is False, verified
+            assert verified.get('status') == 'source_copy_saved_proof_pending', verified
+            assert verified['source_copy_saved_proof']['baseline_origin'] == 'authorized_baseline_Save', verified
+            phase['pending_state'] = verified['state']
+            return verified
+        assert verified.get('state') in ({'verified', 'result_schema_checked'} if successor and label in {'save_baseline', 'save_final'} else {'verified'}), verified
+        if saved_copy:
+            phase['gateway_verification_strength'] = verified.get('verification_strength')
+            phase['gateway_verification_scope'] = verified.get('verification', {}).get('verification_scope')
+        else:
+            phase['gateway_verification_scope'] = 'existing identity verifier only; independent diagnostic observes plugin state'
+        return verified if successor else result
+    def continuation(payload, expected):
+        command = payload.get('next_command', {})
+        argv = command.get('gateway_argv')
+        assert command.get('command') == expected and isinstance(argv, list) and argv and argv[0] == expected, 'Missing or invalid generated Source continuation'
+        assert all(isinstance(value, str) and value for value in argv), 'Invalid generated Source argv'
+        return list(argv)
+    def generated_save(pending, stage):
+        # Rebind exact owned project before each child; never construct a Save.
+        project = exact(status['project']['id'], extra=['--include', 'file-path'])
+        current = Path(localize_waapi_host_path(project['file_path']))
+        assert project['type'] == 'Project' and current.resolve() == runtime.sandbox.sandbox_project.resolve() and path_is_under(current, runtime.sandbox.sandbox_path) and not path_is_link_or_reparse(current), 'Save requires the exact owned sandbox project'
+        child = gateway.gateway(continuation(pending, 'continue-source-copy-proof'), live=True)
+        association = child['source_copy_saved_proof']
+        parent_key = 'draft_id' if stage == 'baseline' else 'transaction_id'
+        parent_id = receipt['copy_draft_id'] if stage == 'baseline' else pending['transaction_id']
+        assert association['stage'] == stage and association['parent'][parent_key] == parent_id, 'Generated Save parent/stage changed'
+        checked = gateway.gateway(continuation(child, 'draft-check'), live=True)
+        preview = gateway.gateway(continuation(checked, 'preview-from-draft'), live=True)
+        shown = gateway.gateway(['transaction-show', preview['transaction_id']], live=False)
+        origin = shown['artifact']['prepared_operation']['pre_state']['source_copy_save_origin']
+        assert origin['stage'] == stage and origin['parent'][parent_key] == parent_id, 'Save origin differs from generated child'
+        if stage == 'baseline':
+            assert origin['parent']['source_revision'] == pending['draft']['revision'] and origin['parent']['request_digest'] == pending['draft']['check']['request_digest'], 'Baseline child revision/request differs from checked parent'
+        else:
+            copy_phase, = [row for row in receipt['phases'] if row['name'] == 'copy_source_only']
+            assert all(origin['parent'][key] == value for key, value in copy_phase['authority_receipt'].items()), 'Final child differs from original copy execution receipt'
+        saved = complete(preview, 'save_' + stage)
+        returned = continuation(saved, 'continue-source-copy-proof' if stage == 'baseline' else 'verify')
+        assert returned == (['continue-source-copy-proof', child['draft']['draft_id']] if stage == 'baseline' else ['verify', parent_id]), 'Generated Save returned wrong parent'
+        receipt['continuation_links'].append({'stage': stage, 'parent_' + parent_key: parent_id,
+            'save_draft_id': child['draft']['draft_id'], 'save_transaction_id': preview['transaction_id'],
+            'origin': origin, 'return_gateway_argv': returned,
+            'save_verify_call_index': receipt['phases'][-1]['verify_call_index'],
+            'save_receipt': receipt['phases'][-1]['authority_receipt']})
+        return gateway.gateway(returned, live=True)
+    def repeated_unit():
+        unit = exact(source_unit_id, extra=['--include', 'file-path', '--include', 'work-unit-type', '--include', 'work-unit-is-dirty'])
+        assert unit['type'] == 'WorkUnit' and unit['class_id'] == 1638416 and unit['work_unit_type'] == 'rootFile', 'Repeated fixture requires its standalone Work Unit'
+        assert type(unit.get('work_unit_is_dirty')) is bool and Path(localize_waapi_host_path(unit['file_path'])).resolve() == source_file.resolve(), 'Repeated Work Unit file/dirty authority changed'
+        return unit
+    def repeated_live(nodes, *, fields, owner_id=None):
+        from tests.destructive.support.source_copy_fixture import validate_frames
+        live, snapshots = {}, {}
+        owner_id = old_owner if owner_id is None else owner_id
+        if fields:
+            for role, node in nodes.items():
+                identity = node.get('ID')
+                names = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64'], live=True)['agent_result']
+                assert names['complete'] is True and names['total_count'] == len(names['fields']) <= 64, 'Fixture field inventory incomplete'
+                readable, unavailable = [], {}
+                for field in names['fields']:
+                    name = field['name']; assert name not in readable and name not in unavailable, 'Duplicate fixture field'
+                    if not modern and role.endswith('.rtpc') and name == 'ControlInput':
+                        detail = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', field['selection']], live=True)['agent_result']
+                        assert detail['complete'] is True and detail['metadata']['name'] == name, 'ControlInput metadata incomplete'
+                        metadata = detail['metadata']
+                        if not metadata.get('type') and metadata.get('restriction', {}).get('type') != 'reference':
+                            unavailable[name] = metadata
+                            continue
+                    readable.append(name)
+                values, metadata, authority = {}, {}, {}
+                for offset in range(0, len(readable), 8):
+                    selected = readable[offset:offset + 8]
+                    # This exact public query already performs typed metadata
+                    # discovery. Retain its own native packets, never reuse a
+                    # prior phase or add duplicate metadata-detail calls.
+                    metadata_before = set(native_root.glob('*getPropertyInfo.json'))
+                    row, = query(identity, fields=selected, extra=['--include', 'curve-points'] if modern and role == 'curve' else [])
+                    packets = set(native_root.glob('*getPropertyInfo.json')) - metadata_before
+                    assert len(packets) <= receipt['limits']['native_files'], 'Fixture metadata packet bound exceeded'
+                    page_authority = {}
+                    for path in sorted(packets):
+                        observed = observe_console_file(path, io_root=native_root)
+                        packet = json.loads(base64.b64decode(observed['content_base64'], validate=True))
+                        assert packet['api'] == 'ak.wwise.core.object.getPropertyInfo' and packet['ok'] is True and packet['version'] == runtime.version, 'Fixture query metadata packet failed'
+                        facts = packet['result']; name = facts['name']
+                        if name not in selected: continue
+                        assert name not in metadata or metadata[name] == facts, 'Fixture query metadata drift'
+                        metadata[name] = facts
+                        page_authority.setdefault(name, []).append(observed['file_proof'])
+                    assert set(page_authority) == set(selected), 'Fixture query lacks complete typed metadata authority'
+                    authority.update(page_authority)
+                    if role not in live:
+                        live[role] = {key: value for key, value in row.items() if key not in {'properties', 'references'}}
+                    assert all(row.get(key) == live[role].get(key) for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes', 'short_id')), 'Fixture field-read identity drift'
+                    assert (modern or not row.get('references')) and set(row.get('properties', {})) | set(row.get('references', {})) == set(selected), 'Fixture scalar field scope incomplete or changed'
+                    values.update(row.get('properties', {})); values.update(row.get('references', {}))
+                snapshots[role] = {'names': [field['name'] for field in names['fields']], 'values': values, 'metadata': metadata, 'native_metadata_authority': authority, 'untyped_reference_metadata': unavailable}
+        validate_frames(nodes, live, owner_id, xml_notes_crlf=modern)
+        if modern:
+            assert {role: len(snapshot['names']) for role, snapshot in snapshots.items()} == {'source': 18, 'rtpc': 5, 'control_input': 10, 'curve': 1}, 'Modern typed inventory differs'
+            for token, role, owner in (('RTPC', 'rtpc', 'source'), ('ControlInput', 'control_input', 'rtpc'), ('Curve', 'curve', 'rtpc')):
+                assert owned_hop(live[owner]['id'], token, 2, extra=['--include', 'curve-points'] if role == 'curve' else []) == [live[role]], 'Modern canonical membership/reference hop differs: ' + token
+            points = live['curve']['curve_points']
+            saved_points = nodes['curve'].findall('PointList/Point')
+            assert isinstance(points, list) and len(points) == len(saved_points) and all(
+                isinstance(point, dict) and set(point) == {'x', 'y', 'shape'} and
+                all(type(point[axis]) in (int, float) and math.isfinite(point[axis]) for axis in ('x', 'y'))
+                for point in points), 'Modern native curve points require finite numbers'
+            assert [(point['x'], point['y']) for point in points] == [(float(node.findtext('XPos')), float(node.findtext('YPos'))) for node in saved_points], 'Modern saved/native curve coordinates differ'
+            assert [point['shape'] for point in points] == ['Linear', 'Linear'], 'Modern native curve shape differs'
+            assert snapshots['rtpc']['values']['ControlInput'] == {'id': live['control_input']['id'], 'name': live['control_input']['name']}, 'Modern typed ControlInput differs'
+            curve = snapshots['rtpc']['values']['Curve']
+            assert curve == {'id': live['curve']['id'], 'points': points, '@Flags': snapshots['curve']['values']['Flags']}, 'Modern typed Curve reference differs'
+        for prop in (() if modern else ('OutputLevel', 'Osc1Level')):
+            assert owned_hop(nodes[prop + '.rtpc'].get('ID'), 'ControlInput', 2) == [live[prop + '.control']], 'Repeated ControlInput hop differs'
+        return live, snapshots
+    def scalar_facts(snapshots):
+        return json.loads(json.dumps({role: {key: value for key, value in snapshot.items() if key != 'native_metadata_authority'} for role, snapshot in snapshots.items()}))
+    def accept_repeated_fixture(images, checked):
+        from tests.destructive.support.source_copy_fixture import source_graph, canonical, saved_midi, validate_scalars, sha
+        nonlocal accepted_fields, accepted_root_order
+        receipt['fixture_acceptance'] = {'status': 'checking', 'before_copy_preview': True}
+        unit = repeated_unit()
+        assert unit['work_unit_is_dirty'] is False, 'Baseline Save did not clean selected MIDI Work Unit'
+        assert query(source_unit_id, relation='children') == setup_children, 'Baseline Save changed setup childset'
+        assert len(images) == 1 and sha(images[0]) != pre_save_observed['file_proof']['sha256'], 'Baseline Save lacks a real MIDI serialization witness'
+        saved = source_graph(images, source_id, old_owner, version=runtime.version if modern else None)
+        assert canonical(saved['source']) == canonical(loaded_nodes['source']), 'Baseline Save lost or changed synthetic Source graph'
+        before_index, = [index for index in saved_model_indexes if index.phase == 'before']
+        saved_unit = saved_midi(images, index=before_index, relative=source_archive_identity, work_unit_id=source_unit_id, root_children=setup_children)
+        children = saved_unit.find('ChildrenList')
+        accepted_root_order = [(node.tag, dict(node.attrib)) for node in children]
+        destination, = [node for node in children if node.get('ID') == destination_id]
+        if modern:
+            assert [(node.tag, dict(node.attrib)) for node in children if node is not destination] == pinned_root_order, 'Baseline Save changed pinned original root order or attributes'
+        assert destination.tag == 'Sound' and destination.get('Name') == prefix and len(destination.findall('ChildrenList/*')) == 0, 'Actual destination not serialized empty in MIDI'
+        live, fields = repeated_live(saved, fields=True)
+        expected_scalars = validate_scalars(loaded_nodes, loaded_fields, allow_references=modern)
+        assert validate_scalars(saved, fields, allow_references=modern) == expected_scalars, 'Saved fixture scalar authority differs'
+        accepted_fields = fields
+        assert live == loaded_live and scalar_facts(fields) == scalar_facts(loaded_fields), 'Native baseline Save changed loaded Source declarations or scalar fields'
+        assert owner_frame(old_owner) == owner_before and query(old_owner, relation='children') == source_children, 'Baseline Save changed original owner frame/children'
+        assert observe_console_file(source_file, io_root=runtime.sandbox.sandbox_path)['file_proof'] == before_index.files[source_archive_identity]['file_proof'], 'Saved native fixture changed during acceptance observations'
+        receipt['fixture_acceptance'] = {'status': 'accepted', 'scope': 'exact ' + runtime.version + ' native Load and generated baseline Save only; no constructor or copy-effect credit',
+            'before_copy_preview': True, 'accepted_at_call_index': len(receipt['calls']) - 1,
+            'prelaunch_output_sha256': sha(loaded_raw),
+            'pre_save_file_proof': pre_save_observed['file_proof'], 'saved_sha256': sha(images[0]),
+            'saved_model_index': receipt['model_images']['before'], 'native_build': receipt['native_build'], 'endpoint': endpoint,
+            'baseline_Save': receipt['continuation_links'][0], 'parent_draft_id': checked['draft']['draft_id'],
+            'parent_checked_revision': checked['draft']['revision'], 'role_ids': {key: node.get('ID') for key, node in saved.items()},
+            'serialized_scalar_authority': expected_scalars,
+            'loaded_scalar_observation': archive('loaded-live-fields.json', json.dumps(loaded_fields, ensure_ascii=False).encode('utf-8')),
+            'scalar_observation': archive('accepted-live-fields.json', json.dumps(fields, ensure_ascii=False).encode('utf-8'))}
+        persist()
+        return live
+    def selected_probe():
+        # Closed developer diagnostic over the original MIDI fixture. These
+        # candidates are scheduled independently, never a fallback after error.
+        pinned = {
+            '2022.1': ('2022.1.19.8584', '41784c1030c678d9a7f19a105dfb48e46fb8b76b044e9a3bdb8f2da885f61c3a'),
+            '2023.1': ('2023.1.19.8928', '09970d6126a6867f4535f9273b99873af4d044bccd591d7b1414029ffaf317d7'),
+            '2024.1': ('2024.1.13.9056', '9a00fda73b8d9a10e96968f8b10169c91b57051a24c43226e267444b2bd1b0a3'),
+            '2025.1': ('2025.1.7.9143', 'b8fc20794cc3d6b7ac17f5bd67fd57d297098830c52e985d44318f459da9c0df')}
+        build, midi_sha = pinned[runtime.version]
+        relative = Path('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy') / 'MIDI.wwu'
+        original = REPO_ROOT / 'tests/_org' / runtime.version / relative
+        live_file = runtime.sandbox.sandbox_project.parent / relative
+        original_observed = observe_console_file(original, io_root=original.parents[1])
+        live_observed = observe_console_file(live_file, io_root=runtime.sandbox.sandbox_path)
+        assert original_observed['file_proof']['sha256'] == live_observed['file_proof']['sha256'] == midi_sha, 'Pinned MIDI fixture changed'
+        xml_raw = base64.b64decode(original_observed['content_base64'], validate=True)
+        assert b'<!DOCTYPE' not in xml_raw.upper()
+        xml = ET.fromstring(xml_raw)
+        ids = {'sound': '{63E5A1E6-4265-463E-A5C5-322F742423E1}', 'source': source_id,
+            'rtpc': original_owned_ids[0], 'lfo': original_owned_ids[1], 'curve': original_owned_ids[2]}
+        nodes = {}
+        for role, identity in ids.items():
+            matches = [node for node in xml.iter() if node.get('ID') == identity and
+                node.tag in {'Sound', 'SourcePlugin', 'RTPC', 'ModulatorLfo', 'Curve'}]
+            assert len(matches) == 1, (role, matches)
+            nodes[role] = matches[0]
+        source_xml = ET.tostring(nodes['source'], encoding='utf-8')
+        probe = receipt['selected_owned_probe'] = {'frames': {}, 'membership': {}, 'hops': {}, 'fields': {},
+            'native_build': build, 'fixture': {'relative_path': relative.as_posix(), 'sha256': midi_sha,
+                'original_file_proof': original_observed['file_proof'], 'sandbox_file_proof': live_observed['file_proof'],
+                'archive': archive('original-midi.wwu', xml_raw),
+                'source_subtree': archive('original-source.xml', source_xml),
+                'source_subtree_representation': 'ElementTree serialization of exact-hash original WWU subtree'},
+            'diagnostic_transport_complete': False, 'full_membership_verified': False, 'all_values_available': False}
+        receipt['fixture_topology'] = {'file': str(original.relative_to(REPO_ROOT)), 'source_id': source_id,
+            'owned_ids': original_owned_ids, 'sha256': midi_sha}
+        for extra in ([], ['--advanced'], *[['--output', name] for name in ('owner', 'class-id', 'short-id', 'curve-points')]):
+            schema = gateway.gateway(['--version', runtime.version, 'query-schema', *extra], live=False)
+            assert schema.get('contract') == ('waapi-skill.advanced-object-query-business-schema/v1' if extra == ['--advanced']
+                else 'waapi-skill.object-query-business-schema/v1'), schema
+        gateway.gateway(['config-show'], live=False)
+        status = gateway.gateway(['status'], live=True)
+        info_call = next(row for row in status['calls'] if row['api'] == 'ak.wwise.core.getInfo')
+        info_observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
+        info = json.loads(base64.b64decode(info_observed['content_base64'], validate=True))['result']
+        assert info['isCommandLine'] is True and '.'.join(str(info['version'][key]) for key in ('year', 'major', 'minor', 'build')) == build, info
+        receipt['native_build'] = build
+        assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), 'Probe requires the exact owned sandbox project'
+        classes = {'sound': 65552, 'source': 9699330, 'rtpc': 1441808, 'lfo': 4194320, 'curve': 917520}
+        def rows(payload):
+            assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', 'Probe query must be complete below two-row cap'
+            result = payload.get('objects', payload.get('agent_result'))
+            assert isinstance(result, list) and payload['count'] == len(result) and len(result) < 2, 'Probe query must be complete below two-row cap'
+            assert len({uuid.UUID(row['id']) for row in result}) == len(result), result
+            return result
+        def checked_frame(role, row):
+            assert uuid.UUID(row['id']) == uuid.UUID(ids[role]) and row['class_id'] == classes[role], row
+            assert row['type'] in ({'Source', 'SourcePlugin'} if role == 'source' else {nodes[role].tag}), row
+            if role == 'source': assert row.get('parent', {}).get('id') == ids['sound'], row
+            if role in {'rtpc', 'lfo', 'curve'}:
+                assert row.get('owner', {}).get('id') == ids['source' if role == 'rtpc' else 'rtpc'], row
+            if 'ShortID' in nodes[role].attrib:
+                assert row.get('short_id') == int(nodes[role].get('ShortID')), row
+            assert row['name'] == nodes[role].get('Name', ''), row
+            native_notes, saved_notes = row.get('notes'), nodes[role].findtext('Comment') or ''
+            assert isinstance(native_notes, str), row
+            # XML parsing replaces literal CRLF in Comment text with LF.
+            # Keep the live frame and original saved WWU bytes unchanged;
+            # compare only notes under this observed newline equivalence.
+            comparison = {'exact': native_notes == saved_notes,
+                'xml_crlf_equivalent': native_notes.replace('\r\n', '\n') == saved_notes,
+                'comparison': 'native notes CRLF to LF versus parsed saved Comment; notes only',
+                'native_utf8_sha256': hashlib.sha256(native_notes.encode('utf-8')).hexdigest(),
+                'saved_parsed_utf8_sha256': hashlib.sha256(saved_notes.encode('utf-8')).hexdigest()}
+            probe.setdefault('notes_comparison', {})[role] = comparison
+            assert comparison['exact'] or comparison['xml_crlf_equivalent'], row
+        for role, identity in ids.items():
+            row, = rows(gateway.gateway(['query-object', '--exact-id', identity, '--max-results', '2',
+                *[arg for name in ('class-id', 'parent', 'owner', 'notes', 'short-id') for arg in ('--include', name)]], live=True))
+            checked_frame(role, row); probe['frames'][role] = row
+        def issued(result, command):
+            envelope = result.get('next_command', {})
+            argv = envelope.get('gateway_argv')
+            assert envelope.get('command') == command and isinstance(argv, list) and argv and argv[0] == command, result
+            assert all(isinstance(value, str) and value for value in argv), result
+            return argv
+        def metadata(role):
+            identity = ids[role]; names, selections, calls = [], {}, []
+            command = ['metadata', 'list', '--exact-id', identity, '--page-size', '20']
+            seen = set()
+            for _ in range(8):
+                assert tuple(command) not in seen, 'Repeated metadata continuation'; seen.add(tuple(command))
+                calls.append(len(receipt['calls']))
+                result = gateway.gateway(command, live=True)['agent_result']
+                for field in result['fields']:
+                    name = field['name']; assert isinstance(name, str) and name and name not in selections, result
+                    names.append(name); selections[name] = field['selection']
+                assert len(names) <= 128, 'Selected role exceeds field cap'
+                if result['complete']:
+                    assert len(names) == result['total_count'], result
+                    break
+                command = issued(result, 'metadata')
+                assert command[:2] == ['metadata', 'list'] and identity in command, command
+            else: raise AssertionError('Selected role exceeds metadata page cap')
+            observation = {'names': names, 'list_call_indexes': calls, 'details': {}, 'values': [], 'unavailable': {}}
+            probe['fields'][role] = observation
+            readable = []
+            for name in names:
+                command = ['metadata', 'detail', '--exact-id', identity, '--selection', selections[name]]
+                entries, detail_calls, snapshot, total = [], [], None, None
+                for _ in range(8):
+                    detail_calls.append(len(receipt['calls']))
+                    detail = gateway.gateway(command, live=True)['agent_result']
+                    assert detail['selection'] == selections[name], detail
+                    if 'metadata' in detail:
+                        assert detail['complete'] is True and not entries, detail
+                        header = detail['metadata']; snapshot = hashlib.sha256(json.dumps(header, sort_keys=True).encode()).hexdigest()
+                        total = None
+                        break
+                    assert detail['detail_view'] == 'raw', detail
+                    assert detail['offset'] == len(entries), detail
+                    if snapshot is not None: assert detail['snapshot'] == snapshot and detail['total_entries'] == total, detail
+                    snapshot, total = detail['snapshot'], detail['total_entries']; entries.extend(detail['entries'])
+                    if detail['complete']:
+                        assert len(entries) == total, detail
+                        break
+                    command = issued(detail, 'metadata')
+                    assert command[:2] == ['metadata', 'detail'] and identity in command and selections[name] in command, command
+                else: raise AssertionError('Selected field exceeds detail page cap')
+                # Exact raw entries stay in archived replies; this header only
+                # classifies whether public scalar/reference discovery can read it.
+                header = detail.get('metadata', detail.get('field')); assert header['name'] == name, detail
+                observation['details'][name] = {'call_indexes': detail_calls, 'snapshot': snapshot, 'entries': total, 'header': header}
+                if role == 'source' and name == 'RTPC':
+                    # A truthy native List type does not establish public
+                    # projection support. Observe this only through the sealed
+                    # owner-array candidate so its boundary cannot suppress
+                    # the independently scheduled traversal and reference hops.
+                    observation.setdefault('independent_candidate_fields', []).append(name)
+                elif header.get('type') or header.get('constraints', header.get('restriction', {})).get('type') == 'reference': readable.append(name)
+                else: observation['unavailable'][name] = 'live metadata leaves type/reference semantics unavailable'
+            for offset in range(0, len(readable), 8):
+                selected = readable[offset:offset + 8]
+                index = len(receipt['calls'])
+                payload = gateway.gateway(['query-object', '--exact-id', identity, '--max-results', '2',
+                    *[arg for field in selected for arg in ('--include-field', field)]], live=True)
+                row, = rows(payload)
+                assert all(row.get(key) == probe['frames'][role].get(key) for key in ('id', 'name', 'type', 'path')), row
+                actual = set(row.get('properties', {})) | set(row.get('references', {}))
+                missing = set(selected) - actual
+                assert actual <= set(selected), row
+                assert missing == {value.split('.', 1)[1] for value in row.get('unavailable_fields', []) if value.startswith(('properties.', 'references.'))}, row
+                observation['values'].append({'fields': selected, 'call_index': index, 'row': row})
+                observation['unavailable'].update({name: 'omitted by native observation' for name in missing})
+            return observation
+        metadata('source')
+        def candidate(argv, *, rtpc_boundary=False):
+            code, payload = gateway.raw_gateway(argv)
+            if code == 0 and payload.get('ok') is True and payload.get('status') != 'needs_clarification':
+                assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
+                return payload
+            # Only this predeclared applicability/type boundary may be retained
+            # without preventing the other predeclared selector observations.
+            error = payload.get('error_code')
+            expected = rtpc_boundary and (error in {'FIELD_TYPE_UNAVAILABLE', 'UNKNOWN_BUSINESS_FIELD'} or
+                (code == 0 and payload.get('status') == 'needs_clarification') or
+                payload.get('call', {}).get('message') == 'Unknown property RTPC (61)')
+            assert expected, payload
+            return None
+        index = len(receipt['calls'])
+        array = candidate(['query-object', '--exact-id', source_id, '--max-results', '2', '--include-field', 'RTPC'], rtpc_boundary=True)
+        array_observation = {'available': False, 'complete': False, 'call_index': index}
+        if array is not None:
+            row, = rows(array)
+            accessor = row.get('references', {}).get('RTPC', row.get('properties', {}).get('RTPC'))
+            array_observation['value'] = accessor
+            if isinstance(accessor, list):
+                assert [value['id'] for value in accessor] == [ids['rtpc']], accessor
+                array_observation.update(available=True, complete=True)
+        probe['membership']['owner_array'] = array_observation
+        if 'RTPC' in probe['fields']['source']['names']:
+            probe['fields']['source']['independent_candidate_call_index'] = index
+            if not array_observation['available']:
+                probe['fields']['source']['unavailable']['RTPC'] = 'independent owner-array candidate unavailable'
+        for token, role, owner in (('RTPC', 'rtpc', 'source'), ('ControlInput', 'lfo', 'rtpc'), ('Curve', 'curve', 'rtpc')):
+            index = len(receipt['calls'])
+            payload = candidate(['query-object', '--advanced-waql', f'from object "{ids[owner]}" select @{token}',
+                '--max-results', '2', '--include', 'class-id', '--include', 'owner',
+                *(['--include', 'curve-points'] if token == 'Curve' else [])], rtpc_boundary=token == 'RTPC')
+            observation = {'available': payload is not None, 'complete': False, 'call_index': index}
+            if payload is not None:
+                row, = rows(payload)
+                assert row['id'] == ids[role] and row['class_id'] == classes[role] and row.get('owner', {}).get('id') == ids[owner], row
+                observation.update(complete=True, row=row)
+                if token == 'Curve':
+                    points = row.get('curve_points')
+                    saved_points = nodes['curve'].findall('.//Point')
+                    observation['saved_points'] = [{'x': node.findtext('XPos'), 'y': node.findtext('YPos'), 'flags': node.findtext('Flags')} for node in saved_points]
+                    observation['points_available'] = isinstance(points, list) and len(points) == len(saved_points)
+                    if observation['points_available']:
+                        assert all(isinstance(point, dict) and type(point.get('x')) in (int, float) and type(point.get('y')) in (int, float) and isinstance(point.get('shape'), str) and point['shape'] for point in points), points
+                        # Preserve native floating precision and XML text
+                        # independently. Exact numeric agreement is an observed
+                        # fact, not a guessed Flags-to-shape interpretation.
+                        observation['coordinates_exactly_equal_saved_text'] = [(point['x'], point['y']) for point in points] == [(float(node.findtext('XPos')), float(node.findtext('YPos'))) for node in saved_points]
+            if token == 'RTPC': probe['membership']['traversal'] = observation
+            else: probe['hops'][token] = observation
+        for role in ('rtpc', 'lfo', 'curve'): metadata(role)
+        probe['full_membership_verified'] = all(row['complete'] for row in probe['membership'].values())
+        probe['missing_semantic_fields'] = {role: sorted(set(required) - set(probe['fields'][role]['names'])) for role, required in {'rtpc': ['PropertyName', 'ControlInput', 'Curve'], 'curve': ['Flags']}.items()}
+        probe['all_values_available'] = not any(row['unavailable'] for row in probe['fields'].values()) and not any(probe['missing_semantic_fields'].values())
+        property_pages = probe['fields']['rtpc']['values']
+        property_values = {key: value for page in property_pages for key, value in page['row'].get('properties', {}).items()}
+        if 'PropertyName' in property_values:
+            assert property_values['PropertyName'] == 'OutputLevel' and type(property_values['PropertyName']) is str, 'RTPC PropertyName changed'
+        assert observe_console_file(original, io_root=original.parents[1])['file_proof'] == original_observed['file_proof'], 'Original MIDI changed'
+        assert observe_console_file(live_file, io_root=runtime.sandbox.sandbox_path)['file_proof'] == live_observed['file_proof'], 'Read-only sandbox MIDI changed'
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, 'Diagnostic config changed'
+        probe['diagnostic_transport_complete'] = True
+        receipt['collection_complete'] = True
+        ready = probe['full_membership_verified'] and probe['all_values_available'] and all(row['complete'] for row in probe['hops'].values()) and probe['hops']['Curve'].get('points_available') is True and probe['hops']['Curve'].get('coordinates_exactly_equal_saved_text') is True
+        category['status'] = 'PASS' if ready else 'blocked'
+        category['reason'] = 'Read protocol complete; availability and completeness recorded separately; no copy-effect credit'
+        return category
+
+    persist()
+    try:
+        if selected_owned_probe:
+            return selected_probe()
+        status = gateway.gateway(['status'], live=True)
+        info_call = next(row for row in status['calls'] if row['api'] == 'ak.wwise.core.getInfo')
+        observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
+        info = json.loads(base64.b64decode(observed['content_base64'], validate=True))['result']
+        assert info['isCommandLine'] is True
+        expected_build = MODERN_ORIGINALS[runtime.version][0] if modern else '2021.1.14.8108'
+        assert tuple(info['version'][key] for key in ('year', 'major', 'minor', 'build')) == tuple(map(int, expected_build.split('.'))), info
+        receipt['native_build'] = catalog['provenance']['build']
+        types = gateway.gateway(['metadata', 'types', '--meaning', 'Wwise Synth One', '--page-size', '64'], live=True)['agent_result']
+        assert types['complete'] is True, types
+        selected = [row for row in types['types'] if row['name'] == 'Wwise Synth One']
+        assert len(selected) == 1 and selected[0]['classId'] == 9699330 and selected[0]['type'] == 'Source', selected
+        if saved_copy and not successor: explicit_save('save_baseline')
+        source_before = save_observation('source-before', {'identity': exact(source_id)} if owned_read_only or saved_copy else snapshot(source_id))
+        assert source_before['identity']['type'] in {'Source', 'SourcePlugin'} and source_before['identity']['class_id'] == 9699330
+        if owned_read_only:
+            original_owned_read()
+            assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash
+            receipt['collection_complete'] = True; category['status'] = 'blocked'
+            category['reason'] = 'Original read protocol complete; Curve points and any untyped fields remain unverified'
+            return category
+        old_owner = source_before['identity']['parent']['id']
+        owner_before = save_observation('original-owner-before', owner_frame(old_owner))
+        assert owner_before['identity']['type'] == 'Sound' and owner_before['identity']['class_id'] == 65552
+        source_children = save_observation('original-owner-children-before', query(old_owner, relation='children'))
+        if not saved_copy: save_observation('source-descendants-before', query(source_id, relation='descendants'))
+        if selected_fixture:
+            from tests.destructive.support.source_copy_fixture import source_graph, sha, xml, MIDI, ORIGINAL_SHA, SPAN_SHA
+            if repeated:
+                prelaunch = runtime.source_copy_prelaunch
+                assert prelaunch['profile'] == fixture_profile and prelaunch['native_acceptance'] is False and prelaunch['input_sha256'] == ORIGINAL_SHA and prelaunch['donor']['rtpc_list_sha256'] == SPAN_SHA, 'Missing synthetic prelaunch authority'
+                receipt['prelaunch'] = archive('prelaunch.json', json.dumps(prelaunch, ensure_ascii=False).encode('utf-8'))
+            else:
+                _, relative, pinned_sha = MODERN_ORIGINALS[runtime.version]
+                MIDI = Path(relative)
+                original = observe_console_file(REPO_ROOT / 'tests/_org' / runtime.version / MIDI, io_root=REPO_ROOT / 'tests/_org' / runtime.version)
+                assert original['file_proof']['sha256'] == pinned_sha, 'Modern original MIDI drift'
+                receipt['fixture_topology'].update(file='tests/_org/' + runtime.version + '/' + relative, sha256=pinned_sha)
+                receipt['original_midi'] = archive('original-midi.wwu', base64.b64decode(original['content_base64'], validate=True))
+            source_binding = exact(source_id, extra=['--include', 'work-unit', '--include', 'file-path'])
+            source_unit_id = source_binding['work_unit']['id']
+            source_file = runtime.sandbox.sandbox_project.parent / MIDI
+            from tests.semantic.support.codex_archive_paths import archive_relative_from_absolute
+            source_archive_identity = archive_relative_from_absolute(source_file, runtime.sandbox.sandbox_project.parent).canonical
+            assert Path(localize_waapi_host_path(source_binding['file_path'])).resolve() == source_file.resolve(), 'Source outside selected MIDI file'
+            project = exact(status['project']['id'], extra=['--include', 'file-path'])
+            assert Path(localize_waapi_host_path(project['file_path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), 'Repeated fixture requires exact sandbox Project'
+            loaded_unit = repeated_unit()
+            loaded_observed = observe_console_file(source_file, io_root=runtime.sandbox.sandbox_path)
+            loaded_raw = base64.b64decode(loaded_observed['content_base64'], validate=True)
+            assert sha(loaded_raw) == (prelaunch['output_sha256'] if repeated else pinned_sha), 'Loaded synthetic file drift'
+            loaded_nodes = source_graph([loaded_raw], source_id, old_owner, version=runtime.version if modern else None)
+            declared_unit, = [node for node in xml(loaded_raw).iter('WorkUnit') if node.get('ID') == source_unit_id]
+            assert declared_unit.get('PersistMode') == 'Standalone', 'Synthetic MIDI Work Unit identity differs'
+            if modern:
+                pinned_root_order = [(node.tag, dict(node.attrib)) for node in declared_unit.find('ChildrenList')]
+            initial_children = query(source_unit_id, relation='children')
+            assert len(initial_children) == 7 and {node.get('ID') for node in declared_unit.find('ChildrenList')} == {row['id'] for row in initial_children}, 'Loaded MIDI root childset differs'
+            loaded_live, loaded_fields = repeated_live(loaded_nodes, fields=True)
+            original_owned_ids = [node.get('ID') for role, node in loaded_nodes.items() if role != 'source']
+        owned_before = save_observation('known-owned-before', {identity: {'identity_rows': [next(row for row in loaded_live.values() if row['id'] == identity)], 'scope': 'observed topology/class/notes only; fields and copied GUID mapping unverified'} for identity in original_owned_ids} if selected_fixture else known_owned())
+        if saved_copy:
+            if not successor: before_images = model_images('before', [source_id])
+            before_live = loaded_live if selected_fixture else {'source': source_before['identity'], **{role: owned_before[identity]['identity_rows'][0]
+                for role, identity in zip(('rtpc', 'control_input', 'curve'), original_owned_ids)}}
+        # Existing classic Gateway creation; no field/default or locale changes.
+        draft = _start_business_draft(gateway, 'object.create')
+        parent = _bind_business_object(gateway, draft, object_id=source_unit_id) if selected_fixture else _bind_business_object(gateway, draft, path_segments=ACTOR_MIXER_PARENT_SEGMENTS)
+        _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'destination',
+            '--parent-handle', parent, '--name', prefix, '--kind', 'sound-sfx', '--field', 'notes', 'Owned copy feasibility destination'], live=False)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        setup = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        complete(setup, 'create_empty_destination')
+        if selected_fixture:
+            setup_children = query(source_unit_id, relation='children')
+            added = [row for row in setup_children if row['id'] not in {old['id'] for old in initial_children}]
+            assert len(setup_children) == 8 and [row for row in setup_children if row not in added] == initial_children, 'Create must add exactly one sibling Sound'
+            created, = added
+            rows = [exact(created['id'], extra=['--include', 'work-unit', '--include', 'file-path'])]
+            assert rows[0]['name'] == prefix and rows[0]['parent']['id'] == source_unit_id and rows[0]['work_unit']['id'] == source_unit_id and Path(localize_waapi_host_path(rows[0]['file_path'])).resolve() == source_file.resolve(), 'Destination must belong to selected MIDI Work Unit'
+            assert repeated_unit()['work_unit_is_dirty'] is True, 'Destination create must dirty selected MIDI Work Unit'
+            pre_save_observed = observe_console_file(source_file, io_root=runtime.sandbox.sandbox_path)
+            pre_save_raw = base64.b64decode(pre_save_observed['content_base64'], validate=True)
+            assert pre_save_raw == loaded_raw and not any(node.get('ID') == rows[0]['id'] for node in xml(pre_save_raw).iter()), 'Destination must not be serialized before baseline Save'
+        else:
+            rows = gateway.gateway(['query-object', *[arg for segment in (*ACTOR_MIXER_PARENT_SEGMENTS, prefix)
+                for arg in ('--path-segment', segment)], '--include', 'parent', '--include', 'class-id', '--max-results', '2'], live=True)['objects']
+        destination, = rows; destination_id = receipt['destination_id'] = destination['id']
+        destination_before = save_observation('destination-before', owner_frame(destination_id))
+        assert destination['type'] == 'Sound' and destination['class_id'] == 65552
+        assert destination_before['identity']['properties']['IsVoice'] is False, destination_before
+        assert query(destination_id, relation='children') == [], 'Copy destination must be empty'
+        if successor: before_images = None
+        def copy_gateway(argv):
+            nonlocal before_images, before_live
+            payload = gateway.gateway(argv, live=argv[0] in {'draft-bind-object', 'draft-check', 'preview-from-draft'})
+            if successor and argv[0] == 'draft-check':
+                receipt['copy_draft_id'] = payload['draft']['draft_id']
+                assert payload.get('source_copy_saved_proof', {}).get('status') == 'baseline_save_pending', 'Expected dirty selected baseline after destination setup'
+                parent = generated_save(payload, 'baseline')
+                assert parent['draft']['draft_id'] == receipt['copy_draft_id'], 'Baseline Save returned wrong copy Draft'
+                checked = gateway.gateway(continuation(parent, 'draft-check'), live=True)
+                assert checked['draft']['draft_id'] == receipt['copy_draft_id'] and checked['draft']['revision'] > payload['draft']['revision'], 'Baseline return did not advance exact parent'
+                before_images = model_images('before', [source_id])
+                if selected_fixture: before_live = accept_repeated_fixture(before_images, checked)
+                return checked
+            return payload
+        preview = create_object_lifecycle_business_preview(copy_gateway,
+            version=runtime.version, operation='object.copy', object_id=source_id, parent_id=destination_id, name_conflict='fail')
+        # Full immutable artifact stays in its single archived reply, not duplicated in the receipt.
+        shown = gateway.gateway(['transaction-show', preview['transaction_id']], live=False)
+        expected_copy_args = {'object': source_id, 'parent': destination_id, 'onNameConflict': 'fail'}
+        if modern and runtime.version in {'2023.1', '2024.1', '2025.1'}:
+            # Matching reflected copy schemas introduce the two closed safety defaults.
+            expected_copy_args.update(autoAddToSourceControl=False, autoCheckOutToSourceControl=False)
+        assert shown['artifact']['prepared_operation']['dispatch']['args'] == expected_copy_args, shown
+        if successor:
+            baseline = shown['artifact']['prepared_operation']['pre_state']['source_copy_saved_proof']
+            if selected_fixture:
+                assert receipt['fixture_acceptance']['status'] == 'accepted' and baseline['status'] == 'ready' and baseline['graph_format'] == 'waapi-skill.source-copy-owned-declarations/v1', 'Copy Preview requires accepted ready graph'
+                assert len(baseline['role_ids']) == (4 if modern else 7) and set(baseline['role_ids'].values()) == {node.get('ID') for node in loaded_nodes.values()} and len(baseline['authority']['units']) == 1, 'Copy baseline differs from accepted same-WWU graph'
+            assert baseline['baseline_save_receipt'] == receipt['continuation_links'][0]['save_receipt'], 'Copy baseline differs from generated Save receipt'
+        pending = complete(preview, 'copy_source_only')
+        if successor:
+            final = generated_save(pending, 'final')
+            assert final['transaction_id'] == preview['transaction_id'] and final.get('state') == 'verified', 'Final Save must verify original copy'
+            scope = final.get('verification', {}).get('verification_scope', {})
+            assert scope.get('complete_copy_preservation') is True and final.get('verification_strength') == 'saved_source_graph_and_live_roles', 'Original copy lacks complete supported shape proof'
+            assert scope.get('supported_shape') == expected_build + '_Synth_owned_declaration_graph_zero_ObjectRefs', 'Original copy proof exceeds reviewed owned declaration graph'
+            phase, = [row for row in receipt['phases'] if row['name'] == 'copy_source_only']
+            assert scope['final_save_receipt'] == receipt['continuation_links'][1]['save_receipt'], 'Original copy used an unrelated final Save receipt'
+            terminal = gateway.gateway(['transaction-show', preview['transaction_id'], '--summary-only'], live=False)
+            assert terminal['state'] == 'verified' and len([row for row in terminal['events'] if row['event_type'] == 'execution_completed']) == 1, 'Original copy final receipt is not terminal/unique'
+            phase.update(gateway_verification_scope=scope, gateway_verification_strength=final['verification_strength'],
+                final_verify_call_index=len(receipt['calls']) - 2, final_terminal_call_index=len(receipt['calls']) - 1)
+        children = query(destination_id, relation='children'); copied, = children
+        assert uuid.UUID(copied['id']) != uuid.UUID(source_id) and copied['class_id'] == 9699330
+        assert copied['type'] in {'Source', 'SourcePlugin'} and copied['parent']['id'] == destination_id, copied
+        receipt['native_admission_verified'] = True
+        copied_state = save_observation('copied-source', {'identity': copied if modern else exact(copied['id'])} if saved_copy else snapshot(copied['id']))
+        if not saved_copy: save_observation('copied-descendants', query(copied['id'], relation='descendants'))
+        retained_live = saved_copy_result(before_images, copied, old_owner, before_live) if saved_copy else None
+        source_after = save_observation('source-after', {'identity': retained_live['source'] if modern else exact(source_id)} if saved_copy else snapshot(source_id))
+        owner_after = save_observation('original-owner-after', owner_frame(old_owner))
+        destination_after = save_observation('destination-after', owner_frame(destination_id))
+        owned_after = save_observation('known-owned-after', {identity: {'identity_rows': [next(row for row in retained_live.values() if row['id'] == identity)], 'scope': 'observed topology/class/notes only; fields and copied GUID mapping unverified'} for identity in original_owned_ids} if modern else known_owned())
+        assert source_after == source_before and owner_after == owner_before and owned_after == owned_before, 'Original Source/owner/observed owned objects changed'
+        assert query(old_owner, relation='children') == source_children, 'Original owner childset changed'
+        assert destination_after == destination_before, 'Destination identity/Voice frame changed'
+        receipt['preservation'] = {'original_source_observed_state': True, 'original_owner_identity_voice_frame': True,
+            'original_owner_children': True, 'destination_identity_voice_frame': True, 'known_owned_topology_observations': True,
+            'unresolvable_owned_ID_scope': 'equal unavailable observations do not prove owned object preservation'}
+        if saved_copy:
+            assert query(destination_id, relation='children') == children, 'Saved destination childset changed'
+            after_index, = [index for index in saved_model_indexes if index.phase == 'after']
+            for relative, image in after_index.files.items():
+                assert observe_console_file(runtime.sandbox.sandbox_project.parent / relative,
+                    io_root=runtime.sandbox.sandbox_path)['file_proof'] == image['file_proof'], 'Saved model changed during public observations'
+            receipt['copy_observation'] = {'new_id': copied['id'], 'class_id': copied['class_id'],
+                'parent_id': destination_id, 'saved_subtree': 'independent full serialized graph oracle',
+                'runtime_verifier': ('original copy verified through its exact generated Save children; fixed supported graph only' if successor else
+                    'returned Gateway live-field strength/scope recorded separately; no production complete-copy authority')}
+            assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash
+            receipt['collection_complete'] = True; category['status'] = 'PASS'
+            return category
+        before_fields = {key: value for row in source_before['field_pages'] for key, value in row.get('properties', {}).items()}
+        after_fields = {key: value for row in copied_state['field_pages'] for key, value in row.get('properties', {}).items()}
+        before_refs = {key: value for row in source_before['field_pages'] for key, value in row.get('references', {}).items()}
+        after_refs = {key: value for row in copied_state['field_pages'] for key, value in row.get('references', {}).items()}
+        receipt['copy_observation'] = {'new_id': copied['id'], 'class_id': copied['class_id'], 'parent_id': destination_id,
+            'same_field_names': copied_state['field_names'] == source_before['field_names'],
+            'same_notes': copied_state['identity'].get('notes') == source_before['identity'].get('notes'),
+            'observed_scalar_differences': {key: {'before': before_fields.get(key), 'after': after_fields.get(key)}
+                for key in before_fields.keys() | after_fields.keys() if before_fields.get(key) != after_fields.get(key)},
+            'observed_reference_differences': {key: {'before': before_refs.get(key), 'after': after_refs.get(key)}
+                for key in before_refs.keys() | after_refs.keys() if before_refs.get(key) != after_refs.get(key)},
+            'reference_difference_scope': 'owned reference GUID remapping is not classified as corruption',
+            'owned_state_mapping': 'unverified; no copied-GUID equality assumed'}
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash
+        receipt.update(collection_complete=True, native_admission_verified=True); category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        if selected_owned_probe and 'selected_owned_probe' in receipt:
+            partial = receipt['selected_owned_probe']
+            link = archive('partial-probe.json', json.dumps(partial, ensure_ascii=False).encode('utf-8'))
+            receipt['selected_owned_probe'] = {'diagnostic_transport_complete': False, 'partial_observations': link}
+        raise
+    finally:
+        try:
+            paths = sorted(set(native_root.glob('*.json')) - old_native)
+            assert len(paths) + int(indexed_native) <= receipt['limits']['native_files']
+            native_proofs = []
+            for index, path in enumerate(paths):
+                observed = observe_console_file(path, io_root=native_root)
+                raw = base64.b64decode(observed['content_base64'], validate=True)
+                if selected_owned_probe:
+                    packet = json.loads(raw)
+                    assert packet['api'] in {'ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo',
+                        'ak.wwise.core.object.get', 'ak.wwise.core.object.getTypes',
+                        'ak.wwise.core.object.getPropertyInfo', 'ak.wwise.core.object.getPropertyAndReferenceNames'}, 'Probe dispatched a non-read URI'
+                link = archive('native-' + str(index) + '.json', raw)
+                if indexed_native:
+                    receipt['native_evidence'].append(link)
+                    native_proofs.append({'archive': link, 'native_file_proof': observed['file_proof']})
+                else:
+                    receipt['native_evidence'].append({'native_path': str(path), **link,
+                        'native_file_proof': observed['file_proof']})
+            if indexed_native:
+                receipt['native_file_proofs'] = archive('native-proofs.json', json.dumps({
+                    'contract': 'waapi-skill.legacy-source-native-file-proofs/v1',
+                    'count': len(native_proofs), 'files': native_proofs}, ensure_ascii=False).encode('utf-8'))
+                index_link = receipt['native_file_proofs']
+                index_observed = observe_console_file(Path(index_link['path']), io_root=artifacts)
+                assert all(index_observed['file_proof'][key] == index_link[key] for key in ('sha256', 'size')), 'Native proof index hash/size changed'
+                index_document = json.loads(base64.b64decode(index_observed['content_base64'], validate=True))
+                assert index_document['count'] == len(receipt['native_evidence'])
+                assert [row['archive'] for row in index_document['files']] == receipt['native_evidence'], 'Native proof index archive bindings changed'
+                if successor or not saved_copy:
+                    assert index_document == {'contract': 'waapi-skill.legacy-source-native-file-proofs/v1',
+                        'count': len(native_proofs), 'files': native_proofs}, 'Native proof index content changed'
+                    for indexed in index_document['files']:
+                        link = indexed['archive']
+                        archived = observe_console_file(Path(link['path']), io_root=artifacts)['file_proof']
+                        assert all(archived[key] == link[key] == indexed['native_file_proof'][key] for key in ('sha256', 'size')), 'Indexed native archive hash/size changed'
+                        native = indexed['native_file_proof']
+                        assert observe_console_file(Path(native['path']), io_root=native_root)['file_proof'] == native, 'Indexed native source proof changed'
+        except Exception as exc:
+            receipt.update(collection_complete=False, native_admission_verified=False,
+                archive_failure={'type': type(exc).__name__, 'message': str(exc)[:2048]}); category['status'] = 'FAIL'; raise
+        finally:
+            if successor or selected_owned_probe:
+                receipt['budget'] = {'public_calls': len(receipt['calls']),
+                    # Every admitted non-offline call performs exactly one
+                    # version handshake; dispatcher packets are archived below.
+                    # The positive fake independently counts all native calls.
+                    'native_calls': len(paths) + sum(row['argv'][0] != '--version' and row['argv'][0] not in waapi_gateway.OFFLINE_COMMANDS for row in receipt['calls']),
+                    'native_dispatcher_packets': len(paths),
+                    'native_version_handshakes': sum(row['argv'][0] != '--version' and row['argv'][0] not in waapi_gateway.OFFLINE_COMMANDS for row in receipt['calls']),
+                    'archive_files': sum(path.is_file() for path in artifacts.rglob('*')),
+                    'native_files_including_index': len(receipt['native_evidence']) + int('native_file_proofs' in receipt),
+                    'native_packet_bytes': sum(row['size'] for row in receipt['native_evidence']),
+                    'archive_bytes': receipt['archive_bytes'], 'total_reply_bytes': receipt['total_reply_bytes'],
+                    'max_reply_bytes': max((row.get('reply', {}).get('size', 0) for row in receipt['calls']), default=0),
+                    'unique_transactions': len(set(transactions)), 'receipt_bytes': 0}
+            persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_legacy_source_only_copy_console_feasibility(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2021.1':
+        pytest.skip('Source-only copy feasibility is pinned to Console2021.1.14.8108')
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime, prefix='WAAPI_SOURCE_COPY_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_legacy_original_source_owned_read_console_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2021.1':
+        pytest.skip('Original owned metadata observation is pinned to Console2021.1.14.8108')
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime, prefix='', owned_read_only=True)
+    assert category['status'] == 'blocked', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_legacy_source_only_copy_saved_graph_console_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2021.1':
+        pytest.skip('Saved Source graph diagnostic is pinned to Console2021.1.14.8108')
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime,
+        prefix='WAAPI_SAVED_SOURCE_COPY_' + uuid.uuid4().hex[:10], saved_copy=True)
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_source_copy_generated_save_children_console_oracle(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2021.1':
+        pytest.skip('Generated Source Save children are pinned to Console2021.1.14.8108')
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime,
+        prefix='WAAPI_SOURCE_SAVE_CHILDREN_' + uuid.uuid4().hex[:10], saved_copy=True,
+        saved_copy_protocol='gateway-owned-save-children/v1')
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+@pytest.mark.parametrize('workflow_sandbox_runtime', ['2021-native-donor-two-properties/v1'], indirect=True)
+def test_source_copy_repeated_native_donor_saved_graph(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime,
+        prefix='WAAPI_REPEATED_SOURCE_' + uuid.uuid4().hex[:10], saved_copy=True,
+        saved_copy_protocol='gateway-owned-save-children/v1', fixture_profile='2021-native-donor-two-properties/v1')
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_selected_source_owned_graph_console_probe(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version == '2021.1':
+        pytest.skip('Modern selected Source probe covers2022–2025;2021 retains its original owned diagnostic')
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime, prefix='', selected_owned_probe=True)
+    assert category['status'] in {'PASS', 'blocked'}, category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_modern_source_copy_generated_save_children_console_oracle(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version == '2021.1':
+        pytest.skip('Modern original Source collector covers 2022–2025; 2021 profiles remain unchanged')
+    from tests.destructive.support.source_copy_fixture import MODERN_PROFILE
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime,
+        prefix='WAAPI_MODERN_SOURCE_' + uuid.uuid4().hex[:10], saved_copy=True,
+        saved_copy_protocol='gateway-owned-save-children/v1', fixture_profile=MODERN_PROFILE)
+    assert category['status'] == 'PASS', category
+
+
+def _collect_structure_changed_notes_diagnostic(runtime, *, name: str, filtered: bool = False) -> dict[str, Any]:
+    """One owned Notes trigger; a schema rejection stays failed diagnostic evidence."""
+    from wwise_waapi.native_catalog import load_native_catalog
+    from wwise_waapi.canonical import canonical_sha256
+
+    assert runtime.version == '2025.1', 'Notes diagnostic is pinned to 2025.1.7.9143'
+    topic = 'ak.wwise.core.object.structureChanged'
+    label = 'structure-changed-notes-filtered-diagnostic' if filtered else 'structure-changed-notes-diagnostic'
+    output = runtime.state_dir / (label + '.json')
+    assert not output.exists(), 'Never overwrite a Notes diagnostic attempt'
+    runtime.state_dir.mkdir(parents=True, exist_ok=True)
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH'])
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
+    category = {'category': label, 'status': 'FAIL',
+        'diagnostic_only': True, 'business_effect_verified': False, 'coverage_credit': 'none',
+        'verifier_strength': 'exact_packet_or_complete_bounded_diagnostic_only',
+        'observation_path': str(output), 'reason': 'collection incomplete'}
+    runtime.category_results.append(category)
+    catalog = load_native_catalog('2025.1', 'wwise-console')
+    receipt = {'contract': 'waapi-skill.structure-changed-notes-diagnostic/v1',
+        'candidate': runtime.candidate, 'version': runtime.version, 'endpoint': endpoint,
+        'native_catalog_build': catalog['provenance']['build'],
+        'native_schema_sha256': canonical_sha256(catalog['schemas'][topic]),
+        'diagnostic_only': True, 'business_effect_verified': False, 'coverage_credit': 'none',
+        'native_delivery_pass': False, 'collection_complete': False, 'calls': [], 'records': [],
+        'stage': 'setup', 'object_cleanup': 'not_attempted',
+        'lifecycle_final_reference': {'contract': 'waapi-skill.host-category-evidence/v3',
+            'phase': 'final', 'candidate': runtime.candidate, 'category': category['category'],
+            'transaction_ids': [], 'cleanup_status': 'unresolved_until_final_row'},
+        'lifecycle_acceptance': 'Requires matching final v3 source hash/mtime/tree and owned-process cleanup; collector body is not final acceptance.'}
+    attempted = set()
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
+    prior_native = set(native_root.glob('*.json'))
+    config_hash = None
+
+    def persist():
+        raw = json.dumps(receipt, ensure_ascii=False, indent=2, allow_nan=False).encode('utf-8')
+        assert len(raw) <= 2 * 1024 * 1024, 'Notes diagnostic receipt bound exceeded'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+
+    class Gateway:
+        def raw_gateway(self, argv, *, stream_sink=None, producer=False):
+            assert len(receipt['calls']) < 64, 'Notes diagnostic public call bound exceeded'
+            if argv[0] == 'execute':
+                assert argv[1] not in attempted, 'Never retry a Notes diagnostic transaction'
+                attempted.add(argv[1])
+                receipt['lifecycle_final_reference']['transaction_ids'].append(argv[1])
+            row = {'argv': list(argv), 'started_monotonic_ns': time.monotonic_ns(),
+                'execution_context': 'separate_packaged_gateway_process' if producer else 'observer_process'}
+            receipt['calls'].append(row)
+            code, payload = (runtime.packaged_topic_producer(argv) if producer
+                else runtime.raw_gateway(argv, stream_sink=stream_sink))
+            raw = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode('utf-8')
+            assert len(raw) <= 256 * 1024, 'Notes diagnostic public reply bound exceeded'
+            row.update(exit_code=code, payload=deepcopy(payload)); persist()
+            return code, payload
+
+        def gateway(self, argv, *, live, producer=False):
+            code, payload = self.raw_gateway(argv, producer=producer)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
+            return payload
+
+    gateway = Gateway()
+
+    def read(identity):
+        payload = gateway.gateway(['query-object', '--exact-id', identity, '--include', 'notes'], live=True)
+        assert payload['count'] == 1 and len(payload['objects']) == 1, payload
+        row = payload['objects'][0]
+        assert row['id'] == identity, row
+        return row
+
+    try:
+        gateway.version = runtime.version
+        assert runtime.sandbox.source_project.resolve() != runtime.sandbox.sandbox_project.resolve(), 'Private sandbox required'
+        gateway.gateway(['config-set', '--wwise-version', '2025.1', '--waapi-host', runtime.lifecycle.host,
+            '--waapi-port', str(runtime.port)], live=False)
+        settings = json.loads(config.read_text(encoding='utf-8'))
+        assert settings['project_modification_policy'] == 'ask_before_changes', 'Notes probe requires explicit confirmation'
+        config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+        receipt.update(config_path=str(config), config_sha256=config_hash,
+            source_project=str(runtime.sandbox.source_project), sandbox_project=str(runtime.sandbox.sandbox_project))
+        status = gateway.gateway(['status'], live=True); receipt['host'] = status
+        info = status['wwise']; version = info['version']
+        assert '.'.join(str(version[k]) for k in ('year', 'major', 'minor', 'build')) == '2025.1.7.9143', info
+        assert info['isCommandLine'] is True and info.get('sessionId') and info.get('processId'), info
+        assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), 'Wrong sandbox project'
+        gateway.gateway(['operation-schema', 'object.setNotes'], live=False)
+        schema = gateway.gateway(['topic-schema', topic], live=False)
+        digest = schema['continuation']['contract_binding']['value']
+        match_facts = []
+        if filtered:
+            for field, value in (('notes-change-old-notes', 'topic-notes-before'),
+                    ('notes-change-new-notes', 'topic-notes-after')):
+                disclosure = gateway.gateway(['topic-schema', topic, '--row', 'objects-changes',
+                    '--row-field-group', field], live=False)
+                assert disclosure['continuation']['contract_binding']['value'] == digest, 'Notes contract drift'
+                row = disclosure['business_input']['event_rows']['selected']
+                assert row['collection'] == 'objects-changes' and row['index_depth'] == 2, row
+                fields = row['fields']
+                assert fields['columns'] == ['field', 'value_mode', 'value_choice_handles'], fields
+                assert fields['rows'] == [[field, 'gateway_derived', []]], fields
+                match_facts += ['--event-row', row['collection'], '0,0', fields['rows'][0][0], value]
+        draft = _start_business_draft(gateway, 'object.create')
+        parent = _bind_business_object(gateway, draft, path_segments=CONTAINERS_PARENT_SEGMENTS)
+        _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'notes-target',
+            '--parent-handle', parent, '--name', name, '--kind', 'actor-mixer',
+            '--field', 'notes', 'topic-notes-before'], live=False)
+        created = _complete_business_draft(gateway, draft)
+        identity = _created_object_id(created['execute']); receipt['object_id'] = identity
+        before = read(identity); receipt['before'] = before
+        assert before['name'] == name and before['type'] == 'PropertyContainer' and before['notes'] == 'topic-notes-before', before
+        preview = create_object_lifecycle_business_preview(lambda argv: gateway.gateway(argv,
+            live=argv[0] in {'draft-bind-object', 'draft-check', 'preview-from-draft'}),
+            version='2025.1', operation='object.setNotes', object_id=identity, notes='topic-notes-after')
+        transaction = preview['transaction_id']; receipt['notes_transaction_id'] = transaction
+        shown = gateway.gateway(['transaction-show', transaction, '--summary-only'], live=False)
+        gateway.gateway(['confirm', transaction, '--confirmation-token', shown['confirmation']['token']], live=False)
+        receipt['stage'] = 'observation'; started = False
+
+        def observe(record):
+            nonlocal started
+            assert len(receipt['records']) < 3, 'Notes diagnostic stream record bound exceeded'
+            receipt['records'].append(deepcopy(record)); persist()
+            if record.get('record_type') == 'started':
+                assert not started, 'Duplicate started record; Notes trigger will not repeat'
+                started = True
+                assert (record.get('contract') == 'waapi-skill.topic-stream/v1'
+                    and record.get('status') == 'streaming' and record.get('ok') is True
+                    and record.get('topic') == topic and record.get('topic_contract_digest') == digest
+                    and record.get('endpoint') == endpoint and record.get('detected_version') == '2025.1'
+                    and record.get('is_command_line') is True and record.get('event_count_limit') == 1), record
+                receipt['started_monotonic_ns'] = time.monotonic_ns()
+                receipt['started_before_execute'] = True; persist()
+                gateway.gateway(['execute', transaction], live=True, producer=True)
+                verified = gateway.gateway(['verify', transaction], live=True, producer=True)
+                assert verified['state'] == 'verified' and verified['verification']['business_state_verified'] is True, verified
+
+        argv = ['--timeout', '10', 'stream-topic', topic, '--topic-contract-digest', digest, '--event-count', '1',
+            *[arg for field in ('id', 'name', 'type', 'path', 'notes') for arg in ('--topic-option', 'include', field)],
+            *match_facts]
+        # The existing public stream emits started only after open_stream has subscribed.
+        code, terminal = gateway.raw_gateway(argv, stream_sink=observe)
+        receipt['stream'] = {'exit_code': code, 'payload': terminal}
+        assert started and terminal.get('cleanup') == 'unsubscribed', 'Notes subscription cleanup not proven'
+        after = read(identity); receipt['after'] = after
+        assert all(after[k] == before[k] for k in ('id', 'name', 'type', 'path')) and after['notes'] == 'topic-notes-after', after
+        events = [r['event'] for r in receipt['records'] if r.get('record_type') == 'event']
+        mismatch = terminal.get('error_code') == 'TOPIC_EVENT_SCHEMA_MISMATCH'
+        if mismatch:
+            assert not events, 'Rejected event must not appear as accepted delivery'
+            diagnostic = terminal['details']['event_diagnostic']
+            assert diagnostic.get('complete') is True and isinstance(diagnostic.get('json'), str), 'Incomplete Notes event diagnostic'
+            assert len(diagnostic['json'].encode('utf-8')) <= 2048, 'Notes diagnostic exceeded public boundary'
+            event = json.loads(diagnostic['json'])
+        else:
+            assert code == 0 and terminal.get('ok') is True and len(events) == 1, terminal.get('message') or terminal
+            assert terminal.get('monitoring_outcome', {}).get('target_completed') is True, terminal
+            event = events[0]
+        receipt['event'] = event
+        assert len(event.get('objects', [])) == 1, 'Notes observation must contain one tracked object'
+        changed = event['objects'][0]
+        assert changed.get('object', {}).get('id') == identity, 'Wrong GUID in Notes event'
+        assert len(changed.get('changes', [])) == 1 and changed['changes'][0].get('type') == 'notesChange', changed
+        details = changed['changes'][0].get('notesChange'); assert isinstance(details, dict), changed
+        pairs = [(a, b) for a, b in (('oldNotes', 'newNotes'), ('oldName', 'newName')) if a in details and b in details]
+        for old, new in pairs:
+            assert details[old] == 'topic-notes-before' and details[new] == 'topic-notes-after', details
+        receipt['notes_shape'] = 'both' if len(pairs) == 2 else '/'.join(pairs[0]) if pairs else 'another_shape'
+        final_status = gateway.gateway(['status'], live=True)
+        assert final_status['wwise'] == status['wwise'] and final_status['project']['id'] == status['project']['id'], 'Host/session/project drift'
+        receipt['stage'] = 'cleanup'
+        _delete_if_present_via_transaction(gateway, identity)
+        receipt.update(object_cleanup='verified_absent', collection_complete=True,
+            schema_validation='rejected' if mismatch else 'accepted')
+        if mismatch:
+            category['reason'] = 'Notes event schema rejected; exact diagnostic retained'
+            raise AssertionError(category['reason'])
+        category.update(status='PASS', reason='Diagnostic collection complete; no native branch acceptance credit')
+        return category
+    except BaseException as exc:
+        receipt['error'] = f'{type(exc).__name__}: {str(exc)[:1024]}'
+        category.update(status='FAIL', reason=receipt['error'])
+        raise
+    finally:
+        receipt['native_evidence'] = []
+        paths = sorted(set(native_root.glob('*.json')) - prior_native)
+        assert len(paths) <= 256, 'Notes native evidence file bound exceeded'
+        total = 0
+        for path in paths:
+            raw = path.read_bytes(); total += len(raw)
+            assert total <= 16 * 1024 * 1024, 'Notes native evidence byte bound exceeded'
+            receipt['native_evidence'].append({'path': str(path), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+        if config_hash is not None:
+            assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, 'Notes diagnostic config drift'
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_structure_changed_notes_shape_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Notes shape diagnostic is pinned to Console 2025.1.7.9143')
+    _collect_structure_changed_notes_diagnostic(workflow_sandbox_runtime, name='WAAPI_NOTES_' + uuid.uuid4().hex[:12])
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_structure_changed_notes_filtered_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Filtered Notes diagnostic is pinned to Console 2025.1.7.9143')
+    _collect_structure_changed_notes_diagnostic(workflow_sandbox_runtime,
+        name='WAAPI_NOTES_FILTERED_' + uuid.uuid4().hex[:12], filtered=True)
+
+
+def _compact_blend_failure_receipt(receipt, *, state_dir, full_body):
+    """Bounded failure index, never a second copy of omitted phase payloads."""
+    from wwise_waapi.transactions import validate_transaction_id
+
+    compact = {key: receipt[key] for key in ("candidate", "version", "build", "source_member", "source_sha256",
+        "native_assignment_effect_verified", "failure", "finalization_error") if key in receipt}
+    compact.update(full_phase_payloads_retained=False,
+        omission_reason="Full payload omitted from bounded failure retention; use persisted transaction/native evidence.",
+        full_receipt={"bytes": len(full_body), "sha256": hashlib.sha256(full_body).hexdigest(), "serialization": "UTF-8 JSON indent=2"})
+    original = receipt["transactions"]
+    phases = {key: original[key] for key in ("transaction_id", "phase") if key in original}
+    for name in ("draft-check", "preview", "transaction-show", "confirm", "execute", "verify"):
+        payload = original.get(name)
+        if not isinstance(payload, Mapping):
+            continue
+        phases[name] = {key: payload[key] for key in ("transaction_id", "artifact_hash", "ok", "status", "state",
+            "executed", "verified", "automatic_retry", "error_code") if key in payload}
+        verification = payload.get("verification")
+        if isinstance(verification, Mapping):
+            phases[name]["verification"] = {key: verification[key] for key in ("status", "ok", "business_state_verified",
+                "verification_strength", "assertion_count", "passed_assertion_count") if key in verification}
+        raw = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+        phases[name]["omitted_payload"] = {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        if name + "_exit_code" in original:
+            phases[name + "_exit_code"] = original[name + "_exit_code"]
+    compact["transactions"] = phases
+    compact["native_evidence"] = receipt.get("native_evidence", [])[:64]
+    compact["persisted_transaction_evidence"] = []
+    if "transaction_id" in phases:
+        tx = validate_transaction_id(phases["transaction_id"])
+        for name in ("preview.json", "state.json", "events.jsonl"):
+            path = state_dir / "transactions" / tx / name
+            try:
+                raw = read_bounded_exclusive_regular_file(path, max_bytes=8 * 1024 * 1024).raw
+                compact["persisted_transaction_evidence"].append({"path": str(path), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
+            except Exception as exc:
+                compact["persisted_transaction_evidence"].append({"path": str(path), "unavailable": {"type": type(exc).__name__, "message": str(exc)[:2048]}})
+    assert len(json.dumps(compact, ensure_ascii=False, indent=2).encode("utf-8")) <= 8 * 1024 * 1024, "Compact Blend failure index byte bound"
+    return compact
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_blend_assignment_negative_index_order_preservation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """One pending actual insertion slice using the unchanged Porsche fixture."""
+    runtime = workflow_sandbox_runtime
+    fixtures = {
+        "2024.1": ("Actor-Mixer Hierarchy", "e6984d157c7b6418a3d9729fdf7d3ff295d551314656ce76e985185dda6257cc"),
+        "2025.1": ("Containers", "f9ee5098445ebe1e66b649e4af90699362796186c81fa04dc2d0e18f39209f52"),
+    }
+    if runtime.version not in fixtures:
+        pytest.skip("Blend assignment actual insertion slice is pinned to 2024/2025")
+    folder, source_hash = fixtures[runtime.version]
+    source = runtime.sandbox.source_root / folder / "Car Engine.wwu"
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash, "Fixture prerequisite: exact offline source"
+    track = "{8D76C40F-1C73-42C7-9A26-8C0E56E6898F}"
+    child = "{CFAF8A1B-1DF5-4711-80DA-D61A42F859D7}"
+    getter = "ak.wwise.core.blendContainer.getAssignments"
+    category = {"category": "blend-assignment", "status": "FAIL", "version": runtime.version,
+                "verifier_strength": "blend_assignment_order_and_observed_preservation"}
+    runtime.category_results.append(category)
+    receipt = {"candidate": runtime.candidate, "version": runtime.version, "build": runtime.sandbox.metadata.get_info_version, "source_member": str(source),
+               "source_sha256": source_hash, "native_assignment_effect_verified": False, "transactions": {}}
+    output = runtime.state_dir / "blend-negative-insertion.json"
+    native_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
+    previous_native = set(native_root.glob("*.json"))
+    effect_observed = False
+    original_error = None
+    try:
+        expected_build = (2024, 1, 13, 9056) if runtime.version == "2024.1" else (2025, 1, 7, 9143)
+        assert tuple(receipt["build"][key] for key in ("year", "major", "minor", "build")) == expected_build, "Fixture prerequisite: exact native build"
+        before_payload = runtime.gateway(["core-call", getter, "--object-id", track], live=True)
+        receipt["before"] = before_payload
+        before = before_payload["agent_result"]["return"]
+        assert len(before) == 6 and {row["index"] for row in before} == set(range(6)), "Fixture prerequisite: complete native explicit indices"
+        assert all("edges" in row for row in before) and child not in {row["child"] for row in before}, "Fixture prerequisite: returned edges and unassigned child"
+        before_order = [next(row["child"] for row in before if row["index"] == index) for index in range(6)]
+        draft = _start_business_draft(runtime, "ak.wwise.core.blendContainer.addAssignment")
+        handles = {}
+        for role, identity in (("blend_track", track), ("child", child)):
+            bound = _update_business_draft(runtime, draft, "draft-bind-object", ["--role", role, "--object-id", identity], live=True)
+            handles[role] = bound["bound_object"]["handle"]
+        _update_business_draft(runtime, draft, "draft-declare-core-plan", [
+            "--role", "blend_track_handle", handles["blend_track"], "--role", "child_handle", handles["child"],
+            "--value", "insertion_index", "-9"], live=False)
+        def inspect(preview):
+            notice = preview["preview_summary"]["blend_assignment"]
+            assert notice["expected_position"] == 0 and notice["observed_assignment_count"] == 6, preview
+            assert notice["verification_scope"]["unobserved"] == [], preview
+        _complete_business_draft(runtime, draft, inspect_preview=inspect, phase_receipt=receipt["transactions"])
+        after_payload = runtime.gateway(["core-call", getter, "--object-id", track], live=True)
+        receipt["after"] = after_payload
+        after = after_payload["agent_result"]["return"]
+        assert len(after) == 7 and {row["index"] for row in after} == set(range(7)), after
+        after_order = [next(row["child"] for row in after if row["index"] == index) for index in range(7)]
+        assert after_order == [child, *before_order], after
+        after_by_id = {row["child"]: row for row in after}
+        assert all(all(after_by_id[row["child"]].get(key) == value for key, value in row.items() if key != "index") for row in before), after
+        verification = receipt["transactions"]["verify"]["verification"]
+        assert verification["verification_strength"] == "blend_assignment_order_and_observed_preservation", verification
+        assert verification["assertion_count"] > 0 and verification["passed_assertion_count"] == verification["assertion_count"], verification
+        effect_observed = True
+    except BaseException as exc:
+        original_error = exc
+        receipt["failure"] = {"type": type(exc).__name__, "message": str(exc)[:2048]}
+        raise
+    finally:
+        try:
+            paths = sorted(set(native_root.glob("*.json")) - previous_native)
+            assert len(paths) <= 64, "Blend dispatcher evidence file bound"
+            assert sum(path.stat().st_size for path in paths) <= 16 * 1024 * 1024, "Blend dispatcher evidence byte bound"
+            receipt["native_evidence"] = [{"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()} for path in paths]
+            sealed = deepcopy(receipt)
+            sealed["native_assignment_effect_verified"] = effect_observed
+            body = json.dumps(sealed, ensure_ascii=False, indent=2).encode("utf-8")
+            assert len(body) <= 8 * 1024 * 1024, "Blend receipt byte bound"
+            pending = output.with_name(output.name + ".pending")
+            pending.write_bytes(body)
+            assert pending.read_bytes() == body, "Blend receipt write readback differs"
+            pending.replace(output)
+            category.update(status="PASS" if effect_observed else "FAIL", native_assignment_effect_verified=effect_observed,
+                observation_path=str(output), observation_sha256=hashlib.sha256(body).hexdigest())
+        except BaseException as exc:
+            receipt["finalization_error"] = {"type": type(exc).__name__, "message": str(exc)[:2048]}
+            category.update(status="FAIL", native_assignment_effect_verified=False, finalization_error=receipt["finalization_error"])
+            # Keep failed/partial phase evidence separate from the sealed PASS path.
+            try:
+                partial = output.with_name("blend-negative-insertion.partial.json")
+                body = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+                retained = receipt
+                if len(body) > 8 * 1024 * 1024:
+                    retained = _compact_blend_failure_receipt(receipt, state_dir=runtime.state_dir, full_body=body)
+                    body = json.dumps(retained, ensure_ascii=False, indent=2).encode("utf-8")
+                assert len(body) <= 8 * 1024 * 1024, "Partial Blend receipt byte bound"
+                partial.write_bytes(body)
+                category.update(observation_path=str(partial), observation_sha256=hashlib.sha256(body).hexdigest())
+            except BaseException as retention_error:
+                body = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+                retained = _compact_blend_failure_receipt(receipt, state_dir=runtime.state_dir, full_body=body)
+                fallback = {**category, "partial_receipt": retained,
+                    "retention_error": {"type": type(retention_error).__name__, "message": str(retention_error)[:2048]}}
+                assert len(json.dumps(fallback, ensure_ascii=False, indent=2).encode("utf-8")) <= 8 * 1024 * 1024, "Blend category failure byte bound"
+                category.update(fallback)
+            if original_error is None:
+                raise
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_owned_2025_transport_profiler_probe(workflow_sandbox_runtime):
+    """Candidate-only Console playback/data; no support inferred from reflection."""
+    from tests.destructive.support.console_profiler_probe import collect_console_profiler
+    collect_console_profiler(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_owned_2025_transport_profiler_diagnostic(workflow_sandbox_runtime):
+    """One capture-log observer; silence cannot establish Console absence."""
+    from tests.destructive.support.console_profiler_probe import collect_console_profiler
+    collect_console_profiler(workflow_sandbox_runtime, diagnostic=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_owned_older_transport_profiler_diagnostic(workflow_sandbox_runtime):
+    """One matching older lane; missing originals/prepare remains a native boundary."""
+    from tests.destructive.support.console_profiler_probe import collect_console_profiler
+    collect_console_profiler(workflow_sandbox_runtime, diagnostic=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_owned_runtime_read_batch(workflow_sandbox_runtime):
+    """One fixed capture frame; independent results survive sibling read failures."""
+    from tests.destructive.support.console_profiler_probe import collect_console_profiler
+    collect_console_profiler(workflow_sandbox_runtime, grouped_runtime_reads=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_owned_additional_runtime_read_batch(workflow_sandbox_runtime):
+    """Four exact2023+ readers; same frame, independent availability/data facts."""
+    from tests.destructive.support.console_profiler_probe import collect_console_profiler
+    collect_console_profiler(workflow_sandbox_runtime,additional_runtime_reads=True)

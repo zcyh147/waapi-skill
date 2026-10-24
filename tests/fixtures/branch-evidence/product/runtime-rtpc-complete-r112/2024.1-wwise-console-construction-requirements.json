@@ -1,0 +1,47 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/argsSchema/properties/time": {
+      "native_shape_sha256": "5e5ec92d7f0fed3fa4d4979705cef1dc1950d69b4ef93c421c6ba93e05a74108",
+      "categories": [
+        "program"
+      ],
+      "reason": "Deterministic closed numeric time/reference/minimum/empty-options construction; no native data/effect inference"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/argsSchema/properties/time/$ref": {
+      "native_shape_sha256": "1ac15471078d85eed39256583cb2dec2d6f8ee5054ad0ffee149fb9e163364db",
+      "categories": [
+        "program"
+      ],
+      "reason": "Deterministic closed numeric time/reference/minimum/empty-options construction; no native data/effect inference"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime": {
+      "native_shape_sha256": "b30c36884f7bff743ed80d53f8d4c2e3f47e199033168b30b44316b998cf4f35",
+      "categories": [
+        "program"
+      ],
+      "reason": "Deterministic closed numeric time/reference/minimum/empty-options construction; no native data/effect inference"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0": {
+      "native_shape_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
+      "categories": [
+        "program"
+      ],
+      "reason": "Deterministic closed numeric time/reference/minimum/empty-options construction; no native data/effect inference"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0/minimum": {
+      "native_shape_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "categories": [
+        "program"
+      ],
+      "reason": "Deterministic closed numeric time/reference/minimum/empty-options construction; no native data/effect inference"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/optionsSchema/@empty/object": {
+      "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "categories": [
+        "program"
+      ],
+      "reason": "Deterministic closed numeric time/reference/minimum/empty-options construction; no native data/effect inference"
+    }
+  }
+}

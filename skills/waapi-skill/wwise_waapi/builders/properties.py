@@ -188,7 +188,10 @@ class PropertyReferenceBuilder:
         return self._build_preview(
             PropertyReferenceOperation.SET_REFERENCE,
             args,
-            readback_plan=_object_value_readback(source, ("id", "path", reference), "read back changed reference by exact identity when WAAPI exposes it"),
+            readback_plan=_object_value_readback(source,
+                ("id", "path", f"@{reference}", reference) if target_object is None else ("id", "path", reference),
+                "read back the directly stored reference clear; an inherited reference may still apply"
+                if target_object is None else "read back changed reference by exact identity when WAAPI exposes it"),
             evidence_items=(
                 reference_changed_topic_expectation(
                     source,
@@ -488,7 +491,7 @@ def _require_reference_metadata(metadata: PropertyInfoMetadataRecord) -> None:
     restriction_type = metadata.restriction.get("type")
     supports_reference = (
         metadata.supports.get("reference") is True
-        or metadata.type.lower() in {"reference", "objectreference"}
+        or metadata.is_reference
         or (isinstance(restriction_type, str) and restriction_type.casefold() == "reference")
     )
     constrained = metadata.supports.get("constrained") is True or bool(metadata.restriction.get("constraints")) or bool(metadata.restriction.get("ordering"))

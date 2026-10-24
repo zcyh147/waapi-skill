@@ -290,10 +290,8 @@ def materialize_compound_undo_business_request(
     if set(session.settings) != {"undo_plan"}:
         raise _session_repair(session, "BUSINESS_DECLARATION_INCOMPLETE", "undo_plan")
     raw_plan = session.settings["undo_plan"]
-    if not isinstance(raw_plan, Mapping) or set(raw_plan) != {
-        "display_name",
-        "children",
-    }:
+    if (not isinstance(raw_plan, Mapping) or not {"display_name", "children"}.issubset(raw_plan)
+            or set(raw_plan) - {"display_name", "children", "failure_cancellation"}):
         raise _session_repair(session, "INVALID_ARGUMENT", "undo_plan")
     display_name = raw_plan.get("display_name")
     if (
@@ -347,7 +345,9 @@ def materialize_compound_undo_business_request(
         "contract": "waapi-skill.operation-request/v1",
         "version": session.context.wwise_version,
         "operation": "waapi.undoGroup",
-        "arguments": {"display_name": display_name, "calls": calls},
+        "arguments": {"display_name": display_name, "calls": calls,
+                      **({"failure_cancellation": raw_plan["failure_cancellation"]}
+                         if "failure_cancellation" in raw_plan else {})},
     }
 
 

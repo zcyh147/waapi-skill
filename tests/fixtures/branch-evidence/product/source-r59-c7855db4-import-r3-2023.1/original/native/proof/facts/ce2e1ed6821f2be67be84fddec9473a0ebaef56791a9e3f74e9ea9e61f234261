@@ -1,0 +1,76 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792540976824039000-18bafd6a61704070bb4767cb53d91d0c-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 5,
+    "default": 0,
+    "dependencies": [],
+    "display": {
+      "group": "",
+      "index": 1655,
+      "name": "Waveform"
+    },
+    "name": "LfoWaveform",
+    "restriction": {
+      "type": "enum",
+      "values": [
+        {
+          "displayName": "Sine",
+          "value": 0
+        },
+        {
+          "displayName": "Triangle",
+          "value": 1
+        },
+        {
+          "displayName": "Square",
+          "value": 2
+        },
+        {
+          "displayName": "Saw up",
+          "value": 3
+        },
+        {
+          "displayName": "Saw down",
+          "value": 4
+        },
+        {
+          "displayName": "Random",
+          "value": 5
+        }
+      ]
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "Exclusive",
+      "unlink": false
+    },
+    "type": "int32",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.980111290991772,
+  "version": "2023.1"
+}

@@ -1,0 +1,23 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/native/1792558272810688000-1b3558774dc4409a8a2b51a833200759-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "default": 0.0,
+    "name": "LfoAttack",
+    "restriction": {
+      "max": 100000.0,
+      "min": 0.0,
+      "type": "range"
+    },
+    "type": "Real64"
+  },
+  "risk_level": "low",
+  "timeout": 9.997956874984084,
+  "version": "2021.1"
+}

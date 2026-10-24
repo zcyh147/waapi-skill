@@ -44,7 +44,7 @@ def _project_hash(value: str = "a" * 64) -> ProjectHash:
     )
 
 
-def _install_fakes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, shutdown_error=False):
+def _install_fakes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, shutdown_error=False, version="2022.1"):
     source_root = tmp_path / "immutable-source"
     source_root.mkdir()
     source_project = source_root / "SampleProject.wproj"
@@ -52,7 +52,7 @@ def _install_fakes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, shutdown_
     fixed_hash = _project_hash()
 
     def fake_require(_env):
-        return SimpleNamespace(version="2022.1", sample_project_source=source_project)
+        return SimpleNamespace(version=version, sample_project_source=source_project)
 
     def fake_prepare(_env, *, sandbox_root: Path, hash_strategy: str):
         assert hash_strategy == "full"
@@ -65,7 +65,7 @@ def _install_fakes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, shutdown_
             source_root=str(source_root),
             sandbox_path=str(sandbox_path),
             sandbox_project_path=str(sandbox_project),
-            wwise_version="2022.1",
+            wwise_version=version,
             copy_duration_seconds=0.01,
             source_hash=fixed_hash,
             sandbox_hash=fixed_hash,
@@ -681,3 +681,320 @@ def test_unproven_start_failure_leaves_private_home_untouched(
     evidence = json.loads(caught.value.evidence_path.read_text(encoding="utf-8"))
     assert evidence["wwise_stop_status"] == "unproven"
     assert evidence["launch_environment_archive_path"] is None
+
+
+def test_successful_owner_can_stop_without_releasing_before_last_teardown(monkeypatch, tmp_path):
+    _install_fakes(monkeypatch, tmp_path)
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='shared-authoring-owner', version='2022.1',
+        scenario_root=tmp_path / 'batch', live_environment={}, lock_root=tmp_path / 'lock')
+    runtime = owner.start()
+    result = owner.finish('PASS', defer_success_cleanup=True)
+    assert result.final_status == 'PREPARED'
+    assert result.sandbox_retained is True
+    assert result.cleanup_deferred is True
+    assert result.as_dict()['contract'] == 'waapi-skill.codex-semantic-scenario-prepared-cleanup/v1'
+    assert owner._finished is True
+    assert runtime.sandbox.sandbox_project.exists()
+    assert runtime.owned_root.exists()
+
+
+def test_prepared_owner_releases_only_after_fresh_post_teardown_proofs(monkeypatch, tmp_path):
+    _install_fakes(monkeypatch, tmp_path)
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='shared-owner-release', version='2022.1',
+        scenario_root=tmp_path / 'batch', live_environment={}, lock_root=tmp_path / 'lock')
+    runtime = owner.start()
+    prepared = owner.finish('PASS', defer_success_cleanup=True)
+    observations = []
+    def resource_check(actual_runtime):
+        assert actual_runtime is runtime
+        assert runtime.sandbox.sandbox_project.exists()
+        observations.append('fresh resource check')
+    result = owner.release_prepared_cleanup(post_teardown_check=resource_check)
+    assert observations == ['fresh resource check']
+    assert result.final_status == 'PASS'
+    assert result.cleanup_deferred is False
+    assert result.sandbox_retained is False
+    assert not runtime.owned_root.exists()
+    assert json.loads((runtime.evidence_root / 'lifecycle.json').read_text()) == prepared.as_dict()
+    assert json.loads((runtime.evidence_root / 'lifecycle-final.json').read_text()) == result.as_dict()
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='prepared'):
+        owner.release_prepared_cleanup(post_teardown_check=resource_check)
+
+
+@pytest.mark.parametrize('damage', ['source-content', 'source-mtime', 'resource'])
+def test_prepared_owner_preserves_root_when_last_teardown_changes_proofs(monkeypatch, tmp_path, damage):
+    source, _ = _install_fakes(monkeypatch, tmp_path)
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='shared-owner-late-drift', version='2022.1',
+        scenario_root=tmp_path / 'batch', live_environment={}, lock_root=tmp_path / 'lock')
+    runtime = owner.start()
+    owner.finish('PASS', defer_success_cleanup=True)
+    if damage == 'source-content':
+        monkeypatch.setattr(lifecycle_v3, 'hash_project', lambda *_args, **_kwargs: _project_hash('b' * 64))
+    elif damage == 'source-mtime':
+        original = source.stat().st_mtime_ns
+        os.utime(source, ns=(source.stat().st_atime_ns, original + 1000000))
+    def resource_check(_runtime):
+        if damage == 'resource':
+            raise RuntimeError('owned process/resource reappeared after teardown')
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='post-teardown'):
+        owner.release_prepared_cleanup(post_teardown_check=resource_check)
+    assert runtime.owned_root.exists()
+    assert runtime.sandbox.sandbox_project.exists()
+    assert not (runtime.evidence_root / 'lifecycle-final.json').exists()
+
+
+@pytest.mark.parametrize('status', ['FAIL', 'BLOCKED', 'INDETERMINATE'])
+def test_original_nonpass_owner_never_becomes_a_prepared_release(monkeypatch, tmp_path, status):
+    _install_fakes(monkeypatch, tmp_path)
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='original-nonpass', version='2022.1',
+        scenario_root=tmp_path / 'batch', live_environment={}, lock_root=tmp_path / 'lock')
+    runtime = owner.start()
+    result = owner.finish(status, defer_success_cleanup=True)
+    assert result.final_status == status
+    assert result.cleanup_deferred is False
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='prepared'):
+        owner.release_prepared_cleanup(post_teardown_check=lambda _: pytest.fail('nonpass must not reach release'))
+    assert runtime.owned_root.exists()
+
+
+@pytest.mark.parametrize('failure', ['none', 'proof', 'publication'])
+def test_prepared_cleanup_keeps_global_lock_through_proof_cleanup_and_publication(monkeypatch, tmp_path, failure):
+    _install_fakes(monkeypatch, tmp_path)
+    owner = _controller(tmp_path)
+    runtime = owner.start()
+    exits_before = _FakeLock.exited
+    owner.finish('PASS', defer_success_cleanup=True)
+    assert owner._lock_acquired is True
+    assert _FakeLock.exited == exits_before
+    events = []
+    def proof(actual):
+        assert owner._lock_acquired
+        assert _FakeLock.exited == exits_before
+        assert actual.owned_root.exists()
+        events.append('proof')
+        if failure == 'proof':
+            raise RuntimeError('late resource failure')
+    def publish(result):
+        assert owner._lock_acquired
+        assert _FakeLock.exited == exits_before
+        assert not runtime.owned_root.exists()
+        assert result.final_status == 'PASS'
+        events.append('publication')
+        if failure == 'publication':
+            raise RuntimeError('publication failed')
+    if failure == 'none':
+        owner.release_prepared_cleanup(post_teardown_check=proof, publication_hook=publish)
+        assert events == ['proof', 'publication']
+    else:
+        with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='post-teardown'):
+            owner.release_prepared_cleanup(post_teardown_check=proof, publication_hook=publish)
+    assert not owner._lock_acquired
+    assert _FakeLock.exited == exits_before + 1
+
+
+def test_prepared_receipt_failure_consumes_finish_without_repeating_shutdown(monkeypatch, tmp_path):
+    _install_fakes(monkeypatch, tmp_path)
+    owner = _controller(tmp_path)
+    runtime = owner.start()
+    original = lifecycle_v3._write_json
+    def write(path, value):
+        if path.name == 'lifecycle.json':
+            raise OSError('prepared receipt write failed')
+        original(path, value)
+    monkeypatch.setattr(lifecycle_v3, '_write_json', write)
+    with pytest.raises(OSError, match='prepared receipt'):
+        owner.finish('PASS', defer_success_cleanup=True)
+    assert owner._finished is True
+    assert owner._lock_acquired is False
+    assert runtime.owned_root.exists()
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='not active'):
+        owner.finish('BLOCKED')
+
+
+@pytest.mark.parametrize('version,build', [('2021.1', '2021.1.14.8108'), ('2022.1', '2022.1.19.8584'),
+    ('2023.1', '2023.1.19.8928'), ('2024.1', '2024.1.13.9056'), ('2025.1', '2025.1.7.9143'),
+    ('2025.1', '2025.1.11.9262')])
+@pytest.mark.parametrize('broken', [None, 'roundtrip', 'native-argv', 'host', 'build', 'bottle-environment', 'bottle-proof'])
+def test_owned_authoring_scenario_forwards_pinned_host_and_requires_project_proof(monkeypatch, tmp_path, version, build, broken):
+    _install_fakes(monkeypatch, tmp_path, version=version)
+    root = tmp_path / 'authoring-scenario'
+    home = root / 'owned/private-home'
+    captured = {}
+    def launch(sandbox, env, **kwargs):
+        captured.update(kwargs)
+        prefix = home / 'Library/Application Support/Wwise2019/Bottles/Wwise2019x64'
+        environment = {'HOME': str(home), 'WINEPREFIX': str(prefix), 'CX_BOTTLE': 'Wwise2019x64',
+            'CX_BOTTLE_PATH': str(prefix.parent),
+            'CX_MANAGED_BOTTLE_PATH': str(home / 'Library/Application Support/Wwise2019/BuiltinBottles')}
+        native = 'Z:\\private\\SampleProject.wproj'
+        proof = {'method': 'owned_winepath_roundtrip', 'project': str(sandbox.sandbox_project),
+                 'native_project': native, 'roundtrip_project': str(sandbox.sandbox_project), 'build': build,
+                 'bottle_resolution': {'name': 'Wwise2019x64', 'private_prefix': str(prefix),
+                    'managed_reference': '/owned/support/Wwise2019x64',
+                    'configuration': '/owned/support/Wwise2019x64/cxbottle.conf', 'environment': dict(environment)}}
+        if broken == 'bottle-environment':
+            environment['CX_BOTTLE_PATH'] = '/unowned/Bottles'
+        elif broken == 'bottle-proof':
+            proof['bottle_resolution']['managed_reference'] = '/unowned/support/Wwise2019x64'
+        if broken == 'roundtrip':
+            proof['roundtrip_project'] = str(tmp_path / 'user-project.wproj')
+        info = {'isCommandLine': broken == 'host', 'version': {
+            'year': int(version[:4]), 'major': 1, 'minor': int(build.split('.')[2]),
+            'build': int(build.split('.')[3]) + (1 if broken == 'build' else 0), 'displayName': build}}
+        return SimpleNamespace(host_kind='wwise-authoring', host='127.0.0.1', port=8080,
+            process=SimpleNamespace(pid=424242), ready_result=info,
+            command=['/owned/bin/wine', 'start.exe', '/wait',
+                     f'c:/Program Files/Audiokinetic/Wwise {build}/Authoring/x64/Release/bin/Wwise.exe',
+                     native if broken != 'native-argv' else 'Z:\\user-project.wproj'],
+            launch_cwd=sandbox.sandbox_root, launch_env=environment, launch_project_attestation=proof, launch_preparation=[])
+    monkeypatch.setattr(lifecycle_v3, 'launch_sandboxed_wwise', launch)
+    private = {}
+    live = {'WWISE_TEST_CONFIG': 'unused'}
+    if build == '2025.1.11.9262':
+        from tests.unit.test_integration_demo_observation import _installed
+        context = _installed(tmp_path)
+        private = {'developer_observation': context}
+        live.update(WWISE_CONSOLE=str(context.bundle / 'Contents/Tools/WwiseConsole.sh'), AK_AUTOMATION_MODE='1')
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='authoring-layout-batch', version=version,
+        scenario_root=root, live_environment=live, host_kind='wwise-authoring',
+        launch_environment_overrides={'HOME': str(home)}, lock_root=tmp_path / 'lock', **private)
+    if broken:
+        with pytest.raises(lifecycle_v3.ScenarioLifecycleStartError, match='Authoring'):
+            owner.start()
+        assert owner._lock_acquired is False
+        assert (root / 'owned').exists()
+        return
+    runtime = owner.start()
+    assert captured == {'host_kind': 'wwise-authoring', 'wine_prefix_path': home / 'Library/Application Support/Wwise2019/Bottles/Wwise2019x64',
+                        'case_owned_root': root / 'owned', **private}
+    start = json.loads((runtime.evidence_root / 'start.json').read_text())
+    assert start['host_kind'] == 'wwise-authoring'
+    assert start['authoring_build'] == build
+    assert start['launch_project_attestation']['roundtrip_project'] == str(runtime.sandbox.sandbox_project)
+    assert start['get_info']['isCommandLine'] is False
+    assert owner._lock_acquired is True
+    owner.finish('BLOCKED', reason='fake launch proof only')
+
+
+def test_authoring_scenario_requires_private_home_before_allocating(tmp_path):
+    with pytest.raises(ValueError, match='private HOME'):
+        lifecycle_v3.ScenarioLifecycle(scenario_id='layout-batch', version='2025.1',
+            scenario_root=tmp_path / 'case', live_environment={}, host_kind='wwise-authoring')
+    assert not (tmp_path / 'case').exists()
+
+
+@pytest.mark.parametrize('with_phase_proof', [True, False])
+def test_failed_authoring_preflight_needs_exact_no_start_proof(monkeypatch, tmp_path, with_phase_proof):
+    _install_fakes(monkeypatch, tmp_path)
+    def failing_launch(sandbox, env):
+        sandbox.metadata.process_cleanup_result = 'not-started'
+        sandbox.metadata.authoring_launch = {'preflight_failure': {
+            'phase': 'authoring_context_validation', 'tools_started': False, 'process_started': False
+        }} if with_phase_proof else {}
+        raise ValueError('required bundled program unavailable')
+    monkeypatch.setattr(lifecycle_v3, 'launch_sandboxed_wwise', failing_launch)
+    controller, private_home = _private_home_controller(tmp_path)
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleStartError) as caught:
+        controller.start()
+    evidence = json.loads(caught.value.evidence_path.read_text())
+    assert evidence['wwise_stop_status'] == ('not-started' if with_phase_proof else 'unproven')
+    assert caught.value.unsafe_to_continue is (not with_phase_proof)
+    assert bool(evidence['launch_environment_archive_path']) is with_phase_proof
+
+
+@pytest.mark.parametrize('reply', ['console', 'wrong-build', 'malformed', 'probe-error'])
+def test_failed_authoring_readiness_retains_owning_diagnostics_in_start_proof(monkeypatch, tmp_path, reply):
+    from tests.unit.test_headless_lifecycle import FakeProcess
+    from wwise_waapi.headless import HeadlessLifecycle, HeadlessLifecycleError, LifecycleTimeouts
+    _install_fakes(monkeypatch, tmp_path, version='2024.1')
+    captured, calls = {}, []
+    info = {'isCommandLine': reply == 'console', 'version': {'year': 2024, 'major': 1, 'minor': 13,
+        'build': 9057 if reply == 'wrong-build' else 9056}}
+    class Client:
+        def call(self, uri):
+            calls.append(uri)
+            if reply == 'probe-error': raise RuntimeError('fixture exact getInfo failed')
+            return None if reply == 'malformed' else info
+        def disconnect(self): pass
+    def launch(sandbox, env, **kwargs):
+        lifecycle = HeadlessLifecycle(host_kind='wwise-authoring', authoring_build='2024.1.13.9056', port=8080,
+            launch_env={}, timeouts=LifecycleTimeouts(readiness=0.01, probe=0.1, probe_interval=0.001),
+            waapi_client_factory=lambda _url: Client())
+        lifecycle.process = FakeProcess()
+        try:
+            lifecycle.wait_ready()
+        except HeadlessLifecycleError as exc:
+            captured['error'] = exc
+            sandbox.metadata.process_cleanup_result = 'cleaned'
+            raise
+        pytest.fail('The existing readiness guard must reject the injected reply')
+    monkeypatch.setattr(HeadlessLifecycle, '_terminate', lambda self, process: process.terminate())
+    monkeypatch.setattr(HeadlessLifecycle, '_cleanup_detached_waapi_servers', lambda self: [])
+    monkeypatch.setattr(lifecycle_v3, 'launch_sandboxed_wwise', launch)
+    root = tmp_path / 'authoring-scenario'
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='authoring-readiness-evidence', version='2024.1',
+        scenario_root=root, live_environment={'WWISE_TEST_CONFIG': 'unused'}, host_kind='wwise-authoring',
+        launch_environment_overrides={'HOME': str(root / 'owned/private-home')}, lock_root=tmp_path / 'lock')
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleStartError) as caught:
+        owner.start()
+    proof = json.loads(caught.value.evidence_path.read_text())
+    retained = proof['primary_error_diagnostics']
+    assert retained['retention'] == 'complete'
+    assert retained['diagnostics'] == captured['error'].diagnostics
+    if reply == 'probe-error':
+        assert retained['diagnostics']['last_exception'] == {'type': 'RuntimeError', 'message': 'fixture exact getInfo failed'}
+    else:
+        assert calls == ['ak.wwise.core.getInfo']
+        observed = retained['diagnostics']['observed_host_info']
+        assert observed['result_type'] == ('NoneType' if reply == 'malformed' else 'dict')
+        assert observed['is_command_line'] == (None if reply == 'malformed' else reply == 'console')
+        assert observed['exact_build'] == (None if reply == 'malformed' else '2024.1.13.9057' if reply == 'wrong-build' else '2024.1.13.9056')
+    assert proof['primary_error'] == 'start:' + type(captured['error']).__name__ + ':' + str(captured['error'])
+    assert proof['wwise_stop_status'] == 'stopped-by-launch-helper' and proof['errors'] == []
+    assert proof['source_hash_before'] == proof['source_hash_after']
+    assert proof['source_mtime_before_ns'] == proof['source_mtime_after_ns']
+    assert caught.value.unsafe_to_continue is False and owner._lock_acquired is False
+
+
+@pytest.mark.parametrize('diagnostic_case', ['oversized', 'non-json', 'non-finite', 'foreign-error'])
+def test_start_failure_diagnostics_are_bounded_without_masking_primary_error(monkeypatch, tmp_path, diagnostic_case):
+    from wwise_waapi.headless import HeadlessLifecycleError
+    _install_fakes(monkeypatch, tmp_path)
+    priority = {'phase': 'authoring-readiness', 'observed_host_info': {
+        'result_type': 'NoneType', 'is_command_line': None, 'exact_build': None}}
+    diagnostics = {**priority, 'stdout_tail': '雨' * 100000}
+    if diagnostic_case == 'non-json':
+        diagnostics['stdout_tail'] = object()
+    elif diagnostic_case == 'non-finite':
+        diagnostics['stdout_tail'] = float('nan')
+    error = (RuntimeError('original owning launch failure') if diagnostic_case == 'foreign-error'
+        else HeadlessLifecycleError('original owning launch failure', diagnostics=diagnostics))
+    if diagnostic_case == 'foreign-error':
+        error.diagnostics = diagnostics
+    def launch(sandbox, env):
+        sandbox.metadata.process_cleanup_result = 'cleaned'
+        raise error
+    monkeypatch.setattr(lifecycle_v3, 'launch_sandboxed_wwise', launch)
+    owner, _home = _private_home_controller(tmp_path)
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleStartError) as caught:
+        owner.start()
+    proof = json.loads(caught.value.evidence_path.read_text())
+    retained = proof['primary_error_diagnostics']
+    if diagnostic_case == 'foreign-error':
+        assert retained is None
+    else:
+        assert retained['diagnostics'] == priority
+        assert retained['omitted_priority_fields'] == []
+        assert len(json.dumps(retained, ensure_ascii=False).encode('utf-8')) < 8192
+        if diagnostic_case == 'oversized':
+            assert retained['retention'] == 'partial'
+            assert retained['bytes'] > retained['limit_bytes'] == 65536
+            assert len(retained['sha256']) == 64
+        else:
+            assert retained['retention'] == 'invalid'
+            assert retained['reason'] == 'diagnostics_not_a_finite_JSON_object'
+    assert proof['primary_error'] == f'start:{type(error).__name__}:original owning launch failure'
+    assert proof['wwise_stop_status'] == 'stopped-by-launch-helper' and proof['errors'] == []
+    assert proof['source_hash_before'] == proof['source_hash_after']
+    assert proof['source_mtime_before_ns'] == proof['source_mtime_after_ns']
+    assert caught.value.unsafe_to_continue is False and owner._lock_acquired is False

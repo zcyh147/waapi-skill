@@ -167,8 +167,17 @@ def _prepare_replace() -> dict[str, Any]:
     return prepared
 
 
+def _replacement_types() -> dict[str, Any]:
+    return {"return": [
+        {"classId": 1, "name": "ActorMixer", "type": "WObject"},
+        {"classId": 2, "name": "RandomSequenceContainer", "type": "WObject"},
+        {"classId": 3, "name": "Sound", "type": "WObject"},
+    ]}
+
+
 def _role_guard_responses(*, descendants: list[dict[str, Any]] | None = None) -> dict[str, list[Mapping[str, Any]]]:
     return {
+        "ak.wwise.core.object.getTypes": [_replacement_types()],
         "ak.wwise.core.object.get": [
             {"return": [_parent_row(), _owned_root_row(), _old_root_row()]},
             {"return": _parent_children()},
@@ -180,7 +189,7 @@ def _role_guard_responses(*, descendants: list[dict[str, Any]] | None = None) ->
 
 
 def _new_rows() -> list[dict[str, Any]]:
-    return [
+    rows = [
         _row(
             NEW_ROOT_ID,
             "Prototype_Footsteps",
@@ -198,6 +207,9 @@ def _new_rows() -> list[dict[str, Any]]:
         ),
         _row(NEW_SOUND_ID, "Boot_01", "Sound", NEW_SOUND_PATH, NEW_GROUP_ID),
     ]
+    for row, class_id in zip(rows, (1, 2, 3), strict=True):
+        row["classId"] = class_id
+    return rows
 
 
 def _execution_result() -> dict[str, Any]:
@@ -992,6 +1004,7 @@ def test_replace_verifier_requires_exact_new_topology_and_every_old_guid_absent(
         execution_result=_execution_result(),
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [_replacement_types()],
                 "ak.wwise.core.object.get": [
                     {"return": [root]},
                     {"return": [group]},
@@ -1051,6 +1064,7 @@ def test_replace_verifier_fails_for_surviving_old_guid_or_extra_new_child() -> N
         execution_result=_execution_result(),
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [_replacement_types()],
                 "ak.wwise.core.object.get": [
                     {"return": [root]},
                     {"return": [group]},

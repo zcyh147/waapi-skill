@@ -17,10 +17,10 @@
   },
   "source_review": "docs/research/waapi-v11-inventory-source-review.md",
   "source_contracts": {
-    "gateway_parser_sha256": "7f47db965914bc7af6d2947742fc0e2a67d9bb3582f281b72e0d829573d09440",
-    "operation_contract_sha256": "206b88bf1d1810dbe876745c0c952208b965b92b0e74d69b3ba93878e0243617",
-    "public_continuation_sha256": "2904c6b6e9f45047ba553e786cf3cf4f2424a54edbf67e0f8d5f6180205ded11",
-    "typed_request_surface_sha256": "cbdccf1679c6f534b501cf3f67b503c376fa6a155d0cf8f085306ad86c0a031c"
+    "gateway_parser_sha256": "6dc4cb03ba12b6a935006231270bc431187ba9367575efc15718fe645d0af3bb",
+    "operation_contract_sha256": "b2d76899195fbd342375b80651c80b8d5229af2330cd0ee8d991645d242b5b59",
+    "public_continuation_sha256": "7e63798666897561b08432f6016228adb55199bd4a47f15d48314ea1bcaf5584",
+    "typed_request_surface_sha256": "829f71b2cca1e2779e14f7c681cc3802b94945f9a9a9e111c070c82478151150"
   },
   "ownership_classes": {
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",
@@ -137,6 +137,34 @@
   ],
   "native_lane_rules": [
     {
+      "id": "authoring-layout-partial",
+      "disposition": "migration_required",
+      "owner_issue": 188,
+      "match": {"uris": ["ak.wwise.ui.layout.closeView", "ak.wwise.ui.layout.dockView", "ak.wwise.ui.layout.getCurrentLayoutName", "ak.wwise.ui.layout.getOrCreateView", "ak.wwise.ui.layout.getElementRectangle", "ak.wwise.ui.layout.getLayout", "ak.wwise.ui.layout.getLayoutNames", "ak.wwise.ui.layout.getViewHandle", "ak.wwise.ui.layout.getViewInstances", "ak.wwise.ui.layout.getViewTypes", "ak.wwise.ui.layout.moveSplitter", "ak.wwise.ui.layout.removeLayout", "ak.wwise.ui.layout.resetLayouts", "ak.wwise.ui.layout.setLayout", "ak.wwise.ui.layout.switchLayout", "ak.wwise.ui.layout.undockView"]},
+      "leaked_mechanics": [],
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit."
+    },
+    {
+      "id": "authoring-model-partial",
+      "disposition": "migration_required",
+      "owner_issue": 189,
+      "match": {
+        "uris": [
+          "ak.wwise.ui.model.createHandle",
+          "ak.wwise.ui.model.destroyHandle",
+          "ak.wwise.ui.model.getState",
+          "ak.wwise.ui.model.registerWafm",
+          "ak.wwise.ui.model.setState",
+          "ak.wwise.ui.signal.emit",
+          "ak.wwise.ui.window.close",
+          "ak.wwise.ui.window.create",
+          "ak.wwise.ui.window.present"
+        ]
+      },
+      "leaked_mechanics": [],
+      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit."
+    },
+    {
       "id": "generic-topics",
       "disposition": "already_deep",
       "owner_issue": null,
@@ -233,7 +261,13 @@
       "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. Game Parameter names use a Gateway-fixed typed-name binding and dedicated range flags. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Packaged candidate 98d9e70 passed macOS Program 4126/2 skipped; final evidence candidate a0a0178 passed native-Windows Program 4111/17 skipped and macOS Non-live 9324/111 skipped/27 deselected. The 2025.1 project-setting plus external source-control proportional real workflow passed on both hosts at 590a416, and the final packaged Skill passed Fresh Agent plus verify-only cumulatively on macOS and Windows with clean task/process teardown."
     }
   ],
-  "ticket_blueprints": {},
+  "ticket_blueprints": {
+    "authoring-model-partial": {"title": "Complete owned Authoring model/window/signal behavior and evidence", "scope": "Retain the exact 2024.1/2025.1 closed routes under #189 while native constructor effects, resource cleanup, delivered signals and exact branch evidence remain unresolved."},
+    "authoring-layout-partial": {
+      "title": "Complete ordinary Authoring layout business contracts and evidence",
+      "scope": "Retain the exact 2024.1/2025.1 layout read and switch rows while #188 resolves native definition interpretation, remaining layout constructors and mutations, public-route validation, and required effect evidence."
+    }
+  },
   "completed_family_seals": {
     "generic-core-project-object": {
       "github_issue": 84,
@@ -276,7 +310,7 @@
       "rows_sha256": "7446dd701ea343d3a089f452c82ad1ec40c3ca261764d78adfda4a147e31db18"
     }
   },
-  "ticket_issue_numbers": {},
+  "ticket_issue_numbers": {"authoring-model-partial": 189, "authoring-layout-partial": 188},
   "field_ownership_rules": {
     "gateway_derivation_names": ["acknowledge", "transform"],
     "fixed_gateway_derivation_names": ["advanced_return", "api", "array_handle", "choice_handle", "map_handle", "member_key", "parent_schema_token", "return", "return_field", "schema_digest", "select", "shape", "typed_advanced", "typed_append", "typed_choose", "typed_choose_dynamic", "typed_map_correct", "typed_map_put", "typed_map_remove", "typed_present", "typed_schema_digest", "typed_set", "typed_structured", "page", "selection"],

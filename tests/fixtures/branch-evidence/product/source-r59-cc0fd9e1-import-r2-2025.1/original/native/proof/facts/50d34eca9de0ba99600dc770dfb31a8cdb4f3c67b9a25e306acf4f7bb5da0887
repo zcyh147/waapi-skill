@@ -1,0 +1,69 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792541054609384000-7a63d92602584afa891d24ccb2deda45-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 12,
+    "default": 0,
+    "dependencies": [],
+    "display": {
+      "group": "Oscillator 2",
+      "index": 1433,
+      "name": "Osc2 Waveform"
+    },
+    "name": "Osc2Waveform",
+    "restriction": {
+      "type": "enum",
+      "values": [
+        {
+          "displayName": "Sine",
+          "value": 0
+        },
+        {
+          "displayName": "Triangle",
+          "value": 1
+        },
+        {
+          "displayName": "Square",
+          "value": 2
+        },
+        {
+          "displayName": "Sawtooth",
+          "value": 3
+        }
+      ]
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "Exclusive",
+      "unlink": false
+    },
+    "type": "int32",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false,
+        "percentage": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.98007033401518,
+  "version": "2025.1"
+}

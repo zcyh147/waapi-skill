@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "started_at_unix": 1792528938.42016,
+  "finished_at_unix": 1792528938.891457,
+  "elapsed_seconds": 0.47129874999518506,
+  "error": null,
+  "launched": true,
+  "child_reaped": true
+}

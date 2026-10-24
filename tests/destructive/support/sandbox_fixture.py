@@ -22,6 +22,7 @@ from wwise_waapi.headless import (  # pyright: ignore[reportMissingImports]
     PortUnavailable,
     assert_port_free,
 )
+from wwise_waapi.native_catalog import load_native_catalog
 from .live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_FIXTURE_PROJECT,
     ENV_WWISE_SANDBOX_ROOT,
@@ -58,6 +59,7 @@ _LOCK_REGION_BYTES = 1
 _WINDOWS_LOCK_RETRY_SECONDS = 0.05
 _WINDOWS_LOCK_VIOLATION = 33
 _PORT_RELEASE_TIMEOUT_SECONDS = 15.0
+_MACOS_PORT_RELEASE_TIMEOUT_SECONDS = 45.0
 _PORT_RELEASE_POLL_SECONDS = 0.1
 _MACOS_WWISE_2022_VERSION = "2022.1"
 _WINE_COREAUDIO_OVERRIDE = "winecoreaudio.drv="
@@ -109,11 +111,19 @@ def wait_for_port_release(
     host: str,
     port: int,
     *,
-    timeout_seconds: float = _PORT_RELEASE_TIMEOUT_SECONDS,
+    timeout_seconds: float | None = None,
     poll_interval_seconds: float = _PORT_RELEASE_POLL_SECONDS,
 ) -> None:
     """Wait until a stopped Wwise host has released its exact server port."""
 
+    if timeout_seconds is None:
+        # macOS can retain a closed connection for its roughly 30-second
+        # TIME_WAIT quiet period. Keep requiring a successful bare bind.
+        timeout_seconds = (
+            _MACOS_PORT_RELEASE_TIMEOUT_SECONDS
+            if sys.platform == "darwin"
+            else _PORT_RELEASE_TIMEOUT_SECONDS
+        )
     if timeout_seconds <= 0 or poll_interval_seconds < 0:
         raise SandboxFixtureError("port-release timing bounds are invalid")
     deadline = time.monotonic() + timeout_seconds
@@ -123,9 +133,17 @@ def wait_for_port_release(
             return
         except PortUnavailable as exc:
             if time.monotonic() >= deadline:
+                cause = exc.__cause__
+                if isinstance(cause, OSError):
+                    diagnostic = (
+                        f"; last bind error: {type(cause).__name__} "
+                        f"(errno={cause.errno!r}): {str(cause)[:512]}"
+                    )
+                else:
+                    diagnostic = f"; last probe error: {type(exc).__name__}: {str(exc)[:512]}"
                 raise SandboxFixtureError(
-                    f"Wwise WAAPI port 0.0.0.0:{port} remained occupied after "
-                    f"the {timeout_seconds:g}-second release wait"
+                    f"Wwise WAAPI port 0.0.0.0:{port} remained unavailable for binding after "
+                    f"the {timeout_seconds:g}-second release wait{diagnostic}"
                 ) from exc
             time.sleep(poll_interval_seconds)
 
@@ -275,6 +293,7 @@ class SandboxMetadata:
     ready_duration_seconds: float | None = None
     get_info_version: dict[str, Any] | None = None
     get_info_display_name: str | None = None
+    authoring_launch: dict[str, Any] | None = None
     process_cleanup_result: str | None = None
     process_cleanup_details: dict[str, Any] | None = None
     keep_decision: str = "pending"
@@ -476,8 +495,17 @@ def launch_sandboxed_wwise(
     port: int | None = None,
     wine_prefix_path: Path | None = None,
     case_owned_root: Path | None = None,
+    host_kind: str = 'wwise-console',
+    developer_observation=None,
 ) -> HeadlessLifecycle:
-    """Launch WwiseConsole only against the sandbox copy."""
+    """Launch the selected fixed lifecycle strategy against the sandbox copy."""
+
+    if host_kind not in {'wwise-console', 'wwise-authoring'}:
+        raise SandboxFixtureError('unsupported sandbox lifecycle host strategy')
+    if host_kind == 'wwise-authoring' and (
+        wine_prefix_path is None or case_owned_root is None or port not in (None, 8080)
+    ):
+        raise SandboxFixtureError('Authoring requires an owned private HOME bottle and the fixed default port')
 
     env_map = dict(env if env is not None else os.environ)
     env_map.update(sandbox.env)
@@ -497,10 +525,21 @@ def launch_sandboxed_wwise(
     contract = require_destructive_environment(env_map)
     if contract.active_destructive_project != sandbox.sandbox_project.resolve(strict=False):
         raise SandboxFixtureError("destructive environment did not select the sandbox project")
-    env_map = prepare_headless_console_environment(
-        env_map,
-        version=contract.version,
-    )
+    strategy_arguments = {}
+    if developer_observation is not None:
+        from tests.destructive.support.integration_demo import IntegrationDemoObservation
+        if type(developer_observation) is not IntegrationDemoObservation:
+            raise SandboxFixtureError('Expected private Integration Demo observation context')
+        developer_observation.validate(version=contract.version, host_kind=host_kind, console=contract.console_path)
+        if env_map.get('AK_AUTOMATION_MODE') != '1':
+            raise SandboxFixtureError('Integration Demo requires Authoring AutomationMode')
+    if host_kind == 'wwise-authoring':
+        build = (developer_observation.build if developer_observation is not None else
+            load_native_catalog(contract.version, 'wwise-authoring')['provenance']['build'])
+        strategy_arguments = {'host_kind': host_kind, 'authoring_build': build, 'authoring_owned_root': case_owned_root}
+        port = 8080
+    else:
+        env_map = prepare_headless_console_environment(env_map, version=contract.version)
 
     launch_cwd = sandbox.sandbox_root.resolve(strict=True)
     lifecycle = HeadlessLifecycle(
@@ -510,6 +549,7 @@ def launch_sandboxed_wwise(
         timeouts=timeouts or _timeouts_from_env(env_map),
         launch_env=env_map,
         launch_cwd_path=launch_cwd,
+        **strategy_arguments,
     )
     sandbox.metadata.launch_cwd_path = str(launch_cwd)
     try:
@@ -520,6 +560,8 @@ def launch_sandboxed_wwise(
             lifecycle,
             expected_version=contract.version,
         )
+        if host_kind == 'wwise-authoring':
+            ready_info = require_authoring_launch_proof(lifecycle, project=sandbox.sandbox_project, build=build)
         if lifecycle.launch_cwd != launch_cwd:
             raise SandboxFixtureError(
                 "WwiseConsole lifecycle did not retain the exact sandbox-root cwd"
@@ -558,12 +600,24 @@ def launch_sandboxed_wwise(
             sandbox.metadata.process_cleanup_result = (
                 f"error:{type(cleanup_error).__name__}:{cleanup_error}"
             )
+        elif (host_kind == 'wwise-authoring' and lifecycle.process is None
+                and getattr(lifecycle, 'launch_preflight_failure', None) == {
+                    'phase': 'authoring_context_validation', 'tools_started': False, 'process_started': False}):
+            sandbox.metadata.process_cleanup_result = 'not-started'
         else:
             sandbox.metadata.process_cleanup_result = (
                 "cleaned" if cleanup_report is not None and cleanup_report.is_clean else "residual-processes"
             )
         raise
     finally:
+        if host_kind == 'wwise-authoring':
+            sandbox.metadata.authoring_launch = {
+                'host_kind': host_kind, 'build': build,
+                'preparation': list(lifecycle.launch_preparation),
+                'preflight_failure': getattr(lifecycle, 'launch_preflight_failure', None),
+                'project_attestation': lifecycle.launch_project_attestation,
+                'get_info': lifecycle.ready_result,
+            }
         sandbox.write_metadata()
 
 
@@ -711,6 +765,49 @@ def require_lifecycle_ready_proof(
     if not lifecycle.command:
         raise SandboxFixtureError("WwiseConsole readiness proof requires the launch command")
     return ready_result
+
+
+def require_authoring_launch_proof(
+    lifecycle: HeadlessLifecycle, *, project: Path, build: str,
+) -> Mapping[str, Any]:
+    """Bind the fixed GUI command to the owned project and exact native host."""
+    info = require_lifecycle_ready_proof(lifecycle, expected_version='.'.join(build.split('.')[:2]))
+    version = info['version']
+    actual = tuple(version.get(key) for key in ('year', 'major', 'minor', 'build'))
+    if (getattr(lifecycle, 'host_kind', None) != 'wwise-authoring'
+            or info.get('isCommandLine') is not False
+            or any(type(value) is not int for value in actual)
+            or actual != tuple(map(int, build.split('.')))):
+        raise SandboxFixtureError('Authoring launch did not prove the exact native host/build')
+    proof = getattr(lifecycle, 'launch_project_attestation', None)
+    command = lifecycle.command
+    environment = getattr(lifecycle, 'launch_env', None)
+    startup_arguments = (['-AutomationMode'] if isinstance(environment, Mapping)
+        and environment.get('AK_AUTOMATION_MODE') == '1' else [])
+    expected_executable = f'c:/Program Files/Audiokinetic/Wwise {build}/Authoring/x64/Release/bin/Wwise.exe'
+    if (not isinstance(proof, Mapping) or proof.get('method') != 'owned_winepath_roundtrip'
+            or proof.get('project') != str(project) or proof.get('roundtrip_project') != str(project)
+            or proof.get('build') != build or not isinstance(proof.get('native_project'), str)
+            or not proof['native_project'] or lifecycle.host != '127.0.0.1' or lifecycle.port != 8080
+            or len(command) != 5 + len(startup_arguments) or Path(command[0]).name != 'wine'
+            or list(command[1:]) != ['start.exe', '/wait', expected_executable, *startup_arguments, proof['native_project']]):
+        raise SandboxFixtureError('Authoring launch did not prove the private project path and fixed command')
+    resolution = proof.get('bottle_resolution')
+    if not isinstance(environment, Mapping) or not isinstance(resolution, Mapping):
+        raise SandboxFixtureError('Authoring launch did not prove the owned bottle resolution')
+    home = Path(environment.get('HOME', ''))
+    prefix = home / 'Library/Application Support/Wwise2019/Bottles/Wwise2019x64'
+    managed = Path(command[0]).parent.parent / 'support/Wwise2019x64'
+    expected_environment = {'HOME': str(home), 'WINEPREFIX': str(prefix), 'CX_BOTTLE': 'Wwise2019x64',
+        'CX_BOTTLE_PATH': str(prefix.parent),
+        'CX_MANAGED_BOTTLE_PATH': str(home / 'Library/Application Support/Wwise2019/BuiltinBottles')}
+    if (not home.is_absolute() or resolution.get('name') != 'Wwise2019x64'
+            or resolution.get('private_prefix') != str(prefix) or resolution.get('managed_reference') != str(managed)
+            or resolution.get('configuration') not in (str(prefix / 'cxbottle.conf'), str(managed / 'cxbottle.conf'))
+            or resolution.get('environment') != expected_environment
+            or any(environment.get(key) != value for key, value in expected_environment.items())):
+        raise SandboxFixtureError('Authoring launch did not prove the owned bottle resolution')
+    return info
 
 
 def _get_info_display_name(info: Mapping[str, Any]) -> str | None:
@@ -917,6 +1014,7 @@ __all__ = [
     "launch_sandboxed_wwise",
     "prepare_sample_project_sandbox",
     "require_lifecycle_ready_proof",
+    "require_authoring_launch_proof",
     "resolve_safe_sandbox_root",
     "shutdown_sandboxed_wwise",
     "verify_project_identity",

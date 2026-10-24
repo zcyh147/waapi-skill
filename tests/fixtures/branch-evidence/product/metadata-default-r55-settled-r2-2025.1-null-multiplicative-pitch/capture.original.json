@@ -1,0 +1,12 @@
+{
+  "functional_coverage": "program_only_native_missing",
+  "git_candidate": "0377d16b7dfef3779c901cbcbecdf743414cdf92",
+  "obligations_in_scope": 2,
+  "outcome": "PASS",
+  "phase_reports": {
+    "call": "passed",
+    "setup": "passed",
+    "teardown": "passed"
+  },
+  "source_unchanged": true
+}

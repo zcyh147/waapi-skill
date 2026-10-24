@@ -1,0 +1,19 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r2/run-cc0fd9e1-r1/pytest-capture/test_repeated_collector_gates_0/native/1792554424957541000-0d5e26f3a0434714b68b5b52ccfa888b-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "default": false,
+    "name": "OverrideColor",
+    "restriction": {},
+    "type": "bool"
+  },
+  "risk_level": "low",
+  "timeout": 9.998142083000857,
+  "version": "2021.1"
+}

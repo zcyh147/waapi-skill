@@ -1,0 +1,286 @@
+{
+  "contract": "waapi-skill.qualified-r104-anchor-selectors/v1",
+  "original_candidate": "a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8",
+  "source_map_sha256": "ea923adf89f880842b4fcaff20fc22ec7478fedd9b62c5e2128990a12e45e42b",
+  "profiles": {
+    "2021.1|r104-audio-objects-observation": {
+      "archive": "b8c26df5d2810caaea7bd1f0bbb23ddbdee4da2af06c2866ffe11e86708ac36d",
+      "decoded_files_sha256": "5c0577acb93ed3f5fc9acd480549c28765a33863054f9b39cd5d2e22d2f52c65",
+      "files": 293,
+      "manifest_count": 288,
+      "build": "2021.1.14.8108",
+      "time": 34752,
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2021-r1",
+      "route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects",
+      "uri": "ak.wwise.core.profiler.getAudioObjects",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2021-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788747216223000-580aa722a4614b5a9ee4c1b9ff19962c-ak_wwise_core_profiler_getAudioObjects.json",
+      "raw_sha256": "d48fb730871e46ed810c16fa706d89985051db6dc93e4f6715744936de4ff91b",
+      "public_argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getAudioObjects",
+        "--profiler-position",
+        "34752",
+        "--result-view",
+        "diagnostics",
+        "--max-results",
+        "64"
+      ],
+      "public_exit_code": 0,
+      "selectors": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+          "shape_sha256": "16955db0c49f968f3911455557432a251f89b56f24ffb9a6e9d8b81875511ca8"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+          "shape_sha256": "5894f8029ee502ada64c74fb8aa8ad51b88d0d69b0056f040acf964393901e0e"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+          "shape_sha256": "f21e326ca043f04586eca535a3b7cb8640fe1c75282e1efc7b6021e3452b639b"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+          "shape_sha256": "6c98a724ff07f27fd64a497ccf563c2821933996f6a032396b93231d5042460f"
+        }
+      ]
+    },
+    "2021.1|r104-object-rtpcs-observation": {
+      "archive": "b8c26df5d2810caaea7bd1f0bbb23ddbdee4da2af06c2866ffe11e86708ac36d",
+      "decoded_files_sha256": "5c0577acb93ed3f5fc9acd480549c28765a33863054f9b39cd5d2e22d2f52c65",
+      "files": 293,
+      "manifest_count": 288,
+      "build": "2021.1.14.8108",
+      "time": 34752,
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2021-r1",
+      "route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs",
+      "uri": "ak.wwise.core.profiler.getRTPCs",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2021-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788749721754000-42c640ca654a47b28dc2e1ed684da17a-ak_wwise_core_profiler_getRTPCs.json",
+      "raw_sha256": "d43d73d5d1a8ad249967e3747b4619adb4c93c641f6048e2be590a4ce58121d9",
+      "public_argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getRTPCs",
+        "--profiler-position",
+        "34752",
+        "--max-results",
+        "64"
+      ],
+      "public_exit_code": 0,
+      "selectors": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id",
+          "shape_sha256": "a9ff36f1c0aec517b112fa7ce8053f4a4b83b55154119ce68df693a541a2762f"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId",
+          "shape_sha256": "b9c3393e01d1409252fa5102b7242a3b67c0e3249137a86da1d532335603d710"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value",
+          "shape_sha256": "a582baf45f2eac3ddc3553ad8a309c82ad36806831a5c99f748e881732ac58d0"
+        }
+      ]
+    },
+    "2022.1|r104-audio-objects-observation": {
+      "archive": "8b1ff23b40bd955e2aa6fd04826d4b87bb7f3093ba1e690db7cf2145605403ea",
+      "decoded_files_sha256": "8956078282a8e35b3d73cd875d624a7486db0edc862945006280ee8f47c69f3c",
+      "files": 298,
+      "manifest_count": 293,
+      "build": "2022.1.19.8584",
+      "time": 39861,
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2022-r1",
+      "route": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects",
+      "uri": "ak.wwise.core.profiler.getAudioObjects",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2022-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788874704685000-4a6c024cec584069984b874106e4e289-ak_wwise_core_profiler_getAudioObjects.json",
+      "raw_sha256": "ce87d8fd2c17f64dfe926b40db67c8a368faa2bbb4df062b089cf26c413597a2",
+      "public_argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getAudioObjects",
+        "--profiler-position",
+        "39861",
+        "--result-view",
+        "diagnostics",
+        "--max-results",
+        "64"
+      ],
+      "public_exit_code": 0,
+      "selectors": [
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+          "shape_sha256": "16955db0c49f968f3911455557432a251f89b56f24ffb9a6e9d8b81875511ca8"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+          "shape_sha256": "5894f8029ee502ada64c74fb8aa8ad51b88d0d69b0056f040acf964393901e0e"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+          "shape_sha256": "f21e326ca043f04586eca535a3b7cb8640fe1c75282e1efc7b6021e3452b639b"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+          "shape_sha256": "6c98a724ff07f27fd64a497ccf563c2821933996f6a032396b93231d5042460f"
+        }
+      ]
+    },
+    "2022.1|r104-game-objects-observation": {
+      "archive": "8b1ff23b40bd955e2aa6fd04826d4b87bb7f3093ba1e690db7cf2145605403ea",
+      "decoded_files_sha256": "8956078282a8e35b3d73cd875d624a7486db0edc862945006280ee8f47c69f3c",
+      "files": 298,
+      "manifest_count": 293,
+      "build": "2022.1.19.8584",
+      "time": 39861,
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2022-r1",
+      "route": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getGameObjects",
+      "uri": "ak.wwise.core.profiler.getGameObjects",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2022-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788875220726000-a4386ef57bc44989a096f8c546fbfa94-ak_wwise_core_profiler_getGameObjects.json",
+      "raw_sha256": "ea07f23bed22b4697040fa2748e00fec8ce384c5979c92827a37ce2d619c3848",
+      "public_argv": [
+        "profiler-game-objects",
+        "--capture-ms",
+        "39861"
+      ],
+      "public_exit_code": 2,
+      "selectors": [
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id",
+          "shape_sha256": "45adf790f6e560a8417fc981301d31bd1ddd29cd5d315d8ae97d9786b87c7433"
+        }
+      ]
+    },
+    "2023.1|r104-audio-objects-observation": {
+      "archive": "47a7cc6bb531e7c1d35d167e47b2794a6f809a2ce0ca80306ba5bf1164999e8b",
+      "decoded_files_sha256": "446a3a1ff73202c328d7233db49d9f15fc3a8b6fc6014cf2e6da332c8d496d53",
+      "files": 377,
+      "manifest_count": 372,
+      "build": "2023.1.19.8928",
+      "time": 45888,
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1",
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects",
+      "uri": "ak.wwise.core.profiler.getAudioObjects",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789011579009000-859a8ac2b04c4de19ae40f4586959c21-ak_wwise_core_profiler_getAudioObjects.json",
+      "raw_sha256": "c96bb9fb566dc66be9bc005e3b48838624663b48bc074ab957a7e1fe2e142e50",
+      "public_argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getAudioObjects",
+        "--profiler-position",
+        "45888",
+        "--result-view",
+        "diagnostics",
+        "--max-results",
+        "64"
+      ],
+      "public_exit_code": 0,
+      "selectors": [
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+          "shape_sha256": "16955db0c49f968f3911455557432a251f89b56f24ffb9a6e9d8b81875511ca8"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+          "shape_sha256": "5894f8029ee502ada64c74fb8aa8ad51b88d0d69b0056f040acf964393901e0e"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+          "shape_sha256": "f21e326ca043f04586eca535a3b7cb8640fe1c75282e1efc7b6021e3452b639b"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+          "shape_sha256": "6c98a724ff07f27fd64a497ccf563c2821933996f6a032396b93231d5042460f"
+        }
+      ]
+    },
+    "2023.1|r104-game-objects-observation": {
+      "archive": "47a7cc6bb531e7c1d35d167e47b2794a6f809a2ce0ca80306ba5bf1164999e8b",
+      "decoded_files_sha256": "446a3a1ff73202c328d7233db49d9f15fc3a8b6fc6014cf2e6da332c8d496d53",
+      "files": 377,
+      "manifest_count": 372,
+      "build": "2023.1.19.8928",
+      "time": 45888,
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1",
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getGameObjects",
+      "uri": "ak.wwise.core.profiler.getGameObjects",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789012104628000-7a8fde46686449edaa0f9f1270319a1a-ak_wwise_core_profiler_getGameObjects.json",
+      "raw_sha256": "81262fbd753063c9a94181bcce2b5383f2fda85e360c2e54a72f3a23a90804ec",
+      "public_argv": [
+        "profiler-game-objects",
+        "--capture-ms",
+        "45888"
+      ],
+      "public_exit_code": 0,
+      "selectors": [
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id",
+          "shape_sha256": "45adf790f6e560a8417fc981301d31bd1ddd29cd5d315d8ae97d9786b87c7433"
+        }
+      ]
+    },
+    "2024.1|r104-audio-objects-observation": {
+      "archive": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22",
+      "decoded_files_sha256": "eb637204417efe17638a220b19057babe589c85b7615dbffa11171d398e2bfd4",
+      "files": 377,
+      "manifest_count": 372,
+      "build": "2024.1.13.9056",
+      "time": 45621,
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1",
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects",
+      "uri": "ak.wwise.core.profiler.getAudioObjects",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789156305700000-b30ab9afcfa840fcb1b17574bcfd4fe7-ak_wwise_core_profiler_getAudioObjects.json",
+      "raw_sha256": "fb6232a13c77a547d9ca3a35277ae4cd8e31bd52da67d88503eafc171f0e9d9e",
+      "public_argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getAudioObjects",
+        "--profiler-position",
+        "45621",
+        "--result-view",
+        "diagnostics",
+        "--max-results",
+        "64"
+      ],
+      "public_exit_code": 0,
+      "selectors": [
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+          "shape_sha256": "ef55c7e77a02953ad781cdd1d465b434331be77367bcd6f908880d1e7a1422fa"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+          "shape_sha256": "7518127ea1795c14ac8da59e381bdacf88597cb09100f208a75fdb3b827fb048"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+          "shape_sha256": "8a956a30fc5355ae489e2dd384a8e5a9e1962ee57bbdcbbed3062ef59c8cb6ae"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+          "shape_sha256": "41c4130c258ad44f5b78854ed444b75ef0b259e28a2af0f0f5e03777f841997f"
+        }
+      ]
+    },
+    "2024.1|r104-game-objects-observation": {
+      "archive": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22",
+      "decoded_files_sha256": "eb637204417efe17638a220b19057babe589c85b7615dbffa11171d398e2bfd4",
+      "files": 377,
+      "manifest_count": 372,
+      "build": "2024.1.13.9056",
+      "time": 45621,
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1",
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects",
+      "uri": "ak.wwise.core.profiler.getGameObjects",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789156825596000-2e947b675a264939ba1535692f532710-ak_wwise_core_profiler_getGameObjects.json",
+      "raw_sha256": "c53c46f033a966283edb2f53934d69349998c8575f25805cc2e3eda382a93de9",
+      "public_argv": [
+        "profiler-game-objects",
+        "--capture-ms",
+        "45621"
+      ],
+      "public_exit_code": 0,
+      "selectors": [
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id",
+          "shape_sha256": "98401d6507986510cb141db4fcdeaf02462729648fc43ab7d02901fd31726960"
+        }
+      ]
+    }
+  }
+}

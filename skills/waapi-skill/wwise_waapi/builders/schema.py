@@ -31,6 +31,7 @@ class SchemaValidationResult:
     section: str = "request"
     validated_nodes: int = 0
     unresolved_refs: tuple[str, ...] = ()
+    compatibility_rules: tuple[Mapping[str, Any], ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -41,6 +42,8 @@ class SchemaValidationResult:
             "section": self.section,
             "validated_nodes": self.validated_nodes,
             "unresolved_refs": list(self.unresolved_refs),
+            **({"compatibility_rules": [dict(rule) for rule in self.compatibility_rules]}
+               if self.compatibility_rules else {}),
         }
 
 
@@ -147,6 +150,13 @@ class SemanticSchemaValidator:
 
         schema = self.schema_for(uri)
         result_schema = _mapping_or_empty(schema.get("resultSchema"))
+        compatibility = None
+        if uri == "ak.wwise.cli.moveMediaIdsToSingleFile" and self.version in {"2021.1", "2022.1", "2023.1"}:
+            from wwise_waapi.schema_inventory import observed_console_result_schema, SchemaInventoryError
+            try:
+                result_schema, compatibility = observed_console_result_schema(self.version, uri, result_schema, result)
+            except SchemaInventoryError as exc:
+                raise _schema_error(uri, self.version, str(exc), section="result") from exc
         walker = _SchemaWalker(uri=uri, version=self.version)
         walker.validate(result_schema, result, path="result")
         return SchemaValidationResult(
@@ -157,6 +167,7 @@ class SemanticSchemaValidator:
             section="result",
             validated_nodes=walker.nodes,
             unresolved_refs=tuple(sorted(walker.unresolved_refs)),
+            compatibility_rules=(compatibility,) if compatibility is not None else (),
         )
 
     def validate_event(self, uri: str, event: Any) -> SchemaValidationResult:
@@ -196,6 +207,148 @@ def validate_semantic_payload(
     return validator.validate(uri, args=args, options=options)
 
 
+def validate_resolved_semantic_payload(
+    uri: str, args: Mapping[str, Any], options: Mapping[str, Any], *, version: str,
+    authoring_ui_profile: bool = False,
+) -> SchemaValidationResult:
+    return _validate_resolved_sections(uri, (("args", dict(args)), ("options", dict(options))),
+                                      version=version, authoring_ui_profile=authoring_ui_profile)
+
+
+def validate_resolved_semantic_result(
+    uri: str, result: Any, *, version: str, meter_projection_fields: tuple[str, ...] = (),
+) -> SchemaValidationResult:
+    """Validate native results in memory before a protected call can publish them."""
+    return _validate_resolved_sections(uri, (("result", result),), version=version,
+                                       meter_projection_fields=meter_projection_fields)
+
+
+def _validate_resolved_sections(
+    uri: str, sections: tuple[tuple[str, Any], ...], *, version: str,
+    authoring_ui_profile: bool = False, meter_projection_fields: tuple[str, ...] = (),
+) -> SchemaValidationResult:
+    """Validate Gateway-owned native sections against reachable pinned definitions.
+
+    Unlike conservative reflection validation, unresolved references cannot
+    establish a match here. Reuse the same constraint walker and its budgets.
+    """
+    from wwise_waapi.schema_inventory import load_definition_graph, resolve_schema_reference, resolved_request_schema, ResolvedSchemaReference, SchemaInventoryError
+
+    if authoring_ui_profile:
+        from wwise_waapi.schema_inventory import load_authoring_definition_graph
+        graph = load_authoring_definition_graph(version)
+    else:
+        graph = load_definition_graph(version)
+    schema = SemanticSchemaValidator(version=version, authoring_ui_profile=authoring_ui_profile).schema_for(uri)
+    compatibility_rules: list[Mapping[str, Any]] = []
+    result_compatibility_seen: set[tuple[str, str]] = set()
+
+    class ResolvedWalker(_SchemaWalker):
+        context: Mapping[str, Any]
+        context_document: str = "<schema>"
+        reference_depth: int = 0
+
+        def validate(self, node, value, *, path, depth=0):
+            if depth > SCHEMA_VALIDATION_MAX_DEPTH:
+                raise _schema_error(uri, version, "Resolved schema exceeds the validation depth budget", section=path, maximum_depth=SCHEMA_VALIDATION_MAX_DEPTH)
+            reference = node.get("$ref", node.get("#ref"))
+            if reference is not None:
+                self.nodes += 1
+                if self.nodes > SCHEMA_VALIDATION_MAX_NODES:
+                    raise _schema_error(uri, version, "Resolved schema exceeds the validation node budget", section=path, maximum_nodes=SCHEMA_VALIDATION_MAX_NODES)
+                try:
+                    resolved = resolve_schema_reference(reference, root_schema=self.context, graph=graph)
+                except SchemaInventoryError as exc:
+                    raise _schema_error(uri, version, "Native schema reference cannot be resolved", section=path) from exc
+                previous = self.context
+                previous_document = self.context_document
+                if resolved.document_name == "<schema>" and previous_document != "<schema>":
+                    resolved = ResolvedSchemaReference(resolved.reference, previous_document, resolved.pointer, resolved.target)
+                self.context_document = resolved.document_name
+                self.context = previous if resolved.document_name == "<schema>" else graph.documents[resolved.document_name]
+                self.reference_depth += 1
+                try:
+                    # Expansion does not descend into the payload. Keep the
+                    # existing structural depth budget available to recursive
+                    # object graphs, and bound reference recursion separately.
+                    if self.reference_depth > SCHEMA_VALIDATION_MAX_DEPTH:
+                        raise _schema_error(uri, version, "Resolved schema exceeds the reference depth budget", section=path, maximum_depth=SCHEMA_VALIDATION_MAX_DEPTH)
+                    try:
+                        target, compatibility = resolved_request_schema(version, uri, resolved, value)
+                    except SchemaInventoryError as exc:
+                        raise _schema_error(uri, version, str(exc), section=path) from exc
+                    if sections[0][0] == "result":
+                        target, result_compatibility = _runtime_result_reference_schema(
+                            uri, version, resolved, target, meter_projection_fields)
+                        if result_compatibility is not None:
+                            key = (result_compatibility["rule_id"], result_compatibility["definition_pointer"])
+                            if key not in result_compatibility_seen:
+                                result_compatibility_seen.add(key)
+                                compatibility_rules.append({**result_compatibility, "section": path})
+                    self.validate(target, value, path=path, depth=depth)
+                    if compatibility is not None:
+                        compatibility_rules.append({**compatibility, "section": path + ".audioFileBase64"})
+                finally:
+                    self.reference_depth -= 1
+                    self.context = previous
+                    self.context_document = previous_document
+                node = {key: child for key, child in node.items() if key not in {"$ref", "#ref"}}
+            super().validate(node, value, path=path, depth=depth)
+
+    walker = ResolvedWalker(uri=uri, version=version)
+    for section, payload in sections:
+        walker.context = schema.get(section + "Schema", {})
+        walker.context_document = "<schema>"
+        walker.validate(walker.context, payload, path=section)
+    return SchemaValidationResult(uri=uri, version=version,
+        section="result" if sections[0][0] == "result" else "request", validated_nodes=walker.nodes,
+        compatibility_rules=tuple(compatibility_rules))
+
+
+def _runtime_result_reference_schema(
+    uri: str, version: str, resolved: Any, target: Mapping[str, Any],
+    meter_projection_fields: tuple[str, ...],
+) -> tuple[Mapping[str, Any], Mapping[str, Any] | None]:
+    """Preserve two exact existing runtime contracts while resolving base fields."""
+    if resolved.document_name != "waapi_definitions.json":
+        return target, None
+    if (uri == "ak.wwise.core.profiler.getVoiceContributions"
+            and version in {"2021.1", "2022.1", "2023.1"}
+            and resolved.pointer == "/definitions/voiceContributionsObject"):
+        from wwise_waapi.canonical import canonical_sha256
+        digest = "65a31a502cc581aebc372d674d16d60e772329b957474418d10aec3fa70f02f7"
+        if canonical_sha256(target) != digest:
+            raise _schema_error(uri, version, "Contribution driver definition changed; review its documented union")
+        properties = target["properties"]
+        parameters = properties["parameters"]
+        item = parameters["items"]
+        driver = item["properties"]["driver"]
+        # Its pinned description explicitly permits a driving reason OR GUID.
+        # A GUID is also a string: these native alternatives overlap.
+        driver = {**{key: value for key, value in driver.items() if key != "oneOf"},
+                  "anyOf": driver["oneOf"]}
+        projected = {**target, "properties": {**properties, "parameters": {**parameters,
+            "items": {**item, "properties": {**item["properties"], "driver": driver}}}}}
+        return projected, {"rule_id": "profiler-contribution-driver-reason-or-guid/v1",
+            "uri": uri, "version": version, "document": resolved.document_name,
+            "reflected_definition_sha256": digest, "definition_pointer": resolved.pointer,
+            "preserved_contract": "driver accepts a string reason or GUID; driverValue remains number or GUID"}
+    if (uri == "ak.wwise.core.profiler.getMeters" and version in {"2024.1", "2025.1"}
+            and resolved.pointer == "/definitions/objectReturn" and meter_projection_fields):
+        # Only Gateway-selected dynamic fields retain the existing meter
+        # projection's nullable-value behavior. Every reflected named field and
+        # all other dynamic fields still cross their original resolved schema.
+        properties = target.get("properties", {})
+        selected = sorted(set(meter_projection_fields) - set(properties))
+        if selected:
+            return {**target, "properties": {**properties, **{name: {} for name in selected}}}, {
+                "rule_id": "meter-selected-dynamic-values-preserved/v1",
+                "uri": uri, "version": version, "document": resolved.document_name,
+                "definition_pointer": resolved.pointer, "fields": selected,
+                "preserved_contract": "Gateway-bound meter dynamic selections preserve explicit null and native values; no additional value-type claim"}
+    return target, None
+
+
 def validate_semantic_result(
     uri: str,
     result: Any,
@@ -230,6 +383,61 @@ def validate_semantic_event(
         authoring_ui_profile=authoring_ui_profile,
     )
     return validator.validate_event(uri, event)
+
+
+def validate_resolved_semantic_event(
+    uri: str,
+    event: Any,
+    *,
+    version: str = DEFAULT_WWISE_VERSION,
+    authoring_ui_profile: bool = False,
+) -> SchemaValidationResult:
+    """Validate delivered events against the complete pinned definition graph.
+
+    Subscription acknowledgement and a conservative unresolved-reference check
+    do not prove event delivery conforms to the native publish contract.
+    """
+    from wwise_waapi.schema_inventory import (
+        SchemaInventoryError, load_definition_graph, resolve_schema_reference,
+    )
+    from wwise_waapi.topic_compatibility import public_topic_publish_schema
+
+    graph = load_definition_graph(version)
+    schema = SemanticSchemaValidator(
+        version=version, authoring_ui_profile=authoring_ui_profile,
+    ).schema_for(uri)
+    publish, compatibility = public_topic_publish_schema(version, uri, schema,
+        host='wwise-authoring' if authoring_ui_profile else 'wwise-console')
+
+    class EventWalker(_SchemaWalker):
+        context: Mapping[str, Any] = publish
+
+        def validate(self, node, value, *, path, depth=0):
+            reference = node.get("$ref", node.get("#ref"))
+            if reference is not None:
+                self.nodes += 1
+                if depth > SCHEMA_VALIDATION_MAX_DEPTH or self.nodes > SCHEMA_VALIDATION_MAX_NODES:
+                    raise _schema_error(uri, version, "Topic event exceeded resolved schema budget", section=path)
+                try:
+                    resolved = resolve_schema_reference(reference, root_schema=self.context, graph=graph)
+                except (SchemaInventoryError, TypeError) as exc:
+                    raise _schema_error(uri, version, "Topic event definition cannot be resolved", section=path) from exc
+                previous = self.context
+                self.context = previous if resolved.document_name == "<schema>" else graph.documents[resolved.document_name]
+                try:
+                    self.validate(resolved.target, value, path=path, depth=depth + 1)
+                finally:
+                    self.context = previous
+                node = {key: child for key, child in node.items() if key not in {"$ref", "#ref"}}
+            super().validate(node, value, path=path, depth=depth)
+
+    walker = EventWalker(uri=uri, version=version)
+    walker.validate(publish, event, path="event")
+    return SchemaValidationResult(
+        uri=uri, version=version, section="event", validated_nodes=walker.nodes,
+        required_fields=_required_fields(publish), required_families=_required_families(publish),
+        compatibility_rules=(compatibility,) if compatibility is not None else (),
+    )
 
 
 def extract_semantic_constraint_facts(

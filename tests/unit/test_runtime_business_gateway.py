@@ -17,6 +17,8 @@ from wwise_waapi.canonical import canonical_sha256
 LOG_GET_URI = "ak.wwise.core.log.get"
 GET_CURSOR_TIME_URI = "ak.wwise.core.profiler.getCursorTime"
 GET_VOICES_URI = "ak.wwise.core.profiler.getVoices"
+GET_BUSSES_URI = "ak.wwise.core.profiler.getBusses"
+GET_AUDIO_OBJECTS_URI = "ak.wwise.core.profiler.getAudioObjects"
 TRANSPORT_GET_STATE_URI = "ak.wwise.core.transport.getState"
 PROFILER_MOVE_CURSOR_URI = "ak.wwise.core.profiler.moveCursor"
 PROFILER_SET_CURSOR_TIME_URI = "ak.wwise.core.profiler.setCursorTime"
@@ -222,7 +224,8 @@ def test_log_get_schema_exposes_business_channel_and_bounded_result_only(
     )
 
     assert code == 0, payload
-    assert payload["business_adapter"] == {
+    assert payload["business_adapter"]["result_delivery"]["mode"] == "immutable_bounded_observation"
+    assert {key: value for key, value in payload["business_adapter"].items() if key != "result_delivery"} == {
         "contract": "waapi-skill.runtime-inspection-business/v1",
         "operation": LOG_GET_URI,
         "version": "2025.1",
@@ -245,6 +248,10 @@ def test_log_get_schema_exposes_business_channel_and_bounded_result_only(
                 "log_channel": {"flag": "--log-channel", "repeatable": False},
                 "max_results": {"flag": "--max-results", "repeatable": False},
             },
+            "value_choices": {"log_channel": [
+                "soundbank-generation", "audio-conversion", "platform-settings-copy",
+                "waapi", "project-load", "general", "source-control", "lua",
+            ]},
         },
         "gateway_derivations": [
             "versioned_native_log_channel",
@@ -272,7 +279,7 @@ def test_log_get_schema_exposes_business_channel_and_bounded_result_only(
         TRANSPORT_GET_STATE_URI,
     ),
 )
-def test_remote_and_transport_contracts_disclose_authoring_host_requirement(
+def test_runtime_contracts_disclose_operation_host_requirement(
     tmp_path: Path,
     operation: str,
 ) -> None:
@@ -283,7 +290,8 @@ def test_remote_and_transport_contracts_disclose_authoring_host_requirement(
     )
 
     assert code == 0, payload
-    assert payload["business_adapter"]["host_requirement"] == "wwise-authoring"
+    assert payload["business_adapter"]["host_requirement"] == (
+        "wwise-authoring" if operation.startswith("ak.wwise.core.remote.") else "wwise-console-or-authoring")
 
 
 class FakeClient:
@@ -326,12 +334,13 @@ def test_log_get_core_call_maps_channel_and_returns_latest_bounded_items(
                     },
                 }
             ],
+            "ak.wwise.core.getProjectInfo": [{"id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}", "name": "SampleProject", "path": str(tmp_path / "project" / "Sample.wproj")}],
             LOG_GET_URI: [
                 {
                     "items": [
-                        {"message": "old", "severity": "Message"},
-                        {"message": "warning", "severity": "Warning"},
-                        {"message": "latest", "severity": "Error"},
+                        {"message": "old", "severity": "Message", "time": 1, "messageId": "Custom"},
+                        {"message": "warning", "severity": "Warning", "time": 2, "messageId": "Custom"},
+                        {"message": "latest", "severity": "Error", "time": 3, "messageId": "Custom"},
                     ]
                 }
             ],
@@ -341,7 +350,7 @@ def test_log_get_core_call_maps_channel_and_returns_latest_bounded_items(
     code, payload = gateway.execute_gateway(
         [
 
-            "core-call",
+            "--state-dir", str(tmp_path / "state"), "core-call",
             LOG_GET_URI,
             "--log-channel",
             "soundbank-generation",
@@ -354,11 +363,11 @@ def test_log_get_core_call_maps_channel_and_returns_latest_bounded_items(
 
     assert code == 0, payload
     assert (LOG_GET_URI, {"channel": "soundbankGenerate"}, {}) in client.calls
-    assert payload["agent_result"] == {
+    assert {key: payload["agent_result"][key] for key in ("channel", "items", "returned_count", "truncated")} == {
         "channel": "soundbank-generation",
         "items": [
-            {"message": "warning", "severity": "Warning"},
-            {"message": "latest", "severity": "Error"},
+            {"message": "warning", "severity": "Warning", "time": 2, "messageId": "Custom"},
+            {"message": "latest", "severity": "Error", "time": 3, "messageId": "Custom"},
         ],
         "returned_count": 2,
         "truncated": True,
@@ -479,6 +488,293 @@ def test_log_get_blocks_retired_draft_before_state_or_connection(tmp_path: Path)
     assert not (state_dir / "operation-drafts-v1").exists()
 
 
+def _pinned_profiler_return_fields(version: str, operation: str, host: str = "wwise-authoring") -> list[str]:
+    catalog = json.loads((Path(__file__).resolve().parents[2] / "skills/waapi-skill/resources/native-catalog"
+                          / version / (host + ".json")).read_bytes())
+    definition = {GET_VOICES_URI: "voiceReturnOptions", GET_BUSSES_URI: "busReturnOptions",
+                  GET_AUDIO_OBJECTS_URI: "audioObjectReturnOptions"}[operation]
+    schema = catalog["definitions"]["documents"]["waapi_definitions.json"]["definitions"][definition]
+    assert schema["type"] == "array" and schema["items"]["type"] == "string"
+    assert not schema.get("uniqueItems")
+    assert isinstance(schema["items"]["enum"], list)
+    return schema["items"]["enum"]
+
+
+def test_profiler_voice_can_select_only_name_and_level_through_public_gateway(tmp_path: Path) -> None:
+    client = _RuntimeControlDraftClient(tmp_path)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        if uri == GET_VOICES_URI:
+            return {"return": [{"objectName": "Rifle", "baseVolume": -3.5}]}
+        return original(uri, args, options)
+    client.call = call
+    code, payload = gateway.execute_gateway([
+        "--state-dir", str(tmp_path / "state"), "core-call", GET_VOICES_URI,
+        "--profiler-position", "123", "--result-field", "objectName", "--result-field", "baseVolume",
+    ], env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 0, payload
+    assert next(options for uri, _args, options in calls if uri == GET_VOICES_URI) == {
+        "return": ["objectName", "baseVolume"],
+    }
+    assert payload["agent_result"]["return"] == [{"objectName": "Rifle", "baseVolume": -3.5}]
+    assert list(payload)[-1] == "agent_result"
+
+
+def _profiler_field_read(tmp_path, operation, rows, *, version="2025.1", console=False):
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        if uri == operation:
+            return {"return": [dict(row) for row in rows]}
+        result = original(uri, args, options)
+        if uri == "ak.wwise.core.getInfo":
+            result["isCommandLine"] = console
+        return result
+    client.call = call
+    env = _env(tmp_path, version=version)
+    state = tmp_path / "state"
+    def read(*argv):
+        return gateway.execute_gateway([
+            "--state-dir", str(state), "core-call", operation, "--profiler-position", "123", *argv,
+        ], env=env, client_factory=lambda _url: client)
+    return read, calls, state, env
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("console", (False, True))
+@pytest.mark.parametrize("operation,fields,row", (
+    (GET_VOICES_URI, ["objectName", "baseVolume"], {"objectName": "Rifle", "baseVolume": -3.5}),
+    (GET_BUSSES_URI, ["objectName", "volume"], {"objectName": "Weapons", "volume": -2.0}),
+    (GET_AUDIO_OBJECTS_URI, ["audioObjectName", "rmsMeter"], {"audioObjectName": "Rifle", "rmsMeter": [-4.0]}),
+))
+def test_profiler_explicit_fields_match_each_pinned_host_version_profile(
+    tmp_path, version, console, operation, fields, row,
+):
+    read, calls, _state, env = _profiler_field_read(tmp_path, operation, [row], version=version, console=console)
+    code, schema = gateway.execute_gateway(["request-schema", operation], env=env,
+        client_factory=lambda _url: pytest.fail("Projection choices must be disclosed offline"))
+    assert code == 0, schema
+    declaration = schema["business_adapter"]["declaration"]
+    choices = declaration["value_choices"]["result_fields"]
+    pinned = _pinned_profiler_return_fields(version, operation, "wwise-console" if console else "wwise-authoring")
+    assert set(choices) == set(pinned) and len(choices) == len(pinned)
+    assert declaration["input_forms"]["result_fields"] == {
+        "flag": "--result-field", "repeatable": True, "minimum_items": 1, "maximum_items": 64,
+        "bound_owner": "Gateway request resource policy", "order_preserved": True,
+        "repetitions_preserved": True, "mutually_exclusive_with": ["result_view"],
+    }
+    assert "no identity fields are appended" in declaration["result_fields_meaning"]["projection"]
+    flags = [argument for field in fields for argument in ("--result-field", field)]
+    code, payload = read(*flags)
+    assert code == 0, payload
+    assert [(args, options) for uri, args, options in calls if uri == operation] == [
+        ({"time": 123}, {"return": fields}),
+    ]
+    assert payload["agent_result"]["return"] == [row]
+    assert payload["agent_result"]["complete"] is True
+    assert payload["agent_result"]["instantaneous_native_resource_authority"] is False
+    assert list(payload)[-1] == "agent_result"
+
+
+@pytest.mark.parametrize("operation,name_field,value_field", (
+    (GET_VOICES_URI, "objectName", "baseVolume"),
+    (GET_BUSSES_URI, "objectName", "volume"),
+    (GET_AUDIO_OBJECTS_URI, "audioObjectName", "rmsMeter"),
+))
+@pytest.mark.parametrize("repeat", (False, True))
+def test_profiler_explicit_field_order_and_repetition_survive_dispatch(tmp_path, operation, name_field, value_field, repeat):
+    value = [-3.5] if operation == GET_AUDIO_OBJECTS_URI else -3.5
+    row = {name_field: "Voice", value_field: value}
+    read, calls, _state, _env_value = _profiler_field_read(tmp_path, operation, [row])
+    fields = [value_field, name_field, value_field] if repeat else [value_field, name_field]
+    code, payload = read(*[argument for field in fields for argument in ("--result-field", field)])
+    assert code == 0, payload
+    assert next(options for uri, _args, options in calls if uri == operation) == {"return": fields}
+    assert payload["agent_result"]["return"] == [{value_field: value, name_field: "Voice"}]
+
+
+@pytest.mark.parametrize("operation,pipeline,guid", (
+    (GET_VOICES_URI, "pipelineID", "objectGUID"),
+    (GET_BUSSES_URI, "pipelineID", "objectGUID"),
+    (GET_AUDIO_OBJECTS_URI, "busPipelineID", "busGUID"),
+))
+@pytest.mark.parametrize("basis", ("pipeline-only", "pipeline-guid", "pipeline-game-object", "complete"))
+def test_profiler_explicit_pipeline_fields_remain_visible_without_invented_instance_authority(
+    tmp_path, operation, pipeline, guid, basis,
+):
+    row = {pipeline: 42}
+    if basis in {"pipeline-guid", "complete"}:
+        row[guid] = _RuntimeControlDraftClient.target_id
+    if basis in {"pipeline-game-object", "complete"}:
+        row["gameObjectID"] = 1
+    fields = [pipeline, guid, "gameObjectID"]
+    read, calls, _state, _env_value = _profiler_field_read(tmp_path, operation, [row])
+    code, payload = read(*[argument for field in fields for argument in ("--result-field", field)])
+    assert code == 0, payload
+    projected = dict(payload["agent_result"]["return"][0])
+    handle = projected.pop("voice_instance_handle" if operation == GET_VOICES_URI else "bus_instance_handle", None)
+    assert projected == row
+    assert (handle is not None) is (basis == "complete")
+    assert next(options for uri, _args, options in calls if uri == operation) == {"return": fields}
+
+
+def test_profiler_explicit_projection_omits_unselected_and_unreported_native_fields(tmp_path):
+    read, _calls, _state, _env_value = _profiler_field_read(tmp_path, GET_VOICES_URI, [
+        {"objectName": "Only label", "isStarted": True},
+        {"objectName": "Label and level", "baseVolume": -3.5, "isVirtual": False},
+    ])
+    code, payload = read("--result-field", "objectName", "--result-field", "baseVolume")
+    assert code == 0, payload
+    assert payload["agent_result"]["return"] == [
+        {"objectName": "Only label"}, {"objectName": "Label and level", "baseVolume": -3.5},
+    ]
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("operation,name_field,value_field", (
+    (GET_VOICES_URI, "objectName", "baseVolume"),
+    (GET_BUSSES_URI, "objectName", "volume"),
+    (GET_AUDIO_OBJECTS_URI, "audioObjectName", "rmsMeter"),
+))
+@pytest.mark.parametrize("select_value", (False, True))
+def test_profiler_explicit_fields_validate_off_page_selected_and_unselected_values(
+    tmp_path, version, operation, name_field, value_field, select_value,
+):
+    read, _calls, state, _env_value = _profiler_field_read(tmp_path, operation, [
+        {name_field: "Off-page malformed value", value_field: None},
+        {name_field: "Visible valid row", value_field: [-3.5] if operation == GET_AUDIO_OBJECTS_URI else -3.5},
+    ], version=version)
+    fields = [name_field, value_field] if select_value else [name_field]
+    code, payload = read("--max-results", "1", *[argument for field in fields for argument in ("--result-field", field)])
+    assert code == 2, payload
+    assert payload["error_code"] == "SemanticValidationError"
+    assert "agent_result" not in payload
+    assert not list((state / "runtime-inspection-observations-v1").glob("**/*.json"))
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_profiler_explicit_fields_reject_wrong_version_choice_before_connection(tmp_path, version):
+    wrong = "effectCount" if version in {"2021.1", "2022.1"} else "mixerID"
+    allowed = "mixerID" if version in {"2021.1", "2022.1"} else "effectCount"
+    code, payload = gateway.execute_gateway([
+        "core-call", GET_BUSSES_URI, "--profiler-position", "123", "--result-field", wrong,
+    ], env=_env(tmp_path, version=version), client_factory=lambda _url: pytest.fail("Wrong-version field must not connect"))
+    assert code == 2, payload
+    assert wrong in payload["message"] and allowed in payload["message"] and version in payload["message"]
+    assert "permitted choices" in payload["message"]
+
+
+@pytest.mark.parametrize("operation", (GET_VOICES_URI, GET_BUSSES_URI, GET_AUDIO_OBJECTS_URI))
+def test_profiler_explicit_fields_reject_unknown_choices_and_bound_before_connection(tmp_path, operation):
+    for fields, expected in ((["invented-field"], "permitted choices"), (["objectName"] * 65, "64")):
+        code, payload = gateway.execute_gateway([
+            "core-call", operation, "--profiler-position", "123",
+            *[argument for field in fields for argument in ("--result-field", field)],
+        ], env=_env(tmp_path), client_factory=lambda _url: pytest.fail("Invalid field selection must not connect"))
+        assert code == 2, payload
+        assert "result_fields" in payload["message"] and expected in payload["message"]
+
+
+def test_profiler_explicit_fields_accept_the_disclosed_request_ceiling(tmp_path):
+    read, calls, _state, _env_value = _profiler_field_read(tmp_path, GET_VOICES_URI, [{"objectName": "Voice"}])
+    code, payload = read(*[argument for _ in range(64) for argument in ("--result-field", "objectName")])
+    assert code == 0, payload
+    assert next(options for uri, _args, options in calls if uri == GET_VOICES_URI) == {"return": ["objectName"] * 64}
+    assert payload["agent_result"]["return"] == [{"objectName": "Voice"}]
+
+
+@pytest.mark.parametrize("view", ("summary", "identity", "diagnostics", "capture-defaults", "empty-selection"))
+def test_profiler_explicit_fields_conflict_with_every_explicit_preset(tmp_path, view):
+    with pytest.raises(SystemExit) as exc:
+        gateway.execute_gateway([
+            "core-call", GET_VOICES_URI, "--profiler-position", "123", "--result-view", view,
+            "--result-field", "objectName",
+        ], env=_env(tmp_path), client_factory=lambda _url: pytest.fail("Conflicting selection must not connect"))
+    assert exc.value.code == 2
+
+
+@pytest.mark.parametrize("operation", (LOG_GET_URI, GET_CURSOR_TIME_URI, TRANSPORT_GET_STATE_URI,
+    "ak.wwise.core.profiler.getRTPCs", "ak.wwise.core.profiler.getMeters", "ak.wwise.core.object.isLinked"))
+def test_profiler_explicit_field_flag_is_not_a_projection_escape_for_other_readers(tmp_path, operation):
+    code, payload = gateway.execute_gateway([
+        "core-call", operation, "--result-field", "objectName",
+    ], env=_env(tmp_path), client_factory=lambda _url: pytest.fail("Unrelated reader projection must not connect"))
+    assert code == 2, payload
+    assert "result_fields applies only" in payload["message"]
+
+
+def test_profiler_explicit_field_pages_preserve_projection_without_reread_or_new_selection(tmp_path):
+    read, calls, _state, env = _profiler_field_read(tmp_path, GET_VOICES_URI, [
+        {"objectName": f"Voice{index}", "baseVolume": -3.5, "isStarted": True} for index in range(5)
+    ])
+    code, payload = read("--max-results", "2", "--result-field", "objectName", "--result-field", "baseVolume")
+    assert code == 0, payload
+    assert len([uri for uri, _args, _options in calls if uri == GET_VOICES_URI]) == 1
+    pages = [payload["agent_result"]]
+    continuation = pages[0]["next_command"]["full_argv"][3:]
+    code, invalid = gateway.execute_gateway([*continuation, "--result-field", "isStarted"], env=env,
+        client_factory=lambda _url: pytest.fail("Cached page cannot accept a new projection"))
+    assert code == 2 and "exact runtime observation" in invalid["message"], invalid
+    while pages[-1].get("next_command"):
+        code, payload = gateway.execute_gateway(pages[-1]["next_command"]["full_argv"][3:], env=env,
+            client_factory=lambda _url: pytest.fail("Explicit projection pages must remain offline"))
+        assert code == 0, payload
+        pages.append(payload["agent_result"])
+    assert [row for page in pages for row in page["return"]] == [
+        {"objectName": f"Voice{index}", "baseVolume": -3.5} for index in (3, 4, 1, 2, 0)
+    ]
+    assert pages[-1]["complete"] is True
+
+
+@pytest.mark.parametrize("change", ("configuration", "version", "expiry"))
+def test_profiler_explicit_field_pages_retain_configuration_version_and_lifetime_guards(tmp_path, monkeypatch, change):
+    read, _calls, _state, env = _profiler_field_read(tmp_path, GET_VOICES_URI, [
+        {"objectName": "First"}, {"objectName": "Second"},
+    ])
+    code, payload = read("--max-results", "1", "--result-field", "objectName")
+    assert code == 0, payload
+    continuation = payload["agent_result"]["next_command"]["full_argv"][3:]
+    if change == "configuration":
+        set_gateway_config(env, waapi_port=31338)
+    elif change == "version":
+        set_gateway_config(env, wwise_version="2024.1")
+    else:
+        import time
+        expired = time.time() + 901
+        monkeypatch.setattr(time, "time", lambda: expired)
+    code, invalid = gateway.execute_gateway(continuation, env=env,
+        client_factory=lambda _url: pytest.fail("Changed or expired cached reads must not connect"))
+    assert code == 2, invalid
+    assert ("expired" if change == "expiry" else "configuration or operation changed") in invalid["message"]
+    assert "agent_result" not in invalid
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("operation", (GET_VOICES_URI, GET_BUSSES_URI, GET_AUDIO_OBJECTS_URI))
+@pytest.mark.parametrize("view", (None, "summary", "identity"))
+def test_profiler_existing_summary_identity_and_omitted_selection_keep_native_presets(tmp_path, version, operation, view):
+    summaries = {
+        GET_VOICES_URI: ["pipelineID", "objectName", "gameObjectName", "baseVolume", "isStarted", "isVirtual", "objectGUID", "gameObjectID"],
+        GET_BUSSES_URI: ["pipelineID", "objectName", "gameObjectName", "volume", "downstreamGain", "voiceCount", "depth", "objectGUID", "gameObjectID"],
+        GET_AUDIO_OBJECTS_URI: ["audioObjectID", "audioObjectName", "busPipelineID", "busName", "gameObjectName", "rmsMeter", "peakMeter", "busGUID", "gameObjectID"],
+    }
+    identities = {
+        GET_VOICES_URI: ["pipelineID", "playingID", "objectGUID", "objectName", "playTargetGUID", "playTargetName", "gameObjectID", "gameObjectName"],
+        GET_BUSSES_URI: ["pipelineID", "objectGUID", "objectName", "gameObjectID", "gameObjectName"],
+        GET_AUDIO_OBJECTS_URI: ["audioObjectID", "audioObjectName", "busPipelineID", "busGUID", "busName", "gameObjectID", "gameObjectName", "instigatorPipelineID"],
+    }
+    read, calls, _state, _env_value = _profiler_field_read(tmp_path, operation, [], version=version)
+    code, payload = read(*(["--result-view", view] if view is not None else []))
+    assert code == 0, payload
+    assert next(options for uri, _args, options in calls if uri == operation) == {
+        "return": identities[operation] if view == "identity" else summaries[operation],
+    }
+
+
 def test_profiler_voice_schema_exposes_position_view_bound_and_handle_only(
     tmp_path: Path,
 ) -> None:
@@ -494,6 +790,7 @@ def test_profiler_voice_schema_exposes_position_view_bound_and_handle_only(
     assert declaration["optional_fields"] == [
         "max_results",
         "result_view",
+        "result_fields",
         "voice_instance_handle",
     ]
     encoded = json.dumps(payload, sort_keys=True)
@@ -502,101 +799,46 @@ def test_profiler_voice_schema_exposes_position_view_bound_and_handle_only(
     assert "typed-call" not in encoded
 
 
-def test_profiler_voice_read_derives_native_time_projection_and_handle(
-    tmp_path: Path,
-) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": [
-                {
-                    "displayName": "Wwise",
-                    "isCommandLine": True,
-                    "apiVersion": 1,
-                    "platform": "macosx",
-                    "configuration": "release",
-                    "version": {
-                        "year": 2025,
-                        "major": 1,
-                        "minor": 0,
-                        "build": 1,
-                        "displayName": "v2025.1.0.1",
-                    },
-                }
-            ],
-            GET_VOICES_URI: [
-                {
-                    "return": [
-                        {
-                            "pipelineID": 41,
-                            "objectName": "Old",
-                            "gameObjectName": "Player",
-                            "baseVolume": -6.0,
-                            "isStarted": True,
-                            "isVirtual": False,
-                        },
-                        {
-                            "pipelineID": 42,
-                            "objectName": "Rifle",
-                            "gameObjectName": "Player",
-                            "baseVolume": -4.0,
-                            "isStarted": True,
-                            "isVirtual": False,
-                        },
-                    ]
-                }
-            ],
-        }
-    )
-
-    code, payload = gateway.execute_gateway(
-        [
-
-            "core-call",
-            GET_VOICES_URI,
-            "--profiler-position",
-            "capture-latest",
-            "--result-view",
-            "summary",
-            "--voice-instance-handle",
-            "voice-instance-0000002a",
-            "--max-results",
-            "1",
-        ],
-        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
-        client_factory=lambda _url: client,
-    )
-
-    assert code == 0, payload
-    assert (
-        GET_VOICES_URI,
-        {"time": "capture", "voicePipelineID": 42},
-        {
-            "return": [
-                "pipelineID",
-                "objectName",
-                "gameObjectName",
-                "baseVolume",
-                "isStarted",
-                "isVirtual",
-            ]
-        },
-    ) in client.calls
-    assert payload["agent_result"] == {
-        "profiler_position": "capture-latest",
-        "return": [
-            {
-                "objectName": "Rifle",
-                "gameObjectName": "Player",
-                "baseVolume": -4.0,
-                "isStarted": True,
-                "isVirtual": False,
-                "voice_instance_handle": "voice-instance-0000002a",
-            }
-        ],
-        "returned_count": 1,
-        "truncated": True,
-    }
-    assert "pipelineID" not in json.dumps(payload["agent_result"], sort_keys=True)
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_profiler_voice_read_derives_native_time_projection_and_handle(tmp_path: Path, version: str) -> None:
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    calls = []
+    row = {"pipelineID": 42, "objectGUID": client.target_id, "gameObjectID": 1,
+           "objectName": "Rifle", "gameObjectName": "Player"}
+    def call(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        if uri == GET_CURSOR_TIME_URI:
+            return {"return": 123}
+        if uri == GET_VOICES_URI:
+            return {"return": [dict(row)]}
+        return original(uri, args, options)
+    client.call = call
+    env = _env(tmp_path, version=version)
+    prefix = ["--state-dir", str(tmp_path / "state"), "core-call", GET_VOICES_URI,
+              "--profiler-position", "capture-latest"]
+    code, observed = gateway.execute_gateway(prefix, env=env, client_factory=lambda _url: client)
+    assert code == 0, observed
+    handle = observed["agent_result"]["return"][0]["voice_instance_handle"]
+    assert handle.startswith("rph1-") and "0000002a" not in handle
+    calls.clear()
+    code, wrong_position = gateway.execute_gateway([
+        "--state-dir", str(tmp_path / "state"), "core-call", GET_VOICES_URI,
+        "--profiler-position", "124", "--voice-instance-handle", handle],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and "another capture position" in wrong_position["message"], wrong_position
+    assert not any(uri == GET_VOICES_URI for uri, _args, _options in calls)
+    code, selected = gateway.execute_gateway([*prefix, "--voice-instance-handle", handle],
+        env=env, client_factory=lambda _url: client)
+    assert code == 0, selected
+    assert any(uri == GET_VOICES_URI and args == {"time": 123, "voicePipelineID": 42} for uri, args, _options in calls)
+    row["objectGUID"] = client.meter_id
+    calls.clear()
+    code, stale = gateway.execute_gateway([*prefix, "--voice-instance-handle", handle],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2, stale
+    assert "identity changed" in stale["message"]
+    assert not any(uri == GET_VOICES_URI and "voicePipelineID" in args for uri, args, _options in calls)
 
 
 def test_profiler_cursor_read_maps_business_cursor_and_projects_milliseconds(
@@ -645,6 +887,98 @@ def test_profiler_cursor_read_maps_business_cursor_and_projects_milliseconds(
     }
 
 
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_profiler_cursor_choices_are_disclosed_before_the_live_read(tmp_path: Path, version: str) -> None:
+    env = _env(tmp_path, version=version)
+    code, schema = gateway.execute_gateway(
+        ["request-schema", GET_CURSOR_TIME_URI], env=env,
+        client_factory=lambda _url: pytest.fail("Offline schema must not connect"),
+    )
+    assert code == 0, schema
+    choices = schema["business_adapter"]["declaration"]["value_choices"]["profiler_cursor"]
+    assert choices == ["capture-latest", "user-cursor"]
+    native_choices = {"capture-latest": "capture", "user-cursor": "user"}
+    for choice in choices:
+        client = FakeClient({
+            "ak.wwise.core.getInfo": [{
+                "displayName": "Wwise", "isCommandLine": True, "apiVersion": 1,
+                "platform": "macosx", "configuration": "release",
+                "version": {"year": int(version[:4]), "major": 1, "minor": 0, "build": 1,
+                            "displayName": f"v{version}.0.1"},
+            }],
+            GET_CURSOR_TIME_URI: [{"return": 1234}],
+        })
+        code, result = gateway.execute_gateway(
+            [*schema["continuation"]["gateway_argv_prefix"], "--profiler-cursor", choice],
+            env=env, client_factory=lambda _url: client,
+        )
+        assert code == 0, result
+        assert (GET_CURSOR_TIME_URI, {"cursor": native_choices[choice]}, {}) in client.calls
+        assert result["agent_result"] == {"profiler_cursor": choice, "available": True, "position_ms": 1234}
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_runtime_schema_discloses_accepted_business_meanings_and_position_forms(tmp_path: Path, version: str) -> None:
+    channels = ["soundbank-generation", "audio-conversion", "platform-settings-copy", "waapi", "project-load", "general"]
+    if version not in {"2021.1", "2022.1"}:
+        channels += ["source-control", "lua"]
+    expectations = {
+        LOG_GET_URI: {"log_channel": channels},
+        GET_VOICES_URI: {"result_view": ["summary", "identity", "diagnostics", "capture-defaults", "empty-selection"],
+                         "result_fields": _pinned_profiler_return_fields(version, GET_VOICES_URI)},
+        "ak.wwise.core.transport.executeAction": {
+            "audition_action": ["play", "stop", "pause", "toggle-play-stop", "play-directly"],
+            "transport_scope": ["one-transport", "all-active"],
+        },
+    }
+    if version not in {"2021.1", "2022.1"}:
+        expectations["ak.wwise.core.log.addItem"] = {"log_channel": channels, "severity": ["message", "warning", "error", "fatal"]}
+        expectations["ak.wwise.core.transport.useOriginals"] = {"audition_media": ["originals", "converted"]}
+    if version == "2025.1":
+        expectations[PROFILER_MOVE_CURSOR_URI] = {"cursor_move": ["first-frame", "last-frame", "next-frame", "previous-frame"]}
+    for operation, expected in expectations.items():
+        code, schema = gateway.execute_gateway(
+            ["request-schema", operation], env=_env(tmp_path, version=version),
+            client_factory=lambda _url: pytest.fail("Offline schema must not connect"),
+        )
+        assert code == 0, schema
+        declaration = schema["business_adapter"]["declaration"]
+        assert declaration.get("value_choices") == expected, operation
+        if operation == GET_VOICES_URI:
+            assert declaration["input_forms"]["profiler_position"]["value_forms"] == {
+                "named": ["capture-latest", "user-cursor"],
+                "integer_milliseconds": {"minimum": 0, "encoding": "ASCII decimal string", "maximum_input_bytes": 1024, "bound_owner": "Gateway request resource policy"},
+            }
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_log_control_draft_and_invalid_choice_preserve_disclosed_meanings(tmp_path: Path, version: str) -> None:
+    env = _env(tmp_path, version=version)
+    state = tmp_path / "state"
+    code, started = gateway.execute_gateway(
+        ["--state-dir", str(state), "draft-start", "ak.wwise.core.log.clear"],
+        env=env, client_factory=lambda _url: pytest.fail("Offline Draft start must not connect"),
+    )
+    assert code == 0, started
+    next_action = started["draft"]["next_action_binding"]
+    disclosed = next_action["declaration"]["append_fields"]["value_choices"]["log_channel"]
+    assert "source-control" in disclosed
+    assert next_action["business_contract"]["declaration"]["value_choices"]["log_channel"] == disclosed
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    code, rejected = gateway.execute_gateway(
+        ["--state-dir", str(state), "draft-declare-runtime-control-plan", started["draft"]["draft_id"],
+         "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]),
+         "--log-channel", "invented-log-view"],
+        env=env, client_factory=lambda _url: client,
+    )
+    assert code == 2, rejected
+    assert rejected["error_code"] == "BUSINESS_ENUM_INVALID"
+    repair = rejected["details"]["repair"]
+    assert repair["field"] == "log_channel"
+    assert set(repair["choices"]) == set(disclosed)
+    assert repair["draft_changed"] is False
+
+
 def test_profiler_cursor_unavailable_sentinel_is_hidden_from_business_result() -> None:
     assert normalize_runtime_inspection_result(
         GET_CURSOR_TIME_URI,
@@ -656,6 +990,55 @@ def test_profiler_cursor_unavailable_sentinel_is_hidden_from_business_result() -
         "available": False,
         "position_ms": None,
     }
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1'))
+def test_profiler_cursor_optional_position_retains_explicit_unknown_reason(tmp_path, version):
+    for console in (True, False):
+        for number, (native, expected) in enumerate((
+            ({}, {'profiler_cursor':'user-cursor','available':False,'position_ms':None,
+                  'unavailable_reason':'native-position-not-returned'}),
+            ({'return':-1}, {'profiler_cursor':'user-cursor','available':False,'position_ms':None}),
+            *[(value, None) for value in ({'return':None},{'return':True},{'return':-2},
+                                        {'return':1.5},{'return':-1.0},{'return':float('nan')},{'return':'1'})],
+        )):
+            path=tmp_path/(str(console)+'-'+str(number));path.mkdir()
+            client=FakeClient({'ak.wwise.core.getInfo':[{
+                'displayName':'Wwise','isCommandLine':console,'apiVersion':1,
+                'platform':'macosx','configuration':'release',
+                'version':{'year':int(version[:4]),'major':1,'minor':0,'build':1,
+                           'displayName':f'v{version}.0.1'},
+            }], GET_CURSOR_TIME_URI:[native]})
+            code, result=gateway.execute_gateway(['core-call',GET_CURSOR_TIME_URI,'--profiler-cursor','user-cursor'],
+                env=_env(path,version=version),client_factory=lambda _:client)
+            if expected is None:
+                assert code==2 and result['ok']is False and result.get('agent_result')is None
+            else:
+                assert code==0,result
+                assert result['agent_result']==expected
+            assert client.calls.count((GET_CURSOR_TIME_URI,{'cursor':'user'},{}))==1
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_profiler_cursor_required_position_cannot_be_omitted(tmp_path, version):
+    for console in (True,False):
+        client=FakeClient({'ak.wwise.core.getInfo':[{
+            'displayName':'Wwise','isCommandLine':console,'apiVersion':1,
+            'platform':'macosx','configuration':'release',
+            'version':{'year':int(version[:4]),'major':1,'minor':0,'build':1,
+                       'displayName':f'v{version}.0.1'},
+        }], GET_CURSOR_TIME_URI:[{}]})
+        code,result=gateway.execute_gateway(['core-call',GET_CURSOR_TIME_URI,'--profiler-cursor','capture-latest'],
+            env=_env(tmp_path,version=version),client_factory=lambda _:client)
+        assert code==2 and result['ok']is False and 'agent_result'not in result
+
+
+def test_profiler_cursor_omission_needs_an_attested_supported_optional_version():
+    from wwise_waapi.runtime_inspection_business import RuntimeInspectionBusinessError
+    for version in (None,'unknown','2020.1','2023.1','2024.1','2025.1'):
+        with pytest.raises(RuntimeInspectionBusinessError):
+            normalize_runtime_inspection_result(GET_CURSOR_TIME_URI,{},
+                business_request={'profiler_cursor':'user-cursor'},max_results=1,version=version)
 
 
 def test_profiler_cursor_invalid_live_shape_preserves_bounded_diagnostics(
@@ -723,6 +1106,291 @@ def test_profiler_voice_read_rejects_invented_handle_before_connection(
 
     assert code == 2
     assert "copied exactly" in payload["message"]
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_profiler_read_accepts_native_nonnegative_time_without_int32_ceiling(tmp_path: Path, version: str) -> None:
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        if uri == GET_VOICES_URI:
+            return {"return": []}
+        return original(uri, args, options)
+    client.call = call
+    code, payload = gateway.execute_gateway(
+        ["--state-dir", str(tmp_path / "state"), "core-call", GET_VOICES_URI, "--profiler-position", "4294967296"],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client,
+    )
+    assert code == 0, payload
+    assert any(uri == GET_VOICES_URI and args == {"time": 4294967296} for uri, args, _options in calls)
+
+
+def test_profiler_numeric_encoded_handle_is_not_gateway_issued_authority(tmp_path: Path) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": [{"isCommandLine": True,
+        "version": {"year": 2025, "major": 1, "minor": 0, "build": 1, "displayName": "v2025.1.0.1"}}],
+        GET_VOICES_URI: [{"return": []}]})
+    code, payload = gateway.execute_gateway(
+        ["core-call", GET_VOICES_URI, "--profiler-position", "123", "--voice-instance-handle", "voice-instance-0000002a"],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, payload
+    assert not any(uri == GET_VOICES_URI for uri, _args, _options in client.calls)
+
+
+def test_profiler_complete_snapshot_continuation_retains_original_rows_without_live_reread(tmp_path: Path) -> None:
+    client = _RuntimeControlDraftClient(tmp_path)
+    client.rows = [{"pipelineID": index + 1, "objectName": f"Voice{index}", "gameObjectName": "Player"} for index in range(5)]
+    original_call = client.call
+    def call(uri, args=None, options=None):
+        if uri == GET_VOICES_URI:
+            return {"return": client.rows}
+        return original_call(uri, args, options)
+    client.call = call
+    env = _env(tmp_path)
+    prefix = ["--state-dir", str(tmp_path / "state")]
+    code, payload = gateway.execute_gateway([*prefix, "core-call", GET_VOICES_URI,
+        "--profiler-position", "123", "--max-results", "2"], env=env, client_factory=lambda _url: client)
+    assert code == 0, json.dumps(payload, indent=2)
+    pages = [payload["agent_result"]]
+    while pages[-1].get("next_command"):
+        code, payload = gateway.execute_gateway(pages[-1]["next_command"]["full_argv"][3:], env=env,
+            client_factory=lambda _url: pytest.fail("Snapshot continuation must not read a newer capture"))
+        assert code == 0, payload
+        pages.append(payload["agent_result"])
+    assert len(pages) == 3
+    assert [row["objectName"] for page in pages for row in page["return"]] == ["Voice3", "Voice4", "Voice1", "Voice2", "Voice0"]
+    assert pages[-1]["complete"] is True
+    assert all(page["observation"] == "retained_profiler_capture_snapshot" for page in pages)
+
+
+@pytest.mark.parametrize("message", ["界" * 12000, '\\"' * 12000])
+def test_runtime_snapshot_fragments_preserve_every_character_under_terminal_bound(tmp_path: Path, message: str) -> None:
+    client = _RuntimeControlDraftClient(tmp_path)
+    original = client.call
+    def call(uri, args=None, options=None):
+        return {"items": [{"message": message, "severity": "Message", "time": 1, "messageId": "Custom"}]} if uri == LOG_GET_URI else original(uri, args, options)
+    client.call = call
+    env = _env(tmp_path)
+    code, payload = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), "core-call", LOG_GET_URI,
+        "--log-channel", "general"], env=env, client_factory=lambda _url: client)
+    assert code == 0, json.dumps(payload)
+    fragments = []
+    while True:
+        assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode()) <= gateway.MAX_GATEWAY_RESULT_JSON_BYTES
+        result = payload["agent_result"]
+        assert list(payload)[-1] == "agent_result"
+        fragments.append(result["row_fragment"]["value"])
+        if result["complete"]:
+            break
+        code, payload = gateway.execute_gateway(result["next_command"]["full_argv"][3:], env=env,
+            client_factory=lambda _url: pytest.fail("Fragment continuation must be offline"))
+        assert code == 0, payload
+    assert json.loads("".join(fragments)) == {"message": message, "severity": "Message", "time": 1, "messageId": "Custom"}
+
+
+def _public_runtime_preview(tmp_path, client, state_dir, operation, declaration=()):
+    env = _env(tmp_path, version=client.version)
+    def invoke(argv):
+        code, result = gateway.execute_gateway(["--state-dir", str(state_dir), *argv], env=env, client_factory=lambda _url: client)
+        assert code == 0, json.dumps(result, indent=2)
+        return result
+    started = invoke(["draft-start", operation])
+    draft, authority = started["draft"]["draft_id"], started["task_authority"]
+    current = started
+    if operation.endswith(".create"):
+        current = invoke(["draft-bind-object", draft, "--task-authority", authority,
+            "--expected-revision", str(current["draft"]["revision"]), "--role", "target", "--object-id", client.target_id])
+        declaration = ("--target-handle", current["bound_object"]["handle"], *declaration)
+    current = invoke(["draft-declare-runtime-control-plan", draft, "--task-authority", authority,
+        "--expected-revision", str(current["draft"]["revision"]), *declaration])
+    current = invoke(["draft-check", draft, "--task-authority", authority,
+        "--expected-revision", str(current["draft"]["revision"])])
+    previewed = invoke(["preview-from-draft", draft, "--task-authority", authority,
+        "--expected-revision", str(current["draft"]["revision"])])
+    shown = invoke(previewed["next_command"]["gateway_argv"])
+    invoke(shown["next_command"]["gateway_argv"])
+    return previewed, invoke
+
+
+@pytest.mark.parametrize("intervention", ("replacement", "destroy"))
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_transport_late_creation_verification_cannot_resurrect_prior_lifetime(tmp_path: Path, intervention: str, version: str) -> None:
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    client.calls = []
+    def call(uri, args=None, options=None):
+        client.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.transport.create":
+            return {"transport": 74}
+        if uri == "ak.wwise.core.transport.destroy":
+            return {}
+        if uri == TRANSPORT_GET_STATE_URI:
+            return {"state": "stopped"}
+        return original(uri, args, options)
+    client.call = call
+    state_dir = tmp_path / "state"
+    pending, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.create")
+    invoke(["execute", pending["transaction_id"]])
+    successor, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.create")
+    invoke(["execute", successor["transaction_id"]])
+    published = invoke(["verify", successor["transaction_id"]])
+    handle = published["agent_result"]["business_result"]["transport_handle"]
+    if intervention == "destroy":
+        destroyed, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.destroy", ("--transport-handle", handle))
+        invoke(["execute", destroyed["transaction_id"]])
+        # Native ID has been recycled outside Gateway before the delayed read.
+        # Identical rows cannot confer the old transaction's publication right.
+    code, result = gateway.execute_gateway(["--state-dir", str(state_dir), "verify", pending["transaction_id"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 2, result
+    assert result["error_code"] in {"TRANSPORT_HANDLE_GENERATION_DRIFT", "TRANSPORT_HANDLE_LIFETIME_RETIRED"}
+    assert result["automatic_retry"] is False
+    assert result["verified"] is False
+    assert result["state"] == "verification_failed"
+    assert result["verification"]["business_state_verified"] is False
+    shown = invoke(["transaction-show", pending["transaction_id"]])
+    assert shown["state"] == "verification_failed"
+    verifications = [event for event in shown["events"] if event["event_type"] == "verification_recorded"]
+    assert verifications[-1]["details"]["verification"]["business_state_verified"] is False
+
+
+def test_transport_retired_lifetime_capacity_is_reusable_and_old_verification_stays_rejected(tmp_path: Path, monkeypatch) -> None:
+    import wwise_waapi.runtime_transport_handles as handles
+    monkeypatch.setattr(handles, "_MAX_RECORDS", 2)
+    client = _RuntimeControlDraftClient(tmp_path)
+    original = client.call
+    active = {}
+    next_id = 0
+    def call(uri, args=None, options=None):
+        nonlocal next_id
+        if uri == "ak.wwise.core.transport.create":
+            native_id = next_id
+            next_id += 1
+            active[native_id] = {"transport": native_id, "object": client.target_id, "gameObject": 1}
+            return {"transport": native_id}
+        if uri == "ak.wwise.core.transport.destroy":
+            active.pop(args["transport"])
+            return {}
+        if uri == "ak.wwise.core.transport.getList":
+            return {"list": list(active.values())}
+        if uri == TRANSPORT_GET_STATE_URI:
+            return {"state": "stopped"}
+        return original(uri, args, options)
+    client.call = call
+    state_dir = tmp_path / "state"
+    for _ in range(3):
+        created, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.create")
+        invoke(["execute", created["transaction_id"]])
+        verified = invoke(["verify", created["transaction_id"]])
+        handle = verified["agent_result"]["business_result"]["transport_handle"]
+        destroyed, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.destroy", ("--transport-handle", handle))
+        invoke(["execute", destroyed["transaction_id"]])
+        verified = invoke(["verify", destroyed["transaction_id"]])
+        assert verified["agent_result"]["business_result"]["retired_transport_handle_count"] == 1
+    assert next_id == 3 and active == {}
+    assert len(list((state_dir / "runtime-transport-handles-v1" / "lifetimes").iterdir())) <= 2
+
+
+def test_transport_unknown_destroy_outcome_consumes_authority_before_dispatch(tmp_path: Path) -> None:
+    client = _RuntimeControlDraftClient(tmp_path)
+    original = client.call
+    attempts = []
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.transport.create":
+            return {"transport": 74}
+        if uri == TRANSPORT_GET_STATE_URI:
+            return {"state": "stopped"}
+        if uri == "ak.wwise.core.transport.destroy":
+            attempts.append(uri)
+            raise RuntimeError("native reply lost")
+        return original(uri, args, options)
+    client.call = call
+    state_dir = tmp_path / "state"
+    created, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.create")
+    invoke(["execute", created["transaction_id"]])
+    verified = invoke(["verify", created["transaction_id"]])
+    handle = verified["agent_result"]["business_result"]["transport_handle"]
+    destroyed, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.destroy", ("--transport-handle", handle))
+    prefix = ["--state-dir", str(state_dir)]
+    code, result = gateway.execute_gateway([*prefix, "execute", destroyed["transaction_id"]], env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2 and result["automatic_retry"] is False, result
+    code, result = gateway.execute_gateway([*prefix, "core-call", TRANSPORT_GET_STATE_URI, "--transport-handle", handle],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2 and result["error_code"] == "TRANSPORT_HANDLE_RETIRED", result
+    assert attempts == ["ak.wwise.core.transport.destroy"]
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("subject", ("Busses", "AudioObjects"))
+def test_profiler_diagnostics_requests_every_pinned_native_projection_field(tmp_path: Path, version: str, subject: str) -> None:
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    operation = "ak.wwise.core.profiler.get" + subject
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        if uri == operation:
+            return {"return": []}
+        return original(uri, args, options)
+    client.call = call
+    code, payload = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), "core-call", operation,
+        "--profiler-position", "123", "--result-view", "diagnostics"], env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 0, payload
+    returned = next(options["return"] for uri, _args, options in calls if uri == operation)
+    expected = ({"mixerID"} if version in {"2021.1", "2022.1"} else {"effectCount"}) if subject == "Busses" else {"busID", "effectClassID", "effectIndex"}
+    assert expected <= set(returned)
+    if subject == "Busses":
+        assert ("effectCount" if version in {"2021.1", "2022.1"} else "mixerID") not in returned
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("view,expected", (("capture-defaults", {}), ("empty-selection", {"return": []})))
+@pytest.mark.parametrize("operation", (GET_VOICES_URI, "ak.wwise.core.profiler.getBusses", "ak.wwise.core.profiler.getAudioObjects"))
+def test_profiler_native_default_and_explicit_empty_projection_remain_distinct(tmp_path: Path, version: str, view: str, expected: dict, operation: str) -> None:
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        return {"return": []} if uri == operation else original(uri, args, options)
+    client.call = call
+    code, payload = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), "core-call", operation,
+        "--profiler-position", "123", "--result-view", view], env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 0, payload
+    assert next(options for uri, _args, options in calls if uri == operation) == expected
+
+
+def test_transport_preview_cannot_transfer_to_recycled_identical_native_row(tmp_path: Path) -> None:
+    client = _RuntimeControlDraftClient(tmp_path)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append(uri)
+        if uri == "ak.wwise.core.transport.create":
+            return {"transport": 74}
+        if uri == "ak.wwise.core.transport.destroy":
+            return {}
+        if uri == TRANSPORT_GET_STATE_URI:
+            return {"state": "stopped"}
+        return original(uri, args, options)
+    client.call = call
+    state_dir = tmp_path / "state"
+    first, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.create")
+    invoke(["execute", first["transaction_id"]])
+    first_result = invoke(["verify", first["transaction_id"]])
+    handle = first_result["agent_result"]["business_result"]["transport_handle"]
+    old_destroy, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.destroy", ("--transport-handle", handle))
+    replacement, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.create")
+    invoke(["execute", replacement["transaction_id"]])
+    invoke(["verify", replacement["transaction_id"]])
+    calls.clear()
+    code, result = gateway.execute_gateway(["--state-dir", str(state_dir), "execute", old_destroy["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, result
+    assert result["status"] == "repreview_required"
+    assert result["error_code"] == "TRANSPORT_HANDLE_GENERATION_DRIFT"
+    assert "ak.wwise.core.transport.destroy" not in calls
 
 
 def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
@@ -883,46 +1551,23 @@ def test_transport_state_rejects_invented_native_id_before_connection(
     assert "copied exactly" in payload["message"]
 
 
-def test_transport_state_returns_authoring_boundary_before_transport_dispatch(
-    tmp_path: Path,
-) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": [
-                {
-                    "displayName": "WwiseConsole",
-                    "isCommandLine": True,
-                    "apiVersion": 1,
-                    "platform": "macosx",
-                    "configuration": "release",
-                    "version": {
-                        "year": 2025,
-                        "major": 1,
-                        "minor": 0,
-                        "build": 1,
-                        "displayName": "v2025.1.0.1",
-                    },
-                }
-            ],
-        }
-    )
-
-    code, payload = gateway.execute_gateway(
-        [
-
-            "core-call",
-            TRANSPORT_GET_STATE_URI,
-            "--transport-handle",
-            "trh1-" + "61" * 16,
-        ],
-        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
-        client_factory=lambda _url: client,
-    )
-
-    assert code == 2
-    assert payload["error_code"] == "AUTHORING_HOST_REQUIRED"
-    assert payload["executed"] is False
-    assert client.calls == [("ak.wwise.core.getInfo", None, None)]
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1"])
+def test_console_transport_state_rejects_unknown_handle_before_native_state(tmp_path, version):
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append(uri)
+        result = original(uri, args, options)
+        if uri == "ak.wwise.core.getInfo":
+            result.update(isCommandLine=True, displayName="WwiseConsole")
+        return result
+    client.call = call
+    code, payload = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"),
+        "core-call", TRANSPORT_GET_STATE_URI, "--transport-handle", "trh1-" + "61" * 16],
+        env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == 2 and payload["error_code"] == "TRANSPORT_HANDLE_UNKNOWN", payload
+    assert TRANSPORT_GET_STATE_URI not in calls
 
 
 def test_transport_state_rejects_well_formed_but_non_live_handle_before_state_call(
@@ -1051,6 +1696,10 @@ class _RuntimeControlDraftClient:
         self.project_file.write_text("fixture", encoding="utf-8")
 
     def call(self, uri: str, args: object = None, options: object = None) -> object:
+        if uri == LOG_GET_URI:
+            return {"items": []}
+        if uri == "ak.wwise.core.remote.getConnectionStatus":
+            return {"isConnected": False, "status": "Not connected"}
         if uri == "ak.wwise.core.getInfo":
             year, major = (int(part) for part in self.version.split("."))
             return {
@@ -1086,6 +1735,8 @@ class _RuntimeControlDraftClient:
                     }
                 ]
             }
+        if uri == TRANSPORT_GET_STATE_URI:
+            return {"state": "stopped"}
         if (
             uri == "ak.wwise.core.object.get"
             and self.version == "2021.1"
@@ -1134,11 +1785,136 @@ class _RuntimeControlDraftClient:
         return None
 
 
+class _RemoteLifecycleClient(_RuntimeControlDraftClient):
+    def __init__(self, tmp_path: Path, *, version: str, observation: str):
+        super().__init__(tmp_path, version=version)
+        self.observation = observation
+        self.connected = False
+        self.calls = []
+
+    def call(self, uri, args=None, options=None):
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.remote.connect":
+            self.connected = True
+            return {}
+        if uri == "ak.wwise.core.remote.disconnect":
+            self.connected = False
+            return {}
+        console = {"host": "127.0.0.2" if self.observation == "wrong-host" else "127.0.0.1",
+            "appName": "Wrong Game" if self.observation == "wrong-app" else "Game Preview",
+            "name": "Remote Console", "platform": "Windows", "customPlatform": "Windows"}
+        if uri == "ak.wwise.core.remote.getConnectionStatus":
+            return {"isConnected": self.connected, "status": "Connected" if self.connected else "Not connected",
+                **({"console": console} if self.connected and self.observation != "missing-console" else {})}
+        if uri == "ak.wwise.core.remote.getAvailableConsoles":
+            rows = [{**console, "commandPort": 24026 if self.observation == "wrong-port" else 24024,
+                **({"notificationPort": 24025} if self.version == "2021.1" else {})}]
+            if self.observation == "ambiguous-port":
+                rows.append({**rows[0], "commandPort": 24027})
+            return {"consoles": rows}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("version,observation", [
+    (version, observation) for version in ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"]
+    for observation in ["exact", "wrong-host", "wrong-app", "exact-port", "wrong-port", "ambiguous-port", "hostname-alias", "missing-console", "connection-drift"]
+] + [(version, "host-port") for version in ["2022.1", "2023.1", "2024.1", "2025.1"]])
+def test_remote_public_lifecycle_verifies_the_requested_host_and_application(tmp_path: Path, version: str, observation: str) -> None:
+    client = _RemoteLifecycleClient(tmp_path, version=version, observation=observation)
+    state = tmp_path / "remote-state"
+    env = _env(tmp_path, version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client)
+    code, started = run("draft-start", "ak.wwise.core.remote.connect")
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    host = "game-host" if observation == "hostname-alias" else "127.0.0.1:24024" if observation == "host-port" else "127.0.0.1"
+    operands = ["--remote-host", host, "--application-name", "Game Preview"]
+    if observation.endswith("port") and observation != "host-port":
+        operands += ["--command-port", "24024"]
+        if version == "2021.1":
+            operands += ["--notification-port", "24025"]
+    code, declared = run("draft-declare-runtime-control-plan", draft_id, "--task-authority", authority,
+        "--expected-revision", str(started["draft"]["revision"]), *operands)
+    assert code == 0, declared
+    code, checked = run("draft-check", draft_id, "--task-authority", authority, "--expected-revision", str(declared["draft"]["revision"]))
+    assert code == 0, checked
+    code, previewed = run("preview-from-draft", draft_id, "--task-authority", authority, "--expected-revision", str(checked["draft"]["revision"]))
+    assert code == 0, previewed
+    transaction = previewed["transaction_id"]
+    snapshot = TransactionStore(state).load_snapshot(transaction)
+    code, confirmed = run("confirm", transaction, "--confirmation-token", snapshot.confirmation_token)
+    assert code == 0, confirmed
+    if observation == "connection-drift":
+        client.connected = True
+    code, executed = run("execute", transaction)
+    if observation == "connection-drift":
+        assert code == 2, executed
+        assert not any(call[0] == "ak.wwise.core.remote.connect" for call in client.calls)
+        return
+    assert code == 0, executed
+    code, verified = run("verify", transaction)
+    diagnostic = json.dumps(verified, ensure_ascii=False)
+    if observation == "exact":
+        assert code == 0 and verified["verified"] is True, diagnostic
+    elif observation in {"wrong-host", "wrong-app"}:
+        assert code == 2 and verified.get("verification", {}).get("status") == "verification_failed", diagnostic
+    else:
+        assert code == 0 and verified["verified"] is False, verified
+        assert verified["verification"]["business_state_verified"] is False
+        assert verified["verification"]["verification_strength"] == "partial_remote_target_observation"
+        if observation.endswith("port"):
+            observed = next(row for row in verified["verification"]["readbacks"] if row.get("kind") == "remote-target-observation")
+            assert any(row["reason"] == "connected_status_has_no_port_or_process_identity" for row in observed["unresolved"])
+            assert not any(row["field"] in {"commandPort", "notificationPort"} for row in observed["checks"])
+            if observation in {"exact-port", "wrong-port", "host-port"}:
+                corroboration = next(row for row in observed["corroboration"] if row["field"] == "commandPort")
+                assert corroboration["matches_requested"] is (observation != "wrong-port")
+                assert corroboration["connected_instance_identity_proven"] is False
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.remote.connect"]) == 1
+    code, rejected = run("execute", transaction)
+    assert code == 2, rejected
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.remote.connect"]) == 1
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("drift", [False, True])
+def test_remote_disconnect_public_preview_preserves_connection_identity(tmp_path: Path, version: str, drift: bool) -> None:
+    client = _RemoteLifecycleClient(tmp_path, version=version, observation="exact")
+    client.connected = True
+    state = tmp_path / "disconnect-state"
+    env = _env(tmp_path, version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client)
+    code, schema = run("request-schema", "ak.wwise.core.remote.disconnect")
+    assert code == 0, schema
+    code, previewed = run(*schema["continuation"]["gateway_argv"])
+    assert code == 0, previewed
+    transaction = previewed["transaction_id"]
+    token = TransactionStore(state).load_snapshot(transaction).confirmation_token
+    code, confirmed = run("confirm", transaction, "--confirmation-token", token)
+    assert code == 0, confirmed
+    if drift:
+        client.observation = "wrong-app"
+    code, executed = run("execute", transaction)
+    if drift:
+        assert code == 2, executed
+        assert not any(call[0] == "ak.wwise.core.remote.disconnect" for call in client.calls)
+    else:
+        assert code == 0, executed
+        code, verified = run("verify", transaction)
+        assert code == 0 and verified["verified"] is True, verified
+        assert len([call for call in client.calls if call[0] == "ak.wwise.core.remote.disconnect"]) == 1
+    code, rejected = run("execute", transaction)
+    assert code == 2, rejected
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.remote.disconnect"]) == (0 if drift else 1)
+
+
 @pytest.mark.parametrize(
     "operation",
-    ("ak.wwise.core.remote.connect", "ak.wwise.core.transport.destroy"),
+    ("ak.wwise.core.remote.connect",),
 )
-def test_remote_and_transport_control_return_authoring_boundary_before_project_read(
+def test_remote_control_returns_authoring_boundary_before_project_read(
     tmp_path: Path,
     operation: str,
 ) -> None:
@@ -1296,8 +2072,444 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
         "options": {},
     }
     assert artifact["prepared_operation"]["verification_plan"]["kind"] == (
-        "result-schema"
+        "profiler-user-cursor"
     )
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("operation", ("ak.wwise.core.log.addItem", "ak.wwise.core.log.clear"))
+def test_log_controls_disclose_bounded_observation_and_concurrency_limits(tmp_path: Path, version: str, operation: str) -> None:
+    code, schema = gateway.execute_gateway(["request-schema", operation], env=_env(tmp_path, version=version),
+        client_factory=lambda _: pytest.fail("Schema is offline"))
+    assert code == 0, schema
+    verification = schema["business_adapter"]["declaration"]["verification"]
+    assert verification["observer"] == LOG_GET_URI
+    assert verification["maximum_channel_items"] == 1000
+    assert verification["maximum_channel_bytes"] == 65536
+    assert verification["row_identity"] == "none; messageId and time are not treated as unique or ordered"
+    assert verification["console_add_observer"]["topic"] == "ak.wwise.core.log.itemAdded"
+    assert verification["native_log_observation_policy"]["console_minimum_version"] == "2025.1.4"
+
+
+class _LogControlClient(_RuntimeControlDraftClient):
+    def __init__(self, tmp_path: Path, *, version: str = "2025.1") -> None:
+        super().__init__(tmp_path, version=version)
+        self.calls = []
+        self.rows = [{"message": "retained", "severity": "Message", "time": 1720000000, "messageId": "Custom"}]
+        self.after = None
+        self.control_result = {}
+        self.console = False
+
+    def call(self, uri, args=None, options=None):
+        self.calls.append((uri, args, options))
+        if uri == LOG_GET_URI:
+            return {"items": list(self.rows)}
+        if uri == "ak.wwise.core.log.addItem":
+            self.rows = self.after if self.after is not None else [*self.rows,
+                {"message": args["message"], "severity": args["severity"], "time": 1720000000, "messageId": "Custom"}]
+            return self.control_result
+        if uri == "ak.wwise.core.log.clear":
+            self.rows = self.after if self.after is not None else []
+            return self.control_result
+        result = super().call(uri, args, options)
+        if uri == "ak.wwise.core.getInfo":
+            result["isCommandLine"] = self.console
+        return result
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_log_add_verifies_new_identical_item_through_public_transaction(tmp_path: Path, version: str) -> None:
+    client = _LogControlClient(tmp_path, version=version)
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state",
+        "ak.wwise.core.log.addItem", ("--message", "retained"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is True, verified
+    observation = verified["verification"]["verification_scope"]["log_observation"]
+    assert observation["outcome"] == "new_matching_item"
+    assert observation["matching_items_before"] == 1
+    assert observation["matching_items_after"] == 2
+    assert observation["exclusive_causation_verified"] is False
+    assert all(args == {"channel": "general"} and options == {} for uri, args, options in client.calls if uri == LOG_GET_URI)
+    assert sum(uri == "ak.wwise.core.log.addItem" for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("remaining", ("empty", "competing", "identical"))
+def test_log_clear_observes_prior_channel_contents_without_promising_empty_forever(
+    tmp_path: Path, version: str, remaining: str,
+) -> None:
+    client = _LogControlClient(tmp_path, version=version)
+    old = dict(client.rows[0])
+    client.after = ([] if remaining == "empty" else [old] if remaining == "identical" else
+        [{"message": "concurrent", "severity": "Warning", "messageId": "Custom", "time": 1}])
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state",
+        "ak.wwise.core.log.clear", ("--log-channel", "source-control"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is (remaining != "identical"), verified
+    observation = verified["verification"]["verification_scope"]["log_observation"]
+    assert observation["outcome"] == ("indistinguishable_prior_contents" if remaining == "identical" else "prior_contents_absent")
+    assert observation["post_channel_empty"] is (remaining == "empty")
+    assert observation["continuing_channel_state_verified"] is False
+    assert all(args == {"channel": "sourceControl"} for uri, args, _ in client.calls if uri == LOG_GET_URI)
+    assert sum(uri == "ak.wwise.core.log.clear" for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("after", ("unchanged", "wrong-severity", "missing", "competitor"))
+def test_log_add_preexisting_or_competing_content_does_not_prove_a_new_matching_item(tmp_path: Path, after: str) -> None:
+    client = _LogControlClient(tmp_path)
+    client.after = {"unchanged": list(client.rows), "wrong-severity": [*client.rows,
+        {"message": "retained", "severity": "Warning", "time": 2, "messageId": "Custom"}],
+        "missing": [], "competitor": [{"message": "another", "severity": "Message", "time": 3, "messageId": "Custom"}]}[after]
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state",
+        "ak.wwise.core.log.addItem", ("--message", "retained"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is False, verified
+    assert verified["state"] == "result_schema_checked"
+    assert verified["verification"]["verification_scope"]["log_observation"]["outcome"] == "no_matching_increase"
+    code, replay = gateway.execute_gateway(["--state-dir", str(tmp_path / "log-state"), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, replay
+    assert sum(uri == "ak.wwise.core.log.addItem" for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("operation,declaration", [
+    ("ak.wwise.core.log.clear", ("--log-channel", "general")),
+])
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_log_console_empty_observation_never_proves_the_effect(tmp_path: Path, operation: str, declaration: tuple, version: str) -> None:
+    client = _LogControlClient(tmp_path, version=version)
+    client.console = True
+    client.rows = client.after = []
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state", operation, declaration)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is False, verified
+    assert verified["state"] == "result_schema_checked"
+    assert verified["verification"]["verification_scope"]["log_observation"]["outcome"] == "console_log_unobservable"
+
+
+@pytest.mark.parametrize("operation", ("ak.wwise.core.log.addItem", "ak.wwise.core.log.clear"))
+@pytest.mark.parametrize("version", ("2021.1", "2022.1"))
+@pytest.mark.parametrize("command", ("request-schema", "draft-start"))
+def test_log_controls_preserve_older_packaged_route_boundary(tmp_path: Path, operation: str, version: str, command: str) -> None:
+    code, result = gateway.execute_gateway([command, operation], env=_env(tmp_path, version=version),
+        client_factory=lambda _: pytest.fail("Older packaged route must fail before connection"))
+    assert code == 2, result
+    assert result["error_code"] == "TypedRequestError"
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("severity,native", (("message", "Message"), ("warning", "Warning"), ("error", "Error"), ("fatal", "Fatal Error")))
+def test_log_add_native_severity_and_optional_result_fields_are_verified(tmp_path: Path, version: str, severity: str, native: str) -> None:
+    client = _LogControlClient(tmp_path, version=version)
+    message = '日志 "Weather"\n$HOME; second line'
+    client.after = [*client.rows, {"message": message, "severity": native, "time": 1, "messageId": "Custom",
+        "parameters": ["Weather"], "platform": {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "Windows"}}]
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state", "ak.wwise.core.log.addItem",
+        ("--message", message, "--log-channel", "soundbank-generation", "--severity", severity))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is True, verified
+    assert ("ak.wwise.core.log.addItem", {"message": message, "channel": "soundbankGenerate", "severity": native}, {}) in client.calls
+    assert all(args == {"channel": "soundbankGenerate"} for uri, args, _ in client.calls if uri == LOG_GET_URI)
+    observed = verified["verification"]["verification_scope"]["log_observation"]
+    assert observed["post_channel"]["items"][-1]["parameters"] == ["Weather"]
+    assert list(verified)[-1] == "agent_result"
+
+
+@pytest.mark.parametrize("change", ("new-message", "reordered"))
+def test_log_preview_revalidates_complete_channel_multiset_before_execution(tmp_path: Path, change: str) -> None:
+    client = _LogControlClient(tmp_path)
+    client.rows.append({"message": "other", "severity": "Warning", "time": 2, "messageId": "Custom"})
+    state = tmp_path / "log-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, "ak.wwise.core.log.clear", ("--log-channel", "general"))
+    client.rows = list(reversed(client.rows))
+    if change == "new-message":
+        client.rows.append({"message": "new", "severity": "Message", "time": 1, "messageId": "Custom"})
+    code, result = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    if change == "new-message":
+        assert code == 2, result
+        assert result["error_code"] == "STALE_LOG_CHANNEL"
+        assert not any(uri == "ak.wwise.core.log.clear" for uri, _, _ in client.calls)
+    else:
+        assert code == 0, result
+        assert invoke(result["next_command"]["gateway_argv"])["verified"] is True
+
+
+@pytest.mark.parametrize("stage", ("preview", "execute", "verify"))
+@pytest.mark.parametrize("overflow", ("rows", "bytes"))
+def test_log_oversized_channel_observations_stay_bounded_and_never_prove_effect(tmp_path: Path, stage: str, overflow: str) -> None:
+    client = _LogControlClient(tmp_path)
+    oversized = ([client.rows[0]] * 1001 if overflow == "rows" else
+        [{**client.rows[0], "message": "日志" * 12000}])
+    state = tmp_path / "log-state"
+    if stage == "preview":
+        client.rows = oversized
+        code, started = gateway.execute_gateway(["--state-dir", str(state), "draft-start", "ak.wwise.core.log.clear"],
+            env=_env(tmp_path), client_factory=lambda _: client)
+        assert code == 0, started
+        code, result = gateway.execute_gateway(["--state-dir", str(state), "draft-declare-runtime-control-plan", started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]), "--log-channel", "general"],
+            env=_env(tmp_path), client_factory=lambda _: client)
+        # Declaration preparation is allowed to expose the limit before Preview.
+        if code == 0:
+            code, result = gateway.execute_gateway(["--state-dir", str(state), "draft-check", started["draft"]["draft_id"],
+                "--task-authority", started["task_authority"], "--expected-revision", str(result["draft"]["revision"])],
+                env=_env(tmp_path), client_factory=lambda _: client)
+        assert code == 2, result
+        assert "LOG_OBSERVATION_TOO_LARGE" in json.dumps(result), result
+        assert not any(uri == "ak.wwise.core.log.clear" for uri, _, _ in client.calls)
+    else:
+        previewed, invoke = _public_runtime_preview(tmp_path, client, state, "ak.wwise.core.log.clear", ("--log-channel", "general"))
+        if stage == "execute":
+            client.rows = oversized
+        else:
+            client.after = oversized
+        code, result = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+            env=_env(tmp_path), client_factory=lambda _: client)
+        if stage == "execute":
+            assert code == 2 and result["error_code"] == "LOG_OBSERVATION_TOO_LARGE", result
+            assert not any(uri == "ak.wwise.core.log.clear" for uri, _, _ in client.calls)
+        else:
+            assert code == 0, result
+            result = invoke(result["next_command"]["gateway_argv"])
+            assert result["state"] == "result_schema_checked", result
+            assert result["verified"] is False
+            observation = result["verification"]["verification_scope"]["log_observation"]
+            assert observation["outcome"] == "oversized"
+            assert "items" not in observation["post_channel"]
+    assert len(json.dumps(result, ensure_ascii=False).encode("utf-8")) < 100000
+
+
+@pytest.mark.parametrize("stage", ("control", "readback"))
+@pytest.mark.parametrize("malformed", ({"unexpected": True}, {"items": [{"message": "looks-right", "severity": "Message"}]}))
+def test_log_invalid_native_shapes_cannot_verify_effect(tmp_path: Path, stage: str, malformed: dict) -> None:
+    client = _LogControlClient(tmp_path)
+    state = tmp_path / "log-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, "ak.wwise.core.log.addItem", ("--message", "looks-right"))
+    if stage == "control":
+        client.control_result = malformed
+    executed = invoke(["execute", previewed["transaction_id"]])
+    if stage == "readback":
+        original = client.call
+        client.call = lambda uri, args=None, options=None: malformed if uri == LOG_GET_URI else original(uri, args, options)
+    code, verified = gateway.execute_gateway(["--state-dir", str(state), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, verified
+    assert verified["state"] == "verification_failed"
+    assert verified["verification"]["business_state_verified"] is False
+    assert verified["verification"]["verification_scope"]["log_observation"]["outcome"] == ("malformed" if stage == "readback" else "malformed_control_result")
+    assert verified["automatic_retry"] is False
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("invalid", ({"severity": "fatal"}, {"time": True}, {"parameters": [42]}))
+def test_log_referenced_native_definition_rejects_wrong_enum_and_nested_types(tmp_path: Path, version: str, invalid: dict) -> None:
+    client = _LogControlClient(tmp_path, version=version)
+    state = tmp_path / "log-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, "ak.wwise.core.log.addItem", ("--message", "retained"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    client.rows = [{**row, **invalid} for row in client.rows]
+    code, verified = gateway.execute_gateway(["--state-dir", str(state), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == 2 and verified["state"] == "verification_failed", verified
+    assert verified["verification"]["business_state_verified"] is False
+    assert verified["verification"]["verification_scope"]["log_observation"]["outcome"] == "malformed"
+
+
+@pytest.mark.parametrize("native_result,error_code", (([], "INVALID_READBACK"), (RuntimeError("log observation unavailable"), "READBACK_FAILED")))
+def test_log_unavailable_readback_retains_once_executed_unverified_transaction(tmp_path: Path, native_result: object, error_code: str) -> None:
+    client = _LogControlClient(tmp_path)
+    state = tmp_path / "log-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, "ak.wwise.core.log.clear", ("--log-channel", "general"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    original = client.call
+    def call(uri, args=None, options=None):
+        if uri == LOG_GET_URI:
+            if isinstance(native_result, Exception):
+                raise native_result
+            return native_result
+        return original(uri, args, options)
+    client.call = call
+    code, verified = gateway.execute_gateway(["--state-dir", str(state), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2 and verified["state"] == "executed_unverified", verified
+    assert verified["status"] == "verification_deferred"
+    assert verified["error_code"] == error_code
+    assert verified["automatic_retry"] is False
+    code, replay = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, replay
+    assert sum(uri == "ak.wwise.core.log.clear" for uri, _, _ in client.calls) == 1
+
+
+class _ProfilerCursorControlClient(_RuntimeControlDraftClient):
+    def __init__(self, tmp_path: Path) -> None:
+        super().__init__(tmp_path)
+        self.calls: list[tuple[str, object, object]] = []
+        self.control_result: object = {"return": 1230}
+        self.cursor_result: object = {"return": 1230}
+
+    def call(self, uri: str, args: object = None, options: object = None) -> object:
+        self.calls.append((uri, args, options))
+        if uri in {PROFILER_MOVE_CURSOR_URI, PROFILER_SET_CURSOR_TIME_URI}:
+            return self.control_result
+        if uri == GET_CURSOR_TIME_URI:
+            if isinstance(self.cursor_result, Exception):
+                raise self.cursor_result
+            return self.cursor_result
+        return super().call(uri, args, options)
+
+
+def test_profiler_cursor_setter_verifies_returned_snapped_time_through_public_transaction(tmp_path: Path) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    state_dir = tmp_path / "cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir,
+        PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "1234"))
+    assert not any(uri in {PROFILER_SET_CURSOR_TIME_URI, GET_CURSOR_TIME_URI} for uri, _, _ in client.calls)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is True, verified
+    assert verified["verification"]["business_state_verified"] is True
+    assert verified["verification"]["verification_strength"] == "independent_profiler_user_cursor_observation"
+    shown = invoke(["transaction-show", previewed["transaction_id"]])
+    evidence = next(event["details"]["verification"] for event in reversed(shown["events"])
+        if event["event_type"] == "verification_recorded")
+    assert {"uri": GET_CURSOR_TIME_URI, "args": {"cursor": "user"}, "options": {},
+        "result": {"return": 1230}} in evidence["readbacks"]
+    assert "Capture data completeness" in evidence["message"]
+    assert (PROFILER_SET_CURSOR_TIME_URI, {"time": 1234}, {}) in client.calls
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+    assert (GET_CURSOR_TIME_URI, {"cursor": "user"}, {}) in client.calls
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state_dir), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, rejected
+    assert sum(uri == PROFILER_SET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("move,native,time_ms", [
+    ("first-frame", "first", 0), ("last-frame", "last", 4560),
+    ("next-frame", "next", 0), ("previous-frame", "previous", 0),
+])
+def test_profiler_cursor_moves_verify_observed_time_without_requiring_motion(
+    tmp_path: Path, move: str, native: str, time_ms: int,
+) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    client.control_result = client.cursor_result = {"return": time_ms}
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "cursor-state",
+        PROFILER_MOVE_CURSOR_URI, ("--cursor-move", move))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is True, verified
+    assert (PROFILER_MOVE_CURSOR_URI, {"position": native}, {}) in client.calls
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+    assert verified["verification"]["verification_scope"]["cursor_observation"] == {
+        "kind": "profiler-user-cursor-observation", "returned_time_ms": time_ms,
+        "observed_time_ms": time_ms, "capture_data_verified": False, "outcome": "matched"}
+
+
+@pytest.mark.parametrize("operation,declaration", [
+    (PROFILER_MOVE_CURSOR_URI, ("--cursor-move", "next-frame")),
+    (PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "1234")),
+])
+@pytest.mark.parametrize("returned,observed,outcome", [
+    (1230, 1234, "changed"), (1230, 1220, "changed"),
+    (1230, -1, "unavailable"), (-1, -1, "unavailable"), (-1, 1230, "unavailable"),
+])
+def test_profiler_cursor_changed_or_unavailable_observation_never_verifies_effect(
+    tmp_path: Path, operation: str, declaration: tuple[str, ...], returned: int, observed: int, outcome: str,
+) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    client.control_result, client.cursor_result = {"return": returned}, {"return": observed}
+    state_dir = tmp_path / "cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir, operation, declaration)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    code, verified = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == (2 if outcome == "changed" else 0), verified
+    assert verified["verified"] is False
+    assert verified["state"] == ("verification_failed" if outcome == "changed" else "result_schema_checked")
+    assert verified["verification"]["business_state_verified"] is False
+    assert verified["verification"]["verification_scope"]["cursor_observation"]["outcome"] == outcome
+    assert verified["automatic_retry"] is False
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state_dir), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, rejected
+    assert sum(uri == operation for uri, _, _ in client.calls) == 1
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("stage", ("control", "readback"))
+@pytest.mark.parametrize("native_result", [
+    {}, {"time": 1230}, {"return": True}, {"return": 1230.5}, {"return": None},
+    {"return": -2}, {"return": 1230, "time": 1230},
+], ids=("missing", "wrong-field", "boolean", "fraction", "null", "invalid-negative", "extra-field"))
+def test_profiler_cursor_malformed_result_cannot_verify_a_valid_looking_other_result(
+    tmp_path: Path, stage: str, native_result: dict[str, object],
+) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    if stage == "control":
+        client.control_result = native_result
+    else:
+        client.cursor_result = native_result
+    state_dir = tmp_path / "cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir,
+        PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "1234"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    code, verified = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, verified
+    assert verified["state"] == "verification_failed"
+    assert verified["verification"]["business_state_verified"] is False
+    assert verified["verification"]["verification_scope"]["cursor_observation"]["outcome"] == (
+        "malformed" if stage == "readback" else "malformed_control_result")
+    assert verified["automatic_retry"] is False
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == (1 if stage == "readback" else 0)
+    assert len(json.dumps(verified, ensure_ascii=False).encode("utf-8")) < gateway.MAX_GATEWAY_RESULT_JSON_BYTES
+
+
+@pytest.mark.parametrize("native_result,error_code", [
+    ([], "INVALID_READBACK"), (RuntimeError("cursor observation unavailable"), "READBACK_FAILED"),
+])
+def test_profiler_cursor_read_error_retains_executed_unverified_transaction(
+    tmp_path: Path, native_result: object, error_code: str,
+) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    client.cursor_result = native_result
+    state_dir = tmp_path / "cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir,
+        PROFILER_MOVE_CURSOR_URI, ("--cursor-move", "last-frame"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    code, verified = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, verified
+    assert verified["status"] == "verification_deferred"
+    assert verified["state"] == "executed_unverified"
+    assert verified["error_code"] == error_code
+    assert verified["automatic_retry"] is False
+    assert verified["manual_verification_retry_allowed"] is True
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state_dir), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, rejected
+    assert sum(uri == PROFILER_MOVE_CURSOR_URI for uri, _, _ in client.calls) == 1
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1"))
+@pytest.mark.parametrize("operation", (PROFILER_MOVE_CURSOR_URI, PROFILER_SET_CURSOR_TIME_URI))
+@pytest.mark.parametrize("command", ("request-schema", "draft-start"))
+def test_profiler_cursor_controls_do_not_offer_a_route_on_earlier_definitions(
+    tmp_path: Path, version: str, operation: str, command: str,
+) -> None:
+    code, result = gateway.execute_gateway([command, operation], env=_env(tmp_path, version=version),
+        client_factory=lambda url: pytest.fail(f"unavailable cursor route connected to {url}"))
+    assert code == 2, result
+    assert result["error_code"] == "TypedRequestError", result
+    assert operation in result["message"] and version in result["message"], result
 
 
 def _seal_runtime_control_preview(
@@ -1372,6 +2584,21 @@ def _seal_runtime_control_preview(
     return TransactionStore(state_dir).load_preview(
         previewed["transaction_id"]
     ).artifact
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+def test_remote_notification_port_is_disclosed_and_preserved_as_native_unused_input(tmp_path: Path, version: str) -> None:
+    code, schema = gateway.execute_gateway(["request-schema", "ak.wwise.core.remote.connect"],
+        env=_env(tmp_path, version=version), client_factory=lambda _: pytest.fail("schema must be offline"))
+    assert code == 0, schema
+    declaration = schema["business_adapter"]["declaration"]
+    assert "notification_port" in declaration["optional_fields"]
+    assert declaration["field_semantics"]["notification_port"]["native_effect"] == "unused"
+    assert declaration["field_semantics"]["notification_port"]["selector_used_by_native"] is False
+    assert declaration["field_semantics"]["notification_port"]["target_identity_evidence"] is False
+    artifact = _seal_runtime_control_preview(tmp_path, operation="ak.wwise.core.remote.connect", version=version,
+        declaration=("--remote-host", "127.0.0.1", "--notification-port", "0"))
+    assert artifact["request"]["arguments"]["args"] == {"host": "127.0.0.1", "notificationPort": 0}
 
 
 @pytest.mark.parametrize(
@@ -1669,8 +2896,8 @@ def test_runtime_object_control_binds_role_then_seals_native_guid_preview(
         (
             "ak.wwise.core.remote.connect",
             "2022.1",
-            ("--remote-host", "127.0.0.1", "--notification-port", "24025"),
-            "not disclosed",
+            ("--remote-host", "127.0.0.1", "--notification-port", "65536"),
+            "BUSINESS_VALUE_INVALID",
         ),
         (
             "ak.wwise.core.remote.connect",
@@ -1790,3 +3017,533 @@ def test_meter_control_rejects_bound_non_meter_object_with_repair(tmp_path: Path
     assert code == 2
     assert "BOUND_OBJECT_ROLE_MISMATCH" in json.dumps(rejected, sort_keys=True)
     assert "AudioDevice" in json.dumps(rejected, sort_keys=True)
+
+
+class _TransportCreateAssociationClient(_RuntimeControlDraftClient):
+    def __init__(self, tmp_path: Path, *, version: str, observed_object: str, observed_game_object: int = 123) -> None:
+        super().__init__(tmp_path, version=version)
+        self.observed_object = observed_object
+        self.observed_game_object = observed_game_object
+        self.created = False
+        self.calls: list[tuple[str, object, object]] = []
+
+    def call(self, uri: str, args: object = None, options: object = None) -> object:
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.transport.create":
+            self.created = True
+            return {"transport": 0}
+        if uri == "ak.wwise.core.transport.getList":
+            return {"list": [{"transport": 0, "object": self.observed_object, "gameObject": self.observed_game_object}]
+                if self.created else []}
+        if uri == TRANSPORT_GET_STATE_URI:
+            return {"state": "stopped"}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_transport_create_wrong_object_cannot_publish_handle(tmp_path: Path, version: str) -> None:
+    client = _TransportCreateAssociationClient(tmp_path, version=version,
+        observed_object=_RuntimeControlDraftClient.meter_id)
+    state_dir = tmp_path / "state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.create")
+    assert not any(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls)
+    invoke(["execute", previewed["transaction_id"]])
+    before_verify = len(client.calls)
+    code, verified = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "verify", previewed["transaction_id"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 2, verified
+    assert verified["state"] == "verification_failed"
+    assert verified["verified"] is False
+    assert "agent_result" not in verified
+    assert any(not assertion["passed"] and "object" in assertion["name"]
+        for assertion in verified["verification"]["assertions"])
+    assert sum(uri == "ak.wwise.core.transport.getList" for uri, _, _ in client.calls[before_verify:]) == 1
+    shown = invoke(["transaction-show", previewed["transaction_id"]])
+    assert shown["state"] == "verification_failed"
+    code, rejected = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 2, rejected
+    assert sum(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_transport_create_wrong_explicit_game_object_cannot_publish_handle(tmp_path: Path, version: str) -> None:
+    client = _TransportCreateAssociationClient(tmp_path, version=version,
+        observed_object=_RuntimeControlDraftClient.target_id)
+    state_dir = tmp_path / "state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir,
+        "ak.wwise.core.transport.create", ("--game-object-id", "0"))
+    invoke(["execute", previewed["transaction_id"]])
+    before_verify = len(client.calls)
+    code, verified = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "verify", previewed["transaction_id"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 2, verified
+    assert verified["state"] == "verification_failed"
+    assert verified["verified"] is False
+    assert "agent_result" not in verified
+    assert any(not assertion["passed"] and "Game Object" in assertion["name"]
+        for assertion in verified["verification"]["assertions"])
+    assert sum(uri == "ak.wwise.core.transport.getList" for uri, _, _ in client.calls[before_verify:]) == 1
+    assert sum(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("game_object_id", (None, 0, 18446744073709551615), ids=("native-default", "explicit-zero", "explicit-uint64-max"))
+def test_transport_create_matching_association_publishes_usable_zero_id_handle(
+    tmp_path: Path, version: str, game_object_id: int | None,
+) -> None:
+    client = _TransportCreateAssociationClient(tmp_path, version=version,
+        observed_object="{ABCDEFAB-ABCD-ABCD-ABCD-ABCDEFABCDEF}".lower(),
+        observed_game_object=123 if game_object_id is None else game_object_id)
+    client.target_id = "{ABCDEFAB-ABCD-ABCD-ABCD-ABCDEFABCDEF}"
+    state_dir = tmp_path / "state"
+    declaration = () if game_object_id is None else ("--game-object-id", str(game_object_id))
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir,
+        "ak.wwise.core.transport.create", declaration)
+    assert not any(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    before_verify = len(client.calls)
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["state"] == "verified"
+    assert verified["verified"] is True
+    assert sum(uri == "ak.wwise.core.transport.getList" for uri, _, _ in client.calls[before_verify:]) == 1
+    handle = verified["agent_result"]["business_result"]["transport_handle"]
+    assert handle.startswith("trh1-")
+    state = invoke(["core-call", TRANSPORT_GET_STATE_URI, "--transport-handle", handle])
+    assert state["agent_result"] == {"transport_handle": handle, "state": "stopped"}
+    creates = [args for uri, args, _ in client.calls if uri == "ak.wwise.core.transport.create"]
+    assert creates == [{"object": client.target_id, **({"gameObject": game_object_id} if game_object_id is not None else {})}]
+    code, rejected = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 2, rejected
+    assert sum(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls) == 1
+
+
+class _ProfilerEnableDataClient(_RuntimeControlDraftClient):
+    def __init__(self, tmp_path: Path, *, version: str = "2025.1") -> None:
+        super().__init__(tmp_path, version=version)
+        self.calls: list[tuple[str, object, object]] = []
+        self.control_result: object = {}
+
+    def call(self, uri: str, args: object = None, options: object = None) -> object:
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.profiler.enableProfilerData":
+            if isinstance(self.control_result, Exception):
+                raise self.control_result
+            return self.control_result
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("declaration,rows", [
+    (("--capture-data-empty",), []),
+    (("--capture-data", "voices", "enable", "--capture-data", "voices", "enable"),
+        [{"dataType": "voices", "enable": True}, {"dataType": "voices", "enable": True}]),
+    (("--capture-data", "voices", "enable", "--capture-data", "voices", "disable"),
+        [{"dataType": "voices", "enable": True}, {"dataType": "voices", "enable": False}]),
+    (("--capture-data", "voices", "disable", "--capture-data", "voices", "enable"),
+        [{"dataType": "voices", "enable": False}, {"dataType": "voices", "enable": True}]),
+], ids=("empty", "identical", "enable-disable", "disable-enable"))
+def test_profiler_capture_data_rows_execute_once_without_claiming_settings(
+    tmp_path: Path, version: str, declaration: tuple[str, ...], rows: list[dict[str, object]],
+) -> None:
+    operation = "ak.wwise.core.profiler.enableProfilerData"
+    client = _ProfilerEnableDataClient(tmp_path, version=version)
+    state = tmp_path / "capture-data-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, operation, declaration)
+    artifact = TransactionStore(state).load_preview(previewed["transaction_id"]).artifact
+    assert artifact["request"]["arguments"] == {"api": operation, "args": {"dataTypes": rows}, "options": {}}
+    assert not any(uri == operation for uri, _, _ in client.calls)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is False, verified
+    assert verified["state"] == "result_schema_checked"
+    assert verified["verification"]["business_state_verified"] is False
+    assert [call for call in client.calls if call[0] == operation] == [(operation, {"dataTypes": rows}, {})]
+    boundary = verified["verification"]["verification_scope"]
+    assert boundary["enabled_settings_verified"] is False
+    assert boundary["empty_effect_verified"] is False
+    assert boundary["repeated_data_set_resolution_verified"] is False
+    assert boundary["prior_settings_restoration_verified"] is False
+    assert "acknowledged the submitted capture-data directives" in verified["verification"]["message"]
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == 2, rejected
+    assert sum(uri == operation for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_profiler_capture_data_schema_and_continuation_disclose_list_and_observer_boundaries(tmp_path: Path, version: str) -> None:
+    operation = "ak.wwise.core.profiler.enableProfilerData"
+    env = _env(tmp_path, version=version)
+    def offline(*argv):
+        code, payload = gateway.execute_gateway(list(argv), env=env,
+            client_factory=lambda _: pytest.fail("Discovery must stay offline"))
+        assert code == 0, payload
+        return payload
+    schema = offline("request-schema", operation)
+    contract = schema["business_adapter"]["declaration"]
+    assert contract["input_forms"]["capture_data_changes"]["empty_flag"] == "--capture-data-empty"
+    semantics = contract["field_semantics"]["capture_data_changes"]
+    assert semantics["preserve_rows_and_order"] is True
+    assert semantics["empty_effect"] == "unspecified_by_native_documentation"
+    assert semantics["repeated_data_set_resolution"] == "unspecified_by_native_documentation"
+    assert semantics["native_legality_established_by_schema"] is False
+    boundary = contract["verification"]
+    assert boundary["strategy"] == "native_result_schema_only"
+    assert boundary["enabled_settings_verified"] is False
+    assert boundary["prior_settings_restoration_verified"] is False
+    started = offline("--state-dir", str(tmp_path / "state"), "draft-start", operation)
+    declaration = started["draft"]["next_action_binding"]["declaration"]
+    assert declaration["append_fields"] == contract
+    assert "--capture-data-empty" in declaration["append"][0]
+    assert declaration["native_request_input"] == "forbidden"
+
+
+@pytest.mark.parametrize("target_ms", (-1, -2))
+def test_profiler_signed_cursor_input_uses_returned_time_verifier_without_sentinel_meaning(tmp_path: Path, target_ms: int) -> None:
+    code, schema = gateway.execute_gateway(["request-schema", PROFILER_SET_CURSOR_TIME_URI], env=_env(tmp_path),
+        client_factory=lambda _: pytest.fail("Schema is offline"))
+    assert code == 0, schema
+    contract = schema["business_adapter"]["declaration"]
+    assert contract["field_types"]["cursor_target_ms"] == "signed_integer_milliseconds"
+    assert contract["field_semantics"]["cursor_target_ms"]["negative_value_meaning"] == "not_specified_by_native_documentation"
+    assert contract["verification"]["comparison"] == "returned_time_not_requested_time"
+    code, started = gateway.execute_gateway(["--state-dir", str(tmp_path / "discovery-state"),
+        "draft-start", PROFILER_SET_CURSOR_TIME_URI], env=_env(tmp_path),
+        client_factory=lambda _: pytest.fail("Draft start is offline"))
+    assert code == 0, started
+    declaration = started["draft"]["next_action_binding"]["declaration"]
+    assert declaration["append_fields"] == contract
+    assert "signed-integer-milliseconds" in declaration["append"][0]
+    client = _ProfilerCursorControlClient(tmp_path)
+    state = tmp_path / "signed-cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state,
+        PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", str(target_ms)))
+    artifact = TransactionStore(state).load_preview(previewed["transaction_id"]).artifact
+    assert artifact["request"]["arguments"]["args"] == {"time": target_ms}
+    assert not any(uri == PROFILER_SET_CURSOR_TIME_URI for uri, _, _ in client.calls)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is True, verified
+    observed = verified["verification"]["verification_scope"]["cursor_observation"]
+    assert observed["returned_time_ms"] == observed["observed_time_ms"] == 1230
+    assert (PROFILER_SET_CURSOR_TIME_URI, {"time": target_ms}, {}) in client.calls
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, rejected
+    assert sum(uri == PROFILER_SET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("declaration,parser_error", [
+    ((), False),
+    (("--capture-data-empty", "--capture-data", "voices", "enable"), True),
+    (("--capture-data", "voices", "enable", "--capture-data-empty"), True),
+    (("--capture-data", "unknown-data-set", "enable"), False),
+    (("--capture-data", "voices", "null"), False),
+    (("--capture-data", "voices"), True),
+    (("--capture-data-empty", "--args", '{"dataTypes":[]}'), True),
+], ids=("missing", "empty-plus-row", "row-plus-empty", "unknown-data-set", "null-outcome", "half-row", "native-input"))
+def test_profiler_capture_data_invalid_declaration_leaves_draft_unchanged(
+    tmp_path: Path, version: str, declaration: tuple[str, ...], parser_error: bool,
+) -> None:
+    operation = "ak.wwise.core.profiler.enableProfilerData"
+    state = tmp_path / "invalid-capture-state"
+    client = _ProfilerEnableDataClient(tmp_path, version=version)
+    env = _env(tmp_path, version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client)
+    code, started = run("draft-start", operation)
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    code, before = run("draft-inspect", draft_id, "--task-authority", authority)
+    assert code == 0, before
+    argv = ("draft-declare-runtime-control-plan", draft_id, "--task-authority", authority,
+        "--expected-revision", str(started["draft"]["revision"]), *declaration)
+    if parser_error:
+        with pytest.raises(SystemExit) as rejected:
+            run(*argv)
+        assert rejected.value.code == 2
+    else:
+        code, rejected = run(*argv)
+        assert code == 2, rejected
+        assert rejected["details"]["repair"]["field"] in {"runtime_control_plan", "capture_data_changes"}
+        assert rejected["details"]["repair"]["draft_changed"] is False
+    code, after = run("draft-inspect", draft_id, "--task-authority", authority)
+    assert code == 0, after
+    assert after["draft"] == before["draft"]
+    assert not any(uri == operation for uri, _, _ in client.calls)
+    assert not (state / "transactions-v1").exists()
+
+
+@pytest.mark.parametrize("operation,declaration", [
+    (PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "null")),
+    (PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "true")),
+    (PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "-1.5")),
+    (PROFILER_MOVE_CURSOR_URI, ("--capture-data-empty",)),
+])
+def test_profiler_new_input_forms_do_not_admit_nonintegers_or_undisclosed_fields(
+    tmp_path: Path, operation: str, declaration: tuple[str, ...],
+) -> None:
+    state = tmp_path / "invalid-input-state"
+    client = _ProfilerEnableDataClient(tmp_path)
+    env = _env(tmp_path)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client)
+    code, started = run("draft-start", operation)
+    assert code == 0, started
+    argv = ("draft-declare-runtime-control-plan", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]), *declaration)
+    if operation == PROFILER_SET_CURSOR_TIME_URI:
+        with pytest.raises(SystemExit) as rejected:
+            run(*argv)
+        assert rejected.value.code == 2
+    else:
+        code, rejected = run(*argv)
+        assert code == 2 and "not disclosed" in rejected["message"], rejected
+    assert not any(uri == operation for uri, _, _ in client.calls)
+    assert not (state / "transactions-v1").exists()
+
+
+@pytest.mark.parametrize("operation,version,declaration", [
+    *[("ak.wwise.core.profiler.enableProfilerData", version, ("--capture-data-empty",))
+        for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")],
+    (PROFILER_SET_CURSOR_TIME_URI, "2025.1", ("--cursor-target-ms", "-1")),
+])
+@pytest.mark.parametrize("failure", ("native-error", "malformed-result"))
+def test_profiler_new_input_shapes_retain_failure_and_cannot_reexecute(
+    tmp_path: Path, operation: str, version: str, declaration: tuple[str, ...], failure: str,
+) -> None:
+    client = _ProfilerEnableDataClient(tmp_path, version=version)
+    original = client.call
+    def call(uri, args=None, options=None):
+        if uri == operation and uri != "ak.wwise.core.profiler.enableProfilerData":
+            client.calls.append((uri, args, options))
+            if isinstance(client.control_result, Exception):
+                raise client.control_result
+            return client.control_result
+        return original(uri, args, options)
+    client.call = call
+    client.control_result = RuntimeError("native input outcome unavailable") if failure == "native-error" else {"unexpected": True}
+    state = tmp_path / "failed-input-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, operation, declaration)
+    env = _env(tmp_path, version=version)
+    code, executed = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=env, client_factory=lambda _: client)
+    if failure == "native-error":
+        assert code == 2 and executed["automatic_retry"] is False, executed
+    else:
+        assert code == 0, executed
+        code, verified = gateway.execute_gateway(["--state-dir", str(state), *executed["next_command"]["gateway_argv"]],
+            env=env, client_factory=lambda _: client)
+        assert code == 2 and verified["state"] == "verification_failed", verified
+        assert verified["verification"]["business_state_verified"] is False
+        assert "acknowledged the submitted" not in verified["verification"]["message"]
+    code, replay = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=env, client_factory=lambda _: client)
+    assert code == 2, replay
+    assert sum(uri == operation for uri, _, _ in client.calls) == 1
+    assert not any(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize("returned,observed,outcome", [(-1, -1, "unavailable"), (1230, 1220, "changed")])
+def test_profiler_signed_cursor_unavailable_or_changed_result_remains_unverified(
+    tmp_path: Path, returned: int, observed: int, outcome: str,
+) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    client.control_result, client.cursor_result = {"return": returned}, {"return": observed}
+    state = tmp_path / "signed-cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state,
+        PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "-2"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    code, verified = gateway.execute_gateway(["--state-dir", str(state), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == (0 if outcome == "unavailable" else 2), verified
+    assert verified["verified"] is False
+    assert verified["verification"]["business_state_verified"] is False
+    assert verified["verification"]["verification_scope"]["cursor_observation"]["outcome"] == outcome
+    assert verified["automatic_retry"] is False
+    code, replay = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, replay
+    assert sum(uri == PROFILER_SET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize('console', (False, True), ids=('authoring', 'console'))
+def test_log_add_preserves_empty_and_edge_whitespace_through_once_public_transaction(tmp_path, version, console):
+    from tests.unit.test_console_log_observer_gateway import ConsoleLogClient
+    messages = ('', ' \tmessage\n ', '\t \n')
+    for ordinal, message in enumerate(messages):
+        client_root = tmp_path / ('client-' + str(ordinal))
+        client_root.mkdir()
+        client = ConsoleLogClient(client_root, version=version) if console else _LogControlClient(client_root, version=version)
+        state = tmp_path / ('exact-message-' + str(ordinal))
+        preview, invoke = _public_runtime_preview(tmp_path, client, state, 'ak.wwise.core.log.addItem',
+            ('--message', message, '--severity', 'warning'))
+        shown = invoke(['transaction-show', preview['transaction_id']])
+        assert shown['artifact']['request']['arguments']['args'] == {
+            'message': message, 'channel': 'general', 'severity': 'Warning'}
+        executed = invoke(['execute', preview['transaction_id']])
+        verified = invoke(executed['next_command']['gateway_argv'])
+        assert verified['verified'] is (not console or version == '2025.1'), verified
+        assert [(args, options) for uri, args, options in client.calls if uri == 'ak.wwise.core.log.addItem'] == [
+            ({'message': message, 'channel': 'general', 'severity': 'Warning'}, {})]
+        code, rejected = gateway.execute_gateway(['--state-dir', str(state), 'execute', preview['transaction_id']],
+            env=_env(tmp_path, version=version), client_factory=lambda _: client)
+        assert code == 2, rejected
+        assert sum(uri == 'ak.wwise.core.log.addItem' for uri, _, _ in client.calls) == 1
+        if console:
+            assert client.order == (['subscribed', 'add', 'unsubscribed'] if version == '2025.1' else ['add'])
+            if version != '2025.1':
+                assert verified['state'] == 'result_schema_checked'
+                observed = verified['verification']['verification_scope']['log_observation']
+                assert observed['outcome'] == 'console_log_unobservable'
+                assert observed['native_observation_support']['state'] == 'unavailable'
+        else:
+            observation = verified['verification']['verification_scope']['log_observation']
+            assert observation['outcome'] == 'new_matching_item'
+            assert observation['post_channel']['items'][-1]['message'] == message
+        assert list(verified)[-1] == 'agent_result'
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_log_message_schema_discloses_exact_string_resource_bounds(tmp_path, version):
+    code, schema = gateway.execute_gateway(['request-schema', 'ak.wwise.core.log.addItem'],
+        env=_env(tmp_path, version=version), client_factory=lambda _: pytest.fail('Offline schema'))
+    assert code == 0, schema
+    form = schema['business_adapter']['declaration']['input_forms']['message']
+    assert form == {'flag': '--message', 'repeatable': False, 'maximum_input_bytes': 16384,
+        'empty_string_allowed': True, 'whitespace': 'preserve_exactly', 'nul_allowed': False}
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_log_message_missing_oversized_or_nul_is_rejected_before_preview(tmp_path, version):
+    for ordinal, declaration in enumerate(((), ('--message', '界' * 5462), ('--message', 'a\x00b'))):
+        client_root = tmp_path / ('client-' + str(ordinal))
+        client_root.mkdir()
+        client = _LogControlClient(client_root, version=version)
+        state = tmp_path / ('rejected-' + str(ordinal))
+        env = _env(tmp_path, version=version)
+        code, started = gateway.execute_gateway(['--state-dir', str(state), 'draft-start', 'ak.wwise.core.log.addItem'],
+            env=env, client_factory=lambda _: client)
+        assert code == 0, started
+        code, rejected = gateway.execute_gateway(['--state-dir', str(state), 'draft-declare-runtime-control-plan',
+            started['draft']['draft_id'], '--task-authority', started['task_authority'],
+            '--expected-revision', str(started['draft']['revision']), *declaration], env=env, client_factory=lambda _: client)
+        assert code == 2, rejected
+        assert rejected['error_code'] == ('RUNTIME_CONTROL_PLAN_FIELDS_INVALID' if ordinal == 0 else 'BUSINESS_VALUE_INVALID')
+        assert not any(uri in ('ak.wwise.core.log.addItem', LOG_GET_URI) for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_closed_log_declaration_rejects_nonstring_messages_without_relaxing_other_text(version):
+    from tests.unit.test_core_business_adapter import _session
+    from wwise_waapi.business_declarations import BusinessDeclarationError
+    from wwise_waapi.runtime_inspection_business import materialize_runtime_control_business_request
+    session, _, _ = _session(version)
+    # CLI message tokens are always strings; the closed compiler also rejects
+    # invalid structured declaration state before materializing a native request.
+    for message in (None, True, 42, [], {}):
+        with pytest.raises(BusinessDeclarationError, match='BUSINESS_VALUE_INVALID'):
+            materialize_runtime_control_business_request('ak.wwise.core.log.addItem',
+                session.with_settings({'runtime_control_plan': {'message': message}}))
+    for host in ('', ' host '):
+        with pytest.raises(BusinessDeclarationError, match='BUSINESS_VALUE_INVALID'):
+            materialize_runtime_control_business_request('ak.wwise.core.remote.connect',
+                session.with_settings({'runtime_control_plan': {'remote_host': host}}))
+
+
+def test_log_add_edge_whitespace_does_not_verify_a_trimmed_readback(tmp_path):
+    client = _LogControlClient(tmp_path)
+    client.after = [*client.rows, {'message': 'message', 'severity': 'Message', 'time': 1, 'messageId': 'Custom'}]
+    preview, invoke = _public_runtime_preview(tmp_path, client, tmp_path / 'state',
+        'ak.wwise.core.log.addItem', ('--message', ' message '))
+    executed = invoke(['execute', preview['transaction_id']])
+    verified = invoke(executed['next_command']['gateway_argv'])
+    assert verified['state'] == 'result_schema_checked' and verified['verified'] is False, verified
+    assert verified['verification']['verification_scope']['log_observation']['outcome'] == 'no_matching_increase'
+    assert sum(uri == 'ak.wwise.core.log.addItem' for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_log_message_terminal_allowance_requires_resolved_channel_and_severity(version):
+    from copy import deepcopy
+    request = {'contract': 'waapi-skill.operation-request/v1', 'version': version,
+        'operation': 'waapi.call', 'arguments': {'api': 'ak.wwise.core.log.addItem',
+            'args': {'channel': 'general', 'message': '界' * 5461 + 'a', 'severity': 'Message'}, 'options': {}}}
+    assert gateway.transaction_verify_terminal_budget(request) == 41338
+    for field in ('channel', 'severity'):
+        for invalid in ('', 'Unknown', 42):
+            malformed = deepcopy(request)
+            malformed['arguments']['args'][field] = invalid
+            assert gateway.transaction_verify_terminal_budget(malformed) == 24576, (field, invalid)
+
+
+@pytest.mark.parametrize('console', (False, True), ids=('authoring', 'console'))
+@pytest.mark.parametrize('message', ('界' * 5461 + 'a', '\t' * 16384), ids=('utf8', 'escaped'))
+def test_log_message_maximum_transaction_keeps_exact_agent_result_and_journal(tmp_path, monkeypatch, console, message):
+    from copy import deepcopy
+    from tests.unit.test_console_log_observer_gateway import ConsoleLogClient
+    client = ConsoleLogClient(tmp_path) if console else _LogControlClient(tmp_path)
+    state = tmp_path / 'state'
+    original_payloads = []
+    project = gateway.project_successful_transaction_verify_payload
+    def record_projection_input(payload, **kwargs):
+        original_payloads.append(deepcopy(payload))
+        return project(payload, **kwargs)
+    monkeypatch.setattr(gateway, 'project_successful_transaction_verify_payload', record_projection_input)
+    preview, invoke = _public_runtime_preview(tmp_path, client, state, 'ak.wwise.core.log.addItem', ('--message', message))
+    executed = invoke(['execute', preview['transaction_id']])
+    try:
+        verified = invoke(executed['next_command']['gateway_argv'])
+    finally:
+        if original_payloads:
+            (tmp_path / 'unprojected-verification.json').write_text(json.dumps(original_payloads[-1], ensure_ascii=False))
+    original, = original_payloads
+    assert verified['verified'] is True and verified['state'] == 'verified', verified
+    assert verified['agent_result'] == original['agent_result'] and list(verified)[-1] == 'agent_result'
+    assert gateway.gateway_json_document_size(verified) <= verified['stdout_projection']['stdout_budget_bytes']
+    assert gateway.TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES == 24576
+    assert verified['stdout_projection']['stdout_budget_bytes'] <= 123904
+    event = next(e for e in TransactionStore(state).read_events(preview['transaction_id']) if e['event_type'] == 'verification_recorded')
+    assert event['details']['verification'] == original['verification']
+    assert verified['stdout_projection']['verification_canonical_sha256'] == canonical_sha256(original['verification'])
+    assert verified['stdout_projection']['full_verification_evidence_persisted'] is True
+    if console:
+        assert event['details']['verification']['verification_scope']['log_observation']['execution_observation']['event']['item']['message'] == message
+        assert client.order == ['subscribed', 'add', 'unsubscribed']
+    else:
+        assert event['details']['verification']['verification_scope']['log_observation']['post_channel']['items'][-1]['message'] == message
+    assert sum(uri == 'ak.wwise.core.log.addItem' for uri, _, _ in client.calls) == 1
+    assert verified['verification']['canonical_sha256'] == canonical_sha256(original['verification'])
+    request = deepcopy(original['agent_result']['request'])
+    rendered = gateway.gateway_json_document_size({'agent_result': {'request': request}})
+    assert verified['stdout_projection']['stdout_budget_bytes'] == rendered + 24576
+    for damage in ('another-api', 'oversized', 'nul', 'extra-field', 'older-version'):
+        changed = deepcopy(request)
+        if damage == 'another-api': changed['arguments']['api'] = 'ak.wwise.core.log.clear'
+        elif damage == 'oversized': changed['arguments']['args']['message'] = '界' * 5462
+        elif damage == 'nul': changed['arguments']['args']['message'] = '\t' * 16383 + '\x00'
+        elif damage == 'extra-field': changed['arguments']['io_root'] = str(tmp_path)
+        else: changed['version'] = '2022.1'
+        assert gateway.transaction_verify_terminal_budget(changed) == 24576
+    for field in ('ok', 'status', 'project_guard_fingerprint', 'runtime_guard_fingerprint'):
+        assert verified['guard_validation'][field] == original['guard_validation'][field]
+    worst_escaped = deepcopy(request)
+    worst_escaped['arguments']['args']['message'] = '\x01' * 16384
+    worst_rendered = gateway.gateway_json_document_size({'agent_result': {'request': worst_escaped}})
+    assert gateway.transaction_verify_terminal_budget(worst_escaped) == worst_rendered + 24576 <= 123904
+    for damage in ('failed-assertion', 'agent-result-state'):
+        changed = deepcopy(original)
+        if damage == 'failed-assertion': changed['verification']['assertions'][0]['passed'] = False
+        else: changed['agent_result']['state'] = 'executed_unverified'
+        with pytest.raises(gateway.GatewayResultShapeError) as caught:
+            gateway.project_successful_transaction_verify_payload(changed)
+        assert caught.value.error_code == 'INVALID_VERIFY_SUCCESS_PROJECTION'

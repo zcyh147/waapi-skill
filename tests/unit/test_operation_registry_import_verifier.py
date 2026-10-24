@@ -41,15 +41,14 @@ OLD_ROOT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 NEW_ROOT = r"\Containers\Default Work Unit"
 WWISE_2021_PROJECT_ID = "{16164796-C6E6-491A-8799-C42A33110A84}"
 WWISE_2021_PROJECT = Path(__file__).resolve().parents[1] / "_org" / "2021.1" / "SampleProject.wproj"
-LIVE_SOUND_TYPES = {
-    "return": [
-        {
-            "classId": 65552,
-            "name": "Sound",
-            "type": "WObject",
-        }
-    ]
-}
+
+def _live_import_types(version: str) -> dict[str, Any]:
+    # Independent live metadata fixture: legacy metadata names the same class
+    # AudioSource, while actual object.get rows still say AudioFileSource.
+    return {"return": [
+        {"classId": 65552, "name": "Sound", "type": "WObject"},
+        {"classId": 16, "name": "AudioSource" if version == "2021.1" else "AudioFileSource", "type": "WObject"},
+    ]}
 
 
 def test_import_file_path_key_uses_the_path_own_filesystem_rules() -> None:
@@ -73,6 +72,7 @@ class ScriptedReader:
         self,
         responses: list[Mapping[str, Any]],
         *,
+        version: str,
         project_languages: list[Mapping[str, Any]] | None = None,
         project_root: Path | None = None,
         originals_root: Path | None = None,
@@ -80,6 +80,7 @@ class ScriptedReader:
         source_children: list[Mapping[str, Any]] | None = None,
     ) -> None:
         self.responses = deque(responses)
+        self.types = _live_import_types(version)
         self.source_children = source_children
         self.calls: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
         self.project_languages = [
@@ -110,9 +111,9 @@ class ScriptedReader:
         self.calls.append((uri, dict(args), dict(options)))
         if (self.source_children is not None and uri == "ak.wwise.core.object.get"
                 and args.get("waql", "").endswith(" select children take 129")):
-            return {"return": self.source_children}
+            return self._class_projection({"return": self.source_children}, options)
         if uri == "ak.wwise.core.object.getTypes":
-            return LIVE_SOUND_TYPES
+            return self.types
         if uri == "ak.wwise.core.getProjectInfo":
             return {
                 "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
@@ -161,7 +162,16 @@ class ScriptedReader:
                     }
                 ]
             }
-        return self.responses.popleft()
+        return self._class_projection(self.responses.popleft(), options)
+
+    @staticmethod
+    def _class_projection(response, options):
+        if "classId" in options.get("return", []):
+            return response
+        return {**response, "return": [
+            {key: value for key, value in row.items() if key != "classId"}
+            for row in response.get("return", [])
+        ]}
 
 
 class Import2021Reader:
@@ -171,7 +181,7 @@ class Import2021Reader:
 
     def __call__(self, uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
         if uri == "ak.wwise.core.object.getTypes":
-            return LIVE_SOUND_TYPES
+            return _live_import_types("2021.1")
         if uri != "ak.wwise.core.object.get":
             raise AssertionError((uri, args, options))
         if args.get("waql") == "from type Project take 2":
@@ -254,6 +264,15 @@ def _prepared(
     prepared_targets: list[dict[str, Any]] = []
     for target in targets:
         prepared_target = dict(target)
+        metadata_name = prepared_target.get("metadata_object_type", prepared_target.get("requested_object_type", "Sound"))
+        metadata_name = {"Sound SFX": "Sound", "Sound Voice": "Sound"}.get(metadata_name, metadata_name)
+        class_id = {"Sound": 65552, "MusicTrack": 1835024}[metadata_name]
+        prepared_target.setdefault("metadata_class_id", class_id)
+        prepared_target.setdefault("audio_source_class_id", 16)
+        prepared_target.setdefault("class_metadata", [
+            {"classId": class_id, "name": metadata_name, "type": "WObject"},
+            {"classId": 16, "name": "AudioSource" if version == "2021.1" else "AudioFileSource", "type": "WObject"},
+        ])
         prepared_target.setdefault(
             "requested_notes_destination",
             (
@@ -326,6 +345,7 @@ def _object_row(
     object_id: str = NEW_GUID,
     notes: str = "",
     object_type: str = "Sound",
+    class_id: Any = 65552,
     relative_path: str = "SFX/Closed/original.wav",
     **values: Any,
 ) -> dict[str, Any]:
@@ -333,6 +353,7 @@ def _object_row(
         "id": object_id,
         "name": path.rsplit("\\", 1)[-1],
         "type": object_type,
+        "classId": class_id,
         "path": path,
         "parent": {"id": PARENT_GUID},
         "notes": notes,
@@ -376,7 +397,7 @@ def test_closed_audio_import_enforces_each_reflected_version_shape(
     verified = verify_prepared_operation(
         _prepared(version=version, targets=[target]),
         execution_result=_result(version, [live], [copied], log=log),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version=version),
     )
 
     assert verified.status == "verified"
@@ -405,11 +426,11 @@ def test_music_import_verifies_source_and_clip_without_sound_active_source(
     target = _target(source, path, requested_object_type="MusicTrack", metadata_object_type="MusicTrack",
                      requested_language="SFX", media_expected=True,
                      explicit_audio_file_source_pre_state_rows=[])
-    live = {"id": NEW_GUID, "name": "Track", "path": path, "type": "MusicTrack",
+    live = {"id": NEW_GUID, "name": "Track", "path": path, "type": "MusicTrack", "classId": 1835024,
             "parent": {"id": PARENT_GUID}, "notes": "", "@Sequences": [{"id": sequence_id}]}
     media_field = "originalWavFilePath" if version == "2021.1" else "originalFilePath"
     audio_source = {"id": SOURCE_GUID, "name": "music", "path": path + r"\music",
-                    "type": "AudioFileSource", "notes": "", "audioSource:language": "SFX",
+                    "type": "AudioFileSource", "classId": 16, "notes": "", "audioSource:language": "SFX",
                     "parent": {"id": NEW_GUID if fault != "wrong_parent" else OLD_GUID},
                     media_field: str(copied)}
     sequence = {"id": sequence_id, "type": "MusicTrackSequence", "@Clips": [] if fault == "missing_clip" else [{"id": clip_id}]}
@@ -426,7 +447,7 @@ def test_music_import_verifies_source_and_clip_without_sound_active_source(
     verified = verify_prepared_operation(
         _prepared(version=version, targets=[target]),
         execution_result=_result(version, [live, audio_source], [copied]),
-        read_call=ScriptedReader(responses),
+        read_call=ScriptedReader(responses, version=version),
     )
     assert verified.status == ("verified" if fault is None else "verification_failed"), verified.as_dict()
 
@@ -455,7 +476,7 @@ def test_closed_audio_import_native_directive_boundary_is_weak_success(
     verified = verify_prepared_operation(
         prepared,
         execution_result=_result(version, [live], [copied]),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version=version),
     )
 
     assert verified.status == "result_schema_checked"
@@ -487,7 +508,7 @@ def test_create_new_accepts_bound_sound_and_audio_file_source_rows(
     audio_source = {
         "id": SOURCE_GUID,
         "name": "created-source",
-        "type": "AudioFileSource",
+        "type": "AudioFileSource", "classId": 16,
         "path": path + r"\created-source",
         "parent": {"id": NEW_GUID, "name": "Created"},
         "notes": "",
@@ -498,7 +519,7 @@ def test_create_new_accepts_bound_sound_and_audio_file_source_rows(
         _prepared(version="2022.1", targets=[target]),
         execution_result=_result("2022.1", [audio_source, live], [copied]),
         read_call=ScriptedReader(
-            [{"return": [live]}, {"return": [audio_source]}]
+            [{"return": [live]}, {"return": [audio_source]}], version='2022.1'
         ),
     )
 
@@ -528,13 +549,13 @@ def test_2021_import_verifier_uses_result_bound_source_without_unsupported_acces
     audio_source = {
         "id": SOURCE_GUID,
         "name": "legacy-source",
-        "type": "AudioFileSource",
+        "type": "AudioFileSource", "classId": 16,
         "path": path + r"\legacy-source",
         "parent": {"id": NEW_GUID, "name": "Legacy"},
         "notes": "",
         "originalFilePath": str(copied.resolve()),
     }
-    reader = ScriptedReader([{"return": [live]}, {"return": [audio_source]}])
+    reader = ScriptedReader([{"return": [live]}, {"return": [audio_source]}], version='2021.1')
 
     verified = verify_prepared_operation(
         _prepared(version="2021.1", targets=[target]),
@@ -579,7 +600,7 @@ def test_use_existing_binds_explicit_audio_file_source_identity(
             {
                 "id": OLD_GUID,
                 "name": "Existing",
-                "type": "Sound",
+                "type": "Sound", "classId": 65552,
                 "path": path,
                 "notes": "before",
             }
@@ -597,7 +618,7 @@ def test_use_existing_binds_explicit_audio_file_source_identity(
             {
                 "id": SOURCE_GUID,
                 "name": "existing-source",
-                "type": "AudioFileSource",
+                "type": "AudioFileSource", "classId": 16,
                 "path": expected_source_path,
                 "notes": "before source",
             }
@@ -614,7 +635,7 @@ def test_use_existing_binds_explicit_audio_file_source_identity(
     audio_source = {
         "id": post_source_id,
         "name": "existing-source",
-        "type": "AudioFileSource",
+        "type": "AudioFileSource", "classId": 16,
         "path": expected_source_path,
         "parent": {"id": OLD_GUID, "name": "Existing"},
         "notes": "",
@@ -633,7 +654,7 @@ def test_use_existing_binds_explicit_audio_file_source_identity(
             [copied],
         ),
         read_call=ScriptedReader(
-            [{"return": [live]}, {"return": [audio_source]}]
+            [{"return": [live]}, {"return": [audio_source]}], version='2022.1'
         ),
     )
 
@@ -658,7 +679,7 @@ def test_closed_audio_import_rejects_unsealed_audio_file_source_result(
     unrelated_source = {
         "id": SOURCE_GUID,
         "name": "unrelated",
-        "type": "AudioFileSource",
+        "type": "AudioFileSource", "classId": 16,
         "path": path + r"\unrelated",
         "parent": {"id": NEW_GUID, "name": "ExpectedSource"},
         "notes": "",
@@ -672,7 +693,7 @@ def test_closed_audio_import_rejects_unsealed_audio_file_source_result(
             [live, unrelated_source],
             [copied],
         ),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version='2022.1'),
     )
 
     boundary = next(
@@ -701,7 +722,7 @@ def test_closed_audio_import_rejects_audio_file_source_parent_mismatch(
     audio_source = {
         "id": SOURCE_GUID,
         "name": "parent-source",
-        "type": "AudioFileSource",
+        "type": "AudioFileSource", "classId": 16,
         "path": path + r"\parent-source",
         "parent": {"id": SECOND_GUID, "name": "WrongParent"},
         "notes": "",
@@ -712,7 +733,7 @@ def test_closed_audio_import_rejects_audio_file_source_parent_mismatch(
         _prepared(version="2022.1", targets=[target]),
         execution_result=_result("2022.1", [live, audio_source], [copied]),
         read_call=ScriptedReader(
-            [{"return": [live]}, {"return": [audio_source]}]
+            [{"return": [live]}, {"return": [audio_source]}], version='2022.1'
         ),
     )
 
@@ -763,7 +784,7 @@ def test_copied_media_hash_localizes_wine_y_path_without_subfolder(
             originals_root=originals_root,
         ),
         execution_result=_result("2022.1", [live], [copied]),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version='2022.1'),
     )
 
     assert verified.status == "verified"
@@ -801,7 +822,7 @@ def test_tab_delimited_import_remains_objects_only_in_every_version(
             [copied],
             source_operation="audio.importTabDelimited",
         ),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version=version),
     )
 
     assert verified.status == "verified"
@@ -832,7 +853,7 @@ def test_tab_delimited_prepare_and_verify_share_the_closed_oracle(
     location = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": "{77777777-7777-7777-7777-777777777777}"},
         "notes": "",
@@ -862,7 +883,7 @@ def test_tab_delimited_prepare_and_verify_share_the_closed_oracle(
                 {"return": []},
                 {"return": [location]},
                 {"return": []},
-            ],
+            ], version=version,
             project_root=tmp_path,
         ),
     ).as_dict()
@@ -882,7 +903,7 @@ def test_tab_delimited_prepare_and_verify_share_the_closed_oracle(
             [copied],
             source_operation="audio.importTabDelimited",
         ),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version=version),
     )
 
     assert prepared["verification_plan"]["kind"] == "closed-audio-import"
@@ -945,7 +966,7 @@ def test_import_object_get_projection_never_uses_unproven_relative_accessor(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": root,
         "parent": {"id": OLD_GUID},
         "notes": "",
@@ -971,7 +992,7 @@ def test_import_object_get_projection_never_uses_unproven_relative_accessor(
         else None
     )
     reader = ScriptedReader(
-        [{"return": [anchor]}, {"return": []}],
+        [{"return": [anchor]}, {"return": []}], version=version,
         legacy_project_file=legacy_project_file,
     )
 
@@ -995,7 +1016,7 @@ def test_use_existing_rejects_only_live_localized_rows_with_non_audio_fields(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": OLD_GUID},
         "notes": "",
@@ -1003,7 +1024,7 @@ def test_use_existing_rejects_only_live_localized_rows_with_non_audio_fields(
     existing = {
         "id": OLD_GUID,
         "name": "ExistingVoice",
-        "type": "Sound",
+        "type": "Sound", "classId": 65552,
         "path": existing_path,
         "parent": {"id": PARENT_GUID},
         "notes": "legacy",
@@ -1043,7 +1064,7 @@ def test_use_existing_rejects_only_live_localized_rows_with_non_audio_fields(
                     {"return": [existing]},
                     {"return": [anchor]},
                     {"return": []},
-                ]
+                ], version='2022.1'
             ),
         )
 
@@ -1066,7 +1087,7 @@ def test_use_existing_live_sfx_preserves_inline_base64_and_native_directives(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": SECOND_GUID},
         "notes": "",
@@ -1074,7 +1095,7 @@ def test_use_existing_live_sfx_preserves_inline_base64_and_native_directives(
     existing = {
         "id": OLD_GUID,
         "name": "ExistingSfx",
-        "type": "Sound",
+        "type": "Sound", "classId": 65552,
         "path": target_path,
         "parent": {"id": PARENT_GUID},
         "notes": "preserved",
@@ -1106,7 +1127,7 @@ def test_use_existing_live_sfx_preserves_inline_base64_and_native_directives(
     prepared = prepare_operation(
         request,
         read_call=ScriptedReader(
-            [{"return": [anchor]}, {"return": [existing]}],
+            [{"return": [anchor]}, {"return": [existing]}], version='2022.1',
             project_root=tmp_path,
         ),
     ).as_dict()
@@ -1133,7 +1154,7 @@ def test_use_existing_live_localized_row_has_exact_three_field_wire_shape(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": OLD_GUID},
         "notes": "",
@@ -1141,7 +1162,7 @@ def test_use_existing_live_localized_row_has_exact_three_field_wire_shape(
     existing = {
         "id": OLD_GUID,
         "name": "ExistingVoice",
-        "type": "Sound",
+        "type": "Sound", "classId": 65552,
         "path": target_path,
         "parent": {"id": PARENT_GUID},
         "notes": "preserved",
@@ -1165,7 +1186,7 @@ def test_use_existing_live_localized_row_has_exact_three_field_wire_shape(
         }
     )
     reader = ScriptedReader(
-        [{"return": [anchor]}, {"return": [existing]}],
+        [{"return": [anchor]}, {"return": [existing]}], version='2022.1',
         source_children=[],
         project_languages=[
             {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "Japanese", "shortId": 2}
@@ -1239,7 +1260,7 @@ def test_use_existing_live_localized_row_has_exact_three_field_wire_shape(
         [
             {"return": [anchor, existing]},
             {"return": [existing]},
-        ],
+        ], version='2022.1',
         source_children=[],
         project_languages=[
             {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "Japanese", "shortId": 2}
@@ -1286,7 +1307,7 @@ def test_use_existing_live_localized_typed_input_normalizes_from_canonical_paren
     existing = {
         "id": OLD_GUID,
         "name": "ExistingVoice",
-        "type": "Sound",
+        "type": "Sound", "classId": 65552,
         "path": target_path,
         "parent": {"id": PARENT_GUID},
         "notes": "preserved",
@@ -1309,7 +1330,7 @@ def test_use_existing_live_localized_typed_input_normalizes_from_canonical_paren
         }
     )
     reader = ScriptedReader(
-        [{"return": [anchor]}, {"return": [existing]}],
+        [{"return": [anchor]}, {"return": [existing]}], version='2022.1',
         source_children=[],
         project_languages=[
             {
@@ -1352,7 +1373,7 @@ def test_use_existing_live_localized_rejects_explicit_sfx_type_before_dispatch(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": SECOND_GUID},
         "notes": "",
@@ -1360,7 +1381,7 @@ def test_use_existing_live_localized_rejects_explicit_sfx_type_before_dispatch(
     existing = {
         "id": OLD_GUID,
         "name": "ExistingVoice",
-        "type": "Sound",
+        "type": "Sound", "classId": 65552,
         "path": target_path,
         "parent": {"id": PARENT_GUID},
         "notes": "preserved",
@@ -1384,7 +1405,7 @@ def test_use_existing_live_localized_rejects_explicit_sfx_type_before_dispatch(
         }
     )
     reader = ScriptedReader(
-        [{"return": [anchor]}, {"return": [existing]}],
+        [{"return": [anchor]}, {"return": [existing]}], version='2022.1',
         project_languages=[
             {
                 "id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
@@ -1417,7 +1438,7 @@ def test_localized_absent_target_wire_path_is_not_rewritten(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": SECOND_GUID},
         "notes": "",
@@ -1441,7 +1462,7 @@ def test_localized_absent_target_wire_path_is_not_rewritten(
         }
     )
     reader = ScriptedReader(
-        [{"return": [anchor]}, {"return": []}],
+        [{"return": [anchor]}, {"return": []}], version='2022.1',
         project_languages=[
             {
                 "id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
@@ -1473,7 +1494,7 @@ def test_use_existing_sfx_row_may_update_notes_on_an_existing_target(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": OLD_GUID},
         "notes": "",
@@ -1481,7 +1502,7 @@ def test_use_existing_sfx_row_may_update_notes_on_an_existing_target(
     existing = {
         "id": OLD_GUID,
         "name": "ExistingSfx",
-        "type": "Sound",
+        "type": "Sound", "classId": 65552,
         "path": target_path,
         "parent": {"id": PARENT_GUID},
         "notes": "before",
@@ -1505,7 +1526,7 @@ def test_use_existing_sfx_row_may_update_notes_on_an_existing_target(
         }
     )
     reader = ScriptedReader(
-        [{"return": [anchor]}, {"return": [existing]}],
+        [{"return": [anchor]}, {"return": [existing]}], version='2022.1',
         project_languages=[
             {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "SFX", "shortId": 1}
         ],
@@ -1540,7 +1561,7 @@ def test_use_existing_rejects_two_competing_audio_source_notes_fields(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": SECOND_GUID},
         "notes": "",
@@ -1548,7 +1569,7 @@ def test_use_existing_rejects_two_competing_audio_source_notes_fields(
     existing = {
         "id": OLD_GUID,
         "name": "AmbiguousExistingSfx",
-        "type": "Sound",
+        "type": "Sound", "classId": 65552,
         "path": target_path,
         "parent": {"id": PARENT_GUID},
         "notes": "before",
@@ -1577,7 +1598,7 @@ def test_use_existing_rejects_two_competing_audio_source_notes_fields(
         prepare_operation(
             request,
             read_call=ScriptedReader(
-                [{"return": [anchor]}, {"return": [existing]}]
+                [{"return": [anchor]}, {"return": [existing]}], version='2022.1'
             ),
         )
 
@@ -1590,7 +1611,7 @@ def test_2021_subfolder_prepare_binds_hashed_wproj_originals_setting(tmp_path: P
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": OLD_GUID},
         "notes": "",
@@ -1652,7 +1673,7 @@ def test_originals_subfolder_is_derived_without_legacy_relative_field(
             originals_root=originals_root,
         ),
         execution_result=_result(version, [live], [copied]),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version=version),
     )
 
     assert verified.status == "verified"
@@ -1674,7 +1695,7 @@ def test_originals_root_project_context_drift_blocks_confirmation(tmp_path: Path
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": OLD_GUID},
         "notes": "",
@@ -1698,7 +1719,7 @@ def test_originals_root_project_context_drift_blocks_confirmation(tmp_path: Path
     prepared = prepare_operation(
         parsed,
         read_call=ScriptedReader(
-            [{"return": [anchor]}, {"return": []}],
+            [{"return": [anchor]}, {"return": []}], version='2022.1',
             project_root=tmp_path,
             originals_root=original_root,
         ),
@@ -1707,7 +1728,7 @@ def test_originals_root_project_context_drift_blocks_confirmation(tmp_path: Path
     guard = validate_prepared_roles(
         prepared,
         read_call=ScriptedReader(
-            [{"return": [anchor]}, {"return": []}],
+            [{"return": [anchor]}, {"return": []}], version='2022.1',
             project_root=tmp_path,
             originals_root=changed_root,
         ),
@@ -1742,7 +1763,7 @@ def test_originals_subfolder_rejects_copied_path_escape_even_with_injected_legac
             originals_root=originals_root,
         ),
         execution_result=_result("2022.1", [live], [copied]),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version='2022.1'),
     )
 
     subfolder = next(
@@ -1794,7 +1815,7 @@ def test_originals_subfolder_rejects_symlink_root_or_path_components(
             originals_root=originals_root,
         ),
         execution_result=_result("2022.1", [live], [copied]),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version='2022.1'),
     )
 
     subfolder = next(
@@ -1833,7 +1854,7 @@ def test_originals_subfolder_rejects_windows_junction_component(
             originals_root=originals_root,
         ),
         execution_result=_result("2022.1", [live], [copied]),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version='2022.1'),
     )
 
     subfolder = next(
@@ -1851,7 +1872,7 @@ def test_import_anchor_query_rejects_a_row_from_the_wrong_path(tmp_path: Path) -
     wrong_anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": OLD_GUID},
         "notes": "",
@@ -1875,7 +1896,7 @@ def test_import_anchor_query_rejects_a_row_from_the_wrong_path(tmp_path: Path) -
     with pytest.raises(OperationContractError) as caught:
         prepare_operation(
             request,
-            read_call=ScriptedReader([{"return": [wrong_anchor]}]),
+            read_call=ScriptedReader([{"return": [wrong_anchor]}], version='2022.1'),
         )
 
     assert caught.value.error_code == "IDENTITY_MISMATCH"
@@ -1894,7 +1915,7 @@ def test_missing_import_ancestor_drift_blocks_confirmation(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": OLD_GUID},
         "notes": "",
@@ -1921,7 +1942,7 @@ def test_missing_import_ancestor_drift_blocks_confirmation(
                 {"return": []},
                 {"return": [anchor]},
                 {"return": []},
-            ]
+            ], version='2022.1'
         ),
     ).as_dict()
     unchanged = validate_prepared_roles(
@@ -1931,7 +1952,7 @@ def test_missing_import_ancestor_drift_blocks_confirmation(
                 {"return": [anchor]},
                 {"return": []},
                 {"return": []},
-            ]
+            ], version='2022.1'
         ),
     )
     assert unchanged["status"] == "valid"
@@ -1954,7 +1975,7 @@ def test_missing_import_ancestor_drift_blocks_confirmation(
                 {"return": [anchor]},
                 {"return": [appeared]},
                 {"return": []},
-            ]
+            ], version='2022.1'
         ),
     )
 
@@ -2019,7 +2040,7 @@ def test_closed_audio_import_fails_wrong_shape_missing_fields_and_error_logs(
     verified = verify_prepared_operation(
         _prepared(version=version, targets=[target]),
         execution_result={"result": resolved_payload},
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version=version),
     )
 
     assert verified.status == "verification_failed"
@@ -2054,7 +2075,7 @@ def test_use_existing_verifies_guid_fields_audio_source_and_original_hash(tmp_pa
     audio_source = {
         "id": SOURCE_GUID,
         "name": "dialogue-source",
-        "type": "AudioFileSource",
+        "type": "AudioFileSource", "classId": 16,
         "path": path + "\\dialogue-source",
         "parent": {"id": OLD_GUID, "name": "Line_01"},
         "notes": "localized line",
@@ -2070,7 +2091,7 @@ def test_use_existing_verifies_guid_fields_audio_source_and_original_hash(tmp_pa
             originals_root=tmp_path / "Originals",
         ),
         execution_result=_result("2022.1", [audio_source], [copied]),
-        read_call=ScriptedReader([{"return": [live]}, {"return": [audio_source]}]),
+        read_call=ScriptedReader([{"return": [live]}, {"return": [audio_source]}], version='2022.1'),
     )
 
     assert verified.status == "verified"
@@ -2102,11 +2123,11 @@ def test_reimport_may_omit_source_result_only_with_exact_live_source_proof(
                      requested_object_type="Sound Voice", requested_language="English(US)",
                      localized_audio_file_source_id=SOURCE_GUID)
     live = _object_row(path, copied, object_id=OLD_GUID, activeSource={"id": SOURCE_GUID})
-    audio = {"id": SOURCE_GUID, "name": "Line", "type": "AudioFileSource",
+    audio = {"id": SOURCE_GUID, "name": "Line", "type": "AudioFileSource", "classId": 16,
              "path": path + r"\Line", "parent": {"id": OLD_GUID}, "notes": "",
              "originalFilePath": str(copied), "originalWavFilePath": str(copied),
              "audioSource:language": {"name": "English(US)"}}
-    identity_keys = ("id", "name", "type", "path", "parent", "audioSource:language")
+    identity_keys = ("id", "name", "type", "classId", "path", "parent", "audioSource:language")
     english = {key: audio[key] for key in identity_keys}
     japanese = {**english, "id": SECOND_GUID, "audioSource:language": {"name": "Japanese"}}
     target["localized_source_snapshot"] = {"owner_id": OLD_GUID, "rows": [english, japanese]}
@@ -2127,10 +2148,10 @@ def test_reimport_may_omit_source_result_only_with_exact_live_source_proof(
     class SourceReader(ScriptedReader):
         def __call__(self, uri, args, options):
             if args.get("waql") == f'from object "{OLD_GUID}" select children take 129':
-                return {"return": children}
+                return self._class_projection({"return": children}, options)
             return super().__call__(uri, args, options)
 
-    reader = SourceReader([{"return": [live]}, {"return": [] if defect == "missing-source" else [audio]}])
+    reader = SourceReader([{"return": [live]}, {"return": [] if defect == "missing-source" else [audio]}], version=version)
     verified = verify_prepared_operation(
         _prepared(version=version, targets=[target], import_operation="useExisting",
                   originals_root=tmp_path / "Originals"),
@@ -2173,7 +2194,7 @@ def test_localized_verifier_scopes_sound_and_active_source_reads_to_row_language
     japanese_source = {
         "id": SOURCE_GUID,
         "name": "localized-source",
-        "type": "AudioFileSource",
+        "type": "AudioFileSource", "classId": 16,
         "path": path + r"\localized-source",
         "parent": {"id": OLD_GUID, "name": "LocalizedReadback"},
         "notes": "",
@@ -2191,7 +2212,7 @@ def test_localized_verifier_scopes_sound_and_active_source_reads_to_row_language
     default_source = {
         "id": SECOND_GUID,
         "name": "localized-source",
-        "type": "AudioFileSource",
+        "type": "AudioFileSource", "classId": 16,
         "path": path + r"\localized-source",
         "parent": {"id": OLD_GUID, "name": "LocalizedReadback"},
         "notes": "",
@@ -2285,7 +2306,7 @@ def test_replace_existing_requires_distinct_new_guid_and_absent_old_guid(
             import_operation="replaceExisting",
         ),
         execution_result=_result("2022.1", [live], [copied]),
-        read_call=ScriptedReader([{"return": [live]}, {"return": old_rows}]),
+        read_call=ScriptedReader([{"return": [live]}, {"return": old_rows}], version='2022.1'),
     )
 
     assert verified.status == expected_status
@@ -2339,7 +2360,7 @@ def test_closed_audio_import_verifies_exact_event_action_and_target_in_every_ver
         "Target": {"id": NEW_GUID, "path": path},
     }
     reader = ScriptedReader(
-        [{"return": [live]}, {"return": [event]}, {"return": [action]}]
+        [{"return": [live]}, {"return": [event]}, {"return": [action]}], version=version
     )
 
     verified = verify_prepared_operation(
@@ -2424,7 +2445,7 @@ def test_closed_audio_import_rejects_missing_wrong_or_ambiguous_event_actions_in
         _prepared(version=version, targets=[target]),
         execution_result=_result(version, [live], [copied]),
         read_call=ScriptedReader(
-            [{"return": [live]}, {"return": [event]}, {"return": action_rows}]
+            [{"return": [live]}, {"return": [event]}, {"return": action_rows}], version=version
         ),
     )
 
@@ -2449,7 +2470,7 @@ def test_closed_audio_import_event_oracle_rejects_missing_event_readback(tmp_pat
     verified = verify_prepared_operation(
         _prepared(version="2022.1", targets=[target]),
         execution_result=_result("2022.1", [live], [copied]),
-        read_call=ScriptedReader([{"return": [live]}, {"return": []}]),
+        read_call=ScriptedReader([{"return": [live]}, {"return": []}], version='2022.1'),
     )
 
     assert verified.status == "verification_failed"
@@ -2468,7 +2489,7 @@ def test_audio_import_prepare_rejects_a_preexisting_event_path(tmp_path: Path) -
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": OLD_GUID},
         "notes": "",
@@ -2503,7 +2524,7 @@ def test_audio_import_prepare_rejects_a_preexisting_event_path(tmp_path: Path) -
         prepare_operation(
             request,
             read_call=ScriptedReader(
-                [{"return": [anchor]}, {"return": []}, {"return": [event]}]
+                [{"return": [anchor]}, {"return": []}, {"return": [event]}], version='2022.1'
             ),
         )
 
@@ -2517,7 +2538,7 @@ def test_audio_import_prepare_rejects_two_rows_sharing_one_event_path(tmp_path: 
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": OLD_GUID},
         "notes": "",
@@ -2555,7 +2576,7 @@ def test_audio_import_prepare_rejects_two_rows_sharing_one_event_path(tmp_path: 
                     {"return": []},
                     {"return": [anchor]},
                     {"return": []},
-                ]
+                ], version='2022.1'
             ),
         )
 
@@ -2577,7 +2598,7 @@ def test_closed_audio_import_rejects_partial_target_results(tmp_path: Path) -> N
     verified = verify_prepared_operation(
         _prepared(version="2022.1", targets=targets),
         execution_result=_result("2022.1", [first], [copied]),
-        read_call=ScriptedReader([{"return": [first]}, {"return": [second]}]),
+        read_call=ScriptedReader([{"return": [first]}, {"return": [second]}], version='2022.1'),
     )
 
     assert verified.status == "verification_failed"
@@ -2599,7 +2620,7 @@ def test_closed_audio_import_rejects_copied_wav_hash_mismatch(tmp_path: Path) ->
     verified = verify_prepared_operation(
         _prepared(version="2022.1", targets=[target]),
         execution_result=_result("2022.1", [live], [copied]),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version='2022.1'),
     )
 
     assert verified.status == "verification_failed"
@@ -2624,7 +2645,7 @@ def test_closed_audio_import_rejects_tampered_result_contract_before_readback(tm
         verify_prepared_operation(
             prepared,
             execution_result={"result": {"objects": []}},
-            read_call=ScriptedReader([]),
+            read_call=ScriptedReader([], version='2025.1'),
         )
 
     assert caught.value.error_code == "INVALID_PREVIEW"
@@ -2646,7 +2667,7 @@ def test_closed_audio_import_rejects_extra_result_objects_outside_derived_ancest
     verified = verify_prepared_operation(
         _prepared(version="2022.1", targets=[target]),
         execution_result=_result("2022.1", [live, extra], [copied]),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version='2022.1'),
     )
 
     assert verified.status == "verification_failed"
@@ -2679,7 +2700,7 @@ def test_originals_subfolder_requires_the_exact_parent_suffix(tmp_path: Path) ->
             originals_root=tmp_path / "Originals",
         ),
         execution_result=_result("2022.1", [live], [copied]),
-        read_call=ScriptedReader([{"return": [live]}]),
+        read_call=ScriptedReader([{"return": [live]}], version='2022.1'),
     )
 
     mismatch = next(
@@ -2715,7 +2736,7 @@ def test_localized_import_language_must_exist_and_drift_blocks_confirmation(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": "{77777777-7777-7777-7777-777777777777}"},
         "notes": "",
@@ -2724,14 +2745,14 @@ def test_localized_import_language_must_exist_and_drift_blocks_confirmation(
     with pytest.raises(OperationContractError) as unavailable:
         prepare_operation(
             parse_operation_request(_language_import_request(source, "Japanese")),
-            read_call=ScriptedReader([{"return": [anchor]}, {"return": []}]),
+            read_call=ScriptedReader([{"return": [anchor]}, {"return": []}], version='2022.1'),
         )
     assert unavailable.value.error_code == "IMPORT_LANGUAGE_UNAVAILABLE"
 
     prepared = prepare_operation(
         parse_operation_request(_language_import_request(source, "Japanese")),
         read_call=ScriptedReader(
-            [{"return": [anchor]}, {"return": []}],
+            [{"return": [anchor]}, {"return": []}], version='2022.1',
             project_languages=[
                 {
                     "id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
@@ -2744,7 +2765,7 @@ def test_localized_import_language_must_exist_and_drift_blocks_confirmation(
     confirmation = validate_prepared_roles(
         prepared,
         read_call=ScriptedReader(
-            [{"return": [anchor]}, {"return": []}],
+            [{"return": [anchor]}, {"return": []}], version='2022.1',
             project_languages=[
                 {
                     "id": "{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}",
@@ -2771,13 +2792,13 @@ def test_sfx_import_skips_live_project_language_inventory(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": "{77777777-7777-7777-7777-777777777777}"},
         "notes": "",
     }
     preview_reader = ScriptedReader(
-        [{"return": [anchor]}, {"return": []}],
+        [{"return": [anchor]}, {"return": []}], version='2022.1',
         project_languages=[
             {
                 "id": "{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}",
@@ -2802,7 +2823,7 @@ def test_sfx_import_skips_live_project_language_inventory(
     ) == 1
 
     confirmation_reader = ScriptedReader(
-        [{"return": [anchor]}, {"return": []}],
+        [{"return": [anchor]}, {"return": []}], version='2022.1',
         project_languages=[],
     )
     confirmation = validate_prepared_roles(
@@ -2825,7 +2846,7 @@ def test_mixed_sfx_and_localized_import_validates_only_localized_languages(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": "{77777777-7777-7777-7777-777777777777}"},
         "notes": "",
@@ -2857,7 +2878,7 @@ def test_mixed_sfx_and_localized_import_validates_only_localized_languages(
             {"return": []},
             {"return": [anchor]},
             {"return": []},
-        ],
+        ], version='2022.1',
         project_languages=[
             {
                 "id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
@@ -2896,7 +2917,7 @@ def test_2021_import_language_wproj_drift_blocks_confirmation(
     anchor = {
         "id": PARENT_GUID,
         "name": "Default Work Unit",
-        "type": "WorkUnit",
+        "type": "WorkUnit", "classId": 1638416,
         "path": OLD_ROOT,
         "parent": {"id": "{77777777-7777-7777-7777-777777777777}"},
         "notes": "",

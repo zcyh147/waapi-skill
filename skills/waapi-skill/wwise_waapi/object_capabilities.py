@@ -100,9 +100,19 @@ _BY_OBJECT_TYPE = {
         relative_display_paths=(r"Root\Transition",),
     ),
     "StateGroupInfo": _OWNED_COLLECTION_ENTRY,
+    # Native 2025.1 exact context-GUID readback exposes an unnamed association.
+    # That observation establishes identity acceptance, not rename immutability.
+    "ObjectSettingAssociation": ObjectIdentitySemantics(
+        name_mode="intrinsic",
+        empty_name_allowed=True,
+        mutable_intrinsic_name=True,
+        display_identity_source="name_and_path",
+    ),
 }
 
-NON_INTRINSIC_NAME_OBJECT_TYPES = frozenset(_BY_OBJECT_TYPE)
+NON_INTRINSIC_NAME_OBJECT_TYPES = frozenset(
+    name for name, semantics in _BY_OBJECT_TYPE.items() if not semantics.mutable_intrinsic_name
+)
 
 OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
     {
@@ -223,6 +233,15 @@ def object_child_capability(
         allowed_child_types=allowed_child_types,
         required_parent_types_by_child=requirements,
     )
+
+
+def object_transfer_parent_compatible(*, version: str, parent_type: object, child_type: object) -> bool:
+    """Transfer admission is distinct from creating an object of this class."""
+    if child_type in {"Source", "SourcePlugin", "AudioFileSource"}:
+        # Existing Source identity carries the plugin/file class. The public
+        # preparation seam separately certifies that class and the Sound owner.
+        return parent_type == "Sound"
+    return object_child_capability(version=version, parent_type=parent_type, child_types=(child_type,)).allowed
 
 
 __all__ = [

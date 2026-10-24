@@ -16,13 +16,32 @@ import json
 import math
 import os
 import re
+import time
 import stat
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
+from .layout_blueprint import declared_layout_matches, declared_layout_mismatches
+from .authoring_model_business import MODEL_OPERATIONS, MODEL_READ_URI, validate_model_call, state_query_from_assignments, canonical_state_result, model_file_audit
+from .authoring_wafm import select_registered_template
+from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, LAYOUT_RESET_URI, reset_selection_observation, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
+
+from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, AUTHORING_CREATE_URI, PROJECT_CREATE_URIS, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect, prepare_console_project_open, validate_console_project_open
 from .canonical import canonical_json_bytes, canonical_sha256
+from .runtime_inspection_business_contracts import (
+    LOG_ADD_ITEM_URI, LOG_CLEAR_URI, LOG_GET_URI, runtime_log_observation_support,
+    PROFILER_ENABLE_DATA_URI,
+    PROFILER_CAPTURE_DATA_VERIFICATION,
+    PROFILER_GET_CURSOR_TIME_URI,
+    PROFILER_MOVE_CURSOR_URI,
+    PROFILER_SET_CURSOR_TIME_URI,
+)
+from .object_inline_curve import InlineCurveError, prepare_inline_curve, observe_inline_curve_proof
+from .source_copy_observations import capture_source_copy, source_copy_scope, verify_source_copy
+from .object_lifecycle_graph import LifecycleGraphError, capture_lifecycle_graph, lifecycle_graph_matches, lifecycle_snapshot_equal
 from .business_adapters import business_adapter
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
 from .builders.metadata import (
@@ -32,6 +51,8 @@ from .builders.metadata import (
     PropertyInfoMetadataRecord,
     parse_get_types_result,
     parse_get_property_info_result,
+    bind_get_property_info_result,
+    parse_property_and_reference_names_result,
 )
 from .builders.object_mutation import ObjectMutationBuilder
 from .builders.properties import PropertyReferenceBuilder
@@ -48,7 +69,7 @@ from .builders.debug_lua import (
     seal_inline_lua_source,
     seal_isolated_lua_file,
 )
-from .builders.schema import validate_semantic_payload, validate_semantic_result
+from .builders.schema import validate_semantic_payload, validate_semantic_result, validate_resolved_semantic_payload
 from .builders.soundbank import SoundBankBuilder
 from .builders.switchcontainer import SwitchContainerAssignmentBuilder
 from .execution_contracts import ExecutionContractError, ExecutionContractRegistry
@@ -62,9 +83,14 @@ from .host_paths import (
     parse_relative_host_path,
 )
 from .io_policy import IOPolicyError, validate_isolated_io
+from .profiler_capture_artifact import SAVE_CAPTURE_URI, prepare_capture_artifact, validate_capture_artifact, verify_capture_artifact
 from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
+from .condition_limits import MAX_CONDITION_CONTROLLERS, MAX_CONDITION_PATH_FIELDS
 from .metadata_restrictions import (
     MetadataRestrictionError,
+    condition_values_equal,
+    is_terminal_override_dependency,
+    is_master_bus_visibility_dependency,
     reference_allowed_types,
     reference_type_token,
 )
@@ -88,6 +114,8 @@ from .operation_import import (
     verify_regular_file_proof as verify_import_file_proof,
 )
 from .operation_object import (
+    ObjectCurveDescriptor,
+    OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
     DEFAULT_MAX_CHILDREN_PER_NODE,
     DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_FIELDS_PER_NODE,
@@ -124,12 +152,15 @@ from .operation_plugin import (
     PluginOperationContractError,
     ValidatedPluginProperty,
     build_plugin_creation_plan,
+    bind_plugin_name,
+    plugin_name_policy,
     normalize_plugin_creation,
     validate_plugin_target,
     plugin_property_metadata_requests,
     plugin_verification_fields,
     validate_plugin_property_metadata,
     verify_created_plugin_row,
+    _materialize_plugin_object,
 )
 from .operation_ui_commands import (
     EXECUTE_URI as UI_COMMAND_EXECUTE_URI,
@@ -164,6 +195,7 @@ from .operation_ui_commands import (
     validate_ui_command_runtime_preconditions,
     verify_ui_command_inventory_postcondition,
 )
+from .operation_tone import TONE_URI, prepare_tone_verification, validate_tone_binding, verify_tone_artifact
 from .operation_soundbank import (
     SoundBankContractError,
     build_external_sources_operation_plan,
@@ -183,6 +215,7 @@ from .object_capabilities import (
 from .platform_paths import WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT
 from .transaction_cleanup import build_transaction_cleanup_spec, persistent_project_cleanup
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
+from .owned_control_inputs import OwnedControlInputDescriptor, CONTROL_INPUT_CLASSES, CONTROL_INPUT_VERSIONS
 from .waql import quote_waql_literal
 
 
@@ -212,12 +245,14 @@ GET_PROJECT_INFO_URI = "ak.wwise.core.getProjectInfo"
 SOUNDBANK_GET_INCLUSIONS_URI = "ak.wwise.core.soundbank.getInclusions"
 SWITCHCONTAINER_GET_ASSIGNMENTS_URI = "ak.wwise.core.switchContainer.getAssignments"
 REMOTE_GET_CONNECTION_STATUS_URI = "ak.wwise.core.remote.getConnectionStatus"
+REMOTE_GET_AVAILABLE_CONSOLES_URI = "ak.wwise.core.remote.getAvailableConsoles"
 REMOTE_CONNECT_URI = "ak.wwise.core.remote.connect"
 OBJECT_SET_IMPORT_VERSIONS = frozenset(
     {"2023.1", "2024.1", "2025.1"}
 )
 OBJECT_SET_IMPORT_READBACK_FIELDS = (
     "id",
+    "classId",
     "name",
     "type",
     "path",
@@ -232,6 +267,7 @@ TRANSPORT_CREATE_URI = "ak.wwise.core.transport.create"
 TRANSPORT_DESTROY_URI = "ak.wwise.core.transport.destroy"
 TRANSPORT_GET_LIST_URI = "ak.wwise.core.transport.getList"
 TRANSPORT_GET_STATE_URI = "ak.wwise.core.transport.getState"
+TRANSPORT_EXECUTE_ACTION_URI = "ak.wwise.core.transport.executeAction"
 CLI_CONVERT_EXTERNAL_SOURCE_URI = "ak.wwise.cli.convertExternalSource"
 AUTHORING_AUDIO_CONVERT_URI = "ak.wwise.core.audio.convert"
 CLI_EXECUTE_LUA_URI = "ak.wwise.cli.executeLuaScript"
@@ -262,7 +298,7 @@ REPLAY_GUARD_OPERATIONS = frozenset(
         "ui.captureScreen",
     }
 )
-PACKAGED_TRANSACTION_READBACK_URIS = frozenset(
+PACKAGED_TRANSACTION_READBACK_URIS = frozenset({MODEL_READ_URI}) | (LAYOUT_READ_URIS - {'ak.wwise.ui.layout.getViewHandle'}) | frozenset(
     {
         OBJECT_GET_URI,
         OBJECT_GET_TYPES_URI,
@@ -274,9 +310,15 @@ PACKAGED_TRANSACTION_READBACK_URIS = frozenset(
         GET_PROPERTY_INFO_URI,
         SOUNDBANK_GET_INCLUSIONS_URI,
         SWITCHCONTAINER_GET_ASSIGNMENTS_URI,
+        "ak.wwise.core.blendContainer.getAssignments",
         REMOTE_GET_CONNECTION_STATUS_URI,
+        REMOTE_GET_AVAILABLE_CONSOLES_URI,
         TRANSPORT_GET_LIST_URI,
         TRANSPORT_GET_STATE_URI,
+        PROFILER_GET_CURSOR_TIME_URI,
+        LOG_GET_URI,
+        "ak.soundengine.getState",
+        "ak.soundengine.getSwitch",
         UI_COMMAND_GET_COMMANDS_URI,
     }
 )
@@ -290,6 +332,7 @@ UNDO_GROUP_MAX_REQUEST_BYTES = 128 * 1024
 UNDO_GROUP_MAX_PLAN_BYTES = 256 * 1024
 _UNDO_GROUP_2021_INNER_URIS = frozenset(
     {
+        "ak.wwise.core.object.create",
         "ak.wwise.core.object.setAttenuationCurve",
         "ak.wwise.core.object.setName",
         "ak.wwise.core.object.setNotes",
@@ -302,6 +345,7 @@ _UNDO_GROUP_2021_INNER_URIS = frozenset(
     }
 )
 _UNDO_GROUP_2022_INNER_URIS = _UNDO_GROUP_2021_INNER_URIS | {
+    "ak.wwise.core.object.set",
     "ak.wwise.core.object.pasteProperties",
     "ak.wwise.core.sound.setActiveSource",
 }
@@ -326,16 +370,6 @@ UNDO_GROUP_INNER_URIS_BY_VERSION: Mapping[str, frozenset[str]] = {
 }
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
 IDENTITY_RETURN_FIELDS = ("id", "name", "type", "path", "parent", "notes")
-# ``ak.wwise.core.object.get`` does not accept a bare numeric Short ID.  Its
-# ``from.id`` Short ID selector is a closed object whose numeric ``type`` is
-# the WAAPI object-type code.  Only Definition directives with an official
-# selector code are admitted here; notably, DialogueEvent has no such selector
-# and must fail closed instead of borrowing Event's code.
-DEFINITION_SHORT_ID_OBJECT_TYPE_CODES: Mapping[str, int] = {
-    "Event": 10,
-    "Effect": 17,  # EffectPlugin; Definition readback accepts Effect/EffectShareSet.
-    "AuxBus": 20,
-}
 OBJECT_REPLACE_SNAPSHOT_FIELDS = ("id", "path")
 OBJECT_REPLACE_MAX_SUBTREE_NODES = 128
 OBJECT_LIST_SNAPSHOT_FIELDS = (
@@ -696,10 +730,21 @@ _PLUGIN_PROPERTY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
 _PLUGIN_CREATION_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "type": "object",
     "required": ["kind", "name", "class_id"],
-    "optional": ["notes", "platform", "language", "properties", "placement"],
+    "optional": ["notes", "platform", "language", "properties", "placement", "references"],
     "additionalProperties": False,
     "properties": {
-        "kind": {"type": "string", "enum": ["source", "effect"]},
+        "kind": {"type": "string", "enum": ["source", "effect", "sink", "metadata"]},
+        "references": {
+            "type": "array", "maxItems": 32,
+            "items": {
+                "type": "object", "required": ["name", "target"],
+                "additionalProperties": False,
+                "properties": {
+                    "name": {"type": "string", "minLength": 1},
+                    "target": IDENTITY_ARGUMENT_SCHEMA,
+                },
+            },
+        },
         "placement": {"type": "string", "enum": ["owner", "shareset"], "default": "owner"},
         "name": {"type": "string", "minLength": 1, "maxLength": 255},
         "class_id": {
@@ -791,6 +836,41 @@ _OBJECT_CREATE_TYPE_TOKEN_DESCRIPTION = (
     "Wwise 2025.1 reflects an Actor Mixer as PropertyContainer, but its "
     "object.create request token remains ActorMixer."
 )
+_OBJECT_CREATE_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    **_OBJECT_REFERENCE_ARGUMENT_SCHEMA,
+    "properties": {**_OBJECT_REFERENCE_ARGUMENT_SCHEMA["properties"],
+                   "target": {"oneOf": [IDENTITY_ARGUMENT_SCHEMA, {"type": "null"}]}},
+}
+
+_RTPC_CONTROL_INPUT_ARGUMENT_SCHEMA = {"oneOf": [IDENTITY_ARGUMENT_SCHEMA,
+    {"type": "object", "required": ["new_control_input"], "additionalProperties": False,
+     "properties": {"new_control_input": {"type": "object", "required": ["type", "name", "properties"],
+        "additionalProperties": False, "properties": {
+            "type": {"type": "string", "enum": sorted(CONTROL_INPUT_CLASSES)},
+            "name": {"type": "string", "minLength": 1, "maxLength": 255},
+            "notes": {"type": "string", "maxLength": 65536},
+            "platform": {"type": "string", "minLength": 1, "maxLength": 128},
+            "properties": {"type": "array", "maxItems": 32, "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA}}}}}]}
+
+_OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    **_OBJECT_REFERENCE_ARGUMENT_SCHEMA,
+    "properties": {**_OBJECT_REFERENCE_ARGUMENT_SCHEMA["properties"],
+                   "target": {"oneOf": [*_RTPC_CONTROL_INPUT_ARGUMENT_SCHEMA["oneOf"], {"type": "null"},
+                       {"type": "array", "maxItems": 32, "items": IDENTITY_ARGUMENT_SCHEMA,
+                        "supported_versions": sorted(OBJECT_SET_REFERENCE_ARRAY_VERSIONS)},
+                       {"type": "object", "required": ["curve_points"], "additionalProperties": False,
+                        "properties": {"curve_points": {"type": "array", "maxItems": 256,
+                                                          "items": _RTPC_POINT_ARGUMENT_SCHEMA}}}]}},
+}
+
+_GRAPH_RESULT_BINDINGS_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": True,
+    "description": "Gateway-owned declaration result bindings; no native identities or caller paths.",
+    "items": {"type": "object", "required": ["result_handle", "request_path"], "additionalProperties": False,
+        "properties": {"result_handle": {"type": "string", "pattern": r"^bnh1-[0-9a-f]{32}$"},
+            "request_path": {"type": "string", "minLength": 1, "maxLength": 1024}}},
+}
+
 _OBJECT_CREATE_TYPE_TOKEN_SCHEMA: Mapping[str, Any] = {
     "type": "string",
     "minLength": 1,
@@ -840,7 +920,7 @@ _OBJECT_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
         "name": {"type": "string", "minLength": 1},
         "notes": {"type": "string"},
         "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
-        "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
+        "references": {"type": "array", "items": _OBJECT_CREATE_REFERENCE_ARGUMENT_SCHEMA},
         "children": {
             "type": "array",
             "description": "Recursive closed object-node DSL; depth 8 and 128 total nodes.",
@@ -943,7 +1023,7 @@ _OBJECT_SET_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
             "supported_versions": ["2023.1", "2024.1", "2025.1"],
         },
         "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
-        "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
+        "references": {"type": "array", "items": _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA},
         "children": {
             "type": "array",
             "description": (
@@ -951,7 +1031,22 @@ _OBJECT_SET_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
                 "depth 8 and 128 total nodes."
             ),
         },
+        "lists": {
+            "type": "array", "maxItems": 32,
+            "description": "Recursive owned lists of the same closed node DSL; list mode inherits from the existing target row.",
+        },
     },
+}
+_OBJECT_SET_RTPC_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "object", "required": ["rtpc"], "additionalProperties": False,
+    "properties": {
+        "rtpc": {"type": "object", "required": ["property", "control_input", "points"], "additionalProperties": False, "properties": {
+            "property": {"type": "string", "minLength": 1}, "control_input": _RTPC_CONTROL_INPUT_ARGUMENT_SCHEMA,
+            "points": {"type": "array", "minItems": 1, "maxItems": 256, "items": _RTPC_POINT_ARGUMENT_SCHEMA},
+            "notes": {"type": "string"}}},
+        "rtpc_mode": {"type": "string", "enum": ["add", "add_or_replace"], "default": "add_or_replace"},
+    },
+    "description": "Gateway-owned unnamed RTPC semantic descriptor; valid only inside the source-proven RTPC List in 2022.1–2025.1.",
 }
 _OBJECT_LIST_NAME_SCHEMA: Mapping[str, Any] = {
     "type": "string",
@@ -968,11 +1063,13 @@ _OBJECT_LIST_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "required": ["name", "objects"],
     "additionalProperties": False,
     "properties": {
-        "name": _OBJECT_LIST_NAME_SCHEMA,
+        "name": {**_OBJECT_LIST_NAME_SCHEMA, "description": (
+            "Canonical Wwise object-list name without the native @ prefix. "
+            "Unnamed RTPC members use their closed object.set pair/curve variant; plug-in construction remains dedicated.")},
         "objects": {
             "type": "array",
             "maxItems": 32,
-            "items": _OBJECT_SET_NODE_ARGUMENT_SCHEMA,
+            "items": {"oneOf": [_OBJECT_SET_NODE_ARGUMENT_SCHEMA, _OBJECT_SET_RTPC_NODE_ARGUMENT_SCHEMA]},
             "description": (
                 "Closed recursive object-node DSL. An empty array is meaningful "
                 "only with list_mode=replaceAll, where it clears the reviewed list."
@@ -1789,6 +1886,7 @@ class VerificationResult:
     message: str = ""
     verification_strength: str = "operation_specific_readback"
     business_state_verified: bool = True
+    verification_scope: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         # Verifier strength is not a claim that a failed check verified state.
@@ -1810,6 +1908,7 @@ class VerificationResult:
             "message": self.message,
             "verification_strength": self.verification_strength,
             "business_state_verified": self.business_state_verified,
+            **({"verification_scope": _json_mapping(self.verification_scope)} if self.verification_scope is not None else {}),
         }
 
 
@@ -1817,6 +1916,7 @@ ReadCall = Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, An
 
 MAX_OBJECT_SET_BATCH_CHECK_READS = 512
 MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS = 1024
+MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES = 32768
 
 # Positive contract for dedicated operations whose adapters bind paths on the
 # gateway machine. Generic ``waapi.call`` locality is derived separately from
@@ -1928,6 +2028,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "same-connection-compound",
         "Execute 1-32 reviewed project mutations inside one same-session Wwise Undo Group.",
         ("display_name", "calls"),
+        ("failure_cancellation",),
         argument_contract=_object_contract(
             ("display_name", "calls"),
             {
@@ -1936,6 +2037,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "minLength": 1,
                     "maxLength": UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH,
                 },
+                "failure_cancellation": {"type": "string", "enum": ["undo-changes", "preserve-changes", "native-default"]},
                 "calls": {
                     "type": "array",
                     "minItems": 1,
@@ -1949,6 +2051,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
             },
+            optional=("failure_cancellation",),
         ),
         constraints=(
             "beginGroup, every inner mutation, and endGroup execute on one existing WAAPI client",
@@ -1982,7 +2085,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "public-execution-contract",
         "Execute one manifest-registered guarded function without model-authored code.",
         ("api",),
-        ("args", "options", "io_root", "result_projection"),
+        ("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding", "provider_profile_binding", "history_binding"),
         argument_contract=_object_contract(
             ("api",),
             {
@@ -2017,6 +2120,11 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         "inside args."
                     ),
                 },
+                "source_control_binding": {"type": "object", "description": "Gateway-owned exact object-to-file scope proof; never forwarded."},
+                "history_binding": {"type": "object", "description": "Gateway-owned latest-history scoped expectation proof; never forwarded."},
+                "provider_profile_binding": {"type": "object", "description": "Gateway-owned protected provider profile recipe; native values resolve only during dispatch."},
+                "model_binding": {"type": "object", "description": "Gateway-owned Authoring resource and declaration proof."},
+                "layout_binding": {"type": "object", "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded."},
                 "result_projection": {
                     "type": "object",
                     "description": (
@@ -2025,7 +2133,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
             },
-            optional=("args", "options", "io_root", "result_projection"),
+            optional=("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding", "provider_profile_binding", "history_binding"),
         ),
         constraints=(
             "api must be reflected by the requested Wwise version",
@@ -2231,6 +2339,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "auto_add_to_source_control",
             "on_name_conflict",
             "replace_owned_root",
+            "documented_list_bindings",
+            "graph_result_bindings",
         ),
         argument_contract=_object_contract(
             ("parent", "type", "name"),
@@ -2244,9 +2354,12 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 },
                 "notes": {"type": "string"},
                 "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
-                "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
+                "references": {"type": "array", "items": _OBJECT_CREATE_REFERENCE_ARGUMENT_SCHEMA},
                 "platform": PLATFORM_ARGUMENT_SCHEMA,
                 "list": _OBJECT_LIST_NAME_SCHEMA,
+                "graph_result_bindings": _GRAPH_RESULT_BINDINGS_ARGUMENT_SCHEMA,
+                "documented_list_bindings": {"type": "array", "maxItems": 128, "items": {"type": "object"},
+                    "description": "Gateway-owned documented List source/owner proofs; never forwarded."},
                 "auto_add_to_source_control": {"type": "boolean", "default": False},
                 "children": {
                     "type": "array",
@@ -2278,6 +2391,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "auto_add_to_source_control",
                 "on_name_conflict",
                 "replace_owned_root",
+                "documented_list_bindings",
+                "graph_result_bindings",
             ),
         ),
         identity_arguments=("parent", "replace_owned_root"),
@@ -2412,9 +2527,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object.setProperty",
         "ak.wwise.core.object.setProperty",
         "property-reference",
-        "Set one property for the current or an explicit platform using live property metadata and typed readback.",
+        "Set one property for the current or an explicit platform using live property metadata and typed readback; Effect Render also previews and verifies its source-proved owner-chain prefix and version-observed clearing suffix.",
         ("object", "property", "value"),
-        ("platform",),
+        ("platform", "switch_child_context"),
         argument_contract=_object_contract(
             ("object", "property", "value"),
             {
@@ -2422,8 +2537,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "property": {"type": "string", "minLength": 1},
                 "value": {"description": "JSON scalar accepted only after live property metadata validation."},
                 "platform": PLATFORM_ARGUMENT_SCHEMA,
+                "switch_child_context": {"type": "object", "description": "Gateway-generated owner/child context binding; callers use the disclosed binding handles."},
             },
-            optional=("platform",),
+            optional=("platform", "switch_child_context"),
         ),
         identity_arguments=("object",),
         selection_guidance=_selection_guidance(
@@ -2444,7 +2560,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object.setReference",
         "ak.wwise.core.object.setReference",
         "property-reference",
-        "Set or clear one reference for the current or an explicit platform after resolving every non-null identity.",
+        "Set one active reference or clear its directly stored value for the current or an explicit platform; an inherited reference may still apply after a stored clear.",
         ("object", "reference", "target"),
         ("platform",),
         argument_contract=_object_contract(
@@ -2458,7 +2574,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         {
                             "type": "null",
                             "description": (
-                                "Explicitly clear the reference; omitted target is "
+                                "Explicitly clear the directly stored reference; an inherited reference may still apply. Omitted target is "
                                 "never interpreted as a clear request."
                             ),
                         },
@@ -2472,7 +2588,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "target=null is an explicit closed clear operation and is rejected when live metadata contains a notNull restriction",
             "a non-null target is live-resolved and checked against live reference type restrictions",
-            "non-null references require their live Boolean activation closure already satisfied; missing prerequisites require separate Field Handle property Previews, or object.set on 2022.1+",
+            "non-null references require their live activation prerequisites already satisfied; use separate Field Handle Previews, or explicit object.set declarations on 2022.1+",
+            "childOfReference binds the chosen target parent to the exact controlling reference; explicit atomic reference changes use the declared future parent and both relationships are revalidated and verified",
             "when a prior successful Gateway read returned an exact id for object or target, copy that id exactly; do not retype its path or name",
         ),
         selection_guidance=_selection_guidance(
@@ -2527,7 +2644,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         OBJECT_SET_URI,
         "object-mutation",
         (
-            "Create one owner-local Source/Effect or standalone Effect ShareSet through "
+            "Create one owner-local Source/Effect or independent Effect, Sink, or Metadata ShareSet through "
             "the version-correct Wwise object topology with a live Type Handle."
         ),
         ("target", "plugin"),
@@ -2546,14 +2663,14 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "Source plug-ins are create-only children of Sound or Voice targets",
             "Wwise 2022.1 owner Effects use the first proven-empty @Effect0 through @Effect3 reference",
             "Wwise 2023.1 and later owner Effects append one EffectSlot and verify its @Effect reference",
-            "standalone Effect ShareSets are children of an Effects Work Unit and verify their own parent/class/name/properties",
+            "independent ShareSets verify parent/class/name/fields and sibling preservation; Effect placement additionally admits a fresh source-proven Folder beneath an Effects Work Unit, while Sink and Metadata require their matching Work Unit",
             "pre-existing plug-in identities are sealed before dispatch; replacement, raw replaceAll, and caller-authored object.set payloads are rejected",
             "the returned association and post-read id/name/type/classId/parent/owner must bind uniquely to the immutable plan",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
         selection_guidance=_selection_guidance(
             use_when=(
-                "The user asks to attach a local Source/Effect or create an independent Effect ShareSet from live plug-in discovery.",
+                "The user asks to attach a local Source/Effect or create an independent Effect, Sink or Metadata ShareSet from live plug-in discovery.",
             ),
             avoid_when=(
                 "The request is ordinary object creation with no plug-in semantics.",
@@ -2571,13 +2688,14 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object-mutation",
         "Add or update one RTPC curve through a closed property, ControlInput, and point contract.",
         ("object", "property", "control_input", "points"),
-        ("notes", "mode"),
+        ("notes", "mode", "graph_result_bindings"),
         argument_contract=_object_contract(
             ("object", "property", "control_input", "points"),
             {
                 "object": IDENTITY_ARGUMENT_SCHEMA,
                 "property": {"type": "string", "minLength": 1},
-                "control_input": IDENTITY_ARGUMENT_SCHEMA,
+                "control_input": _RTPC_CONTROL_INPUT_ARGUMENT_SCHEMA,
+                "graph_result_bindings": _GRAPH_RESULT_BINDINGS_ARGUMENT_SCHEMA,
                 "points": {
                     "type": "array",
                     "minItems": 1,
@@ -2598,12 +2716,14 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
             },
-            optional=("notes", "mode"),
+            optional=("notes", "mode", "graph_result_bindings"),
         ),
         identity_arguments=("object", "control_input"),
         constraints=(
             "live getPropertyInfo must report RTPC support for the requested property",
-            "the ControlInput resolves to exactly one existing GameParameter, MIDI, or Modulator object",
+            "the ControlInput is exactly one existing GameParameter/MIDI/Modulator identity or a new owned Modulator through selected class Field Handles",
+            "a new owned input always adds a fresh pair, preserves other RTPC rows and obeys exclusive property cardinality",
+            "new owned Time Curve X values are seconds within the explicit or fresh typed class-default Duration; this interim intent-preservation policy rejects outside points before writes without normalization and does not prove the complete native domain",
             "add appends one typed @RTPC row; add_or_replace updates one exact property/ControlInput match in place",
             "raw @RTPC rows and caller-authored listMode/replaceAll are never accepted",
             "the complete RTPC list is sealed before execution and read back after execution",
@@ -2629,6 +2749,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "list_mode",
             "on_name_conflict",
             "auto_add_to_source_control",
+            "documented_list_bindings",
+            "graph_result_bindings",
+            "voice_source_staging",
         ),
         argument_contract={
             **_object_contract(
@@ -2645,7 +2768,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                             ("object",),
                             {
                                 "object": IDENTITY_ARGUMENT_SCHEMA,
-                                "name": {"type": "string", "minLength": 1},
+                                "name": {"type": "string", "minLength": 1,
+                                    "description": "Exact new name of this existing GUID; child creation conflict policy does not choose a different name."},
                                 "notes": {"type": "string"},
                                 "platform": PLATFORM_ARGUMENT_SCHEMA,
                                 "list_mode": {
@@ -2654,10 +2778,11 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                                 },
                                 "on_name_conflict": {
                                     "type": "string",
-                                    "enum": ["fail", "rename", "merge"],
+                                    "enum": ["fail", "rename", "merge", "replace"],
+                                    "description": "Collision policy for new child/list-member creation; existing GUID name edits remain exact.",
                                 },
                                 "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
-                                "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
+                                "references": {"type": "array", "items": _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA},
                                 "import": {
                                     **_OBJECT_SET_IMPORT_ARGUMENT_SCHEMA,
                                     "supported_versions": ["2023.1", "2024.1", "2025.1"],
@@ -2707,7 +2832,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     },
                     "on_name_conflict": {
                         "type": "string",
-                        "enum": ["fail", "rename", "merge"],
+                        "enum": ["fail", "rename", "merge", "replace"],
                         "default": "fail",
                         "description": (
                             "Applies only to genuinely new children, never to existing objects[] "
@@ -2717,12 +2842,19 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         ),
                     },
                     "auto_add_to_source_control": {"type": "boolean", "default": False},
+                    "graph_result_bindings": _GRAPH_RESULT_BINDINGS_ARGUMENT_SCHEMA,
+                    "voice_source_staging": {"type": "object", "description": "Gateway-generated exact staged declaration/provenance; strictly reparsed, never caller-authored."},
+                    "documented_list_bindings": {"type": "array", "maxItems": 128,
+                        "items": {"type": "object"}, "description": "Gateway-owned documented List source/owner proofs; never forwarded."},
                 },
                 optional=(
                     "platform",
                     "list_mode",
                     "on_name_conflict",
                     "auto_add_to_source_control",
+                    "documented_list_bindings",
+                    "graph_result_bindings",
+                    "voice_source_staging",
                 ),
             ),
             "maximumCanonicalRequestBytes": DEFAULT_MAX_REQUEST_BYTES,
@@ -3194,7 +3326,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             {
                 "object": IDENTITY_ARGUMENT_SCHEMA,
                 "parent": IDENTITY_ARGUMENT_SCHEMA,
-                "on_name_conflict": {"type": "string", "enum": ["fail", "rename"]},
+                "on_name_conflict": {"type": "string", "enum": ["fail", "rename", "replace"]},
                 "auto_add_to_source_control": _COPY_AUTO_ADD_SCHEMA,
                 "auto_check_out_to_source_control": _OBJECT_MUTATION_AUTO_CHECK_OUT_SCHEMA,
             },
@@ -3218,7 +3350,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             {
                 "object": IDENTITY_ARGUMENT_SCHEMA,
                 "parent": IDENTITY_ARGUMENT_SCHEMA,
-                "on_name_conflict": {"type": "string", "enum": ["fail", "rename"]},
+                "on_name_conflict": {"type": "string", "enum": ["fail", "rename", "replace"]},
                 "auto_check_out_to_source_control": _OBJECT_MUTATION_AUTO_CHECK_OUT_SCHEMA,
             },
             optional=("on_name_conflict", "auto_check_out_to_source_control"),
@@ -3446,6 +3578,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "supported uint32 Short IDs because quoted names can complete without "
             "applying inclusions; 2023.1 and later retain the official quoted-name form",
             "unsupported directives, duplicate rows, unknown objects, and ambiguous names fail before dispatch",
+            "Event, DialogueEvent, AuxBus and Effect uint32 Short IDs resolve through a version-pinned bounded typed read; exact numeric Short ID, canonical GUID and directive type are checked independently",
             "execution replays file/project and SoundBank inclusion snapshots; verification checks exact target inclusions and one unrelated control Bank",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
@@ -3909,6 +4042,9 @@ def parse_operation_request(payload: Mapping[str, Any], *, expected_version: str
     if not isinstance(arguments, Mapping):
         raise OperationContractError("INVALID_REQUEST", "arguments must be a JSON object.")
     _require_exact_keys(arguments, required=spec.required_arguments, optional=spec.optional_arguments, context=operation)
+    if "voice_source_staging" in arguments:
+        from .voice_source_staging import validate_request
+        validate_request(operation, str(version), arguments)
     _validate_nested_request_shape(operation, arguments, version=str(version))
     if operation == "waapi.call":
         _public_call_arguments(str(version), arguments)
@@ -4069,7 +4205,14 @@ def build_undo_group_execution_plan(
                 ),
             }
         )
-    cancel_args = {} if version in {"2021.1", "2022.1"} else {"undo": True}
+    cancellation = arguments.get("failure_cancellation",
+                                 "native-default" if version in {"2021.1", "2022.1"} else "undo-changes")
+    if not isinstance(cancellation, str) or cancellation not in {"undo-changes", "preserve-changes", "native-default"}:
+        raise OperationContractError("INVALID_ARGUMENT", "Unknown failure_cancellation choice.")
+    if version in {"2021.1", "2022.1"} and cancellation != "native-default":
+        raise OperationContractError("UNSUPPORTED_CANCELLATION_OPTION",
+                                     "This pinned cancelGroup schema has no undo option; use native-default.")
+    cancel_args = {} if cancellation == "native-default" else {"undo": cancellation == "undo-changes"}
     def phase(uri: str, args: Mapping[str, Any]) -> dict[str, Any]:
         phase_contract = registry.describe(version, uri)
         return {
@@ -4116,7 +4259,7 @@ def _public_call_arguments(
 
         registry = ExecutionContractRegistry()
         contract = (registry.authoring_ui_describe(version, api)
-                    if requires_core_supplement(version, api) else registry.describe(version, api))
+                    if requires_core_supplement(version, api) or api in LAYOUT_MUTATION_URIS | MODEL_OPERATIONS else registry.describe(version, api))
     except ExecutionContractError as exc:
         raise OperationContractError(
             "UNAVAILABLE_IN_VERSION",
@@ -4172,7 +4315,69 @@ def _public_call_arguments(
             "Packaged waapi.call does not accept custom command-line hooks.",
             details={"api": api, "fields": list(supplied_forbidden)},
         )
-    validation = validate_semantic_payload(api, raw_args, raw_options, version=version)
+    if api in MODEL_OPERATIONS:
+        try:
+            validate_model_call(version, api, raw_args, raw_options, arguments.get("model_binding"))
+        except ValueError as exc:
+            raise OperationContractError("INVALID_AUTHORING_RESOURCE_BINDING", str(exc)) from exc
+    elif "model_binding" in arguments:
+        raise OperationContractError("INVALID_ARGUMENT", "Authoring resource binding belongs only to its closed operations")
+    if api in LAYOUT_MUTATION_URIS:
+        try:
+            validate_layout_call(version, api, raw_args, raw_options, arguments.get('layout_binding'))
+        except ValueError as exc:
+            raise OperationContractError('INVALID_LAYOUT_BUSINESS_BINDING', str(exc)) from exc
+    elif 'layout_binding' in arguments:
+        raise OperationContractError('INVALID_ARGUMENT', 'Layout binding is reserved for closed Authoring layout operations')
+    validation = validate_semantic_payload(api, raw_args, raw_options, version=version,
+        authoring_ui_profile=api in LAYOUT_MUTATION_URIS | MODEL_OPERATIONS)
+    if api in PROJECT_FILE_URIS:
+        validation = validate_resolved_semantic_payload(api, raw_args, raw_options, version=version)
+    from .edit_history_contracts import HISTORY_VERSIONS
+    if api in HISTORY_VERSIONS:
+        from .edit_history_business import validate_history_binding, validate_history_reference, REFERENCE_CONTRACT
+        try:
+            binding = arguments.get("history_binding")
+            if isinstance(binding, Mapping) and binding.get("contract") == REFERENCE_CONTRACT:
+                validate_history_reference(api, version, binding)
+            else:
+                validate_history_binding(api, version, binding)
+            if raw_args != {} or raw_options != {}:
+                raise ValueError("Latest-history actions accept only the sealed empty native request")
+        except ValueError as exc:
+            raise OperationContractError("HISTORY_EXPECTATION_REQUIRED", str(exc)) from exc
+    elif "history_binding" in arguments:
+        raise OperationContractError("INVALID_ARGUMENT", "History expectation belongs only to standalone undo/redo")
+    provider_binding = arguments.get("provider_profile_binding")
+    if api == "ak.wwise.core.sourceControl.setProvider":
+        from .source_control_profiles import validate_binding
+        try:
+            bound = validate_binding(provider_binding)
+            if raw_args != {"provider": bound["provider"]} or raw_options != {}:
+                raise ValueError("Protected provider call accepts only its sealed public provider intent")
+        except ValueError as exc:
+            raise OperationContractError("SOURCE_CONTROL_PROFILE_PROOF_REQUIRED", str(exc)) from exc
+    elif provider_binding is not None:
+        raise OperationContractError("INVALID_ARGUMENT", "Provider profile proof belongs only to setProvider")
+    source_control_binding = arguments.get("source_control_binding")
+    if source_control_binding is not None:
+        from .source_control_object_files import validate_object_file_binding
+        try:
+            bound_files = validate_object_file_binding(api, source_control_binding)
+            native_files = raw_args.get("files", [])
+            if "moves" in source_control_binding:
+                from .source_control_object_moves import validate_move_binding
+                pairs = validate_move_binding(source_control_binding, bound_files)
+                native_pairs = list(zip(native_files, raw_args.get("newFiles", [])))
+                if any(pair not in native_pairs for pair in pairs):
+                    raise ValueError("A bound move row is not present in the sealed native source/destination pairs")
+            else:
+                for row in bound_files:
+                    path = str(Path(_localize_waapi_file_path(row["file_path"], field="source-control bound file path")).resolve(strict=False))
+                    if path not in native_files:
+                        raise ValueError("A bound object file is not present in the sealed native file scope")
+        except ValueError as exc:
+            raise OperationContractError("SOURCE_CONTROL_OBJECT_FILE_BINDING_INVALID", str(exc)) from exc
     result_projection = arguments.get("result_projection")
     if result_projection is not None:
         if api != "ak.wwise.core.sourceControl.getSourceFiles":
@@ -4230,6 +4435,8 @@ def _public_call_arguments(
             "waapi.call io_root is accepted only for isolated_transaction routes.",
             details={"api": api, "version": version, "route": contract.route},
         )
+    if api == 'ak.wwise.ui.model.registerWafm' and isinstance(raw_args.get('wafm'), str):
+        io_audit = model_file_audit(arguments['model_binding'])
     return api, dict(raw_args), dict(raw_options), {
         **contract.as_dict(),
         "request_validation": validation.as_dict(),
@@ -4355,6 +4562,44 @@ def _enforce_versioned_public_call_boundaries(
         )
 
 
+def _observe_active_source_plugin_binding(sound_id, source_id, *, read, rows=None, platform=None, include_active=False):
+    """Bind a Source plugin's actual class and direct parent, without caller tokens."""
+    if rows is None:
+        fields = ["id", "name", "type", "path", "classId", "parent", *(["activeSource"] if include_active else [])]
+        batch = _bounded_multi_identity_read([sound_id, source_id], fields=fields, read=read,
+            context="Active Source plugin identity binding", **({"platform": platform} if platform is not None else {}))
+        if not batch["exact"]:
+            raise OperationContractError("INVALID_READBACK", "Sound and source must resolve as one exact identity batch.")
+        rows = batch["result"]["return"]
+    by_id = {_identity_key(row["id"]): row for row in rows}
+    sound, source = by_id[_identity_key(sound_id)], by_id[_identity_key(source_id)]
+    if sound.get("type") != "Sound" or source.get("type") not in {"AudioFileSource", "Source", "SourcePlugin"}:
+        raise OperationContractError("INVALID_SOURCE_TARGET", "Active source selection requires a Sound and a file or Source-plugin child.")
+    if source["type"] == "AudioFileSource":
+        return None, rows  # Preserve the existing file-source contract and verifier.
+    from .business_declarations import normalize_live_object_identity
+    try:
+        normalize_live_object_identity(sound)
+        normalize_live_object_identity(source)
+    except ValueError as exc:
+        raise OperationContractError("INVALID_READBACK", "Sound and Source plugin require complete live identities.") from exc
+    if not _same_identity(_parent_value(source.get("parent")), sound_id):
+        raise OperationContractError("INVALID_SOURCE_TARGET", "The Source plugin must remain a direct child of the selected Sound.")
+    if source.get("path", "").rsplit("\\", 1)[0].casefold() != sound.get("path", "").casefold():
+        raise OperationContractError("INVALID_SOURCE_TARGET", "The Source plugin hierarchy must match its actual Sound parent.")
+    catalog = _read_object_type_catalog(read)
+    sound_type = _resolve_object_type("Sound", catalog=catalog)
+    if type(sound.get("classId")) is not int or sound["classId"] != sound_type.class_id:
+        raise OperationContractError("INVALID_OBJECT_TYPE", "The Sound class must match its exact live semantic type.")
+    source_class = source.get("classId")
+    matches = [row for row in catalog if row.class_id == source_class]
+    if type(source_class) is not int or not 0 < source_class <= 0xFFFFFFFF or len(matches) != 1 or matches[0].type.casefold() != "source":
+        raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "The actual Source plugin class requires one live Source-category row.")
+    return {"sound": {key: sound[key] for key in ("id", "name", "type", "path", "classId")},
+        "source": {**{key: source[key] for key in ("id", "name", "type", "path", "classId")}, "parent": sound_id},
+        "source_type": matches[0].as_dict(), "sound_type": sound_type.as_dict()}, rows
+
+
 def _public_call_verification_plan(
     *,
     api: str,
@@ -4364,6 +4609,8 @@ def _public_call_verification_plan(
     result_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     common = {"uri": api, "version": version}
+    if api in CLI_PROJECT_FILE_URIS:
+        return {"kind": "console-project-process", **common, "base_result_strategy": strategy}
     if api == "ak.wwise.core.sound.setActiveSource":
         sound_id = args.get("sound")
         source_id = args.get("source")
@@ -4414,19 +4661,53 @@ def _public_call_verification_plan(
             "expected_maximum": float(maximum),
         }
     if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
+        from .remote_transition import remote_target
         return {
             "kind": "remote-connection-state",
             **common,
             "strategy": "operation_specific_readback",
             "base_result_strategy": strategy,
             "expected_connected": api == REMOTE_CONNECT_URI,
+            **({"expected_target": remote_target(version, args)} if api == REMOTE_CONNECT_URI else {}),
         }
+    if api in {PROFILER_MOVE_CURSOR_URI, PROFILER_SET_CURSOR_TIME_URI} and version == "2025.1":
+        return {
+            "kind": "profiler-user-cursor",
+            **common,
+            "strategy": "operation_specific_readback",
+            "base_result_strategy": strategy,
+        }
+    if api == TRANSPORT_EXECUTE_ACTION_URI:
+        return {"kind": "transport-action-state", **common,
+            "strategy": "operation_specific_readback", "base_result_strategy": strategy,
+            "action": args["action"],
+            **({"transport_id": args["transport"]} if "transport" in args else {})}
+    if api in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI} and version in {"2023.1", "2024.1", "2025.1"}:
+        return {"kind": "log-channel-effect", **common, "strategy": "operation_specific_readback",
+            "base_result_strategy": strategy, "channel": args.get("channel", "general"),
+            **({"message": args["message"], "severity": args.get("severity", "Message")} if api == LOG_ADD_ITEM_URI else {})}
     if api == TRANSPORT_CREATE_URI:
+        object_id = args.get("object")
+        if not isinstance(object_id, str) or _PLUGIN_GUID.fullmatch(object_id) is None:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "Transport creation verification requires the selected object GUID.",
+            )
+        game_object_id = args.get("gameObject")
+        if "gameObject" in args and (
+            type(game_object_id) is not int or not 0 <= game_object_id <= 0xFFFFFFFFFFFFFFFF
+        ):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "Transport creation verification requires an explicit uint64 Game Object ID.",
+            )
         return {
             "kind": "transport-created",
             **common,
             "strategy": "operation_specific_readback",
             "base_result_strategy": strategy,
+            "expected_object_id": object_id,
+            **({"expected_game_object_id": game_object_id} if "gameObject" in args else {}),
         }
     if api == TRANSPORT_DESTROY_URI:
         transport_id = args.get("transport")
@@ -4466,7 +4747,15 @@ def _closed_operation_preview(
 ) -> SemanticPreview:
     """Build a reviewed registry-owned preview and validate its exact dispatch."""
 
-    validation = validate_semantic_payload(uri, args, options, version=version)
+    # These graph requests contain recursive nodes and dynamic @field values
+    # whose native constraints live in the pinned definition documents.  A
+    # conservative inspection result cannot certify the compiled dispatch.
+    validator = (
+        validate_resolved_semantic_payload
+        if uri in {"ak.wwise.core.object.create", OBJECT_SET_URI}
+        else validate_semantic_payload
+    )
+    validation = validator(uri, args, options, version=version)
     return SemanticPreview(
         envelope=SemanticEnvelope(
             uri=uri,
@@ -4488,6 +4777,88 @@ def _closed_operation_preview(
         requires_destructive_gate=True,
         raw_dispatch_allowed=False,
     )
+
+
+def _capture_planned_rename_collision(row, *, read):
+    collision = ResolvedObject(identity=ObjectIdentity(id=row["id"]), object=row["id"], resolution="live-exact-path", row=row)
+    identities = [item["id"] for item in _capture_replace_subtree_snapshot(collision, read=read)]
+    if len(identities) > MULTI_IDENTITY_READ_MAX_IDS:
+        raise OperationContractError("MULTI_IDENTITY_READ_LIMIT_EXCEEDED", "Rename preservation exceeds the exact read bound")
+    fields = ["id", "name", "type", "path", "parent", "owner", "notes", "classId"]
+    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": identities}}, {"return": fields}))
+    if len(rows) != len(identities) or len({row.get("id") for row in rows}) != len(identities) or {row.get("id") for row in rows} != set(identities):
+        raise OperationContractError("INVALID_READBACK", "Rename collision preservation must resolve every old GUID exactly once")
+    return {"fields": fields, "rows": [{key: item[key] for key in fields if key in item} for item in sorted(rows, key=lambda item: item["id"])]}
+
+
+def _omit_new_sound_null_reference_assignments(*, version, conflict, root_path, list_name,
+                                                node_specs, native_nodes, path_snapshots):
+    """2022 constructor candidate: preserve null intent and rely on a proved null default.
+
+    Existing targets and other native constructors keep their actual assignment.
+    The complete metadata and absent-root snapshots remain normal phase guards.
+    """
+    if version != "2022.1" or conflict != "fail" or list_name is not None:
+        return []
+    nodes = {node["request_path"]: node for node in node_specs}
+    omissions = []
+    for node in node_specs:
+        if node.get("canonical_type") != "Sound" or node.get("class_id") != 65552:
+            continue
+        selected = [item for item in node.get("references", [])
+                    if item.get("name") == "Attenuation" and "target_id" in item and item["target_id"] is None
+                    and not item.get("condition_guard")]
+        if not selected:
+            continue
+        # An absent ordinary root implies all its admitted ordinary descendants
+        # are new too. List/owned/plugin/import paths cannot borrow that premise.
+        current, visited = node, set()
+        new_hierarchy = True
+        while current is not None:
+            path = current["request_path"]
+            if (path in visited or current.get("collection") != "children"
+                    or current.get("existing_target") is not False or current.get("preexisting_id") is not None
+                    or current.get("requested_language") is not None or current.get("import_requested") is True
+                    or "import" in current or "graph_plugin_native" in current):
+                new_hierarchy = False
+                break
+            visited.add(path)
+            parent_path = current.get("parent_request_path")
+            if parent_path is None:
+                new_hierarchy = path == "$"
+                break
+            current = nodes.get(parent_path)
+            if current is None:
+                new_hierarchy = False
+        absent_root = [snapshot for snapshot in path_snapshots
+                       if snapshot.get("path") == root_path and snapshot.get("rows") == []]
+        evidence = [item for item in node.get("new_object_default_evidence", [])
+                    if item.get("class_scope") == {"classId": 65552}]
+        proof = evidence[0] if len(evidence) == 1 else {}
+        metadata = proof.get("metadata", {}).get("Attenuation", {})
+        reference_kind = (metadata.get("restriction", {}).get("type") == "reference"
+                          or str(metadata.get("type", "")).casefold() in {"reference", "objectreference"})
+        resolved_conditions = all(item.get("value_resolved") is True for item in proof.get("requirements", []))
+        if (len(selected) != 1 or not new_hierarchy or len(absent_root) != 1 or not isinstance(root_path, str)
+                or not proof or not reference_kind or proof.get("default_presence", {}).get("Attenuation") is not True
+                or "default" not in metadata or metadata["default"] is not None or not resolved_conditions):
+            raise OperationContractError(
+                "NEW_OBJECT_NULL_DEFAULT_UNPROVEN",
+                "The 2022 Sound null Attenuation constructor requires a present null class default, satisfied conditions and a proved new fail-mode hierarchy.",
+                details={"request_path": node["request_path"], "field": "Attenuation", "mutation_dispatched": False},
+            )
+        native = native_nodes.get(node["request_path"])
+        if not isinstance(native, dict) or "@Attenuation" not in native or native["@Attenuation"] is not None:
+            raise OperationContractError("INVALID_PREVIEW", "Null constructor intent differs from its canonical native assignment.")
+        del native["@Attenuation"]
+        # Reuse the strict actual-class observer: the null-default certificate
+        # belongs to this receiver class, even when native type text is generic.
+        node["structural_class_id"] = 65552
+        node["native_default_reference_omissions"] = ["Attenuation"]
+        omissions.append({"request_path": node["request_path"], "class_id": 65552,
+                          "field": "Attenuation", "reason": "present_null_class_default",
+                          "verification": "present_actual_null_reference_required"})
+    return omissions
 
 
 def _prepare_object_create(
@@ -4584,11 +4955,18 @@ def _prepare_object_create(
         version=request.version,
     )
     type_catalog = _read_object_type_catalog(read)
+    render_native_nodes: dict[str, dict[str, Any]] = {}
+    from .planned_references import prepare_result_context
+    result_context = prepare_result_context(arguments.get("graph_result_bindings", []), normalized.nodes,
+        {"$": (parent, requested_conflict)}, resolve_type=lambda node: _resolve_graph_node_type(node, catalog=type_catalog, version=request.version), read=read, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
     canonical_types: dict[str, str] = {}
     resolved_references: dict[str, Any] = {}
     derived_properties: dict[str, dict[str, Any]] = {}
+    early_merge_guards = []
     node_specs = _prepare_object_node_specs(
         normalized.nodes,
+        root_parent=parent,
+        root_collection=list_name or "children",
         version=request.version,
         type_catalog=type_catalog,
         read=read,
@@ -4598,6 +4976,10 @@ def _prepare_object_create(
         derived_properties=derived_properties,
         identity_cache=identity_cache,
         property_info_cache=property_info_cache,
+        result_context=result_context,
+        merge_existing=requested_conflict == "merge",
+        merge_guards=early_merge_guards,
+        platform=platform,
     )
     for index, spec in enumerate(node_specs):
         spec["platform"] = platform
@@ -4613,9 +4995,21 @@ def _prepare_object_create(
     path_snapshots: list[dict[str, Any]] = []
     list_snapshots: list[dict[str, Any]] = []
     merge_field_snapshots: list[dict[str, Any]] = []
+    merge_children_snapshots: list[dict[str, Any]] = []
     replace_subtree_snapshots: list[dict[str, Any]] = []
     list_before: list[dict[str, Any]] = []
+    documented_guards = list(early_merge_guards)
     if list_name is not None:
+        from .documented_list_fields import resolve_live_list_evidence, observe_list_binding
+        proof = resolve_live_list_evidence(request.version, parent.object, list_name, read=read)
+        selected = arguments.get("documented_list_bindings", [])
+        if selected and selected != [proof]:
+            raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Selected List proof differs from its exact owner/class/source")
+        allowed_classes = {element["class_id"] for element in proof["declaration"]["element_classes"]}
+        if proof["declaration"]["unresolved_element_types"] or node_specs[0]["class_id"] not in allowed_classes:
+            raise OperationContractError("DOCUMENTED_LIST_ELEMENT_CLASS_INVALID", "The requested root class is not proved by this exact List source")
+        node_specs[0]["documented_list_element_class"] = node_specs[0]["class_id"]
+        _merge_observed_list_guards(documented_guards, [observe_list_binding(proof, read=read)])
         list_before = _normalize_object_list_snapshot(
             _read_object_list(
                 parent.object,
@@ -4655,7 +5049,10 @@ def _prepare_object_create(
                 details={"list": list_name, "name": normalized.root.name, "rows": collisions},
             )
         if conflict == "merge" and collisions:
-            if not _object_type_matches(collisions[0].get("type"), node_specs[0]):
+            class_rows = _read_object_id_rows(collisions[0]["id"], fields=("id", "classId"), read=read)
+            if (len(class_rows) != 1 or not _same_identity(class_rows[0].get("id"), collisions[0]["id"])
+                    or not _object_type_matches(collisions[0].get("type"), node_specs[0],
+                        actual_class_id=class_rows[0].get("classId"))):
                 raise OperationContractError(
                     "INVALID_TARGET_TYPE",
                     "object.create list merge collision has a different live object type.",
@@ -4666,12 +5063,6 @@ def _prepare_object_create(
                     },
                 )
             node_specs[0]["preexisting_id"] = collisions[0].get("id")
-            if normalized.root.children:
-                raise OperationContractError(
-                    "LIST_MERGE_CHILDREN_UNSUPPORTED",
-                    "A pre-existing object.create list member with requested descendants requires a dedicated list operation.",
-                    details={"list": list_name, "name": normalized.root.name},
-                )
             merge_fields = _object_spec_return_fields(node_specs[0])
             merge_options: dict[str, Any] = {"return": merge_fields}
             if platform is not None:
@@ -4683,7 +5074,7 @@ def _prepare_object_create(
                     merge_options,
                 )
             )
-            if len(merge_rows) != 1:
+            if (len(merge_rows) != 1 or not _object_spec_row_matches(merge_rows[0], node_specs[0], collisions[0]["id"])):
                 raise OperationContractError(
                     "INVALID_READBACK",
                     "The merged object.create list member must resolve exactly once.",
@@ -4696,6 +5087,37 @@ def _prepare_object_create(
                     "rows": merge_rows,
                 }
             )
+            node_specs[0]["pre_state"] = merge_rows[0]
+            spec_by_path = {str(spec["request_path"]): spec for spec in node_specs}
+            for spec in node_specs:
+                if spec is not node_specs[0]:
+                    parent_spec = spec_by_path[str(spec["parent_request_path"])]
+                    candidates = [row for row in parent_spec.get("preexisting_children", [])
+                                  if str(row.get("name", "")).casefold() == str(spec["requested_name"]).casefold()]
+                    if len(candidates) > 1:
+                        raise OperationContractError("AMBIGUOUS_IDENTITY", "A merged list descendant name is not unique.")
+                    if candidates:
+                        candidate_id = candidates[0]["id"]
+                        candidates = _read_object_id_rows(candidate_id, fields=_object_spec_return_fields(spec), read=read)
+                        if (len(candidates) != 1 or not _same_identity(candidates[0].get("id"), candidate_id)
+                                or not _object_type_matches(candidates[0].get("type"), spec,
+                                actual_class_id=candidates[0].get("classId"))):
+                            raise OperationContractError("INVALID_TARGET_TYPE", "A merged list descendant has another live type.")
+                        spec["preexisting_id"] = candidates[0]["id"]
+                        spec["pre_state"] = candidates[0]
+                        spec["requested_name"] = candidates[0]["name"]
+                if spec.get("preexisting_id") is not None:
+                    children_before = _read_direct_children(spec["preexisting_id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+                    spec["preexisting_children"] = children_before
+                    merge_children_snapshots.append({"object_id": spec["preexisting_id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": children_before})
+                    if spec is not node_specs[0]:
+                        fields = _object_spec_return_fields(spec)
+                        options = {"return": fields, **({"platform": platform} if platform else {})}
+                        observed = _rows(read(OBJECT_GET_URI, {"from": {"id": [spec["preexisting_id"]]}}, options))
+                        if len(observed) != 1 or not _object_spec_row_matches(observed[0], spec, spec["preexisting_id"]):
+                            raise OperationContractError("INVALID_READBACK", "Merged list descendant lost its exact identity.")
+                        spec["pre_state"] = observed[0]
+                        merge_field_snapshots.append({"object_id": spec["preexisting_id"], "fields": fields, "platform": platform, "rows": observed})
         if conflict == "rename":
             node_specs[0]["rename_collision_rows"] = collisions
     elif conflict == "fail":
@@ -4720,7 +5142,7 @@ def _prepare_object_create(
                     "object.create merge path must resolve to at most one object.",
                     details={"path": expected_path, "rows": rows},
                 )
-            if rows and not _object_type_matches(rows[0].get("type"), spec):
+            if rows and not _object_type_matches(rows[0].get("type"), spec, actual_class_id=rows[0].get("classId")):
                 raise OperationContractError(
                     "INVALID_TARGET_TYPE",
                     "object.create merge collision has a different live object type.",
@@ -4730,6 +5152,11 @@ def _prepare_object_create(
             spec["expected_path"] = expected_path
             if rows:
                 spec["preexisting_id"] = rows[0].get("id")
+                spec["pre_state"] = rows[0]
+                children_before = _read_direct_children(spec["preexisting_id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+                spec["preexisting_children"] = children_before
+                merge_children_snapshots.append({"object_id": spec["preexisting_id"],
+                    "fields": list(IDENTITY_RETURN_FIELDS), "rows": children_before})
     elif conflict == "rename":
         assert isinstance(root_path, str)
         rows = _read_object_path_rows(root_path, fields=IDENTITY_RETURN_FIELDS, read=read)
@@ -4825,12 +5252,26 @@ def _prepare_object_create(
         if list_name is None
         else []
     )
+    from .planned_references import apply_result_name_choices
+    apply_result_name_choices(node_specs, result_context)
     trusted_root = _materialize_canonical_object_node(
         normalized.root,
         canonical_types=canonical_types,
         resolved_references=resolved_references,
         derived_properties=derived_properties,
+        native_nodes=render_native_nodes,
+        prepared_names=result_context["prepared_names"] if result_context else None,
     )
+    null_reference_omissions = _omit_new_sound_null_reference_assignments(
+        version=request.version, conflict=conflict, root_path=root_path, list_name=list_name,
+        node_specs=node_specs, native_nodes=render_native_nodes, path_snapshots=path_snapshots,
+    )
+    from .effect_render_conditions import prepare_graph, EffectRenderConditionError
+    try:
+        effect_render_chains = prepare_graph(node_specs, render_native_nodes, version=request.version, read=read,
+            root_parent=parent, root_collection=list_name)
+    except EffectRenderConditionError as exc:
+        raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
     dispatch_args = {
         "parent": parent.object,
         **trusted_root,
@@ -4841,6 +5282,7 @@ def _prepare_object_create(
         dispatch_args["platform"] = platform
     if list_name is not None:
         dispatch_args["list"] = list_name
+    from .owned_result_stages import creation_stage_count
     preview = _closed_operation_preview(
         uri="ak.wwise.core.object.create",
         args=dispatch_args,
@@ -4849,6 +5291,12 @@ def _prepare_object_create(
         family="object-mutation",
         metadata={
             "closed_object_tree": True,
+            **({"native_default_reference_omissions": null_reference_omissions} if null_reference_omissions else {}),
+            "native_name_bindings": result_context["renames"] if result_context else [],
+            **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
+                "dependent_write": "after actual GUID/class/parent/membership binding",
+                "stage_count": creation_stage_count(node_specs) + sum(1 for node in node_specs for field in node.get("references", []) if "target_request_path" in field)}}
+                if result_context and (result_context['renames'] or result_context.get('duplicate_sibling_groups')) else {}),
             "node_count": len(node_specs),
             "on_name_conflict": conflict,
             "platform": platform,
@@ -4880,7 +5328,7 @@ def _prepare_object_create(
             ]
             if list_name is None
             else []
-        ),
+        ) + merge_children_snapshots,
         "list_snapshots": list_snapshots,
         "field_snapshots": merge_field_snapshots,
         "subtree_snapshots": replace_subtree_snapshots,
@@ -4921,7 +5369,58 @@ def _prepare_object_create(
             "source": "execution_result.id",
             "irreversible_preexisting_changes": conflict == "merge",
         }
-    return preview, roles, {"object_graph_guard": graph_guard, "object_create_nodes": node_specs}, verification, cleanup
+    state = {"object_graph_guard": graph_guard, "object_create_nodes": node_specs, "effect_render_chains": effect_render_chains}
+    from .creation_observations import ordinary_creation_fields, ordinary_creation_graph
+    try:
+        ordinary_creation_graph(verification, state, parent=parent.row)
+    except ValueError:
+        history_fields = []
+    else:
+        history_fields = [field for node in node_specs for field in (ordinary_creation_fields(node) or [])]
+    if history_fields:
+        from .edit_history_business import capture_field_read_platform
+        state["field_read_platform"] = capture_field_read_platform(request.version, platform, read=read)
+    condition_guards = [spec["condition_metadata_guard"] for spec in node_specs if "condition_metadata_guard" in spec]
+    if condition_guards:
+        state["condition_metadata_guards"] = condition_guards
+    related = [item for spec in node_specs for item in spec.get("related_conditions", [])]
+    if related:
+        state["related_conditions"] = related
+    if result_context:
+        graph_guard["path_snapshots"].extend(result_context["path_snapshots"])
+        state["planned_reference_context"] = result_context
+        from .owned_result_stages import prepare as prepare_owned_stages
+        try:
+            stage_plan = prepare_owned_stages(preview.envelope.uri, preview.envelope.args, preview.envelope.options,
+                node_specs, result_context, request.version, root_parent=parent.row, parent_children=parent_children)
+        except ValueError as exc:
+            raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
+        if stage_plan is not None:
+            from .owned_result_stages import FIELDS as stage_fields
+            parent_rows = _rows(read(OBJECT_GET_URI, {'from': {'id': [parent.object]}}, {'return': stage_fields}))
+            if (len(parent_rows) != 1 or not _same_identity(parent_rows[0].get('id'), parent.object)
+                    or any(parent_rows[0].get(key) != parent.row.get(key) for key in ('name', 'type', 'path'))
+                    or type(parent_rows[0].get('classId')) is not int or not any(info.class_id == parent_rows[0]['classId']
+                        and info.name == parent_rows[0].get('type') for info in type_catalog)):
+                raise OperationContractError('INVALID_READBACK', 'Staged creation parent requires its exact live GUID/class identity')
+            stage_plan['parent_before'] = parent_rows[0]
+            graph_guard['field_snapshots'].append({'object_id': parent.object, 'fields': stage_fields, 'platform': None, 'rows': parent_rows})
+            state["owned_result_stages"] = stage_plan
+            from .owned_result_stages import preservation_rows
+            try:
+                preservation_rows({'verification_plan': verification, 'pre_state': state})
+            except ValueError as exc:
+                raise OperationContractError('PLANNED_REFERENCE_STAGING_UNAVAILABLE', str(exc)) from exc
+            from .edit_history_business import capture_field_read_platform
+            state["field_read_platform"] = capture_field_read_platform(request.version,
+                stage_plan["creation_args"].get("platform"), read=read)
+    if documented_guards:
+        state["documented_list_guards"] = documented_guards
+    from .documented_list_fields import capture_slot_reference_targets
+    reference_targets = capture_slot_reference_targets(node_specs, roles)
+    if reference_targets:
+        state["documented_list_reference_targets"] = reference_targets
+    return preview, roles, state, verification, cleanup
 
 
 def _raise_plugin_operation_error(exc: PluginOperationContractError) -> NoReturn:
@@ -4962,20 +5461,20 @@ def _sealed_plugin_property_validation(
             "INVALID_PREVIEW",
             "object.createPlugin property validation must be an ordered array.",
         )
-    if len(value) != len(descriptor.properties):
+    if len(value) != len(descriptor.fields):
         raise OperationContractError(
             "INVALID_PREVIEW",
             "object.createPlugin property validation count does not match the "
             "immutable descriptor.",
             details={
-                "expected": len(descriptor.properties),
+                "expected": len(descriptor.fields),
                 "actual": len(value),
             },
         )
 
     validated: list[ValidatedPluginProperty] = []
     for index, (raw_row, requested) in enumerate(
-        zip(value, descriptor.properties)
+        zip(value, descriptor.fields)
     ):
         if (
             not isinstance(raw_row, Mapping)
@@ -5106,12 +5605,15 @@ def _read_plugin_prestate(
     target_id: str,
     descriptor: PluginCreationDescriptor,
     read: ReadCall,
+    target_type: str | None = None,
 ) -> dict[str, Any]:
+    catalog = parse_get_types_result(read(OBJECT_GET_TYPES_URI, {}, {}))
+    plugins = [row for row in catalog if row.class_id == descriptor.class_id
+               and row.type.casefold() == descriptor.object_type.casefold()]
+    if len(plugins) != 1:
+        raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "The selected plug-in class and kind are no longer available.")
+    plugin_type = plugins[0].as_dict()
     if descriptor.placement == "shareset":
-        catalog = parse_get_types_result(read(OBJECT_GET_TYPES_URI, {}, {}))
-        plugins = [row for row in catalog if row.class_id == descriptor.class_id and row.type.casefold() == "effect"]
-        if len(plugins) != 1:
-            raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "The selected Effect plug-in is no longer available.")
         args = {"from": {"id": [target_id]}, "transform": [{"select": ["children"]}]}
         options = {"return": ["id", "name", "type", "parent"]}
         rows = _rows(read(OBJECT_GET_URI, args, options))
@@ -5121,7 +5623,7 @@ def _read_plugin_prestate(
             parent_id = _plugin_guid(row.get("parent"), field="shareset_child.parent")
             if not _same_identity(parent_id, target_id) or not isinstance(row.get("name"), str) or not isinstance(row.get("type"), str):
                 raise OperationContractError("INVALID_READBACK", "ShareSet children must expose exact names, types, and parent bindings.")
-            if row["name"].casefold() == descriptor.name.casefold():
+            if row["name"].casefold() in {name.casefold() for name in plugin_name_policy(descriptor, version=version)["accepted_names"]}:
                 raise OperationContractError("SHARESET_NAME_CONFLICT", "The Effects Work Unit already contains the requested name.")
             normalized.append({"id": child_id, "name": row["name"], "type": row["type"], "parent": parent_id})
         normalized.sort(key=lambda row: row["id"].casefold())
@@ -5129,7 +5631,9 @@ def _read_plugin_prestate(
         if len({value.casefold() for value in ids}) != len(ids):
             raise OperationContractError("INVALID_READBACK", "ShareSet children contain duplicate identities.")
         return {"kind": "shareset_children", "uri": OBJECT_GET_URI, "args": args, "options": options,
-                "rows": normalized, "plugin_type": plugins[0].as_dict(), "preexisting_plugin_ids": ids}
+                "rows": normalized, "plugin_type": plugin_type, "preexisting_plugin_ids": ids,
+                **({"effect_shareset_placement": _observe_effect_shareset_placement(target_id, catalog=catalog, read=read, platform=descriptor.platform)}
+                   if descriptor.kind == "effect" and target_type == "Folder" else {})}
 
     if descriptor.kind == "source":
         fields = ("id", "name", "type", "parent")
@@ -5146,6 +5650,7 @@ def _read_plugin_prestate(
         )
         return {
             "kind": "source_children",
+            "plugin_type": plugin_type,
             "uri": OBJECT_GET_URI,
             "args": args,
             "options": options,
@@ -5195,6 +5700,7 @@ def _read_plugin_prestate(
             )
         return {
             "kind": "fixed_effect_references",
+            "plugin_type": plugin_type,
             "uri": OBJECT_GET_URI,
             "args": args,
             "options": options,
@@ -5279,6 +5785,7 @@ def _read_plugin_prestate(
         )
     return {
         "kind": "effect_slots",
+        "plugin_type": plugin_type,
         "uri": OBJECT_GET_URI,
         "args": owner_readback["args"],
         "options": owner_readback["options"],
@@ -5325,6 +5832,9 @@ def _prepare_object_create_plugin(
         _raise_plugin_operation_error(exc)
 
     property_metadata: list[dict[str, Any]] = []
+    property_infos = []
+    reference_roles = {}
+    reference_conditions = []
     for metadata_request in plugin_property_metadata_requests(descriptor):
         raw_args = metadata_request["args"]
         info = _read_property_info(
@@ -5332,13 +5842,41 @@ def _prepare_object_create_plugin(
             class_id=descriptor.class_id,
             name=str(raw_args["property"]),
         )
+        selected = next(prop for prop in descriptor.fields if prop.name == str(raw_args["property"]))
+        if selected in descriptor.references:
+            _require_object_reference_metadata(info, allow_hierarchy=True)
+            resolved = _resolve_identity({"kind": "id", "value": selected.value}, role="plugin.reference." + selected.name, read=read)
+            _require_reference_target_allowed(info, resolved, read=read, conditions=reference_conditions,
+                platform=descriptor.platform, wwise_version=request.version)
+            reference_roles["plugin.reference." + selected.name] = resolved
+        else:
+            _require_object_property_value(info, selected.value)
+        property_infos.append(info)
         property_metadata.append(info.as_dict())
+
+    default_evidence = []
+    if any(info.dependencies for info in property_infos):
+        from .new_object_defaults import class_default_evidence, NewObjectDefaultError
+        try:
+            evidence = class_default_evidence(
+                infos=tuple(property_infos), scope={"classId": descriptor.class_id}, read_call=read,
+                supplied_values={prop.name: prop.value for prop in descriptor.properties},
+                supplied_references={ref.name: ref.value for ref in descriptor.references},
+                validate_scalar=_require_object_property_value,
+            )
+            if evidence["derived_properties"]:
+                raise NewObjectDefaultError("Declare the disclosed plugin prerequisite explicitly in this creation Preview.",
+                    error_code="REFERENCE_ACTIVATION_REQUIRED", details={"prerequisites": evidence["derived_properties"], "mutation_dispatched": False})
+            default_evidence.append(evidence)
+        except NewObjectDefaultError as exc:
+            raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
 
     plugin_prestate = _read_plugin_prestate(
         version=request.version,
         target_id=target.object,
         descriptor=descriptor,
         read=read,
+        target_type=target_type,
     )
     fixed_effects = (
         plugin_prestate.get("fixed_effects")
@@ -5388,6 +5926,7 @@ def _prepare_object_create_plugin(
         "plan": plan_payload,
         "snapshot": plugin_prestate,
         "property_metadata": property_metadata,
+        **({"new_object_default_evidence": default_evidence} if default_evidence else {}),
     }
     verification: dict[str, Any] = {
         "kind": "object-plugin-created",
@@ -5406,6 +5945,12 @@ def _prepare_object_create_plugin(
             "platform": descriptor.platform,
         },
     }
+    if default_evidence:
+        verification["new_object_default_evidence"] = default_evidence
+    if "name_binding" in plugin_plan.verification:
+        verification["name_binding"] = dict(plugin_plan.verification["name_binding"])
+    if plugin_prestate["kind"] == "shareset_children":
+        verification["preexisting_children"] = list(plugin_prestate["rows"])
     if plugin_prestate["kind"] == "fixed_effect_references":
         verification["pre_effect_references"] = dict(
             plugin_prestate["fixed_effects"]
@@ -5427,8 +5972,8 @@ def _prepare_object_create_plugin(
     }
     return (
         preview,
-        {"target": target},
-        {"plugin_creation_guard": guard},
+        {"target": target, **reference_roles},
+        {"plugin_creation_guard": guard, **({"reference_target_conditions": reference_conditions} if reference_conditions else {})},
         verification,
         cleanup,
     )
@@ -5439,7 +5984,14 @@ def _prepare_object_set(
     *,
     arguments: Mapping[str, Any],
     read: ReadCall,
+    stage_new_graphs: bool = False,
 ) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    all_documented_bindings = list(arguments.get("documented_list_bindings", []))
+    planned_bindings = [binding for binding in all_documented_bindings if "planned_owner" in binding]
+    documented_bindings = [binding for binding in all_documented_bindings if "planned_owner" not in binding]
+    planned_guards = []
+    early_merge_guards = []
+    rtpc_snapshots = {}
     raw_objects = _mapping_sequence(arguments.get("objects"), field="objects")
     conflict = str(arguments.get("on_name_conflict", "fail"))
     global_platform = (
@@ -5458,13 +6010,19 @@ def _prepare_object_set(
             "object.set auto_add_to_source_control must be a JSON boolean.",
         )
     type_catalog = _read_object_type_catalog(read)
+    render_native_nodes: dict[str, dict[str, Any]] = {}
     roles: dict[str, ResolvedObject] = {}
     dispatch_objects: list[dict[str, Any]] = []
     node_specs: list[dict[str, Any]] = []
     field_snapshots: list[dict[str, Any]] = []
+    existing_field_history: list[dict[str, Any]] = []
+    condition_metadata_guards: list[dict[str, Any]] = []
+    related_conditions: list[dict[str, Any]] = []
+    reference_target_conditions: list[dict[str, Any]] = []
     children_snapshots: list[dict[str, Any]] = []
     list_snapshots: list[dict[str, Any]] = []
     list_subtree_snapshots: list[dict[str, Any]] = []
+    replace_subtree_snapshots: list[dict[str, Any]] = []
     path_snapshots: list[dict[str, Any]] = []
     object_set_file_proofs: list[dict[str, Any]] = []
     requested_languages: set[str] = set()
@@ -5475,6 +6033,22 @@ def _prepare_object_set(
         tuple[str, str, str],
         PropertyInfoMetadataRecord,
     ] = {}
+
+    def seal_replace_collision(row: Mapping[str, Any]) -> None:
+        collision = ResolvedObject(
+            identity=ObjectIdentity(id=row.get("id")),
+            object=row.get("id"),
+            resolution="live-exact-set-collision",
+            row=dict(row),
+        )
+        _reject_protected_replace_boundary(collision)
+        rows = _capture_replace_subtree_snapshot(collision, read=read)
+        replace_subtree_snapshots.append({
+            "root_id": collision.object,
+            "root_path": collision.row.get("path"),
+            "fields": list(OBJECT_REPLACE_SNAPSHOT_FIELDS),
+            "rows": rows,
+        })
 
     def import_context_read(
         uri: str,
@@ -5490,6 +6064,31 @@ def _prepare_object_set(
             return result
         return read(uri, args, options)
 
+    result_context = None
+    if arguments.get("graph_result_bindings"):
+        from .planned_references import prepare_result_context
+        result_nodes, result_roots, result_references = [], {}, []
+        for result_index, result_item in enumerate(raw_objects):
+            prefix = f"$.objects[{result_index}]"
+            result_roots[prefix] = (_resolve_identity(result_item["object"], role=f"objects[{result_index}].object",
+                read=read, identity_cache=identity_cache), str(result_item.get("on_name_conflict", conflict)), result_item.get("name"))
+            references = normalize_reference_descriptors(result_item.get("references", []),
+                request_path=prefix + ".references", allow_unions=True)
+            result_references.extend(references)
+            for reference in references:
+                if isinstance(reference.target, OwnedControlInputDescriptor):
+                    from dataclasses import replace
+                    normalized = normalize_object_forest([reference.target.as_dict()["new_control_input"]], allow_platform=True).roots[0]
+                    result_nodes.append(replace(normalized, request_path=prefix + ".owned_control_input",
+                        parent_request_path=None, collection="ControlInput"))
+            result_nodes.extend(normalize_object_forest(result_item.get("children", []), base_path=prefix + ".children",
+                on_name_conflict=result_item.get("on_name_conflict", conflict),
+                replace_owned=result_item.get("on_name_conflict", conflict) == "replace", allow_platform=True, allow_language=True, allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS).nodes)
+            result_nodes.extend(node for descriptor in normalize_object_lists(result_item.get("lists", []),
+                request_path=prefix + ".lists", allow_platform=True, allow_language=True,
+                allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS) for node in descriptor.nodes)
+        result_context = prepare_result_context(arguments["graph_result_bindings"], result_nodes, result_roots,
+            resolve_type=lambda node: _resolve_graph_node_type(node, catalog=type_catalog, version=request.version), read=read, references=result_references, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
     resolved_target_ids: dict[str, int] = {}
     for index, item in enumerate(raw_objects):
         merge_child_snapshots: list[dict[str, Any]] = []
@@ -5527,10 +6126,12 @@ def _prepare_object_set(
         references = normalize_reference_descriptors(
             item.get("references", []),
             request_path=f"$.objects[{index}].references",
+            allow_unions=True,
         )
         children = normalize_object_forest(
             item.get("children", []),
             on_name_conflict=row_conflict,
+            replace_owned=row_conflict == "replace",
             base_path=f"$.objects[{index}].children",
             allow_platform=True,
             allow_language=True,
@@ -5543,19 +6144,58 @@ def _prepare_object_set(
             allow_language=True,
             allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS,
         )
+        if row_conflict != "fail" and any(node.rtpc is not None
+                and isinstance(node.rtpc.control_input, OwnedControlInputDescriptor)
+                for node in (*children.nodes, *(node for descriptor in lists for node in descriptor.nodes))):
+            raise OperationContractError("OWNED_CONTROL_INPUT_CONFLICT_UNPROVEN",
+                "Non-fail owned ControlInput conflicts remain unfinished under issue #180.", details={"tracking_issue": 180})
+        live_source_parent = (target.row.get("type") == "Sound" and bool(children.roots)
+            and all(root.plugin is not None and root.plugin.kind == "source" for root in children.roots))
         if children.roots:
-            _require_object_create_writable_parent(
-                target,
-                version=request.version,
-                child_types=tuple(root.type for root in children.roots),
-            )
+            if not live_source_parent:
+                _require_object_create_writable_parent(
+                    target,
+                    version=request.version,
+                    child_types=tuple(root.type for root in children.roots),
+                )
             _require_specialized_object_tree_relationships(
                 children.nodes,
                 version=request.version,
             )
         if lists:
             _require_object_list_owner(target)
+        class_rows = _read_object_id_rows(target.object, fields=(*IDENTITY_RETURN_FIELDS, "classId"), read=read)
+        if (len(class_rows) != 1 or not _same_identity(class_rows[0].get("id"), target.object)
+                or any(not _native_snapshot_equal(class_rows[0].get(key), target.row.get(key))
+                       for key in ("id", "name", "type", "path"))):
+            raise OperationContractError("INVALID_READBACK", "Existing graph target class requires its exact bound identity.")
+        target_class = class_rows[0].get("classId")
+        _require_object_class_id(target_class)
+        class_types = [row for row in type_catalog if row.class_id == target_class]
+        if len(class_types) != 1:
+            raise OperationContractError("INVALID_OBJECT_TYPE", "Existing graph target class must resolve to one live getTypes row.")
+        def type_matches(row):
+            return _ordinary_object_type_matches(target.row.get("type"),
+                {"requested_type": row.type, "canonical_type": row.name})
+        if any(type_matches(row) for row in type_catalog) and not type_matches(class_types[0]):
+            raise OperationContractError("INVALID_TARGET_TYPE", "Existing ordinary native type contradicts its live class metadata.")
+        if (request.version == "2025.1" and target.row.get("type") == "PluginInnerObject"
+                and target_class == 5636096):
+            raise OperationContractError(
+                "PLAYLIST_SLOT_OBJECT_SET_UNPROVEN",
+                "Direct object.set on an existing PlaylistSlot is not admitted: Console 2025.1.7.9143 rejected the reference-and-notes request with objectType 50. Other direct shapes remain unproven. Use the closed object.setReference route for the reference outcome. For notes and reference together, use closed object.setNotes then a fresh object.setReference as two separately previewed and authorized transactions; atomic object.set support is not established.",
+                details={"tracking_issues": [177, 180], "object_id": target.object,
+                    "observed_host": "WwiseConsole", "observed_build": "2025.1.7.9143",
+                    "observed_error": {"uri": "ak.wwise.unexpected_error", "objectType": 50,
+                        "message": "Can't process object type."},
+                    "observed_request": "direct_existing_slot_reference_and_notes",
+                    "other_direct_shapes": "unproven", "reference_operation": "object.setReference",
+                    "separate_preview_operations": ["object.setNotes", "object.setReference"],
+                    "atomic_object_set": "not_established"},
+            )
         target_spec: dict[str, Any] = {
+            "class_id": target_class,
+            "class_metadata": class_types[0].as_dict(),
             "request_path": f"$.objects[{index}]",
             "parent_request_path": None,
             "existing_target": True,
@@ -5573,7 +6213,25 @@ def _prepare_object_set(
             "properties": [],
             "references": [],
         }
+        if live_source_parent:
+            if row_conflict != "fail":
+                raise OperationContractError("SOURCE_CONFLICT_UNRESOLVED", "Source child collision modes other than fail require separately established identity semantics.")
+            info = _read_property_info_cached(read, cache=property_info_cache, object_id=target.object, name="IsVoice")
+            if (info.type or "").casefold() not in {"bool", "boolean"}:
+                raise OperationContractError("INVALID_METADATA", "A Source owner requires Boolean IsVoice metadata.")
+            owner_rows = _read_object_id_rows(target.object, fields=["id", "classId", "IsVoice"], read=read, platform=platform)
+            if (len(owner_rows) != 1 or not _same_identity(owner_rows[0].get("id"), target.object)
+                    or owner_rows[0].get("classId") != target_class
+                    or type(_field_value(owner_rows[0], "IsVoice")) is not bool):
+                raise OperationContractError("INVALID_READBACK", "A Source owner requires its exact class and actual Boolean IsVoice.")
+            is_voice = _field_value(owner_rows[0], "IsVoice")
+            if any(root.plugin.language is not None for root in children.roots) and not is_voice:
+                raise OperationContractError("PLUGIN_LANGUAGE_UNAVAILABLE", "A localized Source requires an existing Boolean Voice owner.")
+            if any(prop.name.casefold() == "isvoice" and prop.value is not is_voice for prop in properties):
+                raise OperationContractError("SOURCE_OWNER_CHANGE_UNRESOLVED", "Change the owner's Voice flag in a separately verified Preview before adding a Source.")
+            target_spec["source_owner"] = {"is_voice": is_voice, "metadata": info.as_dict()}
         trusted: dict[str, Any] = {"object": target.object}
+        render_native_nodes[target_spec["request_path"]] = trusted
         if "import" in item:
             if request.version not in OBJECT_SET_IMPORT_VERSIONS:
                 raise OperationContractError(
@@ -5594,6 +6252,7 @@ def _prepare_object_set(
                 ) from exc
             trusted_import, import_spec = _prepare_object_set_import(
                 row_import,
+                version=request.version,
                 canonical_type=target.row.get("type"),
                 type_catalog=type_catalog,
                 file_proofs=object_set_file_proofs,
@@ -5630,12 +6289,6 @@ def _prepare_object_set(
                     "NO_OP",
                     f"object.set objects[{index}].name already matches the live target.",
                 )
-            if row_conflict == "merge":
-                raise OperationContractError(
-                    "INVALID_CONFLICT_POLICY",
-                    "Renaming an existing object does not support on_name_conflict=merge.",
-                    details={"index": index},
-                )
             trusted["name"] = requested_name
         for descriptor in properties:
             info = _read_property_info_cached(
@@ -5657,44 +6310,136 @@ def _prepare_object_set(
             target_spec["properties"].append(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
+        reference_targets = []
         for descriptor in references:
+            documented = [binding for binding in arguments.get("documented_list_bindings", [])
+                if binding.get("scope", {}).get("scope_kind") == "object"
+                and binding["scope"]["scope_value"] == target.object
+                and binding.get("declaration", {}).get("name") == descriptor.name
+                and "reference_targets" in binding]
+            if documented:
+                if (len(documented) != 1 or request.version not in OBJECT_SET_REFERENCE_ARRAY_VERSIONS
+                        or not isinstance(descriptor.target, tuple)):
+                    raise OperationContractError("INVALID_DOCUMENTED_LIST_ARRAY", "This exact List declaration requires its supported bounded reference-array shape")
+                identities = []
+                for offset, target_descriptor in enumerate(descriptor.targets):
+                    role = f"{descriptor.request_path}[{offset}]"
+                    resolved = _resolve_identity(target_descriptor.as_dict(), role=role, read=read, identity_cache=identity_cache)
+                    roles[role] = resolved
+                    identities.append(resolved.object)
+                if identities != documented[0]["reference_targets"]:
+                    raise OperationContractError("INVALID_DOCUMENTED_LIST_ARRAY", "The List proof does not match the exact requested ordered target identities")
+                trusted[f"@{descriptor.name}"] = identities
+                target_spec["references"].append({"name": descriptor.name, "target_id": identities,
+                    "metadata_evidence": "documented-list"})
+                continue
             info = _read_property_info_cached(
                 read,
                 cache=property_info_cache,
                 object_id=target.object,
                 name=descriptor.name,
             )
-            _require_object_reference_metadata(info)
-            if platform is not None:
+            _require_object_reference_metadata(info, allow_hierarchy=True)
+            property_info_by_name[descriptor.name.casefold()] = info
+            if isinstance(descriptor.target, OwnedControlInputDescriptor):
+                if (target_class != 1441808 or target.row.get("type") != "RTPC" or descriptor.name != "ControlInput"
+                        or row_conflict != "fail" or row_list_mode != "append"):
+                    raise OperationContractError("OWNED_CONTROL_INPUT_REPLACEMENT_UNPROVEN", "Only an exact existing RTPC ControlInput replacement with fail/append is admitted; other variants remain under issue #180.", details={"tracking_issue": 180})
+                _require_owned_control_input_reference(info, descriptor.target.type)
+                proof, owned_spec, snapshots = _prepare_owned_control_replacement(target, descriptor,
+                    target_spec=target_spec, version=request.version, read=read)
+                if result_context is None or owned_spec["request_path"] not in result_context["facts"]:
+                    raise OperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "Replacement requires its exact nonshareable owned outcome binding.")
+                owned_spec["result_handle"] = result_context["facts"][owned_spec["request_path"]]["result_handle"]
+                trusted["@ControlInput"] = proof["native"]
+                target_spec["owned_control_input_replacement"] = proof
+                target_spec["references"].append({"name": "ControlInput", "target_request_path": owned_spec["request_path"],
+                    "target_result_handle": owned_spec["result_handle"]})
+                node_specs.append(owned_spec)
+                field_snapshots.extend(snapshots)
+                condition_metadata_guards.append({"object_id": target.object, "platform": platform, "fields": [info.as_dict()]})
+                continue
+            from .reference_applicability import needs_structural_proof
+            if platform is not None and not needs_structural_proof(info):
                 _require_platform_field_enabled(
                     read,
                     object_id=target.object,
                     field_name=descriptor.name,
                     platform=platform,
                 )
+            if (result_context and getattr(descriptor.target, "kind", None) == "id"
+                    and descriptor.target.value in result_context["handles"]):
+                from .planned_references import PlannedReferenceTarget
+                target_path = result_context["handles"][descriptor.target.value]
+                fact = result_context["facts"][target_path]
+                _require_reference_target_allowed(info, PlannedReferenceTarget(fact))
+                trusted[f"@{descriptor.name}"] = fact["path"]
+                target_spec["references"].append({"name": descriptor.name, "target_request_path": target_path,
+                    "target_result_handle": fact["result_handle"], "planned_native_path": fact["path"]})
+                result_context["metadata"].append({"object_id": target.object, "name": descriptor.name, "metadata": info.as_dict()})
+                continue
+            if isinstance(descriptor.target, ObjectCurveDescriptor):
+                try:
+                    value, proof = prepare_inline_curve(descriptor.target, token=descriptor.name, metadata=info,
+                                                        scope={"object": target.object}, types=type_catalog)
+                except (InlineCurveError, MetadataRestrictionError) as exc:
+                    raise OperationContractError(exc.error_code, str(exc)) from exc
+                trusted[f"@{descriptor.name}"] = value
+                target_spec["references"].append({"name": descriptor.name, "curve": value, "curve_proof": proof})
+                continue
+            identities = []
+            for offset, target_descriptor in enumerate(descriptor.targets):
+                role = descriptor.request_path + (f"[{offset}]" if isinstance(descriptor.target, tuple) else "")
+                resolved = _resolve_identity(target_descriptor.as_dict(), role=role, read=read, identity_cache=identity_cache)
+                reference_targets.append((info, resolved))
+                roles[role] = resolved
+                identities.append(resolved.object)
+            value = None if descriptor.target is None else identities if isinstance(descriptor.target, tuple) else identities[0]
+            trusted[f"@{descriptor.name}"] = value
+            target_spec["references"].append({"name": descriptor.name, "target_id": value})
+        desired_references = {row["name"].casefold(): row.get("planned_native_path", row.get("target_id", row.get("curve"))) for row in target_spec["references"]}
+        for info, resolved in reference_targets:
+            _require_reference_target_allowed(info, resolved, source_id=target.object, read=read,
+                platform=platform, desired_references=desired_references,
+                conditions=reference_target_conditions, property_info_cache=property_info_cache,
+                wwise_version=request.version)
+        reference_requirements: dict[str, Any] = {}
+        override_applicability = {}
+        structural_applicability = {}
+        for descriptor in (*properties, *references):
+            if descriptor.name.casefold() not in property_info_by_name:
+                continue  # Exact documented-list evidence is re-read independently; no property-info receipt is invented.
             activation_properties = _apply_reference_activation_dependencies(
-                info,
-                read=read,
-                object_id=target.object,
+                property_info_by_name[descriptor.name.casefold()],
+                read=read, object_id=target.object,
                 property_specs=target_spec["properties"],
                 property_info_by_name=property_info_by_name,
                 derived_properties=derived_target_properties,
                 request_path=descriptor.request_path,
                 property_info_cache=property_info_cache,
+                wwise_version=request.version, override_applicability=override_applicability,
+                structural_applicability=structural_applicability,
+                _condition_sources=tuple(property_info_by_name.values()),
+                reference_requirements=reference_requirements,
+                desired_references=desired_references,
+                related_conditions=related_conditions,
+                platform=platform,
             )
-            resolved = _resolve_identity(
-                descriptor.target.as_dict(),
-                role=descriptor.request_path,
-                read=read,
-                identity_cache=identity_cache,
-            )
-            _require_reference_target_allowed(info, resolved)
-            roles[descriptor.request_path] = resolved
-            trusted[f"@{descriptor.name}"] = resolved.object
-            reference_spec = {"name": descriptor.name, "target_id": resolved.object}
             if activation_properties:
-                reference_spec["activation_properties"] = list(activation_properties)
-            target_spec["references"].append(reference_spec)
+                for row in target_spec["references"]:
+                    if row["name"] == descriptor.name:
+                        row["activation_properties"] = list(activation_properties)
+        for name, identity in reference_requirements.items():
+            if name.casefold() not in desired_references:
+                target_spec["references"].append({"name": name, "target_id": identity, "condition_guard": True})
+        if property_info_by_name:
+            condition_metadata_guards.append({
+                "object_id": target.object,
+                "platform": platform,
+                "fields": [info.as_dict() for info in property_info_by_name.values()],
+                "override_applicability": [proof for proof in override_applicability.values() if proof is not None],
+                "structural_applicability": list(structural_applicability.values()),
+            })
         for property_name, value in derived_target_properties.items():
             trusted[f"@{property_name}"] = value
 
@@ -5703,6 +6448,7 @@ def _prepare_object_set(
         derived_child_properties: dict[str, dict[str, Any]] = {}
         child_specs = _prepare_object_node_specs(
             children.nodes,
+            root_parent=target,
             version=request.version,
             type_catalog=type_catalog,
             read=read,
@@ -5712,16 +6458,26 @@ def _prepare_object_set(
             derived_properties=derived_child_properties,
             identity_cache=identity_cache,
             property_info_cache=property_info_cache,
+            list_bindings=planned_bindings,
+            result_context=result_context,
+            merge_existing=row_conflict == "merge",
+            allow_list_merge=row_list_mode == "append",
+            rtpc_replace_all=row_list_mode == "replaceAll",
+            rtpc_snapshots=rtpc_snapshots,
+            merge_guards=early_merge_guards,
+            platform=platform,
+            live_source_parent=live_source_parent,
         )
         child_spec_by_path = {
             str(spec["request_path"]): spec for spec in child_specs
         }
         for node in children.nodes:
-            if node.language is not None:
+            if node.language is not None and node.import_arg is not None:
                 requested_languages.add(node.language)
             if node.import_arg is not None:
                 trusted_import, import_spec = _prepare_object_set_import(
                     node.import_arg,
+                    version=request.version,
                     canonical_type=canonical_types[node.request_path],
                     type_catalog=type_catalog,
                     file_proofs=object_set_file_proofs,
@@ -5731,7 +6487,7 @@ def _prepare_object_set(
                 child_spec_by_path[node.request_path]["import"] = import_spec
         for child_spec in child_specs:
             child_spec.setdefault("platform", platform)
-            child_spec["collection"] = "children"
+            child_spec.setdefault("collection", "children")
             child_spec["on_name_conflict"] = row_conflict
         if children.roots:
             trusted["children"] = [
@@ -5740,21 +6496,40 @@ def _prepare_object_set(
                     canonical_types=canonical_types,
                     resolved_references=resolved_references,
                     derived_properties=derived_child_properties,
+                    native_nodes=render_native_nodes,
                     materialized_imports=materialized_imports,
+                    prepared_names=result_context["prepared_names"] if result_context else None,
+                    rtpc_updates={spec["request_path"]: spec for spec in child_specs if spec.get("rtpc_update")},
+                    plugin_materializations={spec["request_path"]: spec["graph_plugin_native"] for spec in child_specs if "graph_plugin_native" in spec},
+                    rtpc_update_rows=dispatch_objects,
                 )
                 for root in children.roots
             ]
-        target_path = _absolute_live_object_path(
-            target.row.get("path"),
-            field=f"objects[{index}].path",
-        )
+        if (request.version == "2025.1" and target_class == 5373968
+                and target.row.get("type") == "Marker" and target.row.get("name") == ""
+                and target.row.get("path") == "[Marker]" and "name" not in item
+                and not children.nodes and not lists and "import" not in item):
+            from .documented_list_fields import capture_owned_empty_identity
+            from .business_declarations import normalize_live_object_identity
+            try:
+                owned = capture_owned_empty_identity(request.version, class_rows[0], read=read)
+                target_path = normalize_live_object_identity(class_rows[0], owned_identity=owned).path
+            except (ValueError, KeyError, TypeError) as exc:
+                raise OperationContractError("INVALID_READBACK", "A relative Marker display requires its exact owned identity proof.") from exc
+            target_spec["owned_identity"] = owned
+            target_spec["expected_path"] = target_path
+        else:
+            target_path = _absolute_live_object_path(
+                target.row.get("path"),
+                field=f"objects[{index}].path",
+            )
         target_spec["old_path"] = target_path
         future_target_path = target_path
         if "name" in item:
             parent_path = target_path.rsplit("\\", 1)[0]
             future_target_path = _child_path(
                 parent_path,
-                item.get("name"),
+                trusted.get("name", item.get("name")),
                 field=f"objects[{index}].parent_path",
             )
             rename_rows = _read_object_path_rows(
@@ -5773,11 +6548,12 @@ def _prepare_object_set(
                     "object.set rename collision path resolved more than once.",
                     details={"path": future_target_path, "rows": rename_rows},
                 )
-            if row_conflict == "fail" and rename_rows:
+            if rename_rows:
                 raise OperationContractError(
                     "TARGET_EXISTS",
-                    "object.set rename with fail requires the exact requested path to be absent.",
-                    details={"path": future_target_path, "rows": rename_rows},
+                    "Existing-object rename requires the exact requested name; child creation policy cannot resolve its collision.",
+                    details={"path": future_target_path, "rows": rename_rows,
+                        "name_conflict_scope": "new_children_and_list_members"},
                 )
             path_snapshots.append(
                 {
@@ -5787,8 +6563,7 @@ def _prepare_object_set(
                 }
             )
             target_spec["rename_collision_rows"] = rename_rows
-            if row_conflict == "fail":
-                target_spec["expected_path"] = future_target_path
+            target_spec["expected_path"] = future_target_path
         for child_spec in child_specs:
             child_spec["target_index"] = index
             child_spec["parent_request_path"] = (
@@ -5796,6 +6571,17 @@ def _prepare_object_set(
                 if child_spec["parent_request_path"] is None
                 else child_spec["parent_request_path"]
             )
+            if child_spec.get("collection") != "children":
+                continue
+            parent_spec = child_spec_by_path.get(str(child_spec.get("parent_request_path")))
+            list_ancestor = False
+            while parent_spec is not None:
+                if parent_spec.get("collection") != "children":
+                    list_ancestor = True
+                    break
+                parent_spec = child_spec_by_path.get(str(parent_spec.get("parent_request_path")))
+            if list_ancestor:
+                continue
             expected_path = (
                 _request_node_expected_path(
                     future_target_path,
@@ -5803,16 +6589,15 @@ def _prepare_object_set(
                     child_specs,
                     root_request_path=target_spec["request_path"],
                 )
-                if row_conflict in {"fail", "merge"}
+                if row_conflict in {"fail", "merge", "replace"}
                 else None
             )
             if row_conflict == "merge":
                 assert isinstance(expected_path, str)
                 fields = _object_spec_return_fields(child_spec)
                 snapshot_platform = child_spec.get("platform")
-                snapshot_language = _localized_import_read_language(
-                    child_spec.get("requested_language")
-                )
+                snapshot_language = (None if "construction_language" in child_spec else
+                    _localized_import_read_language(child_spec.get("requested_language")))
                 rows = _read_object_path_rows(
                     expected_path,
                     fields=fields,
@@ -5826,7 +6611,7 @@ def _prepare_object_set(
                         "object.set merge path must resolve to at most one object.",
                         details={"path": expected_path, "rows": rows},
                     )
-                if rows and not _object_type_matches(rows[0].get("type"), child_spec):
+                if rows and not _object_type_matches(rows[0].get("type"), child_spec, actual_class_id=rows[0].get("classId")):
                     raise OperationContractError(
                         "INVALID_TARGET_TYPE",
                         "object.set merge collision has a different live object type.",
@@ -5844,6 +6629,8 @@ def _prepare_object_set(
                 child_spec["expected_path"] = expected_path
                 if rows:
                     child_spec["preexisting_id"] = rows[0].get("id")
+                    child_spec["existing_path"] = rows[0].get("path")
+                    child_spec["pre_state"] = rows[0]
                     preexisting_children = _read_direct_children(
                         rows[0].get("id"),
                         fields=IDENTITY_RETURN_FIELDS,
@@ -5858,23 +6645,27 @@ def _prepare_object_set(
                         }
                     )
             elif (
-                row_conflict == "fail"
+                row_conflict in {"fail", "replace"}
                 and child_spec["parent_request_path"] == target_spec["request_path"]
             ):
                 assert isinstance(expected_path, str)
                 fields = _object_spec_return_fields(child_spec)
                 snapshot_platform = child_spec.get("platform")
-                snapshot_language = _localized_import_read_language(
-                    child_spec.get("requested_language")
+                snapshot_language = (None if "construction_language" in child_spec else
+                    _localized_import_read_language(child_spec.get("requested_language")))
+                collision_path = (
+                    _request_node_expected_path(target_path, child_spec, child_specs,
+                                                root_request_path=target_spec["request_path"])
+                    if row_conflict == "replace" else expected_path
                 )
                 rows = _read_object_path_rows(
-                    expected_path,
+                    collision_path,
                     fields=fields,
                     read=read,
                     platform=snapshot_platform,
                     language=snapshot_language,
                 )
-                if rows:
+                if rows and row_conflict == "fail":
                     raise OperationContractError(
                         "TARGET_EXISTS",
                         "object.set append-only child creation with fail requires each root child path to be absent.",
@@ -5882,28 +6673,33 @@ def _prepare_object_set(
                     )
                 path_snapshots.append(
                     {
-                        "path": expected_path,
+                        "path": collision_path,
                         "fields": fields,
                         "platform": snapshot_platform,
                         "language": snapshot_language,
                         "rows": rows,
                     }
                 )
+                if len(rows) > 1:
+                    raise OperationContractError("AMBIGUOUS_IDENTITY", "A replace child collision must resolve at most once.")
+                if rows and row_conflict == "replace":
+                    seal_replace_collision(rows[0])
+                child_spec["expected_path"] = expected_path
+            elif row_conflict == "replace":
                 child_spec["expected_path"] = expected_path
 
         list_specs: list[dict[str, Any]] = []
         target_list_snapshots: list[dict[str, Any]] = []
         for list_index, descriptor in enumerate(lists):
-            if descriptor.name.casefold() in OBJECT_DEDICATED_LIST_NAMES:
-                raise OperationContractError(
-                    "DEDICATED_OPERATION_REQUIRED",
-                    "Effect and RTPC object lists must use object.createPlugin or object.setRTPC.",
-                    details={
-                        "index": index,
-                        "list_index": list_index,
-                        "list": descriptor.name,
-                    },
-                )
+            from .documented_list_fields import resolve_live_list_evidence
+            proof = resolve_live_list_evidence(request.version, target.object, descriptor.name, read=read)
+            selected = [binding for binding in documented_bindings
+                if binding.get("scope", {}).get("scope_value") == target.object
+                and binding.get("declaration", {}).get("name") == descriptor.name]
+            if selected and selected != [proof]:
+                raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Selected List proof differs from its exact owner/class/source")
+            if not selected:
+                documented_bindings.append(proof)
             before_rows = _normalize_object_list_snapshot(
                 _read_object_list(
                     target.object,
@@ -5911,10 +6707,14 @@ def _prepare_object_set(
                     fields=OBJECT_LIST_SNAPSHOT_FIELDS,
                     read=read,
                     platform=platform,
+                    version=request.version,
                 ),
                 owner_id=target.object,
                 list_name=descriptor.name,
             )
+            if (any(member.anonymous for member in descriptor.objects)
+                    and len(descriptor.objects) + (len(before_rows) if row_list_mode == "append" else 0) > OBJECT_LIST_MAX_SUBTREE_NODES):
+                raise OperationContractError("LIST_SNAPSHOT_LIMIT_EXCEEDED", "Anonymous construction exceeds the Gateway complete ordered membership bound before dispatch")
             list_snapshot = {
                 "object_id": target.object,
                 "list": descriptor.name,
@@ -5924,6 +6724,9 @@ def _prepare_object_set(
             }
             list_snapshots.append(list_snapshot)
             target_list_snapshots.append(list_snapshot)
+            if any(member.anonymous for member in descriptor.objects):
+                field_snapshots.extend(_capture_anonymous_member_state(before_rows, read=read, platform=platform,
+                    preserve=row_list_mode == "append"))
             if row_list_mode == "replaceAll":
                 replacement_subtrees = _capture_object_list_replace_subtrees(
                     before_rows,
@@ -5936,6 +6739,7 @@ def _prepare_object_set(
 
             prepared_specs = _prepare_object_node_specs(
                 descriptor.nodes,
+                root_parent=target,
                 version=request.version,
                 type_catalog=type_catalog,
                 read=read,
@@ -5945,16 +6749,25 @@ def _prepare_object_set(
                 derived_properties=derived_child_properties,
                 identity_cache=identity_cache,
                 property_info_cache=property_info_cache,
+                list_bindings=planned_bindings,
+                result_context=result_context,
+                root_collection=descriptor.name,
+                rtpc_replace_all=row_list_mode == "replaceAll",
+                rtpc_snapshots=rtpc_snapshots,
+                merge_existing=row_conflict == "merge" and row_list_mode == "append",
+                merge_guards=early_merge_guards,
+                platform=platform,
             )
             prepared_spec_by_path = {
                 str(spec["request_path"]): spec for spec in prepared_specs
             }
             for node in descriptor.nodes:
-                if node.language is not None:
+                if node.language is not None and node.import_arg is not None:
                     requested_languages.add(node.language)
                 if node.import_arg is not None:
                     trusted_import, import_spec = _prepare_object_set_import(
                         node.import_arg,
+                        version=request.version,
                         canonical_type=canonical_types[node.request_path],
                         type_catalog=type_catalog,
                         file_proofs=object_set_file_proofs,
@@ -5970,6 +6783,12 @@ def _prepare_object_set(
                 for spec in prepared_specs
                 if spec.get("request_path") in root_paths
             ]
+            allowed_classes = {element["class_id"] for element in proof["declaration"]["element_classes"]}
+            if proof["declaration"]["unresolved_element_types"] or any(
+                    spec["class_id"] not in allowed_classes for spec in root_specs):
+                raise OperationContractError("DOCUMENTED_LIST_ELEMENT_CLASS_INVALID",
+                    "Every requested List root class must be proved by this exact versioned owner declaration.",
+                    details={"list": descriptor.name, "allowed_element_classes": proof["declaration"]["element_classes"]})
             if len(root_specs) != len(descriptor.objects):
                 raise OperationContractError(
                     "INVALID_PREVIEW",
@@ -5977,17 +6796,32 @@ def _prepare_object_set(
                 )
             for list_spec in prepared_specs:
                 is_root = list_spec.get("request_path") in root_paths
+                if is_root:
+                    from .documented_list_fields import certify_anonymous_marker
+                    certify_anonymous_marker(list_spec, proof)
+                    list_spec["documented_list_element_class"] = list_spec["class_id"]
                 list_spec["target_index"] = index
                 list_spec.setdefault("platform", platform)
-                list_spec["collection"] = descriptor.name if is_root else "children"
+                list_spec["collection"] = descriptor.name if is_root else list_spec.get("collection", "children")
                 list_spec["list_owner_id"] = target.object
                 list_spec["list_name"] = descriptor.name
                 list_spec["list_mode"] = row_list_mode
                 list_spec["on_name_conflict"] = row_conflict
                 if is_root:
                     list_spec["parent_request_path"] = target_spec["request_path"]
+            if row_conflict != "fail" and any(spec.get("owned_control_input") for spec in prepared_specs):
+                raise OperationContractError("OWNED_CONTROL_INPUT_CONFLICT_UNPROVEN", "Non-fail owned ControlInput conflicts remain unfinished under issue #180.", details={"tracking_issue": 180})
+            rtpc_pairs = [_rtpc_pair_key(spec) for spec in root_specs if spec.get("rtpc_binding")]
+            if len(rtpc_pairs) != len(set(rtpc_pairs)):
+                raise OperationContractError("DUPLICATE_RTPC_PAIR", "An owner may request each exact RTPC pair once.")
             collisions_by_name: dict[str, list[dict[str, Any]]] = {}
             for root_spec in root_specs:
+                if root_spec.get("anonymous_list_member"):
+                    if row_conflict != "fail":
+                        raise OperationContractError("ANONYMOUS_LIST_CONFLICT_UNRESOLVED", "Anonymous nondefault name conflict semantics remain pending exact source/native proof")
+                    continue
+                if root_spec.get("rtpc_binding"):
+                    continue
                 requested_name = root_spec.get("requested_name")
                 collisions = [
                     row
@@ -6017,8 +6851,18 @@ def _prepare_object_set(
                             "rows": collisions,
                         },
                     )
+                if row_list_mode == "append" and row_conflict == "replace" and collisions:
+                    replacement_subtrees = _capture_object_list_replace_subtrees(collisions, read=read)
+                    for subtree in replacement_subtrees:
+                        subtree.update({"object_id": target.object, "list": descriptor.name})
+                    list_subtree_snapshots.extend(replacement_subtrees)
                 if row_list_mode == "append" and row_conflict == "merge" and collisions:
-                    if not _object_type_matches(collisions[0].get("type"), root_spec):
+                    # The ordinary List snapshot does not request classId. Never
+                    # accept an incidental extra field as semantic class proof.
+                    class_rows = _read_object_id_rows(collisions[0]["id"], fields=("id", "classId"), read=read)
+                    if (len(class_rows) != 1 or not _same_identity(class_rows[0].get("id"), collisions[0]["id"])
+                            or not _object_type_matches(collisions[0].get("type"), root_spec,
+                                actual_class_id=class_rows[0].get("classId"))):
                         raise OperationContractError(
                             "INVALID_TARGET_TYPE",
                             "An object-list merge collision has a different live type.",
@@ -6029,21 +6873,10 @@ def _prepare_object_set(
                                 "actual": collisions[0].get("type"),
                             },
                         )
-                    direct_requested_children = [
-                        spec
-                        for spec in prepared_specs
-                        if spec.get("parent_request_path") == root_spec.get("request_path")
-                    ]
-                    if direct_requested_children:
-                        raise OperationContractError(
-                            "LIST_MERGE_CHILDREN_UNSUPPORTED",
-                            "A pre-existing object-list member with requested descendants requires a dedicated list operation.",
-                            details={
-                                "list": descriptor.name,
-                                "name": requested_name,
-                            },
-                        )
                     root_spec["preexisting_id"] = collisions[0].get("id")
+                    root_spec["existing_path"] = collisions[0].get("path")
+                    root_spec["preexisting_children"] = _read_direct_children(collisions[0]["id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+                    children_snapshots.append({"object_id": collisions[0]["id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": root_spec["preexisting_children"]})
                     existing_fields = _object_spec_return_fields(root_spec)
                     snapshot_platform = root_spec.get("platform")
                     snapshot_language = _localized_import_read_language(
@@ -6063,7 +6896,7 @@ def _prepare_object_set(
                             existing_options,
                         )
                     )
-                    if len(existing_rows) != 1:
+                    if len(existing_rows) != 1 or not _object_spec_row_matches(existing_rows[0], root_spec, collisions[0]["id"]):
                         raise OperationContractError(
                             "INVALID_READBACK",
                             "A merged object-list member must resolve exactly once.",
@@ -6077,21 +6910,146 @@ def _prepare_object_set(
                             "rows": existing_rows,
                         }
                     )
+                    root_spec["pre_state"] = existing_rows[0]
             trusted[f"@{descriptor.name}"] = [
                 _materialize_canonical_object_node(
                     root,
                     canonical_types=canonical_types,
                     resolved_references=resolved_references,
                     derived_properties=derived_child_properties,
+                    native_nodes=render_native_nodes,
                     materialized_imports=materialized_imports,
+                    prepared_names=result_context["prepared_names"] if result_context else None,
+                    rtpc_updates={spec["request_path"]: spec for spec in prepared_specs if spec.get("rtpc_update")},
+                    rtpc_update_rows=dispatch_objects,
+                    plugin_materializations={spec["request_path"]: spec["graph_plugin_native"] for spec in prepared_specs if "graph_plugin_native" in spec},
                 )
                 for root in descriptor.objects
             ]
+            if descriptor.name == "RTPC":
+                trusted["@RTPC"] = [payload for spec, payload in zip(root_specs, trusted["@RTPC"])
+                    if not spec.get("rtpc_update")]
+                if not trusted["@RTPC"] and row_list_mode == "append":
+                    del trusted["@RTPC"]
             list_specs.extend(prepared_specs)
 
+        nested_nodes = [*children.nodes, *(node for descriptor in lists for node in descriptor.nodes)]
+        nested_specs = {str(spec["request_path"]): spec for spec in [*child_specs, *list_specs]}
+        for node in nested_nodes:
+            owner_spec = nested_specs[node.request_path]
+            parent_spec = nested_specs.get(str(owner_spec.get("parent_request_path")))
+            if (node.collection == "children" and parent_spec is not None
+                    and "expected_path" not in owner_spec and parent_spec.get("existing_path")
+                    and row_conflict in {"fail", "merge"}):
+                expected_path = _child_path(parent_spec["existing_path"], node.name, field="nested-parent.path")
+                fields = _object_spec_return_fields(owner_spec)
+                existing_rows = _read_object_path_rows(expected_path, fields=fields, read=read, platform=owner_spec.get("platform"))
+                if len(existing_rows) > 1:
+                    raise OperationContractError("AMBIGUOUS_IDENTITY", "A nested descendant resolves more than once.")
+                if existing_rows and row_conflict == "fail":
+                    raise OperationContractError("TARGET_EXISTS", "The requested nested descendant already exists.")
+                path_snapshots.append({"path": expected_path, "fields": fields, "platform": owner_spec.get("platform"), "rows": existing_rows})
+                owner_spec["expected_path"] = expected_path
+                if existing_rows:
+                    if not _object_type_matches(existing_rows[0].get("type"), owner_spec, actual_class_id=existing_rows[0].get("classId")):
+                        raise OperationContractError("INVALID_TARGET_TYPE", "The merged nested descendant has another type.")
+                    owner_spec["preexisting_id"] = existing_rows[0]["id"]
+                    owner_spec["existing_path"] = existing_rows[0]["path"]
+                    owner_spec["pre_state"] = existing_rows[0]
+                    owner_spec["preexisting_children"] = _read_direct_children(existing_rows[0]["id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+                    children_snapshots.append({"object_id": existing_rows[0]["id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": owner_spec["preexisting_children"]})
+            for descriptor in node.lists:
+                from .documented_list_fields import validate_planned_list_source, observe_planned_list
+                matches = [binding for binding in planned_bindings
+                    if binding.get("planned_owner", {}).get("request_path") == node.request_path
+                    and binding.get("declaration", {}).get("name") == descriptor.name]
+                if len(matches) != 1:
+                    raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Every planned List must bind one exact declaration result and source")
+                binding = matches[0]
+                if (binding.get("version") != request.version or binding["scope"].get("class_id") != owner_spec["class_id"]
+                        or not isinstance(binding["planned_owner"].get("result_handle"), str)):
+                    raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Planned owner occurrence/class/version differs from its List proof")
+                validate_planned_list_source(binding, read=read)
+                allowed_classes = {element["class_id"] for element in binding["declaration"]["element_classes"]}
+                if binding["declaration"]["unresolved_element_types"] or any(
+                        nested_specs[member.request_path]["class_id"] not in allowed_classes for member in descriptor.objects):
+                    raise OperationContractError("DOCUMENTED_LIST_ELEMENT_CLASS_INVALID", "Requested nested List member class is not proved by its owner declaration")
+                for member in descriptor.objects:
+                    from .documented_list_fields import certify_anonymous_marker
+                    certify_anonymous_marker(nested_specs[member.request_path], binding)
+                    nested_specs[member.request_path]["documented_list_element_class"] = nested_specs[member.request_path]["class_id"]
+                before_proof = observe_planned_list(binding, owner_spec["preexisting_id"], read=read) if owner_spec.get("preexisting_id") else None
+                planned_guards.append({"binding": binding, "before": before_proof})
+                if not descriptor.objects and row_list_mode != "replaceAll":
+                    raise OperationContractError("NO_OP", "An empty nested object list requires replace-all.")
+                before_rows: list[dict[str, Any]] = []
+                owner_id = owner_spec.get("preexisting_id")
+                if owner_id is not None:
+                    before_rows = _normalize_object_list_snapshot(
+                        _read_object_list(owner_id, descriptor.name, fields=OBJECT_LIST_SNAPSHOT_FIELDS, read=read,
+                                          platform=owner_spec.get("platform"), version=request.version), owner_id=owner_id, list_name=descriptor.name,
+                    )
+                if (any(member.anonymous for member in descriptor.objects)
+                        and len(descriptor.objects) + (len(before_rows) if row_list_mode == "append" else 0) > OBJECT_LIST_MAX_SUBTREE_NODES):
+                    raise OperationContractError("LIST_SNAPSHOT_LIMIT_EXCEEDED", "Anonymous construction exceeds the Gateway complete ordered membership bound before dispatch")
+                snapshot = {"object_id": owner_id, "list": descriptor.name, "fields": list(OBJECT_LIST_SNAPSHOT_FIELDS),
+                            "platform": owner_spec.get("platform"), "rows": before_rows}
+                owner_spec.setdefault("list_snapshots", []).append(snapshot)
+                owner_spec["list_mode"] = row_list_mode
+                if owner_id is not None:
+                    list_snapshots.append(snapshot)
+                    if any(member.anonymous for member in descriptor.objects):
+                        field_snapshots.extend(_capture_anonymous_member_state(before_rows, read=read,
+                            platform=owner_spec.get("platform"), preserve=row_list_mode == "append"))
+                    if row_list_mode == "replaceAll":
+                        removed = _capture_object_list_replace_subtrees(before_rows, read=read)
+                        for subtree in removed:
+                            subtree.update({"object_id": owner_id, "list": descriptor.name})
+                        list_subtree_snapshots.extend(removed)
+                for member in descriptor.objects:
+                    spec = nested_specs[member.request_path]
+                    spec.update({"collection": descriptor.name, "list_name": descriptor.name,
+                                 "list_mode": row_list_mode, "on_name_conflict": row_conflict})
+                    if member.anonymous:
+                        if row_conflict != "fail":
+                            raise OperationContractError("ANONYMOUS_LIST_CONFLICT_UNRESOLVED", "Anonymous nondefault name conflict semantics remain pending exact source/native proof")
+                        continue
+                    collisions = [row for row in before_rows if str(row.get("name", "")).casefold() == member.name.casefold()]
+                    if len(collisions) > 1:
+                        raise OperationContractError("AMBIGUOUS_IDENTITY", "A nested list member name resolves more than once.")
+                    if collisions and row_list_mode == "append":
+                        if row_conflict == "fail":
+                            raise OperationContractError("TARGET_EXISTS", "The nested list member already exists.")
+                        if row_conflict == "replace":
+                            replacement_subtrees = _capture_object_list_replace_subtrees(collisions, read=read)
+                            for subtree in replacement_subtrees:
+                                subtree.update({"object_id": owner_id, "list": descriptor.name})
+                            list_subtree_snapshots.extend(replacement_subtrees)
+                        if row_conflict == "merge":
+                            class_rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [collisions[0]["id"]]}}, {"return": ["id", "classId"]}))
+                            if (len(class_rows) != 1 or not _same_identity(class_rows[0].get("id"), collisions[0]["id"])
+                                    or not _object_type_matches(collisions[0].get("type"), spec, actual_class_id=class_rows[0].get("classId"))):
+                                raise OperationContractError("INVALID_TARGET_TYPE", "The merged nested list member has another type/class.")
+                            spec["preexisting_id"] = collisions[0]["id"]
+                            spec["existing_path"] = collisions[0].get("path")
+                            fields = _object_spec_return_fields(spec)
+                            options = {"return": fields, **({"platform": spec["platform"]} if spec.get("platform") else {})}
+                            observed = _rows(read(OBJECT_GET_URI, {"from": {"id": [collisions[0]["id"]]}}, options))
+                            if len(observed) != 1 or not _object_spec_row_matches(observed[0], spec, collisions[0]["id"]):
+                                raise OperationContractError("INVALID_READBACK", "Merged nested member lost its exact identity.")
+                            field_snapshots.append({"object_id": collisions[0]["id"], "fields": fields, "platform": spec.get("platform"), "rows": observed})
+                            spec["pre_state"] = observed[0]
+                            spec["preexisting_children"] = _read_direct_children(collisions[0]["id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+                            children_snapshots.append({"object_id": collisions[0]["id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": spec["preexisting_children"]})
+
+        from .existing_field_observations import capture_before
+        existing_field_history.append(capture_before(target_spec, property_info_by_name,
+            version=request.version, catalog=type_catalog, read=read))
         snapshot_fields = _dedupe_fields(
             [
                 *IDENTITY_RETURN_FIELDS,
+                "classId",
+                *(["IsVoice"] if "source_owner" in target_spec else []),
                 *(row["name"] for row in target_spec["properties"]),
                 *(row["name"] for row in target_spec["references"]),
             ]
@@ -6102,8 +7060,8 @@ def _prepare_object_set(
             snapshot_options["platform"] = platform
         snapshot_result = read(OBJECT_GET_URI, snapshot_args, snapshot_options)
         snapshot_rows = _rows(snapshot_result)
-        if len(snapshot_rows) != 1:
-            raise OperationContractError("INVALID_READBACK", "object.set pre-state target must resolve exactly once.")
+        if len(snapshot_rows) != 1 or not _object_spec_row_matches(snapshot_rows[0], target_spec, target.object):
+            raise OperationContractError("INVALID_READBACK", "object.set pre-state target must resolve once with its exact identity and class.")
         field_snapshots.append(
             {
                 "object_id": target.object,
@@ -6113,16 +7071,31 @@ def _prepare_object_set(
             }
         )
         for property_spec in target_spec["properties"]:
-            if property_spec.get("derived") and _field_value(
-                snapshot_rows[0], property_spec["name"]
-            ) is property_spec["value"]:
+            if not property_spec.get("derived"):
+                continue
+            current_value = _field_value(snapshot_rows[0], property_spec["name"])
+            restriction = property_spec.get("condition_restriction")
+            if isinstance(restriction, Mapping):
+                from .metadata_restrictions import condition_matches
+                satisfied = _has_field(snapshot_rows[0], property_spec["name"]) and condition_matches(restriction, current_value)
+                if not satisfied and len(restriction.get("values", [])) != 1:
+                    raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "The final Preview state requires an explicit satisfying prerequisite choice.", details={
+                        "object_id": target.object, "property": property_spec["name"], "current_value": current_value,
+                        "restriction": restriction, "mutation_dispatched": False,
+                    })
+            else:
+                satisfied = _has_field(snapshot_rows[0], property_spec["name"]) and condition_values_equal(current_value, property_spec["value"])
+            if satisfied:
                 trusted.pop(f"@{property_spec['name']}", None)
+                property_spec["value"] = current_value
                 property_spec["already_satisfied"] = True
         target_spec["pre_state"] = snapshot_rows[0]
         target_spec["expected_parent_id"] = _parent_value(
             snapshot_rows[0].get("parent")
         )
         child_rows = _read_direct_children(target.object, fields=IDENTITY_RETURN_FIELDS, read=read)
+        if live_source_parent:
+            field_snapshots.extend(_capture_retained_source_state(child_rows, owner=target, catalog=type_catalog, read=read, platform=platform, version=request.version))
         children_snapshots.append(
             {"object_id": target.object, "fields": list(IDENTITY_RETURN_FIELDS), "rows": child_rows}
         )
@@ -6142,7 +7115,53 @@ def _prepare_object_set(
                 "object.set target and child nodes exceed the single bounded result budget.",
                 details={"count": len(node_specs), "limit": DEFAULT_MAX_NODES},
             )
-        dispatch_objects.append(trusted)
+        if set(trusted) != {"object"}:
+            dispatch_objects.append(trusted)
+
+    unique_snapshots = []
+    for snapshot in field_snapshots:
+        if snapshot not in unique_snapshots:
+            unique_snapshots.append(snapshot)
+    field_snapshots = unique_snapshots
+    for spec in node_specs:
+        for snapshot in spec.pop("anonymous_target_snapshots", []):
+            matching = [row for row in field_snapshots if row.get("object_id") == snapshot["object_id"] and row.get("fields") == snapshot["fields"]]
+            if matching and matching != [snapshot]:
+                raise OperationContractError("INVALID_READBACK", "One selected ShareSet requires one unchanged preparation snapshot")
+            if not matching:
+                field_snapshots.append(snapshot)
+    from .effect_render_conditions import prepare_graph, EffectRenderConditionError
+    try:
+        effect_render_chains = prepare_graph(node_specs, render_native_nodes, version=request.version, read=read)
+    except EffectRenderConditionError as exc:
+        raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
+    _validate_graph_rtpc_capacity(node_specs, version=request.version)
+    from .object_graph_paths import prepare_ancestor_path_guards, FIELDS as ANCESTOR_PATH_FIELDS
+    try:
+        added_ancestors = prepare_ancestor_path_guards(node_specs, read=read)
+    except (ValueError, KeyError, TypeError) as exc:
+        raise OperationContractError("ANCESTOR_RENAME_PATH_UNPROVED", str(exc)) from exc
+    for row in added_ancestors:
+        field_snapshots.append({"object_id": row["id"], "fields": list(ANCESTOR_PATH_FIELDS), "rows": [row], "platform": None})
+
+    replaced_ids = {
+        _identity_key(row["id"])
+        for snapshot in [*replace_subtree_snapshots, *list_subtree_snapshots]
+        for row in snapshot["rows"]
+    }
+    if len(replaced_ids) > OBJECT_REPLACE_MAX_SUBTREE_NODES:
+        raise OperationContractError(
+            "REPLACE_SNAPSHOT_LIMIT_EXCEEDED",
+            "The batch replacement exceeds the complete old-GUID snapshot budget.",
+            details={"count": len(replaced_ids), "limit": OBJECT_REPLACE_MAX_SUBTREE_NODES},
+        )
+    for role, resolved in roles.items():
+        if _identity_key(resolved.object) in replaced_ids:
+            raise OperationContractError(
+                "REPLACE_DEPENDENCY_CONFLICT",
+                "A replacement would delete a target or reference required by this same Preview.",
+                details={"role": role, "object_id": resolved.object},
+            )
 
     has_imports = any(
         isinstance(spec.get("import"), Mapping) for spec in node_specs
@@ -6158,12 +7177,33 @@ def _prepare_object_set(
             if language_requires_live_project_validation(language):
                 requested_languages.add(str(language))
 
+    specs_by_path = {spec["request_path"]: spec for spec in node_specs}
+    for spec in node_specs:
+        if "source_plugin" not in spec:
+            continue
+        parent_spec = specs_by_path[spec["parent_request_path"]]
+        if parent_spec.get("preexisting_id") is not None and "preexisting_children" not in parent_spec:
+            rows = _read_direct_children(parent_spec["preexisting_id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+            parent_spec["preexisting_children"] = rows
+            children_snapshots.append({"object_id": parent_spec["preexisting_id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": rows})
+        ids = [row.get("id") for row in parent_spec.get("preexisting_children", [])]
+        if any(not _valid_object_id(value) for value in ids) or len({_identity_key(value) for value in ids}) != len(ids):
+            raise OperationContractError("INVALID_READBACK", "Source construction requires the complete unique pre-existing parent child GUID set.")
+        spec["source_plugin"]["preexisting_plugin_ids"] = ids
+    language_contexts = [spec[key] for spec in node_specs for key in ("construction_language", "source_language") if key in spec]
+    construction_inventory = (_read_import_language_inventory(request.version, read=import_context_read)
+                              if language_contexts else None)
+    for context in language_contexts:
+        context["selected"] = _select_construction_language(construction_inventory, context["requested"])
+        context["project"] = construction_inventory["project"]
+    for spec in node_specs:
+        if "construction_language" in spec:
+            spec["construction_language"]["expected_sources"] = [child["request_path"] for child in node_specs
+                if "source_plugin" in child and child["parent_request_path"] == spec["request_path"]]
     language_inventory: Mapping[str, Any] | None = None
     if requested_languages:
-        language_inventory = _read_import_language_inventory(
-            request.version,
-            read=import_context_read,
-        )
+        language_inventory = (construction_inventory if construction_inventory is not None else
+            _read_import_language_inventory(request.version, read=import_context_read))
         available_languages = {
             str(row["name"])
             for row in language_inventory.get("languages", [])
@@ -6195,6 +7235,15 @@ def _prepare_object_set(
     }
     if global_platform is not None:
         dispatch_args["platform"] = global_platform
+    from .owned_result_stages import certify_inner_occurrences
+    try:
+        stage_new_graphs = certify_inner_occurrences(node_specs, request.version) or stage_new_graphs
+    except ValueError as exc:
+        raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
+    from .planned_references import apply_result_name_choices
+    apply_result_name_choices(node_specs, result_context)
+    deferred_reference_stage = any('target_request_path' in field for node in node_specs for field in node.get('references', []))
+    from .owned_result_stages import creation_stage_count
     preview = _closed_operation_preview(
         uri="ak.wwise.core.object.set",
         args=dispatch_args,
@@ -6203,6 +7252,11 @@ def _prepare_object_set(
         family="object-mutation",
         metadata={
             "closed_object_batch": True,
+            "native_name_bindings": result_context["renames"] if result_context else [],
+            **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
+                "dependent_write": "after actual GUID/class/parent/membership binding" if deferred_reference_stage else "none",
+                "stage_count": creation_stage_count(node_specs) + bool(deferred_reference_stage)}}
+                if (result_context and (result_context['renames'] or result_context.get('duplicate_sibling_groups'))) or (stage_new_graphs and any(not node.get('existing_target') for node in node_specs)) else {}),
             "target_count": len(raw_objects),
             "node_count": len(node_specs),
             "platform": global_platform,
@@ -6223,6 +7277,7 @@ def _prepare_object_set(
         "children_snapshots": children_snapshots,
         "list_snapshots": list_snapshots,
         "list_subtree_snapshots": list_subtree_snapshots,
+        "subtree_snapshots": replace_subtree_snapshots,
         "field_snapshots": field_snapshots,
     }
     import_guard = {
@@ -6248,7 +7303,10 @@ def _prepare_object_set(
                 for row in node_specs
                 if isinstance(row.get("list_name"), str)
             }
+            | {snapshot["list"] for row in node_specs for snapshot in row.get("list_snapshots", [])}
+            | {row["collection"] for row in node_specs if row.get("owned_reference")}
         ),
+        "replaced_subtree_rows": [dict(row) for snapshot in replace_subtree_snapshots for row in snapshot["rows"]],
         "replaced_list_subtree_rows": [
             dict(row)
             for snapshot in list_subtree_snapshots
@@ -6266,7 +7324,114 @@ def _prepare_object_set(
     state: dict[str, Any] = {
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
+        "existing_field_observations": existing_field_history,
+        "effect_render_chains": effect_render_chains,
+        "graph_rtpc_guards": [spec for spec in node_specs if spec.get("rtpc_binding")],
     }
+    if result_context:
+        graph_guard["path_snapshots"].extend(result_context["path_snapshots"])
+        state["planned_reference_context"] = result_context
+    if documented_bindings:
+        if any(binding.get("version") != request.version for binding in documented_bindings):
+            raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "List source evidence must belong to this exact Wwise version")
+        from .documented_list_fields import observe_list_binding
+        try:
+            state["documented_list_guards"] = [observe_list_binding(evidence, read=read)
+                for evidence in documented_bindings]
+        except (ValueError, KeyError, TypeError) as exc:
+            raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", str(exc)) from exc
+    if result_context or stage_new_graphs:
+        from .owned_result_stages import prepare as prepare_owned_stages
+        try:
+            stage_plan = prepare_owned_stages(preview.envelope.uri, preview.envelope.args, preview.envelope.options,
+                node_specs, result_context, request.version, force=stage_new_graphs,
+                list_guards=[*planned_guards, *state.get('documented_list_guards', []), *early_merge_guards])
+        except ValueError as exc:
+            raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
+        if stage_plan is not None:
+            from .owned_result_stages import native_node
+            captured = {row['id'].upper() for rename in (result_context or {}).get('renames', [])
+                for snapshot in rename['collision_state'] for row in snapshot['rows']}
+            collision_state = []
+            for parent_spec in (node for node in node_specs if node.get('existing_target')):
+                native_parent = native_node(stage_plan['creation_args'], parent_spec['request_path'])
+                if native_parent.get('onNameConflict', conflict) != 'rename':
+                    continue
+                names = {node['requested_name'].casefold() for node in node_specs
+                    if node.get('parent_request_path') == parent_spec['request_path']}
+                for collision in parent_spec.get('preexisting_children', []):
+                    if collision['name'].casefold() not in names or collision['id'].upper() in captured:
+                        continue
+                    snapshot = _capture_planned_rename_collision(collision, read=read)
+                    collision_state.append(snapshot)
+                    captured.update(row['id'].upper() for row in snapshot['rows'])
+                    for row in snapshot['rows']:
+                        graph_guard['field_snapshots'].append({'object_id': row['id'], 'fields': snapshot['fields'], 'platform': None, 'rows': [row]})
+                        graph_guard['children_snapshots'].append({'object_id': row['id'], 'fields': ['id'],
+                            'rows': [{'id': child['id']} for child in snapshot['rows'] if _same_identity(_parent_value(child.get('parent')), row['id'])]})
+            if collision_state:
+                stage_plan['collision_state'] = collision_state
+            merged_owners = [node for node in node_specs if node.get('preexisting_id')
+                and node['request_path'] in {profile['owner'] for profile in stage_plan.get('lists', [])}]
+            if merged_owners:
+                stage_plan['merge_state'] = []
+                for owner in merged_owners:
+                    snapshot = _capture_planned_rename_collision(owner['pre_state'], read=read)
+                    rows_by_id = {row['id']: row for row in snapshot['rows']}
+                    old = rows_by_id.get(owner['preexisting_id'], {})
+                    if (old.get('classId') != owner['class_id'] or any(old.get(key) != value
+                            for key, value in owner['pre_state'].items() if key in snapshot['fields'])
+                            or any(any(rows_by_id.get(child['id'], {}).get(key) != value
+                                for key, value in child.items() if key in snapshot['fields'])
+                                for child in owner.get('preexisting_children', []))):
+                        raise OperationContractError('INVALID_READBACK', 'Merged owner preservation changed during preparation')
+                    stage_plan['merge_state'].append(snapshot)
+                    for row in snapshot['rows']:
+                        graph_guard['field_snapshots'].append({'object_id': row['id'], 'fields': snapshot['fields'],
+                            'platform': None, 'rows': [row]})
+            if stage_plan.get('lists') and replace_subtree_snapshots:
+                from .owned_result_stages import replacement_scopes
+                try:
+                    stage_plan['replacements'] = replacement_scopes(node_specs, replace_subtree_snapshots, path_snapshots)
+                except ValueError as exc:
+                    raise OperationContractError('PLANNED_REFERENCE_STAGING_UNAVAILABLE', str(exc)) from exc
+            state["owned_result_stages"] = stage_plan
+            from .owned_result_stages import preservation_rows
+            try:
+                preservation_rows({'verification_plan': verification, 'pre_state': state})
+            except ValueError as exc:
+                raise OperationContractError('PLANNED_REFERENCE_STAGING_UNAVAILABLE', str(exc)) from exc
+            from .edit_history_business import capture_field_read_platform
+            state["field_read_platform"] = capture_field_read_platform(request.version,
+                stage_plan["creation_args"].get("platform"), read=read)
+    reference_guards = [guard for spec in node_specs for guard in spec.get("documented_reference_lists", [])]
+    changed_ids = {spec.get("target_id") or spec.get("preexisting_id") for spec in node_specs}
+    for guard in reference_guards:
+        guard["changed_target_ids"] = [row["id"] for row in guard["targets"] if row["id"] in changed_ids]
+    if reference_guards:
+        state["documented_planned_reference_guards"] = reference_guards
+    if len(planned_guards) + len(reference_guards) != len(planned_bindings):
+        raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Every planned List source must belong to one reachable owner occurrence")
+    if planned_guards:
+        state["documented_planned_list_guards"] = planned_guards
+    from .documented_list_fields import capture_slot_reference_targets
+    reference_targets = capture_slot_reference_targets(node_specs, roles)
+    if reference_targets:
+        state["documented_list_reference_targets"] = reference_targets
+    curve_guards = [field["curve_proof"] for spec in node_specs for field in spec.get("references", []) if "curve_proof" in field]
+    if curve_guards:
+        if len(node_specs) + len(curve_guards) > DEFAULT_MAX_NODES:
+            raise OperationContractError("NODE_LIMIT_EXCEEDED", "Inline curves and their owners exceed the single bounded node budget.")
+        state["inline_curve_guards"] = list({canonical_json_bytes(proof): proof for proof in curve_guards}.values())
+    _merge_observed_list_guards(state.setdefault("documented_list_guards", []), early_merge_guards, planned=planned_guards)
+    condition_metadata_guards.extend(spec["condition_metadata_guard"] for spec in node_specs if "condition_metadata_guard" in spec)
+    related_conditions.extend(item for spec in node_specs for item in spec.get("related_conditions", []))
+    if condition_metadata_guards:
+        state["condition_metadata_guards"] = condition_metadata_guards
+    if related_conditions:
+        state["related_conditions"] = related_conditions
+    if reference_target_conditions:
+        state["reference_target_conditions"] = reference_target_conditions
     if has_imports or requested_languages:
         state["import_guard"] = import_guard
     return preview, roles, state, verification, cleanup
@@ -6352,14 +7517,240 @@ def _prepare_object_set_linked(
     return preview, {"object": target}, pre_state, verification, cleanup
 
 
+def _require_owned_control_input_reference(reference, input_type):
+    _require_object_reference_metadata(reference)
+    from .metadata_restrictions import reference_allowed_types
+    allowed = reference_allowed_types(reference.restriction)
+    input_token = reference_type_token(input_type)
+    if allowed and input_token not in {reference_type_token(value) for value in allowed}:
+        raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "Live ControlInput metadata does not permit the requested type.")
+    for row in reference.restriction.get("restrictions", []):
+        if row == "notNull":
+            continue
+        if not isinstance(row, Mapping) or "type" not in row or set(row) - {"type", "sharedOnlyTypes"}:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Owned ControlInput has an unproved live reference classifier.")
+        types = row["type"]
+        if not isinstance(types, list) or not all(isinstance(value, str) and value for value in types):
+            raise OperationContractError("INVALID_METADATA", "Reference type restriction must be a string array.")
+        shared = row.get("sharedOnlyTypes", [])
+        if (not isinstance(shared, list) or any(not isinstance(value, str) or not value for value in shared)
+                or {reference_type_token(value) for value in shared} - {reference_type_token(value) for value in types}):
+            raise OperationContractError("INVALID_METADATA", "Shared-only reference types must be non-empty strings within the allowed type array.")
+        if input_token in {reference_type_token(value) for value in shared}:
+            raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "This live target type requires a shared reference.")
+
+
+def _prepare_owned_control_input(descriptor, *, version, read, inherited_platform=None, curve_points=None, curve_context="new_rtpc"):
+    """Seal the exact new class, reference allowance and prospective fields."""
+    from .new_object_defaults import class_default_evidence, NewObjectDefaultError
+    if version not in CONTROL_INPUT_VERSIONS or not isinstance(descriptor, OwnedControlInputDescriptor):
+        raise OperationContractError("CONTROL_INPUT_CONSTRUCTION_VERSION_BOUNDARY", "This property-bound owned ControlInput constructor was introduced in 2022.1.")
+    if descriptor.platform is None and descriptor.properties and inherited_platform is not None:
+        raise OperationContractError("OWNED_CONTROL_INPUT_PLATFORM_ASSIGNMENTS_UNRESOLVED",
+            "Generic new-input Field Handles cannot inherit an explicit graph platform; separate assignment authority remains issue #180 work.",
+            details={"tracking_issue": 180, "inherited_platform": inherited_platform})
+    from .owned_control_inputs import constructor_authority
+    try:
+        source_authority = constructor_authority(version)
+    except (ValueError, KeyError, TypeError, OSError, StopIteration) as exc:
+        raise OperationContractError("OWNED_CONTROL_INPUT_SOURCE_INVALID", "Packaged constructor authority is unavailable or changed.") from exc
+    catalog = _read_object_type_catalog(read)
+    info = _resolve_object_type(descriptor.type, catalog=catalog)
+    rtpc = _resolve_object_type("RTPC", catalog=catalog)
+    if info.class_id != CONTROL_INPUT_CLASSES[descriptor.type] or rtpc.class_id != 1441808:
+        raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "Live classes differ from the version-proven owned ControlInput classes.")
+    reference = _read_property_info(read, class_id=rtpc.class_id, name="ControlInput")
+    _require_owned_control_input_reference(reference, descriptor.type)
+    fields = [_read_property_info(read, class_id=info.class_id, name=name) for name, _ in descriptor.properties]
+    for field, (_, value) in zip(fields, descriptor.properties):
+        _require_object_property_value(field, value)
+    time_axis = None
+    if descriptor.type == "ModulatorTime":
+        duration_field = next((field for field in fields if field.name == "TimeModDuration"), None)
+        if duration_field is None:
+            duration_field = _read_property_info(read, class_id=info.class_id, name="TimeModDuration")
+            fields.append(duration_field)
+        supplied = dict(descriptor.properties)
+        explicit = "TimeModDuration" in supplied
+        duration = supplied.get("TimeModDuration", duration_field.default)
+        repair = {"discover_field": {"subcommand": "draft-discover-fields", "type_handle": "<selected ModulatorTime Type Handle>", "meaning": "Duration"},
+            "declare": {"subcommand": "draft-declare-field-change" if curve_context == "replacement_preservation" else "draft-declare-rtpc",
+                "option": "--new-control-input-field-value", "arguments": ["<returned Duration Field Handle>", "<explicit duration in seconds within its live restriction>"]}}
+        if (duration_field.name != "TimeModDuration" or (duration_field.type or "").casefold() != "real64"
+                or not explicit and "default" not in duration_field.raw
+                or not _is_finite_waapi_number(duration) or duration <= 0):
+            raise OperationContractError("CONTROL_INPUT_TIME_DURATION_REQUIRED", "Discover the Duration class Field Handle and declare its explicit value in seconds; no usable typed class default is proved.",
+                details={"repair": repair, "tracking_issue": 180, "mutation_dispatched": False})
+        try:
+            _require_object_property_value(duration_field, duration)
+        except OperationContractError as exc:
+            raise OperationContractError("CONTROL_INPUT_TIME_DURATION_REQUIRED", "The effective Duration does not satisfy fresh class metadata; declare an explicit Duration Field Handle value.",
+                details={"repair": repair, "tracking_issue": 180, "mutation_dispatched": False}) from exc
+        if not isinstance(curve_points, (list, tuple)) or not curve_points:
+            raise OperationContractError("INVALID_READBACK", "Time-axis admission requires the exact declared or preserved Curve points.")
+        if any(not isinstance(point, Mapping) or not _is_finite_waapi_number(point.get("x")) for point in curve_points):
+            raise OperationContractError("INVALID_READBACK", "Time-axis admission requires Curve point objects with finite numeric X coordinates.")
+        outside = [index for index, point in enumerate(curve_points) if not 0 <= point["x"] <= duration]
+        if outside:
+            if curve_context == "replacement_preservation":
+                repair["preservation"] = "This replacement changes only ControlInput and cannot rewrite its existing Curve. Choose an explicit Duration Field Handle value that contains every existing X within its live restriction, if one exists; otherwise retain this input. A separate object.setRTPC draft-declare-rtpc can add a new RTPC with explicitly chosen Time points while preserving the old RTPC."
+            raise OperationContractError("CONTROL_INPUT_TIME_AXIS_OUT_OF_RANGE", "Interim Time intent-preservation policy requires explicit Curve X coordinates in seconds within effective Duration; points and Duration are never normalized.",
+                details={"x_range_seconds": [0, duration], "effective_duration_source": "explicit" if explicit else "class_default",
+                    "offending_point_indices": outside, "curve_context": curve_context, "repair": repair,
+                    "tracking_issue": 180, "native_domain_complete": False, "mutation_dispatched": False})
+        time_axis = {"unit": "seconds", "x_range_seconds": [0, duration], "effective_duration": duration,
+            "effective_duration_source": "explicit" if explicit else "class_default", "curve_context": curve_context,
+            "platform": descriptor.platform, "points": [dict(point) for point in curve_points],
+            "authority": source_authority["time_axis"], "native_domain_complete": False, "tracking_issue": 180}
+    try:
+        defaults = class_default_evidence(infos=fields, scope={"classId": info.class_id}, read_call=read,
+            supplied_values=dict(descriptor.properties), validate_scalar=_require_object_property_value, version=version)
+        reference_defaults = class_default_evidence(infos=[reference], scope={"classId": rtpc.class_id}, read_call=read,
+            supplied_references={"ControlInput": True}, validate_scalar=_require_object_property_value, version=version)
+    except NewObjectDefaultError as exc:
+        raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+    properties = {**dict(descriptor.properties), **defaults["derived_properties"]}
+    if time_axis is not None:
+        properties["TimeModDuration"] = time_axis["effective_duration"]
+    return {"type": info.name, "class_id": info.class_id, "name": descriptor.name,
+        "constructor_authority": source_authority,
+        "platform": descriptor.platform,
+        "notes": descriptor.notes, "properties": properties, **({"time_axis": time_axis} if time_axis is not None else {}),
+        "native": descriptor.native(defaults["derived_properties"]),
+        "metadata_guards": [{"class_metadata": info.as_dict(), "new_object_default_evidence": [defaults]},
+            {"class_metadata": rtpc.as_dict(), "new_object_default_evidence": [reference_defaults]}]}
+
+
+def _observe_owned_reference_result(owner_id, field, *, read, readbacks):
+    args, options = {"from": {"id": [owner_id]}}, {"return": ["id", field]}
+    result = read(OBJECT_GET_URI, args, options)
+    rows = _rows(result)
+    readbacks.append({"role": "owned-reference-association", "uri": OBJECT_GET_URI, "args": args, "options": options, "result": result})
+    identity = _reference_identity(_field_value(rows[0], field)) if len(rows) == 1 and _same_identity(rows[0].get("id"), owner_id) else None
+    if not _valid_object_id(identity):
+        raise ObjectOperationContractError("INVALID_READBACK", "The owned reference must expose one canonical target GUID")
+    args, options = {"from": {"id": [identity]}}, {"return": ["id", "name"]}
+    result = read(OBJECT_GET_URI, args, options)
+    rows = _rows(result)
+    readbacks.append({"role": "owned-reference-result", "uri": OBJECT_GET_URI, "args": args, "options": options, "result": result})
+    if len(rows) != 1 or not _same_identity(rows[0].get("id"), identity) or not isinstance(rows[0].get("name"), str):
+        raise ObjectOperationContractError("INVALID_READBACK", "The owned target must independently resolve once")
+    return identity, rows[0]["name"]
+
+
+def _prepare_owned_control_replacement(target, descriptor, *, target_spec, version, read):
+    """An existing RTPC changes one owned reference; its list/Curve stay fixed."""
+    before = _read_object_id_rows(target.object, fields=(*RTPC_SNAPSHOT_FIELDS, "classId", "owner"), read=read)
+    if len(before) != 1 or not _same_identity(before[0].get("id"), target.object):
+        raise OperationContractError("INVALID_READBACK", "Existing RTPC replacement needs one exact complete RTPC row.")
+    row = before[0]
+    owner_id = _reference_identity(row.get("owner"))
+    old_id = _reference_identity(_field_value(row, "ControlInput"))
+    if not _valid_object_id(owner_id) or not _valid_object_id(old_id):
+        raise OperationContractError("OWNED_CONTROL_INPUT_REPLACEMENT_UNPROVEN", "The existing RTPC must have observed canonical owner/input identities.", details={"tracking_issue": 180})
+    shared = _read_shared_reference_target(old_id, read=read, platform=None, version=version, require_match=False)
+    if shared["owner_absent"] is not True or not _valid_object_id(shared["parent_id"]):
+        raise OperationContractError("OWNED_INPUT_REPLACEMENT_DISPOSITION_UNPROVEN", "Replacing an old owned custom input remains unfinished under issue #180.", details={"tracking_issue": 180})
+    baseline = _read_graph_rtpc_rows(owner_id, version=version, class_id=1441808, read=read)
+    if sum(_same_identity(member["id"], target.object) for member in baseline) != 1:
+        raise OperationContractError("INVALID_READBACK", "The selected RTPC must occur exactly once in its complete owning list.")
+    curve = _field_value(row, "Curve")
+    proof = _prepare_owned_control_input(descriptor.target, version=version, read=read, inherited_platform=target_spec.get("platform"),
+        curve_points=curve.get("points") if isinstance(curve, Mapping) else None, curve_context="replacement_preservation")
+    proof.update(baseline_rows=baseline, old_control_input=old_id, owner_id=owner_id)
+    path = target_spec["request_path"] + ".owned_control_input"
+    spec = {"request_path": path, "parent_request_path": target_spec["request_path"],
+        "existing_target": False, "requested_name": proof["name"], "requested_type": proof["type"],
+        "canonical_type": proof["type"], "class_id": proof["class_id"],
+        **proof["metadata_guards"][0], "notes_supplied": proof["notes"] is not None,
+        "requested_notes": proof["notes"], "properties": [{"name": name, "value": value} for name, value in proof["properties"].items()],
+        "platform": proof["platform"],
+        "references": [], "collection": "ControlInput", "owned_reference": True}
+    snapshots = []
+    for member in baseline:
+        fields = list(RTPC_SNAPSHOT_FIELDS) + ["classId", "owner"]
+        if _same_identity(member["id"], target.object):
+            fields = [field for field in fields if field.lstrip("@") != "ControlInput"]
+        expected = {field: member[field] for field in fields if field in member}
+        snapshots.append({"object_id": member["id"], "fields": fields, "rows": [expected], "preserve_after_write": True})
+    membership_fields = [*IDENTITY_RETURN_FIELDS, "classId", "@RTPC"]
+    membership = _read_object_id_rows(owner_id, fields=membership_fields, read=read)
+    if len(membership) != 1 or not _same_identity(membership[0].get("id"), owner_id):
+        raise OperationContractError("INVALID_READBACK", "RTPC owner membership must independently resolve once.")
+    snapshots.append({"object_id": owner_id, "fields": membership_fields, "rows": membership, "preserve_after_write": True})
+    # Discovery owns the projection tokens; bounded pages preserve every
+    # discovered old shared-input field without assuming a fixed Modulator set.
+    from .builders.query import MAX_STRUCTURED_RETURN_FIELDS
+    names = parse_property_and_reference_names_result(read(GET_PROPERTY_AND_REFERENCE_NAMES_URI, {"object": old_id}, {}))
+    base = _dedupe_fields([*IDENTITY_RETURN_FIELDS, "classId", "owner"])
+    tokens = _dedupe_fields(["@" + field.name for field in names])
+    page_size = MAX_STRUCTURED_RETURN_FIELDS - len(base)
+    for offset in range(0, max(1, len(tokens)), page_size):
+        fields = [*base, *tokens[offset:offset + page_size]]
+        rows = _read_object_id_rows(old_id, fields=fields, read=read)
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), old_id):
+            raise OperationContractError("INVALID_READBACK", "The old shared ControlInput must independently resolve once.")
+        snapshots.append({"object_id": old_id, "fields": fields, "rows": rows, "preserve_after_write": True})
+    return proof, spec, snapshots
+
+
+def _rtpc_baseline_identities(rows):
+    values = []
+    for row in rows:
+        values.extend((row.get("id"), _reference_identity(_field_value(row, "ControlInput")),
+            _reference_identity(_field_value(row, "Curve"))))
+    return {_identity_key(value) for value in values if _valid_object_id(value)}
+
+
+def _owned_control_input_assertions(proof, *, rtpc_id, control_id, read, owner_id=None, baseline_ids=()):
+    """Independently certify the exact new owned result; shared by callers."""
+    fields = ["id", "name", "type", "classId", "owner", "notes", *proof["properties"]]
+    args, options = {"from": {"id": [control_id]}}, {"return": fields}
+    if proof.get("platform") is not None:
+        options["platform"] = proof["platform"]
+    result = read(OBJECT_GET_URI, args, options)
+    rows = _rows(result)
+    exact = len(rows) == 1 and _same_identity(rows[0].get("id"), control_id)
+    row = rows[0] if exact else {}
+    assertions = [{"name": "new ControlInput identity is absent from the complete owning baseline",
+        "passed": _identity_key(control_id) not in baseline_ids, "evidence": {"id": control_id, "baseline_ids": sorted(baseline_ids)}},
+        {"name": "new ControlInput has its exact requested class and RTPC owner", "passed": bool(exact
+        and row.get("type") == proof["type"] and _object_class_matches(row.get("classId"), proof["class_id"])
+        and row.get("name") == proof["name"] and _same_identity(_reference_identity(row.get("owner")), rtpc_id)), "evidence": rows}]
+    for name, value in proof["properties"].items():
+        assertions.append({"name": f"new ControlInput {name} matches", "passed": bool(exact and _has_field(row, name)
+            and condition_values_equal(_field_value(row, name), value)), "evidence": {"expected": value, "actual": _field_value(row, name)}})
+    if proof["notes"] is not None:
+        assertions.append({"name": "new ControlInput notes match", "passed": bool(exact and row.get("notes") == proof["notes"]), "evidence": rows})
+    readbacks = [{"role": "new-owned-control-input", "uri": OBJECT_GET_URI, "args": args, "options": options, "result": result}]
+    if owner_id is not None:
+        args, options = {"from": {"id": [rtpc_id]}}, {"return": ["id", "name", "type", "classId", "owner"]}
+        result = read(OBJECT_GET_URI, args, options)
+        rows = _rows(result)
+        assertions.append({"name": "new RTPC retains the exact native class and selected owner", "passed": bool(len(rows) == 1
+            and _same_identity(rows[0].get("id"), rtpc_id) and rows[0].get("name") == ""
+            and rows[0].get("type") == "RTPC" and _object_class_matches(rows[0].get("classId"), 1441808)
+            and _same_identity(_reference_identity(rows[0].get("owner")), owner_id)), "evidence": rows})
+        readbacks.append({"role": "new-owned-control-rtpc", "uri": OBJECT_GET_URI, "args": args, "options": options, "result": result})
+    return assertions, readbacks
+
+
 def _prepare_object_set_rtpc(
     request: OperationRequest,
     *,
     arguments: Mapping[str, Any],
     read: ReadCall,
 ) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    raw_control = arguments.get("control_input")
+    owned = isinstance(raw_control, Mapping) and "new_control_input" in raw_control
+    if owned:
+        node = {"rtpc": {key: arguments[key] for key in ("property", "control_input", "points", "notes") if key in arguments},
+            "rtpc_mode": arguments.get("mode", "add_or_replace")}
+        return _prepare_object_set(request, arguments={"objects": [{"object": arguments["object"],
+            "lists": [{"name": "RTPC", "objects": [node]}]}],
+            "graph_result_bindings": arguments["graph_result_bindings"]}, read=read)
     target = _resolve_identity(arguments.get("object"), role="object", read=read)
-    control = _resolve_identity(arguments.get("control_input"), role="control_input", read=read)
+    control = _resolve_identity(raw_control, role="control_input", read=read)
     if not _is_rtpc_control_input(control.row.get("type")):
         raise OperationContractError(
             "INVALID_CONTROL_INPUT_TYPE",
@@ -6401,31 +7792,7 @@ def _prepare_object_set_rtpc(
         version=request.version,
         read=read,
     )
-    matches = [
-        row
-        for row in before_rows
-        if row.get("@PropertyName") == descriptor.property
-        and _same_identity(
-            _reference_identity(row.get("@ControlInput")),
-            control.object,
-        )
-    ]
-    if len(matches) > 1:
-        raise OperationContractError(
-            "AMBIGUOUS_RTPC",
-            "More than one RTPC matches the requested property and ControlInput.",
-            details={
-                "property": descriptor.property,
-                "control_input": control.object,
-                "matches": matches,
-            },
-        )
-    if mode == "add" and matches:
-        raise OperationContractError(
-            "TARGET_EXISTS",
-            "object.setRTPC add requires the property/ControlInput pair to be absent.",
-            details={"property": descriptor.property, "control_input": control.object},
-        )
+    matches = _match_rtpc_pair(before_rows, descriptor.property, control.object, mode=mode, rtpc_support=rtpc_support)
 
     action = "update" if matches else "add"
     if action == "add":
@@ -6520,10 +7887,166 @@ def _prepare_object_set_rtpc(
     return (
         preview,
         {"object": target, "control_input": control},
-        {"rtpc_snapshot": rtpc_snapshot},
+        {"rtpc_snapshot": rtpc_snapshot, "condition_metadata": {"object_id": target.object,
+            "fields": [info.as_dict()]}},
         verification,
         cleanup,
     )
+
+
+def _require_rtpc_property_count(property_name, rtpc_support, count):
+    if isinstance(rtpc_support, str) and rtpc_support.casefold() == "exclusive" and count > 1:
+        raise OperationContractError("RTPC_EXCLUSIVE_CONFLICT",
+            "Exclusive RTPC support permits only one curve per property, regardless of ControlInput; an append cannot replace an unrequested old pair.",
+            details={"property": property_name, "rtpc_support": rtpc_support, "expected_count": count, "limit": 1})
+
+
+def _match_rtpc_pair(rows, property_name, control_id, *, mode, rtpc_support=None):
+    """The pair, rather than the empty native name, defines RTPC identity."""
+    matches = [row for row in rows if _field_value(row, "PropertyName") == property_name
+        and _same_identity(_reference_identity(_field_value(row, "ControlInput")), control_id)]
+    if len(matches) > 1:
+        raise OperationContractError("AMBIGUOUS_RTPC", "More than one RTPC matches the requested property and ControlInput.",
+            details={"property": property_name, "control_input": control_id, "matches": matches})
+    if mode == "add" and matches:
+        raise OperationContractError("TARGET_EXISTS", "RTPC add requires the property/ControlInput pair to be absent.",
+            details={"property": property_name, "control_input": control_id})
+    existing_property_count = sum(isinstance(_field_value(row, "PropertyName"), str)
+        and _field_value(row, "PropertyName").casefold() == property_name.casefold() for row in rows)
+    _require_rtpc_property_count(property_name, rtpc_support, existing_property_count + (not matches))
+    return matches
+
+
+def _read_graph_rtpc_rows(owner_id, *, version, class_id, read, snapshot_cache=None):
+    key = (_identity_key(owner_id), version, class_id)
+    if snapshot_cache is not None and key in snapshot_cache:
+        return snapshot_cache[key]
+    rows, _ = _read_rtpc_rows_with_evidence(owner_id, version=version, read=read)
+    complete = []
+    for row in rows:
+        observed = _read_object_id_rows(row["id"], fields=(*RTPC_SNAPSHOT_FIELDS, "classId", "owner"), read=read)
+        if (len(observed) != 1 or any(observed[0].get(key) != value for key, value in row.items())
+                or type(observed[0].get("classId")) is not int or observed[0]["classId"] != class_id
+                or observed[0].get("name") != ""
+                or not _same_identity(_reference_identity(observed[0].get("owner")), owner_id)):
+            raise OperationContractError("INVALID_READBACK", "Every RTPC must retain its exact complete pair/class/owner observation.")
+        complete.append(observed[0])
+    if snapshot_cache is not None:
+        snapshot_cache[key] = complete
+    return complete
+
+
+def _rtpc_pair_key(spec):
+    control_ref = next(ref for ref in spec["references"] if ref["name"] == "ControlInput")
+    input_key = ("new", control_ref["target_request_path"]) if spec.get("owned_control_input") else _identity_key(control_ref["target_id"])
+    return (spec["rtpc_binding"]["property"].casefold(), input_key)
+
+
+def _owned_rtpc_outcome_signature(spec):
+    """Observable requested outcome, independent of temporary occurrence IDs."""
+    proof = spec["owned_control_input"]
+    return canonical_sha256({"property": spec["rtpc_binding"]["property"],
+        "platform": spec.get("platform"),
+        "input": {key: proof.get(key) for key in ("type", "class_id", "name", "notes", "platform", "properties")},
+        "rtpc_notes": {"supplied": spec.get("notes_supplied"), "value": spec.get("requested_notes")},
+        "curve": next(ref["curve"] for ref in spec["references"] if ref["name"] == "Curve")})
+
+
+def _validate_graph_rtpc_capacity(specs, *, version):
+    """Admit the combined owner outcome, including aliases of an existing owner."""
+    by_path = {spec["request_path"]: spec for spec in specs}
+    owners = {}
+    for spec in specs:
+        if not spec.get("rtpc_binding"):
+            continue
+        guard = spec.get("rtpc_list_guard")
+        parent = by_path.get(spec.get("parent_request_path"), {})
+        owner = (("existing", _identity_key(guard["owner_id"])) if guard is not None else
+            ("planned", spec.get("parent_request_path")))
+        group = owners.setdefault(owner, {"before": guard["before"] if guard else [],
+            "class_id": spec["class_id"], "version": version, "modes": set(), "pairs": set(), "new": 0,
+            "properties": {}, "owned_outcomes": {}})
+        if group["class_id"] != spec["class_id"] or (guard and group["before"] != guard["before"]):
+            raise OperationContractError("INVALID_READBACK", "One RTPC owner needs one exact class and complete pre-state.")
+        mode = spec.get("list_mode", parent.get("list_mode", "append"))
+        group["modes"].add(mode)
+        pair = _rtpc_pair_key(spec)
+        if pair in group["pairs"]:
+            raise OperationContractError("DUPLICATE_RTPC_PAIR", "One owner may request each exact RTPC pair once across the graph.")
+        group["pairs"].add(pair)
+        if spec.get("owned_control_input"):
+            group["owned_outcomes"].setdefault(_owned_rtpc_outcome_signature(spec), []).append(spec["request_path"])
+        is_new = spec.get("preexisting_id") is None
+        group["new"] += is_new
+        support = spec["rtpc_property_guard"]["metadata"]["supports"].get("rtpc")
+        property_group = group["properties"].setdefault(pair[0], {"support": support, "requested": 0, "new": 0})
+        if property_group["support"] != support:
+            raise OperationContractError("INVALID_READBACK", "One RTPC property needs one unchanged support mode.")
+        property_group["requested"] += 1
+        property_group["new"] += is_new
+    for owner, group in owners.items():
+        for paths in group["owned_outcomes"].values():
+            if len(paths) > 1 and any(ref.get("target_request_path") in paths
+                    for node in specs for ref in node.get("references", [])):
+                raise OperationContractError("OWNED_RTPC_ASSOCIATION_DISTINGUISHED_UNPROVEN",
+                    "Equivalent owned RTPC outcomes cannot be externally distinguished without a proved association.",
+                    details={"tracking_issue": 180, "paths": paths})
+        if len(group["modes"]) != 1:
+            raise OperationContractError("OBJECT_SET_LIST_BEHAVIOR_CONFLICT", "One actual RTPC owner cannot mix list modes.")
+        for property_name, property_group in group["properties"].items():
+            before_count = sum(isinstance(_field_value(row, "PropertyName"), str)
+                and _field_value(row, "PropertyName").casefold() == property_name for row in group["before"])
+            count = (property_group["requested"] if group["modes"] == {"replaceAll"} else
+                before_count + property_group["new"])
+            _require_rtpc_property_count(property_name, property_group["support"], count)
+        count = (len(group["pairs"]) if group["modes"] == {"replaceAll"} else
+            len(group["before"]) + group["new"])
+        if count > RTPC_MAX_LIST_ROWS:
+            raise OperationContractError("RTPC_LIST_LIMIT_EXCEEDED", "The combined requested RTPC list exceeds the complete-list limit.",
+                details={"owner": list(owner), "before_count": len(group["before"]), "requested_new_count": group["new"],
+                    "expected_count": count, "limit": RTPC_MAX_LIST_ROWS})
+
+
+def _resolve_graph_rtpc_target(node, spec, specs, *, root_parent, version, read, identity_cache, property_info_cache, snapshot_cache, replace_all=False, platform=None):
+    parent = next((item for item in specs if item["request_path"] == node.parent_request_path), None)
+    if parent is not None:
+        owner_id = parent.get("preexisting_id")
+        owner_class = parent["class_id"]
+    elif root_parent is not None:
+        owner_id, owner_class = root_parent.object, None
+    else:
+        raise OperationContractError("INVALID_PREVIEW", "RTPC requires one closed owner occurrence.")
+    scope = {"object_id": owner_id} if owner_id is not None else {"class_id": owner_class}
+    info = _read_property_info_cached(read, cache=property_info_cache, **scope, name=node.rtpc.property)
+    support = info.supports.get("rtpc")
+    if not isinstance(support, str) or support.casefold() == "none":
+        raise OperationContractError("RTPC_UNSUPPORTED", "Live property metadata does not support an RTPC for this field.")
+    spec["rtpc_property_guard"] = {**scope, "property": node.rtpc.property, "metadata": info.as_dict()}
+    owned = isinstance(node.rtpc.control_input, OwnedControlInputDescriptor)
+    if owned:
+        inherited_platform = parent.get("platform", platform) if parent is not None else platform
+        spec["owned_control_input"] = _prepare_owned_control_input(node.rtpc.control_input, version=version, read=read,
+            inherited_platform=inherited_platform, curve_points=[point.as_dict() for point in node.rtpc.points])
+    control = None if owned else _resolve_identity(node.rtpc.control_input.as_dict(), role=node.request_path + ".control_input", read=read, identity_cache=identity_cache)
+    if control is not None and not _is_rtpc_control_input(control.row.get("type")):
+        raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "RTPC ControlInput must have a supported actual type.")
+    if owner_id is None:
+        return None
+    before = _read_graph_rtpc_rows(owner_id, version=version, class_id=spec["class_id"], read=read, snapshot_cache=snapshot_cache)
+    spec["rtpc_list_guard"] = {"owner_id": owner_id, "version": version, "class_id": spec["class_id"], "before": before}
+    if owned:
+        _require_rtpc_property_count(node.rtpc.property, support, 1 + (0 if replace_all else sum(
+            _field_value(row, "PropertyName").casefold() == node.rtpc.property.casefold() for row in before)))
+        matches = []
+    else:
+        matches = _match_rtpc_pair([] if replace_all else before, node.rtpc.property, control.object, mode=node.rtpc_mode, rtpc_support=support)
+    if not matches:
+        if not replace_all and len(before) >= RTPC_MAX_LIST_ROWS:
+            raise OperationContractError("RTPC_LIST_LIMIT_EXCEEDED", "Adding an RTPC exceeds the complete-list limit.")
+        return None
+    spec["rtpc_update"] = True
+    row = matches[0]
+    return ResolvedObject(identity=ObjectIdentity(id=row["id"]), object=row["id"], resolution="live-exact-rtpc-pair", row=row)
 
 
 def _read_rtpc_rows_with_evidence(
@@ -6740,6 +8263,7 @@ def _resolve_object_type(
             details={"requested": requested, "matches": [row.as_dict() for row in matches]},
         )
     row = matches[0]
+    _require_object_class_id(row.class_id)
     forbidden = {
         "workunit",
         "effect",
@@ -6785,12 +8309,353 @@ def _resolve_object_set_import_type(
             },
         )
     row = matches[0]
+    _require_object_class_id(row.class_id)
     return row
+
+
+def _prepare_prospective_reference_hierarchy(
+    references, *, class_id, class_info=None, version=None, read=None, platform=None,
+):
+    """Validate new-node reference edges against explicit prospective values."""
+    from .planned_references import PlannedReferenceTarget
+    by_name = {info.name.casefold(): (info, targets) for info, targets in references}
+    conditions, controllers, validated = [], set(), set()
+
+    def visit(info, target, path):
+        key = (info.name.casefold(), _identity_key(target.object))
+        if info.name.casefold() in path:
+            raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Prospective reference hierarchy contains a cycle.")
+        if key in validated:
+            return
+        if len(path) >= MAX_CONDITION_PATH_FIELDS:
+            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Prospective reference hierarchy exceeds the field path budget.")
+        rows = info.restriction.get("restrictions") or []
+        parents = []
+        for row in rows:
+            if isinstance(row, Mapping) and "childOfReference" in row:
+                name = row["childOfReference"]
+                if set(row) != {"childOfReference"} or not isinstance(name, str) or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None:
+                    raise OperationContractError("INVALID_METADATA", "Prospective parent restriction must name one exact reference field.")
+                if name not in parents:
+                    parents.append(name)
+        # Keep all existing type/classifier boundaries. Only the independently
+        # checked parent edges are removed from this ordinary target check.
+        ordinary = replace(info, restriction={**info.restriction, "restrictions": [
+            row for row in rows if not (isinstance(row, Mapping) and "childOfReference" in row)]})
+        if (class_info is not None and class_info.class_id == class_id and class_info.name == "RTPC"
+                and info.name == "ControlInput" and version in {"2022.1", "2023.1", "2024.1", "2025.1"}
+                and not isinstance(target, PlannedReferenceTarget)):
+            # The source has an actual class scope; its chosen target already
+            # exists and must satisfy the existing native classifier unchanged.
+            scoped = []
+            _require_reference_target_allowed(ordinary, target, read=read, platform=platform,
+                conditions=scoped, wwise_version=version)
+            if not scoped:
+                scoped.append({"kind": "prospective_reference_metadata", "reference": info.name,
+                    "target_id": target.object, "version": version})
+            for condition in scoped:
+                condition["source_class_metadata"] = {"class": class_info.as_dict(include_raw=True),
+                    "field": info.name, "normalized": info.as_dict(), "native": dict(info.raw), "version": version}
+                if condition not in conditions:
+                    conditions.append(condition)
+        else:
+            _require_reference_target_allowed(ordinary, target)
+        for name in parents:
+            controllers.add(name.casefold())
+            if len(controllers) > MAX_CONDITION_CONTROLLERS:
+                raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Prospective reference hierarchy exceeds the controller budget.")
+            selected = by_name.get(name.casefold())
+            if selected is None or len(selected[1]) != 1:
+                raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
+                    "Declare one exact controlling reference target in this creation or configure the verified object in a separate Preview.",
+                    details={"reference": info.name, "parent_reference": name, "mutation_dispatched": False})
+            controller_info, targets = selected
+            parent = targets[0]
+            _require_object_reference_metadata(controller_info, allow_hierarchy=True)
+            parent_id = _reference_identity(target.row.get("parent"))
+            planned = isinstance(target, PlannedReferenceTarget) or isinstance(parent, PlannedReferenceTarget)
+            if (not isinstance(parent.object, str) or (not isinstance(parent, PlannedReferenceTarget) and _PLUGIN_GUID.fullmatch(parent.object) is None)
+                    or not isinstance(parent_id, str) or (not isinstance(target, PlannedReferenceTarget) and _PLUGIN_GUID.fullmatch(parent_id) is None)):
+                raise OperationContractError("INVALID_READBACK", "Prospective hierarchy needs canonical target and controlling parent GUIDs.")
+            if not _same_identity(parent_id, parent.object):
+                raise OperationContractError("INVALID_REFERENCE_TARGET", "Chosen new-object reference target is not a child of its declared controlling reference.",
+                    details={"reference": info.name, "target_id": target.object, "parent_reference": name,
+                             "expected_parent_id": parent.object, "actual_parent_id": parent_id})
+            visit(controller_info, parent, (*path, info.name.casefold()))
+            condition = {"kind": "planned_reference_parent" if planned else "prospective_reference_parent", "class_id": class_id,
+                "reference": info.name, "target_id": target.object, "parent_reference": name, "parent_id": parent.object,
+                "metadata": {record.name: {"normalized": record.as_dict(), "native": dict(record.raw)}
+                             for record in (info, controller_info)}}
+            if condition not in conditions:
+                conditions.append(condition)
+        validated.add(key)
+
+    for info, targets in references:
+        for target in targets:
+            visit(info, target, ())
+    return conditions
+
+
+def _merge_observed_list_guards(
+    guards: list[dict[str, Any]], observations: Sequence[dict[str, Any]], *,
+    planned: Sequence[Mapping[str, Any]] = (),
+) -> None:
+    """One unchanged source/membership observation per exact owner List."""
+    for observation in observations:
+        evidence = observation["evidence"]
+        planned_matches = [guard["before"] for guard in planned if guard.get("before") is not None
+            and guard["before"]["evidence"]["scope"]["scope_value"] == evidence["scope"]["scope_value"]
+            and guard["binding"]["declaration"]["name"] == evidence["declaration"]["name"]]
+        if planned_matches:
+            if len(planned_matches) != 1 or planned_matches[0] != observation:
+                raise OperationContractError("INVALID_READBACK", "Planned List source or membership changed during preparation.")
+            continue
+        matching = [guard for guard in guards
+            if guard["evidence"]["scope"]["scope_value"] == evidence["scope"]["scope_value"]
+            and guard["evidence"]["declaration"]["name"] == evidence["declaration"]["name"]]
+        if matching:
+            if len(matching) != 1 or matching[0] != observation:
+                raise OperationContractError("INVALID_READBACK", "List source or membership changed during preparation.")
+        else:
+            guards.append(observation)
+
+
+def _resolve_merge_node_target(
+    node: ObjectNodeDescriptor, spec: dict[str, Any], specs: Sequence[Mapping[str, Any]], *,
+    node_paths: set[str], root_parent: ResolvedObject | None, root_collection: str,
+    version: str, read: ReadCall, allow_list_merge: bool, guards: list[dict[str, Any]],
+) -> ResolvedObject | None:
+    """Observe one normalized occurrence; compile no node or native mutation."""
+    parent_spec = next((item for item in specs if item["request_path"] == node.parent_request_path), None)
+    if node.parent_request_path in node_paths:
+        if parent_spec is None:
+            raise OperationContractError("INVALID_PREVIEW", "Merge parent must precede its normalized child.")
+        if parent_spec.get("preexisting_id") is None:
+            return None  # A genuinely new owner has no pre-existing members.
+        owner_id, owner_row = parent_spec["preexisting_id"], parent_spec["pre_state"]
+        collection = node.collection
+    else:
+        if root_parent is None:
+            raise OperationContractError("INVALID_PREVIEW", "Merge occurrence lacks its exact live root.")
+        owner_id, owner_row = root_parent.object, root_parent.row
+        collection = root_collection
+    fields = _dedupe_fields([*IDENTITY_RETURN_FIELDS, "classId",
+        *(descriptor.name for descriptor in (*node.properties, *node.references))])
+    expected_path = None
+    if collection == "children":
+        expected_path = _child_path(owner_row.get("path"), node.name, field="merge_parent.path")
+        rows = _read_object_path_rows(expected_path, fields=fields, read=read)
+    else:
+        if not allow_list_merge:
+            return None  # Replacement modes never inherit an old member's conditions.
+        from .documented_list_fields import resolve_live_list_evidence, observe_list_binding
+        guard = next((item for item in guards
+            if item["evidence"]["scope"]["scope_value"] == owner_id
+            and item["evidence"]["declaration"]["name"] == collection), None)
+        if guard is None:
+            try:
+                evidence = resolve_live_list_evidence(version, owner_id, collection, read=read)
+                guard = observe_list_binding(evidence, read=read)
+            except (ValueError, KeyError, TypeError) as exc:
+                raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", str(exc)) from exc
+            guards.append(guard)
+        candidates = [row for row in guard["members"] if row["name"].casefold() == node.name.casefold()]
+        if len(candidates) > 1:
+            raise OperationContractError("AMBIGUOUS_IDENTITY", "Merge List member name must resolve at most once.")
+        if not candidates:
+            return None
+        spec["documented_list_element_class"] = spec["class_id"]
+        fields = _dedupe_fields([*fields, "owner"])
+        rows = _read_object_id_rows(candidates[0]["id"], fields=fields, read=read)
+        if len(rows) != 1 or any(rows[0].get(key) != candidates[0].get(key)
+                for key in ("id", "name", "type", "path", "classId", "owner")):
+            raise OperationContractError("INVALID_READBACK", "Merge member must retain its exact observed membership identity/class/owner.")
+    if len(rows) > 1:
+        raise OperationContractError("AMBIGUOUS_IDENTITY", "Merge collision must resolve at most once.")
+    if not rows:
+        return None
+    row = rows[0]
+    relation = "parent" if collection == "children" else "owner"
+    if (not _valid_object_id(row.get("id")) or row.get("name") != node.name
+            or not isinstance(row.get("path"), str) or not row["path"].startswith("\\")
+            or (expected_path is not None and row["path"] != expected_path)
+            or type(row.get("classId")) is not int or row["classId"] != spec["class_id"]
+            or not _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId"))
+            or not _same_identity(_reference_identity(row.get(relation)), owner_id)):
+        raise OperationContractError("INVALID_TARGET_TYPE", "Merge needs its exact matching existing class, identity and ownership edge.",
+            details={"expected_class_id": spec["class_id"], "relation": relation, "owner_id": owner_id, "actual": row})
+    spec["collection"] = collection
+    return ResolvedObject(identity=ObjectIdentity(id=row["id"]), object=row["id"],
+        resolution="live-exact-merge-collision", row=row)
+
+
+def _capture_retained_source_state(children, *, owner, catalog, read, platform, version):
+    """Seal every observed Source field through bounded projection pages."""
+    from .builders.query import MAX_STRUCTURED_RETURN_FIELDS
+    snapshots = []
+    for child in children:
+        file_source = child.get("type") == "AudioFileSource"
+        if child.get("type") not in {"Source", "SourcePlugin"} and not file_source:
+            continue
+        file_class = _resolve_import_audio_source_class(version, catalog=catalog) if file_source else None
+        names = parse_property_and_reference_names_result(read(GET_PROPERTY_AND_REFERENCE_NAMES_URI,
+            {"object": child["id"]}, {}))
+        base_fields = [*IDENTITY_RETURN_FIELDS, "classId", "audioSource:language", *(["originalFilePath"] if file_source else [])]
+        page_size = MAX_STRUCTURED_RETURN_FIELDS - len(base_fields)
+        if page_size < 1:
+            raise OperationContractError("LIMIT_EXCEEDED", "The Gateway projection budget cannot hold the Source identity frame.")
+        observed_fields = _dedupe_fields(["@" + row.name for row in names])
+        pages = [observed_fields[offset:offset + page_size] for offset in range(0, len(observed_fields), page_size)] or [[]]
+        identity_frame = None
+        for page in pages:
+            fields = [*base_fields, *page]
+            rows = _read_object_id_rows(child["id"], fields=fields, read=read, platform=platform)
+            if (len(rows) != 1 or any(not _native_snapshot_equal(rows[0].get(key), child.get(key)) for key in IDENTITY_RETURN_FIELDS)
+                    or not _same_identity(_parent_value(rows[0].get("parent")), owner.object)):
+                raise OperationContractError("INVALID_READBACK", "Retained Source identity and parent must remain exact during preparation.")
+            class_id = rows[0].get("classId")
+            if (type(class_id) is not int or (class_id != file_class.class_id if file_source else
+                    len([row for row in catalog if row.class_id == class_id and row.type.casefold() == "source"]) != 1)):
+                raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "Retained Source class must match its exact live versioned type.")
+            current_frame = {key: rows[0][key] for key in base_fields if key in rows[0]}
+            if identity_frame is not None and not _native_snapshot_equal(current_frame, identity_frame):
+                raise OperationContractError("INVALID_READBACK", "Retained Source identity frame changed between projection pages.")
+            identity_frame = current_frame
+            snapshots.append({"object_id": child["id"], "fields": fields, "platform": platform,
+                "rows": rows, "preserve_after_write": True})
+    return snapshots
+
+
+def _capture_anonymous_member_state(members, *, read, platform, preserve):
+    snapshots, targets = [], set()
+    for member in members:
+        fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId", "@Effect", "@Bypass", "@Render"]
+        rows = _read_object_id_rows(member["id"], fields=fields, read=read, platform=platform)
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), member["id"]):
+            raise OperationContractError("INVALID_READBACK", "Anonymous preservation needs one exact existing member")
+        snapshots.append({"object_id": member["id"], "fields": fields, "platform": platform,
+            "rows": rows, "preserve_after_write": preserve, "reference_fields": ["Effect"]})
+        if not preserve or not _has_field(rows[0], "Effect"):
+            continue
+        value = _field_value(rows[0], "Effect")
+        if _reference_value_is_null(value):
+            continue
+        target_id = _reference_identity(value)
+        if not _valid_object_id(target_id):
+            raise OperationContractError("INVALID_READBACK", "Preserved Effect reference needs its exact GUID or explicit native null")
+        if _identity_key(target_id) in targets:
+            continue
+        targets.add(_identity_key(target_id))
+        fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
+        actual = _read_object_id_rows(target_id, fields=fields, read=read, platform=platform)
+        if len(actual) != 1 or not _same_identity(actual[0].get("id"), target_id):
+            raise OperationContractError("INVALID_READBACK", "Preserved Effect target must independently resolve once")
+        snapshots.append({"object_id": target_id, "fields": fields, "platform": platform, "rows": actual, "preserve_after_write": True})
+    return snapshots
+
+
+def _observe_effect_shareset_placement(object_id, *, catalog, read, platform):
+    """Fresh bounded owning closure, shared by Effect creation and references.
+
+    All five pinned SampleProject Effects/Factory Effects.wwu files place
+    independent Effects below Folder nodes. Fresh exact classes and GUID parent
+    edges must close at the actual Effects WorkUnit; a path alone is insufficient.
+    """
+    fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
+    rows, classes, seen = [], {}, set()
+    for _ in range(DEFAULT_MAX_DEPTH + 1):
+        if not _valid_object_id(object_id) or _identity_key(object_id) in seen:
+            raise OperationContractError("INVALID_READBACK", "Effect ShareSet ancestry needs unique exact GUIDs")
+        seen.add(_identity_key(object_id))
+        actual = _read_object_id_rows(object_id, fields=fields, read=read, platform=platform)
+        if len(actual) != 1 or not _same_identity(actual[0].get("id"), object_id):
+            raise OperationContractError("INVALID_READBACK", "Effect ShareSet parent must resolve once by its actual GUID")
+        row = actual[0]
+        matches = [item for item in catalog if type(row.get("classId")) is int
+            and item.class_id == row["classId"] and item.name in {"WorkUnit", "Folder"}]
+        if len(matches) != 1 or row.get("type") != matches[0].name:
+            raise OperationContractError("INVALID_SHARESET_TARGET", "Effect ShareSet ancestors require matching actual type and fresh exact Folder or WorkUnit class")
+        if "owner" in row and not _reference_value_is_null(row["owner"]):
+            raise OperationContractError("INVALID_SHARESET_TARGET", "Independent ShareSet placement cannot have an owner")
+        if not isinstance(row.get("path"), str) or not row["path"].startswith("\\Effects\\"):
+            raise OperationContractError("INVALID_SHARESET_TARGET", "Effect ShareSet ancestry must remain in the actual Effects hierarchy")
+        rows.append(row)
+        classes[matches[0].class_id] = matches[0].as_dict()
+        if matches[0].name == "WorkUnit":
+            return {"rows": rows, "classes": [classes[key] for key in sorted(classes)], "platform": platform}
+        object_id = _reference_identity(row.get("parent"))
+    raise OperationContractError("INVALID_SHARESET_TARGET", "Effect ShareSet ancestry exceeds the graph depth bound")
+
+
+def _observe_independent_effect_ancestry(effect, *, catalog, read, platform):
+    """Bind an existing independent Effect using the same owning placement closure."""
+    if len([row for row in catalog if type(effect.get("classId")) is int
+            and row.class_id == effect["classId"] and row.type == "Effect"]) != 1:
+        raise OperationContractError("INVALID_REFERENCE_TARGET", "Selected Effect needs one fresh exact plugin class")
+    if "owner" in effect and not _reference_value_is_null(effect["owner"]):
+        if _valid_object_id(_reference_identity(effect["owner"])):
+            raise OperationContractError("LOCAL_EFFECT_REUSE_UNRESOLVED", "Existing owner-local Effect reuse is not proved by ShareSet construction authority; its actual owner cannot be silently replaced")
+        raise OperationContractError("INVALID_READBACK", "Independent Effect has malformed ownership")
+    placement = _observe_effect_shareset_placement(_reference_identity(effect.get("parent")),
+        catalog=catalog, read=read, platform=platform)
+    if any(_same_identity(row["id"], effect["id"]) for row in placement["rows"]):
+        raise OperationContractError("INVALID_READBACK", "Independent Effect ancestry cannot contain the Effect itself")
+    return [effect, *placement["rows"]]
+
+
+def _effect_shareset_placement_assertions(pre_state, *, read, after_write=False):
+    """Reobserve only sealed Folder construction placements within this phase."""
+    if not isinstance(pre_state, Mapping):
+        return []
+    nodes = pre_state.get("object_set_nodes", [])
+    placements = [node["effect_shareset_placement"] for node in nodes if "effect_shareset_placement" in node]
+    plugin_guard = pre_state.get("plugin_creation_guard")
+    plugin = plugin_guard.get("snapshot", {}) if isinstance(plugin_guard, Mapping) else {}
+    # Standalone preparation already replays its complete placement snapshot in
+    # the existing plugin guard before execution; avoid observing it twice.
+    if after_write and "effect_shareset_placement" in plugin:
+        placements.append(plugin["effect_shareset_placement"])
+    if not placements:
+        return []
+    catalog, cache, assertions = _read_object_type_catalog(read), {}, []
+    from .object_graph_paths import expected_snapshot
+    renamed = {}
+    def read_renamed(object_id):
+        if object_id not in renamed:
+            rows = _read_object_id_rows(object_id, fields=IDENTITY_RETURN_FIELDS, read=read)
+            if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id):
+                raise OperationContractError("INVALID_READBACK", "Renamed ShareSet ancestor must resolve by exact GUID")
+            renamed[object_id] = rows[0]
+        return renamed[object_id]
+    for expected in placements:
+        object_id = expected["rows"][0]["id"]
+        key = (_identity_key(object_id), expected["platform"])
+        if key not in cache:
+            cache[key] = _observe_effect_shareset_placement(object_id, catalog=catalog, read=read, platform=expected["platform"])
+        actual = cache[key]
+        expected_rows = ([expected_snapshot(row, edits=nodes, read_row=read_renamed) for row in expected["rows"]]
+            if after_write else expected["rows"])
+        assertions.append({"name": "Effect ShareSet Folder ancestry and class proof preserved" if after_write else "Effect ShareSet Folder ancestry and class proof unchanged",
+            "passed": actual["classes"] == expected["classes"] and _native_snapshot_equal(actual["rows"], expected_rows),
+            "evidence": {"expected": {**expected, "rows": expected_rows}, "actual": actual}})
+    return assertions
+
+
+def _resolve_graph_node_type(node, *, catalog, version):
+    if node.plugin is None:
+        return _resolve_object_type("PropertyContainer" if version == "2025.1" and node.type == "ActorMixer" else node.type, catalog=catalog)
+    matches = [row for row in catalog if row.class_id == node.plugin.class_id and row.type == node.plugin.object_type]
+    if len(matches) != 1:
+        raise OperationContractError("INVALID_OBJECT_TYPE", "A typed graph plugin requires one fresh exact selected class and category")
+    _require_object_class_id(matches[0].class_id)
+    return matches[0]
 
 
 def _prepare_object_node_specs(
     nodes: Sequence[ObjectNodeDescriptor],
     *,
+    root_parent: ResolvedObject | None = None,
+    root_collection: str = "children",
     version: str,
     type_catalog: Sequence[ObjectTypeMetadataRecord],
     read: ReadCall,
@@ -6803,9 +8668,29 @@ def _prepare_object_node_specs(
         tuple[str, str, str],
         PropertyInfoMetadataRecord,
     ],
+    list_bindings: Sequence[Mapping[str, Any]] = (),
+    result_context: Mapping[str, Any] | None = None,
+    merge_existing: bool = False,
+    allow_list_merge: bool = True,
+    rtpc_replace_all: bool = False,
+    rtpc_snapshots: dict | None = None,
+    merge_guards: list[dict[str, Any]] | None = None,
+    platform: str | None = None,
+    live_source_parent: bool = False,
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
+    node_paths = {node.request_path for node in nodes}
+    rtpc_snapshots = {} if rtpc_snapshots is None else rtpc_snapshots
+    merge_guards = [] if merge_guards is None else merge_guards
+    shareset_placements = {}
     for node in nodes:
+        # Semantic Voice and an explicit discovered Sound.IsVoice=true converge
+        # on the same Boolean intent; language never converts an unspecified Sound.
+        if (node.language is not None and node.import_arg is None
+                and not any(field.name.casefold() == "isvoice" and field.value is True for field in node.properties)):
+            raise OperationContractError("OBJECT_SET_VOICE_LANGUAGE_EFFECT_UNRESOLVED",
+                "An explicit language without localized media still needs Source effect evidence; omit language for an empty Voice or add the requested media.",
+                details={"request_path": node.request_path, "requested_language": node.language})
         requested_type_token = _object_type_token(node.type)
         uses_2025_actor_mixer_alias = (
             version == "2025.1" and requested_type_token == "actormixer"
@@ -6815,7 +8700,7 @@ def _prepare_object_node_specs(
             if uses_2025_actor_mixer_alias
             else node.type
         )
-        type_info = _resolve_object_type(metadata_type, catalog=type_catalog)
+        type_info = _resolve_graph_node_type(node, catalog=type_catalog, version=version)
         if (
             uses_2025_actor_mixer_alias
             and _object_type_token(type_info.name) != "propertycontainer"
@@ -6835,7 +8720,7 @@ def _prepare_object_node_specs(
         canonical_type = (
             "ActorMixer"
             if uses_2025_actor_mixer_alias
-            else type_info.name
+            else node.plugin.object_type if node.plugin is not None else type_info.name
         )
         canonical_types[node.request_path] = canonical_type
         spec: dict[str, Any] = {
@@ -6846,11 +8731,17 @@ def _prepare_object_node_specs(
             "requested_type": node.type,
             "canonical_type": canonical_type,
             "class_id": type_info.class_id,
+            "class_metadata": type_info.as_dict(),
             "notes_supplied": node.notes is not None,
             "requested_notes": node.notes,
             "properties": [],
             "references": [],
+            "collection": root_collection if node.request_path == "$" else node.collection,
         }
+        if node.plugin is not None and node.plugin.kind == "source":
+            spec["structural_class_id"] = type_info.class_id
+        if result_context and node.request_path in result_context["target_paths"]:
+            spec["planned_reference_target_class"] = type_info.class_id
         if node.language is not None:
             if _object_type_token(type_info.name) != "sound":
                 raise OperationContractError(
@@ -6866,13 +8757,70 @@ def _prepare_object_node_specs(
             spec["platform"] = node.platform
         if node.import_arg is not None:
             spec["import_requested"] = True
+        if node.rtpc is not None:
+            spec["rtpc_binding"] = {"property": node.rtpc.property, "mode": node.rtpc_mode}
+        if node.collection == "ControlInput":
+            parent = next((item for item in specs if item["request_path"] == node.parent_request_path), None)
+            if parent is None or not parent.get("owned_control_input"):
+                raise OperationContractError("INVALID_CONTROL_INPUT_PLACEMENT", "Owned ControlInput requires its exact RTPC occurrence.")
+            spec["owned_reference"] = True
+        merge_target = None
+        if node.rtpc is not None:
+            merge_target = _resolve_graph_rtpc_target(node, spec, specs, root_parent=root_parent,
+                version=version, read=read, identity_cache=identity_cache, property_info_cache=property_info_cache,
+                snapshot_cache=rtpc_snapshots, replace_all=rtpc_replace_all, platform=platform)
+        elif node.anonymous:
+            from .documented_list_fields import is_manual_marker_class
+            marker = node.collection == "Markers" and is_manual_marker_class(version, type_info.name, type_info.class_id)
+            if version not in {"2023.1", "2024.1", "2025.1"} or not (marker or node.collection == "Effects" and type_info.name == "EffectSlot"):
+                raise OperationContractError("ANONYMOUS_LIST_PLACEMENT_INVALID", "Anonymous construction requires source-proven List/type placement")
+            spec["anonymous_list_member"] = True
+            if marker:
+                spec["manual_marker"] = True
+        elif merge_existing:
+            merge_target = _resolve_merge_node_target(node, spec, specs, node_paths=node_paths,
+                root_parent=root_parent, root_collection=root_collection, version=version, read=read,
+                allow_list_merge=allow_list_merge, guards=merge_guards)
+        if merge_target is not None:
+            if node.plugin is not None and node.plugin.kind == "source":
+                raise OperationContractError("TARGET_EXISTS", "Source construction requires a new child; an existing Source needs an explicit existing-object field change.",
+                    details={"request_path": node.request_path, "preexisting_id": merge_target.object,
+                             "existing_path": merge_target.row.get("path")})
+            roles[f"merge:{node.request_path}"] = merge_target
+            spec.update(preexisting_id=merge_target.object, pre_state=merge_target.row,
+                    structural_class_id=type_info.class_id)
+        if node.language is not None and node.import_arg is None:
+            if merge_target is not None:
+                raise OperationContractError(
+                    "OBJECT_SET_VOICE_LANGUAGE_EFFECT_UNRESOLVED",
+                    "Construction language does not establish a language mutation on an existing merged Voice.",
+                    details={"request_path": node.request_path, "requested_language": node.language,
+                             "preexisting_id": merge_target.object, "existing_path": merge_target.row.get("path")},
+                )
+            spec["construction_language"] = {"requested": node.language, "role": "voice-construction-context",
+                "mode": "new", "expected_sources": [], "version": version}
+        from .constructor_inputs import authority as constructor_authority, public_requirements
+        try:
+            constructor = constructor_authority(spec, version=version)
+        except ValueError as exc:
+            raise OperationContractError("CONSTRUCTOR_INPUT_AUTHORITY_INVALID", str(exc)) from exc
+        if constructor is not None:
+            for name in constructor["required_references"]:
+                if not any(field.name == name for field in node.references):
+                    raise OperationContractError("REQUIRED_CONSTRUCTOR_REFERENCE_MISSING",
+                        "Choose the required reference target before creating this owned List member.",
+                        details={"request_path": node.request_path, "reference": name,
+                            "required_inputs": public_requirements(constructor), "field_discovery": {"class_id": type_info.class_id,
+                                "meaning": name, "value": "verified_existing_object_handle"}, "mutation_dispatched": False})
+            spec["constructor_inputs"] = constructor
+        metadata_scope = {"object_id": merge_target.object} if merge_target is not None else {"class_id": type_info.class_id}
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
         node_derived_properties: dict[str, Any] = {}
         for descriptor in node.properties:
             info = _read_property_info_cached(
                 read,
                 cache=property_info_cache,
-                class_id=type_info.class_id,
+                **metadata_scope,
                 name=descriptor.name,
             )
             _require_object_property_value(info, descriptor.value)
@@ -6880,66 +8828,303 @@ def _prepare_object_node_specs(
             spec["properties"].append(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
-        if canonical_type == "GameParameter":
-            from .new_object_defaults import game_parameter_default_evidence, NewObjectDefaultError
-            supplied_values = {descriptor.name: descriptor.value for descriptor in node.properties}
-            for property_info in tuple(property_info_by_name.values()):
-                if not property_info.dependencies:
-                    continue
-                try:
-                    evidence = game_parameter_default_evidence(
-                        class_name=canonical_type, info=property_info,
-                        scope={"classId": type_info.class_id}, read_call=read,
-                        supplied_values=supplied_values,
-                    )
-                except NewObjectDefaultError as exc:
-                    raise OperationContractError("NEW_OBJECT_DEPENDENCY_CONFLICT", str(exc),
-                        details={"field": property_info.name, "request_path": node.request_path}) from exc
-                if evidence is None:
-                    raise OperationContractError("NEW_OBJECT_DEPENDENCY_UNSUPPORTED",
-                        "This new GameParameter field has an unreviewed class dependency; create then configure the verified object separately.",
-                        details={"field": property_info.name, "request_path": node.request_path})
-                spec.setdefault("new_object_default_evidence", []).append(evidence)
+        reference_targets = []
+        for child in node.children:
+            if child.collection not in {"Effect", "ControlInput"}:
+                continue
+            if result_context is None or (child.collection == "Effect" and not node.anonymous) or (child.collection == "ControlInput" and node.rtpc is None):
+                raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Local graph Effect requires its exact planned anonymous owner")
+            field_name = child.collection
+            info = _read_property_info_cached(read, cache=property_info_cache, class_id=type_info.class_id, name=field_name)
+            _require_object_reference_metadata(info, allow_hierarchy=True)
+            property_info_by_name[field_name.casefold()] = info
+            fact = result_context["facts"][child.request_path]
+            from .planned_references import PlannedReferenceTarget
+            target = PlannedReferenceTarget(fact)
+            reference_targets.append((info, [target]))
+            spec["references"].append({"name": field_name, "target_request_path": child.request_path,
+                "target_result_handle": fact["result_handle"]})
+            result_context["metadata"].append({"class_id": type_info.class_id, "name": field_name, "metadata": info.as_dict()})
         for descriptor in node.references:
+            documented = [binding for binding in list_bindings
+                if binding.get("planned_owner", {}).get("request_path") == node.request_path
+                and binding.get("declaration", {}).get("name") == descriptor.name and "reference_targets" in binding]
+            if documented:
+                from .documented_list_fields import validate_planned_list_source, observe_planned_reference_targets
+                if (len(documented) != 1 or documented[0].get("version") != version
+                        or documented[0].get("scope", {}).get("class_id") != type_info.class_id
+                        or version not in OBJECT_SET_REFERENCE_ARRAY_VERSIONS or not isinstance(descriptor.target, tuple)):
+                    raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "The planned reference List owner/source/version/shape does not match")
+                binding = documented[0]
+                validate_planned_list_source(binding, read=read)
+                identities = []
+                for offset, target_descriptor in enumerate(descriptor.targets):
+                    role = f"{descriptor.request_path}[{offset}]"
+                    target = _resolve_identity(target_descriptor.as_dict(), role=role, read=read, identity_cache=identity_cache)
+                    roles[role] = target
+                    identities.append(target.object)
+                if identities != binding["reference_targets"]:
+                    raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Planned List target order differs from its exact declaration")
+                targets = observe_planned_reference_targets(binding, read=read)
+                spec.setdefault("documented_reference_lists", []).append({"binding": binding, "targets": targets})
+                spec["documented_list_owner_class"] = type_info.class_id
+                resolved_references[descriptor.request_path] = identities
+                spec["references"].append({"name": descriptor.name, "target_id": identities, "metadata_evidence": "documented-list"})
+                continue
             info = _read_property_info_cached(
                 read,
                 cache=property_info_cache,
-                class_id=type_info.class_id,
+                **metadata_scope,
                 name=descriptor.name,
             )
-            _require_object_reference_metadata(info)
-            activation_properties = _apply_reference_activation_dependencies(
-                info,
-                read=read,
-                class_id=type_info.class_id,
-                property_specs=spec["properties"],
-                property_info_by_name=property_info_by_name,
-                derived_properties=node_derived_properties,
-                request_path=descriptor.request_path,
-                property_info_cache=property_info_cache,
-            )
-            resolved = _resolve_identity(
-                descriptor.target.as_dict(),
-                role=descriptor.request_path,
-                read=read,
-                identity_cache=identity_cache,
-            )
-            _require_reference_target_allowed(info, resolved)
-            roles[descriptor.request_path] = resolved
-            resolved_references[descriptor.request_path] = resolved.object
-            reference_spec = {"name": descriptor.name, "target_id": resolved.object}
-            if activation_properties:
-                reference_spec["activation_properties"] = list(activation_properties)
-            spec["references"].append(reference_spec)
+            _require_object_reference_metadata(info, allow_hierarchy=True)
+            if descriptor.target is None and "notNull" in (info.restriction.get("restrictions") or []):
+                raise OperationContractError("INVALID_REFERENCE_TARGET", "The selected new-object reference must not be null.",
+                    details={"request_path": descriptor.request_path, "reference": descriptor.name})
+            property_info_by_name[descriptor.name.casefold()] = info
+            if isinstance(descriptor.target, ObjectCurveDescriptor):
+                try:
+                    value, proof = prepare_inline_curve(descriptor.target, token=descriptor.name, metadata=info,
+                                                        scope=({"object": merge_target.object} if merge_target else {"classId": type_info.class_id}), types=type_catalog)
+                except (InlineCurveError, MetadataRestrictionError) as exc:
+                    raise OperationContractError(exc.error_code, str(exc)) from exc
+                resolved_references[descriptor.request_path] = value
+                spec["references"].append({"name": descriptor.name, "curve": value, "curve_proof": proof})
+                continue
+            if (result_context and getattr(descriptor.target, "kind", None) == "id"
+                    and descriptor.target.value in result_context["handles"]):
+                target_path = result_context["handles"][descriptor.target.value]
+                fact = result_context["facts"][target_path]
+                from .planned_references import PlannedReferenceTarget
+                target = PlannedReferenceTarget(fact)
+                reference_targets.append((info, [target]))
+                resolved_references[descriptor.request_path] = fact["path"]
+                spec["references"].append({"name": descriptor.name, "target_request_path": target_path,
+                    "target_result_handle": fact["result_handle"]})
+                result_context["metadata"].append({"class_id": type_info.class_id, "name": descriptor.name, "metadata": info.as_dict()})
+                continue
+            identities, targets = [], []
+            for offset, target_descriptor in enumerate(descriptor.targets):
+                role = descriptor.request_path + (f"[{offset}]" if isinstance(descriptor.target, tuple) else "")
+                resolved = _resolve_identity(target_descriptor.as_dict(), role=role, read=read, identity_cache=identity_cache)
+                if node.anonymous and descriptor.name == "Effect":
+                    fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
+                    rows = _read_object_id_rows(resolved.object, fields=fields, read=read, platform=platform)
+                    if len(rows) != 1 or not _same_identity(rows[0].get("id"), resolved.object):
+                        raise OperationContractError("INVALID_READBACK", "A selected Effect needs its actual identity/class/ownership")
+                    actual = rows[0]
+                    observed = _observe_independent_effect_ancestry(actual, catalog=type_catalog, read=read, platform=platform)
+                    resolved = ResolvedObject(identity=resolved.identity, object=resolved.object, resolution=resolved.resolution, row=actual)
+                    spec.setdefault("anonymous_target_snapshots", []).extend([
+                        {"object_id": row["id"], "fields": fields, "rows": [row], "platform": platform, "preserve_after_write": True}
+                        for row in observed])
+                targets.append(resolved)
+                roles[role] = resolved
+                identities.append(resolved.object)
+            reference_targets.append((info, targets))
+            value = None if descriptor.target is None else identities if isinstance(descriptor.target, tuple) else identities[0]
+            resolved_references[descriptor.request_path] = value
+            spec["references"].append({"name": descriptor.name, "target_id": value})
+        hierarchy = []
+        if merge_target is None:
+            hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id,
+                class_info=type_info, version=version, read=read, platform=platform)
+        else:
+            desired_references = {row["name"].casefold(): row.get("target_id", row.get("curve")) for row in spec["references"]}
+            for info, targets in reference_targets:
+                for target in targets:
+                    _require_reference_target_allowed(info, target, source_id=merge_target.object, read=read,
+                        platform=platform, desired_references=desired_references, conditions=hierarchy,
+                        property_info_cache=property_info_cache, wwise_version=version)
+        if hierarchy:
+            spec["reference_target_conditions"] = hierarchy
+        if merge_target is not None:
+            requirements, applicability, related = {}, {}, []
+            structural_applicability = {}
+            for info in tuple(property_info_by_name.values()):
+                activators = _apply_reference_activation_dependencies(info, read=read, object_id=merge_target.object,
+                    property_specs=spec["properties"], property_info_by_name=property_info_by_name,
+                    derived_properties=node_derived_properties, request_path=node.request_path,
+                    property_info_cache=property_info_cache, wwise_version=version, override_applicability=applicability, structural_applicability=structural_applicability,
+                    _condition_sources=tuple(property_info_by_name.values()), reference_requirements=requirements,
+                    desired_references=desired_references, related_conditions=related, platform=platform)
+                for reference in spec["references"]:
+                    if reference["name"] == info.name and activators:
+                        reference["activation_properties"] = list(activators)
+            for name, identity in requirements.items():
+                if name.casefold() not in desired_references:
+                    spec["references"].append({"name": name, "target_id": identity, "condition_guard": True})
+                    if identity is not None and "documented_list_element_class" in spec:
+                        role = f"{node.request_path}.condition_reference:{name}"
+                        target = _resolve_identity({"kind": "id", "value": identity}, role=role,
+                            read=read, identity_cache=identity_cache)
+                        observed = _read_object_id_rows(target.object,
+                            fields=(*IDENTITY_RETURN_FIELDS, "classId", "owner"), read=read)
+                        if (len(observed) != 1 or not _same_identity(observed[0].get("id"), target.object)
+                                or type(observed[0].get("classId")) is not int
+                                or any(observed[0].get(key) != value for key, value in target.row.items())):
+                            raise OperationContractError("INVALID_READBACK", "A retained slot prerequisite needs its exact complete target observation.")
+                        roles[role] = ResolvedObject(identity=target.identity, object=target.object,
+                            resolution=target.resolution, row=observed[0])
+            spec["condition_metadata_guard"] = {"object_id": merge_target.object, "platform": platform,
+                "fields": [info.as_dict() for info in property_info_by_name.values()],
+                "override_applicability": [proof for proof in applicability.values() if proof is not None],
+                "structural_applicability": list(structural_applicability.values())}
+            if related:
+                spec["related_conditions"] = related
+        elif property_info_by_name:
+            # Even an unconditional supplied field relies on this exact class
+            # metadata. Reuse the existing per-phase default/condition guard.
+            from .new_object_defaults import class_default_evidence, NewObjectDefaultError, planned_non_master_bus_proof
+            try:
+                structural_proof = None
+                # Retain a structural snapshot when available. Its necessity
+                # is determined by the exact versioned source dependencies.
+                if any((is_master_bus_visibility_dependency(item) and item["value"] is False)
+                       or (type_info.name in {"Bus", "AuxBus"} and item == {"type": "override", "action": "Enable",
+                           "context": "Self", "property": "OverrideUserAuxSends"})
+                       for info in property_info_by_name.values() for item in info.dependencies):
+                    structural_proof = planned_non_master_bus_proof(version=version, node=node, info=type_info,
+                        nodes=nodes, resolve_type=lambda name: _resolve_object_type(name, catalog=type_catalog),
+                        root_parent=root_parent, root_collection=root_collection, read=read)
+                evidence = class_default_evidence(
+                    version=version,
+                    structural_bus_proof=structural_proof,
+                    infos=tuple(property_info_by_name.values()),
+                    scope={"classId": type_info.class_id}, read_call=read,
+                    supplied_values={descriptor.name: descriptor.value for descriptor in node.properties},
+                    supplied_references={row["name"]: row.get("target_id", row.get("curve")) for row in spec["references"]},
+                    planned_references={row["name"]: {"result_handle": row["target_result_handle"],
+                        "target_request_path": row["target_request_path"]} for row in spec["references"] if "target_request_path" in row},
+                    validate_scalar=_require_object_property_value,
+                )
+            except NewObjectDefaultError as exc:
+                from .business_declarations import _dependent_new_object_workflow
+                selected = next(iter(property_info_by_name.values()))
+                workflow = _dependent_new_object_workflow(selected.name)
+                if (selected.type or "").casefold() in {"reference", "objectreference"} or selected.restriction.get("type") == "reference":
+                    workflow["configuration_operation"] = "object.setReference"
+                raise OperationContractError(exc.error_code, str(exc),
+                    details={"request_path": node.request_path, "new_object_workflow": workflow, **exc.details}) from exc
+            spec["new_object_default_evidence"] = [evidence]
+            for name, value in evidence["derived_properties"].items():
+                node_derived_properties[name] = value
+                spec["properties"].append({"name": name, "value": value,
+                    "metadata_type": evidence["metadata"][name]["type"], "derived": True})
+        if node.plugin is not None:
+            if node.plugin.kind == "source":
+                parent_spec = next((row for row in specs if row["request_path"] == node.parent_request_path), None)
+                live_source_owner = (live_source_parent and root_parent is not None
+                    and node.parent_request_path not in node_paths and node.collection == "children")
+                if live_source_owner:
+                    # Both ordinary and generated stages use the live owner
+                    # proof. Staged provenance additionally authenticates the
+                    # original Voice intent and its empty-child prerequisite.
+                    validate_plugin_target(node.plugin, target_type=root_parent.row.get("type"), target_path=root_parent.row.get("path"))
+                else:
+                    if node.collection != "children" or parent_spec is None or parent_spec["canonical_type"] != "Sound":
+                        raise OperationContractError("INVALID_SOURCE_TARGET", "Atomic Source construction requires a planned Sound/Voice parent; a live owner uses object.createPlugin.")
+                    validate_plugin_target(node.plugin, target_type=parent_spec["canonical_type"])
+                    if node.plugin.language is not None and not any(
+                            prop["name"].casefold() == "isvoice" and prop["value"] is True for prop in parent_spec["properties"]):
+                        raise OperationContractError("PLUGIN_LANGUAGE_UNAVAILABLE", "A localized Source requires a Boolean Voice owner intent.")
+            elif node.plugin.placement == "shareset":
+                if node.parent_request_path in node_paths or root_parent is None:
+                    raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Independent graph ShareSets require an exact bound Effects Work Unit or Folder")
+                validate_plugin_target(node.plugin, target_type=root_parent.row["type"], target_path=root_parent.row["path"])
+                if root_parent.row["type"] == "Folder":
+                    key = (_identity_key(root_parent.object), platform)
+                    if key not in shareset_placements:
+                        shareset_placements[key] = _observe_effect_shareset_placement(root_parent.object,
+                            catalog=type_catalog, read=read, platform=platform)
+                    spec["effect_shareset_placement"] = shareset_placements[key]
+            else:
+                parent_spec = next((row for row in specs if row["request_path"] == node.parent_request_path), None)
+                if node.collection != "Effect" or parent_spec is None or not parent_spec.get("anonymous_list_member"):
+                    raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Local graph Effects require source-proven anonymous slot ownership")
+                spec["owned_reference"] = True
+            metadata = [{**property_info_by_name[prop.name.casefold()].raw, "name": prop.name} for prop in node.plugin.fields]
+            validated = validate_plugin_property_metadata(node.plugin, metadata)
+            spec["graph_plugin_native"] = _materialize_plugin_object(node.plugin, validated)
+            spec["structural_class_id"] = type_info.class_id
+            if node.plugin.kind == "source":
+                spec["source_plugin"] = {"descriptor": node.plugin.as_dict(),
+                    "property_validation": [item.as_dict() for item in validated]}
+                if node.plugin.language is not None:
+                    spec["source_language"] = {"requested": node.plugin.language, "role": "source-language",
+                        "version": version}
         if node_derived_properties:
             derived_properties[node.request_path] = node_derived_properties
         specs.append(spec)
+    structural_classes = {}
+    for spec in specs:
+        for evidence in spec.get("new_object_default_evidence", []):
+            proofs = [rule["proof"] for rule in evidence.get("structural_visibility", [])]
+            for rule in evidence.get("override_applicability", []):
+                structural_classes[spec["request_path"]] = rule["class_id"]
+                if rule["structural_proof"] is not None:
+                    proofs.append(rule["structural_proof"])
+            for proof in proofs:
+                structural_classes[proof["request_path"]] = proof["class_id"]
+                if "request_path" in proof["parent"]:
+                    structural_classes[proof["parent"]["request_path"]] = proof["parent"]["class_id"]
+    for spec in specs:
+        if spec["request_path"] in structural_classes:
+            spec["structural_class_id"] = structural_classes[spec["request_path"]]
     return specs
+
+
+def _resolve_import_audio_source_class(version, *, catalog):
+    from .metadata_catalog import ObjectTypeCatalogStore
+    pinned = ObjectTypeCatalogStore().load(version).by_name(
+        "AudioSource" if version == "2021.1" else "AudioFileSource")
+    matches = [row for row in catalog if pinned is not None
+        and row.class_id == pinned.class_id and row.name == pinned.name and row.type == pinned.type]
+    if len(matches) != 1 or len([row for row in catalog if pinned is not None and row.class_id == pinned.class_id]) != 1:
+        raise OperationContractError("INVALID_OBJECT_TYPE", "Imported AudioFileSource requires its version-pinned semantic class and one matching live getTypes row.")
+    _require_object_class_id(matches[0].class_id)
+    return matches[0]
+
+
+def _prepare_source_transfer_parent(source, parent, *, version, read):
+    """Certify an existing Source/Sound transfer, without a constructor claim."""
+    if parent.row.get("type") != "Sound":
+        raise OperationContractError("INVALID_TRANSFER_PARENT_TYPE", "An existing Source requires an exact Sound destination.")
+    batch = _bounded_multi_identity_read([source.object, parent.object], fields=(*IDENTITY_RETURN_FIELDS, "classId"),
+        read=read, context="Source transfer class identities")
+    if not batch["exact"]:
+        raise OperationContractError("INVALID_READBACK", "Source transfer class identities must resolve exactly once.")
+    resolved = []
+    for target in (source, parent):
+        row, = batch["rows_by_key"][_identity_key(target.object)]
+        if any(not _native_snapshot_equal(row.get(key), target.row.get(key)) for key in IDENTITY_RETURN_FIELDS):
+            raise OperationContractError("INVALID_READBACK", "Source transfer identity changed during preparation.")
+        _require_object_class_id(row.get("classId"))
+        resolved.append(replace(target, row=dict(row)))
+    source, parent = resolved
+    catalog = _read_object_type_catalog(read)
+    selected = []
+    for target in resolved:
+        matches = [row for row in catalog if row.class_id == target.row["classId"]]
+        if len(matches) != 1:
+            raise OperationContractError("INVALID_OBJECT_TYPE", "A Source transfer class must have one exact live getTypes row.")
+        selected.append(matches[0])
+    source_class, parent_class = selected
+    if parent_class.name != "Sound" or parent_class.type != "WObject":
+        raise OperationContractError("INVALID_TARGET_TYPE", "Source destination type contradicts its live Sound class.")
+    if source.row["type"] == "AudioFileSource":
+        if source_class != _resolve_import_audio_source_class(version, catalog=catalog):
+            raise OperationContractError("INVALID_TARGET_TYPE", "File Source contradicts its version-pinned live class.")
+    elif source_class.type != "Source":
+        raise OperationContractError("INVALID_TARGET_TYPE", "Source/SourcePlugin requires its exact live Source category class.")
+    return source, parent, {"class_metadata": [row.as_dict() for row in selected],
+        "objects": [{key: target.row[key] for key in ("id", "type", "classId")} for target in resolved]}
 
 
 def _prepare_object_set_import(
     descriptor: ObjectImportDescriptor,
     *,
+    version: str,
     canonical_type: Any,
     type_catalog: Sequence[ObjectTypeMetadataRecord],
     file_proofs: list[dict[str, Any]],
@@ -6956,6 +9141,8 @@ def _prepare_object_set_import(
                 "canonical_type": canonical_type,
             },
         )
+    source_type = _resolve_import_audio_source_class(version, catalog=type_catalog)
+    class_metadata = [source_type.as_dict()]
     dispatch_files: list[dict[str, Any]] = []
     source_specs: list[dict[str, Any]] = []
     source_keys: set[tuple[tuple[str, ...], str, str, str]] = set()
@@ -7053,6 +9240,7 @@ def _prepare_object_set_import(
             dispatch_row["objectType"] = type_info.name
             source["requested_object_type"] = type_info.name
             source["requested_object_type_class_id"] = type_info.class_id
+            class_metadata.append(type_info.as_dict())
         source_key = (
             source_identity,
             str(dispatch_row.get("language", "")).casefold(),
@@ -7080,6 +9268,8 @@ def _prepare_object_set_import(
     }
     return dispatch, {
         "sources": source_specs,
+        "class_metadata": class_metadata,
+        "audio_source_class_id": source_type.class_id,
         "canonical_type": canonical_type,
         "readback_contract": (
             "copied Originals paths are located from the imported target and "
@@ -7095,6 +9285,7 @@ def _read_property_info(
     name: str,
     object_id: Any | None = None,
     class_id: int | None = None,
+    reference_kind_version: str | None = None,
 ) -> PropertyInfoMetadataRecord:
     args: dict[str, Any] = {"property": name}
     if object_id is not None:
@@ -7104,7 +9295,14 @@ def _read_property_info(
     else:  # pragma: no cover - internal invariant
         raise AssertionError("object_id or class_id is required")
     try:
-        info = parse_get_property_info_result(read(GET_PROPERTY_INFO_URI, args, {}))
+        result = read(GET_PROPERTY_INFO_URI, args, {})
+        if isinstance(result, Mapping) and ("name" not in result or "type" not in result):
+            names = parse_property_and_reference_names_result(read(
+                GET_PROPERTY_AND_REFERENCE_NAMES_URI, ({"object": object_id} if object_id is not None else {"classId": class_id}), {},
+            ))
+            info = bind_get_property_info_result(result, field_token=name, available_names=tuple(row.name for row in names))
+        else:
+            info = parse_get_property_info_result(result)
     except SemanticValidationError as exc:
         raise OperationContractError("INVALID_METADATA", str(exc), details=exc.as_dict()) from exc
     if info.name != name:
@@ -7113,6 +9311,11 @@ def _read_property_info(
             "getPropertyInfo returned metadata for a different field.",
             details={"requested": name, "actual": info.name},
         )
+    if reference_kind_version is not None and object_id is not None:
+        from .reference_kind_evidence import certify
+        info = certify(info, version=reference_kind_version, object_id=object_id, read=read)
+    if info.type is None and not info.is_reference:
+        raise OperationContractError("FIELD_TYPE_UNAVAILABLE", "Native metadata does not certify a scalar value type.", details={"property": name, "unavailable_facts": ["type"]})
     return info
 
 
@@ -7188,6 +9391,8 @@ def _require_platform_field_enabled(
 
 
 def _require_object_property_value(metadata: PropertyInfoMetadataRecord, value: Any) -> None:
+    if not isinstance(metadata.type, str):
+        raise OperationContractError("FIELD_TYPE_UNAVAILABLE", "Native metadata does not certify a scalar value type.", details={"property": metadata.name})
     property_type = metadata.type.casefold()
     if property_type in {"real32", "real64", "float", "double"}:
         valid = _is_finite_waapi_number(value)
@@ -7240,9 +9445,9 @@ def _is_finite_waapi_number(value: Any) -> bool:
     return math.isfinite(converted)
 
 
-def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> None:
+def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord, *, allow_hierarchy=False) -> None:
     restriction_type = metadata.restriction.get("type")
-    reference = metadata.type.casefold() in {"reference", "objectreference"} or restriction_type == "reference"
+    reference = restriction_type == "reference" or (isinstance(metadata.type, str) and metadata.type.casefold() in {"reference", "objectreference"})
     if not reference:
         raise OperationContractError(
             "INVALID_REFERENCE",
@@ -7250,7 +9455,7 @@ def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> 
             details={"reference": metadata.name, "metadata_type": metadata.type},
         )
     restrictions = metadata.restriction.get("restrictions")
-    if isinstance(restrictions, list) and any(
+    if not allow_hierarchy and isinstance(restrictions, list) and any(
         isinstance(row, Mapping) and row.get("childOfReference") is not None for row in restrictions
     ):
         raise OperationContractError(
@@ -7258,6 +9463,445 @@ def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> 
             "References constrained by another reference require a dedicated ordered operation.",
             details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
         )
+
+
+def _prepare_association_parent_condition(*, object_id, property_name, restriction, read, requirements, activation_path, platform=None, context_binding=None):
+    """Bind the observed Switch association context to its exact native owner."""
+    from .metadata_restrictions import condition_matches
+    if object_id is None:
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "AssocParent conditions require an existing context GUID.")
+    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}},
+                      {"return": ["id", "name", "type", "path", "owner"]}))
+    if (len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id)
+            or (rows[0].get("type") != "ObjectSettingAssociation" and not (context_binding
+                and _same_identity(context_binding["context_id"], object_id)))):
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "AssocParent needs the observed native association context identity.")
+    source = rows[0]
+    owner_id = _reference_identity(source.get("owner"))
+    if not isinstance(owner_id, str) or _PLUGIN_GUID.fullmatch(owner_id) is None:
+        raise OperationContractError("INVALID_READBACK", "Association context must expose its canonical owner GUID.")
+    owner = _resolve_identity({"kind": "id", "value": owner_id}, role="association_owner", read=read)
+    if owner.row.get("type") != "SwitchContainer":
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Association owner must be the observed SwitchContainer context.")
+    info = _read_property_info(read, name=property_name, object_id=owner.object)
+    if info.name != property_name:
+        raise OperationContractError("INVALID_METADATA", "Association controller metadata names a different field.")
+    owner_specs: list[dict[str, Any]] = []
+    owner_metadata = {property_name.casefold(): info}
+    owner_references: dict[str, Any] = {}
+    try:
+        _apply_reference_activation_dependencies(
+            info, read=read, object_id=owner.object, property_specs=owner_specs,
+            property_info_by_name=owner_metadata, derived_properties={},
+            request_path="association_owner", related_conditions=requirements, platform=platform,
+            reference_requirements=owner_references,
+            _activation_path=tuple(f"{object_id}:{name}" for name in activation_path),
+        )
+    except OperationContractError as exc:
+        if exc.error_code != "REFERENCE_ACTIVATION_REQUIRED":
+            raise
+        raise OperationContractError(exc.error_code, str(exc), details={
+            **exc.details, "object_id": object_id, "owner_id": owner.object,
+        }) from exc
+    values = _rows(read(OBJECT_GET_URI, {"from": {"id": [owner.object]}}, {
+        "return": ["id", property_name], **({"platform": platform} if platform is not None else {}),
+    }))
+    if len(values) != 1 or not _same_identity(values[0].get("id"), owner.object) or not _has_field(values[0], property_name):
+        raise OperationContractError("INVALID_READBACK", "Association controller must resolve on its exact owner.")
+    value = _field_value(values[0], property_name)
+    _require_object_property_value(info, value)
+    if not condition_matches(restriction, value):
+        choices = restriction.get("values", [])
+        raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Separately preview the prerequisite on this exact association owner.", details={
+            "object_id": object_id, "owner_id": owner.object, "mutation_dispatched": False,
+            "prerequisite_changes": [{"operation": "object.setProperty", "object_id": owner.object,
+                "discovery_meaning": property_name, "selection": "live_discovered_Field_Handle",
+                "restriction": restriction, **({"required_value": choices[0]["value"]} if len(choices) == 1 else {})}],
+        })
+    # The owner is a separate authorization boundary. Reuse the condition
+    # planner to resolve its closure, then require every planned value to be
+    # already present; never add the owner to this mutation.
+    owner_values = [(property_name, value)]
+    for spec in owner_specs:
+        name = spec["name"]
+        rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [owner.object]}}, {
+            "return": ["id", name], **({"platform": platform} if platform is not None else {}),
+        }))
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), owner.object) or not _has_field(rows[0], name):
+            raise OperationContractError("INVALID_READBACK", "Related prerequisite must resolve on the exact owner.")
+        current = _field_value(rows[0], name)
+        _require_object_property_value(owner_metadata[name.casefold()], current)
+        if not condition_values_equal(current, spec["value"]):
+            raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Separately preview the prerequisite on this exact association owner.", details={
+                "object_id": object_id, "owner_id": owner.object, "mutation_dispatched": False,
+                "prerequisite_changes": [{"operation": "object.setProperty", "object_id": owner.object,
+                    "discovery_meaning": name, "selection": "live_discovered_Field_Handle", "required_value": spec["value"]}],
+            })
+        owner_values.append((name, current))
+    for name, current in owner_values:
+        _append_association_condition(requirements, source=source, owner=owner, property_name=name,
+                                      value=current, info=owner_metadata[name.casefold()], platform=platform)
+    for name, identity in owner_references.items():
+        _append_association_condition(requirements, source=source, owner=owner, property_name=name,
+                                      value=identity, info=owner_metadata[name.casefold()], platform=platform,
+                                      is_reference=True)
+
+
+def _append_association_condition(requirements, *, source, owner, property_name, value, info, platform, is_reference=False):
+    requirement = {"source_id": source["id"], "owner_id": owner.object, "property": property_name, "value": value,
+                   "source_identity": {key: source.get(key) for key in ("id", "name", "type", "path")},
+                   "owner_identity": {key: owner.row.get(key) for key in ("id", "name", "type", "path")},
+                   "metadata": info.as_dict()}
+    if is_reference:
+        requirement["is_reference"] = True
+    if platform is not None:
+        requirement["platform"] = platform
+    if requirement not in requirements:
+        requirements.append(requirement)
+    if len(requirements) > 16:
+        raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Related condition count exceeds 16.")
+
+
+def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
+    """Revalidate selected class identities and field/default facts once per phase."""
+    if not isinstance(pre_state, Mapping):
+        return []
+    nodes = [*pre_state.get("object_create_nodes", []), *pre_state.get("object_set_nodes", [])]
+    nodes.extend(guard for node in tuple(nodes) for key in ("owned_control_input", "owned_control_input_replacement")
+        for guard in node.get(key, {}).get("metadata_guards", []))
+    from .owned_control_inputs import constructor_authority_current
+    authority_proofs = {canonical_sha256(proof.get("constructor_authority")): proof.get("constructor_authority")
+        for node in nodes for proof in (node.get("owned_control_input"), node.get("owned_control_input_replacement"))
+        if isinstance(proof, Mapping)}
+    authority_assertions = [{"name": "constructor source authority unchanged", "passed": constructor_authority_current(proof),
+        "evidence": proof} for proof in authority_proofs.values()]
+    if isinstance(pre_state.get("plugin_creation_guard"), Mapping):
+        nodes.append(pre_state["plugin_creation_guard"])
+    assertions, seen = [], set()
+    class_bindings = [node["class_metadata"] for node in nodes if "class_metadata" in node]
+    class_bindings.extend(pre_state.get("import_guard", {}).get("class_metadata", []))
+    class_bindings.extend(pre_state.get("source_transfer_parent_guard", {}).get("class_metadata", []))
+    for node in nodes:
+        if isinstance(node.get("import"), Mapping):
+            class_bindings.extend(node["import"].get("class_metadata", []))
+    if class_bindings:
+        actual_classes = [row.as_dict() for row in _read_object_type_catalog(read)]
+        expected_classes = {canonical_json_bytes(row): row for row in class_bindings}
+        assertions.append({"name": "selected object classes still match live getTypes metadata",
+            "passed": all([actual for actual in actual_classes if actual.get("classId") == row.get("classId")] == [row]
+                for row in expected_classes.values()),
+            "evidence": {"expected": list(expected_classes.values()),
+                "actual": [row for row in actual_classes if row.get("classId") in
+                    {expected.get("classId") for expected in expected_classes.values()}]}})
+    from .constructor_inputs import authority as constructor_authority, complete as constructor_complete, public_requirements
+    for node in nodes:
+        try:
+            required = constructor_authority(node)
+            valid = constructor_complete(node)
+        except (ValueError, OSError, KeyError, TypeError):
+            required, valid = True, False
+        if required or "constructor_inputs" in node:
+            assertions.append({"name": "source-certified constructor inputs remain complete",
+                "passed": valid, "evidence": {"request_path": node.get("request_path"),
+                    "constructor_inputs": public_requirements(required)}})
+        for evidence in node.get("new_object_default_evidence", []):
+            scope = evidence["class_scope"]
+            for field, expected in evidence["metadata"].items():
+                key = (scope.get("classId"), field)
+                if key in seen:
+                    continue
+                seen.add(key)
+                args = {**scope, "property": field}
+                result = read(GET_PROPERTY_INFO_URI, args, {})
+                actual = parse_get_property_info_result(result).as_dict()
+                if readbacks is not None:
+                    readbacks.append({"role": "new-object-class-default", "uri": GET_PROPERTY_INFO_URI,
+                        "args": args, "options": {}, "result": dict(result)})
+                assertions.append({"name": f"new object class metadata {field} unchanged",
+                    "passed": _native_snapshot_equal(actual, expected) and ("default" in result) == evidence["default_presence"][field],
+                    "evidence": {"expected": expected, "actual": actual,
+                        "expected_default_present": evidence["default_presence"][field], "actual_default_present": "default" in result}})
+    return [*authority_assertions, *assertions]
+
+
+def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=(), compound_path_context=None):
+    """Keep the exact selected condition metadata valid through verification."""
+    assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
+    declared_notes = {_identity_key(node["target_id"]): node["requested_notes"]
+        for node in pre_state.get("object_set_nodes", [])
+        if node.get("existing_target") is True and node.get("notes_supplied") is True} if after_write else {}
+    owned_proofs = ([pre_state["owned_identity"]] if isinstance(pre_state, Mapping) and pre_state.get("owned_identity") is not None else [])
+    for node in pre_state.get("object_set_nodes", []):
+        owned = node.get("owned_identity")
+        if owned is None:
+            continue
+        owned_proofs.append(owned)
+    for owned in owned_proofs:
+        if declared_notes:
+            owned = {**owned, "members": [
+                {**member, "notes": declared_notes[_identity_key(member["id"])]} if _identity_key(member["id"]) in declared_notes else member
+                for member in owned["members"]]}
+        from .documented_list_fields import capture_owned_empty_identity
+        try:
+            rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [owned["object_id"]]}},
+                {"return": ["id", "name", "type", "path", "classId"]}))
+            actual = capture_owned_empty_identity(owned['descriptor']['version'], rows[0], read=read) if len(rows) == 1 else None
+            passed = actual == owned
+        except (ValueError, TypeError, KeyError) as exc:
+            actual, passed = {"error": str(exc)}, False
+        assertions.append({"name": "retained owned identity source and complete typed List remain unchanged",
+            "passed": passed, "evidence": {"expected": owned, "actual": actual}})
+
+    from .switch_child_context import assertions as context_assertions
+    assertions.extend(context_assertions(pre_state, read=read))
+    transfer = pre_state.get("source_transfer_parent_guard") if isinstance(pre_state, Mapping) else None
+    if after_write and isinstance(transfer, Mapping):
+        expected = transfer["objects"]
+        batch = _bounded_multi_identity_read([row["id"] for row in expected], fields=("id", "type", "classId"),
+            read=read, context="Source transfer verified class identities")
+        assertions.append({"name": "Source and destination class identities unchanged", "passed": batch["exact"] and all(
+            batch["rows_by_key"].get(_identity_key(row["id"])) == [row] for row in expected),
+            "evidence": {"expected": expected, "actual": batch["result"]}})
+    for node in (pre_state.get("object_set_nodes", []) if isinstance(pre_state, Mapping) else ()):
+        owner = node.get("source_owner")
+        if owner is None:
+            continue
+        rows = _read_object_id_rows(node["target_id"], fields=["id", "classId", "IsVoice"], read=read, platform=node.get("platform"))
+        actual_metadata = _read_property_info(read, object_id=node["target_id"], name="IsVoice").as_dict()
+        assertions.append({"name": "existing Source owner Boolean Voice intent and metadata remain bound",
+            "passed": (len(rows) == 1 and _same_identity(rows[0].get("id"), node["target_id"])
+                and rows[0].get("classId") == node["class_id"]
+                and _field_value(rows[0], "IsVoice") is owner["is_voice"]
+                and _native_snapshot_equal(actual_metadata, owner["metadata"])),
+            "evidence": {"expected": owner, "actual": rows, "metadata": actual_metadata}})
+    from .voice_source_staging import assertions as staged_assertions
+    assertions.extend(staged_assertions(pre_state, read, after_write=after_write))
+    language_contexts = [node[key] for node in pre_state.get("object_set_nodes", [])
+        for key in ("construction_language", "source_language") if key in node] if isinstance(pre_state, Mapping) else []
+    if language_contexts:
+        try:
+            inventory = _read_import_language_inventory(language_contexts[0]["version"], read=read)
+            for context in language_contexts:
+                selected = _select_construction_language(inventory, context["requested"])
+                assertions.append({"name": "selected Voice/Source language binding remains valid", "passed":
+                    selected == context["selected"] and inventory["project"] == context["project"],
+                    "evidence": {"expected": context, "selected": selected, "project": inventory["project"]}})
+        except OperationContractError as exc:
+            assertions.append({"name": "selected Voice/Source language binding remains valid", "passed": False, "evidence": exc.as_dict()})
+    result_context = pre_state.get("planned_reference_context") if isinstance(pre_state, Mapping) else None
+    if result_context:
+        try:
+            types = _read_object_type_catalog(read)
+            valid_types = all(len([info for info in types if info.class_id == result_context["facts"][path]["class_id"]
+                and info.name == result_context["facts"][path].get("class_name", result_context["facts"][path]["type"])]) == 1 for path in result_context["target_paths"])
+            metadata_cache = {}
+            changed_fields = [binding["name"] for binding in result_context["metadata"]
+                if _read_property_info_cached(read, cache=metadata_cache,
+                    **({"object_id": binding["object_id"]} if "object_id" in binding else {"class_id": binding["class_id"]}),
+                    name=binding["name"]).as_dict() != binding["metadata"]]
+            collision_changes = []
+            for rename in result_context["renames"]:
+                for snapshot in rename["collision_state"]:
+                    expected = snapshot["rows"]
+                    if after_write and compound_path_context:
+                        from .object_graph_paths import project_compound_snapshot
+                        expected = [project_compound_snapshot(row, compound_path_context) for row in expected]
+                    identities = [row["id"] for row in expected]
+                    actual = _rows(read(OBJECT_GET_URI, {"from": {"id": identities}}, {"return": snapshot["fields"]}))
+                    normalized = [{key: row[key] for key in snapshot["fields"] if key in row} for row in actual]
+                    if sorted(normalized, key=lambda row: row.get("id", "")) != expected:
+                        collision_changes.append(rename["request_path"])
+            passed = valid_types and not changed_fields and not collision_changes
+            evidence = {"target_classes_match": valid_types, "changed_fields": changed_fields, "changed_rename_collisions": collision_changes}
+        except (OperationContractError, ValueError, KeyError, TypeError) as exc:
+            passed, evidence = False, {"error": str(exc)}
+        assertions.append({"name": "planned scalar reference target classes and field metadata remain bound", "passed": bool(passed), "evidence": evidence})
+    if isinstance(pre_state, Mapping) and pre_state.get("documented_list_guards"):
+        from .documented_list_fields import list_guard_assertions
+        assertions.extend(list_guard_assertions(pre_state["documented_list_guards"], read=read, after_write=after_write))
+    if isinstance(pre_state, Mapping) and pre_state.get("documented_planned_list_guards"):
+        from .documented_list_fields import planned_list_guard_assertions
+        assertions.extend(planned_list_guard_assertions(pre_state["documented_planned_list_guards"], read=read, after_write=after_write))
+    if isinstance(pre_state, Mapping) and pre_state.get("documented_list_reference_targets"):
+        from .documented_list_fields import slot_reference_preservation_assertions
+        assertions.extend(slot_reference_preservation_assertions(pre_state["documented_list_reference_targets"], read=read))
+    if isinstance(pre_state, Mapping) and pre_state.get("documented_planned_reference_guards"):
+        from .documented_list_fields import planned_reference_guard_assertions
+        assertions.extend(planned_reference_guard_assertions(pre_state["documented_planned_reference_guards"], read=read))
+    if isinstance(pre_state, Mapping) and pre_state.get("effect_render_chains"):
+        from .effect_render_conditions import chain_assertions
+        assertions.extend(chain_assertions([chain for chain in pre_state["effect_render_chains"]
+            if chain not in deferred_render_chains], read=read, after_write=after_write,
+            edits=pre_state.get("object_set_nodes", pre_state.get("object_create_nodes", [])),
+            compound_path_context=compound_path_context))
+    condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
+    condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
+    if isinstance(condition_metadata, Mapping):
+        condition_metadata_groups.append(condition_metadata)
+    observed_fields = {}
+    def observed_field(object_id, name, kind_version=None):
+        key = (object_id, name, kind_version)
+        if key not in observed_fields:
+            observed_fields[key] = _read_property_info(read, object_id=object_id, name=name, reference_kind_version=kind_version)
+        return observed_fields[key]
+    for condition_metadata in condition_metadata_groups:
+        for proof in condition_metadata.get("override_applicability", []):
+            from .override_applicability import proof_current
+            try:
+                passed = proof_current(proof, read=read, after_write=after_write,
+                    edits=pre_state.get("object_set_nodes", pre_state.get("object_create_nodes", [])) if after_write else ())
+                evidence = proof
+            except (ValueError, OSError, KeyError, TypeError, OperationContractError) as exc:
+                passed, evidence = False, {"error": str(exc), "proof": proof}
+            assertions.append({"name": "existing user-send class/actual placement applicability remains bound",
+                "passed": bool(passed), "evidence": evidence})
+        for expected in condition_metadata["fields"]:
+            name = expected.get("field_binding", {}).get("token", expected["name"])
+            kind_version = expected.get("reference_kind_evidence", {}).get("version")
+            observed = observed_field(condition_metadata["object_id"], name, kind_version).as_dict()
+            assertions.append({"name": f"condition metadata {name} unchanged",
+                               "passed": _native_snapshot_equal(observed, expected),
+                               "evidence": {"expected": expected, "actual": observed}})
+            if any(is_master_bus_visibility_dependency(item) and item["value"] is True
+                   for item in expected.get("dependencies", [])):
+                from .reference_applicability import is_reference, proof_current
+                observed_info = observed_field(condition_metadata["object_id"], name)
+                if is_reference(expected):
+                    proofs = [proof for proof in condition_metadata.get("structural_applicability", [])
+                        if proof.get("field") == name and _same_identity(proof.get("object_id"), condition_metadata["object_id"])]
+                    try:
+                        passed = len(proofs) == 1 and proof_current(proofs[0], read=read, info=observed_info,
+                            after_write=after_write, edits=pre_state.get("object_set_nodes", []) if after_write else ())
+                        evidence = proofs
+                    except (ValueError, OSError, KeyError, TypeError, OperationContractError) as exc:
+                        passed, evidence = False, {"error": str(exc)}
+                    assertions.append({"name": f"reference {name} structural visibility remains bound; missing legacy proof requires fresh Preview",
+                        "passed": bool(passed), "evidence": evidence})
+                    continue
+                args = {"object": condition_metadata["object_id"], "property": name,
+                        "platform": condition_metadata.get("platform") or "{00000000-0000-0000-0000-000000000000}"}
+                result = read(OBJECT_IS_PROPERTY_ENABLED_URI, args, {})
+                assertions.append({"name": f"structurally visible field {name} remains enabled",
+                    "passed": isinstance(result, Mapping) and result.get("return") is True,
+                    "evidence": {"uri": OBJECT_IS_PROPERTY_ENABLED_URI, "args": args, "result": result}})
+        for selected in condition_metadata.get("native_fields", []):
+            name = selected["token"]
+            expected = next((item for item in condition_metadata["fields"]
+                if item.get("field_binding", {}).get("token", item.get("name")) == name), {})
+            observed = dict(observed_field(condition_metadata["object_id"], name,
+                expected.get("reference_kind_evidence", {}).get("version")).raw)
+            assertions.append({"name": f"selected native metadata {name} unchanged",
+                               "passed": _native_snapshot_equal(observed, selected["metadata"]),
+                               "evidence": {"expected": selected["metadata"], "actual": observed}})
+    assertions.extend(_reference_target_condition_assertions(pre_state, read=read, after_write=after_write))
+    if isinstance(pre_state, Mapping):
+        for key in ("object_create_nodes", "object_set_nodes"):
+            for node in pre_state.get(key, []):
+                assertions.extend(_reference_target_condition_assertions(node, read=read, after_write=after_write))
+    return assertions
+
+
+def _related_condition_assertions(requirements, *, read):
+    assertions = []
+
+    readbacks = []
+    for requirement in requirements:
+        source_id, owner_id, name = requirement["source_id"], requirement["owner_id"], requirement["property"]
+        args = {"from": {"id": [source_id, owner_id]}}
+        options = {"return": ["id", "name", "type", "path", "owner", name]}
+        if requirement.get("platform") is not None:
+            options["platform"] = requirement["platform"]
+        result = read(OBJECT_GET_URI, args, options)
+        readbacks.append({"uri": OBJECT_GET_URI, "args": args, "options": options, "result": result})
+        rows = _rows(result)
+        source_rows = [row for row in rows if _same_identity(row.get("id"), source_id)]
+        owner_rows = [row for row in rows if _same_identity(row.get("id"), owner_id)]
+        exact = (len(rows) == 2 and len(source_rows) == 1 and len(owner_rows) == 1)
+        if exact:
+            source, owner = source_rows[0], owner_rows[0]
+            exact = (all(source.get(key) == value for key, value in requirement["source_identity"].items())
+                     and all(owner.get(key) == value for key, value in requirement["owner_identity"].items())
+                     and _same_identity(_reference_identity(source.get("owner")), owner_id)
+                     and _has_field(owner, name) and (
+                         _reference_requirement_matches(owner, name, requirement["value"])
+                         if requirement.get("is_reference") else
+                         condition_values_equal(_field_value(owner, name), requirement["value"])))
+        args = {"object": owner_id, "property": name}
+        metadata = _read_property_info(read, object_id=owner_id, name=name).as_dict()
+        assertions.append({"name": f"association owner condition {name} unchanged", "passed": exact and _native_snapshot_equal(metadata, requirement["metadata"]),
+                           "evidence": {"rows": rows, "metadata": metadata, "expected": requirement}})
+    return assertions, readbacks
+
+
+def _existing_override_applicability(info, dependency, *, read, object_id, version, proofs):
+    if object_id is None or version is None or proofs is None:
+        return None
+    from .override_applicability import prove_existing_absent_override, DEPENDENCY
+    if dependency != DEPENDENCY:
+        return None
+    key = (info.name, canonical_sha256(dependency))
+    if key not in proofs:
+        try:
+            proofs[key] = prove_existing_absent_override(version=version, object_id=object_id,
+                info=info, dependency=dependency, read=read)
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            raise OperationContractError("OVERRIDE_APPLICABILITY_INVALID", str(exc)) from exc
+    return proofs[key]
+
+
+def _collect_existing_condition_closure(
+    sources, *, read, object_id, property_info_by_name, property_info_cache,
+    wwise_version=None, override_applicability=None,
+):
+    """Acquire the complete bounded Self graph before selecting prerequisites.
+
+    A controller can be reached through several fields. Choosing its value
+    while following the first path loses restrictions disclosed by later paths.
+    Collection only acquires metadata; the ordinary planner still validates
+    each native shape, checks live values and owns every prospective write.
+    """
+    collected = {info.name.casefold(): info for info in sources}
+    controllers: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(info, path):
+        key = info.name.casefold()
+        if key in path:
+            raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference activation dependencies contain a cycle.")
+        if key in visited:
+            return
+        if len(path) >= MAX_CONDITION_PATH_FIELDS:
+            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Condition path exceeds the finite unique-field budget.")
+        for dependency in info.dependencies:
+            if is_terminal_override_dependency(info.name, info.type, dependency):
+                continue
+            if (dependency.get("action") != "Enable" or dependency.get("context") != "Self"
+                    or dependency.get("type") not in {"property", "override", "reference"}):
+                continue
+            name = dependency.get("property")
+            if not isinstance(name, str) or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None:
+                continue  # The ordinary planner reports the malformed shape.
+            if _existing_override_applicability(info, dependency, read=read, object_id=object_id,
+                    version=wwise_version, proofs=override_applicability) is not None:
+                continue
+            controller = name.casefold()
+            controllers.add(controller)
+            if len(controllers) > MAX_CONDITION_CONTROLLERS:
+                raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds the finite unique-field budget.")
+            child = collected.get(controller) or property_info_by_name.get(controller)
+            if child is None:
+                child = (_read_property_info_cached(read, cache=property_info_cache, name=name, object_id=object_id)
+                         if property_info_cache is not None else _read_property_info(read, name=name, object_id=object_id))
+            if child.name != name:
+                raise OperationContractError("INVALID_METADATA", "Condition controller metadata names a different field.")
+            collected[controller] = child
+            property_info_by_name[controller] = child
+            visit(child, (*path, key))
+        visited.add(key)
+
+    for info in tuple(collected.values()):
+        visit(info, ())
+    return tuple(collected.values())
 
 
 def _apply_reference_activation_dependencies(
@@ -7276,8 +9920,18 @@ def _apply_reference_activation_dependencies(
     ] | None = None,
     _activation_path: tuple[str, ...] = (),
     _activation_fields: set[str] | None = None,
+    _condition_sources: tuple[PropertyInfoMetadataRecord, ...] = (),
+    reference_requirements: dict[str, Any] | None = None,
+    desired_references: Mapping[str, Any] | None = None,
+    related_conditions: list[dict[str, Any]] | None = None,
+    context_binding=None,
+    platform: str | None = None,
+    _closure_collected: bool = False,
+    wwise_version: str | None = None,
+    override_applicability: dict | None = None,
+    structural_applicability: dict | None = None,
 ) -> tuple[str, ...]:
-    """Compile bounded same-object Boolean activation requirements.
+    """Compile bounded scalar and reference-presence activation requirements.
 
     Wwise references such as ``OutputBus`` can be accepted syntactically while
     remaining inherited unless a same-object Boolean override is enabled.  The
@@ -7288,24 +9942,119 @@ def _apply_reference_activation_dependencies(
     if (object_id is None) == (class_id is None):  # pragma: no cover - internal invariant.
         raise AssertionError("object_id or class_id must be supplied exclusively")
 
-    if len(_activation_path) >= 8:
-        raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency depth exceeds 8.")
+    if object_id is not None and not _closure_collected:
+        _condition_sources = _collect_existing_condition_closure(
+            (metadata, *_condition_sources), read=read, object_id=object_id,
+            property_info_by_name=property_info_by_name, property_info_cache=property_info_cache,
+            wwise_version=wwise_version, override_applicability=override_applicability,
+        )
+        _closure_collected = True
+
+    if len(_activation_path) >= MAX_CONDITION_PATH_FIELDS:
+        raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Condition path exceeds the finite unique-field budget.",
+            details={"maximum_path_fields": MAX_CONDITION_PATH_FIELDS, "maximum_controller_fields": MAX_CONDITION_CONTROLLERS})
     path = (*_activation_path, metadata.name.casefold())
     all_fields = set() if _activation_fields is None else _activation_fields
     activation_names: list[str] = []
     seen_dependencies: set[str] = set()
     for index, dependency in enumerate(metadata.dependencies):
-        # Wwise marks the positioning override switch with its own override
-        # descriptor. It is the terminal switch, not another activation edge.
-        if (metadata.name == "OverridePositioning" and metadata.type.casefold() == "bool"
-                and dependency == {"type": "override", "action": "Enable",
-                                   "property": "OverridePositioning", "context": "Self"}):
+        if is_terminal_override_dependency(metadata.name, metadata.type, dependency):
+            continue
+        if _existing_override_applicability(metadata, dependency, read=read, object_id=object_id,
+                version=wwise_version, proofs=override_applicability) is not None:
             continue
         # Reflected attenuation metadata also describes UI visibility. This
         # exact Show rule is not an activation requirement or an implied write.
-        if (dependency.get("value") is False
-                and dependency == {"type": "isMasterBus", "value": False,
-                                   "action": "Show", "context": "Self"}):
+        if is_master_bus_visibility_dependency(dependency):
+            if dependency["value"] is True:
+                if object_id is None:
+                    raise OperationContractError("FIELD_OBJECT_SCOPE_REQUIRED", "Master-bus visibility needs fresh object-scoped applicability proof on the selected existing object.")
+                from .reference_applicability import is_reference, prove
+                if is_reference(metadata):
+                    try:
+                        proof = prove(version=wwise_version, object_id=object_id, info=metadata, read=read, platform=platform)
+                    except (ValueError, KeyError, TypeError, OSError) as exc:
+                        raise OperationContractError("REFERENCE_APPLICABILITY_UNPROVEN", str(exc)) from exc
+                    if structural_applicability is not None:
+                        structural_applicability[metadata.name] = proof
+                else:
+                    _require_platform_field_enabled(read, object_id=object_id, field_name=metadata.name,
+                        platform=platform or "{00000000-0000-0000-0000-000000000000}")
+            continue
+        if dependency.get("type") == "reference" and reference_requirements is not None:
+            expected_fields = {"type", "action", "context", "property", "conditions"}
+            conditions = dependency.get("conditions")
+            name = dependency.get("property")
+            if (set(dependency) != expected_fields or not isinstance(name, str)
+                    or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None
+                    or not all(isinstance(dependency.get(key), str) for key in ("action", "context"))):
+                raise OperationContractError("INVALID_METADATA", "Reference-presence dependency metadata is malformed.")
+            from .metadata_restrictions import reference_presence_condition, MetadataRestrictionError
+            try:
+                required_presence = reference_presence_condition(conditions)
+                if dependency["action"] == "Enable":
+                    accumulated = {
+                        reference_presence_condition(item.get("conditions"))
+                        for source in (metadata, *_condition_sources) for item in source.dependencies
+                        if item.get("type") == "reference" and item.get("action") == dependency["action"]
+                        and item.get("context") == dependency["context"]
+                        and isinstance(item.get("property"), str) and item["property"].casefold() == name.casefold()
+                    }
+                    if len(accumulated) != 1:
+                        raise OperationContractError("REFERENCE_DEPENDENCY_CONFLICT", "Reference-presence conditions require incompatible states.")
+            except MetadataRestrictionError as exc:
+                raise OperationContractError("INVALID_METADATA", str(exc)) from exc
+            if dependency["action"] == "Show" and dependency["context"] in {"Self", "Parent", "AssocParent"}:
+                continue
+            if dependency["action"] != "Enable" or dependency["context"] != "Self":
+                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Reference-presence activation needs its exact object context.")
+            if name.casefold() in path:
+                raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference activation dependencies contain a cycle.")
+            all_fields.add(name.casefold())
+            if len(all_fields) > MAX_CONDITION_CONTROLLERS:
+                raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds the finite unique-field budget.")
+            if object_id is None:
+                raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "A reference prerequisite needs an explicit target or a staged object-scoped Preview.")
+            reference_info = property_info_by_name.get(name.casefold())
+            if reference_info is None:
+                reference_info = _read_property_info_cached(read, cache=property_info_cache, name=name, object_id=object_id) if property_info_cache is not None else _read_property_info(read, name=name, object_id=object_id)
+                property_info_by_name[name.casefold()] = reference_info
+            if reference_info.name != name:
+                raise OperationContractError("INVALID_METADATA", "Reference prerequisite metadata names a different field.")
+            _require_object_reference_metadata(reference_info)
+            rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}}, {
+                "return": ["id", name], **({"platform": platform} if platform is not None else {}),
+            }))
+            if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id) or not _has_field(rows[0], name):
+                raise OperationContractError("INVALID_READBACK", "Reference prerequisite must resolve on the exact object.")
+            value = _field_value(rows[0], name)
+            identity = None if _reference_value_is_null(value) else _reference_identity(value)
+            if not _reference_value_is_null(value) and (not isinstance(identity, str) or _PLUGIN_GUID.fullmatch(identity) is None):
+                raise OperationContractError("INVALID_READBACK", "Reference prerequisite must expose a canonical GUID or native null.")
+            if desired_references is not None and name.casefold() in desired_references:
+                identity = desired_references[name.casefold()]
+            if (identity is not None) != required_presence:
+                raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Choose and separately preview the required reference state before editing this field.", details={
+                    "object_id": object_id, "property": metadata.name, "mutation_dispatched": False,
+                    "prerequisite_changes": [{"operation": "object.setReference", "discovery_meaning": name,
+                        "selection": "live_discovered_Field_Handle", "required_presence": required_presence,
+                        "target_selection": "user_chosen_exact_object" if required_presence else "clear_reference"}],
+                })
+            reference_requirements[name] = identity
+            activation_names.extend(_apply_reference_activation_dependencies(
+                reference_info, read=read, object_id=object_id,
+                property_specs=property_specs, property_info_by_name=property_info_by_name,
+                derived_properties=derived_properties, request_path=request_path,
+                property_info_cache=property_info_cache, _activation_path=path,
+                _activation_fields=all_fields, _condition_sources=_condition_sources,
+                reference_requirements=reference_requirements,
+                desired_references=desired_references,
+                related_conditions=related_conditions, context_binding=context_binding,
+                platform=platform,
+                _closure_collected=_closure_collected,
+                wwise_version=wwise_version, override_applicability=override_applicability,
+                structural_applicability=structural_applicability,
+            ))
             continue
         fields = set(dependency)
         expected_fields = (_REFERENCE_ACTIVATION_DEPENDENCY_FIELDS | {"conditions"}
@@ -7359,26 +10108,65 @@ def _apply_reference_activation_dependencies(
             )
         required_value = True
         if dependency_type == "property":
-            conditions = dependency.get("conditions")
-            if not (
-                isinstance(conditions, list) and len(conditions) == 1
-                and isinstance(conditions[0], Mapping)
-                and set(conditions[0]) == {"restriction"}
-                and isinstance(conditions[0]["restriction"], Mapping)
-                and set(conditions[0]["restriction"]) == {"type", "values"}
-                and conditions[0]["restriction"]["type"] == "enum"
-                and isinstance(conditions[0]["restriction"]["values"], list)
-                and len(conditions[0]["restriction"]["values"]) == 1
-                and isinstance(conditions[0]["restriction"]["values"][0], Mapping)
-                and set(conditions[0]["restriction"]["values"][0]) <= {"value", "displayName"}
-                and isinstance(conditions[0]["restriction"]["values"][0].get("value"), bool)
-            ):
-                raise OperationContractError(
-                    "CONSTRAINED_REFERENCE_BOUNDARY",
-                    "Reference activation requires one exact Boolean enum condition.",
-                    details={"reference": metadata.name, "property": property_name},
+            from .metadata_restrictions import condition_restriction, condition_matches, intersect_condition_restrictions, MetadataRestrictionError
+            try:
+                if action == "Show" and context in {"Self", "Parent", "AssocParent"}:
+                    condition_restriction(dependency.get("conditions"))
+                    continue
+                restriction = intersect_condition_restrictions([
+                    condition_restriction(item.get("conditions"))
+                    for source in (metadata, *_condition_sources)
+                    for item in source.dependencies
+                    if item.get("type") == "property"
+                    and item.get("action") == action and item.get("context") == context
+                    and isinstance(item.get("property"), str)
+                    and item["property"].casefold() == property_name.casefold()
+                ])
+            except MetadataRestrictionError as exc:
+                code = "REFERENCE_DEPENDENCY_CONFLICT" if exc.error_code == "CONDITION_CONFLICT" else "CONSTRAINED_REFERENCE_BOUNDARY"
+                raise OperationContractError(code, str(exc),
+                    details={"reference": metadata.name, "property": property_name}) from exc
+            if action == "Enable" and context == "AssocParent" and related_conditions is not None:
+                _prepare_association_parent_condition(
+                    object_id=object_id, property_name=property_name, restriction=restriction,
+                    read=read, requirements=related_conditions, activation_path=path,
+                    platform=platform, context_binding=context_binding,
                 )
-            required_value = conditions[0]["restriction"]["values"][0]["value"]
+                continue
+            supplied = next((spec for spec in property_specs
+                             if str(spec.get("name", "")).casefold() == property_name.casefold()), None)
+            if supplied is not None:
+                required_value = supplied["value"]
+                if not condition_matches(restriction, required_value):
+                    raise OperationContractError("REFERENCE_DEPENDENCY_CONFLICT",
+                        "An explicit property value conflicts with the activation condition.",
+                        details={"property": property_name, "value": required_value, "restriction": restriction})
+            else:
+                choices = restriction.get("values", [])
+                if object_id is not None:
+                    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}},
+                                      {"return": ["id", property_name], **({"platform": platform} if platform is not None else {})}))
+                    if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id) or not _has_field(rows[0], property_name):
+                        raise OperationContractError("INVALID_READBACK", "Condition value must resolve on the exact object.")
+                    required_value = _field_value(rows[0], property_name)
+                    if not condition_matches(restriction, required_value) and len(choices) == 1:
+                        required_value = choices[0]["value"]
+                    elif not condition_matches(restriction, required_value):
+                        raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
+                            "Choose an explicit prerequisite value satisfying the live condition.",
+                            details={"property": property_name, "current_value": required_value,
+                                     "restriction": restriction, "mutation_dispatched": False,
+                                     "prerequisite_changes": [{
+                                         "operation": "object.setProperty", "discovery_meaning": property_name,
+                                         "object_id": object_id, "selection": "live_discovered_Field_Handle",
+                                         "restriction": restriction,
+                                     }]})
+                elif len(choices) == 1:
+                    required_value = choices[0]["value"]
+                else:
+                    raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
+                        "A new object needs an explicit prerequisite value satisfying the live condition.",
+                        details={"property": property_name, "restriction": restriction, "mutation_dispatched": False})
         if not (
             dependency_type in {"override", "property"}
             and action == "Enable"
@@ -7386,7 +10174,7 @@ def _apply_reference_activation_dependencies(
         ):
             raise OperationContractError(
                 "CONSTRAINED_REFERENCE_BOUNDARY",
-                "Only same-object Enable dependencies with an override or exact Boolean condition are supported.",
+                "This context requires a supported same-object Enable scalar or override dependency.",
                 details={
                     "reference": metadata.name,
                     "request_path": request_path,
@@ -7404,11 +10192,11 @@ def _apply_reference_activation_dependencies(
         if property_key in path:
             raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference activation dependencies contain a cycle.", details={"property": property_name})
         all_fields.add(property_key)
-        if len(all_fields) > 16:
-            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds 16.")
+        if len(all_fields) > MAX_CONDITION_CONTROLLERS:
+            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds the finite unique-field budget.")
         if property_key in seen_dependencies:
             prior = next(spec for spec in property_specs if str(spec["name"]).casefold() == property_key)
-            if prior["value"] is not required_value:
+            if not condition_values_equal(prior["value"], required_value):
                 raise OperationContractError("REFERENCE_DEPENDENCY_CONFLICT", "Reference activation conditions conflict.", details={"property": property_name})
             continue
         seen_dependencies.add(property_key)
@@ -7434,7 +10222,7 @@ def _apply_reference_activation_dependencies(
             property_info_by_name[property_key] = property_info
         if (
             property_info.name != property_name
-            or property_info.type.casefold() not in {"bool", "boolean"}
+            or (dependency_type == "override" and property_info.type.casefold() not in {"bool", "boolean"})
         ):
             raise OperationContractError(
                 "INVALID_METADATA",
@@ -7447,6 +10235,11 @@ def _apply_reference_activation_dependencies(
                     "metadata_type": property_info.type,
                 },
             )
+        if (dependency_type == "property" and supplied is None
+                and property_info.type.casefold().startswith(("int", "uint"))
+                and isinstance(required_value, float) and math.isfinite(required_value)
+                and required_value.is_integer()):
+            required_value = int(required_value)
         _require_object_property_value(property_info, required_value)
         activation_names.extend(_apply_reference_activation_dependencies(
             property_info, read=read, property_specs=property_specs,
@@ -7454,6 +10247,14 @@ def _apply_reference_activation_dependencies(
             derived_properties=derived_properties, request_path=request_path,
             object_id=object_id, class_id=class_id, property_info_cache=property_info_cache,
             _activation_path=path, _activation_fields=all_fields,
+            _condition_sources=_condition_sources,
+            reference_requirements=reference_requirements,
+            desired_references=desired_references,
+            related_conditions=related_conditions, context_binding=context_binding,
+            platform=platform,
+            _closure_collected=_closure_collected,
+            wwise_version=wwise_version, override_applicability=override_applicability,
+                structural_applicability=structural_applicability,
         ))
 
         matching_specs = [
@@ -7470,7 +10271,7 @@ def _apply_reference_activation_dependencies(
             )
         if matching_specs:
             property_spec = matching_specs[0]
-            if property_spec.get("value") is not required_value:
+            if not condition_values_equal(property_spec.get("value"), required_value):
                 raise OperationContractError(
                     "REFERENCE_DEPENDENCY_CONFLICT",
                     "An explicit property value conflicts with the reference activation requirement.",
@@ -7488,6 +10289,8 @@ def _apply_reference_activation_dependencies(
                 "metadata_type": property_info.type,
                 "derived": True,
             }
+            if dependency_type == "property":
+                property_spec["condition_restriction"] = restriction
             property_specs.append(property_spec)
             derived_properties[property_info.name] = required_value
 
@@ -7512,12 +10315,22 @@ def _materialize_canonical_object_node(
     resolved_references: Mapping[str, Any],
     derived_properties: Mapping[str, Mapping[str, Any]],
     materialized_imports: Mapping[str, Mapping[str, Any]] | None = None,
+    prepared_names: Mapping[str, str] | None = None,
+    rtpc_updates: Mapping[str, Mapping[str, Any]] | None = None,
+    rtpc_update_rows: list[dict[str, Any]] | None = None,
+    plugin_materializations: Mapping[str, Mapping[str, Any]] | None = None,
+    native_nodes: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     try:
         subtree_import_paths = {
             item.request_path
             for item in flatten_request_nodes((node,))
             if item.import_arg is not None
+        }
+        subtree_reference_paths = {
+            reference.request_path
+            for item in flatten_request_nodes((node,))
+            for reference in item.references
         }
         import_bindings = {
             path: dict(value)
@@ -7526,14 +10339,28 @@ def _materialize_canonical_object_node(
         }
         payload = materialize_waapi_node(
             node,
-            resolved_references=resolved_references,
+            resolved_references={path: value for path, value in resolved_references.items() if path in subtree_reference_paths},
             materialized_imports=import_bindings,
         )
     except ObjectOperationContractError as exc:
         raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
 
     def apply(current: ObjectNodeDescriptor, row: dict[str, Any]) -> None:
+        if native_nodes is not None:
+            native_nodes[current.request_path] = row
         row["type"] = canonical_types[current.request_path]
+        if current.language is not None and current.import_arg is None and row["type"] == "Sound":
+            # A no-media Voice language is a validated Gateway context, not a
+            # native Sound field. 2025.1 rejects it here: "Language can only be
+            # used for a Source." Explicit plugin language stays on its Source.
+            row.pop("language", None)
+        if current.plugin is not None:
+            payload = (plugin_materializations or {}).get(current.request_path)
+            if payload is None:
+                raise OperationContractError("INVALID_PREVIEW", "Graph plugin materialization requires validated live metadata")
+            row.update(payload)
+        if prepared_names and current.request_path in prepared_names:
+            row["name"] = prepared_names[current.request_path]
         for property_name, value in derived_properties.get(current.request_path, {}).items():
             if (
                 not isinstance(property_name, str)
@@ -7557,8 +10384,27 @@ def _materialize_canonical_object_node(
                     },
                 )
             row[key] = value
-        for child, child_row in zip(current.children, row.get("children", []), strict=True):
+        if current.request_path in (rtpc_updates or {}):
+            if rtpc_update_rows is None:
+                raise OperationContractError("INVALID_PREVIEW", "RTPC updates require the same native batch collector.")
+            spec = rtpc_updates[current.request_path]
+            rtpc_update_rows.append({"object": spec["preexisting_id"], "@Curve": row["@Curve"],
+                **({"notes": row["notes"]} if "notes" in row else {}),
+                **{"@" + name: value for name, value in derived_properties.get(current.request_path, {}).items()}})
+        ordinary = [child for child in current.children if child.collection == "children"]
+        for child, child_row in zip(ordinary, row.get("children", []), strict=True):
             apply(child, child_row)
+        for child in current.children:
+            if child.collection in {"Effect", "ControlInput"}:
+                apply(child, row["@" + child.collection])
+        for descriptor in current.lists:
+            for child, child_row in zip(descriptor.objects, row.get("@" + descriptor.name, []), strict=True):
+                apply(child, child_row)
+            key = "@" + descriptor.name
+            row[key] = [child_row for child, child_row in zip(descriptor.objects, row[key], strict=True)
+                if child.request_path not in (rtpc_updates or {})]
+            if not row[key] and descriptor.objects and all(child.request_path in (rtpc_updates or {}) for child in descriptor.objects):
+                del row[key]
 
     apply(node, payload)
     return payload
@@ -7568,13 +10414,48 @@ def _object_type_token(value: Any) -> str:
     return "".join(character for character in str(value).casefold() if character.isalnum())
 
 
-def _object_type_matches(actual: Any, spec: Mapping[str, Any]) -> bool:
+def _require_object_class_id(value: Any) -> None:
+    if type(value) is not int or not 0 <= value <= 0xFFFFFFFF:
+        raise OperationContractError("INVALID_READBACK", "Object class identity must be a live unsigned 32-bit integer.")
+
+
+def _object_class_matches(actual: Any, expected: Any) -> bool:
+    return (type(actual) is int and type(expected) is int
+        and 0 <= expected <= 0xFFFFFFFF and actual == expected)
+
+
+def _object_type_matches(actual: Any, spec: Mapping[str, Any], *, actual_class_id: Any = None) -> bool:
+    class_proof = spec.get("documented_list_element_class", spec.get("documented_list_owner_class", spec.get("planned_reference_target_class", spec.get("structural_class_id"))))
+    expected_class = class_proof if class_proof is not None else spec.get("class_id")
+    if not (_object_class_matches(actual_class_id, expected_class)
+            and isinstance(actual, str) and bool(actual)):
+        return False
+    inner = spec.get("inner_identity")
+    if inner is not None:
+        return (inner.get("kind") == "source-certified-owned-inner/v1"
+            and _object_class_matches(actual_class_id, inner.get("element_class_id"))
+            and actual == inner.get("native_type"))
+    if class_proof is not None:
+        return True
+    return _ordinary_object_type_matches(actual, spec)
+
+
+def _object_spec_row_matches(row: Mapping[str, Any], spec: Mapping[str, Any], object_id: str) -> bool:
+    return (_same_identity(row.get("id"), object_id)
+        and _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")))
+
+
+def _ordinary_object_type_matches(actual: Any, spec: Mapping[str, Any]) -> bool:
+    if not isinstance(actual, str) or not actual:
+        return False
     token = _object_type_token(actual)
-    return token in {
-        _object_type_token(spec.get("requested_type")),
-        _object_type_token(spec.get("canonical_type")),
-        "propertycontainer" if _object_type_token(spec.get("canonical_type")) == "actormixer" else "",
-    }
+    expected = {_object_type_token(value) for value in (spec.get("requested_type"), spec.get("canonical_type"))
+        if isinstance(value, str) and _object_type_token(value)}
+    if not token:
+        return False
+    if expected & {"actormixer", "propertycontainer"}:
+        expected.update({"actormixer", "propertycontainer"})
+    return token in expected
 
 
 def _child_path(parent_path: Any, name: Any, *, field: str) -> str:
@@ -7668,8 +10549,8 @@ def _read_object_path_rows(
     )
 
 
-def _read_object_id_rows(object_id: Any, *, fields: Sequence[str], read: ReadCall) -> list[dict[str, Any]]:
-    return _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}}, {"return": list(fields)}))
+def _read_object_id_rows(object_id: Any, *, fields: Sequence[str], read: ReadCall, platform: str | None = None) -> list[dict[str, Any]]:
+    return _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}}, {"return": list(fields), **({"platform": platform} if platform is not None else {})}))
 
 
 def _bounded_multi_identity_read(
@@ -7780,16 +10661,25 @@ def _prove_omitted_object_list_empty(
     *,
     read: ReadCall,
     platform: str | None = None,
+    documented_list: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Prove absence independently of a missing owner return projection.
 
-    Only fixed operation-owned lists enter this compatibility path. WAQL list
-    selection is distinct from the legacy transform.select relationship enum.
+    Only fixed operation-owned lists or certified owned Metadata/Marker profiles enter
+    this compatibility path. WAQL list selection is distinct from the legacy transform.select relationship enum.
     One returned member is sufficient to disprove emptiness; never enumerate
     an unbounded list or treat a failed/malformed query as an empty result.
     """
+    from .documented_list_fields import owned_inner_identity, is_manual_marker_list_source
+    certified_metadata = (list_name == "Metadata" and isinstance(documented_list, Mapping)
+        and documented_list.get("scope", {}).get("scope_kind") == "object"
+        and documented_list["scope"].get("scope_value") == object_id
+        and owned_inner_identity(documented_list, 5570560) is not None)
+    certified_marker = (list_name == "Markers" and isinstance(documented_list, Mapping)
+        and documented_list.get("scope", {}).get("scope_value") == object_id
+        and is_manual_marker_list_source(documented_list))
     if (
-        list_name not in {"RTPC", "Effects"}
+        (list_name not in {"RTPC", "Effects"} and not certified_metadata and not certified_marker)
         or not isinstance(object_id, str)
         or not _PLUGIN_GUID.fullmatch(object_id)
     ):
@@ -7805,7 +10695,7 @@ def _prove_omitted_object_list_empty(
         "options": options,
         "result": dict(result) if isinstance(result, Mapping) else result,
     }
-    if not isinstance(result, Mapping) or result.get("return") != []:
+    if not isinstance(result, Mapping) or set(result) != {"return"} or result.get("return") != []:
         raise OperationContractError(
             "INVALID_READBACK",
             "An omitted object-list field requires an independently empty list readback.",
@@ -7823,6 +10713,7 @@ def _read_object_list_rows_with_evidence(
     platform: str | None = None,
     context: str,
     allow_missing_empty: bool = False,
+    version: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Resolve one object list without using an invalid transform selector.
 
@@ -7869,7 +10760,16 @@ def _read_object_list_rows_with_evidence(
     owner_row = owner_rows[0]
     compatibility_normalization: dict[str, Any] | None = None
     if list_field not in owner_row:
-        if allow_missing_empty and set(owner_row) == {"id"}:
+        if (version in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"} and canonical_name in {"RTPC", "Effects"}
+                or version in {"2023.1", "2024.1", "2025.1"} and canonical_name == "Markers"):
+            from .documented_list_fields import resolve_live_list_evidence, prove_source_owned_empty_list
+            try:
+                source = resolve_live_list_evidence(version, object_id, canonical_name, read=read)
+                compatibility_normalization = prove_source_owned_empty_list(source, owner_row, read=read, platform=platform)
+            except (ValueError, KeyError, TypeError) as exc:
+                raise OperationContractError("INVALID_READBACK", str(exc)) from exc
+            raw_references = []
+        elif allow_missing_empty and set(owner_row) == {"id"}:
             emptiness_readback = _prove_omitted_object_list_empty(
                 object_id, canonical_name, read=read, platform=platform,
             )
@@ -8010,6 +10910,7 @@ def _read_object_list(
     fields: Sequence[str],
     read: ReadCall,
     platform: str | None = None,
+    version: str | None = None,
 ) -> list[dict[str, Any]]:
     rows, _readbacks = _read_object_list_rows_with_evidence(
         object_id,
@@ -8018,6 +10919,7 @@ def _read_object_list(
         read=read,
         platform=platform,
         context="object-list snapshot",
+        version=version,
     )
     return rows
 
@@ -8265,21 +11167,28 @@ def _normalize_replace_subtree_snapshot(
 
 
 def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
+    from .constructor_inputs import local_reference_field
     return _dedupe_fields(
         [
             *IDENTITY_RETURN_FIELDS,
+            "classId",
+            *(["IsVoice"] if "source_owner" in spec else []),
             *(
                 ("owner",)
                 if spec.get("collection") not in {None, "children"}
                 else ()
             ),
             *(row.get("name") for row in spec.get("properties", []) if isinstance(row, Mapping)),
-            *(row.get("name") for row in spec.get("references", []) if isinstance(row, Mapping)),
+            *(local_reference_field(spec, row.get("name")) for row in spec.get("references", []) if isinstance(row, Mapping)),
+            *(local_reference_field(spec, requirement["name"]) for evidence in spec.get("new_object_default_evidence", [])
+              for requirement in evidence["requirements"]),
+            *(plugin_verification_fields(normalize_plugin_creation(spec["source_plugin"]["descriptor"]))
+              if "source_plugin" in spec else ()),
             *(
                 OBJECT_SET_IMPORT_READBACK_FIELDS
                 if isinstance(spec.get("import"), Mapping)
-                or isinstance(spec.get("requested_language"), str)
-                else ()
+                or (isinstance(spec.get("requested_language"), str) and "construction_language" not in spec)
+                else ("activeSource",) if "construction_language" in spec else ()
             ),
         ]
     )
@@ -8333,7 +11242,9 @@ def _compound_business_outcome_key(plan: Mapping[str, Any]) -> str:
             "final business-outcome verifier.",
             details={"verification_kind": kind},
         )
-    if any(value is None for value in identity.values()):
+    # Preserve legal current-platform omission as a stable key value; do not
+    # invent a platform token. Other outcome identity components must exist.
+    if any(value is None for key, value in identity.items() if key != "platform"):
         raise OperationContractError(
             "UNDO_GROUP_CHILD_VERIFIER_REQUIRED",
             "Compound Undo child verification lacks its complete outcome identity.",
@@ -8342,7 +11253,160 @@ def _compound_business_outcome_key(plan: Mapping[str, Any]) -> str:
     return canonical_sha256(identity)
 
 
-def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> PreparedOperation:
+def _require_compound_ordinary_creation(prepared: PreparedOperation) -> None:
+    from .creation_observations import ordinary_creation_graph
+    from .edit_history_business import MAX_OBSERVATIONS
+    try:
+        if prepared.request.operation != "object.create":
+            raise ValueError("Creation history requires object.create")
+        ordinary_creation_graph(prepared.verification_plan, prepared.pre_state,
+            parent=prepared.resolved_roles.get("parent", {}).get("row"), max_observations=MAX_OBSERVATIONS)
+    except ValueError as exc:
+        raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", str(exc)) from exc
+
+
+def _compound_platform_guid(value: Any) -> bool:
+    return isinstance(value, str) and _PLUGIN_GUID.fullmatch(value) is not None
+
+
+def _compound_project_platform(context: Any, platform: Any) -> bool:
+    """Require one actual non-null project platform, not just GUID syntax."""
+    if (not isinstance(context, Mapping) or not _compound_platform_guid(platform)
+            or platform.lower() == "{00000000-0000-0000-0000-000000000000}"):
+        return False
+    rows = context.get("platforms")
+    matches = [row for row in rows if isinstance(row, Mapping)
+               and _compound_platform_guid(row.get("id")) and _same_identity(row["id"], platform)] if isinstance(rows, list) else []
+    return len(matches) == 1
+
+
+def _compound_field_outcome_scope(
+    prepared: PreparedOperation, *, version: str, read: ReadCall, evidence: dict[str, Any],
+) -> Mapping[str, Any] | None:
+    """Bind field scope without equating selector spelling with independence."""
+    plan = prepared.verification_plan
+    kind = plan.get("kind")
+    if kind not in {"same-guid-property", "same-guid-reference", "object-linked-state"}:
+        return None
+    evidence["compound_platform_scope_version"] = 1
+    object_id = plan.get("object_id")
+    field = plan.get("field", plan.get("property"))
+    platform = plan.get("platform")
+    scope: dict[str, Any] = {"object_id": object_id, "field": field, "platform": platform, "kind": "unknown"}
+    if kind == "object-linked-state":
+        return {**scope, "kind": "all"}
+    needs_current = kind == "same-guid-property" and platform is None
+    needs_alias = isinstance(platform, str) and not _compound_platform_guid(platform)
+    if needs_current or needs_alias:
+        if version == "2021.1":
+            raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN",
+                "The compound field needs a live effective-platform binding that this pinned lane does not yet provide.",
+                details={"field": field, "implementation_obligation": "current_platform_or_global_linkage_observer"})
+        context = read(GET_PROJECT_INFO_URI, {}, {})
+        if needs_current:
+            platform = context.get("currentPlatformId")
+            if not _compound_project_platform(context, platform):
+                raise OperationContractError("INVALID_READBACK", "Compound current-platform binding requires one non-null currentPlatformId matching exactly one project platform.")
+            expected = evidence.setdefault("compound_current_platform", platform)
+            if not _same_identity(expected, platform):
+                raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN", "Current platform changed during compound preparation.")
+        else:
+            rows = context.get("platforms")
+            matches = [row for row in rows if isinstance(row, Mapping) and row.get("name") == platform] if isinstance(rows, list) else []
+            if len(matches) != 1 or not _compound_project_platform(context, matches[0].get("id")):
+                raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN", "The explicit platform name did not resolve exactly in live project platforms.", details={"platform": platform})
+            previous = evidence.setdefault("compound_platform_aliases", {}).setdefault(str(platform), matches[0]["id"])
+            if not _same_identity(previous, matches[0]["id"]):
+                raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN", "A platform name changed identity during compound preparation.")
+            platform = matches[0]["id"]
+    scope["platform"] = platform
+    # setReference's platform links the reference; its omission is not documented
+    # as setProperty's current-platform shorthand. Do not share that inference.
+    if kind == "same-guid-property" and version in {"2023.1", "2024.1", "2025.1"}:
+        info = prepared.pre_state.get("field_info", {})
+        if isinstance(info, Mapping) and info.get("supports", {}).get("unlink") is True and _compound_platform_guid(platform):
+            args = {"object": object_id, "property": field, "platform": platform}
+            result = read(OBJECT_IS_LINKED_URI, args, {})
+            linked = result.get("linked")
+            if type(linked) is not bool:
+                raise OperationContractError("INVALID_READBACK", "Compound linkage observation requires an explicit linked boolean.")
+            evidence.setdefault("compound_linkage_guards", []).append({"args": args, "linked": linked})
+            scope["kind"] = "all" if linked else "platform"
+    return scope
+
+
+def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read: ReadCall, evidence: dict[str, Any]):
+    """Own each materialized field, including Render-induced writes, separately."""
+    plan, state = prepared.verification_plan, prepared.pre_state
+    kind = plan.get("kind")
+    scopes = []
+    if kind in {"object-create-graph", "object-set-batch"} and state.get("owned_result_stages"):
+        from .creation_observations import ordinary_staged_creation_graphs
+        try:
+            groups = ordinary_staged_creation_graphs(plan, state)
+        except ValueError as exc:
+            raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", str(exc)) from exc
+        paths = state['owned_result_stages']['prospective_paths']
+        from .owned_result_stages import preservation_rows
+        return [{"object_id": "path:" + paths[node['request_path']].casefold(),
+            "field": "presence", "kind": "all", "platform": None} for group in groups for node in group['nodes']] + [
+            {'object_id': row['id'], 'field': 'notes', 'kind': 'all', 'platform': None}
+            for row, _ in preservation_rows({'verification_plan': plan, 'pre_state': state})]
+    if kind == "object-create-graph":
+        _require_compound_ordinary_creation(prepared)
+        from .creation_observations import ordinary_creation_graph
+        _, paths = ordinary_creation_graph(plan, state, parent=prepared.resolved_roles.get("parent", {}).get("row"))
+        return [{"object_id": "path:" + path.casefold(), "field": "presence", "kind": "all", "platform": None}
+            for path in paths.values()]
+    elif kind == "object-set-batch":
+        nodes = plan.get("nodes", [])
+        if (prepared.request.operation != "object.set" or not nodes
+                or any(node.get("existing_target") is not True or node.get("preexisting_id") is not None
+                    or node.get("import") or node.get("children_request_paths") or node.get("list_request_paths")
+                    or node.get("list_snapshots") or node.get("requested_language") for node in nodes)
+                or plan.get("replaced_subtree_rows") or plan.get("replaced_list_subtree_rows")):
+            raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED",
+                "Compound object.set currently needs existing-only ordinary fields; graph/List/restoration remain implementation obligations.")
+        proofs = state.get("existing_field_observations", [])
+        for node in nodes:
+            if node.get("requested_name") != node.get("original_name"):
+                scopes.append({"object_id": node["target_id"], "field": "name", "platform": None, "kind": "all"})
+            if node.get("notes_supplied"):
+                scopes.append({"object_id": node["target_id"], "field": "notes", "platform": None, "kind": "all"})
+            for field_kind, key in (("same-guid-property", "properties"), ("same-guid-reference", "references")):
+                for field in node.get(key, []):
+                    if (field_kind == "same-guid-property" and ("value" not in field or not isinstance(field["value"], (str, bool, int, float)))
+                            or field_kind == "same-guid-reference" and ("target_id" not in field or not (field["target_id"] is None or isinstance(field["target_id"], str)))):
+                        raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", "Compound field union needs its complete observation.")
+                    matching = [item for proof in proofs if proof.get("request_path") == node["request_path"]
+                        for item in proof.get("fields", []) if item.get("field") == field["name"]]
+                    info = matching[0].get("field_info", {}) if len(matching) == 1 else {}
+                    child = replace(prepared, verification_plan={"kind": field_kind, "object_id": node["target_id"],
+                        "field": field["name"], "platform": node.get("platform")}, pre_state={"field_info": info})
+                    scopes.append(_compound_field_outcome_scope(child, version=version, read=read, evidence=evidence))
+    elif kind in {"same-guid-property", "same-guid-reference", "object-linked-state"}:
+        scopes.append(_compound_field_outcome_scope(prepared, version=version, read=read, evidence=evidence))
+    elif kind in {"same-guid-notes", "same-guid-renamed"}:
+        scopes.append({"object_id": plan["object_id"], "field": "notes" if kind.endswith("notes") else "name",
+            "platform": None, "kind": "all"})
+    else:
+        scopes.append({"object_id": "business:" + _compound_business_outcome_key(plan), "field": "outcome",
+            "platform": None, "kind": "all"})
+    # A selected later Render can also write earlier slots. They participate in
+    # the same collision algebra as explicit property/object.set declarations.
+    for chain in state.get("effect_render_chains", []):
+        for item in chain.get("snapshots", []):
+            for field in item.get("after_changes", {}):
+                matches = [info for info in chain["metadata"]
+                    if str(info["scope"].get("object_id")).upper() == str(item["object_id"]).upper() and info["field"] == field]
+                info = matches[0]["normalized"] if matches else {}
+                child = replace(prepared, verification_plan={"kind": "same-guid-property", "object_id": item["object_id"],
+                    "field": field, "platform": chain.get("platform")}, pre_state={"field_info": info})
+                scopes.append(_compound_field_outcome_scope(child, version=version, read=read, evidence=evidence))
+    return scopes
+
+
+def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history_resolver=None, copy_proof_context=None, compound_child=False) -> PreparedOperation:
     """Resolve live identities/metadata and build one immutable semantic preview."""
 
     spec = describe_operation(request.operation)
@@ -8350,6 +11414,9 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
 
     def read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
         result = read_call(uri, args, options)
+        if uri == MODEL_READ_URI and isinstance(result, list):
+            reads.append({"uri": uri, "args": dict(args), "options": dict(options), "result": [_json_mapping(row) for row in result]})
+            return result
         if not isinstance(result, Mapping):
             raise OperationContractError(
                 "INVALID_READBACK",
@@ -8368,7 +11435,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
     if request.operation == "waapi.undoGroup":
         execution_plan = build_undo_group_execution_plan(request.version, arguments)
         prepared_children: list[Mapping[str, Any]] = []
-        outcome_owners: dict[str, int] = {}
+        platform_outcomes: dict[tuple[str, str], list[tuple[int, Mapping[str, Any]]]] = {}
         for index, child_plan in enumerate(execution_plan["calls"]):
             child_request = parse_operation_request(
                 child_plan["child_request"],
@@ -8377,23 +11444,26 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             if child_request.operation == "waapi.call":
                 prepared_children.append(dict(child_plan))
                 continue
-            child_prepared = prepare_operation(child_request, read_call=read)
-            outcome_key = _compound_business_outcome_key(
-                child_prepared.verification_plan
-            )
-            previous = outcome_owners.get(outcome_key)
-            if previous is not None:
-                raise OperationContractError(
-                    "UNDO_GROUP_OVERLAPPING_OUTCOME",
-                    "Compound Undo children cannot independently verify two "
-                    "writes to the same final business outcome.",
-                    details={
-                        "first_index": previous,
-                        "second_index": index,
-                        "operation": child_request.operation,
-                    },
-                )
-            outcome_owners[outcome_key] = index
+            child_prepared = prepare_operation(child_request, read_call=read, compound_child=True)
+            for scope in _compound_outcome_scopes(child_prepared, version=request.version, read=read, evidence=metadata):
+                field_key = (_identity_key(scope["object_id"]), str(scope["field"]))
+                previous_scopes = platform_outcomes.setdefault(field_key, [])
+                for previous_index, previous_scope in previous_scopes:
+                    if previous_index == index:
+                        continue  # Explicit and induced writes within one sealed child are one outcome.
+                    same_platform = (_same_identity(scope["platform"], previous_scope["platform"])
+                        if _compound_platform_guid(scope["platform"]) and _compound_platform_guid(previous_scope["platform"])
+                        else scope["platform"] == previous_scope["platform"])
+                    if scope["kind"] == "all" or previous_scope["kind"] == "all" or same_platform:
+                        raise OperationContractError("UNDO_GROUP_OVERLAPPING_OUTCOME",
+                            "Compound children affect the same final field and effective platform scope.",
+                            details={"first_index": previous_index, "second_index": index, "field": scope["field"]})
+                    if scope["kind"] != "platform" or previous_scope["kind"] != "platform":
+                        raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN",
+                            "Distinct platform selectors need live unlinked scope evidence before their outcomes can be composed.",
+                            details={"first_index": previous_index, "second_index": index,
+                                "field": scope["field"], "implementation_obligation": "effective_platform_and_linkage_scope"})
+                previous_scopes.append((index, scope))
             child_dispatch = child_prepared.semantic_preview.dispatch_payload()
             if child_dispatch.get("uri") != child_plan["api"]:
                 raise OperationContractError(
@@ -8410,9 +11480,21 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                     "request_validation_strength": "dedicated_operation_preparation",
                 }
             )
+        from .creation_observations import require_compound_creation_scope
+        require_compound_creation_scope(prepared_children)
+        from .object_graph_paths import prepare_compound_path_context
+        try:
+            compound_path_context = prepare_compound_path_context(prepared_children, read=read)
+        except ValueError as exc:
+            raise OperationContractError('UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN', str(exc)) from exc
+        if compound_path_context is not None:
+            from .object_graph_paths import compound_phase_arguments
+            for index, child in enumerate(prepared_children):
+                child['args'] = compound_phase_arguments(prepared_children, index, compound_path_context)
         execution_plan = {
             **execution_plan,
             "calls": prepared_children,
+            **({'path_context': compound_path_context} if compound_path_context is not None else {}),
         }
         prepared_plan_size = len(canonical_json_bytes(execution_plan))
         if prepared_plan_size > UNDO_GROUP_MAX_PLAN_BYTES:
@@ -8460,15 +11542,30 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             request.version,
             arguments,
         )
+        call_metadata = {"execution_contract": execution_contract, "model_authored_code": False}
+        if api == "ak.wwise.core.sound.setActiveSource":
+            from .project_setting_business_contracts import active_source_linkage_disclosure
+            call_metadata["source_linkage"] = active_source_linkage_disclosure()
+            warnings.append("Active-source selection uses existing source linkage and may affect other linked platforms; this operation does not unlink or establish platform isolation.")
+        blend_plan = None
+        if api == "ak.wwise.core.blendContainer.addAssignment":
+            from .blend_assignment import prepare as prepare_blend, notice, materialize_index, BlendAssignmentError
+            try:
+                blend_plan = prepare_blend(call_args, read=read, version=request.version)
+            except BlendAssignmentError as exc:
+                raise OperationContractError("INVALID_BLEND_ASSIGNMENT_OBSERVATION", str(exc)) from exc
+            metadata["blend_assignment"] = blend_plan
+            call_metadata["blend_assignment"] = notice(blend_plan)
+            # Keep the raw request while sealing its documented native effect.
+            call_args = materialize_index(call_args, len(blend_plan["before"]["assignments"]))
+            if blend_plan["verification_scope"]["unobserved"]:
+                warnings.append("Blend assignment execution remains effect-unverified for: " + ", ".join(blend_plan["verification_scope"]["unobserved"]))
         preview = SemanticPreview(
             envelope=SemanticEnvelope(
                 uri=api,
                 args=call_args,
                 options=call_options,
-                metadata={
-                    "execution_contract": execution_contract,
-                    "model_authored_code": False,
-                },
+                metadata=call_metadata,
             ),
             source_note_family="public-execution-contract",
             version=request.version,
@@ -8486,6 +11583,256 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 else None
             ),
         )
+        if api == TRANSPORT_EXECUTE_ACTION_URI:
+            from .transport_action import snapshot as transport_action_snapshot
+            try:
+                metadata["transport_action_before"] = transport_action_snapshot(call_args, version=request.version, read=read)
+            except (ValueError, SemanticValidationError) as exc:
+                raise OperationContractError("INVALID_TRANSPORT_OBSERVATION", str(exc)) from exc
+            verification["before"] = metadata["transport_action_before"]
+        if api in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI}:
+            from .runtime_log_effects import channel_snapshot
+            host = read(GET_INFO_URI, {}, {})
+            if type(host.get("isCommandLine")) is not bool:
+                raise OperationContractError("INVALID_LOG_OBSERVATION", "Log verification requires the actual host kind.")
+            try:
+                before = channel_snapshot(read_call(LOG_GET_URI, {"channel": verification["channel"]}, {}), version=request.version)
+            except OperationContractError:
+                raise
+            except (ValueError, SemanticValidationError) as exc:
+                raise OperationContractError("INVALID_LOG_OBSERVATION", "Log prestate did not match its pinned native schema.") from exc
+            if before["outcome"] != "complete":
+                raise OperationContractError("LOG_OBSERVATION_TOO_LARGE", "Log prestate exceeds the bounded complete-channel observation policy.", details=before)
+            verification["console"] = host["isCommandLine"]
+            verification['native_observation_support'] = runtime_log_observation_support(host)
+            if host['isCommandLine'] and verification['native_observation_support']['state'] == 'supported' and api == LOG_ADD_ITEM_URI:
+                from .runtime_inspection_business_contracts import CONSOLE_LOG_ADD_OBSERVER
+                verification['console_add_observer'] = dict(CONSOLE_LOG_ADD_OBSERVER)
+                warnings.append('Console add subscribes before one execution, waits at most 5 seconds for an exact matching addition event (64 events, 64 KiB per event), then unsubscribes. No exclusive writer or continuing contents proof.')
+            elif host['isCommandLine'] and verification['native_observation_support']['state'] != 'supported':
+                warnings.append('This Console build has no established log observation support; native acknowledgment does not prove an addition or removal (WG-80630, available from2025.1.4).')
+            metadata["log_channel_before"] = before
+            warnings.append("Log verification compares one bounded channel observation; concurrent identical messages cannot be attributed, and continuing channel state is unverified.")
+        if blend_plan is not None:
+            verification = {"kind": "blend-assignment", "uri": api, "version": request.version, **blend_plan}
+        if api == SAVE_CAPTURE_URI:
+            try:
+                verification = prepare_capture_artifact(call_args, arguments["io_root"], execution_contract["io_audit"], request.version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+            warnings.append("Capture save verifies only a nonempty created or content-changed destination and bounded output-directory file preservation. Native capture format and capture-data completeness remain unverified.")
+        if api == "ak.wwise.core.sound.setActiveSource":
+            source_guard, source_rows = _observe_active_source_plugin_binding(call_args["sound"], call_args["source"], read=read)
+            if source_guard is not None:
+                from .project_setting_business_contracts import active_source_native_limitations
+                for limitation in active_source_native_limitations(request.version):
+                    if (source_guard["source"]["classId"] == limitation["source_class_id"]
+                            and ("platform" not in call_args or request.version == "2022.1")):
+                        host = read(GET_INFO_URI, {}, {})
+                        native_version = host.get("version")
+                        build = (".".join(str(native_version.get(key)) for key in ("year", "major", "minor", "build"))
+                                 if isinstance(native_version, Mapping) else None)
+                        if host.get("isCommandLine") is True and build == limitation["observed_native_build"]:
+                            if "platform" in call_args:
+                                context = read(GET_PROJECT_INFO_URI, {}, {})
+                                current = context.get("currentPlatformId")
+                                if not _compound_project_platform(context, current):
+                                    raise OperationContractError("INVALID_READBACK",
+                                        "Current project platform requires one exact catalog identity.")
+                                platform = next(row for row in context["platforms"]
+                                    if isinstance(row, Mapping) and _same_identity(row.get("id"), current))
+                                name = platform.get("name")
+                                if not isinstance(name, str) or not name.strip():
+                                    raise OperationContractError("INVALID_READBACK",
+                                        "Current project platform requires its observed name.")
+                                if call_args["platform"] != name:
+                                    continue
+                            raise OperationContractError(
+                                "VERSION_BEHAVIOR_BOUNDARY",
+                                "This Console build rejected Tone source selection in its current "
+                                "platform view. This request made no change.",
+                                details={"api": api, "version": request.version, **limitation},
+                            )
+                metadata["active_source_plugin_binding"] = source_guard
+                roles.update({role: ResolvedObject(identity=ObjectIdentity(id=source_guard[role]["id"]),
+                    object=source_guard[role]["id"], resolution="live-exact-id", row=source_guard[role]) for role in ("sound", "source")})
+        if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
+            from .remote_transition import remote_connection_snapshot
+            try:
+                metadata["remote_connection_before"] = remote_connection_snapshot(request.version, read)
+            except (ValueError, SemanticValidationError) as exc:
+                raise OperationContractError("INVALID_REMOTE_CONNECTION_OBSERVATION", str(exc)) from exc
+
+
+        if arguments.get("history_binding") is not None:
+            from .edit_history_business import observe_history_state, history_summary, REFERENCE_CONTRACT
+            observed = None
+            try:
+                history = arguments["history_binding"]
+                if history.get("contract") == REFERENCE_CONTRACT:
+                    if history_resolver is None:
+                        raise ValueError("History reference requires its owning Gateway resolver")
+                    history = history_resolver(api, request.version, history)
+                if history["source_receipt"] is not None:
+                    observed = observe_history_state(history, after_action=False, read=read)
+                    if not observed["matches"]:
+                        raise ValueError("Current scoped state differs from the owned history expectation")
+            except ValueError as exc:
+                raise OperationContractError("HISTORY_EXPECTATION_CHANGED", str(exc), details={
+                    "readbacks": getattr(exc, "readbacks", []),
+                    **({"history_observation": observed} if observed is not None else {}),
+                }) from exc
+            metadata["history_binding"] = dict(history)
+            metadata["history_expectation"] = history_summary(history)
+            preview = SemanticPreview(envelope=SemanticEnvelope(uri=api, args=call_args, options=call_options,
+                metadata={**dict(preview.envelope.metadata), "history_expectation": metadata["history_expectation"]}),
+                source_note_family="latest-project-history", version=request.version,
+                requires_destructive_gate=True, raw_dispatch_allowed=False)
+            verification = {"kind": "history-scoped-effect" if history["source_receipt"] is not None else "history-result-schema-only", "uri": api, "version": request.version,
+                "history_binding": dict(history)}
+        if arguments.get("provider_profile_binding") is not None:
+            from .source_control_profiles import check_profile
+            try:
+                check_profile(arguments["provider_profile_binding"])
+            except ValueError as exc:
+                raise OperationContractError("SOURCE_CONTROL_PROFILE_PROOF_REQUIRED", str(exc)) from exc
+            metadata["provider_profile_binding"] = dict(arguments["provider_profile_binding"])
+            verification = {"kind": "source-control-provider-protected", "uri": api, "version": request.version}
+        if arguments.get("source_control_binding") is not None:
+            from .source_control_object_files import observe_object_file_binding
+            try:
+                observed = observe_object_file_binding(api, arguments["source_control_binding"], read=read)
+                if observed != arguments["source_control_binding"]:
+                    raise ValueError("The selected object identity or file accessor changed before Preview")
+            except ValueError as exc:
+                raise OperationContractError("SOURCE_CONTROL_OBJECT_FILE_BINDING_CHANGED", str(exc)) from exc
+            metadata["source_control_binding"] = observed
+            from .source_control_object_files import observe_bound_file_state
+            try:
+                metadata["source_control_file_state"] = observe_bound_file_state(api, observed)
+            except ValueError as exc:
+                raise OperationContractError("SOURCE_CONTROL_OBJECT_FILE_BINDING_CHANGED", str(exc)) from exc
+        if api in CLI_PROJECT_FILE_URIS:
+            try:
+                effect = prepare_cli_project_effect(api, call_args, execution_contract['io_audit'], request.version)
+                if effect is not None:
+                    metadata['cli_project_effect'] = effect
+                    optional_none = effect.get('model_before', {}).get('optional_none_state_materialization')
+                    if optional_none is not None:
+                        from .console_media_ids import none_state_notice
+                        preview = replace(preview, envelope=replace(preview.envelope, metadata={
+                            **dict(preview.envelope.metadata), 'optional_none_state_materialization': none_state_notice(optional_none)}))
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api in PROJECT_CREATE_URIS:
+            try:
+                verification = prepare_console_project_creation(call_args, execution_contract['io_audit'], request.version, uri=api)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api == 'ak.wwise.console.project.open':
+            try:
+                verification = prepare_console_project_open(call_args, execution_contract['io_audit'], request.version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api == TONE_URI:
+            try:
+                verification = prepare_tone_verification(call_args, execution_contract['io_audit'], request.version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api in MODEL_OPERATIONS:
+            verification = {"kind": "authoring-model-state", "uri": api, "version": request.version,
+                "binding": dict(arguments["model_binding"]), "native_args": dict(call_args)}
+            if api == 'ak.wwise.ui.model.setState':
+                query = state_query_from_assignments(call_args)
+                try:
+                    metadata['model_state_before'] = canonical_state_result(read(MODEL_READ_URI, query, {}), query)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_MODEL_STATE_OBSERVATION', str(exc)) from exc
+        if api in LAYOUT_MUTATION_URIS:
+            try:
+                validate_layout_live_binding(arguments['layout_binding'], read=read)
+            except ValueError as exc:
+                raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
+            current = read('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            if not isinstance(current.get('name'), str):
+                raise OperationContractError('INVALID_READBACK', 'Current layout name was omitted; cannot prepare layout switching')
+            metadata['layout_original_current'] = dict(current)
+            verification = {'kind': 'authoring-layout-state', 'uri': api, 'version': request.version,
+                'expected_name': call_args.get('name', arguments['layout_binding']['layout_name'])}
+            if api == LAYOUT_RESET_URI:
+                try:
+                    metadata['layout_reset_catalog'] = reset_selection_observation(arguments['layout_binding'], read=read)
+                except ValueError as exc:
+                    raise OperationContractError('STALE_LAYOUT_RESET_SELECTION', str(exc)) from exc
+                verification.update(kind='authoring-layout-reset-observation',
+                    selected_names=list(dict.fromkeys(call_args.get('layouts', []))),
+                    reset_scope=arguments['layout_binding']['reset_request']['scope'],
+                    effect_boundary='Native defaults and omission/empty selection scope are not certified; #188 remains open')
+                preview = SemanticPreview(envelope=SemanticEnvelope(uri=api, args=call_args, options=call_options,
+                    metadata={**dict(preview.envelope.metadata), 'reset_selection_scope': verification['reset_scope'],
+                        'effect_boundary': verification['effect_boundary']}), source_note_family='authoring-layout-reset',
+                    version=request.version, requires_destructive_gate=True, raw_dispatch_allowed=False)
+            elif api == LAYOUT_SET_URI:
+                try:
+                    metadata['layout_target_absence'] = require_layout_absence(call_args['name'], read=read)
+                except ValueError as exc:
+                    raise OperationContractError('LAYOUT_REGISTRATION_COLLISION', str(exc)) from exc
+                try:
+                    metadata['layout_blueprint_view_catalog'] = blueprint_view_catalog(arguments['layout_binding'], read=read)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_LAYOUT_BLUEPRINT_VIEW_TYPE', str(exc)) from exc
+                verification['expected_layout'] = dict(call_args['layout'])
+            elif api == LAYOUT_REMOVE_URI:
+                try:
+                    metadata['layout_factory_names'] = dict(require_temporary_layout(call_args['name'], read=read))
+                except ValueError as exc:
+                    raise OperationContractError('FACTORY_LAYOUT_REMOVAL_FORBIDDEN', str(exc)) from exc
+            elif api == LAYOUT_GET_OR_CREATE_URI:
+                binding = arguments['layout_binding']
+                try:
+                    if current['name'] != binding['layout_name']:
+                        raise ValueError('View creation requires its discovered layout to be current; switch and inspect again')
+                    observed = view_creation_observation(binding, read=read)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_LAYOUT_VIEW_SCOPE', str(exc)) from exc
+                metadata['layout_view_prestate'] = observed
+                verification.update(expected_name=binding['layout_name'], view_type=call_args['name'],
+                    coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args},
+                    existing_view_ids=[row['viewID'] for row in observed['instances'] if row['viewName'] == call_args['name']])
+            elif api == LAYOUT_SPLITTER_URI:
+                binding = arguments['layout_binding']
+                try:
+                    if current['name'] != binding['layout_name']:
+                        raise ValueError('Splitter movement requires its discovered layout to be current')
+                    observed = splitter_state_observation(binding, read=read)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_LAYOUT_SPLITTER_SCOPE', str(exc)) from exc
+                metadata['layout_splitter_prestate'] = observed
+                verification.update(splitter_id=call_args['id'], axis=observed['axis'], parent_id=observed['parent_id'],
+                    rectangle_before=observed['rectangle'], pixel_delta=call_args['delta'],
+                    preserved_view_identities=layout_view_identities(observed['instances']))
+            elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
+                binding = arguments['layout_binding']
+                if current['name'] != binding['layout_name']:
+                    raise OperationContractError('INVALID_LAYOUT_VIEW_SCOPE', 'Changing a view requires its discovered layout to be current')
+                try:
+                    observed_view = validate_layout_view_binding(binding, read=read)
+                except ValueError as exc:
+                    raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
+                verification.update(expected_name=binding['layout_name'], view_id=call_args['viewID'])
+                if api == LAYOUT_DOCK_URI:
+                    try:
+                        dock_state = dock_state_observation(binding, read=read)
+                    except ValueError as exc:
+                        raise OperationContractError('INVALID_LAYOUT_DOCK_TARGET', str(exc)) from exc
+                    metadata['layout_dock_prestate'] = dock_state
+                    verification.update(view_type=observed_view['viewName'], target_id=call_args['targetID'],
+                        target_kind=dock_state['target']['kind'], dock_side=call_args['side'],
+                        target_previous_ids=layout_subtree_ids(dock_state['target']['observation']),
+                        preserved_view_identities=layout_view_identities(dock_state['instances']))
+                if api == LAYOUT_UNDOCK_URI:
+                    verification.update(view_type=observed_view['viewName'],
+                        coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args})
         cleanup = build_transaction_cleanup_spec(
             api,
             call_args,
@@ -8585,6 +11932,26 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                         "value_id": roles[value_role].object,
                     },
                 )
+        if api in {"ak.soundengine.setState", "ak.soundengine.setSwitch"}:
+            is_state = api.endswith("setState")
+            if request.version != "2021.1" and (is_state or "gameObject" in call_args):
+                group_field = "stateGroup" if is_state else "switchGroup"
+                verification = {
+                    "kind": "soundengine-state-effect", "uri": api, "version": request.version,
+                    "getter_uri": "ak.soundengine.getState" if is_state else "ak.soundengine.getSwitch",
+                    "getter_args": {group_field: call_args[group_field],
+                        **({"gameObject": call_args["gameObject"]} if not is_state else {})},
+                    "getter_options": {"return": ["id"]},
+                    "expected_value_id": call_args["state" if is_state else "switchState"],
+                    "observation_delay_seconds": 0.01,
+                }
+            else:
+                verification["business_observation_boundary"] = (
+                    "Matching 2021.1 WAAPI state/switch observer remains unresolved; SDK Query APIs exist but are not a Gateway route."
+                    if request.version == "2021.1" else
+                    "The setter's omitted transport-game-object scope is not proven equal to the getter's omitted scope."
+                )
+                warnings.append(verification["business_observation_boundary"])
         metadata["execution_contract"] = execution_contract
     elif request.operation in {
         "lua.executeCliFile",
@@ -8639,6 +12006,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             request,
             arguments=arguments,
             read=read,
+            stage_new_graphs=compound_child,
         )
         roles.update(workflow_roles)
         metadata.update(workflow_state)
@@ -8747,13 +12115,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 },
             )
         _reject_protected_delete(source)
+        if source.row.get("type") in {"Source", "SourcePlugin", "AudioFileSource"}:
+            source, parent, metadata["source_transfer_parent_guard"] = _prepare_source_transfer_parent(
+                source, parent, version=request.version, read=read)
         roles.update({"object": source, "parent": parent})
         conflict = str(arguments.get("on_name_conflict", "fail"))
-        if conflict == "replace":
-            raise OperationContractError(
-                "UNSUPPORTED_DESTRUCTIVE_COLLISION_POLICY",
-                "object.copy and object.move do not expose native replace because it can delete an unreviewed destination subtree.",
-            )
         source_name = source.row.get("name")
         parent_path = parent.row.get("path")
         _reject_non_intrinsic_object_name_operation(
@@ -8787,6 +12153,34 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             "path": collision_path,
             "rows": collision_rows,
         }
+        lifecycle_source: list[dict[str, Any]] = []
+        lifecycle_replaced: list[dict[str, Any]] = []
+        if conflict == "replace":
+            source_path = _absolute_live_object_path(source.row.get("path"), field="object.path")
+            if (_same_identity(_parent_value(source.row.get("parent")), parent.object)
+                    or _is_strict_descendant_object_path(parent_path, source_path)):
+                raise OperationContractError("INVALID_REPLACEMENT_TOPOLOGY", "Replacement destination cannot be the source's current parent or lie inside its subtree.")
+            try:
+                lifecycle_source = capture_lifecycle_graph(source.object, read=read, version=request.version)
+                if collision_rows:
+                    collision_row = collision_rows[0]
+                    collision = ResolvedObject(identity=ObjectIdentity(path=collision_path), object=collision_row.get("id"),
+                                               resolution="live-exact-copy-move-collision", row=collision_row)
+                    _reject_protected_replace_boundary(collision)
+                    if (str(collision_row.get("path", "")).casefold() != collision_path.casefold()
+                            or not _same_identity(_parent_value(collision_row.get("parent")), parent.object)
+                            or _is_strict_descendant_object_path(source_path, collision_path)
+                            or _same_identity(source.object, collision.object)):
+                        raise OperationContractError("INVALID_REPLACEMENT_TOPOLOGY", "Replacement must target exactly the destination's direct collision without deleting the source.")
+                    lifecycle_replaced = capture_lifecycle_graph(collision.object, read=read, version=request.version)
+                    roles["replace_collision"] = collision
+            except LifecycleGraphError as exc:
+                raise OperationContractError("INVALID_LIFECYCLE_SNAPSHOT", str(exc)) from exc
+            metadata["copy_move_collision_guard"].update({
+                "source_snapshot": lifecycle_source,
+                "replacement_snapshot": lifecycle_replaced,
+                "snapshot_version": request.version,
+            })
         try:
             auto_check_out = normalize_auto_check_out_to_source_control(
                 arguments.get("auto_check_out_to_source_control"),
@@ -8810,6 +12204,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             if request.operation == "object.copy"
             else builder.move(object=source, parent=parent, on_name_conflict=conflict, auto_check_out_to_source_control=auto_check_out)
         )
+        if conflict == "replace":
+            preview = replace(preview, envelope=replace(preview.envelope, metadata={
+                **preview.envelope.metadata, "source_subtree": lifecycle_source,
+                "replaced_subtree": lifecycle_replaced,
+                "reversal": "not_automatic;_deleted_destination_guids_cannot_be_restored",
+            }))
         verification = {
             "kind": "copied-guid-under-parent" if request.operation == "object.copy" else "moved-guid-under-parent",
             "source_id": source.object,
@@ -8819,7 +12219,33 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             "expected_parent_id": parent.object,
             "expected_parent_path": parent.row.get("path"),
             "on_name_conflict": conflict,
+            **({"source_class_id": source.row["classId"], "source_type": source.row["type"]}
+               if "source_transfer_parent_guard" in metadata else {}),
+            **({"source_subtree_rows": lifecycle_source,
+                "replaced_subtree_rows": lifecycle_replaced,
+                "snapshot_version": request.version,
+                "verification_scope": {
+                    "observed": ["hierarchy", "notes", "discovered_default_view_fields", "replaced_guid_absence", "discovered_project_platform_field_views"],
+                    "unobserved": ["owned_lists_and_plugin_state"]
+                        + (["platform_link_flags"] if any(
+                            row.get("platform_observation", {}).get("link_flags_complete") is not True for row in lifecycle_source) else []),
+                    "complete_business_verification": False,
+                }} if conflict == "replace" else {}),
         }
+        if request.operation == "object.copy" and "source_transfer_parent_guard" in metadata:
+            try:
+                snapshot = capture_source_copy(source.object, parent.object, read=read, version=request.version)
+            except LifecycleGraphError as exc:
+                raise OperationContractError("INVALID_SOURCE_COPY_OBSERVATION", str(exc)) from exc
+            metadata["source_copy_observation"] = snapshot
+            verification["source_copy_live_fields"] = True
+            verification["verification_scope"] = source_copy_scope(snapshot)
+            if copy_proof_context is not None:
+                from .source_copy_proof import KEY, capture_baseline, baseline_summary
+                saved = ({'status': 'unavailable', 'reason': 'replace_saved_graph_preservation_unfinished'}
+                    if conflict == 'replace' else capture_baseline(copy_proof_context, snapshot, read))
+                metadata[KEY] = saved
+                verification[KEY] = baseline_summary(saved)
         cleanup = {
             "kind": "delete-created-copy" if request.operation == "object.copy" else "move-back-to-original-parent",
             "source_snapshot": dict(source.row),
@@ -8851,6 +12277,19 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         cleanup = {"kind": "restore-pre-state", "snapshot": dict(target.row)}
     elif request.operation in {"object.setProperty", "object.setReference"}:
         source = _resolve_identity(arguments["object"], role="object", read=read)
+        context_binding = arguments.get("switch_child_context")
+        if context_binding is not None:
+            from .switch_child_context import validate as validate_context
+            try:
+                if request.operation != "object.setProperty" or context_binding.get("version") != request.version:
+                    raise ValueError("Context binding operation/version differs")
+                context_binding = validate_context(context_binding, read=read)
+                if not _same_identity(context_binding["context_id"], source.object):
+                    raise ValueError("Context binding names another target")
+            except (ValueError, TypeError, KeyError, StopIteration) as exc:
+                raise OperationContractError("SWITCH_CHILD_CONTEXT_INVALID", str(exc)) from exc
+            source = ResolvedObject(identity=source.identity, object=source.object, resolution="switch-child-context", row=context_binding["rows"]["context"])
+            metadata["switch_child_context"] = context_binding
         roles["object"] = source
         field_name = "property" if request.operation == "object.setProperty" else "reference"
         field_value = _non_empty_string(arguments[field_name], field=field_name)
@@ -8859,13 +12298,33 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             if "platform" in arguments
             else None
         )
-        info_payload = read(
-            GET_PROPERTY_INFO_URI,
-            {"object": source.object, "property": field_value},
-            {},
-        )
-        info = parse_get_property_info_result(info_payload)
+        observation_platform = platform
+        if platform is None or not _compound_platform_guid(platform):
+            from .edit_history_business import capture_field_read_platform
+            metadata["field_read_platform"] = capture_field_read_platform(request.version, platform, read=read)
+            if metadata["field_read_platform"]["status"] == "certified":
+                observation_platform = metadata["field_read_platform"]["platform_id"]
+        info = _read_property_info(read, object_id=source.object, name=field_value,
+            reference_kind_version=request.version if request.operation == "object.setReference" else None)
         metadata["field_info"] = info.as_dict()
+        if (request.operation == "object.setReference" and request.version == "2025.1" and field_value == "Metadata"
+                and source.row.get("type") == "PluginInnerObject" and source.row.get("name") == ""):
+            from .documented_list_fields import capture_owned_empty_identity
+            typed_rows = _read_object_id_rows(source.object, fields=(*IDENTITY_RETURN_FIELDS, "classId", "owner"), read=read)
+            if (len(typed_rows) != 1 or any(typed_rows[0].get(key) != source.row.get(key)
+                    for key in ("id", "name", "type", "path"))):
+                raise OperationContractError("INVALID_READBACK", "Retained reference source changed its exact identity")
+            owned = capture_owned_empty_identity(request.version, typed_rows[0], read=read)
+            if owned is not None:
+                metadata["owned_identity"] = owned
+        # Every exact selected field stays bound through prewrite and verify,
+        # including dependency-free fields and cleared references. Raw facts
+        # distinguish native omission from explicit null/default containers.
+        metadata["condition_metadata"] = {
+            "object_id": source.object, "platform": platform,
+            "fields": [info.as_dict()],
+            "native_fields": [{"token": field_value, "metadata": dict(info.raw)}],
+        }
         if platform is not None and request.operation == "object.setProperty":
             _require_platform_field_enabled(
                 read,
@@ -8873,38 +12332,78 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 field_name=field_value,
                 platform=platform,
             )
-        activation_requirements: dict[str, bool] = {}
-        if request.operation == "object.setReference" and arguments["target"] is not None:
+        activation_requirements: dict[str, Any] = {}
+        activation_reference_requirements: dict[str, Any] = {}
+        related_conditions: list[dict[str, Any]] = []
+        activation_metadata: dict[str, PropertyInfoMetadataRecord] = {}
+        override_applicability = {}
+        structural_applicability = {}
+        if request.operation == "object.setProperty" or arguments["target"] is not None:
             activation_specs: list[dict[str, Any]] = []
             _apply_reference_activation_dependencies(
                 info, read=read, object_id=source.object,
-                property_specs=activation_specs, property_info_by_name={},
+                property_specs=activation_specs, property_info_by_name=activation_metadata,
                 derived_properties={}, request_path="$.reference",
+                wwise_version=request.version, override_applicability=override_applicability,
+                structural_applicability=structural_applicability,
+                reference_requirements=activation_reference_requirements,
+                related_conditions=related_conditions, context_binding=context_binding,
+                platform=platform,
             )
             activation_requirements = {spec["name"]: spec["value"] for spec in activation_specs}
+            if related_conditions:
+                metadata["related_conditions"] = related_conditions
+            if info.dependencies:
+                metadata["condition_metadata"]["fields"].extend(item.as_dict() for item in activation_metadata.values())
+        metadata["condition_metadata"]["override_applicability"] = [proof for proof in override_applicability.values() if proof is not None]
+        if request.operation == "object.setReference" and arguments["target"] is None:
+            from .reference_applicability import needs_structural_proof, prove
+            if needs_structural_proof(info):
+                try:
+                    structural_applicability[info.name] = prove(version=request.version, object_id=source.object,
+                        info=info, read=read, platform=platform)
+                except (ValueError, KeyError, TypeError, OSError) as exc:
+                    raise OperationContractError("REFERENCE_APPLICABILITY_UNPROVEN", str(exc)) from exc
+        metadata["condition_metadata"]["structural_applicability"] = list(structural_applicability.values())
+        clearing_reference = request.operation == "object.setReference" and arguments["target"] is None
+        from .constructor_inputs import local_reference_field
+        observed_field = (f"@{field_value}" if clearing_reference else
+            local_reference_field({"owned_identity": metadata.get("owned_identity")}, field_value))
+        from .derived_reference_history import applies as derived_reference, FIELDS as derived_reference_fields, capture_before
+        derived_fields = derived_reference_fields if request.operation == "object.setReference" and derived_reference(source.row.get("type"), field_value) else ()
         field_before_result = read(
             OBJECT_GET_URI,
             {"from": {"id": [source.object]}},
             {
-                "return": ["id", "path", field_value, *activation_requirements],
-                **({"platform": platform} if platform is not None else {}),
+                "return": ["id", "path", *derived_fields, observed_field, *([field_value] if clearing_reference else []),
+                    *activation_requirements, *activation_reference_requirements],
+                **({"platform": observation_platform} if observation_platform is not None else {}),
             },
         )
         field_before_rows = _rows(field_before_result)
         if (
             len(field_before_rows) != 1
             or not _same_identity(field_before_rows[0].get("id"), source.object)
-            or not _has_field(field_before_rows[0], field_value)
+            or (clearing_reference and (
+                observed_field not in field_before_rows[0] or field_value not in field_before_rows[0]
+                or not _reference_value_is_observed(field_before_rows[0].get(observed_field))
+                or not _reference_value_is_observed(field_before_rows[0].get(field_value))))
+            or (not clearing_reference and not _has_field(field_before_rows[0], field_value))
         ):
             raise OperationContractError(
                 "INVALID_READBACK",
                 "Property/reference pre-state must return the exact source and requested field.",
                 details={"field": field_value, "rows": field_before_rows},
             )
+        if derived_fields:
+            try:
+                metadata["derived_reference_context"] = capture_before(field_before_rows[0], source.row)
+            except (ValueError, TypeError) as exc:
+                raise OperationContractError("INVALID_READBACK", str(exc)) from exc
         missing_activators = [
             name for name, value in activation_requirements.items()
             if not _has_field(field_before_rows[0], name)
-            or _field_value(field_before_rows[0], name) is not value
+            or not condition_values_equal(_field_value(field_before_rows[0], name), value)
         ]
         if missing_activators:
             raise OperationContractError(
@@ -8926,12 +12425,25 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             )
         metadata["field_before"] = {
             "field": field_value,
-            "value": _field_value(field_before_rows[0], field_value),
+            "value": field_before_rows[0][observed_field] if clearing_reference else _field_value(field_before_rows[0], field_value),
             "platform": platform,
             "row": field_before_rows[0],
+            "observation_platform": observation_platform,
             **({"activation_requirements": activation_requirements} if activation_requirements else {}),
+            **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
         }
+        if clearing_reference:
+            metadata["field_before"]["reference_observation"] = _stored_reference_clear_observation(field_value)
+            metadata["field_before"]["resolved_value"] = field_before_rows[0][field_value]
         if request.operation == "object.setProperty":
+            from .effect_render_conditions import prepare_property, EffectRenderConditionError
+            try:
+                render_chains = prepare_property(object_id=source.object, field=field_value,
+                    value=arguments["value"], version=request.version, platform=observation_platform, read=read)
+                if render_chains:
+                    metadata["effect_render_chains"] = render_chains
+            except EffectRenderConditionError as exc:
+                raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
             preview = PropertyReferenceBuilder(version=request.version).set_property(
                 object=source,
                 property=field_value,
@@ -8942,11 +12454,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             )
             verification = {
                 "kind": "same-guid-property",
+                **({"activation_requirements": activation_requirements} if activation_requirements else {}),
+                **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
                 "object_id": source.object,
                 "field": field_value,
                 "expected_value": arguments["value"],
                 "metadata_type": info.type,
                 "platform": platform,
+                "observation_platform": observation_platform,
             }
         else:
             target_payload = arguments["target"]
@@ -8959,7 +12474,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 _require_reference_clear_allowed(info)
             else:
                 roles["target"] = target
-                _require_reference_target_allowed(info, target)
+                reference_conditions = []
+                _require_reference_target_allowed(info, target, source_id=source.object, read=read,
+                    platform=platform, conditions=reference_conditions, wwise_version=request.version, allow_playlist_slot=True)
+                if reference_conditions:
+                    metadata["reference_target_conditions"] = reference_conditions
             preview = PropertyReferenceBuilder(version=request.version).set_reference(
                 object=source,
                 reference=field_value,
@@ -8970,13 +12489,16 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             verification = {
                 "kind": "same-guid-reference",
                 **({"activation_requirements": activation_requirements} if activation_requirements else {}),
+                **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
                 "object_id": source.object,
                 "field": field_value,
                 "expected_target_id": (
                     target.object if target is not None else None
                 ),
                 "expected_clear": target is None,
+                **({"reference_observation": _stored_reference_clear_observation(field_value)} if target is None else {}),
                 "platform": platform,
+                "observation_platform": observation_platform,
             }
         cleanup = {"kind": "restore-pre-state", "snapshot": dict(source.row), "field_metadata": info.as_dict()}
     elif request.operation == "audio.import":
@@ -9026,6 +12548,18 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
     else:  # pragma: no cover - parse_operation_request closes this branch.
         raise OperationContractError("OPERATION_BOUNDARY", f"No preparer exists for {request.operation}.")
 
+    if "voice_source_staging" in arguments:
+        from .voice_source_staging import prepare as prepare_staging, projection as staging_projection
+        metadata["voice_source_staging"] = prepare_staging(arguments["voice_source_staging"], read)
+        preview = replace(preview, evidence_plan=(*preview.evidence_plan,
+            {"staged_completion": staging_projection(arguments["voice_source_staging"])}))
+    if isinstance(copy_proof_context, Mapping) and copy_proof_context.get('save_origin') is not None:
+        from .source_copy_proof import ORIGIN, SAVE, revalidate_origin
+        origin = copy_proof_context['save_origin']
+        if request.operation != 'waapi.call' or request.arguments != {'api': SAVE, 'args': {}, 'options': {}}:
+            raise OperationContractError('INVALID_SOURCE_COPY_SAVE', 'Generated Save cannot alter the fixed versioned request')
+        revalidate_origin(origin, copy_proof_context, read=read)
+        metadata[ORIGIN] = origin
     return PreparedOperation(
         request=request,
         semantic_preview=preview,
@@ -9071,6 +12605,9 @@ def prepare_object_set_batch_check(
                 details={"limit": MAX_OBJECT_SET_BATCH_CHECK_READS},
             )
         result = read_call(uri, args, options)
+        if uri == MODEL_READ_URI and isinstance(result, list):
+            reads.append({"uri": uri, "args": dict(args), "options": dict(options), "result": [_json_mapping(row) for row in result]})
+            return result
         if not isinstance(result, Mapping):
             raise OperationContractError(
                 "INVALID_READBACK",
@@ -9081,12 +12618,20 @@ def prepare_object_set_batch_check(
         cache[key] = normalized
         return dict(normalized)
 
+    if (request.arguments.get("graph_result_bindings") or any(
+            "planned_owner" in binding for binding in request.arguments.get("documented_list_bindings", []))):
+        # Cross-row result references have one graph scope. Slicing a row would
+        # detach its target and alter the normalized occurrence paths.
+        prepare_operation(request, read_call=cached_read)
+        return cached_read
+
     common_arguments = {
         key: value
         for key, value in request.arguments.items()
         if key != "objects"
     }
     issues: list[dict[str, Any]] = []
+    repair_bytes_remaining = MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES
     for row_index, row in enumerate(raw_objects):
         row_request = OperationRequest(
             contract=request.contract,
@@ -9097,13 +12642,38 @@ def prepare_object_set_batch_check(
         try:
             prepare_operation(row_request, read_call=cached_read)
         except OperationContractError as exc:
-            issues.append(
-                {
-                    "row_index": row_index,
-                    "error_code": exc.error_code,
-                    "message": str(exc)[:MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS],
-                }
-            )
+            issue = {
+                "row_index": row_index,
+                "error_code": exc.error_code,
+                "message": str(exc)[:MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS],
+            }
+            if exc.error_code == "UNKNOWN_PROJECT_LANGUAGE" and "available" in exc.details:
+                choices = _bounded_language_choice_details(exc.details, byte_budget=repair_bytes_remaining)
+                if choices is not None:
+                    issue["details"] = choices
+                    repair_bytes_remaining -= len(canonical_json_bytes(choices))
+                else:
+                    issue["details"] = {"field": "language", "available": [],
+                        "available_total": exc.details["available_total"], "available_returned": 0,
+                        "available_truncated": True,
+                        "language_discovery": {"available": True, "source": "metadata_types_exact_Language", "membership_bound": 1000, "follow": "query_command_then_result_detail_next_command"},
+                        "repair_details": "aggregate_repair_budget_exhausted", "mutation_dispatched": False}
+            if exc.error_code == "REFERENCE_ACTIVATION_REQUIRED":
+                # Preserve the exact owner and staged repair at this public
+                # batch-check boundary, under one aggregate output budget.
+                repair_size = len(canonical_json_bytes(exc.details))
+                if repair_size <= repair_bytes_remaining:
+                    issue["details"] = exc.details
+                    repair_bytes_remaining -= repair_size
+                else:
+                    issue["details"] = {
+                        "mutation_dispatched": False,
+                        "repair_details": "exceeds_batch_check_budget_use_separate_exact_field_preview",
+                        "limit_bytes": MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES,
+                        **{key: exc.details[key] for key in ("object_id", "owner_id")
+                           if isinstance(exc.details.get(key), str) and _PLUGIN_GUID.fullmatch(exc.details[key])},
+                    }
+            issues.append(issue)
     if issues:
         raise OperationContractError(
             "OPERATION_DRAFT_CHECK_FAILED",
@@ -9740,6 +13310,34 @@ def _normalize_import_language_rows(value: Any, *, authority: str) -> list[dict[
     return sorted(rows, key=lambda row: (row["name"].casefold(), row["id"].casefold()))
 
 
+def _bounded_language_choice_details(details, *, byte_budget):
+    bounded = {**details, "available": list(details["available"])}
+    while True:
+        bounded["available_returned"] = len(bounded["available"])
+        bounded["available_truncated"] = bounded["available_returned"] < bounded["available_total"]
+        if bounded["available_truncated"]:
+            # Exact live Language type selections disclose bounded query/result
+            # continuations; status deliberately omits this inventory.
+            bounded["language_discovery"] = {"available": True, "source": "metadata_types_exact_Language", "membership_bound": 1000, "follow": "query_command_then_result_detail_next_command"}
+        if len(canonical_json_bytes(bounded)) <= byte_budget:
+            return bounded
+        if not bounded["available"]:
+            return None
+        bounded["available"].pop()
+
+
+def _select_construction_language(inventory, requested):
+    rows = [row for row in inventory["languages"]
+            if row["name"] == requested or (_valid_object_id(requested) and _same_identity(row["id"], requested))]
+    if len(rows) != 1 or not _valid_object_id(rows[0]["id"]):
+        details = _bounded_language_choice_details({"field": "language", "requested": requested, "matches": rows,
+            "available": inventory["languages"], "available_total": len(inventory["languages"])},
+            byte_budget=MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES)
+        raise OperationContractError("UNKNOWN_PROJECT_LANGUAGE", "Requested language must select one live Project Language by exact name or GUID.",
+            details=details)
+    return dict(rows[0])
+
+
 def _read_import_language_inventory(version: str, *, read: ReadCall) -> dict[str, Any]:
     if version == "2021.1":
         query = "from type Project take 2"
@@ -10284,6 +13882,11 @@ def _prepare_import_dynamic_fields(
             )
         target["metadata_object_type"] = type_info.name
         target["metadata_class_id"] = type_info.class_id
+        target["class_metadata"] = [type_info.as_dict()]
+        if target.get("media_expected") is True:
+            source_type = _resolve_import_audio_source_class(request.version, catalog=type_catalog)
+            target["audio_source_class_id"] = source_type.class_id
+            target["class_metadata"].append(source_type.as_dict())
 
         raw_properties = target.get("requested_properties", [])
         raw_references = target.get("requested_references", [])
@@ -10361,6 +13964,14 @@ def _prepare_import_dynamic_fields(
                     }
                 )
             else:
+                _require_tab_import_property_admission(
+                    version=request.version,
+                    metadata_type=type_info.name,
+                    metadata_class_id=type_info.class_id,
+                    info=info,
+                    row_number=target.get("row_number"),
+                    header=item.get("header"),
+                )
                 property_requests.append(
                     {
                         "name": name,
@@ -10404,6 +14015,10 @@ def _prepare_import_dynamic_fields(
                 }
             )
 
+        from .effect_render_conditions import legacy_import_owner
+        legacy_render = legacy_import_owner(version=request.version, class_id=type_info.class_id, properties=property_specs)
+        if legacy_render:
+            target["legacy_effect_render"] = True
         reference_specs: list[dict[str, Any]] = []
         derived_properties: dict[str, Any] = {}
         for reference_index, descriptor in enumerate(reference_requests):
@@ -10425,7 +14040,7 @@ def _prepare_import_dynamic_fields(
             seen_fields.add(key)
             info = property_info(type_info.class_id, name)
             _require_object_reference_metadata(info)
-            activation_properties = _apply_reference_activation_dependencies(
+            activation_properties = () if legacy_render else _apply_reference_activation_dependencies(
                 info,
                 read=read,
                 class_id=type_info.class_id,
@@ -10491,7 +14106,7 @@ def _localized_source_snapshot(owner_id: str, *, read: ReadCall) -> dict[str, An
     rows = _rows(read(
         OBJECT_GET_URI,
         {"waql": f'from object "{owner_id}" select children take {OBJECT_LIST_MAX_SUBTREE_NODES + 1}'},
-        {"return": ["id", "name", "type", "path", "parent", "audioSource:language"]},
+        {"return": ["id", "name", "type", "classId", "path", "parent", "audioSource:language"]},
     ))
     if len(rows) > OBJECT_LIST_MAX_SUBTREE_NODES:
         raise OperationContractError("LOCALIZED_SOURCE_LIMIT_EXCEEDED", "Voice source discovery exceeded its bounded child limit.")
@@ -10524,7 +14139,7 @@ def _existing_sfx_source_snapshot(owner_id: str, *, version: str, read: ReadCall
     rows = _rows(read(
         OBJECT_GET_URI,
         {"waql": f'from object "{owner_id}" select children take {OBJECT_LIST_MAX_SUBTREE_NODES + 1}'},
-        {"return": ["id", "name", "type", "path", "parent",
+        {"return": ["id", "name", "type", "classId", "path", "parent",
                     "originalWavFilePath" if version == "2021.1" else "originalFilePath", "audioSource:language"]},
     ))
     if len(rows) > OBJECT_LIST_MAX_SUBTREE_NODES:
@@ -10542,6 +14157,36 @@ def _existing_sfx_source_snapshot(owner_id: str, *, version: str, read: ReadCall
     return {"owner_id": owner_id, "version": version, "rows": sorted(rows, key=lambda row: row["id"].casefold())}
 
 
+def _legacy_sfx_active_source(
+    sound: Mapping[str, Any], snapshot: Mapping[str, Any], *, source_class: Any,
+) -> str:
+    """Join the current SFX read view by complete native file paths, never filename."""
+    field = "sound:originalWavFilePath"
+    if field not in sound:
+        raise OperationContractError("INVALID_READBACK", "The SFX Sound omitted its current original-file path.")
+    if sound[field] is None:
+        raise OperationContractError("AMBIGUOUS_SFX_SOURCE", "The SFX Sound has no observable active original-file path.")
+    try:
+        selected = parse_absolute_host_path(sound[field]).comparison_key()
+        matches = []
+        for source in snapshot["rows"]:
+            if _object_type_token(source.get("type")) != "audiofilesource":
+                continue
+            language = source.get("audioSource:language")
+            if (not _object_class_matches(source.get("classId"), source_class)
+                    or not isinstance(language, Mapping) or language.get("name") != "SFX"):
+                raise OperationContractError("INVALID_READBACK", "The SFX source collection has an invalid file-source class or language.")
+            key = parse_absolute_host_path(source.get("originalWavFilePath")).comparison_key()
+            if key == selected:
+                matches.append(source["id"])
+    except HostPathError as exc:
+        raise OperationContractError("INVALID_PROJECT_CONTEXT", "The current SFX file-path join requires complete canonical absolute paths.") from exc
+    if len(matches) != 1:
+        raise OperationContractError("AMBIGUOUS_SFX_SOURCE", "The current SFX original-file path must identify exactly one direct AudioFileSource.",
+                                     details={"matching_source_count": len(matches)})
+    return matches[0]
+
+
 def _normalize_existing_sfx_imports(
     targets: list[dict[str, Any]], dispatch_args: Mapping[str, Any],
     originals_context: Mapping[str, Any], *, version: str, read: ReadCall,
@@ -10554,18 +14199,26 @@ def _normalize_existing_sfx_imports(
                 or len(before) != 1 or _object_type_token(before[0].get("type")) != "sound"):
             continue
         active = before[0].get("activeSource")
-        if active is None and not before[0].get("sound:originalWavFilePath"):
+        snapshot = None
+        if version == "2021.1":
+            snapshot = _existing_sfx_source_snapshot(target["preexisting_id"], version=version, read=read)
+        if active is None and not before[0].get("sound:originalWavFilePath") and not (snapshot and snapshot["rows"]):
+            if snapshot is not None:
+                target["empty_sfx_source_snapshot"] = snapshot
             continue  # An existing empty Sound has no source placement to preserve.
         source_id = _reference_identity(active)
         if version != "2021.1" and (not isinstance(source_id, str) or not _PLUGIN_GUID.fullmatch(source_id)):
             raise OperationContractError("INVALID_READBACK", "An existing SFX Sound has a malformed active Source identity.")
-        snapshot = _existing_sfx_source_snapshot(target["preexisting_id"], version=version, read=read)
+        if snapshot is None:
+            snapshot = _existing_sfx_source_snapshot(target["preexisting_id"], version=version, read=read)
         matching = [source for source in snapshot["rows"]
                     if source.get("path") == target.get("expected_audio_file_source_result_path")
                     and _object_type_token(source.get("type")) == "audiofilesource"]
         if len(matching) != 1 or (source_id is not None and not _same_identity(matching[0].get("id"), source_id)):
             raise OperationContractError("AMBIGUOUS_SFX_SOURCE", "Existing SFX media must resolve to its one exact active AudioFileSource.")
         source = matching[0]
+        if not _object_class_matches(source.get("classId"), target.get("audio_source_class_id")):
+            raise OperationContractError("INVALID_READBACK", "Existing SFX source class differs from its sealed live semantic class.")
         source_id = source["id"]
         language = source.get("audioSource:language")
         if not isinstance(language, Mapping) or language.get("name") != "SFX":
@@ -10580,6 +14233,10 @@ def _normalize_existing_sfx_imports(
             raise OperationContractError("UNSAFE_ORIGINALS_PATH", "Existing SFX media must remain inside the live Originals/SFX root.") from exc
         if original.name != Path(target["source_file"].get("path", target["source_file"].get("relative_path", ""))).name:
             raise OperationContractError("SFX_SOURCE_FILENAME_MISMATCH", "Existing SFX replacement must retain its attested source filename.")
+        if version == "2021.1":
+            active_id = _legacy_sfx_active_source(before[0], snapshot, source_class=target.get("audio_source_class_id"))
+            if not _same_identity(source_id, active_id):
+                raise OperationContractError("AMBIGUOUS_SFX_SOURCE", "Existing SFX media must resolve to its one exact active AudioFileSource.")
         subfolder = "\\".join(relative.parent.parts)
         if subfolder:
             subfolder = normalize_originals_subfolder(subfolder, field="existing SFX Originals subfolder")
@@ -10591,6 +14248,11 @@ def _normalize_existing_sfx_imports(
             target["requested_originals_subfolder"] = subfolder
         target["existing_sfx_source_id"] = source_id
         target["existing_sfx_source_snapshot"] = snapshot
+        if version == "2021.1":
+            try:
+                target["existing_sfx_source_file_proof"] = import_regular_file_proof(str(original), field="existing SFX active original")
+            except ImportContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
     return {**dict(dispatch_args), "imports": rows}
 
 
@@ -10676,6 +14338,8 @@ def _materialize_audio_import_dynamic_rows(
                 )
             dynamic_fields[f"@{name}"] = spec.get("value")
         for spec in references:
+            if spec.get("condition_guard"):
+                continue
             name = spec.get("name")
             target_id = spec.get("target_id")
             if (
@@ -10867,7 +14531,7 @@ def _materialize_audio_import_dynamic_rows(
 
 def _metadata_is_reference(info: PropertyInfoMetadataRecord) -> bool:
     return (
-        info.type.casefold() in {"reference", "objectreference"}
+        (isinstance(info.type, str) and info.type.casefold() in {"reference", "objectreference"})
         or info.restriction.get("type") == "reference"
     )
 
@@ -10895,6 +14559,37 @@ def _import_metadata_object_type(value: str, *, version: str) -> str:
         "virtualfolder": "Folder",
     }
     return aliases.get(token, value)
+
+
+def _require_tab_import_property_admission(
+    *,
+    version: str,
+    metadata_type: str,
+    metadata_class_id: int,
+    info: PropertyInfoMetadataRecord,
+    row_number: Any,
+    header: Any,
+) -> None:
+    # The matching 2022.1.19.8584 importTabDelimited refusal establishes this
+    # route-specific rule. getPropertyInfo and IsVisible do not certify general
+    # writability; this must not restrict ordinary Sound kind construction or
+    # claim the same TSV restriction in the other four version lanes.
+    if version == "2022.1" and metadata_type == "Sound" and info.name == "IsVoice":
+        raise OperationContractError(
+            "TAB_PROPERTY_NOT_MODIFIABLE",
+            "Wwise 2022.1 does not allow TSV assignment to Sound.IsVoice. "
+            "Supply a corrected table using <Sound SFX> with Object Type=Sound SFX "
+            "or <Sound Voice> with Object Type=Sound Voice, without the IsVoice assignment.",
+            details={
+                "version": version,
+                "row": row_number,
+                "header": header,
+                "property": info.name,
+                "metadata_object_type": metadata_type,
+                "metadata_class_id": metadata_class_id,
+                "source_operation": "audio.importTabDelimited",
+            },
+        )
 
 
 def _tab_import_reference_identity(value: str, *, field: str) -> Mapping[str, Any]:
@@ -11154,9 +14849,9 @@ def _prepare_closed_import_plan(
             if not _valid_object_id(existing_id):
                 raise OperationContractError("INVALID_READBACK", "Existing import target lacks a canonical GUID.")
             requested_type = target.get("requested_object_type")
-            if isinstance(requested_type, str) and not _import_object_type_matches(
-                rows[0].get("type"), requested_type
-            ):
+            if (not _object_class_matches(rows[0].get("classId"), target.get("metadata_class_id"))
+                    or isinstance(requested_type, str) and not _import_object_type_matches(
+                        rows[0].get("type"), requested_type)):
                 raise OperationContractError(
                     "INVALID_TARGET_TYPE",
                     "An existing import target does not match the requested object type.",
@@ -11414,6 +15109,7 @@ def _prepare_closed_import_plan(
                     or source_row.get("path") != expected_source_path
                     or _object_type_token(source_row.get("type"))
                     != "audiofilesource"
+                    or not _object_class_matches(source_row.get("classId"), target.get("audio_source_class_id"))
                 ):
                     raise OperationContractError(
                         "INVALID_READBACK",
@@ -11543,6 +15239,10 @@ def _prepare_closed_import_plan(
                                  "candidate_count": len(matching_sources)},
                     )
                 localized_active_source = matching_sources[0]["id"] if matching_sources else None
+                if any(_object_type_token(source.get("type")) == "audiofilesource"
+                        and not _object_class_matches(source.get("classId"), target.get("audio_source_class_id"))
+                        for source in snapshot["rows"]):
+                    raise OperationContractError("INVALID_READBACK", "Existing localized source class differs from live semantic metadata.")
                 target["localized_source_snapshot"] = snapshot
                 target["localized_audio_file_source_id"] = localized_active_source
                 # Console 2021/2022 reuse the language source through the typed
@@ -11650,6 +15350,12 @@ def _prepare_closed_import_plan(
             targets, dispatch_args, originals_context, version=request.version, read=read,
         )
         plan = {**dict(plan), "dispatch_args": dispatch_args}
+    from .effect_render_conditions import prepare_import, EffectRenderConditionError
+    try:
+        render_state = prepare_import(targets, version=request.version, operation=source_operation,
+            import_operation=import_operation, read=read)
+    except EffectRenderConditionError as exc:
+        raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
     native_row_mapping: list[dict[str, Any]] = []
     if source_operation == "audio.import":
         dispatch_args, native_row_mapping = _materialize_audio_import_dynamic_rows(
@@ -11731,6 +15437,7 @@ def _prepare_closed_import_plan(
             "caller_expected_rows_accepted": False,
             "source_control_policy": source_control_policy,
             "preflight_consumed_fields": preflight_consumed_fields,
+            **({"effect_render_read_view": render_state["field_read_platform"]} if render_state else {}),
             **(
                 {"native_row_mapping": native_row_mapping}
                 if native_row_mapping
@@ -11755,6 +15462,9 @@ def _prepare_closed_import_plan(
                 if isinstance(proof, Mapping):
                     label = f"{proof_key}[{len(file_proofs)}]"
                     file_proofs.append({"field": label, "proof": dict(proof)})
+    for index, target in enumerate(targets):
+        if isinstance(target.get("existing_sfx_source_file_proof"), Mapping):
+            file_proofs.append({"field": f"existing_sfx_active_original[{index}]", "proof": dict(target["existing_sfx_source_file_proof"])})
     wire_path_input_audit: dict[str, Any] | None = None
     if source_operation == "audio.importTabDelimited":
         import_file_proof = plan.get("import_file_proof")
@@ -11791,10 +15501,13 @@ def _prepare_closed_import_plan(
         }
     guard = {
         "source_operation": source_operation,
+        "class_metadata": [row for target in targets for row in target.get("class_metadata", [])],
         "file_proofs": file_proofs,
         "path_snapshots": path_snapshots,
         "existing_sfx_source_snapshots": [target["existing_sfx_source_snapshot"] for target in targets
                                           if "existing_sfx_source_snapshot" in target],
+        "empty_sfx_source_snapshots": [target["empty_sfx_source_snapshot"] for target in targets
+                                       if "empty_sfx_source_snapshot" in target],
         "localized_source_snapshots": [target["localized_source_snapshot"] for target in targets
                                        if "localized_source_snapshot" in target],
         "language_inventory": _json_mapping(language_inventory) if language_inventory is not None else None,
@@ -11848,7 +15561,7 @@ def _prepare_closed_import_plan(
         "irreversible": import_operation == "replaceExisting",
         "created_guid_source": "execution_result.result.objects",
     }
-    state = {"closed_import_plan": _json_mapping(plan), "import_guard": guard}
+    state = {"closed_import_plan": _json_mapping(plan), "import_guard": guard, **render_state}
     return preview, roles, state, verification, cleanup
 
 
@@ -11947,7 +15660,7 @@ def _import_target_return_fields(
     *,
     version: str,
 ) -> list[str]:
-    fields = [*IDENTITY_RETURN_FIELDS]
+    fields = [*IDENTITY_RETURN_FIELDS, "classId"]
     # Wwise 2021.1 rejects the otherwise useful ``activeSource`` and
     # ``originalFilePath`` accessors on the imported Sound object.  Its import
     # result still returns the created AudioFileSource, so the verifier binds
@@ -11987,6 +15700,7 @@ def _import_target_return_fields(
 def _import_audio_source_return_fields(*, version: str) -> list[str]:
     fields = [
         "id",
+        "classId",
         "name",
         "type",
         "path",
@@ -12092,7 +15806,7 @@ def _prepare_closed_soundbank_operation(
     snapshots = _capture_soundbank_artifact_snapshots(plan, io_root=io_root)
     definition_oracle: Mapping[str, Any] | None = None
     if request.operation == "soundbank.processDefinitionFiles":
-        definition_oracle = _prepare_definition_oracle(plan, roles=roles, read=read)
+        definition_oracle = _prepare_definition_oracle(plan, version=request.version, roles=roles, read=read)
 
     uri = describe_operation(request.operation).uri
     dispatch_args = plan.get("dispatch_args")
@@ -12586,6 +16300,7 @@ def _resolve_external_source_conversions(
 def _prepare_definition_oracle(
     plan: Mapping[str, Any],
     *,
+    version: str,
     roles: dict[str, ResolvedObject],
     read: ReadCall,
 ) -> dict[str, Any]:
@@ -12629,6 +16344,7 @@ def _prepare_definition_oracle(
             resolved = _resolve_definition_identity(
                 identity,
                 expected_type=expected_type,
+                version=version,
                 role=f"definition.bank[{bank_index}].inclusion[{inclusion_index}]",
                 read=read,
             )
@@ -12695,6 +16411,7 @@ def _resolve_definition_identity(
     identity: Any,
     *,
     expected_type: str,
+    version: str,
     role: str,
     read: ReadCall,
 ) -> ResolvedObject:
@@ -12710,27 +16427,12 @@ def _resolve_definition_identity(
                 "INVALID_PREVIEW",
                 f"{role} short ID is not a uint32.",
             )
-        object_type_code = DEFINITION_SHORT_ID_OBJECT_TYPE_CODES.get(expected_type)
-        if object_type_code is None:
-            raise OperationContractError(
-                "UNSUPPORTED_DEFINITION_SHORT_ID_TYPE",
-                "This Definition object type has no official object.get Short ID selector code.",
-                details={
-                    "role": role,
-                    "expected_type": expected_type,
-                    "supported_types": sorted(DEFINITION_SHORT_ID_OBJECT_TYPE_CODES),
-                },
-            )
-        # ``Global:<shortId>`` is a string-identity spelling accepted by
-        # selected mutation arguments, not an ``object.get`` qualified name.
-        # Real 2022.1 Authoring requires the reflected ``{shortId, type}``
-        # selector object and rejects a bare uint32 in ``from.id``.
-        options = {"return": [*IDENTITY_RETURN_FIELDS, "shortId"]}
-        result = read(
-            OBJECT_GET_URI,
-            {"from": {"id": [{"shortId": value, "type": object_type_code}]}},
-            options,
-        )
+        from wwise_waapi.short_id_query_sources import short_id_query
+        definition_kinds = {"Event": "event", "DialogueEvent": "dialogue-event", "AuxBus": "aux-bus", "Effect": "effect"}
+        if expected_type not in definition_kinds:
+            raise OperationContractError("INVALID_PREVIEW", "Definition Short ID type is not a closed directive type.")
+        args, options = short_id_query(version, number=value, kind=definition_kinds[expected_type], unique=True)
+        result = read(OBJECT_GET_URI, args, options)
         rows = _rows(result)
         if len(rows) != 1:
             raise OperationContractError(
@@ -12745,10 +16447,10 @@ def _resolve_definition_identity(
             )
         row = rows[0]
         live_short_id = row.get("shortId")
-        if isinstance(live_short_id, str) and live_short_id.isdecimal():
-            live_short_id = int(live_short_id, 10)
         object_id = row.get("id")
-        if live_short_id != value or not _valid_object_id(object_id):
+        from wwise_waapi.builders.query import STRUCTURED_GUID_PATTERN
+        canonical_guid = isinstance(object_id, str) and re.fullmatch(STRUCTURED_GUID_PATTERN, object_id) is not None
+        if type(live_short_id) is not int or live_short_id != value or not canonical_guid:
             raise OperationContractError(
                 "IDENTITY_MISMATCH",
                 "A Definition Short ID readback did not preserve the requested numeric identity.",
@@ -13063,15 +16765,26 @@ def _prepare_switch_assignment(
     return preview, roles, state, verification, cleanup
 
 
-def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall) -> Mapping[str, Any]:
+def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall, history_resolver=None, copy_proof_context=None) -> Mapping[str, Any]:
     """Re-read every canonical role and prove it still matches the preview snapshot."""
 
     if prepared.get("contract") != PREPARED_OPERATION_CONTRACT:
         raise OperationContractError("INVALID_PREVIEW", "Prepared operation contract is missing or unsupported.")
+    from .source_copy_proof import ORIGIN, revalidate_origin
+    save_origin = prepared.get('pre_state', {}).get(ORIGIN)
+    if save_origin is not None:
+        revalidate_origin(save_origin, copy_proof_context, read=read_call)
     operation = prepared.get("operation")
     roles = prepared.get("resolved_roles")
     if not isinstance(operation, str) or not isinstance(roles, Mapping):
         raise OperationContractError("INVALID_PREVIEW", "Prepared operation lacks operation or resolved_roles.")
+    try:
+        clear_field = _require_stored_reference_clear_observation(prepared)
+    except OperationContractError as exc:
+        return {"contract": ROLE_VALIDATION_CONTRACT, "operation": operation,
+            "ok": False, "status": "repreview_required",
+            "assertions": [{"name": "stored reference clear requires a fresh Preview",
+            "passed": False, "evidence": exc.as_dict()}], "readbacks": []}
     assertions: list[Mapping[str, Any]] = []
     readbacks: list[Mapping[str, Any]] = []
     if operation == "waapi.undoGroup":
@@ -13158,6 +16871,77 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                             for key in ("args", "options", "request_validation")
                         )
                     passed = passed and binding_ok
+        if passed and isinstance(actual_plan, Mapping):
+            from .object_graph_paths import prepare_compound_path_context
+            def path_guard_read(uri, args, options):
+                result = read_call(uri, args, options)
+                child_readbacks.append({'role': 'compound-path-context-before', 'uri': uri,
+                    'args': args, 'options': options, 'result': result})
+                return result
+            try:
+                rebuilt_context = prepare_compound_path_context(actual_plan['calls'], read=path_guard_read)
+                context_unchanged = lifecycle_snapshot_equal(rebuilt_context, actual_plan.get('path_context'))
+                from .object_graph_paths import compound_phase_arguments
+                context_unchanged = context_unchanged and all(lifecycle_snapshot_equal(
+                    child.get('args'), compound_phase_arguments(actual_plan['calls'], index, rebuilt_context))
+                    for index, child in enumerate(actual_plan['calls']) if 'prepared_operation' in child)
+            except ValueError:
+                context_unchanged = False
+            passed = passed and context_unchanged
+            child_assertions.append({'name': 'compound original GUID ancestry is unchanged', 'passed': context_unchanged})
+        current_platform_children = [
+            child for child in actual_plan.get("calls", [])
+            if isinstance(child, Mapping)
+            and isinstance(child.get("prepared_operation"), Mapping)
+            and child["prepared_operation"].get("verification_plan", {}).get("kind") == "same-guid-property"
+            and child["prepared_operation"]["verification_plan"].get("platform") is None
+        ] if isinstance(actual_plan, Mapping) else []
+        if current_platform_children or "compound_current_platform" in pre_state:
+            expected_platform = pre_state.get("compound_current_platform")
+            actual_platform = None
+            context = None
+            if version != "2021.1" and _compound_platform_guid(expected_platform):
+                context = read_call(GET_PROJECT_INFO_URI, {}, {})
+                actual_platform = context.get("currentPlatformId") if isinstance(context, Mapping) else None
+                child_readbacks.append({"role": "compound-current-platform", "uri": GET_PROJECT_INFO_URI,
+                    "args": {}, "options": {}, "result": dict(context) if isinstance(context, Mapping) else context})
+            platform_unchanged = (_compound_project_platform(context, actual_platform)
+                                  and _same_identity(actual_platform, expected_platform))
+            passed = passed and platform_unchanged
+            child_assertions.append({"name": "compound omitted property platform unchanged", "passed": platform_unchanged,
+                                     "evidence": {"expected": expected_platform, "actual": actual_platform}})
+        platform_field_children = [child for child in actual_plan.get("calls", [])
+            if isinstance(child, Mapping) and isinstance(child.get("prepared_operation"), Mapping)
+            and child["prepared_operation"].get("verification_plan", {}).get("kind") in
+                {"same-guid-property", "same-guid-reference", "object-linked-state"}
+        ] if isinstance(actual_plan, Mapping) else []
+        if platform_field_children:
+            scope_bound = pre_state.get("compound_platform_scope_version") == 1
+            passed = passed and scope_bound
+            child_assertions.append({"name": "compound effective platform scopes were prepared", "passed": scope_bound})
+        aliases = pre_state.get("compound_platform_aliases", {})
+        if aliases:
+            context = read_call(GET_PROJECT_INFO_URI, {}, {})
+            rows = context.get("platforms") if isinstance(context, Mapping) else None
+            child_readbacks.append({"role": "compound-platform-aliases", "uri": GET_PROJECT_INFO_URI,
+                "args": {}, "options": {}, "result": dict(context) if isinstance(context, Mapping) else context})
+            for name, expected_id in aliases.items():
+                matches = [row for row in rows if isinstance(row, Mapping) and row.get("name") == name] if isinstance(rows, list) else []
+                unchanged = (len(matches) == 1 and _compound_project_platform(context, matches[0].get("id"))
+                             and _same_identity(matches[0].get("id"), expected_id))
+                passed = passed and unchanged
+                child_assertions.append({"name": "compound platform name still resolves to its sealed GUID", "passed": unchanged,
+                    "evidence": {"name": name, "expected": expected_id, "actual": matches}})
+        for guard in pre_state.get("compound_linkage_guards", []):
+            args = guard["args"]
+            result = read_call(OBJECT_IS_LINKED_URI, args, {})
+            actual_linked = result.get("linked") if isinstance(result, Mapping) else None
+            unchanged = type(actual_linked) is bool and actual_linked is guard["linked"]
+            passed = passed and unchanged
+            child_readbacks.append({"role": "compound-linkage", "uri": OBJECT_IS_LINKED_URI,
+                "args": dict(args), "options": {}, "result": dict(result) if isinstance(result, Mapping) else result})
+            child_assertions.append({"name": "compound field linkage unchanged", "passed": unchanged,
+                "evidence": {"args": dict(args), "expected": guard["linked"], "actual": actual_linked}})
         assertions.append(
             {
                 "name": "waapi.undoGroup execution plan still matches the immutable reviewed composite",
@@ -13190,6 +16974,140 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if not isinstance(version, str) or not isinstance(arguments, Mapping):
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        if api == TRANSPORT_EXECUTE_ACTION_URI:
+            from .transport_action import snapshot as transport_action_snapshot
+            def action_guard_read(uri, args, options):
+                result = read_call(uri, args, options)
+                readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": result})
+                return result
+            before = prepared.get("pre_state", {}).get("transport_action_before")
+            try:
+                current = transport_action_snapshot(call_args, version=version, read=action_guard_read)
+            except (ValueError, SemanticValidationError) as exc:
+                current = {"error": str(exc)}
+            if not isinstance(before, Mapping) or dict(before) != current:
+                return {"contract": ROLE_VALIDATION_CONTRACT, "operation": operation, "ok": False,
+                    "status": "repreview_required", "assertions": [{"name": "Transport targets and toggle prestate remain unchanged",
+                        "passed": False, "evidence": {"expected": before, "actual": current,
+                            "transport_mutation_dispatched": False}}], "readbacks": readbacks}
+        if api == SAVE_CAPTURE_URI:
+            try:
+                validate_capture_artifact(prepared.get("verification_plan", {}), call_args,
+                    arguments["io_root"], execution_contract["io_audit"], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api == "ak.wwise.core.blendContainer.addAssignment" and "blend_assignment" in prepared.get("pre_state", {}):
+            from .blend_assignment import observe as observe_blend, materialize_index, BlendAssignmentError
+            plan = prepared.get("pre_state", {}).get("blend_assignment")
+            if not isinstance(plan, Mapping):
+                raise OperationContractError("INVALID_PREVIEW", "Blend assignment lacks its immutable observation")
+            try:
+                current = observe_blend(call_args["object"], call_args["child"], read=read_call, version=version)
+            except BlendAssignmentError as exc:
+                raise OperationContractError("STALE_BLEND_ASSIGNMENT", str(exc)) from exc
+            if any(current[key] != value for key, value in plan["before"].items() if key != "native_assignments"):
+                raise OperationContractError("STALE_BLEND_ASSIGNMENT", "Blend identities, owner membership or assignments changed after Preview")
+            call_args = materialize_index(call_args, len(current["assignments"]))
+        if api in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI}:
+            from .runtime_log_effects import channel_snapshot, same_channel_contents
+            before = prepared.get("pre_state", {}).get("log_channel_before")
+            plan = prepared.get("verification_plan", {})
+            try:
+                current = channel_snapshot(read_call(LOG_GET_URI, {"channel": call_args.get("channel", "general")}, {}), version=version)
+            except OperationContractError:
+                raise
+            except (ValueError, SemanticValidationError) as exc:
+                raise OperationContractError("INVALID_LOG_OBSERVATION", "Current log channel did not match its pinned native schema.") from exc
+            if current["outcome"] != "complete":
+                raise OperationContractError("LOG_OBSERVATION_TOO_LARGE", "Current log channel exceeds the complete observation policy.", details=current)
+            if not isinstance(before, Mapping) or not same_channel_contents(before, current) or plan.get("kind") != "log-channel-effect":
+                raise OperationContractError("STALE_LOG_CHANNEL", "Log channel changed after Preview; inspect and preview again before changing it.")
+        if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
+            from .remote_transition import remote_connection_snapshot
+            before = prepared.get("pre_state", {}).get("remote_connection_before")
+            try:
+                current = remote_connection_snapshot(version, read_call)
+            except (ValueError, SemanticValidationError) as exc:
+                raise OperationContractError("INVALID_REMOTE_CONNECTION_OBSERVATION", str(exc)) from exc
+            readbacks.append({"uri": REMOTE_GET_CONNECTION_STATUS_URI, "args": {}, "options": {}, "result": current})
+            if not isinstance(before, Mapping) or dict(before) != current:
+                raise OperationContractError("STALE_REMOTE_CONNECTION", "Remote connection changed after Preview; inspect and preview again.",
+                    details={"expected": before, "actual": current, "remote_mutation_dispatched": False})
+        if arguments.get("provider_profile_binding") is not None:
+            from .source_control_profiles import check_profile
+            try:
+                check_profile(arguments["provider_profile_binding"])
+            except ValueError as exc:
+                raise OperationContractError("SOURCE_CONTROL_PROFILE_PROOF_REQUIRED", str(exc)) from exc
+            if arguments["provider_profile_binding"] != prepared.get("pre_state", {}).get("provider_profile_binding"):
+                raise OperationContractError("SOURCE_CONTROL_PROFILE_PROOF_REQUIRED", "Provider profile recipe changed after Preview")
+        if api in CLI_PROJECT_FILE_URIS:
+            try:
+                validate_cli_project_effect(prepared.get('pre_state', {}).get('cli_project_effect'),
+                    api, call_args, execution_contract['io_audit'], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api in PROJECT_CREATE_URIS:
+            try:
+                validate_console_project_creation(prepared.get('verification_plan', {}), call_args, execution_contract['io_audit'], version, uri=api)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api == 'ak.wwise.console.project.open':
+            try:
+                validate_console_project_open(prepared.get('verification_plan', {}), call_args, execution_contract['io_audit'], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api == TONE_URI:
+            plan = prepared.get('verification_plan', {})
+            try:
+                validate_tone_binding(plan, call_args, execution_contract['io_audit'], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api in LAYOUT_MUTATION_URIS:
+            def layout_guard_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+                result = read_call(uri, args, options)
+                readbacks.append({'uri': uri, 'args': dict(args), 'options': dict(options), 'result': dict(result)})
+                return result
+            try:
+                validate_layout_live_binding(arguments['layout_binding'], read=layout_guard_read)
+                current = layout_guard_read('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+                validate_layout_read_result('current', current)
+                pre_state = prepared.get('pre_state')
+                if not isinstance(pre_state, Mapping) or current != pre_state.get('layout_original_current'):
+                    raise ValueError('Current layout changed since preview; inspect and preview again')
+                if api == LAYOUT_RESET_URI:
+                    if reset_selection_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_reset_catalog'):
+                        raise ValueError('Live layout catalog changed after reset Preview')
+                elif api == LAYOUT_SET_URI:
+                    absence = require_layout_absence(call_args['name'], read=read_call)
+                    readbacks.append(absence)
+                    if blueprint_view_catalog(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_blueprint_view_catalog'):
+                        raise ValueError('Nested blueprint live view catalog changed after preview')
+                elif api == LAYOUT_REMOVE_URI:
+                    require_temporary_layout(call_args['name'], read=layout_guard_read)
+                elif api == LAYOUT_GET_OR_CREATE_URI:
+                    if current.get('name') != arguments['layout_binding']['layout_name']:
+                        raise ValueError('The layout for view creation is no longer current')
+                    if view_creation_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_view_prestate'):
+                        raise ValueError('View catalog or instances changed after preview; inspect and preview again')
+                elif api == LAYOUT_SPLITTER_URI:
+                    if current.get('name') != arguments['layout_binding']['layout_name']:
+                        raise ValueError('The layout for splitter movement is no longer current')
+                    if splitter_state_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_splitter_prestate'):
+                        raise ValueError('Splitter identity, axis or rectangle changed after preview')
+                elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
+                    if current.get('name') != arguments['layout_binding']['layout_name']:
+                        raise ValueError('The layout for the view mutation is no longer current')
+                    validate_layout_view_binding(arguments['layout_binding'], read=layout_guard_read)
+                    if api == LAYOUT_DOCK_URI and dock_state_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_dock_prestate'):
+                        raise ValueError('Dock target, view or rectangles changed after preview')
+            except ValueError as exc:
+                raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
+        if api == 'ak.wwise.ui.model.setState':
+            query = state_query_from_assignments(call_args)
+            observed = canonical_state_result(read_call(MODEL_READ_URI, query, {}), query)
+            if canonical_sha256(observed) != canonical_sha256(prepared.get('pre_state', {}).get('model_state_before')):
+                raise OperationContractError('STALE_MODEL_STATE', 'Widget state changed after Preview; inspect and preview again')
         expected = {"uri": api, "args": dict(call_args), "options": dict(call_options)}
         actual = {
             "uri": dispatch_payload.get("uri"),
@@ -13208,6 +17126,41 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 },
             }
         )
+        if arguments.get("history_binding") is not None:
+            from .edit_history_business import observe_history_state, resolved_prepared_history
+            try:
+                history_binding = resolved_prepared_history(prepared, history_resolver)
+                history_observation = (observe_history_state(history_binding, after_action=False, read=read_call)
+                    if history_binding["source_receipt"] is not None else {"matches": True, "readbacks": [], "effect_expectation": "none"})
+            except ValueError as exc:
+                history_observation = {"matches": False, "error": str(exc), "readbacks": getattr(exc, "readbacks", [])}
+            unchanged = history_observation["matches"]
+            passed = passed and unchanged
+            readbacks.extend(history_observation["readbacks"])
+            assertions.append({"name": "owned history expectation scoped prestate unchanged", "passed": unchanged,
+                "evidence": history_observation})
+        if arguments.get("source_control_binding") is not None:
+            from .source_control_object_files import observe_object_file_binding
+            def object_file_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+                result = read_call(uri, args, options)
+                readbacks.append({"role": "source-control-object-files", "uri": uri,
+                                  "args": dict(args), "options": dict(options), "result": dict(result)})
+                return result
+            try:
+                observed = observe_object_file_binding(api, arguments["source_control_binding"], read=object_file_read)
+            except ValueError as exc:
+                observed = {"error": str(exc)}
+            from .source_control_object_files import observe_bound_file_state
+            try:
+                file_state = observe_bound_file_state(api, arguments["source_control_binding"])
+            except ValueError as exc:
+                file_state = {"error": str(exc)}
+            binding_unchanged = (observed == prepared.get("pre_state", {}).get("source_control_binding") == arguments["source_control_binding"]
+                                 and file_state == prepared.get("pre_state", {}).get("source_control_file_state"))
+            passed = passed and binding_unchanged
+            assertions.append({"name": "source-control object identities and exact file accessors unchanged",
+                "passed": binding_unchanged, "evidence": {"expected": arguments["source_control_binding"], "actual": observed,
+                    "expected_file_state": prepared.get("pre_state", {}).get("source_control_file_state"), "actual_file_state": file_state}})
         role_snapshots: list[tuple[str, Any, Mapping[str, Any]]] = []
         for role, snapshot_value in roles.items():
             if not isinstance(snapshot_value, Mapping):
@@ -13227,7 +17180,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if role_snapshots:
             role_batch = _bounded_multi_identity_read(
                 [object_id for _, object_id, _ in role_snapshots],
-                fields=IDENTITY_RETURN_FIELDS,
+                fields=(*IDENTITY_RETURN_FIELDS, "classId", "parent") if prepared.get("pre_state", {}).get("active_source_plugin_binding") is not None else IDENTITY_RETURN_FIELDS,
                 read=read_call,
                 context="Prepared waapi.call business role validation",
             )
@@ -13280,13 +17233,31 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                         },
                     }
                 )
+        source_guard = prepared.get("pre_state", {}).get("active_source_plugin_binding")
+        if source_guard is not None:
+            current, failure = None, None
+            def source_binding_read(uri, args, options):
+                result = read_call(uri, args, options)
+                readbacks.append({"role": "source-plugin-binding", "uri": uri,
+                    "args": dict(args), "options": dict(options), "result": result})
+                return result
+            if role_batch["exact"]:
+                try:
+                    current, _ = _observe_active_source_plugin_binding(call_args["sound"], call_args["source"],
+                        read=source_binding_read, rows=role_batch["result"]["return"])
+                except OperationContractError as exc:
+                    failure = exc.as_dict()
+            unchanged = current == source_guard
+            passed = passed and unchanged
+            assertions.append({"name": "Source plugin class and direct parent binding are unchanged", "passed": unchanged,
+                "evidence": {"expected": source_guard, "actual": current, "failure": failure}})
         return {
             "contract": ROLE_VALIDATION_CONTRACT,
             "operation": operation,
             "ok": passed,
             "status": "valid" if passed else "repreview_required",
             "assertions": [_json_mapping(item) for item in assertions],
-            "readbacks": [],
+            "readbacks": [_json_mapping(item) for item in readbacks] if api in LAYOUT_MUTATION_URIS or arguments.get("source_control_binding") is not None or arguments.get("history_binding") is not None or source_guard is not None else [],
         }
     if operation in UI_COMMAND_OPERATIONS:
         request_payload = prepared.get("request")
@@ -13482,6 +17453,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 },
             ]
         )
+    pre_state = prepared.get("pre_state")
     role_snapshots: list[tuple[str, Any, Mapping[str, Any]]] = []
     for role, snapshot_value in roles.items():
         if not isinstance(snapshot_value, Mapping):
@@ -13494,10 +17466,16 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         role_snapshots.append((str(role), object_id, expected_row))
 
     role_batch: dict[str, Any] | None = None
+    short_id_roles = {str(role) for role, snapshot in roles.items() if snapshot.get("resolution") == "live-short-id"}
     if role_snapshots:
+        role_fields = list(IDENTITY_RETURN_FIELDS)
+        if isinstance(pre_state, Mapping) and "source_transfer_parent_guard" in pre_state:
+            role_fields.append("classId")
+        if short_id_roles:
+            role_fields.append("shortId")
         role_batch = _bounded_multi_identity_read(
             [object_id for _, object_id, _ in role_snapshots],
-            fields=IDENTITY_RETURN_FIELDS,
+            fields=role_fields,
             read=read_call,
             context="Prepared role validation",
         )
@@ -13538,20 +17516,55 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if len(rows) != 1:
             continue
         actual = rows[0]
-        for field_name in ("id", "name", "type", "path", "parent", "notes"):
+        comparison_fields = (*IDENTITY_RETURN_FIELDS, "shortId") if role in short_id_roles else IDENTITY_RETURN_FIELDS
+        if isinstance(pre_state, Mapping) and "source_transfer_parent_guard" in pre_state:
+            comparison_fields = (*comparison_fields, "classId")
+        for field_name in comparison_fields:
             if field_name not in expected_row:
                 continue
             expected = _parent_value(expected_row.get(field_name)) if field_name == "parent" else expected_row.get(field_name)
             observed = _parent_value(actual.get(field_name)) if field_name == "parent" else actual.get(field_name)
+            unchanged = observed == expected
+            if field_name in {"id", "parent"}:
+                unchanged = _same_identity(observed, expected)
+            elif field_name in {"shortId", "classId"}:
+                unchanged = type(observed) is int and observed == expected
             assertions.append(
                 {
                     "name": f"{role}.{field_name} unchanged",
-                    "passed": _same_identity(observed, expected) if field_name in {"id", "parent"} else observed == expected,
+                    "passed": unchanged,
                     "evidence": {"expected": expected, "actual": observed},
                 }
             )
 
-    pre_state = prepared.get("pre_state")
+    related = pre_state.get("related_conditions", []) if isinstance(pre_state, Mapping) else []
+    related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
+    assertions.extend(related_assertions)
+    readbacks.extend(related_reads)
+    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call))
+    assertions.extend(_effect_shareset_placement_assertions(pre_state, read=read_call))
+    from .edit_history_business import observe_field_read_platform
+    platform_observation = observe_field_read_platform(pre_state or {}, read=read_call)
+    if platform_observation is not None:
+        readbacks.extend(platform_observation["readbacks"])
+        assertions.append({"name": "source field original read-platform binding unchanged", "passed": platform_observation["matches"],
+            "evidence": {key: value for key, value in platform_observation.items() if key != "readbacks"}})
+    curve_type_cache: dict[str, Any] = {}
+    for expected in pre_state.get("inline_curve_guards", []) if isinstance(pre_state, Mapping) else []:
+        def curve_read(uri, args, options):
+            if uri == "ak.wwise.core.object.getTypes" and uri in curve_type_cache:
+                return curve_type_cache[uri]
+            result = read_call(uri, args, options)
+            if uri == "ak.wwise.core.object.getTypes":
+                curve_type_cache[uri] = result
+            readbacks.append({"role": "inline-curve-field-metadata", "uri": uri, "args": dict(args), "options": dict(options), "result": dict(result)})
+            return result
+        try:
+            actual = observe_inline_curve_proof(expected, read=curve_read)
+        except (ValueError, TypeError) as exc:
+            actual = {"error": str(exc)}
+        assertions.append({"name": "inline curve field and class evidence unchanged", "passed": _native_snapshot_equal(actual, expected),
+                           "evidence": {"expected": expected, "actual": actual}})
     field_before = pre_state.get("field_before") if isinstance(pre_state, Mapping) else None
     source = roles.get("object") if isinstance(roles, Mapping) else None
     if isinstance(field_before, Mapping) and isinstance(source, Mapping):
@@ -13560,8 +17573,15 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if isinstance(field_name, str) and object_id is not None:
             args = {"from": {"id": [object_id]}}
             activation_requirements = field_before.get("activation_requirements", {})
-            options = {"return": ["id", "path", field_name, *activation_requirements]}
-            platform = field_before.get("platform")
+            activation_reference_requirements = field_before.get("activation_reference_requirements", {})
+            from .constructor_inputs import local_reference_field
+            observed_field = (f"@{field_name}" if clear_field is not None else
+                local_reference_field({"owned_identity": pre_state.get("owned_identity")}, field_name))
+            from .derived_reference_history import applies as derived_reference, FIELDS as derived_reference_fields, matches as derived_reference_matches
+            derived_fields = derived_reference_fields if derived_reference(source.get("row", {}).get("type"), field_name) else ()
+            options = {"return": ["id", "path", *derived_fields, observed_field, *([field_name] if clear_field is not None else []),
+                *activation_requirements, *activation_reference_requirements]}
+            platform = field_before.get("observation_platform", field_before.get("platform"))
             if platform is not None:
                 if not isinstance(platform, str) or not platform:
                     raise OperationContractError(
@@ -13574,23 +17594,41 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 raise OperationContractError("INVALID_READBACK", "Field precondition readback must be an object.")
             rows = _rows(result)
             readbacks.append({"role": "object-field", "uri": OBJECT_GET_URI, "args": args, "options": options, "result": dict(result)})
-            actual = _field_value(rows[0], field_name) if len(rows) == 1 else None
+            actual = (rows[0].get(observed_field) if clear_field is not None else _field_value(rows[0], field_name)) if len(rows) == 1 else None
             assertions.append(
                 {
                     "name": f"object.{field_name} pre-state unchanged",
-                    "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id) and _has_field(rows[0], field_name) and actual == field_before.get("value"),
+                    "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id)
+                        and (observed_field in rows[0] if clear_field is not None else _has_field(rows[0], field_name))
+                        and (_native_snapshot_equal(actual, field_before.get("value"))
+                            if clear_field is not None else actual == field_before.get("value")),
                     "evidence": {"expected": field_before.get("value"), "actual": actual, "rows": rows},
                 }
             )
+            if derived_fields:
+                context = pre_state.get("derived_reference_context")
+                assertions.append({"name": "derived reference identity/controller frame unchanged; legacy Preview requires refresh",
+                    "passed": isinstance(context, Mapping) and len(rows) == 1 and derived_reference_matches(context, rows[0]),
+                    "evidence": {"expected": context, "rows": rows}})
+            if clear_field is not None:
+                assertions.append({"name": "reference clear inherited context unchanged",
+                    "passed": len(rows) == 1 and field_name in rows[0]
+                        and _native_snapshot_equal(rows[0][field_name], field_before["resolved_value"]),
+                    "evidence": {"expected": field_before["resolved_value"], "rows": rows}})
 
             for name, expected in activation_requirements.items():
                 actual = _field_value(rows[0], name) if len(rows) == 1 else None
                 assertions.append({
                     "name": f"reference activation {name} unchanged",
                     "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id)
-                              and _has_field(rows[0], name) and actual is expected,
+                              and _has_field(rows[0], name) and condition_values_equal(actual, expected),
                     "evidence": {"expected": expected, "actual": actual},
                 })
+            for name, expected in activation_reference_requirements.items():
+                assertions.append({"name": f"reference prerequisite {name} unchanged",
+                    "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id)
+                              and _reference_requirement_matches(rows[0], name, expected),
+                    "evidence": {"expected": expected, "rows": rows}})
 
     copy_move_collision_guard = (
         pre_state.get("copy_move_collision_guard")
@@ -13632,6 +17670,50 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 "evidence": {"path": path, "expected": expected_rows, "actual": actual_rows},
             }
         )
+        for label in ("source_snapshot", "replacement_snapshot"):
+            expected = copy_move_collision_guard.get(label)
+            if expected is None or expected == []:
+                continue
+            if not isinstance(expected, list) or not all(isinstance(row, Mapping) for row in expected):
+                raise OperationContractError("INVALID_PREVIEW", "Lifecycle graph guard is malformed.")
+
+            def graph_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+                result = read_call(uri, args, options)
+                readbacks.append({"role": "copy-move-" + label, "uri": uri, "args": dict(args),
+                                  "options": dict(options), "result": dict(result)})
+                return result
+
+            try:
+                observed = capture_lifecycle_graph(expected[0]["id"], read=graph_read, version=copy_move_collision_guard.get("snapshot_version"))
+            except LifecycleGraphError as exc:
+                observed = {"error": str(exc)}
+            assertions.append({"name": "copy/move " + label + " is unchanged", "passed": lifecycle_snapshot_equal(observed, expected),
+                               "evidence": {"expected": expected, "actual": observed}})
+
+    source_copy_before = pre_state.get("source_copy_observation") if isinstance(pre_state, Mapping) else None
+    if isinstance(source_copy_before, Mapping):
+        def source_copy_read(uri, args, options):
+            result = read_call(uri, args, options)
+            readbacks.append({"role": "source-copy-state", "uri": uri, "args": dict(args), "options": dict(options), "result": dict(result)})
+            return result
+        try:
+            observed = capture_source_copy(source_copy_before["source"]["frame"]["id"], source_copy_before["destination"],
+                read=source_copy_read, version=source_copy_before["version"])
+        except LifecycleGraphError as exc:
+            observed = {"error": str(exc)}
+        assertions.append({"name": "Source-copy fields and owner frames are unchanged before execution",
+            "passed": lifecycle_snapshot_equal(observed, source_copy_before)})
+
+    from .source_copy_proof import KEY, validate_baseline
+    saved_baseline = pre_state.get(KEY) if isinstance(pre_state, Mapping) else None
+    if isinstance(saved_baseline, Mapping) and saved_baseline.get('status') == 'ready':
+        try:
+            validate_baseline(saved_baseline, copy_proof_context, read_call)
+            passed, message = True, None
+        except Exception as exc:
+            passed, message = False, str(exc)
+        assertions.append({'name': 'Saved-copy baseline authority remains clean and unchanged', 'passed': passed,
+            'evidence': {'message': message}})
 
     linked_before = pre_state.get("linked_before") if isinstance(pre_state, Mapping) else None
     if isinstance(linked_before, Mapping):
@@ -13675,6 +17757,25 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 "evidence": {"expected": expected_linked, "actual": actual_linked},
             }
         )
+
+    rtpc_snapshots, rtpc_expected = {}, {}
+    for spec in pre_state.get("graph_rtpc_guards", []):
+        guard = spec["rtpc_property_guard"]
+        scope = {key: guard[key] for key in ("object_id", "class_id") if key in guard}
+        info = _read_property_info(read_call, **scope, name=guard["property"])
+        assertions.append({"name": "RTPC owner property metadata remains unchanged", "passed": info.as_dict() == guard["metadata"],
+            "evidence": {"expected": guard["metadata"], "actual": info.as_dict()}})
+        if spec.get("rtpc_list_guard"):
+            guard = spec["rtpc_list_guard"]
+            key = (_identity_key(guard["owner_id"]), guard["version"], guard["class_id"])
+            if key in rtpc_expected:
+                if rtpc_expected[key] != guard["before"]:
+                    raise OperationContractError("INVALID_PREVIEW", "One RTPC owner has conflicting sealed snapshots.")
+                continue
+            rtpc_expected[key] = guard["before"]
+            actual = _read_graph_rtpc_rows(guard["owner_id"], version=guard["version"], class_id=guard["class_id"], read=read_call, snapshot_cache=rtpc_snapshots)
+            assertions.append({"name": "graph complete RTPC list pre-state unchanged", "passed": actual == guard["before"],
+                "evidence": {"expected": guard["before"], "actual": actual}})
 
     rtpc_snapshot = pre_state.get("rtpc_snapshot") if isinstance(pre_state, Mapping) else None
     if isinstance(rtpc_snapshot, Mapping):
@@ -13789,6 +17890,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             target_id=target_id,
             descriptor=descriptor,
             read=plugin_guard_read,
+            target_type=target_type,
         )
         assertions.extend(
             [
@@ -13867,25 +17969,21 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
 
     # Class defaults authorize only genuinely new objects. Re-read the exact
     # metadata sealed at Preview before dispatching their single creation call.
+    assertions.extend(_new_object_class_metadata_assertions(pre_state, read=read_call, readbacks=readbacks))
     if isinstance(pre_state, Mapping):
-        metadata_seen = set()
-        for node_key in ("object_create_nodes", "object_set_nodes"):
-            for node in pre_state.get(node_key, []):
-                for evidence in node.get("new_object_default_evidence", []):
-                    scope = evidence["class_scope"]
-                    for field, expected in evidence["metadata"].items():
-                        key = (scope.get("classId"), field)
-                        if key in metadata_seen:
-                            continue
-                        metadata_seen.add(key)
-                        args = {**scope, "property": field}
-                        result = read_call(GET_PROPERTY_INFO_URI, args, {})
-                        actual = parse_get_property_info_result(result).as_dict()
-                        readbacks.append({"role": "new-object-class-default", "uri": GET_PROPERTY_INFO_URI,
-                                          "args": args, "options": {}, "result": dict(result)})
-                        assertions.append({"name": f"new object class metadata {field} unchanged",
-                                           "passed": actual == expected,
-                                           "evidence": {"expected": expected, "actual": actual}})
+        condition_nodes = [*pre_state.get("object_create_nodes", []), *pre_state.get("object_set_nodes", [])]
+        if isinstance(pre_state.get("plugin_creation_guard"), Mapping):
+            condition_nodes.append(pre_state["plugin_creation_guard"])
+        for node in condition_nodes:
+            for evidence in node.get("new_object_default_evidence", []):
+                for proof in evidence.get("override_applicability", []):
+                    from .override_applicability import proof_current
+                    assertions.append({"name": "new user-send override applicability proof unchanged",
+                        "passed": proof_current(proof, read=read_call), "evidence": proof})
+                for rule in evidence.get("structural_visibility", []):
+                    from .new_object_defaults import structural_bus_proof_current
+                    assertions.append({"name": "new non-master bus class/source/parent proof unchanged",
+                        "passed": structural_bus_proof_current(rule["proof"], read=read_call), "evidence": rule["proof"]})
 
     graph_guard = pre_state.get("object_graph_guard") if isinstance(pre_state, Mapping) else None
     if isinstance(graph_guard, Mapping):
@@ -13923,7 +18021,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             assertions.append(
                 {
                     "name": f"object graph field snapshot {index} unchanged",
-                    "passed": actual == expected,
+                    "passed": _native_snapshot_equal(actual, expected),
                     "evidence": {"expected": expected, "actual": actual},
                 }
             )
@@ -13983,6 +18081,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 read=read_call,
                 platform=platform,
                 context=f"object-graph-list[{index}]",
+                version=prepared.get("version"),
             )
             actual = _normalize_object_list_snapshot(
                 list_rows,
@@ -14323,7 +18422,8 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     "evidence": evidence,
                 }
             )
-        for snapshot in import_guard.get("existing_sfx_source_snapshots", []):
+        for snapshot in [*import_guard.get("existing_sfx_source_snapshots", []),
+                         *import_guard.get("empty_sfx_source_snapshots", [])]:
             if (not isinstance(snapshot, Mapping) or not _valid_object_id(snapshot.get("owner_id"))
                     or snapshot.get("version") != prepared_version):
                 raise OperationContractError("INVALID_PREVIEW", "Existing SFX source guard is malformed.")
@@ -14705,6 +18805,10 @@ def _bind_object_set_result_nodes(
     specs: Sequence[Mapping[str, Any]],
     *,
     on_name_conflict: str,
+    observed_rtpcs: Mapping[str, Mapping[str, Any]] | None = None,
+    observed_owned_controls: Mapping[str, Mapping[str, Any]] | None = None,
+    observe_anonymous: Callable | None = None,
+    observe_owned_reference: Callable | None = None,
 ) -> dict[str, ObjectResultNode]:
     """Bind sparse ``object.set`` associations to the sealed request graph.
 
@@ -14733,8 +18837,8 @@ def _bind_object_set_result_nodes(
         parent_path = spec.get("parent_request_path")
         if isinstance(parent_path, str):
             children_by_parent.setdefault(parent_path, []).append(spec)
-        if spec.get("existing_target") is True:
-            target_id = spec.get("target_id")
+        if spec.get("existing_target") is True or spec.get("rtpc_update"):
+            target_id = spec.get("target_id") or spec.get("preexisting_id")
             try:
                 target_key = _identity_key(target_id)
             except OperationContractError as exc:
@@ -14760,9 +18864,40 @@ def _bind_object_set_result_nodes(
             returned_children.setdefault(node.parent_request_path, []).append(node)
 
     bound: dict[str, ObjectResultNode] = {}
+    anonymous_ids: dict[str, str] = {}
     seen_result_ids: dict[str, str] = {}
 
-    def name_matches(node: ObjectResultNode, spec: Mapping[str, Any]) -> bool:
+    def name_matches(node: ObjectResultNode, spec: Mapping[str, Any], *, owner_id=None) -> bool:
+        from .documented_list_fields import inner_result_candidate
+        inner_match = inner_result_candidate(spec, node.object, node.name)
+        if inner_match is not None:
+            return inner_match
+        if spec.get("anonymous_list_member"):
+            return node.name == "" and _same_identity(node.object, anonymous_ids.get(str(spec["request_path"])))
+        if spec.get("rtpc_binding"):
+            actual = (observed_rtpcs or {}).get(node.object, {})
+            control = next((ref.get("target_id") for ref in spec.get("references", []) if ref["name"] == "ControlInput"), None)
+            if spec.get("owned_control_input"):
+                control = _reference_identity(_field_value(actual, "ControlInput"))
+                proof = spec["owned_control_input"]
+                input_row = (observed_owned_controls or {}).get((control, proof.get("platform")), {})
+                if (input_row.get("name") != proof["name"] or input_row.get("type") != proof["type"]
+                        or input_row.get("classId") != proof["class_id"]
+                        or not _same_identity(_reference_identity(input_row.get("owner")), node.object)
+                        or any(not _has_field(input_row, name) or not condition_values_equal(_field_value(input_row, name), value)
+                            for name, value in proof["properties"].items())
+                        or proof["notes"] is not None and input_row.get("notes") != proof["notes"]):
+                    return False
+                curve = _field_value(actual, "Curve")
+                expected_curve = next(ref["curve"] for ref in spec["references"] if ref["name"] == "Curve")
+                if (not isinstance(curve, Mapping) or not _native_snapshot_equal(curve.get("points"), expected_curve["points"])
+                        or spec.get("notes_supplied") and actual.get("notes") != spec.get("requested_notes")):
+                    return False
+            return (node.name == "" and actual.get("name") == ""
+                and actual.get("classId") == spec["class_id"]
+                and _same_identity(_reference_identity(actual.get("owner")), owner_id)
+                and _field_value(actual, "PropertyName") == spec["rtpc_binding"]["property"]
+                and _same_identity(_reference_identity(_field_value(actual, "ControlInput")), control))
         requested_name = spec.get("requested_name")
         if not isinstance(requested_name, str):
             return False
@@ -14836,7 +18971,27 @@ def _bind_object_set_result_nodes(
         seen_result_ids[result_id_key] = request_path
 
         available = list(children_by_parent.get(request_path, ()))
-        for child in returned_children.get(node.request_path, ()):  # result-relative parent path
+        if any(child.get("anonymous_list_member") for child in available):
+            if observe_anonymous is None:
+                raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results require independent ordered membership")
+            anonymous_ids.update(observe_anonymous(node.object, spec, available))
+        returned = list(returned_children.get(node.request_path, ()))
+        if any(child.get("owned_control_input") for child in available):
+            # Association arrays have no ordering authority. Equivalent outcomes
+            # use a canonical GUID/occurrence bijection; distinct outcomes still
+            # require independent full-value matching below.
+            rtpcs = iter(sorted((child for child in returned if child.collection == "RTPC"),
+                key=lambda child: _identity_key(child.object)))
+            returned = [next(rtpcs) if child.collection == "RTPC" else child for child in returned]
+        for owned in available:
+            if owned.get("owned_reference") and owned.get("collection") == "ControlInput" and not any(
+                    child.collection == "ControlInput" for child in returned):
+                if observe_owned_reference is None:
+                    raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Sparse owned reference outcomes require exact-ID reference readback")
+                identity, name = observe_owned_reference(node.object, "ControlInput")
+                returned.append(ObjectResultNode(node.request_path + ".@ControlInput[0]", node.request_path,
+                    identity, name, 0, "ControlInput"))
+        for child in returned:  # result-relative parent path
             collection_matches = [
                 candidate
                 for candidate in available
@@ -14852,8 +19007,11 @@ def _bind_object_set_result_nodes(
             matches = sealed_matches or [
                 candidate
                 for candidate in collection_matches
-                if name_matches(child, candidate)
+                if name_matches(child, candidate, owner_id=node.object)
             ]
+            if (len(matches) > 1 and all(candidate.get("owned_control_input") for candidate in matches)
+                    and len({_owned_rtpc_outcome_signature(candidate) for candidate in matches}) == 1):
+                matches = [min(matches, key=lambda candidate: candidate["request_path"])]
             if (
                 not matches
                 and child.collection == "children"
@@ -14888,6 +19046,13 @@ def _bind_object_set_result_nodes(
                 details={"object_id": root.object, "name": root.name},
             )
         bind_node(root, target)
+
+    for target in target_by_id.values():
+        if target.get("owned_control_input_replacement") and target["request_path"] not in bound:
+            # Existing GUID is already sealed. Sparse field-only results gain
+            # no identity authority: the owned edge is read independently.
+            bind_node(ObjectResultNode("$sparse." + target["request_path"], None,
+                target["target_id"], target["requested_name"], 0, None), target)
 
     required_new_paths = {
         str(spec.get("request_path"))
@@ -14935,6 +19100,7 @@ def _extract_plugin_result_binding(
     target_id: str,
     descriptor: PluginCreationDescriptor,
     placement: Mapping[str, Any],
+    version: str,
 ) -> dict[str, Any]:
     raw_associations = payload.get("objects")
     if not isinstance(raw_associations, list) or not all(
@@ -14998,16 +19164,18 @@ def _extract_plugin_result_binding(
         )
     expected_name = "" if expected_type == "EffectSlot" else descriptor.name
     result_name = created.get("name")
-    if result_name is not None and result_name != expected_name:
-        raise OperationContractError(
-            "PLUGIN_RESULT_NAME_MISMATCH",
-            "object.set returned a different created object name.",
-            details={
-                "expected": expected_name,
-                "actual": result_name,
-                "created": created,
-            },
-        )
+    if result_name is not None:
+        try:
+            if expected_type == "EffectSlot":
+                if result_name != expected_name:
+                    raise PluginOperationContractError("PLUGIN_NAME_MISMATCH", "EffectSlot must remain unnamed.")
+            else:
+                bind_plugin_name(descriptor, version=version, actual_name=result_name)
+        except PluginOperationContractError as exc:
+            raise OperationContractError("PLUGIN_RESULT_NAME_MISMATCH",
+                "object.set returned a different created object name.",
+                details={"expected": expected_name, "actual": result_name, "created": created,
+                         "name_binding": exc.as_dict()}) from exc
     return {
         "association": association,
         "created": created,
@@ -15068,6 +19236,10 @@ def verify_prepared_operation(
     *,
     execution_result: Mapping[str, Any],
     read_call: ReadCall,
+    history_resolver=None,
+    compound_path_context=None,
+    compound_created_children=(),
+    compound_phase_path_context=None,
 ) -> VerificationResult:
     """Run the closed postcondition for one persisted prepared operation."""
 
@@ -15079,9 +19251,16 @@ def verify_prepared_operation(
     plan = prepared.get("verification_plan")
     if not isinstance(plan, Mapping):
         raise OperationContractError("INVALID_PREVIEW", "Prepared operation lacks a verification plan.")
+    try:
+        clear_field = _require_stored_reference_clear_observation(prepared)
+    except OperationContractError as exc:
+        return VerificationResult(operation, "indeterminate", (), (),
+            "This historical clear has no bound stored-reference observation; do not execute it again. " + str(exc),
+            verification_strength="unobserved_stored_reference", business_state_verified=False)
     readbacks: list[Mapping[str, Any]] = []
     assertions: list[Mapping[str, Any]] = []
     success_status = "verified"
+    created_history_metadata: list[tuple[Mapping[str, Any], str]] = []
     verification_strength = "operation_specific_readback"
     business_state_verified = True
 
@@ -15117,6 +19296,31 @@ def verify_prepared_operation(
 
     def check(name: str, passed: bool, evidence: Any) -> None:
         assertions.append({"name": name, "passed": bool(passed), "evidence": evidence})
+
+    pre_state = prepared.get("pre_state")
+    related = pre_state.get("related_conditions", []) if isinstance(pre_state, Mapping) else []
+    related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
+    assertions.extend(related_assertions)
+    readbacks.extend(related_reads)
+    deferred_render_chains = [chain for chain in (pre_state or {}).get("effect_render_chains", [])
+        if plan.get("kind") in {"object-create-graph", "object-set-batch"}
+        and any("target_request_path" in intent for snapshot in chain["snapshots"]
+            for intent in snapshot.get("reference_changes", {}).values())]
+    # Keep a failing assertion until the normal graph association proof is reached.
+    # Malformed/early graph outcomes can never silently omit a deferred chain.
+    render_association = {"name": "planned Render chains reach the owned graph association proof",
+        "passed": False, "evidence": {"chain_count": len(deferred_render_chains)}}
+    if deferred_render_chains:
+        assertions.append(render_association)
+    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call, after_write=True,
+        deferred_render_chains=deferred_render_chains, compound_path_context=compound_path_context))
+    assertions.extend(_effect_shareset_placement_assertions(pre_state, read=read_call, after_write=True))
+    from .edit_history_business import observe_field_read_platform
+    platform_observation = observe_field_read_platform(pre_state or {}, read=read_call)
+    if platform_observation is not None:
+        readbacks.extend(platform_observation["readbacks"])
+        check("source field original read-platform binding unchanged", platform_observation["matches"],
+            {key: value for key, value in platform_observation.items() if key != "readbacks"})
 
     def check_result_schema(uri: str, version: str) -> None:
         try:
@@ -15157,8 +19361,34 @@ def verify_prepared_operation(
             )
         return normalized
 
+    curve_type_cache: dict[str, Any] = {}
+    for expected in prepared.get("pre_state", {}).get("inline_curve_guards", []):
+        def curve_read(uri, args, options):
+            if uri == "ak.wwise.core.object.getTypes" and uri in curve_type_cache:
+                return curve_type_cache[uri]
+            result = read_call(uri, args, options)
+            readbacks.append({"role": "inline-curve-field-metadata", "uri": uri, "args": dict(args), "options": dict(options), "result": dict(result)})
+            if uri == "ak.wwise.core.object.getTypes":
+                curve_type_cache[uri] = result
+            return result
+        try:
+            actual = observe_inline_curve_proof(expected, read=curve_read)
+        except (ValueError, TypeError) as exc:
+            actual = {"error": str(exc)}
+        check("inline curve field and class evidence unchanged after execution", _native_snapshot_equal(actual, expected),
+              {"expected": expected, "actual": actual})
+
     kind = plan.get("kind")
-    if kind == "ui-command-plan":
+    if kind == "source-control-provider-protected":
+        success_status = "result_schema_checked"
+        verification_strength = "protected_result_schema_only"
+        business_state_verified = False
+        protected = execution_result.get("result")
+        check("protected provider result was validated before publication",
+              isinstance(protected, Mapping) and protected.get("protected_native_result") is True
+              and protected.get("native_result_schema_valid") is True,
+              {"provider_identity_verified": False, "provider_effects_verified": False, "native_text_disclosed": False})
+    elif kind == "ui-command-plan":
         raw_ui_plan = plan.get("plan")
         version = plan.get("version")
         if not isinstance(raw_ui_plan, Mapping) or not isinstance(version, str):
@@ -15331,6 +19561,17 @@ def verify_prepared_operation(
                         True,
                         validation.as_dict(),
                     )
+            path_context = execution_plan.get('path_context')
+            created_children = ()
+            if path_context is not None:
+                from .object_graph_paths import compound_created_child_roots
+                created_children = compound_created_child_roots(inner_plan, phases)
+            if path_context is not None:
+                from .object_graph_paths import compound_expected_context, observe_compound_path_context
+                path_context = compound_expected_context(path_context, inner_plan)
+                context_assertion, context_read = observe_compound_path_context(path_context, read=read_call)
+                assertions.append(context_assertion)
+                readbacks.append(context_read)
             for index, child_plan in enumerate(inner_plan):
                 if not isinstance(child_plan, Mapping):
                     child_business_state_verified = False
@@ -15347,19 +19588,28 @@ def verify_prepared_operation(
                 ):
                     child_business_state_verified = False
                     continue
+                phase_path_context = None
+                if path_context is not None or prepared_child.get('pre_state', {}).get('owned_result_stages'):
+                    from .object_graph_paths import compound_rename_edits
+                    phase_path_context = {'edits': compound_rename_edits(inner_plan[:index + 1])}
                 child_verification = verify_prepared_operation(
                     prepared_child,
                     execution_result=dispatch_result,
                     read_call=read_call,
+                    compound_path_context=path_context,
+                    compound_created_children=created_children,
+                    compound_phase_path_context=phase_path_context,
                 )
                 verified_child_count += 1
                 child_business_state_verified = (
                     child_business_state_verified
                     and child_verification.business_state_verified
                 )
+                assertion_start, readback_start = len(assertions), len(readbacks)
                 assertions.extend(
                     {
                         **dict(assertion),
+                        "compound_child_index": index,
                         "name": (
                             f"Undo Group child[{index}] "
                             f"{assertion.get('name', 'postcondition')}"
@@ -15374,6 +19624,30 @@ def verify_prepared_operation(
                     }
                     for readback in child_verification.readbacks
                 )
+                # The parent owns these exact flattened ranges. No independent
+                # child transaction or inferred after-state is manufactured.
+                child_header = child_verification.as_dict()
+                child_header.pop("assertions")
+                child_header.pop("readbacks")
+                assertions.append({
+                    "name": f"Undo Group child[{index}] actual observation association",
+                    "kind": "compound_child_observation",
+                    "passed": child_verification.business_state_verified,
+                    "evidence": {
+                        "index": index,
+                        "prepared_sha256": canonical_sha256(prepared_child),
+                        **({'path_context_sha256': canonical_sha256(path_context),
+                            'phase_args_sha256': canonical_sha256(child_plan['args']),
+                            'created_children_sha256': canonical_sha256(created_children)} if path_context is not None else {}),
+                        "dispatch_sha256": canonical_sha256(dispatch_result),
+                        "verification": child_header,
+                        "assertions": {"start": assertion_start, "count": len(assertions) - assertion_start,
+                            "sha256": canonical_sha256(assertions[assertion_start:])},
+                        "readbacks": {"start": readback_start, "count": len(readbacks) - readback_start,
+                            "sha256": canonical_sha256(readbacks[readback_start:])},
+                    },
+                })
+
         business_state_verified = (
             child_business_state_verified
             and verified_child_count == len(inner_plan)
@@ -15392,6 +19666,141 @@ def verify_prepared_operation(
                 else "complete_reflected_schema"
             )
         )
+    elif kind == "profiler-capture-artifact":
+        check_result_schema(plan["uri"], plan["version"])
+        business_state_verified = False
+        verification_strength = "profiler_capture_artifact"
+        try:
+            observed = verify_capture_artifact(plan)
+        except SoundBankContractError as exc:
+            check("Exact authorized capture artifact can be observed safely", False, exc.as_dict())
+        else:
+            readbacks.append(observed)
+            check("Exact authorized capture artifact was created or changed and is nonempty",
+                observed["changed"] and observed["nonempty"], observed)
+            check("Unrelated regular-file contents in the bounded output directory are preserved",
+                observed["unrelated_files_preserved"], observed)
+            business_state_verified = all(item.get("passed") is True for item in assertions)
+    elif kind == 'tone-wav-artifact':
+        check_result_schema(TONE_URI, plan['version'])
+        business_state_verified = False
+        success_status = 'result_schema_checked'
+        verification_strength = 'partial_tone_artifact'
+        try:
+            observed = verify_tone_artifact(plan)
+        except SoundBankContractError as exc:
+            check('Requested Tone WAV artifact exists and matches its observable postconditions', False,
+                {'code': exc.error_code, 'message': str(exc), **exc.details})
+        else:
+            business_state_verified = not observed['unresolved']
+            success_status = 'verified' if business_state_verified else 'result_schema_checked'
+            verification_strength = 'tone_wav_artifact' if business_state_verified else 'partial_tone_artifact'
+            readbacks.append(observed)
+            check('Requested Tone WAV artifact exists and matches its observable postconditions', True, observed)
+    elif kind == 'console-project-open':
+        check_result_schema(plan['uri'], plan['version'])
+        readbacks.append({'kind': 'console-open-project-identity', 'project': dict(plan['project']),
+            'file_proof': dict(plan['file_proof'])})
+        # The Gateway must additionally observe the live path/GUID/name transition.
+        business_state_verified = False
+        success_status = 'result_schema_checked'
+        verification_strength = 'saved_project_input_identity'
+    elif kind in {'console-project-create', 'authoring-project-create'}:
+        business_state_verified = False
+        check_result_schema(plan['uri'], plan['version'])
+        try:
+            observed = inspect_created_project(plan)
+        except SoundBankContractError as exc:
+            if exc.error_code not in {'MISSING_ARTIFACT', 'MISSING_PATH', 'INVALID_PATH_KIND', 'INVALID_PROJECT_ARTIFACT', 'SYMLINK_NOT_ALLOWED'}:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+            check('Requested saved project artifact is present and valid', False,
+                {'code': exc.error_code, 'message': str(exc), **exc.details})
+        else:
+            readbacks.append(observed)
+            if plan['uri'] == AUTHORING_CREATE_URI:
+                check('Saved project name matches its requested project-file name',
+                    observed['project']['name'] == Path(plan['path']).stem, observed['project'])
+            check('Requested project platforms were saved', observed['platforms_match'], observed['platforms'])
+            check('Requested project languages were saved', observed['languages_match'], observed['languages'])
+            check('Requested default language was saved', observed['default_language_matches'], observed['default_language'])
+            business_state_verified = not observed['unresolved']
+            success_status = 'verified' if business_state_verified else 'result_schema_checked'
+        verification_strength = 'saved_project_artifact'
+    elif kind == "console-project-process":
+        uri, version = plan['uri'], plan['version']
+        check_result_schema(uri, version)
+        try:
+            observed = observe_cli_project_outcome(uri, version, execution_result.get('result'))
+        except ValueError as exc:
+            # A missing/unknown result is uncertainty, not proof of a failed
+            # project effect. The durable execution remains non-retryable.
+            raise OperationContractError('UNRECOGNIZED_CLI_PROCESS_OUTCOME', str(exc)) from exc
+        readbacks.append(observed)
+        check('Console command did not report errors', not observed.get('reported_errors', False), observed)
+        business_state_verified = False
+        success_status = 'result_schema_checked'
+        verification_strength = 'documented_cli_process_outcome'
+        effect = pre_state.get('cli_project_effect')
+        if effect is not None and not observed.get('reported_errors', False):
+            try:
+                effect_result = inspect_cli_project_effect(effect)
+            except SoundBankContractError as exc:
+                if exc.error_code not in {'MISSING_ARTIFACT', 'MISSING_PATH', 'INVALID_PATH_KIND', 'INVALID_PROJECT_ARTIFACT', 'SYMLINK_NOT_ALLOWED'}:
+                    raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+                check('Requested Console project/file effect is independently observable', False,
+                    {'code': exc.error_code, 'message': str(exc), **exc.details})
+            else:
+                readbacks.extend(effect_result['observations'])
+                for assertion in effect_result['checks']:
+                    check(assertion['name'], assertion['passed'], assertion.get('evidence', {}))
+                business_state_verified = not effect_result['unresolved']
+                success_status = 'verified' if business_state_verified else 'result_schema_checked'
+                verification_strength = 'independent_console_project_file_artifact'
+
+
+    elif kind == "soundengine-state-effect":
+        check_result_schema(plan["uri"], plan["version"])
+        roles = validate_prepared_roles(prepared, read_call=read_call)
+        readbacks.extend(roles.get("readbacks", ()))
+        check("Exact bound group and value identities still match the immutable Preview", roles.get("ok") is True, roles)
+        if roles.get("ok") is True:
+            # The matching getState documentation permits a brief asynchronous
+            # update delay. Observe once after a bounded 10ms settling interval;
+            # neither the original write nor a mismatching observation is retried.
+            time.sleep(plan["observation_delay_seconds"])
+            observed = read_call(plan["getter_uri"], plan["getter_args"], plan["getter_options"])
+            readbacks.append({"uri": plan["getter_uri"], "args": plan["getter_args"],
+                "options": plan["getter_options"], "result": observed})
+            try:
+                validation = validate_semantic_result(plan["getter_uri"], observed, version=plan["version"])
+            except SemanticValidationError as exc:
+                check("Independent SoundEngine observation matches its reflected result contract", False, exc.as_dict())
+            else:
+                check("Independent SoundEngine observation matches its reflected result contract", True, validation.as_dict())
+            value = observed.get("return") if isinstance(observed, Mapping) else None
+            actual_id = value.get("id") if isinstance(value, Mapping) else None
+            check("Independent runtime group value matches the requested State or Switch identity",
+                _valid_object_id(actual_id) and _same_identity(actual_id, plan["expected_value_id"]),
+                {"expected_value_id": plan["expected_value_id"], "actual_value_id": actual_id,
+                    "scope": plan["getter_args"]})
+        verification_strength = "independent_soundengine_state_observation"
+    elif kind == "blend-assignment":
+        from .blend_assignment import observe as observe_blend, compare as compare_blend, BlendAssignmentError
+        check_result_schema(str(plan["uri"]), str(plan["version"]))
+        def blend_read(uri, args, options):
+            result = read_call(uri, args, options)
+            readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": result})
+            return result
+        try:
+            after = observe_blend(plan["before"]["track"]["id"], plan["before"]["child"]["id"], read=blend_read, version=plan["version"])
+        except BlendAssignmentError as exc:
+            check("Complete indexed Blend assignment readback is available", False, {"error": str(exc)})
+        else:
+            for item in compare_blend(plan, after):
+                check(item["name"], item["passed"], item.get("evidence", {}))
+        business_state_verified = not plan["verification_scope"]["unobserved"]
+        success_status = "verified" if business_state_verified else "result_schema_checked"
+        verification_strength = "blend_assignment_order_and_observed_preservation" if business_state_verified else "blend_assignment_partial_observation"
     elif kind == "result-schema":
         success_status = "result_schema_checked"
         business_state_verified = False
@@ -15422,6 +19831,251 @@ def verify_prepared_operation(
                 True,
                 validation.as_dict(),
             )
+    elif kind == "authoring-model-state":
+        uri, version = plan['uri'], plan['version']
+        try:
+            validation = validate_semantic_result(uri, execution_result.get('result'), version=version, authoring_ui_profile=True)
+        except SemanticValidationError as exc:
+            check('Authoring operation returned its exact reflected result', False, exc.as_dict())
+        else:
+            check('Authoring operation returned its exact reflected result', True, validation.as_dict())
+        business_state_verified = False
+        success_status = 'result_schema_checked'
+        verification_strength = 'native_result_only_observable_effect_unfinished'
+        if uri in {MODEL_READ_URI, 'ak.wwise.ui.model.setState'}:
+            native = plan['native_args']
+            query = native if uri == MODEL_READ_URI else state_query_from_assignments(native)
+            observed_raw = execution_result.get('result') if uri == MODEL_READ_URI else read_call(MODEL_READ_URI, query, {})
+            observed = canonical_state_result(observed_raw, query)
+            readbacks.append({'uri': MODEL_READ_URI, 'args': query, 'options': {}, 'result': observed_raw})
+            if uri != MODEL_READ_URI:
+                expected = {row['widgetID']: {item['attribute']: item['value'] for item in row['state']} for row in native['state']}
+                check('Independently read widget state matches the selected assignments', canonical_sha256(observed) == canonical_sha256(expected), {'expected': expected, 'observed': observed})
+            business_state_verified = True
+            success_status = 'verified'
+            verification_strength = 'independent_widget_state_observation'
+        if uri == 'ak.wwise.ui.model.createHandle':
+            value = execution_result.get('result', {}).get('handleID')
+            import re
+            valid_id = isinstance(value, str) and bool(re.fullmatch(r'\{[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}\}', value))
+            check('Frontend creation returned an owned native identity', valid_id, {'handleID': value})
+            if valid_id:
+                widgets = select_registered_template(plan['binding']['resources']['template'], plan['binding']['plan'].get('template_key'))[0]['widgets']
+                query = {'handleID': value, 'state': [{'widgetID': row['key'], 'state': []} for row in widgets]}
+                observed_raw = read_call(MODEL_READ_URI, query, {})
+                canonical_state_result(observed_raw, query)
+                readbacks.append({'uri': MODEL_READ_URI, 'args': query, 'options': {}, 'result': observed_raw})
+        if uri == 'ak.wwise.ui.model.registerWafm':
+            check('Authoring accepted the owned template registration', execution_result.get('result', {}).get('success') is True, execution_result.get('result'))
+        if uri == 'ak.wwise.ui.window.create':
+            import re
+            value = execution_result.get('result', {}).get('windowID')
+            check('Window creation returned an owned native identity', isinstance(value, str) and bool(re.fullmatch(r'\{[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}\}', value)), {'windowID': value})
+    elif kind == 'authoring-layout-reset-observation':
+        try:
+            validation = validate_semantic_result(str(plan['uri']), execution_result.get('result'),
+                version=str(plan['version']), authoring_ui_profile=True)
+        except SemanticValidationError as exc:
+            check('Layout reset returned its exact Authoring result contract', False, exc.as_dict())
+        else:
+            check('Layout reset returned its exact Authoring result contract', True, validation.as_dict())
+        for subject, read_uri, read_args in [
+                ('names', 'ak.wwise.ui.layout.getLayoutNames', {}),
+                ('current', 'ak.wwise.ui.layout.getCurrentLayoutName', {}),
+                *[('contents', 'ak.wwise.ui.layout.getLayout', {'name': name}) for name in plan['selected_names']]]:
+            observed = read_call(read_uri, read_args, {})
+            readbacks.append({'uri': read_uri, 'args': read_args, 'options': {}, 'result': observed})
+            try:
+                validate_layout_read_result(subject, observed)
+                complete = (isinstance(observed.get('layouts'), list) if subject == 'names' else
+                    isinstance(observed.get('name'), str) if subject == 'current' else
+                    isinstance(observed.get('Layout'), Mapping))
+                check('Post-reset ' + subject + ' observation is present', complete, {'uri': read_uri, 'args': read_args, 'result': observed})
+            except ValueError as exc:
+                check('Post-reset ' + subject + ' observation is valid', False, {'error': str(exc), 'result': observed})
+        success_status = 'result_schema_checked'
+        verification_strength = 'result_schema_only'
+        business_state_verified = False
+    elif kind == "authoring-layout-state":
+        uri, version = plan.get('uri'), plan.get('version')
+        if uri not in LAYOUT_MUTATION_URIS or not isinstance(version, str):
+            raise OperationContractError('INVALID_PREVIEW', 'Layout verifier lacks its exact versioned operation')
+        try:
+            validation = validate_semantic_result(uri, execution_result.get('result'), version=version, authoring_ui_profile=True)
+        except SemanticValidationError as exc:
+            check('Layout mutation returned its exact result contract', False, exc.as_dict())
+        else:
+            check('Layout mutation returned its exact result contract', True, validation.as_dict())
+        if uri == LAYOUT_SET_URI:
+            registered = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})
+            validate_layout_read_result('contents', registered)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': registered})
+            expected_layout = plan.get('expected_layout')
+            check('Registered layout retains its declared name', isinstance(expected_layout, Mapping)
+                and registered.get('Layout', {}).get('Name') == expected_layout.get('Layout', {}).get('Name'),
+                {'expected_name': expected_layout.get('Layout', {}).get('Name') if isinstance(expected_layout, Mapping) else None,
+                 'actual_name': registered.get('Layout', {}).get('Name')})
+            if isinstance(expected_layout, Mapping) and 'StackPanel' in expected_layout.get('Layout', {}):
+                check('Registered layout retains every declared nested field and child order',
+                    declared_layout_matches(expected_layout, registered),
+                    {'mismatches': declared_layout_mismatches(expected_layout, registered),
+                     'expected_layout_sha256': canonical_sha256(expected_layout),
+                     'observed_layout_sha256': canonical_sha256(registered),
+                     'comparison': 'all declared fields and exact child order; native default fields may be additional'})
+        elif uri == LAYOUT_REMOVE_URI:
+            try:
+                absent = require_layout_absence(plan['expected_name'], read=read_call)
+            except ValueError as exc:
+                check('Temporary layout is absent after unregister', False, {'reason': str(exc)})
+            else:
+                readbacks.append(absent)
+                check('Temporary layout is absent after unregister', True, absent)
+        elif uri == LAYOUT_SPLITTER_URI:
+            current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            validate_layout_read_result('current', current)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+            scoped = current.get('name') == plan['expected_name']
+            check('Splitter movement remains in the reviewed current layout', scoped, current)
+            if scoped:
+                instances_raw = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': instances_raw})
+                view_identities = layout_view_identities(canonical_view_instances(instances_raw))
+                check('Splitter movement preserves every existing view identity and type',
+                    view_identities == plan['preserved_view_identities'],
+                    {'before': plan['preserved_view_identities'], 'after': view_identities})
+                layout = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': layout})
+                try:
+                    observed = splitter_element_context(layout, plan['splitter_id'])
+                    same_axis = observed['axis'] == plan['axis'] and observed['parent_id'] == plan['parent_id']
+                    check('The exact splitter retains its reviewed parent and axis', same_axis, observed)
+                    raw = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': plan['splitter_id']}, {})
+                    readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': plan['splitter_id']}, 'options': {}, 'result': raw})
+                    rectangle = require_layout_rectangle(raw)
+                    before = require_layout_rectangle(plan['rectangle_before'])
+                    movement_edges = ('left', 'right') if plan['axis'] == 'x' else ('top', 'bottom')
+                    expected = {edge: value + (plan['pixel_delta'] if edge in movement_edges else 0)
+                                for edge, value in before.items()}
+                    check('Splitter moves by the exact signed pixel displacement without resizing or perpendicular drift',
+                        same_axis and rectangle == expected,
+                        {'axis': plan['axis'], 'pixel_delta': plan['pixel_delta'], 'before': before,
+                         'expected': expected, 'actual': rectangle, 'automatic_replay': False})
+                except ValueError as exc:
+                    check('Exact splitter displacement is independently observed', False, {'reason': str(exc)})
+        elif uri == LAYOUT_DOCK_URI:
+            current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            validate_layout_read_result('current', current)
+            observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+            instances = canonical_view_instances(observed)
+            readbacks.extend([
+                {'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current},
+                {'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': observed}])
+            matches = [row for row in instances if _same_identity(row['viewID'], plan['view_id'])]
+            scoped = current.get('name') == plan['expected_name']
+            docked = len(matches) == 1 and matches[0]['viewName'] == plan['view_type'] and matches[0].get('viewIsDocked') is True
+            check('Docked view remains in the reviewed current layout', scoped, current)
+            view_identities = layout_view_identities(instances)
+            check('Docking preserves every existing view identity and type',
+                view_identities == plan['preserved_view_identities'],
+                {'before': plan['preserved_view_identities'], 'after': view_identities})
+            check('The exact discovered view is independently observed docked', docked, {'view_id': plan['view_id'], 'actual': matches})
+            if scoped and docked:
+                layout = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': layout})
+                try:
+                    target = layout_element_observation(layout, plan['target_id'])
+                    if target['kind'] != plan['target_kind']:
+                        raise ValueError('The exact dock target changed its kind')
+                    topology = docking_topology_proof(layout, view_id=plan['view_id'], target_id=plan['target_id'],
+                        side=plan['dock_side'], previous_target_ids=plan['target_previous_ids'])
+                    rectangles = {}
+                    for role, identity in (('view', plan['view_id']), ('target', plan['target_id']), ('peer', topology['peer_id'])):
+                        raw = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': identity}, {})
+                        readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': identity}, 'options': {}, 'result': raw})
+                        rectangles[role] = require_layout_rectangle(raw)
+                    side_matches = docking_side_matches(rectangles['view'], rectangles['peer'], plan['dock_side'])
+                    if topology['relationship'] == 'container_boundary':
+                        view_rect, target_rect = rectangles['view'], rectangles['target']
+                        side_matches = side_matches and (target_rect['left'] <= view_rect['left'] < view_rect['right'] <= target_rect['right']
+                            and target_rect['top'] <= view_rect['top'] < view_rect['bottom'] <= target_rect['bottom'])
+                    check('Docking matches the exact requested target and side', side_matches,
+                        {'target_id': plan['target_id'], 'side': plan['dock_side'], 'rectangles': rectangles, 'topology': topology,
+                         'unresolved_boundary': None if side_matches else 'requested side not proven; overlapping container topology requires native characterization'})
+                except ValueError as exc:
+                    check('Docking matches the exact requested target and side', False, {'reason': str(exc)})
+        elif uri == LAYOUT_UNDOCK_URI:
+            observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+            instances = canonical_view_instances(observed)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': observed})
+            matches = [row for row in instances if _same_identity(row['viewID'], plan['view_id'])]
+            floating = len(matches) == 1 and matches[0]['viewName'] == plan['view_type'] and matches[0].get('viewIsDocked') is False
+            check('The discovered view is independently observed floating', floating, {'view_id': plan['view_id'], 'actual': matches})
+            if floating and plan.get('coordinates'):
+                current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+                validate_layout_read_result('current', current)
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+                in_scope = current.get('name') == plan['expected_name']
+                check('Floating placement remains in the reviewed current layout', in_scope, current)
+                if in_scope:
+                    rectangle = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': plan['view_id']}, {})
+                    validate_layout_read_result('rectangle', rectangle)
+                    readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': plan['view_id']}, 'options': {}, 'result': rectangle})
+                    for native, edge in (('posX', 'left'), ('posY', 'top')):
+                        if native in plan['coordinates']:
+                            check('Floating view ' + edge + ' matches its declared position', rectangle.get(edge) == plan['coordinates'][native],
+                                {'expected': plan['coordinates'][native], 'actual': rectangle.get(edge)})
+        elif uri == LAYOUT_CLOSE_URI:
+            observed, pending = {}, True
+            for poll in range(16):
+                observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+                instances = canonical_view_instances(observed)
+                pending = any(_same_identity(row['viewID'], plan['view_id']) for row in instances)
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'poll': poll + 1,
+                    'result_sha256': canonical_sha256(observed), 'view_present': pending})
+                if not pending:
+                    break
+                if poll < 15:
+                    time.sleep(0.2)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']},
+                'options': {}, 'result': observed})
+            check('Closed view disappears from independently read layout instances', not pending,
+                {'view_id': plan['view_id'], 'pending_async_close': pending, 'polls': poll + 1})
+        elif uri == LAYOUT_GET_OR_CREATE_URI:
+            result = execution_result.get('result')
+            view_id = result.get('id') if isinstance(result, Mapping) else None
+            valid_id = isinstance(view_id, str) and _PLUGIN_GUID.fullmatch(view_id) is not None
+            check('View result includes its exact native GUID', valid_id, {'id': view_id})
+            if valid_id:
+                current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+                validate_layout_read_result('current', current)
+                current_scope_matches = current.get('name') == plan['expected_name']
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+                check('Created or reused view remains in the reviewed current layout', current_scope_matches,
+                    {'expected': plan['expected_name'], 'actual': current.get('name')})
+                observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+                instances = canonical_view_instances(observed)
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': observed})
+                matches = [row for row in instances if _same_identity(row['viewID'], view_id)]
+                check('Returned view exists with the requested live type', len(matches) == 1 and matches[0]['viewName'] == plan['view_type'],
+                    {'expected_type': plan['view_type'], 'id': view_id, 'actual': matches})
+                existing = plan.get('existing_view_ids', [])
+                if existing:
+                    check('Existing view is reused', any(_same_identity(item, view_id) for item in existing),
+                        {'existing_ids': existing, 'returned_id': view_id})
+                elif plan.get('coordinates') and current_scope_matches:
+                    rectangle = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': view_id}, {})
+                    validate_layout_read_result('rectangle', rectangle)
+                    readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': view_id}, 'options': {}, 'result': rectangle})
+                    for native, edge in (('posX', 'left'), ('posY', 'top')):
+                        if native in plan['coordinates']:
+                            check('New view initial ' + edge + ' matches its declared coordinate', rectangle.get(edge) == plan['coordinates'][native],
+                                {'expected': plan['coordinates'][native], 'actual': rectangle.get(edge), 'rectangle': rectangle})
+        else:
+            current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            validate_layout_read_result('current', current)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+            check('Current layout matches the requested business layout', current.get('name') == plan.get('expected_name'),
+                {'expected': plan.get('expected_name'), 'actual': current.get('name')})
     elif kind == "project-setting-state":
         uri = plan.get("uri")
         version = plan.get("version")
@@ -15450,11 +20104,27 @@ def verify_prepared_operation(
                     "INVALID_PREVIEW",
                     "Active-source verification lacks its exact source or platform.",
                 )
-            rows = read_object(
-                object_id=object_id,
-                fields=("id", "name", "type", "path", "activeSource"),
-                platform=platform,
-            )
+            source_guard = prepared.get("pre_state", {}).get("active_source_plugin_binding")
+            if source_guard is not None:
+                def source_read(uri, args, options):
+                    result = read_call(uri, args, options)
+                    readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": result})
+                    return result
+                try:
+                    current, source_rows = _observe_active_source_plugin_binding(object_id, expected_source,
+                        read=source_read, platform=platform, include_active=True)
+                    rows = [row for row in source_rows if _same_identity(row.get("id"), object_id)]
+                except OperationContractError as exc:
+                    current, rows = None, []
+                    check("Source plugin binding remains valid", False, exc.as_dict())
+                check("Source plugin class and direct parent match the immutable Preview", current == source_guard,
+                    {"expected": source_guard, "actual": current})
+            else:
+                rows = read_object(
+                    object_id=object_id,
+                    fields=("id", "name", "type", "path", "activeSource"),
+                    platform=platform,
+                )
             check(
                 "active-source target resolves exactly once",
                 len(rows) == 1,
@@ -15465,7 +20135,7 @@ def verify_prepared_operation(
                     _field_value(rows[0], "activeSource")
                 )
                 check(
-                    "Sound active source matches the requested AudioFileSource",
+                    "Sound active source matches the requested source",
                     _same_identity(actual_source, expected_source),
                     {
                         "expected": expected_source,
@@ -15530,13 +20200,160 @@ def verify_prepared_operation(
             isinstance(actual_connected, bool) and actual_connected is expected_connected,
             {"expected": expected_connected, "actual": actual_connected, "status": status.get("status")},
         )
+        if expected_connected:
+            from .remote_transition import DISCOVERY_URI, needs_remote_discovery, observe_remote_target
+            target = plan.get("expected_target")
+            if not isinstance(target, Mapping) or not isinstance(target.get("host"), str):
+                raise OperationContractError("INVALID_PREVIEW", "Remote verification lacks the exact requested target.")
+            discovery = (verified_readback(DISCOVERY_URI, {}, version=version)
+                if actual_connected is True and isinstance(status.get("console"), Mapping) and needs_remote_discovery(target) else None)
+            observation = observe_remote_target(target, status, discovery=discovery)
+            readbacks.append({"kind": "remote-target-observation", **observation})
+            for observed_check in observation["checks"]:
+                check(f"remote target {observed_check['field']} matches the requested identity", observed_check["passed"], observed_check)
+            if observation["unresolved"]:
+                business_state_verified = False
+                success_status = "result_schema_checked"
+                verification_strength = "partial_remote_target_observation"
+    elif kind == "log-channel-effect":
+        from .runtime_log_effects import channel_snapshot, compare_channel
+        uri, version = plan.get("uri"), plan.get("version")
+        before = (pre_state or {}).get("log_channel_before")
+        if uri not in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI} or version not in {"2023.1", "2024.1", "2025.1"} or not isinstance(before, Mapping) or before.get("outcome") != "complete" or type(plan.get("console")) is not bool:
+            raise OperationContractError("INVALID_PREVIEW", "Log effect verification lacks its bounded channel prestate and host.")
+        business_state_verified = False
+        verification_strength = "bounded_log_channel_observation"
+        check_result_schema(uri, version)
+        if all(item["passed"] for item in assertions) and plan['console'] and plan.get('native_observation_support', {}).get('state') == 'supported' and uri == LOG_ADD_ITEM_URI:
+            from .runtime_log_observer import event_observation
+            verification_strength = 'bounded_execute_time_log_event'
+            try:
+                observation = event_observation(execution_result, plan)
+            except (ValueError, SemanticValidationError):
+                check('Execute-time log event matches its pinned publish schema', False, {})
+                observation = {'outcome': 'malformed_event', 'effect_observed': False}
+            check('Execute-time log observer integrity and unsubscribe succeeded',
+                observation['outcome'] not in {'console_event_cleanup_failed', 'malformed_event',
+                    'overflow', 'invalid_event_ingress', 'console_event_mismatch'},
+                {'outcome': observation['outcome']})
+            readbacks.append({'kind': 'log-channel-observation', **observation})
+            business_state_verified = observation['effect_observed']
+            if not business_state_verified:
+                success_status = 'result_schema_checked'
+        elif all(item["passed"] for item in assertions):
+            try:
+                after = channel_snapshot(read_call(LOG_GET_URI, {"channel": plan["channel"]}, {}), version=version)
+            except OperationContractError:
+                raise
+            except (ValueError, SemanticValidationError) as exc:
+                check("Log channel readback matches its pinned schema", False, {"outcome": "malformed"})
+                readbacks.append({"kind": "log-channel-observation", "outcome": "malformed", "effect_observed": False})
+            else:
+                observation = compare_channel(plan, before, after)
+                readbacks.append({"kind": "log-channel-observation", **observation, "post_channel": after})
+                business_state_verified = observation["effect_observed"]
+                if not business_state_verified:
+                    success_status = "result_schema_checked"
+    elif kind == "profiler-user-cursor":
+        uri, version = plan.get("uri"), plan.get("version")
+        if uri not in {PROFILER_MOVE_CURSOR_URI, PROFILER_SET_CURSOR_TIME_URI} or version != "2025.1":
+            raise OperationContractError("INVALID_PREVIEW", "Profiler cursor verification lacks its matching URI/version.")
+        business_state_verified = False
+        verification_strength = "independent_profiler_user_cursor_observation"
+        check_result_schema(uri, version)
+        returned_time = _execution_payload(execution_result).get("return")
+        valid_time = type(returned_time) is int and returned_time >= -1
+        check("Profiler control returned an available time or the unavailable sentinel", valid_time,
+            {"returned_time_ms": returned_time})
+        if valid_time and all(item["passed"] for item in assertions):
+            # One independent observation only. Native snapping, endpoints and
+            # concurrent cursor changes do not imply the requested time survives.
+            observed = verified_readback(PROFILER_GET_CURSOR_TIME_URI, {"cursor": "user"}, version=version)
+            observed_time = observed.get("return")
+            valid_observed_time = type(observed_time) is int and observed_time >= -1
+            check("Profiler user-cursor read returned an available time or the unavailable sentinel", valid_observed_time,
+                {"observed_time_ms": observed_time})
+            observation = {"kind": "profiler-user-cursor-observation", "returned_time_ms": returned_time,
+                "observed_time_ms": observed_time, "capture_data_verified": False,
+                "outcome": "malformed"}
+            if valid_observed_time and all(item["passed"] for item in assertions):
+                if returned_time == -1 or observed_time == -1:
+                    success_status = "result_schema_checked"
+                    observation["outcome"] = "unavailable"
+                else:
+                    matches = returned_time == observed_time
+                    observation["outcome"] = "matched" if matches else "changed"
+                    check("Independent user-cursor time matches the control's returned snapped time", matches,
+                        {"returned_time_ms": returned_time, "observed_time_ms": observed_time})
+                    business_state_verified = matches and all(item["passed"] for item in assertions)
+            readbacks.append(observation)
+    elif kind == "transport-action-state":
+        from .transport_action import expected_state, snapshot as transport_action_snapshot
+        uri, version, action = plan.get("uri"), plan.get("version"), plan.get("action")
+        before = plan.get("before")
+        if (uri != TRANSPORT_EXECUTE_ACTION_URI or not isinstance(version, str)
+                or action not in {"play", "stop", "pause", "playStop", "playDirectly"}
+                or not isinstance(before, Mapping) or not isinstance(before.get("targets"), list)):
+            raise OperationContractError("INVALID_PREVIEW", "Transport action lacks its bound URI/version/action/targets.")
+        business_state_verified = False
+        success_status = "result_schema_checked"
+        verification_strength = "bounded_transport_state_observation"
+        check_result_schema(uri, version)
+        args = {"action": "stop", **({"transport": plan["transport_id"]} if "transport_id" in plan else {})}
+        def action_read(uri, args, options):
+            return verified_readback(uri, args, version=version)
+        try:
+            current = transport_action_snapshot(args, version=version, read=action_read)
+        except OperationContractError:
+            raise
+        except (ValueError, SemanticValidationError) as exc:
+            check("Transport target associations remain observable", False, {"error": str(exc)})
+            current = {"scope": before.get("scope"), "targets": []}
+        expected_rows = [{key: row[key] for key in ("transport", "object", "gameObject")} for row in before["targets"]]
+        same_targets = expected_rows == current["targets"] and before.get("scope") == current.get("scope")
+        check("Transport target associations match the bounded Preview scope", same_targets,
+            {"before": expected_rows, "observed": current["targets"]})
+        observation = {"kind": "transport-action-observation", "action": action,
+            "scope": before.get("scope"), "membership_matches": same_targets, "targets": []}
+        if same_targets:
+            for target in before["targets"]:
+                native_id = target["transport"]
+                observed = verified_readback(TRANSPORT_GET_STATE_URI, {"transport": native_id}, version=version)
+                state = observed.get("state")
+                expected, unresolved = expected_state(action, target)
+                valid_state = isinstance(state, str) and state in TRANSPORT_STATES
+                check("Selected transport has a valid observed state", valid_state, {"transport": native_id, "state": state})
+                outcome = ("malformed" if not valid_state else "semantics_unresolved" if unresolved else
+                    "matched" if state == expected else "transient_play_unobserved" if expected == "playing" else "different_state")
+                if outcome == "different_state":
+                    check("Selected transport matches the requested state at observation", False,
+                        {"transport": native_id, "expected": expected, "observed": state})
+                observation["targets"].append({"transport": native_id, "before_state": target.get("state"),
+                    "expected_state": expected, "observed_state": state, "outcome": outcome,
+                    **({"unresolved": unresolved} if unresolved else {})})
+        readbacks.append(observation)
+        business_state_verified = (bool(observation["targets"]) and same_targets
+            and all(row["outcome"] == "matched" for row in observation["targets"])
+            and all(item["passed"] for item in assertions))
+        success_status = "verified" if business_state_verified else "result_schema_checked"
     elif kind == "transport-created":
         uri = plan.get("uri")
         version = plan.get("version")
-        if uri != TRANSPORT_CREATE_URI or not isinstance(version, str):
+        expected_object = plan.get("expected_object_id")
+        expected_game_object = plan.get("expected_game_object_id")
+        if (
+            uri != TRANSPORT_CREATE_URI
+            or not isinstance(version, str)
+            or not isinstance(expected_object, str)
+            or _PLUGIN_GUID.fullmatch(expected_object) is None
+            or ("expected_game_object_id" in plan and (
+                type(expected_game_object) is not int
+                or not 0 <= expected_game_object <= 0xFFFFFFFFFFFFFFFF
+            ))
+        ):
             raise OperationContractError(
                 "INVALID_PREVIEW",
-                "Transport creation verification lacks a valid uri/version.",
+                "Transport creation verification lacks its URI, version, selected object GUID, or explicit Game Object ID.",
             )
         check_result_schema(uri, version)
         transport_id = _execution_payload(execution_result).get("transport")
@@ -15560,6 +20377,23 @@ def verify_prepared_operation(
                 list_shape_ok and len(matches) == 1,
                 {"transport": transport_id, "matches": matches},
             )
+            if list_shape_ok and len(matches) == 1:
+                actual_object = matches[0].get("object")
+                check(
+                    "created transport controls the selected object GUID",
+                    isinstance(actual_object, str)
+                    and _PLUGIN_GUID.fullmatch(actual_object) is not None
+                    and _same_identity(actual_object, expected_object),
+                    {"expected": expected_object, "actual": actual_object},
+                )
+                if "expected_game_object_id" in plan:
+                    actual_game_object = matches[0].get("gameObject")
+                    check(
+                        "created transport uses the explicit Game Object ID",
+                        type(actual_game_object) is int
+                        and actual_game_object == expected_game_object,
+                        {"expected": expected_game_object, "actual": actual_game_object},
+                    )
             transport_state = verified_readback(
                 TRANSPORT_GET_STATE_URI,
                 {"transport": transport_id},
@@ -15967,9 +20801,17 @@ def verify_prepared_operation(
             "readback_fields",
             "readback_view",
         }
+        expected_name_policy = plugin_name_policy(descriptor, version=version)
+        if "space_substitution" in expected_name_policy:
+            base_plan_fields.add("name_binding")
+            if plan.get("name_binding") != expected_name_policy:
+                raise OperationContractError("INVALID_PREVIEW", "Plug-in name acceptance must match the immutable version and placement.")
+        default_evidence = plan.get("new_object_default_evidence", [])
+        if default_evidence:
+            base_plan_fields.add("new_object_default_evidence")
         if descriptor.kind == "source" or descriptor.placement == "shareset":
-            expected_plan_fields = base_plan_fields
-            expected_placement_kind = "effect_shareset_child" if descriptor.placement == "shareset" else "source_child"
+            expected_plan_fields = base_plan_fields | ({"preexisting_children"} if descriptor.placement == "shareset" else set())
+            expected_placement_kind = f"{descriptor.kind}_shareset_child" if descriptor.placement == "shareset" else "source_child"
             placement_shape_matches = (
                 placement.get("collection") == "children"
             )
@@ -16066,6 +20908,7 @@ def verify_prepared_operation(
                 target_id=target_id,
                 descriptor=descriptor,
                 placement=placement,
+                version=version,
             )
         except OperationContractError as exc:
             check(
@@ -16081,8 +20924,41 @@ def verify_prepared_operation(
         )
 
         created_id = result_binding["created_id"]
+        if descriptor.placement == "shareset":
+            # Native success and the new object's readback cannot establish
+            # preservation of the independent Work Unit children.
+            before = plan.get("preexisting_children")
+            if not isinstance(before, list) or not all(isinstance(row, Mapping) for row in before):
+                raise OperationContractError("INVALID_PREVIEW", "ShareSet preservation pre-state is malformed.")
+            after_rows = read_direct_children(object_id=target_id, fields=("id", "name", "type", "parent"))
+            try:
+                after = []
+                for row in after_rows:
+                    child_id = _plugin_guid(row.get("id"), field="shareset_child.id")
+                    parent_id = _plugin_guid(row.get("parent"), field="shareset_child.parent")
+                    if not _same_identity(parent_id, target_id) or not isinstance(row.get("name"), str) or not isinstance(row.get("type"), str):
+                        raise OperationContractError("INVALID_READBACK", "ShareSet child ownership is malformed.")
+                    after.append({"id": child_id, "name": row["name"], "type": row["type"], "parent": parent_id})
+                created_rows = [row for row in after if _same_identity(row["id"], created_id)]
+                if len(created_rows) != 1:
+                    raise OperationContractError("INVALID_READBACK", "Created ShareSet must occur exactly once in its complete parent roster.")
+                actual_name = created_rows[0]["name"]
+                try:
+                    bind_plugin_name(descriptor, version=version, actual_name=actual_name)
+                except PluginOperationContractError as exc:
+                    raise OperationContractError("PLUGIN_READBACK_MISMATCH", str(exc), details=exc.as_dict()) from exc
+                if result_binding["created"].get("name", actual_name) != actual_name:
+                    raise OperationContractError("PLUGIN_READBACK_MISMATCH", "Returned and independently observed ShareSet names disagree.")
+                result_binding["observed_name"] = actual_name
+                expected = [dict(row) for row in before] + [{"id": created_id, "name": actual_name, "type": descriptor.object_type, "parent": target_id}]
+                order = lambda row: row["id"].casefold()
+                preserved = sorted(after, key=order) == sorted(expected, key=order)
+            except OperationContractError as exc:
+                check("ShareSet creation preserves every unrelated child", False, exc.as_dict())
+            else:
+                check("ShareSet creation preserves every unrelated child", preserved, {"expected": expected, "actual": after})
         expected_parent_id = target_id
-        if expected_placement_kind in {"source_child", "effect_shareset_child"}:
+        if expected_placement_kind == "source_child" or descriptor.placement == "shareset":
             plugin_id = created_id
             placement_evidence: dict[str, Any] = {
                 "kind": expected_placement_kind
@@ -16165,6 +21041,36 @@ def verify_prepared_operation(
         )
         if len(plugin_rows) != 1:
             return _verification(operation, assertions, readbacks)
+        actual_plugin_id = plugin_rows[0].get("id")
+        exact_plugin_id = (isinstance(actual_plugin_id, str)
+            and _PLUGIN_GUID.fullmatch(actual_plugin_id) is not None
+            and _same_identity(actual_plugin_id, plugin_id))
+        check("created plug-in exact readback retains its resolved GUID", exact_plugin_id,
+              {"expected_id": plugin_id, "actual_id": actual_plugin_id})
+        if not exact_plugin_id:
+            return _verification(operation, assertions, readbacks)
+        bound_name = result_binding.get("observed_name", result_binding["created"].get("name"))
+        if descriptor.placement == "shareset":
+            check("created ShareSet name agrees across native result and independent reads",
+                  bound_name is not None and plugin_rows[0].get("name") == bound_name,
+                  {"returned_name": result_binding["created"].get("name"), "roster_name": result_binding.get("observed_name"),
+                   "readback_name": plugin_rows[0].get("name")})
+        if default_evidence:
+            fields = _dedupe_fields(["id", *("@" + requirement["name"]
+                for item in default_evidence for requirement in item["requirements"])])
+            condition_rows = read_object(object_id=plugin_id, fields=fields,
+                                         language=descriptor.language, platform=descriptor.platform)
+            exact = len(condition_rows) == 1 and _same_identity(condition_rows[0].get("id"), plugin_id)
+            for item in default_evidence:
+                for requirement in item["requirements"]:
+                    name = requirement["name"]
+                    row = condition_rows[0] if exact else {}
+                    expected = requirement["effective_value"]
+                    passed = (_reference_requirement_matches(row, name, expected)
+                              if requirement["kind"] == "reference" else
+                              _has_field(row, name) and condition_values_equal(_field_value(row, name), expected))
+                    check(f"created plug-in prerequisite {name} is independently verified", exact and passed,
+                          {"expected": expected, "rows": condition_rows})
         try:
             evidence = verify_created_plugin_row(
                 descriptor,
@@ -16199,6 +21105,41 @@ def verify_prepared_operation(
         if not isinstance(raw_specs, list) or not all(isinstance(row, Mapping) for row in raw_specs):
             raise OperationContractError("INVALID_PREVIEW", "Object graph verification nodes are malformed.")
         specs = [dict(row) for row in raw_specs]
+        history_graph = False
+        owned_stage_identities = None
+        if pre_state.get("owned_result_stages"):
+            from .owned_result_stages import validate as validate_owned_stages
+            try:
+                owned_stage_identities = validate_owned_stages(prepared, execution_result, context=compound_phase_path_context)
+            except (ValueError, KeyError, TypeError, StopIteration, SemanticValidationError) as exc:
+                check("Actual owned result stages match their immutable declaration and independent observations", False, {"error": str(exc)})
+            else:
+                check("Actual owned result stages match their immutable declaration and independent observations", True,
+                    {"sha256": canonical_sha256(execution_result['owned_result_execution'])})
+            if kind in {"object-create-graph", "object-set-batch"}:
+                from .creation_observations import ordinary_staged_creation_graphs
+                try:
+                    ordinary_staged_creation_graphs(plan, pre_state)
+                except ValueError:
+                    pass
+                else:
+                    history_graph = True
+        if kind == "object-create-graph" and not pre_state.get("owned_result_stages") and len(specs) > 1:
+            from .creation_observations import ordinary_creation_graph
+            try:
+                ordinary_creation_graph(plan, pre_state or {}, parent=prepared.get("resolved_roles", {}).get("parent", {}).get("row"))
+            except ValueError:
+                pass  # Richer unions retain their existing source verifier.
+            else:
+                history_graph = True
+        renamed_owner_rows = {}
+        def read_renamed_owner(object_id):
+            if object_id not in renamed_owner_rows:
+                observations = read_object(object_id=object_id, fields=IDENTITY_RETURN_FIELDS)
+                if len(observations) != 1 or not _same_identity(observations[0].get("id"), object_id):
+                    raise ValueError("Renamed List owner must retain its exact GUID")
+                renamed_owner_rows[object_id] = observations[0]
+            return renamed_owner_rows[object_id]
         verified_import_direct_child_ids: dict[str, set[str]] = {}
         object_set_originals_root: str | None = None
         if kind == "object-set-batch" and any(
@@ -16223,7 +21164,16 @@ def verify_prepared_operation(
         result_nodes: tuple[ObjectResultNode, ...] = ()
         result_by_path: dict[str, ObjectResultNode] = {}
         try:
-            if kind == "object-create-graph":
+            if owned_stage_identities is not None:
+                # Project the validated business association roster, never a
+                # synthetic merged native response. Every native stage stays
+                # separately retained in owned_result_execution.
+                result_by_path = {spec['request_path']: ObjectResultNode(spec['request_path'], spec.get('parent_request_path'),
+                    owned_stage_identities[spec['request_path']]['id'], owned_stage_identities[spec['request_path']]['name'],
+                    len([child for child in specs if child.get('parent_request_path') == spec['request_path']]), spec.get('collection'))
+                    for spec in specs}
+                result_nodes = tuple(result_by_path.values())
+            elif kind == "object-create-graph":
                 result_nodes = flatten_create_result(payload)
                 result_by_path = {row.request_path: row for row in result_nodes}
             else:
@@ -16239,10 +21189,66 @@ def verify_prepared_operation(
                     payload,
                     allowed_lists=raw_list_names,
                 )
+                observed_rtpcs, observed_owned_controls = {}, {}
+                if any(spec.get("rtpc_binding") for spec in specs):
+                    for result_node in result_nodes:
+                        if result_node.collection == "RTPC":
+                            observations = read_object(object_id=result_node.object,
+                                fields=("id", "name", "type", "path", "classId", "owner", "notes", "PropertyName", "ControlInput", "Curve"))
+                            if len(observations) != 1 or not _same_identity(observations[0].get("id"), result_node.object):
+                                raise ObjectOperationContractError("INVALID_READBACK", "Returned RTPC must resolve by its exact GUID once")
+                            observed_rtpcs[result_node.object] = observations[0]
+                            if any(spec.get("owned_control_input") for spec in specs):
+                                control_id = _reference_identity(_field_value(observations[0], "ControlInput"))
+                                platforms = {spec["owned_control_input"].get("platform") for spec in specs if spec.get("owned_control_input")}
+                                for platform in platforms if _valid_object_id(control_id) else ():
+                                    if (control_id, platform) in observed_owned_controls:
+                                        continue
+                                    fields = ["id", "name", "type", "classId", "owner", "notes", *sorted({
+                                        name for spec in specs for name in spec.get("owned_control_input", {}).get("properties", {})})]
+                                    control_rows = read_object(object_id=control_id, fields=fields, platform=platform)
+                                    if len(control_rows) != 1 or not _same_identity(control_rows[0].get("id"), control_id):
+                                        raise ObjectOperationContractError("INVALID_READBACK", "Owned ControlInput must resolve by its exact GUID once")
+                                    observed_owned_controls[(control_id, platform)] = control_rows[0]
+                def observe_anonymous(owner_id, owner_spec, children):
+                    # Native List order, not returned association order or post
+                    # values, assigns stable declaration identities.
+                    anonymous = [child for child in children if child.get("anonymous_list_member")]
+                    collections = {child.get("collection") for child in anonymous}
+                    if (not collections <= {"Effects", "Markers"} or any(child.get("collection") == "Markers"
+                            and not isinstance(child.get("manual_marker"), Mapping) for child in anonymous)):
+                        raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results require their sealed List profile")
+                    bound_ids = {}
+                    for collection in sorted(collections):
+                        guards = [guard for guard in pre_state.get("documented_list_guards", [])
+                            if _same_identity(guard["evidence"]["scope"]["scope_value"], owner_id)
+                            and guard["evidence"]["declaration"]["name"] == collection]
+                        planned = [guard for guard in pre_state.get("documented_planned_list_guards", [])
+                            if guard["binding"]["planned_owner"]["request_path"] == owner_spec["request_path"]
+                            and guard["binding"]["declaration"]["name"] == collection]
+                        if len(guards) + len(planned) != 1:
+                            raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results need one exact source List proof")
+                        before = (guards[0] if guards else planned[0].get("before") or {"members": []})["members"]
+                        old_ids = [_identity_key(member["id"]) for member in before]
+                        replacement = owner_spec.get("list_mode", "append") == "replaceAll"
+                        prefix = [] if replacement else old_ids
+                        rows = read_object(object_id=owner_id, fields=("id", "@" + collection), platform=owner_spec.get("platform"))
+                        members = rows[0].get("@" + collection) if len(rows) == 1 and _same_identity(rows[0].get("id"), owner_id) else None
+                        ids = [_reference_identity(member) for member in members] if isinstance(members, list) and len(members) <= OBJECT_LIST_MAX_SUBTREE_NODES else []
+                        reviewed = [child for child in children if child.get("collection") == collection]
+                        if (len(ids) != len(prefix) + len(reviewed) or any(not _valid_object_id(identity) for identity in ids)
+                                or len({_identity_key(identity) for identity in ids}) != len(ids)
+                                or [_identity_key(identity) for identity in ids[:len(prefix)]] != prefix
+                                or any(_identity_key(identity) in old_ids for identity in ids[len(prefix):])):
+                            raise ObjectOperationContractError("ANONYMOUS_LIST_MEMBERSHIP_MISMATCH", "Anonymous creation requires the complete new ordered GUID population and preserved append prefix")
+                        bound_ids.update({child["request_path"]: identity for child, identity in zip(reviewed, ids[len(prefix):], strict=True)
+                            if child.get("anonymous_list_member")})
+                    return bound_ids
+
                 result_by_path = _bind_object_set_result_nodes(
-                    result_nodes,
-                    specs,
-                    on_name_conflict=str(plan.get("on_name_conflict")),
+                    result_nodes, specs, on_name_conflict=str(plan.get("on_name_conflict")),
+                    observed_rtpcs=observed_rtpcs, observed_owned_controls=observed_owned_controls, observe_anonymous=observe_anonymous,
+                    observe_owned_reference=lambda owner, field: _observe_owned_reference_result(owner, field, read=read_call, readbacks=readbacks),
                 )
         except ObjectOperationContractError as exc:
             assertion_name = (
@@ -16276,6 +21282,7 @@ def verify_prepared_operation(
                 )
         spec_by_path = {str(row.get("request_path")): row for row in specs}
         resolved_id_by_path: dict[str, Any] = {}
+        observed_row_by_path: dict[str, Mapping[str, Any]] = {}
         for spec in specs:
             request_path = str(spec.get("request_path"))
             result_node = result_by_path.get(request_path)
@@ -16314,6 +21321,12 @@ def verify_prepared_operation(
                 )
             fields = _object_spec_return_fields(spec)
             platform = spec.get("platform")
+            history_view = (pre_state or {}).get("field_read_platform", {})
+            history_fields = ((kind == "object-create-graph" or history_graph)
+                and history_view.get("status") == "certified")
+            if history_fields:
+                fields = _dedupe_fields([*fields, "classId"])
+                platform = history_view["platform_id"]
             if platform is not None and (not isinstance(platform, str) or not platform):
                 raise OperationContractError(
                     "INVALID_PREVIEW",
@@ -16328,16 +21341,20 @@ def verify_prepared_operation(
                     "INVALID_PREVIEW",
                     "Object graph verification language is malformed.",
                 )
+            source_read_language = (spec["source_language"]["selected"]["name"] if "source_language" in spec else None)
             rows = read_object(
                 object_id=object_id,
                 fields=fields,
-                language=_localized_import_read_language(requested_language),
+                language=source_read_language if "source_plugin" in spec else None if "construction_language" in spec else _localized_import_read_language(requested_language),
                 platform=platform,
             )
             check(f"{request_path} GUID resolves exactly once", len(rows) == 1, rows)
             if len(rows) != 1:
                 continue
             row = rows[0]
+            observed_row_by_path[request_path] = row
+            if history_graph:
+                readbacks[-1] = {**readbacks[-1], "role": "created-node-history-source", "request_path": request_path}
             check(
                 f"{request_path} readback GUID matches the result",
                 _same_identity(row.get("id"), object_id),
@@ -16345,18 +21362,30 @@ def verify_prepared_operation(
             )
             check(
                 f"{request_path} reflected type matches the live-resolved request type",
-                _object_type_matches(row.get("type"), spec),
-                {"requested": spec.get("requested_type"), "canonical": spec.get("canonical_type"), "actual": row.get("type")},
+                _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")),
+                {"requested": spec.get("requested_type"), "canonical": spec.get("canonical_type"), "actual": row.get("type"),
+                    "expected_class": spec.get("class_id"), "actual_class": row.get("classId")},
             )
             returned_name = result_node.name if result_node is not None else None
             effective_conflict = spec.get(
                 "on_name_conflict",
                 plan.get("on_name_conflict"),
             )
-            if effective_conflict == "rename" and (
-                spec.get("existing_target") is not True
-                or spec.get("original_name") != spec.get("requested_name")
-            ):
+            if spec.get("inner_identity") is not None:
+                from .documented_list_fields import inner_result_candidate
+                name_ok = (result_node is not None and row.get("name") == returned_name
+                    and inner_result_candidate(spec, object_id, returned_name) is True)
+                owner_spec = spec_by_path.get(spec.get("parent_request_path"), {})
+                old_ids = [member['id'] for snapshot in owner_spec.get('list_snapshots', [])
+                    if snapshot['list'] == spec.get('collection') for member in snapshot['rows']]
+                check(f"{request_path} fresh Inner GUID is outside the sealed List pre-state",
+                    spec.get('preexisting_id') is not None or not any(_same_identity(object_id, old) for old in old_ids),
+                    {"actual": object_id, "retained_ids": old_ids})
+            elif owned_stage_identities is not None and spec.get("existing_target") is not True:
+                # Native conflict naming is certified by the owned GUID/name
+                # association, never a guessed prefix or suffix convention.
+                name_ok = row.get("name") == owned_stage_identities[request_path]["name"] == returned_name
+            elif effective_conflict == "rename" and spec.get("existing_target") is not True:
                 actual_name = row.get("name")
                 requested_name = spec.get("requested_name")
                 name_ok = (
@@ -16375,6 +21404,13 @@ def verify_prepared_operation(
                 name_ok = row.get("name") == spec.get("requested_name") and (
                     result_node is None or row.get("name") == returned_name
                 )
+            if (compound_path_context and compound_phase_path_context is not None
+                    and kind == 'object-set-batch' and spec.get('existing_target') is True
+                    and spec.get('requested_name') == spec.get('original_name')):
+                from .object_graph_paths import project_compound_snapshot
+                final_name = project_compound_snapshot(spec['pre_state'], compound_path_context)['name']
+                phase_name = project_compound_snapshot(spec['pre_state'], compound_phase_path_context)['name']
+                name_ok = row.get('name') == final_name and (result_node is None or returned_name == phase_name)
             check(
                 f"{request_path} name follows the reviewed conflict policy",
                 name_ok,
@@ -16398,7 +21434,28 @@ def verify_prepared_operation(
             else:
                 expected_parent_id = spec.get("expected_parent_id")
             if expected_parent_id is not None:
+                if spec.get("owned_control_input"):
+                    control_id = _reference_identity(_field_value(row, "ControlInput"))
+                    if _valid_object_id(control_id):
+                        owned_assertions, owned_reads = _owned_control_input_assertions(spec["owned_control_input"],
+                            rtpc_id=object_id, control_id=control_id, read=read_call, owner_id=expected_parent_id,
+                            baseline_ids=_rtpc_baseline_identities(spec.get("rtpc_list_guard", {}).get("before", [])))
+                        assertions.extend(owned_assertions)
+                        readbacks.extend(owned_reads)
+                    else:
+                        check("new ControlInput exposes a canonical GUID", False, row)
                 collection = spec.get("collection")
+                if collection == "ControlInput":
+                    fact = pre_state.get("planned_reference_context", {}).get("facts", {}).get(request_path, {})
+                    identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
+                    assertions.append({"name": "owned ControlInput occurrence is independently bound",
+                        "kind": "verified_owned_control_input_identity", "passed": bool(fact
+                            and _same_identity(row.get("id"), object_id) and name_ok
+                            and _object_class_matches(row.get("classId"), fact["class_id"])
+                            and row.get("type") == fact["type"]
+                            and _same_identity(_reference_identity(row.get("owner")), expected_parent_id)),
+                        "evidence": {"result_handle": fact.get("result_handle"), "request_path": request_path,
+                            "object": identity, "class_id": row.get("classId"), "owner_id": expected_parent_id}})
                 if collection not in {None, "children"}:
                     actual_owner = _reference_identity(row.get("owner"))
                     check(
@@ -16412,24 +21469,106 @@ def verify_prepared_operation(
                         _same_identity(_parent_value(row.get("parent")), expected_parent_id),
                         {"expected": expected_parent_id, "actual": _parent_value(row.get("parent"))},
                     )
+            if spec.get("owned_control_input_replacement"):
+                proof = spec["owned_control_input_replacement"]
+                control_id = _reference_identity(_field_value(row, "ControlInput"))
+                if _valid_object_id(control_id):
+                    owned_assertions, owned_reads = _owned_control_input_assertions(proof, rtpc_id=object_id,
+                        control_id=control_id, read=read_call, owner_id=proof["owner_id"],
+                        baseline_ids=_rtpc_baseline_identities(proof["baseline_rows"]))
+                    assertions.extend(owned_assertions)
+                    readbacks.extend(owned_reads)
+                else:
+                    check("replacement ControlInput exposes a canonical GUID", False, row)
             expected_path = spec.get("expected_path")
+            if owned_stage_identities and not spec.get('existing_target'):
+                from .object_graph_paths import project_compound_path
+                expected_path = project_compound_path(owned_stage_identities[request_path]['path'], compound_path_context)
+            if kind == 'object-create-graph' and compound_path_context and not pre_state.get('owned_result_stages'):
+                from .creation_observations import ordinary_creation_graph
+                from .object_graph_paths import project_compound_path
+                _, original_paths = ordinary_creation_graph(plan, pre_state,
+                    parent=prepared['resolved_roles']['parent']['row'])
+                expected_path = project_compound_path(original_paths[request_path], compound_path_context)
+            if (spec.get("preexisting_id") is not None and spec.get("collection") not in {None, "children"}
+                    and isinstance(spec.get("pre_state"), Mapping)):
+                from .object_graph_paths import expected_snapshot
+                try:
+                    expected_path = expected_snapshot(dict(spec["pre_state"]), edits=specs,
+                        read_row=read_renamed_owner)["path"]
+                except (ValueError, KeyError, TypeError) as exc:
+                    check(f"{request_path} existing List path intent is bound", False, {"error": str(exc)})
+            if isinstance(spec.get("ancestor_rename_path_guard"), Mapping):
+                from .object_graph_paths import verify_ancestor_path_guard
+                try:
+                    path_ok, expected_path, path_evidence = verify_ancestor_path_guard(
+                        spec["ancestor_rename_path_guard"], edits=specs, read=read_call)
+                except (ValueError, KeyError, TypeError, OperationContractError) as exc:
+                    path_ok, path_evidence = False, {"error": str(exc)}
+                check(f"{request_path} exact GUID ancestry and requested rename paths match", path_ok, path_evidence)
+            if compound_path_context and kind == 'object-set-batch' and isinstance(spec.get('pre_state'), Mapping):
+                from .object_graph_paths import project_compound_snapshot
+                expected_path = project_compound_snapshot(spec['pre_state'], compound_path_context)['path']
             if isinstance(expected_path, str):
                 check(
                     f"{request_path} exact path matches",
                     row.get("path") == expected_path,
                     {"expected": expected_path, "actual": row.get("path")},
                 )
+            stage_record = pre_state.get("voice_source_staging", {}).get("record", {})
+            staged_voice_root = (kind == "object-set-batch" and stage_record.get("stage") == "voice"
+                and request_path == "$.objects[0].children[0]" and len(specs) == 2
+                and not spec.get("existing_target") and not spec.get("preexisting_id"))
+            if ((kind == "object-create-graph" and parent_request_path is None and not spec.get("preexisting_id"))
+                    or staged_voice_root):
+                identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
+                relation = ("owner" if spec.get("collection") not in {None, "children"} else "parent")
+                identity_ok = (
+                    result_node is not None and _same_identity(row.get("id"), object_id)
+                    and _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")) and name_ok
+                    and _same_identity(_reference_identity(row.get(relation)), expected_parent_id)
+                    and (expected_path is None or row.get("path") == expected_path)
+                    and all(isinstance(identity[key], str) and identity[key] for key in ("name", "type", "path"))
+                )
+                assertions.append({"name": "created root identity is independently verified",
+                    "kind": "verified_created_root_identity", "passed": bool(identity_ok), "evidence": identity})
+                if identity_ok and history_fields and len(specs) == 1:
+                    created_history_metadata.append((spec, object_id))
+            if (history_graph or owned_stage_identities is not None or spec.get("inner_identity")) and not spec.get("preexisting_id") and not spec.get("existing_target"):
+                identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
+                identity_ok = (result_node is not None and _same_identity(row.get("id"), object_id)
+                    and type(row.get("classId")) is int and row["classId"] == spec.get("class_id")
+                    and _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")) and name_ok
+                    and _same_identity(_reference_identity(row.get('owner' if spec.get('collection') not in {None, 'children'} else 'parent')), expected_parent_id)
+                    and isinstance(row.get("notes"), str))
+                assertions.append({"name": ("created owned List member is independently verified" if spec.get("collection") not in {None, "children"} else "created hierarchy node is independently verified"),
+                    "kind": ("verified_created_list_member_identity" if spec.get("collection") not in {None, "children"} else "verified_created_node_identity"), "passed": bool(identity_ok),
+                    "evidence": {"request_path": request_path, "object": identity,
+                        **({"declaration_label": spec["requested_name"], "name_role": "declaration_label",
+                            "native_name": row.get("name")} if spec.get("inner_identity") else
+                            {"requested_name": spec.get("original_requested_name", spec["requested_name"])}),
+                        **({"result_handle": pre_state["planned_reference_context"]["facts"][request_path]["result_handle"]}
+                           if request_path in pre_state.get("planned_reference_context", {}).get("facts", {}) else {}),
+                        "class_id": row.get("classId"),
+                        **({"owner_id": expected_parent_id, "list_name": spec["collection"]} if spec.get("collection") not in {None, "children"}
+                           else {"parent_id": expected_parent_id})}})
+                if identity_ok and history_fields and history_graph:
+                    created_history_metadata.append((spec, object_id))
             if spec.get("notes_supplied") is True:
                 check(
                     f"{request_path} notes match",
                     row.get("notes") == spec.get("requested_notes"),
                     {"expected": spec.get("requested_notes"), "actual": row.get("notes")},
                 )
-            elif spec.get("existing_target") is True and isinstance(spec.get("pre_state"), Mapping):
+            elif (spec.get("existing_target") is True or spec.get("preexisting_id") is not None) and isinstance(spec.get("pre_state"), Mapping):
+                expected_notes = spec["pre_state"].get("notes")
+                if compound_path_context:
+                    from .object_graph_paths import project_compound_snapshot
+                    expected_notes = project_compound_snapshot(spec["pre_state"], compound_path_context).get("notes")
                 check(
                     f"{request_path} untouched notes remain unchanged",
-                    row.get("notes") == spec["pre_state"].get("notes"),
-                    {"expected": spec["pre_state"].get("notes"), "actual": row.get("notes")},
+                    row.get("notes") == expected_notes,
+                    {"expected": expected_notes, "actual": row.get("notes")},
                 )
             for field_spec in spec.get("properties", []):
                 if not isinstance(field_spec, Mapping):
@@ -16439,24 +21578,92 @@ def verify_prepared_operation(
                 expected = field_spec.get("value")
                 check(
                     f"{request_path}.{field_name} matches typed metadata",
-                    _typed_value_equal(actual, expected, str(field_spec.get("metadata_type", ""))),
+                    (_has_field(row, str(field_name)) and condition_values_equal(actual, expected))
+                    if field_spec.get("derived") else _typed_value_equal(actual, expected, str(field_spec.get("metadata_type", ""))),
                     {"expected": expected, "actual": actual, "metadata_type": field_spec.get("metadata_type")},
                 )
+            for evidence in spec.get("new_object_default_evidence", []):
+                for proof in evidence.get("override_applicability", []):
+                    from .override_applicability import proof_current
+                    check(f"{request_path} user-send override applicability remains valid",
+                        proof_current(proof, read=read_call, after_write=True), proof)
+                for rule in evidence.get("structural_visibility", []):
+                    from .new_object_defaults import structural_bus_proof_current
+                    check(f"{request_path} non-master bus class/source/parent proof remains valid",
+                        structural_bus_proof_current(rule["proof"], read=read_call, after_write=True), rule["proof"])
+                for requirement in evidence["requirements"]:
+                    name = requirement["name"]
+                    expected = requirement["effective_value"]
+                    if isinstance(expected, Mapping) and "planned_result_handle" in expected:
+                        continue
+                    passed = (_reference_requirement_matches(row, name, expected)
+                              if requirement["kind"] == "reference" else
+                              _has_field(row, name) and condition_values_equal(_field_value(row, name), expected))
+                    check(f"{request_path}.{name} creation prerequisite is independently verified", passed,
+                          {"expected": expected, "actual": _field_value(row, name), "source": requirement["source"]})
             for field_spec in spec.get("references", []):
                 if not isinstance(field_spec, Mapping):
                     continue
                 field_name = field_spec.get("name")
-                actual = _reference_identity(_field_value(row, str(field_name)))
+                if "target_request_path" in field_spec:
+                    continue
+                if "curve" in field_spec:
+                    curve = _field_value(row, str(field_name))
+                    curve_type = None
+                    curve_id = curve.get("id") if isinstance(curve, Mapping) else None
+                    # The embedded value cannot independently prove its class.
+                    # Only a canonical GUID permits a separate exact-ID read.
+                    if isinstance(curve_id, str) and _PLUGIN_GUID.fullmatch(curve_id):
+                        curve_rows = read_object(object_id=curve_id, fields=("id", "type"))
+                        curve_type = curve_rows[0].get("type") if len(curve_rows) == 1 and _same_identity(curve_rows[0].get("id"), curve_id) else None
+                    points = curve.get("points") if isinstance(curve, Mapping) else None
+                    check(f"{request_path}.{field_name} inline Curve class and points match",
+                          curve_type == "Curve" and _native_snapshot_equal(points, field_spec["curve"]["points"]),
+                          {"expected": field_spec["curve"], "actual": curve, "observed_type": curve_type})
+                    continue
+                # Only the exact certified constructor profile interprets its
+                # observed local singleton array. Native read evidence stays raw.
+                from .constructor_inputs import local_reference_value
+                reference_row = row
+                local_key = "@" + str(field_name)
+                if field_name not in row and "@@" + str(field_name) not in row and local_key in row:
+                    reference_row = {**row, local_key: local_reference_value(spec, field_name, row[local_key])}
+                actual = _reference_identity(_field_value(reference_row, str(field_name)))
                 check(
                     f"{request_path}.{field_name} reference matches",
-                    _same_identity(actual, field_spec.get("target_id")),
+                    _reference_requirement_matches(reference_row, str(field_name), field_spec.get("target_id")),
                     {"expected": field_spec.get("target_id"), "actual": actual},
                 )
+            if "source_plugin" in spec:
+                source_plan = spec["source_plugin"]
+                descriptor_row = dict(source_plan["descriptor"])
+                if platform is not None:
+                    descriptor_row["platform"] = platform
+                if "source_language" in spec:
+                    descriptor_row["language"] = source_read_language
+                descriptor = normalize_plugin_creation(descriptor_row)
+                projection = plugin_verification_fields(descriptor)
+                try:
+                    evidence = verify_created_plugin_row(descriptor,
+                        {field: row[field] for field in projection if field in row}, version=version,
+                        expected_parent_id=expected_parent_id, expected_owner_id=expected_parent_id,
+                        validated_properties=tuple(ValidatedPluginProperty(**item) for item in source_plan["property_validation"]),
+                        preexisting_plugin_ids=source_plan["preexisting_plugin_ids"],
+                        readback_view={"fields": list(projection), "language": descriptor.language, "platform": descriptor.platform},
+                        placement_evidence={"kind": "source_child"})
+                except PluginOperationContractError as exc:
+                    check(f"{request_path} Source plugin state and parent match the immutable plan", False, exc.as_dict())
+                else:
+                    check(f"{request_path} Source plugin state and parent match the immutable plan", True, evidence.as_dict())
             import_spec = spec.get("import")
-            if isinstance(import_spec, Mapping) or isinstance(
-                requested_language,
-                str,
-            ):
+            if "construction_language" in spec and not spec["construction_language"]["expected_sources"]:
+                children = read_direct_children(object_id=object_id, fields=IDENTITY_RETURN_FIELDS)
+                check(f"{request_path} empty Voice has no Source children", not children,
+                      {"expected": [], "children": children, "construction_language": spec["construction_language"]})
+                check(f"{request_path} empty Voice has an observed nil active Source",
+                      _has_field(row, "activeSource") and _reference_requirement_matches(row, "activeSource", None),
+                      {"present": _has_field(row, "activeSource"), "activeSource": _field_value(row, "activeSource")})
+            if isinstance(import_spec, Mapping) or (isinstance(requested_language, str) and "construction_language" not in spec):
                 raw_sources: list[Mapping[str, Any]] = []
                 if isinstance(import_spec, Mapping):
                     raw_import_sources = import_spec.get("sources")
@@ -16506,6 +21713,7 @@ def verify_prepared_operation(
                             read_languages.append(read_language)
 
                 grouped_candidates: dict[str | None, list[dict[str, Any]]] = {}
+                grouped_target_rows: dict[str | None, list[dict[str, Any]]] = {}
                 for read_language in read_languages:
                     target_rows = (
                         [row]
@@ -16517,6 +21725,7 @@ def verify_prepared_operation(
                             platform=platform,
                         )
                     )
+                    grouped_target_rows[read_language] = target_rows
                     language_rows = list(target_rows)
                     for target_row in target_rows:
                         active_source_id = _reference_identity(
@@ -16569,6 +21778,11 @@ def verify_prepared_operation(
                             }
                         )
                         language_rows.extend(_rows(descendant_result))
+                    for source_row in language_rows:
+                        if _object_type_token(source_row.get("type")) == "audiofilesource":
+                            check(f"{request_path} imported source class matches the sealed live class",
+                                _object_class_matches(source_row.get("classId"), import_spec.get("audio_source_class_id") if isinstance(import_spec, Mapping) else None),
+                                {"expected": import_spec.get("audio_source_class_id") if isinstance(import_spec, Mapping) else None, "actual": source_row.get("classId"), "id": source_row.get("id")})
                     grouped_candidates[read_language] = language_rows
 
                 candidate_rows: list[dict[str, Any]] = []
@@ -16842,6 +22056,7 @@ def verify_prepared_operation(
                                 for candidate in ancestor_chain
                                 if _object_type_token(candidate.get("type"))
                                 == _object_type_token(requested_source_type)
+                                and _object_class_matches(candidate.get("classId"), raw_source.get("requested_object_type_class_id"))
                                 and _import_created_name_matches(
                                     candidate.get("name"),
                                     expected_object_name,
@@ -16851,6 +22066,49 @@ def verify_prepared_operation(
                                     ),
                                 )
                             ]
+                            # Importing into an already-declared Sound creates
+                            # an AudioFileSource below that Sound. The ancestor
+                            # helper intentionally excludes the sealed target;
+                            # include it only with the exact active-source edge
+                            # in this source's language. Localized accessors
+                            # differ, but the separately read target identity
+                            # must still match the verified base-language row.
+                            source_read_language = (
+                                _localized_import_read_language(requested_source_language)
+                                if requested_source_language is not None
+                                else base_read_language
+                            )
+                            source_target_rows = grouped_target_rows[source_read_language]
+                            source_target = source_target_rows[0] if len(source_target_rows) == 1 else {}
+                            target_sound_matches = (
+                                _object_type_token(requested_source_type) == "sound"
+                                and _object_type_token(source_target.get("type")) == "sound"
+                                and _same_identity(source_target.get("id"), object_id)
+                                and _object_type_matches(source_target.get("type"), spec, actual_class_id=source_target.get("classId"))
+                                and _object_class_matches(source_target.get("classId"), raw_source.get("requested_object_type_class_id"))
+                                and source_target.get("name") == row.get("name")
+                                and isinstance(source_target.get("path"), str)
+                                and bool(source_target.get("path"))
+                                and source_target.get("path") == row.get("path")
+                                and _valid_object_id(_parent_value(source_target.get("parent")))
+                                and _same_identity(
+                                    _parent_value(source_target.get("parent")),
+                                    _parent_value(row.get("parent")),
+                                )
+                                and _import_created_name_matches(
+                                    source_target.get("name"), spec.get("requested_name"),
+                                    on_name_conflict=effective_conflict,
+                                )
+                                and len(ancestor_chain) == 1
+                                and _object_type_token(matched_row.get("type")) == "audiofilesource"
+                                and _same_identity(_parent_value(matched_row.get("parent")), object_id)
+                                and _same_identity(
+                                    _reference_identity(_field_value(source_target, "activeSource")),
+                                    matched_row.get("id"),
+                                )
+                            )
+                            if target_sound_matches:
+                                type_matches.append(source_target)
                             unique_type_ids = {
                                 _identity_key(candidate.get("id"))
                                 for candidate in type_matches
@@ -16869,6 +22127,9 @@ def verify_prepared_operation(
                                     "expected_object_name": expected_object_name,
                                     "matches": type_matches,
                                     "ancestor_chain": ancestor_chain,
+                                    "sealed_target_is_requested_sound": target_sound_matches,
+                                    "target_read_language": source_read_language,
+                                    "target_readback": source_target_rows,
                                 },
                             )
                         if type_ok and ancestor_chain:
@@ -16879,6 +22140,41 @@ def verify_prepared_operation(
                                     set(),
                                 ).add(_identity_key(direct_child_id))
 
+        for source_spec in specs:
+            source_path = str(source_spec["request_path"])
+            source_row = observed_row_by_path.get(source_path, {})
+            for evidence in source_spec.get("new_object_default_evidence", []):
+                for requirement in evidence["requirements"]:
+                    expected = requirement["effective_value"]
+                    if not isinstance(expected, Mapping) or "planned_result_handle" not in expected:
+                        continue
+                    target_path = expected["target_request_path"]
+                    target_id = resolved_id_by_path.get(target_path)
+                    check(f"{source_path}.{requirement['name']} planned creation prerequisite matches its actual GUID",
+                        isinstance(target_id, str) and _PLUGIN_GUID.fullmatch(target_id) is not None and target_path in observed_row_by_path
+                        and _reference_requirement_matches(source_row, requirement["name"], target_id),
+                        {"target_path": target_path, "expected_id": target_id, "actual": _field_value(source_row, requirement["name"])})
+            for condition in source_spec.get("reference_target_conditions", []):
+                if condition.get("kind") != "planned_reference_parent":
+                    continue
+                context = pre_state["planned_reference_context"]
+                target_path = context["handles"].get(condition["target_id"])
+                parent_path = context["handles"].get(condition["parent_id"])
+                target_row = observed_row_by_path.get(target_path, {})
+                parent_id = resolved_id_by_path.get(parent_path) if parent_path else condition["parent_id"]
+                check(f"{source_path}.{condition['reference']} actual target retains its chosen controlling parent",
+                    isinstance(parent_id, str) and _PLUGIN_GUID.fullmatch(parent_id) is not None and bool(target_row)
+                    and _same_identity(_reference_identity(target_row.get("parent")), parent_id),
+                    {"target_path": target_path, "expected_parent_id": parent_id, "actual_parent": target_row.get("parent")})
+            for reference in source_spec.get("references", []):
+                if "target_request_path" not in reference:
+                    continue
+                target_path = reference["target_request_path"]
+                target_id = resolved_id_by_path.get(target_path)
+                check(f"{source_path}.{reference['name']} references the exact independently verified graph result",
+                    isinstance(target_id, str) and _PLUGIN_GUID.fullmatch(target_id) is not None and target_path in observed_row_by_path
+                    and _reference_requirement_matches(source_row, reference["name"], target_id),
+                    {"target_request_path": target_path, "target_id": target_id, "actual": _field_value(source_row, reference["name"])})
         if kind == "object-create-graph" and plan.get("on_name_conflict") == "replace":
             replaced_rows = plan.get("replaced_subtree_rows")
             if (
@@ -17008,6 +22304,9 @@ def verify_prepared_operation(
                 if collided_id is not None:
                     collided_rows = read_object(object_id=collided_id, fields=IDENTITY_RETURN_FIELDS)
                     expected_collision = dict(before_rows[0])
+                    if pre_state.get("owned_result_stages") and compound_path_context:
+                        from .object_graph_paths import project_compound_snapshot
+                        expected_collision = project_compound_snapshot(expected_collision, compound_path_context)
                     unchanged = len(collided_rows) == 1 and all(
                         (
                             _same_identity(
@@ -17024,7 +22323,20 @@ def verify_prepared_operation(
                         unchanged,
                         {"expected": expected_collision, "actual": collided_rows},
                     )
+        if deferred_render_chains:
+            from .effect_render_conditions import chain_assertions
+            assertions.extend(chain_assertions(deferred_render_chains, read=read_call, after_write=True,
+                edits=specs, resolved_ids=resolved_id_by_path, compound_path_context=compound_path_context))
+            render_association["passed"] = True
+        replaced_set_rows: list[Any] = []
         if kind == "object-set-batch":
+            for field in ("replaced_subtree_rows", "replaced_list_subtree_rows"):
+                rows = plan.get(field, [])
+                if not isinstance(rows, list):
+                    raise OperationContractError("INVALID_PREVIEW", "object.set replacement snapshots must be arrays.")
+                replaced_set_rows.extend(rows)
+        replaced_set_ids = {_identity_key(row.get("id")) for row in replaced_set_rows if isinstance(row, Mapping) and _valid_object_id(row.get("id"))}
+        if kind == "object-set-batch" or (kind == "object-create-graph" and plan.get("on_name_conflict") == "merge"):
             direct_specs_by_parent: dict[str, list[Mapping[str, Any]]] = {}
             for child_spec in specs:
                 if child_spec.get("collection") not in {None, "children"}:
@@ -17062,6 +22374,9 @@ def verify_prepared_operation(
                     for row in parent_spec.get("preexisting_children", [])
                     if isinstance(row, Mapping) and _valid_object_id(row.get("id"))
                 }
+                expected_ids.difference_update(replaced_set_ids)
+                expected_ids.update(_identity_key(root['object_id']) for root in compound_created_children
+                    if _same_identity(root['parent_id'], parent_id))
                 complete_expected = True
                 for child_spec in direct_specs_by_parent.get(parent_path, ()):
                     child_id = resolved_id_by_path.get(str(child_spec.get("request_path")))
@@ -17093,6 +22408,23 @@ def verify_prepared_operation(
                         "rows": actual_children,
                     },
                 )
+                requested_ids = {_identity_key(value) for value in resolved_id_by_path.values() if _valid_object_id(value)}
+                for before_child in parent_spec.get("preexisting_children", []):
+                    if not isinstance(before_child, Mapping) or _identity_key(before_child.get("id")) in requested_ids | replaced_set_ids:
+                        continue
+                    original_child = before_child
+                    if compound_path_context:
+                        from .object_graph_paths import project_compound_snapshot
+                        before_child = project_compound_snapshot(before_child, compound_path_context)
+                    matches = [row for row in actual_children if _same_identity(row.get("id"), before_child.get("id"))]
+                    unchanged = len(matches) == 1 and all(
+                        (_same_identity(_parent_value(matches[0].get(field)), _parent_value(before_child.get(field)))
+                         if field in {"id", "parent"} and before_child.get(field) is not None
+                         else matches[0].get(field) == before_child.get(field))
+                        for field in ("id", "name", "type", "parent", "notes", *(["path"] if kind == "object-create-graph" else [])) if field in before_child
+                    )
+                    check(f"{parent_path} unrequested pre-existing child identity and notes remain unchanged", unchanged,
+                          {"before": dict(original_child), "expected": dict(before_child), "after": matches})
         list_roots_by_owner: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
         for list_spec in specs:
             collection = list_spec.get("collection")
@@ -17100,6 +22432,7 @@ def verify_prepared_operation(
             if (
                 isinstance(collection, str)
                 and collection != "children"
+                and not list_spec.get("owned_reference")
             ):
                 if kind == "object-create-graph" and parent_path is None:
                     parent_path = "$create-parent"
@@ -17111,7 +22444,7 @@ def verify_prepared_operation(
                 ).append(list_spec)
         if kind == "object-set-batch":
             for owner_spec in specs:
-                if owner_spec.get("existing_target") is not True:
+                if not owner_spec.get("list_snapshots"):
                     continue
                 owner_path = owner_spec.get("request_path")
                 snapshots = owner_spec.get("list_snapshots", [])
@@ -17178,6 +22511,7 @@ def verify_prepared_operation(
                     if isinstance(row, Mapping) and _valid_object_id(row.get("id"))
                 }
             )
+            expected_ids.difference_update(replaced_set_ids)
             complete_expected = True
             for list_root_spec in list_root_specs:
                 object_id = resolved_id_by_path.get(
@@ -17204,6 +22538,7 @@ def verify_prepared_operation(
                 read=read_call,
                 platform=effective_platform,
                 context=f"object-list-verification[{owner_path}].{list_name}",
+                version=version,
             )
             actual_rows = _normalize_object_list_snapshot(
                 list_rows,
@@ -17211,6 +22546,38 @@ def verify_prepared_operation(
                 list_name=list_name,
             )
             readbacks.extend(list_readbacks)
+            documented = [guard for guard in pre_state.get("documented_list_guards", [])
+                if guard["evidence"]["scope"]["scope_value"] == owner_id
+                and guard["evidence"]["declaration"]["name"] == list_name
+                and "reference_targets" not in guard["evidence"]]
+            planned = [guard for guard in pre_state.get("documented_planned_list_guards", [])
+                if guard["binding"]["planned_owner"]["request_path"] == owner_path
+                and guard["binding"]["declaration"]["name"] == list_name]
+            if planned:
+                from .documented_list_fields import observe_planned_list
+                try:
+                    actual_planned = observe_planned_list(planned[0]["binding"], owner_id, read=read_call)
+                    check(f"{owner_path}.@{list_name} actual owner and member classes match the planned source", len(planned) == 1, actual_planned)
+                except (ValueError, KeyError, TypeError) as exc:
+                    check(f"{owner_path}.@{list_name} actual owner and member classes match the planned source", False, {"error": str(exc)})
+            if documented or planned:
+                if len(documented) + len(planned) != 1:
+                    raise OperationContractError("INVALID_PREVIEW", "Ordered List verification requires one exact source guard")
+                before_proof = documented[0] if documented else planned[0].get("before") or {"members": []}
+                expected_order = ([] if list_mode == "replaceAll" else
+                    [row["id"] for row in before_proof["members"]
+                     if _identity_key(row["id"]) not in replaced_set_ids])
+                for list_root_spec in list_root_specs:
+                    object_id = resolved_id_by_path.get(str(list_root_spec.get("request_path")))
+                    if _valid_object_id(object_id) and object_id not in expected_order:
+                        expected_order.append(object_id)
+                # The complete List reader preserves the exact owner accessor
+                # order. The normalized identity snapshot sorts GUIDs, so only
+                # the validated reader sequence can prove declaration order.
+                actual_order = [row["id"] for row in list_rows]
+                check(f"{owner_path}.@{list_name} ordered membership matches the reviewed declaration",
+                    complete_expected and actual_order == expected_order,
+                    {"expected": expected_order, "actual": actual_order})
             actual_ids = {_identity_key(row["id"]) for row in actual_rows}
             check(
                 f"{owner_path}.@{list_name} GUID set matches the reviewed {list_mode} operation",
@@ -17222,12 +22589,100 @@ def verify_prepared_operation(
                     "rows": actual_rows,
                 },
             )
+            if list_mode == "append":
+                requested_ids = {_identity_key(resolved_id_by_path[str(spec["request_path"])])
+                                 for spec in list_root_specs if str(spec["request_path"]) in resolved_id_by_path}
+                for before_member in before_rows:
+                    if _identity_key(before_member["id"]) in requested_ids | replaced_set_ids:
+                        continue
+                    matches = [row for row in actual_rows if _same_identity(row.get("id"), before_member["id"])]
+                    from .object_graph_paths import expected_snapshot
+                    try:
+                        expected_member_path = expected_snapshot(dict(before_member), edits=specs,
+                            read_row=read_renamed_owner)["path"]
+                    except (ValueError, KeyError, TypeError) as exc:
+                        check(f"{owner_path}.@{list_name} preserved path intent is bound", False, {"error": str(exc)})
+                        expected_member_path = None
+                    unchanged = len(matches) == 1 and all(
+                        (_same_identity(_parent_value(matches[0].get(field)), _parent_value(before_member.get(field)))
+                         if field in {"id", "parent", "owner"} and before_member.get(field) is not None
+                         else matches[0].get(field) == (expected_member_path if field == "path" else before_member.get(field)))
+                        for field in ("id", "name", "type", "path", "parent", "owner", "notes") if field in before_member
+                    )
+                    check(f"{owner_path}.@{list_name} unrequested member identity and notes remain unchanged", unchanged,
+                          {"before": dict(before_member), "after": matches})
+        for snapshot in pre_state.get("object_graph_guard", {}).get("field_snapshots", []):
+            if not snapshot.get("preserve_after_write"):
+                continue
+            from .object_graph_paths import expected_snapshot
+            expected = expected_snapshot(snapshot["rows"][0], edits=specs, read_row=read_renamed_owner)
+            for chain in pre_state.get("effect_render_chains", []):
+                for member in chain["snapshots"]:
+                    if _same_identity(member["object_id"], snapshot["object_id"]):
+                        for name, value in member["after_changes"].items():
+                            expected[name if name in expected else "@" + name] = value
+            selected_references = {}
+            observed_fields = {field.lstrip("@") for field in snapshot["fields"]}
+            for name in snapshot.get("reference_fields", []):
+                if _has_field(expected, name):
+                    value = _field_value(expected, name)
+                    selected_references[name] = None if _reference_value_is_null(value) else _reference_identity(value)
+            for node in specs:
+                if not _same_identity(node.get("target_id", node.get("preexisting_id")), snapshot["object_id"]):
+                    continue
+                for prop in node.get("properties", []):
+                    if prop["name"] in observed_fields:
+                        expected["@" + prop["name"]] = prop["value"]
+                for reference in node.get("references", []):
+                    if reference.get("condition_guard") or reference["name"] not in observed_fields:
+                        continue
+                    selected_references[reference["name"]] = resolved_id_by_path.get(reference.get("target_request_path"), reference.get("target_id"))
+            actual = read_object(object_id=snapshot["object_id"], fields=snapshot["fields"], platform=snapshot.get("platform"))
+            # A deliberately retargeted reference uses the ordinary canonical
+            # identity/null primitive, never old target display labels with a
+            # new id spliced into them. All unselected fields remain exact.
+            expected_unselected = {key: value for key, value in expected.items() if key.lstrip("@") not in selected_references}
+            actual_unselected = [{key: value for key, value in row.items() if key.lstrip("@") not in selected_references} for row in actual]
+            passed = (_native_snapshot_equal(actual_unselected, [expected_unselected]) and len(actual) == 1
+                and all(_reference_requirement_matches(actual[0], name, value) for name, value in selected_references.items()))
+            check("unrequested existing anonymous member state remains unchanged", passed,
+                {"expected": expected, "selected_reference_intent": selected_references, "actual": actual})
+        rtpc_guards = [spec for spec in specs if spec.get("rtpc_binding")]
+        rtpc_snapshots, rtpc_verified = {}, set()
+        for spec in rtpc_guards:
+            guard = spec["rtpc_property_guard"]
+            scope = {key: guard[key] for key in ("object_id", "class_id") if key in guard}
+            current = _read_property_info(read_call, **scope, name=guard["property"])
+            check("RTPC owner property support remains unchanged", current.as_dict() == guard["metadata"], current.as_dict())
+            guard = spec.get("rtpc_list_guard")
+            if not guard or spec.get("list_mode") == "replaceAll":
+                continue
+            key = (_identity_key(guard["owner_id"]), guard["version"], guard["class_id"])
+            if key in rtpc_verified:
+                continue
+            rtpc_verified.add(key)
+            actual = _read_graph_rtpc_rows(guard["owner_id"], version=guard["version"], class_id=guard["class_id"], read=read_call, snapshot_cache=rtpc_snapshots)
+            requested = {row.get("preexisting_id") for row in rtpc_guards if row.get("rtpc_list_guard")
+                and (_identity_key(row["rtpc_list_guard"]["owner_id"]), row["rtpc_list_guard"]["version"],
+                    row["rtpc_list_guard"]["class_id"]) == key}
+            for before in guard["before"]:
+                if before["id"] in requested:
+                    continue
+                matches = [row for row in actual if _same_identity(row["id"], before["id"])]
+                from .object_graph_paths import expected_snapshot
+                try:
+                    expected = expected_snapshot(dict(before), edits=specs, read_row=read_renamed_owner)
+                except (ValueError, KeyError, TypeError) as exc:
+                    check("unrequested RTPC path intent is bound", False, {"error": str(exc)})
+                    continue
+                check("unrequested RTPC complete state and curve remain unchanged", matches == [expected],
+                    {"before": before, "expected": expected, "after": matches})
         if kind == "object-set-batch":
-            replaced_rows = plan.get("replaced_list_subtree_rows", [])
+            replaced_rows = replaced_set_rows
             if not isinstance(replaced_rows, list):
                 raise OperationContractError(
                     "INVALID_PREVIEW",
-                    "Object-list replaceAll old-subtree verification is malformed.",
+                    "object.set replacement old-subtree verification is malformed.",
                 )
             seen_old_ids: set[str] = set()
             for index, old_row in enumerate(replaced_rows):
@@ -17236,7 +22691,7 @@ def verify_prepared_operation(
                 ):
                     raise OperationContractError(
                         "INVALID_PREVIEW",
-                        "Object-list replaceAll old-subtree row is malformed.",
+                        "object.set replacement old-subtree row is malformed.",
                     )
                 old_id = old_row.get("id")
                 old_key = _identity_key(old_id)
@@ -17248,7 +22703,7 @@ def verify_prepared_operation(
                     fields=OBJECT_LIST_SNAPSHOT_FIELDS,
                 )
                 check(
-                    f"replaced object-list subtree GUID {index} is absent",
+                    f"replaced object.set subtree GUID {index} is absent",
                     not old_rows,
                     {"old_row": dict(old_row), "remaining_rows": old_rows},
                 )
@@ -17299,10 +22754,14 @@ def verify_prepared_operation(
         )
         if object_id is None:
             return _verification(operation, assertions, readbacks)
-        rows = read_object(object_id=object_id, fields=("id", "name", "type", "path", "parent"))
+        rows = read_object(object_id=object_id, fields=("id", "name", "type", "path", "parent",
+            *(("classId",) if "source_class_id" in plan else ())))
         check("result GUID resolves exactly once", len(rows) == 1, rows)
         if len(rows) == 1:
             row = rows[0]
+            if "source_class_id" in plan:
+                check("transferred Source retains its certified class and type",
+                    _object_class_matches(row.get("classId"), plan["source_class_id"]) and row.get("type") == plan["source_type"], row)
             check("result GUID is stable", _same_identity(row.get("id"), object_id), row.get("id"))
             if is_copy:
                 check("copy GUID differs from source", not _same_identity(object_id, plan.get("source_id")), object_id)
@@ -17339,6 +22798,63 @@ def verify_prepared_operation(
                     not any(_same_identity(row.get("id"), plan.get("source_id")) for row in old_rows),
                     old_rows,
                 )
+        if is_copy and plan.get("source_copy_live_fields") is True:
+            snapshot = pre_state.get("source_copy_observation") if isinstance(pre_state, Mapping) else None
+            if not isinstance(snapshot, Mapping):
+                raise OperationContractError("INVALID_PREVIEW", "Source-copy live-field verification lacks its sealed observation.")
+            def source_copy_read(uri, args, options):
+                result = read_call(uri, args, options)
+                readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": dict(result)})
+                return result
+            verification_strength = "source_default_view_fields_and_owner_frames_only"
+            try:
+                for name, passed in verify_source_copy(snapshot, object_id, read=source_copy_read,
+                        replaced_ids=[row["id"] for row in plan.get("replaced_subtree_rows", [])]):
+                    check(name, passed, {})
+            except LifecycleGraphError as exc:
+                check("Source-copy bounded observation completed", False, {"error": str(exc)})
+        if plan.get("on_name_conflict") == "replace":
+            source_snapshot = plan.get("source_subtree_rows")
+            replaced_snapshot = plan.get("replaced_subtree_rows")
+            if (not isinstance(source_snapshot, list) or not source_snapshot
+                    or not isinstance(replaced_snapshot, list)):
+                raise OperationContractError("INVALID_PREVIEW", "Lifecycle replacement lacks its complete source and destination snapshots.")
+
+            def graph_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+                result = read_call(uri, args, options)
+                readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": dict(result)})
+                return result
+
+            try:
+                actual_graph = capture_lifecycle_graph(object_id, read=graph_read, version=plan.get("snapshot_version"))
+                graph_matches = lifecycle_graph_matches(source_snapshot, actual_graph, is_copy=is_copy)
+            except LifecycleGraphError as exc:
+                actual_graph, graph_matches = {"error": str(exc)}, False
+            check("lifecycle result preserves the complete relative topology, notes and discovered fields", graph_matches,
+                  {"source": source_snapshot, "result": actual_graph})
+            if is_copy:
+                try:
+                    remaining_source = capture_lifecycle_graph(plan["source_id"], read=graph_read, version=plan.get("snapshot_version"))
+                except LifecycleGraphError as exc:
+                    remaining_source = {"error": str(exc)}
+                check("copy leaves its complete source subtree unchanged", lifecycle_snapshot_equal(remaining_source, source_snapshot),
+                      {"expected": source_snapshot, "actual": remaining_source})
+            old_ids = [row["id"] for row in replaced_snapshot]
+            for offset in range(0, len(old_ids), MULTI_IDENTITY_READ_MAX_IDS):
+                old_args = {"from": {"id": old_ids[offset:offset + MULTI_IDENTITY_READ_MAX_IDS]}}
+                old_result = graph_read(OBJECT_GET_URI, old_args, {"return": list(OBJECT_REPLACE_SNAPSHOT_FIELDS)})
+                old_rows = _rows(old_result)
+                check("every reviewed replaced subtree GUID is absent", not old_rows,
+                      {"expected_absent": old_args["from"]["id"], "remaining": old_rows})
+            if all(assertion.get("passed") is True for assertion in assertions):
+                return VerificationResult(
+                    operation, "indeterminate", tuple(assertions), tuple(readbacks),
+                    "Observed hierarchy, notes, field views and replaced GUID absence passed. Remaining unobserved state: "
+                    + ", ".join(plan.get("verification_scope", {}).get("unobserved", ["unlinked_platform_views", "owned_lists_and_plugin_state"]))
+                    + "; complete copy/move preservation is unverified.",
+                    "hierarchy_notes_certified_field_views_only", False,
+                    plan.get("verification_scope") if plan.get("source_copy_live_fields") is True else None,
+                )
     elif kind == "same-guid-renamed":
         object_id = plan.get("object_id")
         rows = read_object(object_id=object_id, fields=("id", "name", "type", "path", "parent"))
@@ -17358,6 +22874,29 @@ def verify_prepared_operation(
         if isinstance(old_path, str) and old_path:
             old_rows = read_object(path=old_path, fields=("id", "path"))
             check("old path no longer resolves to GUID", not any(_same_identity(row.get("id"), object_id) for row in old_rows), old_rows)
+    elif kind == "history-result-schema-only":
+        from .edit_history_business import resolved_prepared_history
+        try:
+            resolved_prepared_history(prepared, history_resolver)
+        except ValueError as exc:
+            check("latest-history reference retains its owning context", False, {"error": str(exc)})
+        check_result_schema(str(plan["uri"]), str(plan["version"]))
+        success_status = "result_schema_checked"
+        verification_strength = "result_schema_only"
+        business_state_verified = False
+    elif kind == "history-scoped-effect":
+        check_result_schema(str(plan["uri"]), str(plan["version"]))
+        from .edit_history_business import observe_history_state, resolved_prepared_history
+        try:
+            history_binding = resolved_prepared_history(prepared, history_resolver)
+            history_observation = observe_history_state(history_binding, after_action=True, read=read_call)
+            readbacks.extend(history_observation["readbacks"])
+            check("latest project history action matches the owned scoped state expectation", history_observation["matches"], history_observation)
+        except ValueError as exc:
+            readbacks.extend(getattr(exc, "readbacks", []))
+            check("latest project history action has complete scoped readback", False,
+                  {"error": str(exc), "stack_head_observed": False})
+        verification_strength = "scoped_history_effect_readback"
     elif kind == "same-guid-notes":
         rows = read_object(object_id=plan.get("object_id"), fields=("id", "notes", "path", "type"))
         check("notes target resolves exactly once", len(rows) == 1, rows)
@@ -17366,10 +22905,12 @@ def verify_prepared_operation(
             check("notes match exactly", rows[0].get("notes") == plan.get("expected_notes"), rows[0].get("notes"))
     elif kind == "same-guid-property":
         field_name = str(plan.get("field"))
-        platform = plan.get("platform")
+        platform = plan.get("observation_platform", plan.get("platform"))
+        activation_requirements = plan.get("activation_requirements", {})
+        activation_reference_requirements = plan.get("activation_reference_requirements", {})
         rows = read_object(
             object_id=plan.get("object_id"),
-            fields=("id", "path", field_name),
+            fields=("id", "path", field_name, *activation_requirements, *activation_reference_requirements),
             platform=platform if isinstance(platform, str) else None,
         )
         check("property target resolves exactly once", len(rows) == 1, rows)
@@ -17383,30 +22924,51 @@ def verify_prepared_operation(
                 and _typed_value_equal(actual, expected, str(plan.get("metadata_type", ""))),
                 {"actual": actual, "expected": expected, "metadata_type": plan.get("metadata_type")},
             )
+            for name, expected_value in activation_requirements.items():
+                check(f"property activation {name} remains satisfied",
+                      _has_field(rows[0], name) and condition_values_equal(_field_value(rows[0], name), expected_value),
+                      {"expected": expected_value, "actual": _field_value(rows[0], name)})
+            for name, expected_value in activation_reference_requirements.items():
+                check(f"reference prerequisite {name} remains satisfied",
+                      _reference_requirement_matches(rows[0], name, expected_value),
+                      {"expected": expected_value, "actual": _field_value(rows[0], name)})
     elif kind == "same-guid-reference":
         field_name = str(plan.get("field"))
-        platform = plan.get("platform")
+        from .constructor_inputs import local_reference_field, local_reference_value
+        observed_field = (f"@{field_name}" if clear_field is not None else
+            local_reference_field({"owned_identity": pre_state.get("owned_identity")}, field_name))
+        platform = plan.get("observation_platform", plan.get("platform"))
         activation_requirements = plan.get("activation_requirements", {})
+        activation_reference_requirements = plan.get("activation_reference_requirements", {})
+        from .derived_reference_history import applies as derived_reference, FIELDS as derived_reference_fields, witness as derived_reference_witness
+        derived_fields = derived_reference_fields if derived_reference(pre_state.get("object", {}).get("type"), field_name) else ()
         rows = read_object(
             object_id=plan.get("object_id"),
-            fields=("id", "path", field_name, *activation_requirements),
+            fields=("id", "path", *derived_fields, observed_field, *([field_name] if clear_field is not None else []),
+                *activation_requirements, *activation_reference_requirements),
             platform=platform if isinstance(platform, str) else None,
         )
         check("reference source resolves exactly once", len(rows) == 1, rows)
+        if derived_fields and len(rows) == 1:
+            try:
+                assertions.append(derived_reference_witness(rows[0], pre_state))
+            except (ValueError, TypeError) as exc:
+                check("derived reference actual identity/controller frame is observed", False, {"error": str(exc)})
         if len(rows) == 1:
-            raw_actual = _field_value(rows[0], field_name)
+            raw_actual = rows[0].get(observed_field) if clear_field is not None else _field_value(rows[0], field_name)
             projection_matches = (
                 _same_identity(rows[0].get("id"), plan.get("object_id"))
-                and _has_field(rows[0], field_name)
+                and (observed_field in rows[0] if clear_field is not None else _has_field(rows[0], field_name))
             )
-            actual = _reference_identity(raw_actual)
+            actual = _reference_identity(local_reference_value({"owned_identity": pre_state.get("owned_identity")}, field_name, raw_actual))
             expected = plan.get("expected_target_id")
             expected_clear = plan.get("expected_clear") is True
             if expected_clear:
                 check(
-                    "reference is cleared",
+                    "stored reference is cleared; an inherited reference may still apply",
                     projection_matches and _reference_value_is_null(raw_actual),
-                    {"actual": raw_actual, "expected": None},
+                    {"actual": raw_actual, "expected": None, "value_source": "local_stored",
+                        "resolved_reference": rows[0].get(field_name), "resolved_reference_present": field_name in rows[0]},
                 )
             elif actual is None:
                 return VerificationResult(
@@ -17425,7 +22987,11 @@ def verify_prepared_operation(
         if len(rows) == 1:
             for name, expected_value in activation_requirements.items():
                 check(f"reference activation {name} remains satisfied",
-                      _has_field(rows[0], name) and _field_value(rows[0], name) is expected_value,
+                      _has_field(rows[0], name) and condition_values_equal(_field_value(rows[0], name), expected_value),
+                      {"expected": expected_value, "actual": _field_value(rows[0], name)})
+            for name, expected_value in activation_reference_requirements.items():
+                check(f"reference prerequisite {name} remains satisfied",
+                      _reference_requirement_matches(rows[0], name, expected_value),
                       {"expected": expected_value, "actual": _field_value(rows[0], name)})
     elif kind == "ui-capture-screen-result":
         success_status = "result_schema_checked"
@@ -18349,8 +23915,10 @@ def verify_prepared_operation(
                 expected_type = target.get("requested_object_type", "Sound")
                 check(
                     f"{label} reflected type matches the request",
-                    _import_object_type_matches(live_row.get("type"), expected_type),
-                    {"expected": expected_type, "actual": live_row.get("type")},
+                    _import_object_type_matches(live_row.get("type"), expected_type)
+                    and _object_class_matches(live_row.get("classId"), target.get("metadata_class_id")),
+                    {"expected": expected_type, "actual": live_row.get("type"),
+                        "expected_class": target.get("metadata_class_id"), "actual_class": live_row.get("classId")},
                 )
                 for property_spec in target.get("validated_properties", []):
                     property_name = property_spec.get("name")
@@ -18410,7 +23978,25 @@ def verify_prepared_operation(
                 active_source_id = _reference_identity(
                     _field_value(live_row, "activeSource")
                 )
-                if music_media or (version == "2021.1" and active_source_id is None):
+                legacy_bound_sfx = version == "2021.1" and isinstance(sfx_snapshot, Mapping)
+                if legacy_bound_sfx:
+                    def read_sfx_sources(uri, args, options):
+                        result = read_call(uri, args, options)
+                        readbacks.append({"uri": uri, "args": args, "options": options, "result": result})
+                        return result
+
+                    try:
+                        after_sfx = _existing_sfx_source_snapshot(str(live_id), version=version, read=read_sfx_sources)
+                        active_source_id = _legacy_sfx_active_source(live_row, after_sfx, source_class=target.get("audio_source_class_id"))
+                    except OperationContractError as exc:
+                        active_source_id = None
+                        check(f"{label} active SFX source has an independent file-path proof", False, exc.as_dict())
+                    else:
+                        check(f"{label} existing SFX source identities and placement preserved",
+                              after_sfx == sfx_snapshot, {"expected": sfx_snapshot, "actual": after_sfx})
+                        check(f"{label} active SFX source remains the preview-bound GUID",
+                              _same_identity(active_source_id, sfx_source_id), {"expected": sfx_source_id, "actual": active_source_id})
+                elif music_media or (version == "2021.1" and active_source_id is None):
                     active_source_id = (returned_source_id or target.get("localized_audio_file_source_id")
                                         or (sfx_source_id if omitted_sound_source and bound_sfx_source else None))
                 if omitted_sound_source:
@@ -18443,9 +24029,8 @@ def verify_prepared_operation(
                             },
                         )
                 if active_source_id is not None:
-                    source_fields = _import_audio_source_return_fields(version=version)
-                    if music_media or omitted_sound_source:
-                        source_fields.append("parent")
+                    source_fields = _dedupe_fields([*_import_audio_source_return_fields(version=version), "parent"])
+                    if music_media or omitted_sound_source or legacy_bound_sfx:
                         if version == "2021.1":
                             source_fields.append("originalWavFilePath")
                     source_rows = read_object(
@@ -18456,10 +24041,24 @@ def verify_prepared_operation(
                     check(f"{label} active Audio Source resolves once", len(source_rows) == 1, source_rows)
                     if len(source_rows) == 1:
                         audio_source_row = source_rows[0]
+                        if media_expected:
+                            check(f"{label} actual AudioFileSource class matches live metadata",
+                                _object_class_matches(audio_source_row.get("classId"), target.get("audio_source_class_id")),
+                                {"expected": target.get("audio_source_class_id"), "actual": audio_source_row.get("classId")})
+                            check(f"{label} actual AudioFileSource belongs to the verified target",
+                                  _object_type_token(audio_source_row.get("type")) == "audiofilesource"
+                                  and _same_identity(_reference_identity(audio_source_row.get("parent")), live_id),
+                                  {"target_id": live_id, "source": audio_source_row})
                         if target.get("existing_sfx_source_id") is not None:
                             check(f"{label} reimport preserves the bound SFX source GUID",
                                   _same_identity(audio_source_row.get("id"), target["existing_sfx_source_id"]),
                                   {"expected": target["existing_sfx_source_id"], "actual": audio_source_row.get("id")})
+                        if legacy_bound_sfx:
+                            expected_original = next((source.get("originalWavFilePath") for source in sfx_snapshot["rows"]
+                                                      if _same_identity(source.get("id"), sfx_source_id)), None)
+                            check(f"{label} active SFX original-file path remains bound",
+                                  expected_original is not None and audio_source_row.get("originalWavFilePath") == expected_original,
+                                  {"expected": expected_original, "actual": audio_source_row.get("originalWavFilePath")})
                         if target.get("localized_audio_file_source_id") is not None:
                             check(
                                 f"{label} reimport preserves the bound localized source GUID",
@@ -18509,7 +24108,7 @@ def verify_prepared_operation(
                     )
 
                 sfx_snapshot = target.get("existing_sfx_source_snapshot")
-                if isinstance(sfx_snapshot, Mapping):
+                if isinstance(sfx_snapshot, Mapping) and not legacy_bound_sfx:
                     def read_sfx_sources(uri, args, options):
                         result = read_call(uri, args, options)
                         readbacks.append({"uri": uri, "args": args, "options": options, "result": result})
@@ -18643,7 +24242,7 @@ def verify_prepared_operation(
 
                 if media_expected:
                     copied_path = _field_value(source_state, "originalFilePath")
-                    if music_media and version == "2021.1":
+                    if (music_media or legacy_bound_sfx) and version == "2021.1":
                         copied_path = _field_value(source_state, "originalWavFilePath")
                     if music_media:
                         try:
@@ -18655,9 +24254,9 @@ def verify_prepared_operation(
                         else:
                             readbacks.extend(music_evidence.pop("readbacks"))
                             check(f"{label} Track Clip uses the imported media", music_evidence["ok"], music_evidence)
-                    if copied_path is None and source_state is not live_row:
+                    if copied_path is None and source_state is not live_row and not legacy_bound_sfx:
                         copied_path = _field_value(live_row, "originalFilePath")
-                    if copied_path is None:
+                    if copied_path is None and not legacy_bound_sfx:
                         copied_path = _field_value(
                             live_row,
                             "sound:originalWavFilePath",
@@ -19081,14 +24680,153 @@ def verify_prepared_operation(
             )
     else:
         raise OperationContractError("INVALID_PREVIEW", f"Unknown verification plan kind {kind!r}.")
-    return _verification(
+    if kind in {"object-create-graph", "object-set-batch"} and owned_stage_identities and all(item.get("passed") is True for item in assertions):
+        from .owned_result_stages import observe_preservation
+        preserved = observe_preservation(prepared, owned_stage_identities, read=read_call, context=compound_path_context)
+        readbacks.extend(preserved)
+        for record in preserved:
+            check("Owned native creation retained parent/collision identity, class, notes and exact child membership",
+                record['passed'], {'object_id': record['object_id']})
+    if created_history_metadata and all(item.get("passed") is True for item in assertions):
+        # Optional receipt evidence follows all mandatory source readbacks.
+        # A missing/failed optional read cannot consume a later required read.
+        from .creation_observations import capture_created_field_metadata
+        for spec, object_id in created_history_metadata:
+            readbacks.extend(capture_created_field_metadata(spec, object_id, read=read_call))
+    if kind == "object-create-graph" and history_graph and all(item.get("passed") is True for item in assertions):
+        record = {"role": "created-graph-history-membership", **({"request_path": "$"} if pre_state.get("owned_result_stages") else {}), "uri": OBJECT_GET_URI,
+            "args": {"from": {"id": [resolved_id_by_path.get("$")]}, "transform": [{"select": ["descendants"]}]},
+            "options": {"return": [*IDENTITY_RETURN_FIELDS, "classId"]}}
+        try:
+            record["result"] = read_call(record["uri"], record["args"], record["options"])
+        except OperationContractError as exc:
+            record["error"] = exc.as_dict()
+        readbacks.append(record)
+    if kind == "object-set-batch" and history_graph and all(item.get("passed") is True for item in assertions):
+        from .creation_observations import ordinary_staged_creation_graphs
+        for group in ordinary_staged_creation_graphs(plan, pre_state):
+            record = {"role": "created-graph-history-membership", "request_path": group['root'], "uri": OBJECT_GET_URI,
+                "args": {"from": {"id": [resolved_id_by_path[group['root']]]}, "transform": [{"select": ["descendants"]}]},
+                "options": {"return": [*IDENTITY_RETURN_FIELDS, "classId"]}}
+            try:
+                record["result"] = read_call(record['uri'], record['args'], record['options'])
+            except OperationContractError as exc:
+                record["error"] = exc.as_dict()
+            readbacks.append(record)
+    if kind == "object-set-batch" and all(item.get("passed") is True for item in assertions):
+        from .existing_field_observations import capture_after
+        for proof in (pre_state or {}).get("existing_field_observations", []):
+            readbacks.append(capture_after(proof, read=read_call))
+    outcome = _verification(
         operation,
         assertions,
         readbacks,
         success_status=success_status,
         verification_strength=verification_strength,
         business_state_verified=business_state_verified,
+        verification_scope=plan.get("verification_scope") if plan.get("source_copy_live_fields") is True or kind == "blend-assignment" else None,
     )
+
+    if kind == "result-schema" and plan.get("uri") == PROFILER_ENABLE_DATA_URI:
+        message = (
+            "Wwise acknowledged the submitted capture-data directives; the native result schema was checked. "
+            if outcome.ok else
+            "The capture-data control result did not match its native result schema. "
+        ) + PROFILER_CAPTURE_DATA_VERIFICATION["boundary"] + " Do not replay the executed control."
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, False,
+            dict(PROFILER_CAPTURE_DATA_VERIFICATION))
+    if kind == "blend-assignment" and not outcome.business_state_verified:
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
+            "Blend assignment result and bounded observations were checked; complete effect remains unverified for the disclosed scope. Do not replay automatically.",
+            outcome.verification_strength, False, plan["verification_scope"])
+    if kind == 'authoring-layout-reset-observation':
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
+            ('Native result schema checked and bounded post-reset state observed. Layout defaults, selection effects and unrelated-state preservation remain unverified under #188; do not replay automatically.'
+             if outcome.ok else 'Reset result or required post-reset observations failed validation. Default-state effects remain unverified; do not replay automatically.'),
+            outcome.verification_strength, outcome.business_state_verified)
+    if kind in {"history-scoped-effect", "history-result-schema-only"}:
+        message = ("Only the native result schema was checked. No effect expectation was selected; native history-entry identity, effects and preservation remain unobserved."
+                   if kind == "history-result-schema-only" and outcome.ok else
+                   "The owned receipt's scoped expected state matches. Native history-entry identity and effects outside this scope remain unobserved."
+                   if outcome.ok else "The history result or scoped expected state could not be verified. Do not replay or compensate automatically.")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    if kind == 'console-project-process':
+        if outcome.business_state_verified:
+            message = 'The requested Console command effects passed independent verification.'
+        elif outcome.ok:
+            message = 'The documented Console command outcome passed; file and project effects remain unverified.'
+        elif any(row.get('kind') == 'cli-process-outcome' and row.get('reported_errors') is True
+                 for row in outcome.readbacks):
+            message = 'The Console command reported errors; partial effects are possible and execution must not be retried.'
+        else:
+            message = 'The Console command failed verification; inspect the retained checks and do not retry execution.'
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    if kind == "profiler-capture-artifact":
+        message = ("The exact authorized capture destination was created or content-changed and is nonempty; bounded unrelated output-file contents are preserved. "
+            if outcome.business_state_verified else
+            "The exact authorized capture artifact or unrelated output-file preservation could not be verified. Do not replay the executed save. ")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
+            message + "Native capture format validity and capture-data completeness remain unverified.",
+            outcome.verification_strength, outcome.business_state_verified, plan["verification_scope"])
+    if kind == 'tone-wav-artifact':
+        message = ('The requested Tone WAV artifact failed independent verification.'
+            if outcome.status == 'verification_failed' else
+            'The requested observable Tone WAV artifact state passed independent verification.'
+            if outcome.business_state_verified else
+            'Applicable Tone WAV artifact checks passed; requested postconditions remain explicitly unresolved.')
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    if kind == "authoring-project-create":
+        message = ("The saved project artifact does not match the requested creation; do not replay the executed call."
+            if outcome.status == "verification_failed" else
+            "The saved project artifact matches the requested observable creation fields."
+            if outcome.business_state_verified else
+            "The saved project was observed; explicit-empty collection effects remain unresolved. Do not replay the executed call.")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    if kind == "transport-action-state":
+        message = ("Requested transport states matched one bounded observation. Continuing playback, causality and an atomic all-transport snapshot are unverified."
+            if outcome.business_state_verified else
+            "The later transport observation did not establish every requested state. Transient playback may have ended before observation. State does not establish acoustic output or restart position. Do not replay the executed action.")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified,
+            {"comparison": "one_state_read_per_preview_target", "continuous_state_verified": False,
+                "atomic_scope_verified": False, "causality_verified": False,
+                "observation": next((dict(row) for row in outcome.readbacks if row.get("kind") == "transport-action-observation"), {})})
+    if kind == "log-channel-effect":
+        observation = next((dict(row) for row in outcome.readbacks if row.get("kind") == "log-channel-observation"), {"outcome": "malformed_control_result"})
+        message = ("The requested log addition was delivered in one bounded execute-time event. Exclusive writer causation, individual entry identity and continuing channel contents are unverified."
+            if outcome.business_state_verified and plan['console'] and plan.get('uri') == LOG_ADD_ITEM_URI else
+            "The requested log effect was observed in one bounded channel comparison. Concurrent identical writers, individual entry identity and continuing channel state are unverified."
+            if outcome.business_state_verified else
+            "The log effect remains unverified; inspect the bounded channel observation. Missing or indistinguishable content does not prove the call never took effect. Do not replay the executed control.")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified,
+            {"log_observation": observation, "unrelated_channels": "not requested by the compiled native call; not independently observed"})
+    if kind == "profiler-user-cursor":
+        message = ("The user cursor matched the control's returned snapped time at one independent observation. "
+            "Capture data completeness and a continuing cursor position are unverified."
+            if outcome.business_state_verified else
+            "The cursor was unavailable; its effect remains unverified. Do not replay the executed control."
+            if outcome.status == "result_schema_checked" else
+            "The control result or later user-cursor observation did not verify the cursor effect. "
+            "A changed observation does not prove the control never took effect. Do not replay the executed control.")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified,
+            {"comparison": "one_user_cursor_read_against_returned_snapped_time",
+                "continuing_cursor_position_verified": False,
+                "cursor_observation": next((dict(row) for row in outcome.readbacks
+                    if row.get("kind") == "profiler-user-cursor-observation"), {"outcome": "malformed_control_result"})})
+    if kind == "remote-connection-state" and not outcome.business_state_verified:
+        message = ("The requested remote target did not match independent observations; do not replay the executed transition."
+            if outcome.status == "verification_failed" else
+            "Connection state was observed; the exact requested remote target remains explicitly unresolved. Do not replay the executed transition.")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    return outcome
 
 
 def _soundbank_input_file_proofs(
@@ -19195,6 +24933,7 @@ def _verification(
     success_status: str = "verified",
     verification_strength: str = "operation_specific_readback",
     business_state_verified: bool = True,
+    verification_scope: Mapping[str, Any] | None = None,
 ) -> VerificationResult:
     passed = bool(assertions) and all(item.get("passed") is True for item in assertions)
     status = success_status if passed else "verification_failed"
@@ -19230,6 +24969,7 @@ def _verification(
         message,
         verification_strength,
         business_state_verified,
+        verification_scope,
     )
 
 
@@ -19865,11 +25605,13 @@ def _validate_nested_request_shape(
             if key in arguments
         }
         try:
-            normalize_object_tree(
+            normalized = normalize_object_tree(
                 node,
                 on_name_conflict=conflict,
                 replace_owned=replace_owned_root_supplied,
             )
+            if any(isinstance(reference.target, (tuple, ObjectCurveDescriptor)) for item in normalized.nodes for reference in item.references):
+                raise OperationContractError("NATIVE_VALUE_UNION_UNAVAILABLE", "Pinned object.create propertyValue accepts scalar references or null, never arrays or inline curves.")
         except ObjectOperationContractError as exc:
             raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         return
@@ -19913,7 +25655,16 @@ def _validate_nested_request_shape(
         return
     if operation == "object.setRTPC":
         _validate_identity_payload_shape(arguments.get("object"), role="object")
-        _validate_identity_payload_shape(arguments.get("control_input"), role="control_input")
+        owned = isinstance(arguments.get("control_input"), Mapping) and "new_control_input" in arguments["control_input"]
+        if not owned:
+            _validate_identity_payload_shape(arguments.get("control_input"), role="control_input")
+        if owned:
+            paths = ["$.objects[0].lists[0].objects[0]", "$.objects[0].lists[0].objects[0].control_input"]
+            bindings = arguments.get("graph_result_bindings")
+            if not isinstance(bindings, list) or [row.get("request_path") for row in bindings] != paths:
+                raise OperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "New named RTPC outcomes require their exact graph occurrence bindings.")
+        elif "graph_result_bindings" in arguments:
+            raise OperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "Existing-input named RTPC updates retain their exact identity contract.")
         mode = arguments.get("mode", "add_or_replace")
         if mode not in {"add", "add_or_replace"}:
             raise OperationContractError(
@@ -20008,10 +25759,12 @@ def _validate_nested_request_shape(
                     item.get("properties", []),
                     request_path=f"$.objects[{index}].properties",
                 )
-                normalize_reference_descriptors(
+                normalized_references = normalize_reference_descriptors(
                     item.get("references", []),
                     request_path=f"$.objects[{index}].references",
+                    allow_unions=True,
                 )
+                total_nodes += sum(isinstance(reference.target, (ObjectCurveDescriptor, OwnedControlInputDescriptor)) for reference in normalized_references)
                 if "import" in item:
                     if version not in OBJECT_SET_IMPORT_VERSIONS:
                         raise OperationContractError(
@@ -20026,12 +25779,14 @@ def _validate_nested_request_shape(
                 forest = normalize_object_forest(
                     item.get("children", []),
                     on_name_conflict=row_conflict,
+                    replace_owned=row_conflict == "replace",
                     base_path=f"$.objects[{index}].children",
                     allow_platform=True,
                     allow_language=True,
                     allow_import=version in OBJECT_SET_IMPORT_VERSIONS,
                 )
-                total_nodes += len(forest.nodes)
+                total_nodes += len(forest.nodes) + sum(isinstance(reference.target, ObjectCurveDescriptor)
+                    for node in forest.nodes for reference in node.references)
                 lists = normalize_object_lists(
                     item.get("lists", []),
                     request_path=f"$.objects[{index}].lists",
@@ -20039,9 +25794,19 @@ def _validate_nested_request_shape(
                     allow_language=True,
                     allow_import=version in OBJECT_SET_IMPORT_VERSIONS,
                 )
-                saw_list_assignment = saw_list_assignment or bool(lists)
+                nested_lists = [descriptor for node in [*forest.nodes, *(node for descriptor in lists for node in descriptor.nodes)] for descriptor in node.lists]
+                saw_list_assignment = saw_list_assignment or bool(lists) or bool(nested_lists)
                 list_nodes = sum(len(descriptor.nodes) for descriptor in lists)
-                total_nodes += list_nodes
+                total_nodes += list_nodes + sum(isinstance(reference.target, ObjectCurveDescriptor)
+                    for descriptor in lists for node in descriptor.nodes for reference in node.references)
+                all_references = [*normalized_references,
+                    *(reference for node in forest.nodes for reference in node.references),
+                    *(reference for descriptor in lists for node in descriptor.nodes for reference in node.references)]
+                if version not in OBJECT_SET_REFERENCE_ARRAY_VERSIONS and any(
+                    isinstance(reference.target, tuple) for reference in all_references
+                ):
+                    raise OperationContractError("NATIVE_VALUE_UNION_UNAVAILABLE",
+                        "String reference arrays require the pinned object.set 2023.1-2025.1 alternative; the recursive owned objectArray is a separate branch.")
                 if row_list_mode == "append" and any(
                     not descriptor.objects for descriptor in lists
                 ):
@@ -20051,7 +25816,7 @@ def _validate_nested_request_shape(
                     )
                 if (
                     item.get("list_mode") == "replaceAll"
-                    and not lists
+                    and not lists and not nested_lists
                 ):
                     raise OperationContractError(
                         "NO_OP",
@@ -20885,27 +26650,46 @@ def _import_file_path_key(value: Any) -> HostPathKey | None:
 def _require_reference_target_allowed(
     metadata: PropertyInfoMetadataRecord,
     target: ResolvedObject,
+    *, source_id=None, read=None, platform=None, conditions=None,
+    desired_references=None, property_info_cache=None, _restriction_path=(),
+    _restriction_context=None,
+    wwise_version=None,
+    allow_playlist_slot=False,
 ) -> None:
+    if "mustChildOf" in (metadata.restriction.get("restrictions") or []):
+        if not allow_playlist_slot or source_id is None or read is None or conditions is None:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "PlaylistSlot hierarchy requires the existing object.setReference business path.")
+        from .playlist_reference_conditions import observe
+        try:
+            condition = observe(version=wwise_version, source_id=source_id, target_id=target.object,
+                name=metadata.name, restriction=metadata.restriction, read=read)
+        except ValueError as exc:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", str(exc)) from exc
+        conditions.append(condition)
+        return
     try:
-        allowed_types = set(reference_allowed_types(metadata.restriction))
+        allowed_types = set(reference_allowed_types(metadata.restriction,
+            allow_target_classifiers=read is not None and conditions is not None))
     except MetadataRestrictionError as exc:
         raise OperationContractError(
             exc.error_code,
             str(exc),
             details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
         ) from exc
-    if not allowed_types:
-        return
     target_type = target.row.get("type")
-    if not isinstance(target_type, str) or not target_type:
+    restrictions = metadata.restriction.get("restrictions") or []
+    category_rows = [row for row in restrictions if isinstance(row, Mapping) and "category" in row]
+    ambiguous_categories = len(category_rows) > 1 or bool(category_rows) and any(
+        isinstance(row, Mapping) and "type" in row for row in restrictions)
+    if allowed_types and not ambiguous_categories and (not isinstance(target_type, str) or not target_type):
         raise OperationContractError(
             "INVALID_READBACK",
             "Reference target readback must expose a type when live restrictions are present.",
             details={"reference": metadata.name, "target": target.as_dict()},
         )
-    target_token = reference_type_token(target_type)
+    target_token = reference_type_token(target_type) if isinstance(target_type, str) else None
     allowed_tokens = {reference_type_token(value) for value in allowed_types}
-    if target_token not in allowed_tokens:
+    if allowed_types and not ambiguous_categories and target_token not in allowed_tokens:
         raise OperationContractError(
             "INVALID_REFERENCE_TARGET",
             "Reference target type is not allowed by live getPropertyInfo restrictions.",
@@ -20915,6 +26699,302 @@ def _require_reference_target_allowed(
                 "allowed_types": sorted(allowed_types),
             },
         )
+    requires_shared = False
+    for row in metadata.restriction.get("restrictions", []):
+        if not isinstance(row, Mapping):
+            continue  # String flags and malformed entries are handled by reference_allowed_types.
+        if "type" in row:
+            if set(row) - {"type", "sharedOnlyTypes"}:
+                raise OperationContractError("INVALID_METADATA", "Reference type restriction has unknown fields.")
+            types = row["type"]
+            if not isinstance(types, list) or not all(isinstance(value, str) and value for value in types):
+                raise OperationContractError("INVALID_METADATA", "Reference type restriction must be a string array.")
+            shared = row.get("sharedOnlyTypes", [])
+            if (not isinstance(shared, list) or not all(isinstance(value, str) and value for value in shared)
+                    or {reference_type_token(value) for value in shared} - {reference_type_token(value) for value in types}):
+                raise OperationContractError("INVALID_METADATA", "Shared-only reference types must be a subset of the allowed type array.")
+            if target_token in {reference_type_token(value) for value in shared}:
+                requires_shared = True
+        elif "category" in row:
+            if set(row) != {"category"} or not isinstance(row["category"], list) or not all(isinstance(value, str) for value in row["category"]):
+                raise OperationContractError("INVALID_METADATA", "Reference category restriction must be an exact string array.")
+        elif set(row) != {"childOfReference"}:
+            raise OperationContractError("INVALID_METADATA", "Reference restriction has an unknown object shape.")
+    type_rows = [row for row in restrictions if isinstance(row, Mapping) and "type" in row]
+    classifier_fields = (["type"] if ambiguous_categories and type_rows else []) + (
+        ["category"] if category_rows else []) + (["isPlayable"] if "playable" in restrictions else [])
+    if classifier_fields:
+        if read is None or conditions is None:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Target classifiers require an exact existing scoped Preview.")
+        facts = _read_reference_target_classifiers(target.object, classifier_fields, read=read, platform=platform)
+        if "isPlayable" in facts and facts["isPlayable"] is not True:
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "Fresh native target classification does not satisfy live reference restrictions.",
+                details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
+        if ambiguous_categories:
+            if "type" in facts and not _native_snapshot_equal(facts["type"], target_type):
+                raise OperationContractError("INVALID_READBACK", "Selected target type changed between exact identity and classifier observations.")
+            # Every disclosed row is independently satisfied. This sufficient
+            # proof does not assign AND/OR semantics to partial native matches.
+            all_satisfied = all(facts["category"] in row["category"] for row in category_rows) and all(
+                reference_type_token(facts["type"]) in {reference_type_token(value) for value in row["type"]}
+                for row in type_rows)
+            if not all_satisfied:
+                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
+                    "Partially satisfied combined type/category rows require separately established native admission semantics.",
+                    details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
+        elif category_rows and facts["category"] not in category_rows[0]["category"]:
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "Fresh native target classification does not satisfy live reference restrictions.",
+                details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
+        classifier_condition = {"kind": "target_classifier", "target_id": target.object,
+            "reference": metadata.name, "classifiers": facts, "platform": platform}
+        if classifier_condition not in conditions:
+            conditions.append(classifier_condition)
+    if requires_shared:
+        if read is None or conditions is None or wwise_version not in {"2022.1", "2023.1", "2024.1", "2025.1"}:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only classification requires its pinned existing-object scope.")
+        facts = _read_shared_reference_target(target.object, read=read, platform=platform, version=wwise_version)
+        condition = {"kind": "shared_target", "target_id": target.object, "reference": metadata.name,
+            "classification": facts, "version": wwise_version, "platform": platform}
+        if condition not in conditions:
+            conditions.append(condition)
+    parent_fields = []
+    for row in metadata.restriction.get("restrictions", []):
+        if not isinstance(row, Mapping) or "childOfReference" not in row:
+            continue
+        name = row["childOfReference"]
+        if set(row) != {"childOfReference"} or not isinstance(name, str) or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None:
+            raise OperationContractError("INVALID_METADATA", "Reference parent restriction must name one exact reference field.")
+        if name not in parent_fields:
+            parent_fields.append(name)
+    if not parent_fields:
+        return
+    if source_id is None or read is None or conditions is None:
+        raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
+            "Reference hierarchy constraints need an exact existing object and a separately scoped field Preview.",
+            details={"reference": metadata.name, "parent_references": parent_fields, "mutation_dispatched": False})
+    if _restriction_context is None:
+        _restriction_context = {"fields": set(), "values": {}, "identities": {}, "validated": set()}
+    if property_info_cache is None:
+        property_info_cache = {}
+    validation_key = (metadata.name.casefold(), _identity_key(target.object))
+    if validation_key in _restriction_context["validated"]:
+        return
+    path = (*_restriction_path, metadata.name.casefold())
+    for name in parent_fields:
+        if name.casefold() in path:
+            raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference hierarchy constraints contain a cycle.")
+        _restriction_context["fields"].add(name.casefold())
+        if len(_restriction_context["fields"]) > MAX_CONDITION_CONTROLLERS:
+            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference hierarchy exceeds the finite controller budget.")
+        info = (_read_property_info_cached(read, cache=property_info_cache, name=name, object_id=source_id)
+                if property_info_cache is not None else _read_property_info(read, name=name, object_id=source_id))
+        _require_object_reference_metadata(info, allow_hierarchy=True)
+        if info.name != name:
+            raise OperationContractError("INVALID_METADATA", "Reference parent metadata names a different field.")
+        if name.casefold() not in _restriction_context["values"]:
+            _restriction_context["values"][name.casefold()] = _rows(read(OBJECT_GET_URI, {"from": {"id": [source_id]}}, {
+                "return": ["id", name], **({"platform": platform} if platform is not None else {})}))
+        rows = _restriction_context["values"][name.casefold()]
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), source_id) or not _has_field(rows[0], name):
+            raise OperationContractError("INVALID_READBACK", "Reference parent field must resolve on the exact source object.")
+        current = _field_value(rows[0], name)
+        before = None if _reference_value_is_null(current) else _reference_identity(current)
+        expected = desired_references.get(name.casefold(), before) if desired_references is not None else before
+        if expected is None:
+            raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Choose and separately preview the controlling reference first.", details={
+                "object_id": source_id, "reference": metadata.name, "mutation_dispatched": False,
+                "prerequisite_changes": [{"operation": "object.setReference", "object_id": source_id,
+                    "discovery_meaning": name, "selection": "live_discovered_Field_Handle", "required_presence": True,
+                    "target_selection": "user_chosen_exact_object", **({"platform": platform} if platform is not None else {})}]})
+        if (not isinstance(expected, str) or _PLUGIN_GUID.fullmatch(expected) is None
+                or (before is not None and (not isinstance(before, str) or _PLUGIN_GUID.fullmatch(before) is None))):
+            raise OperationContractError("INVALID_READBACK", "Reference parent must expose a canonical GUID or native null.")
+        actual_parent = _reference_identity(target.row.get("parent"))
+        if not isinstance(actual_parent, str) or _PLUGIN_GUID.fullmatch(actual_parent) is None:
+            raise OperationContractError("INVALID_READBACK", "Chosen reference target must expose its exact parent GUID.")
+        if not _same_identity(actual_parent, expected):
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "Chosen reference target is not a child of the controlling reference.", details={
+                "reference": metadata.name, "target_id": target.object, "parent_reference": name,
+                "required_parent_id": expected, "actual_parent_id": actual_parent})
+        parent = _resolve_identity({"kind": "id", "value": expected}, role="reference_parent", read=read,
+            identity_cache=_restriction_context["identities"])
+        _require_reference_target_allowed(info, parent, source_id=source_id, read=read, platform=platform,
+            conditions=conditions, desired_references=desired_references, property_info_cache=property_info_cache,
+            _restriction_path=path, _restriction_context=_restriction_context, wwise_version=wwise_version)
+        condition = {"source_id": source_id, "target_id": target.object, "reference": metadata.name,
+            "parent_reference": name, "before_parent_id": before, "parent_id": expected,
+            "controller_metadata": info.as_dict(), "controller_native_metadata": dict(info.raw), "platform": platform}
+        if condition not in conditions:
+            conditions.append(condition)
+    _restriction_context["validated"].add(validation_key)
+
+
+def _read_shared_reference_target(target_id, *, read, platform, version, require_match=True):
+    """Prove SDK ShareSet relations without interpreting an omitted owner field.
+
+    The pinned 2022 SDK documents select-this/owner object projection. Its
+    owner=null comparison returned no match for an independently created Game
+    Parameter, so use the relationship projection in that version only. Keeping
+    this in the projection proves the exact source still exists in that read.
+    """
+    from .builders.query import WaqlQueryBuilder, STRUCTURED_QUERY_CONTRACT
+    options = {"return": ["id", "parent"]}
+    if platform is not None:
+        options["platform"] = platform
+    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [target_id]}}, options))
+    if len(rows) != 1 or not _same_identity(rows[0].get("id"), target_id):
+        raise OperationContractError("INVALID_READBACK", "Shared-only target must resolve exactly the chosen GUID.")
+    parent = rows[0].get("parent")
+    if "parent" not in rows[0] or isinstance(parent, Mapping) and "id" not in parent:
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a fresh canonical parent relationship.")
+    if parent is None:
+        parent_id = None
+    else:
+        parent_id = _reference_identity(parent)
+        if not isinstance(parent, Mapping) or not isinstance(parent_id, str) or _PLUGIN_GUID.fullmatch(parent_id) is None:
+            raise OperationContractError("INVALID_READBACK", "Shared-only target parent must expose a canonical GUID.")
+        if _reference_value_is_null(parent_id):
+            parent_id = None
+    if parent_id is None and require_match:
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a non-null parent relationship.")
+    preview = WaqlQueryBuilder(version=version).build({
+        "contract": STRUCTURED_QUERY_CONTRACT,
+        "source": {"kind": "object", "objects": [{"kind": "id", "value": target_id}]},
+        "transforms": ([
+            {"kind": "select", "expressions": [["this"], ["owner"]]},
+            {"kind": "take", "value": 3}] if version == "2022.1" else [
+            {"kind": "where", "predicate": {"kind": "compare", "path": ["owner"], "operator": "=", "value": None}},
+            {"kind": "take", "value": 1}]),
+        "return": ["id"],
+    })
+    query_options = dict(preview.envelope.options)
+    if platform is not None:
+        query_options["platform"] = platform
+    query = {"version": version, "args": dict(preview.envelope.args), "options": query_options}
+    result = read(OBJECT_GET_URI, query["args"], query_options)
+    if version == "2022.1":
+        if not isinstance(result, Mapping) or set(result) != {"return"}:
+            raise OperationContractError("INVALID_READBACK", "Owner projection needs a complete native object.get envelope.")
+        rows = _rows(result)
+        ids = [row.get("id") for row in rows]
+        if (not 1 <= len(ids) <= 2
+                or any(not _valid_object_id(value) or _reference_value_is_null(value) for value in ids)
+                or len({_identity_key(value) for value in ids}) != len(ids)
+                or sum(_same_identity(value, target_id) for value in ids) != 1):
+            raise OperationContractError("INVALID_READBACK", "Owner projection must contain the exact source once and at most one distinct owner.")
+        owner_absent = len(ids) == 1
+        if not owner_absent and require_match:
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "The selected target has a native projected owner and is not a ShareSet.")
+        return {"parent_id": parent_id, "owner_absent": owner_absent, "native_query": query,
+            "native_result": dict(result)}
+    matches = _rows(result)
+    if not matches and require_match:
+        raise OperationContractError("INVALID_REFERENCE_TARGET", "The selected target does not satisfy the native owner-null ShareSet predicate.")
+    if matches and (len(matches) != 1 or not _same_identity(matches[0].get("id"), target_id)):
+        raise OperationContractError("INVALID_READBACK", "Owner-null predicate must return exactly the selected target GUID.")
+    return {"parent_id": parent_id, "owner_absent": bool(matches), "native_query": query}
+
+
+def _read_reference_target_classifiers(target_id, fields, *, read, platform):
+    options = {"return": ["id", *fields]}
+    if platform is not None:
+        options["platform"] = platform
+    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [target_id]}}, options))
+    if len(rows) != 1 or not _same_identity(rows[0].get("id"), target_id):
+        raise OperationContractError("INVALID_READBACK", "Native target classifier must resolve exactly the selected GUID.")
+    facts = {}
+    for field in fields:
+        if field not in rows[0]:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Native target classifier is unavailable for this exact object.",
+                details={"target_id": target_id, "classifier": field})
+        value = rows[0][field]
+        if not (isinstance(value, str) and value if field in {"category", "type"} else isinstance(value, bool)):
+            raise OperationContractError("INVALID_READBACK", "Native target classifier has an invalid value.",
+                details={"target_id": target_id, "classifier": field})
+        facts[field] = value
+    return facts
+
+
+def _reference_target_condition_assertions(pre_state, *, read, after_write):
+    conditions = pre_state.get("reference_target_conditions", []) if isinstance(pre_state, Mapping) else []
+    assertions = []
+    for condition in conditions:
+        if condition.get("kind") == "playlist_slot_direct_child":
+            from .playlist_reference_conditions import assertion
+            assertions.append(assertion(condition, read=read, after_write=after_write))
+            continue
+        source_metadata = condition.get("source_class_metadata")
+        if source_metadata is not None:
+            expected_class = source_metadata["class"]
+            types = [row for row in _read_object_type_catalog(read) if row.class_id == expected_class["classId"]]
+            info = _read_property_info(read, class_id=expected_class["classId"], name=source_metadata["field"])
+            valid = (source_metadata["version"] == condition.get("version")
+                and expected_class["name"] == "RTPC" and source_metadata["field"] == "ControlInput"
+                and len(types) == 1 and types[0].as_dict(include_raw=True) == expected_class
+                and _native_snapshot_equal(info.as_dict(), source_metadata["normalized"])
+                and _native_snapshot_equal(dict(info.raw), source_metadata["native"]))
+            assertions.append({"name": "prospective RTPC ControlInput class and full metadata remain bound",
+                "passed": valid, "evidence": {"expected": source_metadata,
+                    "actual_class": [row.as_dict(include_raw=True) for row in types],
+                    "actual_metadata": info.as_dict(), "actual_native_metadata": dict(info.raw)}})
+        if condition.get("kind") == "prospective_reference_metadata":
+            continue
+        if condition.get("kind") == "planned_reference_parent":
+            valid = all(_native_snapshot_equal(_read_property_info(read, class_id=condition["class_id"], name=name).as_dict(), expected["normalized"])
+                for name, expected in condition["metadata"].items())
+            assertions.append({"name": "planned reference parent metadata remains bound", "passed": valid,
+                "evidence": {"actual_parent_verification": "deferred_to_independent_graph_GUIDs"}})
+            continue
+        if condition.get("kind") == "prospective_reference_parent":
+            target = condition["target_id"]
+            options = {"return": ["id", "parent"]}
+            rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [target]}}, options))
+            valid = (len(rows) == 1 and _same_identity(rows[0].get("id"), target)
+                     and _same_identity(_reference_identity(rows[0].get("parent")), condition["parent_id"]))
+            for name, expected in condition["metadata"].items():
+                info = _read_property_info(read, class_id=condition["class_id"], name=name)
+                valid = (valid and _native_snapshot_equal(info.as_dict(), expected["normalized"])
+                         and _native_snapshot_equal(dict(info.raw), expected["native"]))
+            assertions.append({"name": f"new reference {condition['reference']} retains its declared {condition['parent_reference']} parent",
+                "passed": valid, "evidence": {"target_id": target, "required_parent_id": condition["parent_id"], "rows": rows}})
+            continue
+        if condition.get("kind") == "shared_target":
+            facts = _read_shared_reference_target(condition["target_id"], read=read,
+                platform=condition.get("platform"), version=condition["version"], require_match=False)
+            assertions.append({"name": f"reference {condition['reference']} retains native ShareSet classification",
+                "passed": _native_snapshot_equal(facts, condition["classification"]),
+                "evidence": {"target_id": condition["target_id"], "expected": condition["classification"], "actual": facts}})
+            continue
+        if condition.get("kind") == "target_classifier":
+            facts = _read_reference_target_classifiers(condition["target_id"], condition["classifiers"],
+                read=read, platform=condition.get("platform"))
+            assertions.append({"name": f"reference {condition['reference']} retains native target classification",
+                "passed": _native_snapshot_equal(facts, condition["classifiers"]),
+                "evidence": {"target_id": condition["target_id"], "expected": condition["classifiers"], "actual": facts}})
+            continue
+        source, target, name = condition["source_id"], condition["target_id"], condition["parent_reference"]
+        options = {"return": ["id", "parent", name]}
+        if condition.get("platform") is not None:
+            options["platform"] = condition["platform"]
+        identities = [source] if _same_identity(source, target) else [source, target]
+        rows = _rows(read(OBJECT_GET_URI, {"from": {"id": identities}}, options))
+        owners = [row for row in rows if _same_identity(row.get("id"), source)]
+        targets = [row for row in rows if _same_identity(row.get("id"), target)]
+        expected = condition["parent_id"] if after_write else condition["before_parent_id"]
+        actual = None
+        valid = len(rows) == len(identities) and len(owners) == len(targets) == 1 and _has_field(owners[0], name)
+        if valid:
+            value = _field_value(owners[0], name)
+            actual = None if _reference_value_is_null(value) else _reference_identity(value)
+            valid = ((actual is None and expected is None) or _same_identity(actual, expected)) and _same_identity(
+                _reference_identity(targets[0].get("parent")), condition["parent_id"])
+        info = _read_property_info(read, object_id=source, name=name)
+        valid = valid and _native_snapshot_equal(info.as_dict(), condition["controller_metadata"]) and _native_snapshot_equal(
+            dict(info.raw), condition["controller_native_metadata"])
+        assertions.append({"name": f"reference {condition['reference']} retains exact {name} parent scope", "passed": valid,
+            "evidence": {"expected_source_reference": expected, "actual_source_reference": actual,
+                "required_parent_id": condition["parent_id"], "rows": rows}})
+    return assertions
 
 
 def _require_reference_clear_allowed(
@@ -20934,6 +27014,10 @@ def _require_reference_clear_allowed(
                 "restriction": dict(metadata.restriction),
             },
         )
+    if "notNull" in restrictions:
+        raise OperationContractError("REFERENCE_NOT_CLEARABLE",
+            "Live getPropertyInfo metadata marks this reference as non-null.",
+            details={"reference": metadata.name, "restriction": dict(metadata.restriction)})
     for item in restrictions:
         if isinstance(item, str):
             if item == "notNull":
@@ -20948,6 +27032,10 @@ def _require_reference_clear_allowed(
             if item == "playable":
                 # A target classifier is unnecessary when no target remains.
                 continue
+            if item == "mustChildOf":
+                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
+                    "The native mustChildOf flag has no proven clear-operation semantics.",
+                    details={"reference": metadata.name, "restriction": dict(metadata.restriction)})
             raise OperationContractError(
                 "INVALID_METADATA",
                 "Reference restriction metadata contains an unknown string flag.",
@@ -21067,12 +27155,18 @@ def _require_specialized_object_tree_relationships(
     version: str,
 ) -> None:
     for node in nodes:
-        if not node.children:
+        source_children = [child for child in node.children if child.collection == "children"
+            and child.plugin is not None and child.plugin.kind == "source"]
+        if source_children and node.type != "Sound":
+            raise OperationContractError("INVALID_SOURCE_TARGET", "Source plugin construction requires a Sound/Voice parent.",
+                details={"request_path": node.request_path})
+        ordinary_children = [child for child in node.children if child.collection == "children" and child not in source_children]
+        if not ordinary_children:
             continue
         _require_specialized_object_child_types(
             version=version,
             parent_type=node.type,
-            child_types=tuple(child.type for child in node.children),
+            child_types=tuple(child.type for child in ordinary_children),
             details={"request_path": node.request_path},
         )
 
@@ -21159,7 +27253,7 @@ def _reject_protected_replace_boundary(target: ResolvedObject) -> None:
     if protected:
         raise OperationContractError(
             "PROTECTED_REPLACE_ROOT",
-            "Project, management, and default-work-unit roots cannot bound or be removed by object.create replace.",
+            "Project, management, and default-work-unit roots cannot bound or be removed by replacement.",
             details={"target": target.as_dict()},
         )
 
@@ -21272,6 +27366,37 @@ def _direct_child_parent_relationship_matches(
     return None
 
 
+def _stored_reference_clear_observation(field_name: str) -> dict[str, str]:
+    return {"contract": "waapi-skill.stored-reference-clear/v1", "value_source": "local_stored",
+        "field": field_name, "outcome": "stored reference cleared; an inherited reference may still apply"}
+
+
+def _require_stored_reference_clear_observation(prepared: Mapping[str, Any]) -> str | None:
+    plan = prepared.get("verification_plan", {})
+    if not isinstance(plan, Mapping):
+        return None
+    if prepared.get("operation") != "object.setReference" or plan.get("expected_clear") is not True:
+        return None
+    field_name = plan.get("field")
+    state = prepared.get("pre_state", {})
+    before = state.get("field_before", {}) if isinstance(state, Mapping) else {}
+    row = before.get("row", {}) if isinstance(before, Mapping) else {}
+    if (not isinstance(field_name, str) or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(field_name) is None
+            or plan.get("reference_observation") != _stored_reference_clear_observation(field_name)
+            or not isinstance(before, Mapping) or not isinstance(row, Mapping)
+            or before.get("reference_observation") != plan["reference_observation"]
+            or before.get("field") != field_name or "value" not in before or "resolved_value" not in before
+            or f"@{field_name}" not in row or field_name not in row
+            or not _reference_value_is_observed(before.get("value"))
+            or not _reference_value_is_observed(before["resolved_value"])
+            or not _native_snapshot_equal(before.get("value"), row[f"@{field_name}"])
+            or not _native_snapshot_equal(before["resolved_value"], row[field_name])):
+        raise OperationContractError("REFERENCE_CLEAR_REPREVIEW_REQUIRED",
+            "A clear requires a fresh Preview with its directly stored reference bound; legacy resolved values cannot be reinterpreted as stored values.",
+            details={"automatic_retry": False, "stored_reference_observation_required": True})
+    return field_name
+
+
 def _has_field(row: Mapping[str, Any], field_name: str) -> bool:
     return any(key in row for key in (field_name, f"@{field_name}", f"@@{field_name}"))
 
@@ -21291,17 +27416,30 @@ def _reference_identity(value: Any) -> Any:
     return None
 
 
-def _reference_value_is_null(value: Any) -> bool:
+def _reference_value_is_observed(value: Any) -> bool:
     if value is None:
         return True
     if isinstance(value, Mapping):
-        if "id" not in value or set(value) - {"id", "name", "type", "path"}:
+        if "id" not in value:
             return False
-        if any(key in value and not isinstance(value[key], str) for key in value):
+        if any(key in value and not isinstance(value[key], str) for key in ("id", "name", "type", "path")):
             return False
-        identity = value["id"]
-    else:
-        identity = value
+        # Pinned objectReturn reference objects permit additional properties.
+        # Keep their JSON values intact inside the already bounded native read.
+        try:
+            canonical_json_bytes(dict(value))
+        except (TypeError, ValueError, OverflowError, RecursionError):
+            return False
+        value = value["id"]
+    return isinstance(value, str) and _PLUGIN_GUID.fullmatch(value) is not None
+
+
+def _reference_value_is_null(value: Any) -> bool:
+    if value is None:
+        return True
+    if not _reference_value_is_observed(value):
+        return False
+    identity = value["id"] if isinstance(value, Mapping) else value
     return (
         isinstance(identity, str)
         and identity.casefold()
@@ -21309,7 +27447,37 @@ def _reference_value_is_null(value: Any) -> bool:
     )
 
 
+def _reference_requirement_matches(row: Mapping[str, Any], name: str, expected: Any) -> bool:
+    if not _has_field(row, name):
+        return False
+    value = _field_value(row, name)
+    if expected is None:
+        return _reference_value_is_null(value)
+    if isinstance(expected, list):
+        return isinstance(value, list) and len(value) == len(expected) and all(
+            isinstance(_reference_identity(actual), str) and _same_identity(_reference_identity(actual), identity)
+            for actual, identity in zip(value, expected)
+        )
+    actual = _reference_identity(value)
+    return isinstance(actual, str) and _PLUGIN_GUID.fullmatch(actual) is not None and _same_identity(actual, expected)
+
+
+def _native_snapshot_equal(actual: Any, expected: Any) -> bool:
+    """Keep native snapshot values exact while distinguishing Boolean scalars."""
+    if isinstance(actual, Mapping) and isinstance(expected, Mapping):
+        return actual.keys() == expected.keys() and all(
+            _native_snapshot_equal(actual[key], expected[key]) for key in actual
+        )
+    if isinstance(actual, list) and isinstance(expected, list):
+        return len(actual) == len(expected) and all(
+            _native_snapshot_equal(left, right) for left, right in zip(actual, expected)
+        )
+    return condition_values_equal(actual, expected)
+
+
 def _typed_value_equal(actual: Any, expected: Any, metadata_type: str) -> bool:
+    if metadata_type.lower() in {"bool", "boolean"} or isinstance(actual, bool) or isinstance(expected, bool):
+        return type(actual) is bool and type(expected) is bool and actual is expected
     if metadata_type.lower() in {"real32", "real64", "float", "double"}:
         if isinstance(actual, bool) or isinstance(expected, bool):
             return False
@@ -21380,6 +27548,7 @@ def _operation_argument_contract(
 ) -> dict[str, Any]:
     contract = _json_mapping(value)
     if version is not None and operation in {
+        "object.set",
         "audio.importTabDelimited",
         "lua.executeCliFile",
         "lua.executeCoreFile",

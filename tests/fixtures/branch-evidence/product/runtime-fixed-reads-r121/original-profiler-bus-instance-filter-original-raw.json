@@ -1,0 +1,31 @@
+{
+  "api": "ak.wwise.core.profiler.getBusses",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r103-profiler-readers-native-2025-r1/owned/authoring-nodes/ef3383081f7e65e790dcd929/native-evidence/1792785534094249000-6fe1f17fad8043ea8fd9f14251b0094c-ak_wwise_core_profiler_getBusses.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      {
+        "depth": 0,
+        "deviceID": 17110352032617804106,
+        "downstreamGain": 0.0,
+        "effectCount": 0,
+        "gameObjectID": 18446744073709551614,
+        "gameObjectName": "Transport/Soundcaster",
+        "mixBusID": 710356924,
+        "objectGUID": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}",
+        "objectName": "WAAPI_V2_Weapons",
+        "pipelineID": 2,
+        "voiceCount": 1,
+        "volume": 0.0
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 10.0,
+  "version": "2025.1"
+}

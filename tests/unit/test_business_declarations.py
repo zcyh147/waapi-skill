@@ -1275,6 +1275,9 @@ def test_dependent_field_requires_exact_object_scope_for_enabled_check(
         args: dict[str, object],
         options: dict[str, object],
     ) -> dict[str, object]:
+        if uri == "ak.wwise.core.object.getTypes":
+            assert args == {} and options == {}
+            return {"return": [{"classId": 65552, "name": "Sound", "type": "WObject"}]}
         if uri.endswith("getPropertyAndReferenceNames"):
             return {"return": ["Volume"]}
         if uri.endswith("getPropertyInfo"):
@@ -1341,3 +1344,54 @@ def test_live_property_enum_restrictions_fail_closed(
             token="LoopMode",
         )
     assert captured.value.repair["error_code"] == "INVALID_METADATA"
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+@pytest.mark.parametrize("type_facts,expected_code", [({}, "FIELD_TYPE_UNAVAILABLE"), ({"type": None}, "METADATA_READBACK_INVALID"), ({"type": True}, "METADATA_READBACK_INVALID")])
+def test_exact_live_token_binding_distinguishes_optional_type_absence_from_malformed_present_type(version, type_facts, expected_code):
+    registry = BusinessHandleRegistry(_context(wwise_version=version, wwise_build=f"{version}.fixture"))
+    calls = []
+    def read(uri, args, options):
+        calls.append((uri, dict(args), dict(options)))
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            return {"name": "Volume", **type_facts}
+        raise AssertionError(uri)
+    with pytest.raises(BusinessDeclarationError) as error:
+        bind_live_field(registry, read_call=read, scope_kind="object", scope_value=OBJECT_ID, token="Volume")
+    assert error.value.error_code == expected_code
+    assert calls[-1][1] == {"object": OBJECT_ID, "property": "Volume"}
+    assert registry.as_dict()["fields"] == []
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", None])
+def test_blend_track_relative_identity_requires_the_observed_version_profile(version):
+    with pytest.raises(ValueError):
+        normalize_live_object_identity({"id": OBJECT_ID, "name": "On-Load", "type": "BlendTrack", "path": "On-Load"}, version=version)
+
+
+@pytest.mark.parametrize("version,object_type,name", [
+    ("2022.1", "Platform", "Mac"), ("2023.1", "Platform", "Mac"),
+    ("2024.1", "Platform", "Mac"), ("2025.1", "Platform", "Mac"),
+    (None, "Platform", "Mac"), ("2021.1", "Sound", "Rain"),
+    ("2022.1", "Language", "SFX"), ("2023.1", "Language", "SFX"),
+    ("2024.1", "Language", "SFX"), ("2025.1", "Language", "SFX"), (None, "Language", "SFX"),
+])
+def test_scope_display_identity_does_not_relax_unobserved_types_or_versions(version, object_type, name):
+    with pytest.raises(ValueError, match="absolute Wwise path or a reviewed derived display identity"):
+        normalize_live_object_identity({"id": OBJECT_ID, "name": name, "type": object_type, "path": name}, version=version)
+
+
+@pytest.mark.parametrize('version', SUPPORTED_WWISE_VERSIONS)
+def test_unicode_context_matches_exactly_and_rejects_normalization_drift(version):
+    context = _context(project_path='/项目/é-🚗/SampleProject.wproj', wwise_version=version)
+    registry = BusinessHandleRegistry(context, token_bytes=lambda size: b'u' * size)
+    bound = registry.bind_object(object_id=OBJECT_ID, name='天气', object_type='ActorMixer',
+        path=r'\Actor-Mixer Hierarchy\Default Work Unit\天气')
+    assert registry.resolve_object(bound.handle, context=context) == bound
+    changed = _context(project_path='/项目/e\u0301-🚗/SampleProject.wproj', wwise_version=version)
+    with pytest.raises(BusinessDeclarationError) as caught:
+        registry.resolve_object(bound.handle, context=changed)
+    assert caught.value.repair['error_code'] == 'HANDLE_PROJECT_MISMATCH'
+    assert caught.value.repair['draft_changed'] is False

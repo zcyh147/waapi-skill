@@ -1308,11 +1308,11 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
         )
     expected_declaration_append = {
         "object.copy": [
-            "[--name-conflict fail|rename]",
+            "[--name-conflict fail|rename|replace]",
         ],
         "object.delete": [],
         "object.move": [
-            "[--name-conflict fail|rename]",
+            "[--name-conflict fail|rename|replace]",
         ],
         "object.setName": [
             "--new-name",

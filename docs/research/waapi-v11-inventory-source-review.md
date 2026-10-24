@@ -112,3 +112,135 @@ After the portability merge, 29 focused source-identity, depth-inventory and
 profile-schema attribution checks passed in 58.51s. Both generator `--check`
 commands again returned 0. Runtime seals and all structural counts above stayed
 unchanged; the refreshed branch ledger adds the portable helper's source seal.
+
+## Saved Source continuation parser review
+
+At `c4c56351`, the parser projection adds only `continue-source-copy-proof`.
+Removing that row reproduces the prior reviewed parser hash
+`dce2f9c49744069a16be79a3e145bbdb0dfee2190d3d53e1e2836ebb343d46b0` exactly;
+the complete projection hashes to
+`26fc00e581429d36a11c09c9f66d51e21f24ae5e0968d7acc5a8e37dad998cb7`.
+All prior command/parameter rows and the other three source-contract seals are
+unchanged. The first integration generation stopped on this stale policy seal
+before writing derived files or starting the evidence capture.
+
+The command consumes the Gateway-issued owner identity and, for a checked parent
+Draft, its issued task authority and revision. The disclosed `--decline-save`
+choice records explicit refusal; it does not execute Save. Generated Save
+children retain separate Preview and policy/confirmation authorization, durable
+parent bindings, configuration checks and execute-once guards. Callers copy the
+issued continuation; they do not construct a native request or choose another
+project. This review admits the parser contract only. Complete saved-graph proof
+remains restricted to the eligible 2021.1 Source shape; it grants no new native,
+Fresh or exhaustive business-coverage credit.
+
+## R92 cumulative integration reconciliation
+
+Reviewed integration candidate: `66a0677f13a290c274d98b59ec35c93e9f4e7546`.
+The prior reviewed policy at `c5b93c31` was reproduced exactly in a separate
+immutable snapshot before comparison. Independent interpreter processes loaded
+the producer functions and runtime only from their matching snapshot; import
+roots were checked. The `927f4468` to `4bd56cf6` successor has zero changes in
+all three canonical projections, and the merged candidate changes only the
+test-inventory record relative to that successor. The cumulative seals are:
+
+| Seal | Previous reviewed value | Reconciled value |
+| --- | --- | --- |
+| `gateway_parser_sha256` | `26fc00e581429d36a11c09c9f66d51e21f24ae5e0968d7acc5a8e37dad998cb7` | `6dc4cb03ba12b6a935006231270bc431187ba9367575efc15718fe645d0af3bb` |
+| `operation_contract_sha256` | `3c8e8b29b141e084653af5dc682ae5b6e990b0d4a7ea49e6e84697a65f9c9be1` | `b2d76899195fbd342375b80651c80b8d5229af2330cd0ee8d991645d242b5b59` |
+| `public_continuation_sha256` | `d70ab5cd8cb16538326e7939250429dd86ea03dc7993f3f110fa25438f05e5c0` | `7e63798666897561b08432f6016228adb55199bd4a47f15d48314ea1bcaf5584` |
+| `typed_request_surface_sha256` | `829f71b2cca1e2779e14f7c681cc3802b94945f9a9a9e111c070c82478151150` | `829f71b2cca1e2779e14f7c681cc3802b94945f9a9a9e111c070c82478151150` |
+
+The typed-request surface is byte-identical. Named operation/version identities
+remain 153, with 23 changed public contract rows: `object.set` and
+`object.setRTPC` on 2022.1–2025.1, and `object.setProperty`,
+`object.setReference` and `waapi.undoGroup` on all five versions. Their changes
+are the reviewed owned Modulator/Time alternatives and boundaries; Switch-child
+structural identity and receipt-bound history; source-bound master-Bus reference
+applicability; finite named Metadata and anonymous Marker construction; and
+actual-native-name staged creation/history. Scalar field semantics, exact
+identity and preservation proofs remain Gateway-owned. Typed List restoration,
+old-custom replacement disposition, mixed-platform inputs and broader
+conflict/history combinations remain unfinished under their existing owners.
+
+The declared continuation projection retains 897 identities and changes 114
+rows. Eighty-two existing core-call rows inherit the shared meter parser flags;
+26 existing metadata rows inherit versioned curve-role validation rather than
+a fixed seven-choice argparse list. These shared-parser repetitions do not add
+routes. Five object.get rows disclose closed local-reference and override-source
+values, related singleton/list/sequence/reducer outputs, metadata-bound scalar
+and reference conditions, safe namespaced scalar conditions, randomizers,
+finite local Lists and source-certified reference kinds. Blend Track output is
+only 2024.1/2025.1. Read projections retain identity, occurrence, metadata,
+result and page bounds and never confer mutation authority. The remaining row
+is the reviewed 2025.1 structureChanged public Notes match compatibility:
+derived digest/handles change while raw catalogs and native branch IDs stay
+fixed. Filtered delivery and Authoring effects remain separate acceptance work.
+
+The parser grows from 78 to 79 rows. The only added command is
+`draft-bind-switch-child-context`, accepting copied Draft/task/revision/owner/
+child authority. Seven existing rows change: core-call gains eleven closed
+meter output/scope flags; draft-declare-field-change and draft-declare-rtpc gain
+four new-owned-ControlInput flags, with existing input now an exclusive
+alternative; query-object gains local/override/related/condition options;
+metadata defers curve-role validation to matching-version preflight; and the
+query-schema output and source-control usage-output choices inherit
+blend-tracks. All prior root parser fields are unchanged.
+
+These changes reuse the reviewed components and exact evidence scopes recorded
+in `tests/TEST_INVENTORY.md`: R59 owned construction, R67–R69 output modes,
+R71–R76 related queries and structural identity/history, R77–R83 staged graphs
+and metadata-bound conditions, R84–R90 finite Metadata/Marker/List/randomizer
+contracts, and R90–R92 scoped Profiler/control repairs. Original failed and
+indeterminate receipts keep their original candidates and verdicts; component
+checks are not added together or promoted to whole-ticket acceptance.
+
+### Dynamic public-schema boundary
+
+Zero successor projection delta does not mean unchanged runtime public
+verification descriptions. The producer copies non-named declarations from
+the packaged typed-request surface; it does not dynamically re-evaluate every
+exact-URI request-schema contract. F3 and F6 are reviewed through their direct
+public-schema and transaction controls, separately from these source seals:
+
+- Transport executeAction, all five versions, adds closed action-meaning and
+  bounded verification disclosures: selected/all-active association checks,
+  toggle prestate, at most 64 targets and one later getState observation per
+  target. Transient playback and unresolved native action semantics remain
+  unverified. No continuous, causal or atomic-snapshot guarantee is made.
+- Profiler saveCapture, 2023.1–2025.1, adds exact authorized nonempty created or
+  content-changed artifact proof and bounded regular-file preservation. Native
+  capture format validity and content completeness remain unverified.
+
+The reviewed F6 repair at `0aeaee85` rejects redirected root/destination identity
+before content reads; the reviewed F3 repair at `4bd56cf6` rejects retired or
+replaced selected-handle generations and preserves deferred verification on
+unavailable membership reads. Neither changes accepted input fields, parser or
+version scope. Their independent reviews resolved the causal findings; the
+existing receipts and native-effect limits stay explicit. This reconciliation
+adds no generic inventory architecture and no native/Fresh execution credit.
+
+The final audit must retain this precise projection limit. Regeneration is
+source-consistency accounting, not promotion of pending source-only mappings,
+including the historical f72 proposal. Existing IDs, owners, dispositions,
+requirements and evidence provenance are preserved.
+
+### R92 generation result and retained Source bridge blocker
+
+The existing interface-depth producer and its `--check` both returned 0 on the
+owned reconciliation worktree based at `66a0677f`. Its summary, dispositions,
+owners, native and operation identities, family assignments and mechanic states
+are unchanged. Only five object.get field-contract digests and 23 named contract
+digests change; nine named rows also change their argument-contract digest. The
+interned tables remain 217 field contracts and 35 argument contracts.
+
+The subsequent existing branch producer returned 1 before writing any artifact:
+`Original Source proof/context/public configuration differs`. Its sealed Source
+native attachment contexts disagree with current dependency hashes on the same
+32 files for all five versions. Eight of those files already differed at the
+previous reviewed policy base; none is the policy or regenerated depth file.
+This is a retained evidence-source dependency review, not a new native execution
+failure. The original attachments, branch artifacts and evidence index were not
+modified or re-sealed. Branch `--check` and completion checks remain unrun until
+that explicit bridge reconciliation is accepted; no complete branch generation
+or current branch-coverage consistency is claimed by this partial result.

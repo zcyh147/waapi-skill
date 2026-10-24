@@ -1,0 +1,86 @@
+{
+  "selection": "mf1.1792523914.101.b1af0d9ed6e9e2de03537f7cec7ed3440f904e0ddf7c8d15d2b69c6908615cbc",
+  "scope": {
+    "kind": "object_type",
+    "requested": "Sound",
+    "resolved": {
+      "classId": 65552,
+      "name": "Sound",
+      "type": "WObject"
+    }
+  },
+  "metadata": {
+    "name": "Weight",
+    "type": "Real64",
+    "default": 50.0,
+    "audioEngineId": 4294967295,
+    "supports": {
+      "rtpc": "None",
+      "randomizer": false,
+      "unlink": true
+    },
+    "display": {
+      "name": "Weight",
+      "index": 1517,
+      "group": "Random"
+    },
+    "dependencies": [
+      {
+        "type": "property",
+        "action": "Show",
+        "property": "RandomOrSequence",
+        "context": "Parent",
+        "conditions": [
+          {
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "value": 1,
+                  "displayName": "1"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "restriction": {
+      "type": "range",
+      "min": 0.001,
+      "max": 100.0
+    },
+    "ui": {
+      "value": {
+        "min": 0.0010000000474974513,
+        "max": 100.0,
+        "decimals": 3,
+        "step": 1.0,
+        "fine": 0.001,
+        "infinity": 0
+      },
+      "displayAs": {
+        "lrMix": false,
+        "musicNote": false,
+        "bitfield": false,
+        "percentage": false
+      },
+      "dataMeaning": "None",
+      "autoUpdate": false
+    },
+    "unit": {
+      "status": "unknown",
+      "value": null
+    },
+    "availability": {
+      "type": "known",
+      "default": "known",
+      "restriction": "known",
+      "dependencies": "known",
+      "supports": "known",
+      "ui": "known"
+    }
+  },
+  "complete": true,
+  "mutation_authority": false
+}

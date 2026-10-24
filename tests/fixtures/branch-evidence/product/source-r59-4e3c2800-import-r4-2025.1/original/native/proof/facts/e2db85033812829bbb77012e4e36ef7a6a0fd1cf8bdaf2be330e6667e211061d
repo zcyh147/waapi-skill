@@ -1,0 +1,17 @@
+{
+  "api": "ak.wwise.core.object.create",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792541049342042000-7e8aca114b7841f588a7d326192b72ef-ak_wwise_core_object_create.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "id": "{42390779-452E-48BE-B3D4-4D3024F0DAAD}",
+    "name": "WAAPI_MODERN_SOURCE_3c95eac523"
+  },
+  "risk_level": "medium",
+  "timeout": 29.956705916003557,
+  "version": "2025.1"
+}

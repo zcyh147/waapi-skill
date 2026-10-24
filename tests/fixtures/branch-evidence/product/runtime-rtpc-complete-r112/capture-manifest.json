@@ -1,0 +1,726 @@
+{
+  "source_commit": "7bc03a2aa27e52cb659334ede09d5547ec211aed",
+  "count": 72,
+  "captures": {
+    "2021.1-wwise-authoring-0.json": {
+      "artifact": "2021.1-wwise-authoring-construction-program-capture.json",
+      "sha256": "afb083c98b434f8aca63ab26becf2e98e44788a746cd32f4225ec58d5d08a235",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[0-wwise-authoring-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-23637.json": {
+      "artifact": "2021.1-wwise-authoring-data-program-capture.json",
+      "sha256": "7be7b95fa74d54e8003a4c7d900315dfc03d142cb66b835ddda8f0032572a04b",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[positive-wwise-authoring-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-cursor-capture.json": {
+      "artifact": "2021.1-wwise-authoring-cursor-capture-program-capture.json",
+      "sha256": "363ea4a3a261a6815f5ad155d8a4794f979770c9ee029a7587589d7b52837449",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-capture-wwise-authoring-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-cursor-user.json": {
+      "artifact": "2021.1-wwise-authoring-cursor-user-program-capture.json",
+      "sha256": "3751723b2cb2f8ba06e7a5eae555c8f7e3444ad5772fa1de7db7df04045e808d",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-user-wwise-authoring-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-empty.json": {
+      "artifact": "2021.1-wwise-authoring-empty-program-capture.json",
+      "sha256": "ce857f734d52fac2f66757476c4fc91324d11554a72a924d52f61b57c78d6a11",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[empty-wwise-authoring-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-scalar.json": {
+      "artifact": "2021.1-wwise-authoring-scalar-program-capture.json",
+      "sha256": "50059d131ed440492f99b7b0588b0868ce9bcada3e50616cc45c2d90a5cd2f88",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[scalar-wwise-authoring-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-single.json": {
+      "artifact": "2021.1-wwise-authoring-single-program-capture.json",
+      "sha256": "3377b7bca767ead153d96ad13408fe7759d5c15aa61b0f66af490e5e3db08849",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[single-wwise-authoring-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-0.json": {
+      "artifact": "2021.1-wwise-console-construction-program-capture.json",
+      "sha256": "47077a818e77000a6e422cc87b99e0be321b209324a503f3576b98eb67e502d6",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[0-wwise-console-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-23637.json": {
+      "artifact": "2021.1-wwise-console-data-program-capture.json",
+      "sha256": "4ef9c0786623f3281373c3aedf679a0967a3d79e3a13f73f429efd77452d4c7a",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[positive-wwise-console-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-cursor-capture.json": {
+      "artifact": "2021.1-wwise-console-cursor-capture-program-capture.json",
+      "sha256": "29348f44323bda3315fc3c3cf95cd02229b829fbd38c021bb31ca05ecf9c0553",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-capture-wwise-console-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-cursor-user.json": {
+      "artifact": "2021.1-wwise-console-cursor-user-program-capture.json",
+      "sha256": "ef1cc858db3f923aa1c4f9f8d2e81c5efe0b628a601ac7d49b43358150ee54d4",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-user-wwise-console-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-empty.json": {
+      "artifact": "2021.1-wwise-console-empty-program-capture.json",
+      "sha256": "0c262f13e9f3e5651a5f123156ac1c142faf74e3fc80744e73cd48132956f59a",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[empty-wwise-console-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-scalar.json": {
+      "artifact": "2021.1-wwise-console-scalar-program-capture.json",
+      "sha256": "d0670943c3dc7fe5afcef1a80893fdfcf619296382c9249ba70cd2c6698fffeb",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[scalar-wwise-console-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-single.json": {
+      "artifact": "2021.1-wwise-console-single-program-capture.json",
+      "sha256": "c863be0f53c7549b3e0fa48cfbe133bb93df79aed579ca6a430fc72682b7b52f",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[single-wwise-console-2021.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-original-array.json": {
+      "artifact": "2022.1-wwise-authoring-data-guard-program-replay.json",
+      "sha256": "d5d1dde777b77e3053650237ab1da91f41374d0a238b5319a542d1add08d757d",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_original_complete_native_arrays_preserved_through_public_gateway[2022.1-17]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-0.json": {
+      "artifact": "2022.1-wwise-authoring-construction-program-capture.json",
+      "sha256": "cae8fa63a9bcdb21218d8e15d3a3cf6ebbd445a766ce33f41782a40ce381ebe5",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[0-wwise-authoring-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-23637.json": {
+      "artifact": "2022.1-wwise-authoring-data-program-capture.json",
+      "sha256": "24bf9b3ea4428604c03efc08aff3be8f30ec6ee46b757201cc532521e255fc28",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[positive-wwise-authoring-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-cursor-capture.json": {
+      "artifact": "2022.1-wwise-authoring-cursor-capture-program-capture.json",
+      "sha256": "a4bd5366e9650d5a823ccf89e0dc737c46a7c4c99068a80d9bd2252293401699",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-capture-wwise-authoring-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-cursor-user.json": {
+      "artifact": "2022.1-wwise-authoring-cursor-user-program-capture.json",
+      "sha256": "e8c9d8d93f596dfd5a7d7698eb4882aebcc67550021cdc2497ec13828c320536",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-user-wwise-authoring-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-empty.json": {
+      "artifact": "2022.1-wwise-authoring-empty-program-capture.json",
+      "sha256": "203d1460c8f431ba43ee471955bd3660d37bf3c205feb8d2792347112f8020fc",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[empty-wwise-authoring-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-scalar.json": {
+      "artifact": "2022.1-wwise-authoring-scalar-program-capture.json",
+      "sha256": "e1b6a35be98ef69196c034ca392993839805b069d3b5c25dddb77932a2ad09a8",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[scalar-wwise-authoring-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-single.json": {
+      "artifact": "2022.1-wwise-authoring-single-program-capture.json",
+      "sha256": "6f55831e7a59c9bd43782c20e457e91e8bdc9b0ea3495a34051d9be6b7f77835",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[single-wwise-authoring-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-0.json": {
+      "artifact": "2022.1-wwise-console-construction-program-capture.json",
+      "sha256": "9957f0c79efc0dfb20ef8c3065d97fc1df3d9d4a6e5e7cf5dd2791cc215669a8",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[0-wwise-console-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-23637.json": {
+      "artifact": "2022.1-wwise-console-data-program-capture.json",
+      "sha256": "c3be4a11a23ca60e58d24428da58775d16b37bff355504b990d12ce02a64d8c0",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[positive-wwise-console-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-cursor-capture.json": {
+      "artifact": "2022.1-wwise-console-cursor-capture-program-capture.json",
+      "sha256": "6a149c9a1d1a610212e4c3b85270f34aaa44ce206814c16b3791b75778b20663",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-capture-wwise-console-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-cursor-user.json": {
+      "artifact": "2022.1-wwise-console-cursor-user-program-capture.json",
+      "sha256": "421fdffcef89b2ee7b926469b6fcd64a24e03d6b849409957d359156656579b8",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-user-wwise-console-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-empty.json": {
+      "artifact": "2022.1-wwise-console-empty-program-capture.json",
+      "sha256": "2e4716c9de255d15e7426930656346df23d42e4b7cc7eddcf5c56ac2fb7b5294",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[empty-wwise-console-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-scalar.json": {
+      "artifact": "2022.1-wwise-console-scalar-program-capture.json",
+      "sha256": "2d7afea755f989e2a710bf21b19b0bea55864aaa4c92ccb76ded3afd8078aff5",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[scalar-wwise-console-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-single.json": {
+      "artifact": "2022.1-wwise-console-single-program-capture.json",
+      "sha256": "deec3cf15ca8c0de353b2492c99cf63af2804fab3f023dd085017dbc4c89f05c",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[single-wwise-console-2022.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-0.json": {
+      "artifact": "2023.1-wwise-authoring-construction-program-capture.json",
+      "sha256": "001ddbed6dcca70e325b88677844b44dc07cee227cc12afd2819634278a8f67e",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[0-wwise-authoring-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-23637.json": {
+      "artifact": "2023.1-wwise-authoring-data-program-capture.json",
+      "sha256": "a53283500e9b52f96bdb17cc1a0fd0238df7f131243e92975bfd619521608580",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[positive-wwise-authoring-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-cursor-capture.json": {
+      "artifact": "2023.1-wwise-authoring-cursor-capture-program-capture.json",
+      "sha256": "a50adbcdb75b15359d9c4dd3974b68a8d9195daed1a27fad8c4d2636bd81cbc6",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-capture-wwise-authoring-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-cursor-user.json": {
+      "artifact": "2023.1-wwise-authoring-cursor-user-program-capture.json",
+      "sha256": "f02de1751880694fc7bf91d05488ff212517fadbfd731e47bbbc27bfc2f88106",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-user-wwise-authoring-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-empty.json": {
+      "artifact": "2023.1-wwise-authoring-empty-program-capture.json",
+      "sha256": "fd5adacd76e5626a569b6bdccfcb110cdc59542c475f9a75bbbccff810c0ffc1",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[empty-wwise-authoring-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-scalar.json": {
+      "artifact": "2023.1-wwise-authoring-scalar-program-capture.json",
+      "sha256": "332b8e006ef83d2533f20b10566ac25024a6dd5291f1ecfc035babdefec06d7d",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[scalar-wwise-authoring-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-single.json": {
+      "artifact": "2023.1-wwise-authoring-single-program-capture.json",
+      "sha256": "7dccb39ae5f217751f9324306dba9c0a003998c1ccda017967f106c30dc08fb6",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[single-wwise-authoring-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-0.json": {
+      "artifact": "2023.1-wwise-console-construction-program-capture.json",
+      "sha256": "dfb8be20f5743e4f82ff6544d65e6b9eff0c31653b32d13eb391e6d73894d8c6",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[0-wwise-console-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-23637.json": {
+      "artifact": "2023.1-wwise-console-data-program-capture.json",
+      "sha256": "653cc336e8145d5f553256598e030602443919ec7991132eacf9ff87d99c3cec",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[positive-wwise-console-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-cursor-capture.json": {
+      "artifact": "2023.1-wwise-console-cursor-capture-program-capture.json",
+      "sha256": "f6fda26e7bedd767e82e0d529a8b8bd481cd1aec7af471f40f8a63f89dc7d704",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-capture-wwise-console-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-cursor-user.json": {
+      "artifact": "2023.1-wwise-console-cursor-user-program-capture.json",
+      "sha256": "7eb092bdee97542405e4bf38c3f16856a87992b66f98991e9934297a3a800bf1",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-user-wwise-console-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-empty.json": {
+      "artifact": "2023.1-wwise-console-empty-program-capture.json",
+      "sha256": "1b1b0760375e644f50dc3dcb69688bffb1e5cc9ff1efeccc451e6f526cebe3a0",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[empty-wwise-console-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-scalar.json": {
+      "artifact": "2023.1-wwise-console-scalar-program-capture.json",
+      "sha256": "b1a27332b5feebd250247ebe92bc612746249ed1a2644bdbeba11d563f147379",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[scalar-wwise-console-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-single.json": {
+      "artifact": "2023.1-wwise-console-single-program-capture.json",
+      "sha256": "c0f2e3810f4ea1833147a7eae052757becc5a6349d97885f0b420bea3897da76",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[single-wwise-console-2023.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-0.json": {
+      "artifact": "2024.1-wwise-authoring-construction-program-capture.json",
+      "sha256": "ab613d7f46de0540c001d6335aef478cac5f191ede8bb2fbe5615cb2c3efbbd2",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[0-wwise-authoring-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-23637.json": {
+      "artifact": "2024.1-wwise-authoring-data-program-capture.json",
+      "sha256": "d430f47f3b9adba9f93a99de8c84698d75050ebb9a1a97a4458939bb4bb6b7cf",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[positive-wwise-authoring-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-cursor-capture.json": {
+      "artifact": "2024.1-wwise-authoring-cursor-capture-program-capture.json",
+      "sha256": "2e1b6b59ef821105029bf4d82d79bf25da0aebc4b14c8161af18822f12caa5cf",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-capture-wwise-authoring-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-cursor-user.json": {
+      "artifact": "2024.1-wwise-authoring-cursor-user-program-capture.json",
+      "sha256": "dcca48daaaef97f60923fb74c1fbd9db5443c37247a97edfbfd1273d3ac58522",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-user-wwise-authoring-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-empty.json": {
+      "artifact": "2024.1-wwise-authoring-empty-program-capture.json",
+      "sha256": "5606b1bdda59309ea531f9e0969b8ffaa70fcb4492dba2ed7477c7c65f30e5b8",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[empty-wwise-authoring-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-scalar.json": {
+      "artifact": "2024.1-wwise-authoring-scalar-program-capture.json",
+      "sha256": "9f6f8a71b3468adaf373ff70524f2c011baf0f4dd9861de958745a6617c7059d",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[scalar-wwise-authoring-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-single.json": {
+      "artifact": "2024.1-wwise-authoring-single-program-capture.json",
+      "sha256": "8f85f08d629ac568fad548948a00fc526c56d6dd366d41104c4b02cf85b72a52",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[single-wwise-authoring-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-0.json": {
+      "artifact": "2024.1-wwise-console-construction-program-capture.json",
+      "sha256": "47e1d7fb300ab43a8363b0ff33d605b1d09383696c0401a8810c1b05466ef494",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[0-wwise-console-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-23637.json": {
+      "artifact": "2024.1-wwise-console-data-program-capture.json",
+      "sha256": "ad8c59c4a0da97bfefa85e02963d126e0a2747ef0b7497d8a5dece7ec3252391",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[positive-wwise-console-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-cursor-capture.json": {
+      "artifact": "2024.1-wwise-console-cursor-capture-program-capture.json",
+      "sha256": "e679a88aba647b3c1c3421f6d292120b2947913f4f463569bec1542597f6d29a",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-capture-wwise-console-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-cursor-user.json": {
+      "artifact": "2024.1-wwise-console-cursor-user-program-capture.json",
+      "sha256": "74d870d779cebcb69834d5fc26130ef01c9832d3df3b191d69031f7761eec2a4",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-user-wwise-console-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-empty.json": {
+      "artifact": "2024.1-wwise-console-empty-program-capture.json",
+      "sha256": "46ed7403d12143b5859e2b4b4d15d9e24089d4f3b9583806b8bae0b58099f57a",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[empty-wwise-console-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-scalar.json": {
+      "artifact": "2024.1-wwise-console-scalar-program-capture.json",
+      "sha256": "c65a248417d736854f15fb0b4bd5eb52be9a6aabc0d5cbccde732a173e23b177",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[scalar-wwise-console-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-single.json": {
+      "artifact": "2024.1-wwise-console-single-program-capture.json",
+      "sha256": "e21efbdedd69618d83ead485f678b3c362b44b7d97e680e18b4566e5ffd05cbe",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[single-wwise-console-2024.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-original-array.json": {
+      "artifact": "2025.1-wwise-authoring-data-guard-program-replay.json",
+      "sha256": "f15556711d8165022b582b83b72b7f253ace07df29ef37cb8914573d4f24a307",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_original_complete_native_arrays_preserved_through_public_gateway[2025.1-5]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-0.json": {
+      "artifact": "2025.1-wwise-authoring-construction-program-capture.json",
+      "sha256": "f3abeb4bcf82527fb290143213fb4bbb5abbb481e529303be70138d38decd28f",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[0-wwise-authoring-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-30837.json": {
+      "artifact": "2025.1-wwise-authoring-data-program-capture.json",
+      "sha256": "8a917badf5f89d2be708e561e359379c054c60c720fa9cdd97084ad04e13c84f",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[positive-wwise-authoring-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-cursor-capture.json": {
+      "artifact": "2025.1-wwise-authoring-cursor-capture-program-capture.json",
+      "sha256": "680f2de164e410f880c2e624e714da2b9b427d6862fe55f8e88de5798907eb23",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-capture-wwise-authoring-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-cursor-user.json": {
+      "artifact": "2025.1-wwise-authoring-cursor-user-program-capture.json",
+      "sha256": "5acfbe9e44f116442ad7df7ddefc863821d381bb8c1c4880a47fd1339a8ece1c",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-user-wwise-authoring-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-empty.json": {
+      "artifact": "2025.1-wwise-authoring-empty-program-capture.json",
+      "sha256": "28c080b349ef48b6c17d830526d1b016d76d548bf657edf219246a846b31aabf",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[empty-wwise-authoring-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-scalar.json": {
+      "artifact": "2025.1-wwise-authoring-scalar-program-capture.json",
+      "sha256": "16db1ce7997823919c7d3d0fffaeec037a6ec9c03a37578a63510edd846f0f71",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[scalar-wwise-authoring-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-single.json": {
+      "artifact": "2025.1-wwise-authoring-single-program-capture.json",
+      "sha256": "613f44cea04b7f99b999fa79d0b643d835c2a045a24b8874081f106f6efcc619",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[single-wwise-authoring-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-0.json": {
+      "artifact": "2025.1-wwise-console-construction-program-capture.json",
+      "sha256": "d9f7c1472494828b696bde34b8a2e0a26f6f4e125a159b8285e324617a6b9670",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[0-wwise-console-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-30837.json": {
+      "artifact": "2025.1-wwise-console-data-program-capture.json",
+      "sha256": "5279e2b1ee78697f3ea2774e54c8780456c3540fac1537d8d242591f3f2369f9",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_field_program_emits_after_actual_teardown[positive-wwise-console-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-cursor-capture.json": {
+      "artifact": "2025.1-wwise-console-cursor-capture-program-capture.json",
+      "sha256": "c6b1a8230e961f096c409d04c0a768b8b3bffd3ff83f3210ca9c7726496b091e",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-capture-wwise-console-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-cursor-user.json": {
+      "artifact": "2025.1-wwise-console-cursor-user-program-capture.json",
+      "sha256": "45e500f8a0c709f89f48c79f0b180ff07594e91197c5b3074b71a8ed690da6be",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[cursor-user-wwise-console-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-empty.json": {
+      "artifact": "2025.1-wwise-console-empty-program-capture.json",
+      "sha256": "1d5f68e33831f2685b4534b99221dabab4f0568974af671fe485ddba2428a8db",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[empty-wwise-console-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-scalar.json": {
+      "artifact": "2025.1-wwise-console-scalar-program-capture.json",
+      "sha256": "98c4d07961e814bd2ff19a3a03f65b7eb28bb33982fdb09e94c04feddf78a364",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_frontier_program_emits_after_actual_teardown[scalar-wwise-console-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-single.json": {
+      "artifact": "2025.1-wwise-console-single-program-capture.json",
+      "sha256": "b05ab5cdea52d1d0785a5879bba0ff0c01847a66eab254ab260620f3cc77ade5",
+      "nodeid": "tests/unit/test_rtpc_field_branch_evidence.py::test_rtpc_shape_program_emits_after_actual_teardown[single-wwise-console-2025.1]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    }
+  }
+}

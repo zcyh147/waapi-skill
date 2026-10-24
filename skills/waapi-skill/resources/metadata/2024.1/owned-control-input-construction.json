@@ -1,0 +1,94 @@
+{
+  "contract": "waapi-skill.owned-control-input-construction/v1",
+  "version": "2024.1",
+  "build": "2024.1.13.9056",
+  "sources": {
+    "wobjects": {
+      "member": "Authoring/Data/WObjects/WObjects.xml",
+      "sha256": "28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f",
+      "control_input_fragment": "<Reference Name=\"ControlInput\" DisplayName=\"Control Input\" SupportLink=\"false\" SupportCustom=\"true\">\r\n\t  \t<Restrictions>\r\n          <TypeEnumerationRestriction>\r\n            <Type Name=\"ModulatorLfo\" />\r\n            <Type Name=\"ModulatorEnvelope\" />\r\n            <Type Name=\"ModulatorTime\" />\r\n            <Type Name=\"GameParameter\" SupportCustom=\"false\" />\r\n            <Type Name=\"MidiParameter\" SupportCustom=\"false\" />\r\n          </TypeEnumerationRestriction>\r\n        </Restrictions>\r\n\t  </Reference>",
+      "fragment_sha256": "5da550590597c2281c74f594ce5cf195caa0beddc1cf7110d3d258e1cc4975b3"
+    },
+    "sdk_example": {
+      "member": "ak_wwise_core_object_set_example_adding_an_rtpc_with_curve_to_an_object_and_creates_a_new_custom_controlinput.html",
+      "sha256": "88e7bd29b2b224f443d688e9c147d16fcd5ae8b8cc438a0b4f362d8244724547",
+      "placement": [
+        "@RTPC",
+        "@ControlInput"
+      ],
+      "rtpc_type": "RTPC",
+      "curve_type": "Curve",
+      "control_input": {
+        "type": "ModulatorTime",
+        "name": "TimeMod",
+        "@TimeModDuration": 5,
+        "@EnvelopeStopPlayback": false
+      }
+    },
+    "sdk_classes": [
+      {
+        "name": "GameParameter",
+        "class_id": 1507344,
+        "source_member": "wwiseobject_gameparameter.html",
+        "source_sha256": "865d704881b34e4320f346fda911b460d6160c9659d8b1046c5215b193b6f728"
+      },
+      {
+        "name": "MidiParameter",
+        "class_id": 4128784,
+        "source_member": "wwiseobject_midiparameter.html",
+        "source_sha256": "6c4700150aa29739f2a23946d2dd61b662112ec09b2d3a73505c33f962f84c8f"
+      },
+      {
+        "name": "ModulatorEnvelope",
+        "class_id": 4259856,
+        "source_member": "wwiseobject_modulatorenvelope.html",
+        "source_sha256": "a252697d0dfa2e251a15566299ebdb0a1bec56b9514e56961dd97842104befc0"
+      },
+      {
+        "name": "ModulatorLfo",
+        "class_id": 4194320,
+        "source_member": "wwiseobject_modulatorlfo.html",
+        "source_sha256": "6c9016389ceb5d72f09460ed91d8a131528ed8359665672c45bf2bc6c708840c"
+      },
+      {
+        "name": "ModulatorTime",
+        "class_id": 5111824,
+        "source_member": "wwiseobject_modulatortime.html",
+        "source_sha256": "da219d7fea17e6a4d5052c6c6d1c8498174e270494634be6f20e3e6e2c840603"
+      },
+      {
+        "name": "RTPC",
+        "class_id": 1441808,
+        "source_member": "wwiseobject_rtpc.html",
+        "source_sha256": "3670dd1b3a144f1788a8fad434370f2bc1e037d53433ff169d2f11182cc1047d"
+      }
+    ],
+    "reflected_set": {
+      "manifest_sha256": "45e1f3cd2e18f0c9d6b86adcc5ce5823a05bb059c26a6713c6c99e9461aa0f68",
+      "args_schema_sha256": "220196e94b9183650bf662e1d45a160913d8059284e576d145afc48a6ede05a7",
+      "object_definition": "definitions"
+    },
+    "constructor_introduction": {
+      "build": "2022.1.19.8584",
+      "release_member": "whatsnew_2022_1.html",
+      "release_sha256": "7464fd8ceee05194221956a7c4173f92267304a8cb37524140453acf3b4f9eeb",
+      "rtpc_work_item": "WG-38235",
+      "feature_member": "whatsnew_2022_1_new_features.html",
+      "feature_sha256": "ef6a646ea1b813fa3c5a17231ab182671a0922d958a0da5b251c8d00d2f04201",
+      "custom_modulator_statement": "Custom and ShareSets Modulators can now be created."
+    },
+    "time_axis": {
+      "guide_member": "ch18s06.html",
+      "guide_sha256": "cc52d69790d82c6ca4c4704a1cc5dcae154f3abd156617b28edc4a98f8d58e7d",
+      "duration_member": "Authoring/Data/WObjects/Html/en/TimeModDuration.html",
+      "duration_sha256": "6c21b4981f52b205195067ce36a764b68fc09e69ca57f917d15d2f45146e5d6e",
+      "x_quantity": "time",
+      "unit": "seconds",
+      "duration_quantity": "one_iteration_at_normal_playback_rate",
+      "policy": "interim_gateway_intent_preservation_within_effective_duration",
+      "complete_native_domain": false
+    }
+  },
+  "scope": "new_property_bound_RTPC_ControlInput_only; native_acceptance_not_inferred_from_static_sources",
+  "authority_sha256": "63b09bef2815e20e95f7b154c81e6ff678905cace37660d9140d3030f2596829"
+}

@@ -1,0 +1,73 @@
+{
+  "branch_ids": [
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/autoAddToSourceControl/@boolean/false",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/autoCheckOutToSourceControl/@boolean/false",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name"
+  ],
+  "business_fact_id": "2023.1|source-copy-synth-owned-graph",
+  "contract": "waapi-skill.source-copy-native-attachment/v1",
+  "equivalence": {
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+      "artifact": "native/equivalence-0.json",
+      "sha256": "3c316bbd2f5dad8faa427ea2763f263750dab54567d49cd361b5bd97712fc94b"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/autoAddToSourceControl/@boolean/false": {
+      "artifact": "native/equivalence-1.json",
+      "sha256": "7fc0c10f82cb3b7d5fff098a9d0e03044720fc9d0df94d13fec83b8dea6881d2"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/autoCheckOutToSourceControl/@boolean/false": {
+      "artifact": "native/equivalence-2.json",
+      "sha256": "bc0f1f69226c7d361d453ba5d1cd4e5914c1d29dfb4fbc4d9a8f5325783efd8a"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": {
+      "artifact": "native/equivalence-3.json",
+      "sha256": "39f5e68384cee46519fd36b10e115c94327a8a3585b9be8e49ac7358f3b28132"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": {
+      "artifact": "native/equivalence-4.json",
+      "sha256": "930829f322bfb6f45685acebba9f9e7315fb9e79606bd5da455ed0698b4ce999"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": {
+      "artifact": "native/equivalence-5.json",
+      "sha256": "cf179a2a753d8c1d9c4cd3a0ceb129e7c41874d3e3811dbefd0a65ae56d5d600"
+    }
+  },
+  "evidence": {
+    "artifact": "native/native.json",
+    "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_modern_source_copy_generated_save_children_console_oracle",
+    "sha256": "fc41108de540b6b26bebcbc48eaa3edb0980c3fabbac50499585aa551a8acc6f"
+  },
+  "native_equivalence": {
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+      "artifact": "native/native_equivalence-0.json",
+      "sha256": "996baaa0ba46187541c51838d2832c3814e33c3cbf5bbf5be25d19f119f8e41f"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/autoAddToSourceControl/@boolean/false": {
+      "artifact": "native/native_equivalence-1.json",
+      "sha256": "c31bbc5dce5fe008c46034d4966aee2059f0569432f7879a0460bf4570875fd0"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/autoCheckOutToSourceControl/@boolean/false": {
+      "artifact": "native/native_equivalence-2.json",
+      "sha256": "367ed7eeb795ae2102ce89b5664928bcac64118eeff1857e9304bac763a26f47"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": {
+      "artifact": "native/native_equivalence-3.json",
+      "sha256": "a6d2eef2ba082385fbfa2ff0e86fc6fd652a4db12ef22b4988b91c736dea53b8"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": {
+      "artifact": "native/native_equivalence-4.json",
+      "sha256": "a61c2d74b0e83e72c91657ee433c116ef11a4317318583e1577347859143f88d"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": {
+      "artifact": "native/native_equivalence-5.json",
+      "sha256": "cf2983c5abee698a4413621792d325f91dc1dadb94e7530e3e0335ea2f64632f"
+    }
+  },
+  "proof": {
+    "artifact": "native/proof/proof.json",
+    "sha256": "26cf794ae407ccb0a518c12553b31037f43b1fab1ef093b4c6783864d359ef97"
+  }
+}

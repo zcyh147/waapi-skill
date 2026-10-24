@@ -1,0 +1,343 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/argsSchema": {
+      "native_shape_sha256": "da030b65133f5d55c90419d8b7605d9697c8cae4d78b823979878b7af6089f27",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/argsSchema/properties/busPipelineID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/argsSchema/properties/time": {
+      "native_shape_sha256": "a68138a6d74d4e3750603f7eb442a024b34f58c6dfe0d19bd874c3da256c1b9f",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/argsSchema/properties/time/$ref": {
+      "native_shape_sha256": "21c519ff0ebb2d6a94efdc2c7baeb5d9b18fca7526ca007f52c1a529de4c4413",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime": {
+      "native_shape_sha256": "b30c36884f7bff743ed80d53f8d4c2e3f47e199033168b30b44316b998cf4f35",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0": {
+      "native_shape_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0/minimum": {
+      "native_shape_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/argsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema": {
+      "native_shape_sha256": "c234bd5137eca1b2c7cdc101bde9a0b5e4ccb4ea24322b3a9709f87cd4412b87",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/properties/return/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/properties/return": {
+      "native_shape_sha256": "7ecedf30bcfb8ef531dd583f279605bb905cfa6934011f7ce9e84480b4b3c9af",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/properties/return/$ref": {
+      "native_shape_sha256": "03e286e1ed753c8aa547cd7c99ad71659fbe2eed44079b5ce2dcd0afb2ad0d97",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions": {
+      "native_shape_sha256": "5517e3827d109340097b2f88daea4916c336aad292b31728c266a3e4c533517c",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items": {
+      "native_shape_sha256": "45d4d83a609e39fed0390b534ff6b667fd99b2fef7a75f63a4ca8ba2dc60de8b",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/0": {
+      "native_shape_sha256": "2491b64445ec3878a66022bfc80d05b954c4bec92f86c688236bff0f0e172abb",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/1": {
+      "native_shape_sha256": "578d53f2fe17587c47cf3c189b8ce6486567d64611770f3bcb1a2c18ef4c5276",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/2": {
+      "native_shape_sha256": "a4e8be933a03dba0e39c98a19f6b445d188ccdb6bbbb135a5c41f503385d354d",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/3": {
+      "native_shape_sha256": "ffb30255350583537d3c1d751efe967b3a063108e6aba5520f1123ab4fe99b92",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/4": {
+      "native_shape_sha256": "58506d2d9ba0beee414f70d1ce45675c3aa7ebbb409149a11f07b51ae6dd31d9",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/5": {
+      "native_shape_sha256": "54169f1fe50bf8e83ea0585550a09c49c7aaf54dcd62277d54fd9b9320773fce",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/6": {
+      "native_shape_sha256": "3613a0604f256a486cb5f76c7dda3e957551dc11be0988d33e105fc2a150beec",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/7": {
+      "native_shape_sha256": "3ff4fcda52f994cf24b6c94b6b1fdcc8af3256dabe6136494df5951b5c62b5e4",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/8": {
+      "native_shape_sha256": "8c06e27af4fde576a8074fe8d13e4276ee8c85aa9171d33e40f41f2f8d15d5a2",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/9": {
+      "native_shape_sha256": "b466c8a97f18256a6a01462535c3b27269971d82895d14bc60d5b2931c96f3a4",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/10": {
+      "native_shape_sha256": "3b34c8c2577f75172a429715e503809c5a12d72a8ff12df2ca01c317251ef2cf",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/items/enum/11": {
+      "native_shape_sha256": "2b15586361a05ac1b791e79b926149053c88a133fd089f6666b8448fa28fce7f",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/@definition/waapi_definitions.json/definitions/busReturnOptions/@cardinality/multiple": {
+      "native_shape_sha256": "106c572c7b5c17d9f9d57380703dedabf9ed54c0857fe9e02d752da03f0f12ea",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/optionsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema": {
+      "native_shape_sha256": "55594e406fbe8f53ec1841b2202e42c86aac11f17f1f62f765b42b317d305ac0",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/properties/return": {
+      "native_shape_sha256": "99230cdd50695fffb0993abce162b551a261bb60d9cb843e13aedc3a764d7a15",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/properties/return/items": {
+      "native_shape_sha256": "a7a06ec88a90dd44a8b608bd6b6ff8e064c4a45cac75f469ce27526b140d5c85",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/properties/return/items/$ref": {
+      "native_shape_sha256": "006602c3379c6b0eb1ccb8cabb5b64169a2a7e0e6c923225ffc0d34805da98dd",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn": {
+      "native_shape_sha256": "57180fdfb4b41ddf7e8caf1d3705e1ccfb4fe75bd9305570ea40330e811a6190",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/depth/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/deviceID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/downstreamGain/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/effectCount/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectName/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectName/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/voiceCount/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/@empty/object": {
+      "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/properties/return/@cardinality/single": {
+      "native_shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    }
+  }
+}

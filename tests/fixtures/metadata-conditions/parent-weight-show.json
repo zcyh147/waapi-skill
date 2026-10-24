@@ -1,0 +1,331 @@
+{
+  "contract": "waapi-skill.recorded-parent-show-facts/v1",
+  "evidence_scope": "original exploratory input facts only; no final native effect or semantic acceptance credit",
+  "versions": {
+    "2021.1": {
+      "build": "2021.1.14.8108",
+      "fields": {
+        "Weight": {
+          "name": "Weight",
+          "type": "Real64",
+          "restriction": {
+            "type": "range",
+            "min": 0.001,
+            "max": 100.0
+          },
+          "dependencies": [
+            {
+              "type": "property",
+              "action": "Show",
+              "property": "RandomOrSequence",
+              "context": "Parent",
+              "conditions": [
+                {
+                  "restriction": {
+                    "type": "enum",
+                    "values": [
+                      {
+                        "displayName": "1",
+                        "value": 1
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "RandomOrSequence": {
+          "name": "RandomOrSequence",
+          "type": "int16",
+          "restriction": {
+            "type": "enum",
+            "values": [
+              {
+                "displayName": "Sequence",
+                "value": 0
+              },
+              {
+                "displayName": "Random",
+                "value": 1
+              }
+            ]
+          },
+          "dependencies": []
+        }
+      },
+      "original_observation": {
+        "artifact": "condition-show-2021-r1/parent/evidence/condition-visibility.json",
+        "sha256": "2b0d8e768ac1bbee1217138debdcca000637cf1f7bb06c48352cdaa88c3454c8"
+      },
+      "recorded_enabled_results": [
+        {
+          "return": true
+        },
+        {
+          "return": true
+        }
+      ]
+    },
+    "2022.1": {
+      "build": "2022.1.19.8584",
+      "fields": {
+        "Weight": {
+          "name": "Weight",
+          "type": "Real64",
+          "restriction": {
+            "type": "range",
+            "max": 100.0,
+            "min": 0.001
+          },
+          "dependencies": [
+            {
+              "type": "property",
+              "action": "Show",
+              "property": "RandomOrSequence",
+              "context": "Parent",
+              "conditions": [
+                {
+                  "restriction": {
+                    "type": "enum",
+                    "values": [
+                      {
+                        "displayName": "1",
+                        "value": 1
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "RandomOrSequence": {
+          "name": "RandomOrSequence",
+          "type": "int16",
+          "restriction": {
+            "type": "enum",
+            "values": [
+              {
+                "displayName": "Sequence",
+                "value": 0
+              },
+              {
+                "displayName": "Random",
+                "value": 1
+              }
+            ]
+          },
+          "dependencies": []
+        }
+      },
+      "original_observation": {
+        "artifact": "condition-show-2022-r1/parent/evidence/condition-visibility.json",
+        "sha256": "e8c7dc262d5810d11ed2ffa523fee17def3dd480c4cff9cc3220de207ba20184"
+      },
+      "recorded_enabled_results": [
+        {
+          "return": true
+        },
+        {
+          "return": true
+        }
+      ]
+    },
+    "2023.1": {
+      "build": "2023.1.19.8928",
+      "fields": {
+        "Weight": {
+          "name": "Weight",
+          "type": "Real64",
+          "restriction": {
+            "type": "range",
+            "max": 100.0,
+            "min": 0.001
+          },
+          "dependencies": [
+            {
+              "type": "property",
+              "action": "Show",
+              "property": "RandomOrSequence",
+              "context": "Parent",
+              "conditions": [
+                {
+                  "restriction": {
+                    "type": "enum",
+                    "values": [
+                      {
+                        "displayName": "1",
+                        "value": 1
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "RandomOrSequence": {
+          "name": "RandomOrSequence",
+          "type": "int16",
+          "restriction": {
+            "type": "enum",
+            "values": [
+              {
+                "displayName": "Sequence",
+                "value": 0
+              },
+              {
+                "displayName": "Random",
+                "value": 1
+              }
+            ]
+          },
+          "dependencies": []
+        }
+      },
+      "original_observation": {
+        "artifact": "condition-show-2023-r1/parent/evidence/condition-visibility.json",
+        "sha256": "fb1067b5f9cce8befa0254542330097660963909475624d9b287396394a1542e"
+      },
+      "recorded_enabled_results": [
+        {
+          "return": true
+        },
+        {
+          "return": true
+        }
+      ]
+    },
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "fields": {
+        "Weight": {
+          "name": "Weight",
+          "type": "Real64",
+          "restriction": {
+            "type": "range",
+            "max": 100.0,
+            "min": 0.001
+          },
+          "dependencies": [
+            {
+              "type": "property",
+              "action": "Show",
+              "property": "RandomOrSequence",
+              "context": "Parent",
+              "conditions": [
+                {
+                  "restriction": {
+                    "type": "enum",
+                    "values": [
+                      {
+                        "displayName": "1",
+                        "value": 1
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "RandomOrSequence": {
+          "name": "RandomOrSequence",
+          "type": "int16",
+          "restriction": {
+            "type": "enum",
+            "values": [
+              {
+                "displayName": "Sequence",
+                "value": 0
+              },
+              {
+                "displayName": "Random",
+                "value": 1
+              }
+            ]
+          },
+          "dependencies": []
+        }
+      },
+      "original_observation": {
+        "artifact": "condition-show-2024-r1/parent/evidence/condition-visibility.json",
+        "sha256": "7223c5342b024ddad505e6295c7334503ea96d686721dc0444186679dcf2c15c"
+      },
+      "recorded_enabled_results": [
+        {
+          "return": true
+        },
+        {
+          "return": true
+        }
+      ]
+    },
+    "2025.1": {
+      "build": "2025.1.7.9143",
+      "fields": {
+        "Weight": {
+          "name": "Weight",
+          "type": "Real64",
+          "restriction": {
+            "type": "range",
+            "min": 0.001,
+            "max": 100.0
+          },
+          "dependencies": [
+            {
+              "type": "property",
+              "action": "Show",
+              "property": "RandomOrSequence",
+              "context": "Parent",
+              "conditions": [
+                {
+                  "restriction": {
+                    "type": "enum",
+                    "values": [
+                      {
+                        "value": 1,
+                        "displayName": "1"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "RandomOrSequence": {
+          "name": "RandomOrSequence",
+          "type": "int16",
+          "restriction": {
+            "type": "enum",
+            "values": [
+              {
+                "value": 0,
+                "displayName": "Sequence"
+              },
+              {
+                "value": 1,
+                "displayName": "Random"
+              }
+            ]
+          },
+          "dependencies": []
+        }
+      },
+      "original_observation": {
+        "artifact": "condition-show-2025-r3/parent/evidence/condition-visibility.json",
+        "sha256": "33e3beb5ddd290fb88e9633ba1c0ca43a5f5400fb3528edda50625c40ef19ffa"
+      },
+      "recorded_enabled_results": [
+        {
+          "return": true
+        },
+        {
+          "return": true
+        }
+      ]
+    }
+  }
+}

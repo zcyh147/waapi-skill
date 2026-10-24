@@ -1,0 +1,632 @@
+{
+  "meaning": "Captured class metadata establishes unknown field kind only; it does not establish any Action instance reference type.",
+  "samples": {
+    "2021.1": {
+      "source": ".waapi-skill-state/full-coverage/condition-metadata-2021-r1/025.agent-result.json",
+      "source_sha256": "6be8fcda9b186e704b74aa479abab0273e4f66edc2f2dce10d71dbc774ca0df4",
+      "wwise_build": "2021.1.14.8108",
+      "scope": {
+        "kind": "object_type",
+        "requested": "Action",
+        "resolved": {
+          "classId": 327696,
+          "name": "Action",
+          "type": "WObject"
+        }
+      },
+      "metadata": {
+        "name": "Target",
+        "type": "",
+        "default": null,
+        "supports": {
+          "rtpc": "None",
+          "randomizer": false,
+          "unlink": false
+        },
+        "display": {
+          "name": "Target",
+          "index": 1587,
+          "group": "Events"
+        },
+        "restriction": {},
+        "dependencies": [
+          {
+            "type": "property",
+            "action": "Show",
+            "property": "ActionType",
+            "context": "Self",
+            "conditions": [
+              {
+                "restriction": {
+                  "type": "enum",
+                  "values": [
+                    {
+                      "displayName": "1",
+                      "value": 1
+                    },
+                    {
+                      "displayName": "2",
+                      "value": 2
+                    },
+                    {
+                      "displayName": "4",
+                      "value": 4
+                    },
+                    {
+                      "displayName": "5",
+                      "value": 5
+                    },
+                    {
+                      "displayName": "7",
+                      "value": 7
+                    },
+                    {
+                      "displayName": "9",
+                      "value": 9
+                    },
+                    {
+                      "displayName": "11",
+                      "value": 11
+                    },
+                    {
+                      "displayName": "12",
+                      "value": 12
+                    },
+                    {
+                      "displayName": "13",
+                      "value": 13
+                    },
+                    {
+                      "displayName": "14",
+                      "value": 14
+                    },
+                    {
+                      "displayName": "16",
+                      "value": 16
+                    },
+                    {
+                      "displayName": "18",
+                      "value": 18
+                    },
+                    {
+                      "displayName": "20",
+                      "value": 20
+                    },
+                    {
+                      "displayName": "21",
+                      "value": 21
+                    },
+                    {
+                      "displayName": "22",
+                      "value": 22
+                    },
+                    {
+                      "displayName": "23",
+                      "value": 23
+                    },
+                    {
+                      "displayName": "24",
+                      "value": 24
+                    },
+                    {
+                      "displayName": "25",
+                      "value": 25
+                    },
+                    {
+                      "displayName": "26",
+                      "value": 26
+                    },
+                    {
+                      "displayName": "27",
+                      "value": 27
+                    },
+                    {
+                      "displayName": "29",
+                      "value": 29
+                    },
+                    {
+                      "displayName": "30",
+                      "value": 30
+                    },
+                    {
+                      "displayName": "32",
+                      "value": 32
+                    },
+                    {
+                      "displayName": "34",
+                      "value": 34
+                    },
+                    {
+                      "displayName": "35",
+                      "value": 35
+                    },
+                    {
+                      "displayName": "36",
+                      "value": 36
+                    },
+                    {
+                      "displayName": "38",
+                      "value": 38
+                    },
+                    {
+                      "displayName": "39",
+                      "value": 39
+                    },
+                    {
+                      "displayName": "40",
+                      "value": 40
+                    },
+                    {
+                      "displayName": "41",
+                      "value": 41
+                    },
+                    {
+                      "displayName": "42",
+                      "value": 42
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "ui": {
+          "value": {
+            "min": 0.0,
+            "max": 0.0,
+            "decimals": 0,
+            "step": 0.0,
+            "fine": 0.0,
+            "infinity": 0.0
+          },
+          "displayAs": {
+            "lrMix": false,
+            "musicNote": false,
+            "bitfield": false
+          },
+          "dataMeaning": "None",
+          "autoUpdate": false
+        },
+        "audioEngineId": 4294967295,
+        "unit": {
+          "status": "unknown",
+          "value": null
+        },
+        "availability": {
+          "type": "known",
+          "default": "known",
+          "restriction": "known",
+          "dependencies": "known",
+          "supports": "known",
+          "ui": "known"
+        }
+      }
+    },
+    "2022.1": {
+      "source": ".waapi-skill-state/full-coverage/condition-metadata-2022-r1/006.agent-result.json",
+      "source_sha256": "85779fd6872354b2759ec6fd6148e6b5445a7abfdad1a9b34bc0b7c31cb7f7d2",
+      "wwise_build": "2022.1.19.8584",
+      "scope": {
+        "kind": "object_type",
+        "requested": "Action",
+        "resolved": {
+          "classId": 327696,
+          "name": "Action",
+          "type": "WObject"
+        }
+      },
+      "metadata": {
+        "name": "Target",
+        "type": "",
+        "default": null,
+        "supports": {
+          "unlink": false,
+          "rtpc": "None",
+          "randomizer": false
+        },
+        "display": {
+          "name": "Target",
+          "index": 1593,
+          "group": "Events"
+        },
+        "restriction": {},
+        "dependencies": [
+          {
+            "type": "property",
+            "action": "Show",
+            "property": "ActionType",
+            "context": "Self",
+            "conditions": [
+              {
+                "restriction": {
+                  "type": "enum",
+                  "values": [
+                    {
+                      "displayName": "1",
+                      "value": 1
+                    },
+                    {
+                      "displayName": "2",
+                      "value": 2
+                    },
+                    {
+                      "displayName": "4",
+                      "value": 4
+                    },
+                    {
+                      "displayName": "5",
+                      "value": 5
+                    },
+                    {
+                      "displayName": "7",
+                      "value": 7
+                    },
+                    {
+                      "displayName": "9",
+                      "value": 9
+                    },
+                    {
+                      "displayName": "11",
+                      "value": 11
+                    },
+                    {
+                      "displayName": "12",
+                      "value": 12
+                    },
+                    {
+                      "displayName": "13",
+                      "value": 13
+                    },
+                    {
+                      "displayName": "14",
+                      "value": 14
+                    },
+                    {
+                      "displayName": "16",
+                      "value": 16
+                    },
+                    {
+                      "displayName": "18",
+                      "value": 18
+                    },
+                    {
+                      "displayName": "20",
+                      "value": 20
+                    },
+                    {
+                      "displayName": "21",
+                      "value": 21
+                    },
+                    {
+                      "displayName": "22",
+                      "value": 22
+                    },
+                    {
+                      "displayName": "23",
+                      "value": 23
+                    },
+                    {
+                      "displayName": "24",
+                      "value": 24
+                    },
+                    {
+                      "displayName": "25",
+                      "value": 25
+                    },
+                    {
+                      "displayName": "26",
+                      "value": 26
+                    },
+                    {
+                      "displayName": "27",
+                      "value": 27
+                    },
+                    {
+                      "displayName": "29",
+                      "value": 29
+                    },
+                    {
+                      "displayName": "30",
+                      "value": 30
+                    },
+                    {
+                      "displayName": "32",
+                      "value": 32
+                    },
+                    {
+                      "displayName": "34",
+                      "value": 34
+                    },
+                    {
+                      "displayName": "35",
+                      "value": 35
+                    },
+                    {
+                      "displayName": "36",
+                      "value": 36
+                    },
+                    {
+                      "displayName": "38",
+                      "value": 38
+                    },
+                    {
+                      "displayName": "39",
+                      "value": 39
+                    },
+                    {
+                      "displayName": "40",
+                      "value": 40
+                    },
+                    {
+                      "displayName": "41",
+                      "value": 41
+                    },
+                    {
+                      "displayName": "42",
+                      "value": 42
+                    },
+                    {
+                      "displayName": "43",
+                      "value": 43
+                    },
+                    {
+                      "displayName": "44",
+                      "value": 44
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "ui": {
+          "value": {
+            "max": 0.0,
+            "min": 0.0,
+            "decimals": 0,
+            "step": 0.0,
+            "fine": 0.0,
+            "infinity": 0.0
+          },
+          "displayAs": {
+            "lrMix": false,
+            "musicNote": false,
+            "bitfield": false
+          },
+          "dataMeaning": "None",
+          "autoUpdate": false
+        },
+        "audioEngineId": 4294967295,
+        "unit": {
+          "status": "unknown",
+          "value": null
+        },
+        "availability": {
+          "type": "known",
+          "default": "known",
+          "restriction": "known",
+          "dependencies": "known",
+          "supports": "known",
+          "ui": "known"
+        }
+      }
+    },
+    "2023.1": {
+      "source": ".waapi-skill-state/full-coverage/condition-metadata-2023-r1/006.agent-result.json",
+      "source_sha256": "f3f47350ac5cfc84f153e4b151682102628c1001eb62dad8273a563b7d03f362",
+      "wwise_build": "2023.1.19.8928",
+      "scope": {
+        "kind": "object_type",
+        "requested": "Action",
+        "resolved": {
+          "classId": 327696,
+          "name": "Action",
+          "type": "WObject"
+        }
+      },
+      "metadata": {
+        "name": "Target",
+        "type": "",
+        "default": null,
+        "supports": {
+          "rtpc": "None",
+          "randomizer": false,
+          "unlink": false
+        },
+        "display": {
+          "name": "Target",
+          "index": 1581,
+          "group": ""
+        },
+        "restriction": {},
+        "dependencies": [
+          {
+            "type": "property",
+            "action": "Show",
+            "property": "ActionType",
+            "context": "Self",
+            "conditions": [
+              {
+                "restriction": {
+                  "type": "enum",
+                  "values": [
+                    {
+                      "displayName": "1",
+                      "value": 1
+                    },
+                    {
+                      "displayName": "2",
+                      "value": 2
+                    },
+                    {
+                      "displayName": "4",
+                      "value": 4
+                    },
+                    {
+                      "displayName": "5",
+                      "value": 5
+                    },
+                    {
+                      "displayName": "7",
+                      "value": 7
+                    },
+                    {
+                      "displayName": "9",
+                      "value": 9
+                    },
+                    {
+                      "displayName": "11",
+                      "value": 11
+                    },
+                    {
+                      "displayName": "12",
+                      "value": 12
+                    },
+                    {
+                      "displayName": "13",
+                      "value": 13
+                    },
+                    {
+                      "displayName": "14",
+                      "value": 14
+                    },
+                    {
+                      "displayName": "16",
+                      "value": 16
+                    },
+                    {
+                      "displayName": "18",
+                      "value": 18
+                    },
+                    {
+                      "displayName": "20",
+                      "value": 20
+                    },
+                    {
+                      "displayName": "21",
+                      "value": 21
+                    },
+                    {
+                      "displayName": "22",
+                      "value": 22
+                    },
+                    {
+                      "displayName": "23",
+                      "value": 23
+                    },
+                    {
+                      "displayName": "26",
+                      "value": 26
+                    },
+                    {
+                      "displayName": "27",
+                      "value": 27
+                    },
+                    {
+                      "displayName": "29",
+                      "value": 29
+                    },
+                    {
+                      "displayName": "30",
+                      "value": 30
+                    },
+                    {
+                      "displayName": "34",
+                      "value": 34
+                    },
+                    {
+                      "displayName": "35",
+                      "value": 35
+                    },
+                    {
+                      "displayName": "36",
+                      "value": 36
+                    },
+                    {
+                      "displayName": "38",
+                      "value": 38
+                    },
+                    {
+                      "displayName": "39",
+                      "value": 39
+                    },
+                    {
+                      "displayName": "40",
+                      "value": 40
+                    },
+                    {
+                      "displayName": "41",
+                      "value": 41
+                    },
+                    {
+                      "displayName": "42",
+                      "value": 42
+                    },
+                    {
+                      "displayName": "43",
+                      "value": 43
+                    },
+                    {
+                      "displayName": "44",
+                      "value": 44
+                    },
+                    {
+                      "displayName": "50",
+                      "value": 50
+                    },
+                    {
+                      "displayName": "51",
+                      "value": 51
+                    },
+                    {
+                      "displayName": "53",
+                      "value": 53
+                    },
+                    {
+                      "displayName": "54",
+                      "value": 54
+                    },
+                    {
+                      "displayName": "56",
+                      "value": 56
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "ui": {
+          "value": {
+            "max": 0.0,
+            "min": 0.0,
+            "decimals": 0,
+            "step": 0.0,
+            "fine": 0.0,
+            "infinity": 0.0
+          },
+          "displayAs": {
+            "lrMix": false,
+            "musicNote": false,
+            "bitfield": false
+          },
+          "dataMeaning": "None",
+          "autoUpdate": false
+        },
+        "audioEngineId": 4294967295,
+        "unit": {
+          "status": "unknown",
+          "value": null
+        },
+        "availability": {
+          "type": "known",
+          "default": "known",
+          "restriction": "known",
+          "dependencies": "known",
+          "supports": "known",
+          "ui": "known"
+        }
+      }
+    }
+  }
+}

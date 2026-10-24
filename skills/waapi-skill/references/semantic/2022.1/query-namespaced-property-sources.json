@@ -1,0 +1,53 @@
+{
+  "version": "2022.1",
+  "wwise_build": "2022.1.19.8584",
+  "definitions_sha256": "947aa8dc8a714ad5173290394f84b5f4739b2edb5d9d7a6b2884caf03e501d20",
+  "domain": "query-property-predicates",
+  "archive": "SDK/Help/WwiseSDK-Windows.chm",
+  "archive_sha256": "b080d8847f785e98d9d0ccd31ddd2f2a799d49f9ef1ab0effdd12aa53ecd8b8e",
+  "token_pattern": "[A-Za-z0-9_]+:[A-Za-z0-9_]+",
+  "authority": "Matching custom-property definition and WAQL property-accessor passages support substitution of one freshly discovered property token; exact colon WHERE spelling has the separate2025 native component below.",
+  "return_domain_source": "query-return-options.json",
+  "return_grammar_changed": false,
+  "sections": {
+    "custom_property_definition": {
+      "page": "defining_custom_properties.html",
+      "page_sha256": "570ed67a485d5b11e2d07e3d85dde1497b436ae53e58a84c814ecad8c2810e57",
+      "html_lines": [
+        95,
+        112
+      ],
+      "html": "<p>Below is an example of a simple custom properties XML description file that defines additional properties for sound objects.</p>\r\n<div class=\"fragment\"><div class=\"line\">&lt;?xml version=<span class=\"stringliteral\">&quot;1.0&quot;</span> encoding=<span class=\"stringliteral\">&quot;UTF-8&quot;</span>?&gt;</div>\r\n<div class=\"line\">&lt;!-- Copyright (C) Audiokinetic Inc. --&gt;</div>\r\n<div class=\"line\">&lt;PluginModule&gt;</div>\r\n<div class=\"line\">    &lt;WwiseObject Name=<span class=\"stringliteral\">&quot;Sound&quot;</span> CompanyID=<span class=\"stringliteral\">&quot;1&quot;</span> PluginID=<span class=\"stringliteral\">&quot;1&quot;</span>&gt;</div>\r\n<div class=\"line\">        &lt;Properties&gt;</div>\r\n<div class=\"line\">            &lt;Property Name=<span class=\"stringliteral\">&quot;MyCompany:Status&quot;</span> Type=<span class=\"stringliteral\">&quot;int16&quot;</span> DisplayName=<span class=\"stringliteral\">&quot;Status&quot;</span>&gt;</div>\r\n<div class=\"line\">                &lt;DefaultValue&gt;0&lt;/DefaultValue&gt;</div>\r\n<div class=\"line\">                &lt;Restrictions&gt;</div>\r\n<div class=\"line\">                    &lt;ValueRestriction&gt;</div>\r\n<div class=\"line\">                        &lt;Enumeration Type=<span class=\"stringliteral\">&quot;int16&quot;</span>&gt;</div>\r\n<div class=\"line\">                            &lt;Value DisplayName=<span class=\"stringliteral\">&quot;To do&quot;</span>&gt;0&lt;/Value&gt;</div>\r\n<div class=\"line\">                            &lt;Value DisplayName=<span class=\"stringliteral\">&quot;Done&quot;</span>&gt;1&lt;/Value&gt;</div>\r\n<div class=\"line\">                            &lt;Value DisplayName=<span class=\"stringliteral\">&quot;Verified&quot;</span>&gt;2&lt;/Value&gt;</div>\r\n<div class=\"line\">                        &lt;/Enumeration&gt;</div>\r\n<div class=\"line\">                    &lt;/ValueRestriction&gt;</div>\r\n<div class=\"line\">                &lt;/Restrictions&gt;</div>\r\n<div class=\"line\">            &lt;/Property&gt;</div>\r\n",
+      "html_sha256": "28a051dce81fce6a0a0d4069c0f567e4931bb7d2ab66569586bb1dbfac23bcaf"
+    },
+    "waql_property_accessors": {
+      "page": "waql_glossary.html",
+      "page_sha256": "4098e9dddd857bdcf02d04bd641c04be801d9d3403a0889867971925e1a1b43c",
+      "html_lines": [
+        108,
+        135
+      ],
+      "html": "<td>Property </td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">A named field on a Wwise object that stores a value.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">Each Wwise object defines its own list of properties. For a complete list of all properties, refer to <a class=\"el\" href=\"wobjects_index.html\">Wwise Objects Reference</a> and select a specific object.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">For example: Volume, Pitch, and Lowpass.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">For more information on how to define your own properties for a plug-in or by using Custom Properties, refer to <a class=\"el\" href=\"plugin_xml_properties.html\">Properties XML Description</a>.</p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>\r\n<tr>\r\n<td colspan=\"1\"><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Property Accessor</p>\r\n<p class=\"endtd\"></p>\r\n</td><td colspan=\"1\"><p class=\"starttd\"></p>\r\n<p class=\"intertd\">An accessor that returns the value of a property.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">Property accessors can be used in three ways:</p>\r\n<ul>\r\n<li>\r\nPROPERTY_NAME: returns the value as defined in the user interface, taking into consideration the override settings, if any. </li>\r\n<li>\r\n@PROPERTY_NAME: returns the value of the property as defined directly in the WWU file, not taking the override settings into consideration. </li>\r\n<li>\r\n@@PROPERTY_NAME: same as PROPERTY_NAME, but can be used if the PROPERTY_NAME conflicts with a built-in accessor name.</li>\r\n</ul>\r\n<p class=\"intertd\"><b>Note</b>: Property accessors are case-insensitive.</p>\r\n<p class=\"endtd\"></p>\r\n",
+      "html_sha256": "2e6eab49d6295ba16d2394ef3e3467bcdc16b3f1a8c7725417afcc9e91d83cc9"
+    }
+  },
+  "native_component": {
+    "version": "2025.1",
+    "wwise_build": "2025.1.7.9143",
+    "candidate": "1c5a07b7b8d5cb1aee672d65c96e1bdcadc91c66",
+    "evidence": "r82-namespaced-query-1c5a07b7-2025-r1/root-review.json",
+    "root_review_sha256": "6ca3376353fa83476ea5d0b4b3ecf71e4d9dcbceac46afd69f23f24b77862319",
+    "observation_sha256": "66afe7e50dbe9e4bf17b01d283c82076d5bc7e22628365034908763d3439b1ec",
+    "property": "MyCompany:Status",
+    "value": 0,
+    "negative_constant": 1,
+    "modes": [
+      "ordinary",
+      "override-source-value"
+    ],
+    "scope": "four native WHERE membership reads, fresh actual property metadata, official default0 and complete WWU nonassignment",
+    "custom_return_proof": false,
+    "override_difference_proof": false,
+    "other_version_native_proof": false
+  }
+}

@@ -191,6 +191,7 @@ def _filesystem_probe_path(field_name: str, schema_hint: str) -> str | None:
 @dataclass(slots=True)
 class ProgramCallClient:
     result: Any
+    on_call: Callable[[str, Mapping[str, Any] | None, Mapping[str, Any] | None], None] | None = None
     calls: list[tuple[str, Mapping[str, Any] | None, Mapping[str, Any] | None]] = field(default_factory=list)
 
     def call(
@@ -200,6 +201,8 @@ class ProgramCallClient:
         options: Mapping[str, Any] | None = None,
     ) -> Any:
         self.calls.append((uri, args, options))
+        if self.on_call is not None:
+            self.on_call(uri, args, options)
         return self.result
 
 

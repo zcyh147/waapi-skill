@@ -1,0 +1,31 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "flow-18-fixed-2021.1-wwise-authoring",
+      "bindings": {
+        "artifact": "flow-18-bindings.json",
+        "sha256": "2e5697bc9bb33b293277e7db60ece4560e83e9c91051a2181d2883e6521f7285"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "flow-18-bindings.json",
+          "sha256": "2e5697bc9bb33b293277e7db60ece4560e83e9c91051a2181d2883e6521f7285"
+        },
+        "program": {
+          "artifact": "flow-18-program.json",
+          "sha256": "dcf98f0b86c2cd2c0134038e38f0bbc65326d02febc961dcb9ece4cfd141e334"
+        },
+        "requirements": {
+          "artifact": "flow-18-requirements.json",
+          "sha256": "abd9ff406cc9f70743e4ce57a39767cba250dda826572409bdb63ee614164213"
+        },
+        "capture": {
+          "artifact": "flow-18-program-capture.json",
+          "sha256": "7b7d4099d125c79e99b5133b6484446f95db3275cd9184c4e4abff24c8fc2962"
+        }
+      }
+    }
+  ]
+}

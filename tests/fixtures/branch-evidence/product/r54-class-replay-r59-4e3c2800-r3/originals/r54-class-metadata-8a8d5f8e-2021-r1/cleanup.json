@@ -1,0 +1,15 @@
+{
+  "launch_pid": 91920,
+  "wine_prefix": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2021-r1/scenario/owned/wwise-user-home/Library/Application Support/Wwise2019/Bottles/Wwise2019x64",
+  "process_exited": true,
+  "detached_cleanup_pids": [
+    92014
+  ],
+  "wineserver_commands": [
+    [
+      "/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/SharedSupport/Wwise2019x64/Wwise2019/wineserver",
+      "-k"
+    ]
+  ],
+  "residual_processes": []
+}

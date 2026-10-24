@@ -228,3 +228,16 @@ authorization is still required before execution.
 - The Operation Draft Store owns mutable composition state.
 - The transaction store owns immutable Preview and authorization state.
 - The dispatcher and verifier own native execution and business evidence.
+
+## WAAPI Business Branch
+
+A WAAPI Business Branch is one valid Wwise capability distinguished by its
+version, host, intended outcome, applicable object or placement, and meaningful
+input alternatives. Sharing an API name does not make two such uses equivalent.
+
+## Complete WAAPI Business Coverage
+
+Complete WAAPI Business Coverage means that every in-scope valid business
+branch is available through the Skill with the evidence appropriate to its
+outcome. A missing Skill implementation, unknown mapping, or unverified required
+behavior remains unfinished; it is not a native Wwise limitation.

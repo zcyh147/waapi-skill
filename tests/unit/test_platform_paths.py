@@ -770,13 +770,14 @@ def test_local_wine_cli_dispatch_rejects_audit_drift_and_remote_windows(tmp_path
     assert remote.value.error_code == "REMOTE_WWISE_PATH_MAPPING_UNAVAILABLE"
 
 
-def test_native_windows_cli_dispatch_is_identity_without_wine_mapping() -> None:
-    args = {"project": r"D:\Projects\SampleProject.wproj"}
+@pytest.mark.parametrize('uri', ['ak.wwise.cli.migrate', 'ak.wwise.console.project.open', 'ak.wwise.console.project.create'])
+def test_native_windows_cli_dispatch_is_identity_without_wine_mapping(uri) -> None:
+    args = {"project" if uri == 'ak.wwise.cli.migrate' else "path": r"D:\Projects\SampleProject.wproj"}
     adapted = adapt_cli_dispatch_paths(
-        uri="ak.wwise.cli.migrate",
+        uri=uri,
         args=args,
         options={},
-        io_audit={"uri": "ak.wwise.cli.migrate", "paths": []},
+        io_audit={"uri": uri, "paths": []},
         project_guard={"fingerprint": "native"},
         host_os_name="nt",
     )
@@ -788,11 +789,14 @@ def test_native_windows_cli_dispatch_is_identity_without_wine_mapping() -> None:
     assert len(adapted.proof["host_dispatch_sha256"]) == 64
 
 
+@pytest.mark.parametrize('uri', ['ak.wwise.cli.migrate', 'ak.wwise.console.project.open', 'ak.wwise.console.project.create'])
 def test_native_posix_cli_dispatch_is_identity_without_wine_mapping(
     tmp_path: Path,
+    uri,
 ) -> None:
     target = tmp_path / "SampleProject.wproj"
-    args = {"project": str(target)}
+    field = 'project' if uri == 'ak.wwise.cli.migrate' else 'path'
+    args = {field: str(target)}
     guard = {
         "fingerprint": "native-posix",
         "endpoint": {"host": "127.0.0.1", "port": 8080},
@@ -800,12 +804,12 @@ def test_native_posix_cli_dispatch_is_identity_without_wine_mapping(
         "project": {"state": "open", "path": str(target)},
     }
     adapted = adapt_cli_dispatch_paths(
-        uri="ak.wwise.cli.migrate",
+        uri=uri,
         args=args,
         options={},
         io_audit=_io_audit(
-            "ak.wwise.cli.migrate",
-            [("args", "$.args.project", str(target), str(target.resolve()))],
+            uri,
+            [("args", '$.args.' + field, str(target), str(target.resolve()))],
         ),
         project_guard=guard,
         current_project_guard=guard,

@@ -1,0 +1,24 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "r54-class-replay-r55-settled-r2/case-10/attachment-0.json",
+      "sha256": "77360a40d9b0b6ef587587f25d280ba71949e5b68557bf03244037733d841360"
+    },
+    {
+      "artifact": "r54-class-replay-r55-settled-r2/case-10/attachment-1.json",
+      "sha256": "8175cb5c616aaa15405af591952bdc3580216b65f3ef99bdd3e26d10dc6ab876"
+    },
+    {
+      "artifact": "r54-class-replay-r55-settled-r2/case-10/attachment-2.json",
+      "sha256": "03ff32e4036d09d1888b0df2f77c9d15632322f5aca20c2bf9ace296dbb02a36"
+    },
+    {
+      "artifact": "r54-class-replay-r55-settled-r2/case-10/attachment-3.json",
+      "sha256": "d3d7ed9ba070e81056ade2029a608185adc7d5e40459183adf7873c78d411883"
+    },
+    {
+      "artifact": "r54-class-replay-r55-settled-r2/case-10/attachment-4.json",
+      "sha256": "6cfe5974f033cacb1b25cb8bafcd4443195f11b07a3a7bc2e9c97126d45b5f37"
+    }
+  ]
+}

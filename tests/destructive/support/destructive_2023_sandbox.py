@@ -19,7 +19,6 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     ENV_WWISE_VERSION,
     LiveEnvironmentContract,
     LiveEnvironmentError,
-    WWISE_2023_1_CONSOLE_PATH,
     WWISE_2023_1_SAMPLE_PROJECT_PATH,
     path_is_under,
     path_is_under_immutable_sample_source,
@@ -169,24 +168,15 @@ class Destructive2023SandboxRuntime:
 
 
 def require_2023_live_destructive_prerequisites(env: Mapping[str, str]) -> LiveEnvironmentContract:
-    """Require live/destructive 2023.1 flags and exact installed Wwise paths."""
+    """Require live/destructive 2023.1 flags and the selected pinned configuration."""
 
     if env.get(ENV_WWISE_LIVE) != "1" or env.get(ENV_WWISE_DESTRUCTIVE) != "1":
         raise LiveEnvironmentError("WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1 are required")
     if env.get(ENV_WWISE_VERSION) != WWISE_2023_1_VERSION_KEY:
         raise LiveEnvironmentError("WWISE_VERSION=2023.1 is required for 2023.1 destructive sandbox tests")
-    contract = require_live_environment(env)
-    if contract.console_path != WWISE_2023_1_CONSOLE_PATH:
-        raise LiveEnvironmentError(
-            f"{WWISE_2023_1_VERSION_KEY} destructive tests require exact WwiseConsole path "
-            f"{WWISE_2023_1_CONSOLE_PATH}; got {contract.console_path}"
-        )
-    if contract.sample_project_source != WWISE_2023_1_SAMPLE_PROJECT_PATH:
-        raise LiveEnvironmentError(
-            f"{WWISE_2023_1_VERSION_KEY} destructive tests require exact SampleProject path "
-            f"{WWISE_2023_1_SAMPLE_PROJECT_PATH}; got {contract.sample_project_source}"
-        )
-    return contract
+    # The shared contract pins the explicitly selected version/configuration;
+    # its immutable source may belong to another checkout.
+    return require_live_environment(env)
 
 
 def require_2023_sandbox_copy_target(env: Mapping[str, str], sandbox: SandboxProject) -> LiveEnvironmentContract:
@@ -200,8 +190,12 @@ def require_2023_sandbox_copy_target(env: Mapping[str, str], sandbox: SandboxPro
     contract = require_destructive_environment(target_env)
     sandbox_project = sandbox.sandbox_project.resolve(strict=False)
     sandbox_root = sandbox.sandbox_root.resolve(strict=False)
-    if sandbox.source_project.resolve(strict=True) != WWISE_2023_1_SAMPLE_PROJECT_PATH.resolve(strict=False):
-        raise SandboxFixtureError("2023.1 destructive tests must copy the exact installed 2023.1 SampleProject source")
+    source = resolve_sample_project_source({**env, ENV_WWISE_VERSION: WWISE_2023_1_VERSION_KEY})
+    if source is None or sandbox.source_project.resolve(strict=True) != source.resolve(strict=True):
+        raise SandboxFixtureError("2023.1 destructive tests must copy the exact configured 2023.1 SampleProject source")
+    source_root = source.parent.resolve(strict=True)
+    if path_is_under(sandbox_root, source_root) or path_is_under(source_root, sandbox_root):
+        raise SandboxFixtureError("2023.1 sandbox root must not overlap its immutable configured SampleProject source")
     if contract.active_destructive_project != sandbox_project:
         raise SandboxFixtureError("active destructive project is not the copied sandbox project")
     if not path_is_under(sandbox_project, sandbox_root):

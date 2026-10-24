@@ -12,6 +12,8 @@ from .business_declarations import (
     BusinessHandleRegistry,
     ExistingObjectTarget,
     NewDescendantTarget,
+    AnonymousListTarget,
+    OwnedRtpcTarget,
     business_repair,
     repair_at_draft_revision,
     resolve_semantic_kind,
@@ -67,18 +69,22 @@ _NATIVE_FIELDS = frozenset(
 class BusinessDeclaration:
     declaration_id: str
     result_handle: str
-    target: NewDescendantTarget | ExistingObjectTarget
+    target: NewDescendantTarget | OwnedRtpcTarget | ExistingObjectTarget
     fields: Mapping[str, Any]
 
     def as_dict(self) -> dict[str, Any]:
         target = (
-            {
+            {"form": "anonymous-list-member", "parent_handle": self.target.parent_handle, "kind": self.target.kind}
+            if isinstance(self.target, AnonymousListTarget)
+            else {
                 "form": "new-descendant",
                 "parent_handle": self.target.parent_handle,
                 "name": self.target.name,
                 "kind": self.target.kind,
             }
             if isinstance(self.target, NewDescendantTarget)
+            else {"form": "owned-rtpc", "owner_handle": self.target.owner_handle}
+            if isinstance(self.target, OwnedRtpcTarget)
             else {
                 "form": "existing-object",
                 "object_handle": self.target.object_handle,
@@ -200,6 +206,11 @@ class BusinessDeclarationSession:
             replace=False,
         )
 
+    def with_rtpc_declaration(self, *, declaration_id: str, owner_handle: str,
+                              fields: Mapping[str, Any]) -> "BusinessDeclarationSession":
+        return self._with_declaration(declaration_id=declaration_id,
+            target=OwnedRtpcTarget(owner_handle), fields=fields, replace=False)
+
     def with_existing_declaration(
         self,
         *,
@@ -267,6 +278,7 @@ class BusinessDeclarationSession:
         normalized = _normalize_fields(
             settings,
             draft_revision=self.revision,
+            authoring_model_version=self.context.wwise_version,
         )
         if normalized == self.settings:
             raise business_repair(
@@ -349,7 +361,25 @@ class BusinessDeclarationSession:
         }
         if len(canonical_json_bytes(payload)) > MAX_BUSINESS_SESSION_BYTES:
             raise ValueError("business declaration session exceeds its fixed byte limit")
-        normalized = strict_json_copy(payload)
+        # Model constructors and checked compound snapshots have their own
+        # validated depth/node grammar. Other fields keep the ordinary guard.
+        from .authoring_model_business import MODEL_OPERATIONS
+        binding = self.settings.get("authoring_model_binding")
+        if (set(self.settings) == {"authoring_model_plan", "authoring_model_binding"}
+                and isinstance(binding, Mapping) and binding.get("operation") in MODEL_OPERATIONS):
+            settings = _normalize_fields(self.settings, authoring_model_version=self.context.wwise_version)
+            normalized = strict_json_copy({**payload, "settings": {}})
+            normalized["settings"] = settings
+        elif set(self.settings) == {'undo_plan'}:
+            try:
+                normalized = strict_json_copy(payload)
+            except ValueError:
+                settings = _normalize_fields(self.settings, authoring_model_version=self.context.wwise_version,
+                    validate_compound_snapshot=True)
+                normalized = strict_json_copy({**payload, 'settings': {}})
+                normalized['settings'] = settings
+        else:
+            normalized = strict_json_copy(payload)
         assert isinstance(normalized, dict)
         return normalized
 
@@ -394,7 +424,7 @@ class BusinessDeclarationSession:
             if isinstance(declaration.target, NewDescendantTarget):
                 planned_handles.add(declaration.result_handle)
         declarations = tuple(declarations_list)
-        settings = _normalize_fields(payload.get("settings"))
+        settings = _normalize_fields(payload.get("settings"), authoring_model_version=context.wwise_version)
         ids = tuple(row.declaration_id for row in declarations)
         if len(ids) != len(set(ids)) or revision < len(declarations):
             raise ValueError("business declaration ids or revision are invalid")
@@ -509,7 +539,7 @@ class BusinessDeclarationSession:
         self,
         *,
         declaration_id: str,
-        target: NewDescendantTarget | ExistingObjectTarget,
+        target: NewDescendantTarget | OwnedRtpcTarget | ExistingObjectTarget,
         fields: Mapping[str, Any],
         replace: bool,
     ) -> "BusinessDeclarationSession":
@@ -629,7 +659,7 @@ def _validate_target(
     handles: BusinessHandleRegistry,
     planned_parent_handles: set[str] | None = None,
     draft_revision: int | None = None,
-) -> NewDescendantTarget | ExistingObjectTarget:
+) -> NewDescendantTarget | OwnedRtpcTarget | ExistingObjectTarget:
     if isinstance(target, NewDescendantTarget):
         missing = [
             field
@@ -638,7 +668,7 @@ def _validate_target(
                 ("name", target.name),
                 ("kind", target.kind),
             )
-            if not isinstance(value, str) or not value
+            if not isinstance(value, str) or (not value and not (field == "name" and isinstance(target, AnonymousListTarget)))
         ]
         if missing:
             raise business_repair(
@@ -676,10 +706,23 @@ def _validate_target(
                 exc,
                 draft_revision=0 if draft_revision is None else draft_revision,
             ) from exc
+        if isinstance(target, AnonymousListTarget):
+            kind = handles.resolve_type(target.kind)
+            from .documented_list_fields import is_manual_marker_class
+            if (target.name != "" or handles.context.wwise_version not in {"2023.1", "2024.1", "2025.1"}
+                    or not (kind.name == "EffectSlot" or is_manual_marker_class(handles.context.wwise_version, kind.name, kind.class_id))):
+                raise business_repair("ANONYMOUS_LIST_PLACEMENT_INVALID", field="kind", action="select a source-proven anonymous List member Type Handle")
+        return target
+    if isinstance(target, OwnedRtpcTarget):
+        if handles.context.wwise_version == "2021.1":
+            raise business_repair("UNSUPPORTED_VERSION", field="rtpc",
+                action="RTPC graph construction authority remains unresolved for this version")
+        if target.owner_handle not in (planned_parent_handles or set()):
+            handles.resolve_object(target.owner_handle)
         return target
     if isinstance(target, ExistingObjectTarget):
         try:
-            handles.resolve_object(target.object_handle)
+            handles.resolve_property_target(target.object_handle)
         except BusinessDeclarationError as exc:
             raise repair_at_draft_revision(
                 exc,
@@ -698,6 +741,8 @@ def _normalize_fields(
     fields: Any,
     *,
     draft_revision: int | None = None,
+    authoring_model_version: str | None = None,
+    validate_compound_snapshot: bool = False,
 ) -> dict[str, Any]:
     if not isinstance(fields, Mapping) or len(fields) > MAX_BUSINESS_DECLARATION_FIELDS:
         raise business_repair(
@@ -706,6 +751,53 @@ def _normalize_fields(
             draft_revision=draft_revision,
             action="provide one bounded object of stable business fields",
         )
+    if authoring_model_version is not None and set(fields) == {"authoring_model_plan", "authoring_model_binding"}:
+        from .authoring_model_business import MODEL_OPERATIONS, validate_model_plan, model_resource_roles
+        binding = fields["authoring_model_binding"]
+        if isinstance(binding, Mapping) and binding.get("operation") in MODEL_OPERATIONS and binding.get("plan") == fields["authoring_model_plan"]:
+            operation = binding["operation"]
+            plan = validate_model_plan(operation, authoring_model_version, fields["authoring_model_plan"])
+            expected_resources = set(model_resource_roles(operation))
+            if operation == "ak.wwise.ui.model.registerWafm":
+                expected_resources.add("registration_name")
+                if plan.get("registration_medium", "inline") == "file": expected_resources.add("wafm_file")
+            if (set(binding) != {"operation", "context", "plan", "resources", "sha256"}
+                    or not isinstance(binding["context"], Mapping) or not isinstance(binding["resources"], Mapping)
+                    or set(binding["resources"]) != expected_resources
+                    or canonical_sha256({key: value for key, value in binding.items() if key != "sha256"}) != binding["sha256"]):
+                raise ValueError("Authoring model settings require their exact sealed business binding")
+            return strict_json_copy(dict(fields), maximum_depth=64)
+    if authoring_model_version is not None and set(fields) == {"undo_plan"}:
+        if not validate_compound_snapshot:
+            try:
+                return strict_json_copy(dict(fields))
+            except ValueError:
+                pass  # Only a proved closed snapshot may exceed this guard.
+        try:
+            from .compound_undo_business import build_compound_undo_child_snapshot
+            from .operation_registry import UNDO_GROUP_MAX_CALLS, UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH
+            plan = fields["undo_plan"]
+            if (not isinstance(plan, Mapping) or not {"display_name", "children"} <= set(plan)
+                    or set(plan) - {"display_name", "children", "failure_cancellation"}
+                    or not isinstance(plan.get('display_name'), str) or not plan['display_name'].strip()
+                    or plan['display_name'] != plan['display_name'].strip() or len(plan['display_name']) > UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH
+                    or plan.get('failure_cancellation', 'native-default') not in {'undo-changes', 'preserve-changes', 'native-default'}
+                    or not isinstance(plan.get("children"), (list, tuple))
+                    or not 1 <= len(plan["children"]) <= UNDO_GROUP_MAX_CALLS):
+                raise ValueError("Compound settings require bounded closed child snapshots")
+            source_ids = set()
+            for child in plan["children"]:
+                if not isinstance(child, Mapping) or child.get('source_draft_id') in source_ids:
+                    raise ValueError('Compound settings require distinct closed child snapshots')
+                source_ids.add(child.get('source_draft_id'))
+                rebuilt = build_compound_undo_child_snapshot(version=authoring_model_version,
+                    source_draft_id=child["source_draft_id"], source_revision=child["source_revision"], request=child["request"])
+                if rebuilt != child:
+                    raise ValueError("Compound settings differ from their closed child request hashes")
+            return strict_json_copy(dict(fields), maximum_depth=64)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise business_repair('DECLARATION_FIELD_VALUE_INVALID', field='undo_plan',
+                draft_revision=draft_revision, action='use bounded Gateway-owned checked closed child snapshots') from exc
     normalized: dict[str, Any] = {}
     for name, value in fields.items():
         if not isinstance(name, str) or not _BUSINESS_FIELD.fullmatch(name):
@@ -760,11 +852,15 @@ def _declaration_from_dict(
         "name",
         "kind",
     }:
-        target: NewDescendantTarget | ExistingObjectTarget = NewDescendantTarget(
+        target: NewDescendantTarget | OwnedRtpcTarget | ExistingObjectTarget = NewDescendantTarget(
             parent_handle=str(target_payload.get("parent_handle")),
             name=str(target_payload.get("name")),
             kind=str(target_payload.get("kind")),
         )
+    elif form == "anonymous-list-member" and set(target_payload) == {"form", "parent_handle", "kind"}:
+        target = AnonymousListTarget(parent_handle=str(target_payload["parent_handle"]), name="", kind=str(target_payload["kind"]))
+    elif form == "owned-rtpc" and set(target_payload) == {"form", "owner_handle"}:
+        target = OwnedRtpcTarget(str(target_payload.get("owner_handle")))
     elif form == "existing-object" and set(target_payload) == {
         "form",
         "object_handle",
@@ -800,12 +896,17 @@ def _declaration_from_dict(
 
 def _planned_result_handle(
     declaration_id: str,
-    target: NewDescendantTarget | ExistingObjectTarget,
+    target: NewDescendantTarget | OwnedRtpcTarget | ExistingObjectTarget,
     *,
     context: BusinessContext,
 ) -> str:
     if isinstance(target, ExistingObjectTarget):
         return target.object_handle
+    if isinstance(target, OwnedRtpcTarget):
+        digest = canonical_sha256({"contract": "waapi-skill.planned-object-handle/v1",
+            "context": context.as_binding_dict(), "declaration_id": declaration_id,
+            "form": "owned-rtpc", "owner_handle": target.owner_handle})
+        return f"bnh1-{digest[:32]}"
     digest = canonical_sha256(
         {
             "contract": "waapi-skill.planned-object-handle/v1",

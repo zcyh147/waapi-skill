@@ -1,0 +1,14 @@
+{
+  "attribution": "historical_native_current_program_not_current_native",
+  "observed_branch_ids": [
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false"
+  ],
+  "outcome": "PASS",
+  "phase_reports": {
+    "call": "passed",
+    "setup": "passed",
+    "teardown": "passed"
+  },
+  "source_unchanged": true
+}

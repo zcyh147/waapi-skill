@@ -7,6 +7,8 @@ from typing import Any
 
 MEDIA_BUILD_BUSINESS_CONTRACT = "waapi-skill.media-build-business/v1"
 
+MAX_PEAK_PAIR_COUNT = 16384
+
 PEAKS_REGION_URI = "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion"
 PEAKS_TRIMMED_URI = (
     "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion"
@@ -32,6 +34,14 @@ MEDIA_POOL_NUMBER_OPERATOR_TOKENS = (
     "greaterThanOrEqual",
 )
 MEDIA_POOL_SORT_DIRECTIONS = ("ascending", "descending")
+
+MEDIA_POOL_RETURN_ONLY_FIELDS = {
+    "search-score": {"field": "Score", "meaning": "native search relevance score"},
+    "file-size-bytes": {"field": "Size", "meaning": "native file size in bytes"},
+    "markers": {"field": "Markers", "meaning": "native marker names and times in seconds"},
+    "detected-regions": {"field": "DetectedRegions", "meaning": "native region start/end times in seconds"},
+}
+
 
 _CONTRACTS: dict[str, dict[str, Any]] = {
     PEAKS_REGION_URI: {
@@ -149,7 +159,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "weighted_audio_descriptions": {
                 "flag": "--weighted-audio-description",
                 "repeatable": True,
-                "arguments": ["DESCRIPTION", "WEIGHT_0_TO_1"],
+                "arguments": ["DESCRIPTION", "FINITE_NATIVE_WEIGHT"],
             },
             "audio_similarity_files": {
                 "flag": "--audio-similarity-file",
@@ -158,7 +168,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "weighted_audio_similarity_files": {
                 "flag": "--weighted-audio-similarity-file",
                 "repeatable": True,
-                "arguments": ["ABSOLUTE_AUDIO_FILE", "WEIGHT_0_TO_1"],
+                "arguments": ["ABSOLUTE_AUDIO_FILE", "FINITE_NATIVE_WEIGHT"],
             },
             "return_field_meanings": {
                 "flag": "--include-field",
@@ -179,6 +189,8 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             },
         },
         "result_shape": "bounded_business_media_rows",
+        "field_binding": "copied exact live field names take precedence over business aliases and fuzzy matches; repeated identical native tokens identify one field",
+        "value_keys": "lowercase Unicode letters/digits with punctuation replaced by underscores; colliding or empty keys use the exact requested field meaning",
     },
 }
 
@@ -251,6 +263,11 @@ def media_build_business_contract_data(
             "optional_fields": list(row["optional_fields"]),
             "field_types": dict(row["field_types"]),
             "input_forms": dict(row["input_forms"]),
+            **({"field_choices": {"channel_mode": {
+                "per-channel": "separate peak data for each channel; Gateway default when the flag is omitted",
+                "cross-channel": "one peak stream across all channels",
+                "native-default": "omit the optional native channel mode; report the actual returned channel count without assuming its default",
+            }}} if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else {}),
         },
         "gateway_derivations": [
             "exact_object_selector",
@@ -262,13 +279,54 @@ def media_build_business_contract_data(
         "legacy_typed_call_public": False,
         "safety": {
             "object_revalidation": "exact_guid_name_type_path",
-            "max_peak_pair_count": 512,
+            "max_peak_pair_count": MAX_PEAK_PAIR_COUNT,
             "max_media_pool_candidates": 200,
             "max_soundbank_inclusions": 500,
             "native_request_input": "forbidden",
             "result_bound": True,
         },
         "result_shape": row["result_shape"],
+        **({"return_only_fields": {name: dict(value) for name, value in MEDIA_POOL_RETURN_ONLY_FIELDS.items()},
+            "field_binding": row["field_binding"], "value_keys": row["value_keys"]}
+           if operation == MEDIA_POOL_GET_URI else {}),
+        **({"peak_resource_limits": {
+            "requested_count_unit": "min/max pairs per returned channel",
+            "native_count": {"minimum": 1, "maximum": 4294967295, "required": True, "zero_or_omitted_default": False},
+            "native_omitted_channel_mode": "false" if version == "2025.1" else "not stated in this version schema; preserve observed channel count",
+            "gateway_requested_pair_limit": MAX_PEAK_PAIR_COUNT,
+            "combined_native_result_limit_bytes": 256 * 1024,
+            "completion_claim": "resource limits never prove native capability or collection completion",
+            "larger_intent": "region reads can request an explicit narrower time interval; no native offset/file continuation exists; independent intervals do not prove identical full-region bins",
+        }, "read_continuation": {
+            "flag": "--peak-page", "input": "copy returned Gateway command only",
+            "native_read": "repeat_same_bounded_read_and_verify_entire_result",
+            "binding": ["query", "configuration", "project", "host_session", "complete_native_result"],
+            "lifetime_seconds": 900, "mutation_authority": False,
+            "projection": "append channel-major fragments at exact channel_index/pair_offset; projection_complete covers the observation only",
+            "storage": "dynamic peaks are not stored in the metadata cache; no immutable native-result cache exists",
+        }, "result_projection": {
+            "native_pair_count": "shorter native array contains all available sample values within the requested window; fewer pairs are not truncation",
+            "optional_native_fields": "preserve absence; return partial observation when decoding facts are missing",
+            "zero_normalization_divisor": "retain native observation; normalized samples unavailable",
+            "malformed_present_fields": "bounded structured failure with native call evidence",
+            "partial_projection": "status=partial; projection_complete=false; decode_available=false; native_result retained or losslessly paged as native_result_fragments",
+            "decoded_header_pages": "large channel configuration text is preserved in header_fragments with exact pointer/string offsets; header_projection marks previews incomplete; projection_complete includes all header fragments",
+            "raw_observation_pages": "native_header preserves available facts; observation_complete marks complete raw-fragment recovery only and never implies decoded projection completion",
+        }} if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else {}),
+        **({"read_continuation": {
+            "flag": "--media-page", "input": "copy returned Gateway continuation only",
+            "long_query_flag": "--media-query; copy returned opaque read-plan handle only",
+            "long_query_state": "immutable validated business plan; exact context binding; no native payload input or mutation authority",
+            "state_lifetime": "completed query plans retired; expired plans safely reclaimed within bounded record and byte capacity",
+            "native_offset_supported": False, "mode": "larger bounded prefix reread",
+            "binding": ["query", "configuration", "project", "host_session", "exact preceding native prefix"],
+            "expires_after_seconds": 900, "maximum_prefix_count": 200,
+            "maximum_continuation_command_bytes": 64 * 1024,
+            "oversized_continuation": "retain useful rows and complete=false; explicit continuation command boundary",
+            "ceiling_hit": "partial; complete=false; useful rows retained",
+            "post_processed_presentation": "larger prefix replaces the preceding presentation",
+            "ultimate_bound": "explicit resource boundary; never evidence that the native collection ends here",
+        }} if operation == MEDIA_POOL_GET_URI else {}),
     }
 
 

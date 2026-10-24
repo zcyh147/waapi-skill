@@ -312,6 +312,7 @@ def _blend_edges(value: Any) -> list[dict[str, Any]]:
 def materialize_core_business_request(
     operation: str,
     session: BusinessDeclarationSession,
+    *, history_state_dir=None,
 ) -> dict[str, Any]:
     """Compile one generic Core business declaration at the shared seam."""
 
@@ -320,7 +321,13 @@ def materialize_core_business_request(
     version = session.context.wwise_version
     contract = core_business_contract_data(operation, version)
     plan = _core_plan(session)
-    if operation == "ak.wwise.core.object.diff":
+    from .edit_history_contracts import HISTORY_VERSIONS
+    if operation in HISTORY_VERSIONS:
+        _require_plan_fields(plan, required={"history_scope", "history_binding"})
+        if plan["history_scope"] != "latest_project_history":
+            raise business_repair("HISTORY_SCOPE_INVALID", field="history_scope", action="select latest_project_history explicitly")
+        args = {}
+    elif operation == "ak.wwise.core.object.diff":
         expected = {"source_handle", "target_handle"}
         if set(plan) != expected:
             raise business_repair(
@@ -685,12 +692,11 @@ def materialize_core_business_request(
         }
         if "insertion_index" in plan:
             index = plan["insertion_index"]
-            if type(index) is not int or index < 0:
+            if type(index) is not int:
                 raise business_repair(
                     "BUSINESS_RANGE_INVALID",
                     field="insertion_index",
-                    minimum=0,
-                    action="provide a nonnegative integer",
+                    action="provide an integer; the Gateway discloses Wwise's clamped insertion position",
                 )
             args["index"] = index
         if "edges" in plan:
@@ -736,12 +742,13 @@ def materialize_core_business_request(
             ),
         }
     elif operation == "ak.wwise.core.project.save":
-        if set(plan) - {"auto_check_out"}:
+        optional_fields = contract["declaration"]["optional_fields"]
+        if set(plan) - set(optional_fields):
             raise business_repair(
                 "CORE_PLAN_FIELDS_INVALID",
                 field="core_plan",
                 required=[],
-                optional=["auto_check_out"],
+                optional=list(optional_fields),
                 supplied=sorted(str(key) for key in plan),
                 action="submit only the disclosed project save choice",
             )
@@ -772,6 +779,14 @@ def materialize_core_business_request(
         "args": args,
         "options": {},
     }
+    if operation in HISTORY_VERSIONS:
+        from .edit_history_business import materialize_history_reference
+        from .transactions import TransactionStore
+        history = plan["history_binding"]
+        if isinstance(history, Mapping) and history.get("contract") == "waapi-skill.history-draft-reference/v1":
+            materialize_history_reference(operation, version, history,
+                store=None if history_state_dir is None else TransactionStore(history_state_dir), context=session.context)
+        operation_arguments["history_binding"] = history
     if operation == "ak.wwise.core.audio.convert":
         io_root = plan["io_root"]
         if not isinstance(io_root, str) or not io_root:

@@ -1,0 +1,23 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r4/run-c7855db4-r2/pytest-capture/test_modern_collector_preserve1/native/1792556958769494000-22f9a5eb9c1a40328f86304299d819ab-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "default": 0.0,
+    "name": "LfoInitialPhase",
+    "restriction": {
+      "max": 180.0,
+      "min": -180.0,
+      "type": "range"
+    },
+    "type": "Real64"
+  },
+  "risk_level": "low",
+  "timeout": 9.978693791985279,
+  "version": "2023.1"
+}

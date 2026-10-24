@@ -9,9 +9,12 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
     DraftTypedActionBatchArgument,
     GatewayInvocationError,
+    ResponseBinding,
     dependency_free_draft_action_block,
     draft_compact_action_result,
     project_required_metadata_tokens,
+    partition_operation_draft_protocol_steps,
+    validate_operation_draft_protocol_steps,
 )
 from tests.semantic.support.codex_gateway_contracts import gateway_payload_contracts
 
@@ -67,6 +70,7 @@ _BUSINESS_DRAFT_EVENT_OPTIONS = {
     "draft-add-media": frozenset({"declaration.revised"}),
     "draft-bind-field": frozenset({"handles.bound"}),
     "draft-bind-object": frozenset({"handles.bound"}),
+    "draft-bind-switch-child-context": frozenset({"handles.bound"}),
     "draft-business-configure": frozenset({"settings.revised"}),
     "draft-declare-import-batch": frozenset({"declaration.batch-added"}),
     "draft-clear-object-list": frozenset(
@@ -82,6 +86,13 @@ _BUSINESS_DRAFT_EVENT_OPTIONS = {
     "draft-declare-soundbank-plan": frozenset({"settings.revised"}),
     "draft-declare-artifact-plan": frozenset({"settings.revised"}),
     "draft-declare-core-plan": frozenset({"settings.revised"}),
+    "draft-declare-cli-console-plan": frozenset({"settings.revised"}),
+    "draft-declare-debug-intent": frozenset({"settings.revised"}),
+    "draft-declare-host-plan": frozenset({"settings.revised"}),
+    "draft-declare-layout-plan": frozenset({"settings.revised"}),
+    "draft-declare-model-plan": frozenset({"settings.revised"}),
+    "draft-declare-soundengine-plan": frozenset({"settings.revised"}),
+    "draft-declare-undo-plan": frozenset({"settings.revised"}),
     "draft-declare-project-setting-plan": frozenset({"settings.revised"}),
     "draft-declare-runtime-control-plan": frozenset({"settings.revised"}),
     "draft-declare-source-control-plan": frozenset({"settings.revised"}),
@@ -547,6 +558,8 @@ def validate_typed_draft_evidence(
     steps: Sequence[Any],
     broker_records: Sequence[Mapping[str, Any]],
     allow_cleaned_file_evidence: bool = False,
+    user_prompts: Sequence[str] = (),
+    turn_prefix_counts: Sequence[int] = (),
 ) -> Mapping[str, Any] | None:
     """Rebuild one Composer flow from Broker facts and frozen local state."""
 
@@ -561,7 +574,9 @@ def validate_typed_draft_evidence(
             zip(steps, broker_records, strict=False),
             start=1,
         ):
-            if step.subcommand != "draft-start":
+            if step.subcommand not in {"draft-start", "draft-start-undo-child"} and not (
+                step.source_copy_proof_role is not None and step.source_copy_proof_role.issues_save
+            ):
                 continue
             record = _mapping(raw_record, label=f"Composer Broker record {index}")
             payload = _record_payload(
@@ -569,7 +584,7 @@ def validate_typed_draft_evidence(
                 index=index,
                 subcommand=step.subcommand,
             )
-            draft = _draft_projection(payload, command="draft-start")
+            draft = _draft_projection(payload, command=step.subcommand)
             draft_id = draft.get("draft_id")
             if not isinstance(draft_id, str) or not draft_id:
                 _fail("draft-start evidence is missing its issued Draft id")
@@ -583,6 +598,18 @@ def validate_typed_draft_evidence(
             if draft_ids
             else {}
         )
+        if any(step.source_copy_proof_role is not None for step in steps):
+            return _validate_source_copy_draft_evidence(
+                state_directory=state_directory, steps=steps, broker_records=broker_records,
+                durable_records=durable_records, allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+                user_prompts=user_prompts, turn_prefix_counts=turn_prefix_counts,
+            )
+        if any(step.subcommand == "draft-start-undo-child" for step in steps):
+            return _validate_compound_child_draft_evidence(
+                state_directory=state_directory, steps=steps,
+                broker_records=broker_records, durable_records=durable_records,
+                allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            )
         return _validate_typed_draft_evidence(
             state_directory=state_directory,
             steps=steps,
@@ -596,11 +623,99 @@ def validate_typed_draft_evidence(
         OperationComposerError,
         OperationDraftError,
         TransactionError,
+        GatewayInvocationError,
+        KeyError,
+        StopIteration,
         OSError,
         TypeError,
         ValueError,
     ) as exc:
         raise TypedDraftEvidenceError(f"Composer archive replay failed: {exc}") from exc
+
+
+def _validate_source_copy_draft_evidence(
+    *, state_directory, steps, broker_records, durable_records,
+    allow_cleaned_file_evidence, user_prompts, turn_prefix_counts,
+):
+    """Account for every original receipt/event in one exact Source-owned chain."""
+    from types import SimpleNamespace
+    from tests.semantic.support.codex_source_copy_protocol import (
+        validate_source_copy_steps, validate_source_copy_role_payload,
+        source_copy_selection_bindings, source_copy_decline_command,
+    )
+    validate_source_copy_steps(steps)
+    selections = source_copy_selection_bindings(steps, broker_records,
+        user_prompts=user_prompts, turn_prefix_counts=turn_prefix_counts)
+    root = next(step for step in steps if step.subcommand == 'draft-start')
+    payloads = {}
+    groups = {draft_id: [] for draft_id in durable_records}
+    tx_owners = {record.seal['transaction_id']: draft_id for draft_id, record in durable_records.items()
+        if record.seal is not None}
+    context = SimpleNamespace(_state_directory=state_directory, _existing_state_directory=None,
+        _execution_steps=steps, _payloads_by_step=payloads,
+        _source_copy_archive_draft_ids=tuple(durable_records))
+    for index, (step, record) in enumerate(zip(steps, broker_records, strict=True)):
+        if (record.get('step_name') != step.name or record.get('sequence') != index + 1
+                or not all(record.get(key) is True for key in ('authenticated', 'accepted', 'succeeded'))):
+            _fail('Source Composer receipt is not its exact authenticated step')
+        payload = _record_payload(record, index=index + 1, subcommand=step.subcommand)
+        role = step.source_copy_proof_role
+        if role is not None:
+            expected = []
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    value = payloads[argument.step]
+                    for token in argument.pointer.lstrip('/').split('/'):
+                        value = value[token]
+                    if type(value) not in {str, int}:
+                        _fail('Source Composer owner binding is not one exact scalar')
+                    expected.append(str(value))
+                elif isinstance(argument, str):
+                    expected.append(argument)
+                else:
+                    _fail('Source Composer continuation has an unowned argument')
+            actual = _subcommand_arguments(_gateway_arguments(record, index=index + 1), step.subcommand)
+            if actual != tuple(expected):
+                _fail('Source Composer continuation differs from its exact owner/revision')
+            if index in selections:
+                choice = payloads[role.choice_step]
+                decline = source_copy_decline_command(choice, stage=role.kind.split('_')[0])
+                selected = decline if role.is_decline else choice['next_command']
+                if tuple(selected['gateway_argv']) != (step.subcommand, *actual):
+                    _fail('Source Composer selection differs from its disclosed command')
+            validate_source_copy_role_payload(context, step, payload)
+            if role.issues_save or role.is_resume:
+                owner = payload['draft']['draft_id']
+            else:
+                owner = payloads[root.name]['draft']['draft_id']
+        elif isinstance(payload.get('draft'), Mapping):
+            owner = payload['draft'].get('draft_id')
+        elif step.subcommand in {'preview-from-draft', 'transaction-show', 'confirm', 'execute', 'verify'}:
+            owner = tx_owners.get(payload.get('transaction_id'))
+        elif step.subcommand == 'operation-schema':
+            owner = next(draft_id for draft_id, durable in durable_records.items() if durable.operation == 'object.copy')
+        else:
+            _fail('Source Composer receipt has no recognized owning chain')
+        if owner not in groups:
+            _fail('Source Composer receipt refers to an unissued Draft/transaction')
+        groups[owner].append((step, payload))
+        payloads[step.name] = payload
+    if sum(len(group) for group in groups.values()) != len(steps) or any(not group for group in groups.values()):
+        _fail('Source Composer chains do not account for every receipt exactly once')
+    flows = []
+    for draft_id, group in groups.items():
+        durable = durable_records[draft_id]
+        flows.append(_validate_business_draft_evidence(
+            state_directory=state_directory, operation=durable.operation, version=durable.version,
+            schema_digest=durable.schema_digest, draft_id=draft_id, durable=durable,
+            steps=tuple(step for step, _ in group), payloads=tuple(payload for _, payload in group),
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence, source_copy_chain=True,
+        ))
+    evidence = {'contract': TYPED_DRAFT_EVIDENCE_CONTRACT, 'flow_count': len(flows),
+        'flows': flows, 'flows_sha256': canonical_sha256(flows)}
+    if len(canonical_json_bytes(evidence)) > MAX_TYPED_DRAFT_EVIDENCE_BYTES:
+        _fail('Source Composer evidence exceeds its fixed archive byte ceiling')
+    return evidence
 
 
 def _composer_flow_step_indexes(
@@ -642,8 +757,149 @@ def _composer_flow_step_indexes(
     )
 
 
+def _validate_compound_child_draft_evidence(
+    *, state_directory: Path, steps: Sequence[Any],
+    broker_records: Sequence[Mapping[str, Any]],
+    durable_records: Mapping[str, OperationDraftRecord],
+    allow_cleaned_file_evidence: bool,
+) -> Mapping[str, Any]:
+    """Join separately checked, parent-owned records to the one sealed parent."""
+    from wwise_waapi.compound_undo_business import build_compound_undo_child_snapshot
+
+    validate_operation_draft_protocol_steps(steps)
+    starts = [step for step in steps if step.subcommand == "draft-start"]
+    if len(starts) > 1:
+        indexes = {step.name: index for index, step in enumerate(steps)}
+        roots = []
+        flows = []
+        for group in partition_operation_draft_protocol_steps(steps):
+            receipts = tuple(broker_records[indexes[step.name]] for step in group)
+            arguments = dict(state_directory=state_directory, steps=group,
+                broker_records=receipts, durable_records=durable_records,
+                allow_cleaned_file_evidence=allow_cleaned_file_evidence)
+            result = (_validate_compound_child_draft_evidence(**arguments)
+                      if any(step.subcommand == "draft-start-undo-child" for step in group)
+                      else _validate_typed_draft_evidence(**arguments))
+            roots.append(result)
+            flows.extend(result["flows"] if "flows" in result else (result,))
+        evidence = {"contract": TYPED_DRAFT_EVIDENCE_CONTRACT, "root_count": len(roots),
+                    "flow_count": len(flows), "flows": flows, "flows_sha256": canonical_sha256(flows),
+                    "root_evidence_sha256": canonical_sha256(roots)}
+        if len(canonical_json_bytes(evidence)) > MAX_TYPED_DRAFT_EVIDENCE_BYTES:
+            _fail("Independent Draft root evidence exceeds its fixed archive byte ceiling")
+        return evidence
+    if len(starts) != 1:
+        _fail("Compound child archive requires exactly one owning parent start")
+    parent_start = starts[0]
+    child_starts = [step for step in steps if step.subcommand == "draft-start-undo-child"]
+    payloads: dict[str, Mapping[str, Any]] = {}
+    arguments: dict[str, tuple[str, ...]] = {}
+    for index, (step, record) in enumerate(zip(steps, broker_records, strict=True), start=1):
+        if record.get("step_name") != step.name or step.name in payloads:
+            _fail("Compound child Broker records have duplicate or reordered owners")
+        payload = _record_payload(record, index=index, subcommand=step.subcommand)
+        actual = _subcommand_arguments(_gateway_arguments(record, index=index), step.subcommand)
+        expected: list[str] = []
+        for argument in step.arguments:
+            if isinstance(argument, str):
+                expected.append(argument)
+            elif isinstance(argument, ResponseBinding):
+                value: Any = payloads.get(argument.step)
+                for token in argument.pointer.lstrip("/").split("/"):
+                    if not isinstance(value, Mapping) or token not in value:
+                        _fail("Compound child argument lacks its prior issued response binding")
+                    value = value[token]
+                if type(value) not in {str, int}:
+                    _fail("Compound child argument binding is not one exact scalar")
+                expected.append(str(value))
+            else:
+                _fail("Compound child archive requires closed business command arguments")
+        if actual != tuple(expected):
+            _fail("Compound child argv differs from its own issued capability or revision")
+        payloads[step.name], arguments[step.name] = payload, actual
+
+    parent_id = _draft_projection(payloads[parent_start.name], command="draft-start")["draft_id"]
+    parent_authority = payloads[parent_start.name].get("task_authority")
+    parent = durable_records[parent_id]
+    if parent.operation != "waapi.undoGroup" or parent.composition is None:
+        _fail("Compound child archive does not have its exact Undo parent")
+    parent_session = BusinessDeclarationSession.from_dict(parent.composition["business_session"])
+    if parent_session.context.task_authority_digest != operation_draft_authority_digest(parent_authority):
+        _fail("Compound parent context differs from its issued authority")
+    declarations = [step for step in steps if step.subcommand == "draft-declare-undo-plan"]
+    (declaration,) = declarations
+    declaration_argv = arguments[declaration.name]
+    declaration_revision = int(_option(declaration_argv, "--expected-revision"))
+    ordered_pairs = [declaration_argv[index + 1:index + 3]
+                     for index, value in enumerate(declaration_argv) if value == "--child-draft"]
+    child_capabilities = {
+        payloads[step.name]["draft"]["draft_id"]: payloads[step.name].get("task_authority")
+        for step in child_starts
+    }
+    if (len(ordered_pairs) != len(child_starts)
+            or len({pair[0] for pair in ordered_pairs}) != len(child_starts)
+            or dict(ordered_pairs) != child_capabilities):
+        _fail("Compound parent declaration does not consume every issued child exactly once")
+
+    flows: list[Mapping[str, Any]] = []
+    covered: set[int] = set()
+    for start in (parent_start, *child_starts):
+        if not start.name.endswith(".draft-start"):
+            _fail("Compound child start lacks its exact owning flow prefix")
+        indexes = _composer_flow_step_indexes(steps, start.name[:-len(".draft-start")])
+        if covered.intersection(indexes):
+            _fail("Compound child archive has overlapping flow owners")
+        covered.update(indexes)
+        flows.append(_validate_typed_draft_evidence(
+            state_directory=state_directory, steps=tuple(steps[index] for index in indexes),
+            broker_records=tuple(broker_records[index] for index in indexes),
+            durable_records=durable_records, allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            start_subcommand=start.subcommand,
+        ))
+    if covered != set(range(len(steps))):
+        _fail("Compound child archive contains commands without an owning flow")
+    by_id = {flow["draft_id"]: flow for flow in flows}
+    snapshots = []
+    for child_id, child_authority in ordered_pairs:
+        child = durable_records[child_id]
+        if child.composition is None:
+            _fail("Compound child is missing its original composition")
+        if child.composition.get("compound_parent") != {
+            "draft_id": parent_id, "task_authority": parent_authority,
+            "expected_revision": declaration_revision,
+        }:
+            _fail("Compound child does not belong to its exact parent authority and revision")
+        child_session = BusinessDeclarationSession.from_dict(child.composition["business_session"])
+        if (child.connection_binding != parent.connection_binding
+                or child_session.context.task_authority_digest != operation_draft_authority_digest(child_authority)
+                or any(getattr(child_session.context, field) != getattr(parent_session.context, field)
+                       for field in ("project_id", "project_path", "wwise_version", "wwise_build"))):
+            _fail("Compound child differs from its own authority or parent project/configuration")
+        check = child.check
+        if (child.state is not OperationDraftState.EDITABLE or child.seal is not None
+                or not isinstance(check, Mapping) or not isinstance(parent.check, Mapping)
+                or check.get("source_revision") != child.revision - 1
+                or check.get("schema_digest") != child.schema_digest
+                or check.get("composer_digest") != child.composer_digest
+                or check.get("live_version") != child.version
+                or check.get("project_guard") != parent.check.get("project_guard")):
+            _fail("Compound child lacks its exact current checked snapshot and parent guard")
+        snapshots.append(build_compound_undo_child_snapshot(version=parent.version,
+            source_draft_id=child_id, source_revision=child.revision,
+            request=by_id[child_id]["canonical_request"]))
+    if parent_session.settings["undo_plan"]["children"] != snapshots:
+        _fail("Compound parent ordered snapshots differ from its checked original child records")
+    evidence = {"contract": TYPED_DRAFT_EVIDENCE_CONTRACT, "flow_count": len(flows),
+                "flows": flows, "flows_sha256": canonical_sha256(flows),
+                "compound_children_sha256": canonical_sha256(snapshots)}
+    if len(canonical_json_bytes(evidence)) > MAX_TYPED_DRAFT_EVIDENCE_BYTES:
+        _fail("Compound child evidence exceeds its fixed archive byte ceiling")
+    return evidence
+
+
 def _validate_business_draft_evidence(
     *,
+    state_directory: Path,
     operation: str,
     version: str,
     schema_digest: str,
@@ -652,15 +908,37 @@ def _validate_business_draft_evidence(
     steps: Sequence[Any],
     payloads: Sequence[Mapping[str, Any]],
     allow_cleaned_file_evidence: bool,
+    compound_child: bool = False,
+    source_copy_chain: bool = False,
 ) -> Mapping[str, Any]:
     event_options: list[frozenset[str]] = []
     response_revisions: list[int] = []
+    response_no_events: list[bool] = []
     preview_payload: Mapping[str, Any] | None = None
     for step, payload in zip(steps, payloads, strict=True):
-        options = _BUSINESS_DRAFT_EVENT_OPTIONS.get(step.subcommand)
-        if options is not None:
+        no_event = step.subcommand == "draft-inspect" or (
+            step.subcommand == "draft-discover-fields" and "--list" in step.arguments
+        )
+        child_start = compound_child and step.subcommand == "draft-start-undo-child"
+        if (step.subcommand.startswith("draft-") and not child_start
+                and step.subcommand not in _BUSINESS_DRAFT_EVENT_OPTIONS
+                and step.subcommand != "draft-inspect"):
+            _fail("Business Draft command has no exact business event or read-only policy")
+        # Child creation starts its own original record; it is never a parent
+        # mutation or a generic business command event fallback.
+        options = frozenset({"started"}) if child_start else _BUSINESS_DRAFT_EVENT_OPTIONS.get(step.subcommand)
+        role = step.source_copy_proof_role if source_copy_chain else None
+        if role is not None:
+            if role.issues_save:
+                event_options.extend(frozenset({event}) for event in
+                    ('started', 'source_copy.save_started', 'settings.revised'))
+            elif role.kind in {'baseline_return', 'baseline_decline'}:
+                event_options.append(frozenset({'source_copy.baseline_decided'}))
+            elif role.is_resume:
+                no_event = True
+        if options is not None and not no_event:
             event_options.extend(
-                (options, options)
+                (frozenset({"seal_reserved"}), frozenset({"sealed"}))
                 if step.subcommand == "preview-from-draft"
                 else (options,)
             )
@@ -689,6 +967,7 @@ def _validate_business_draft_evidence(
         ):
             _fail("Business Draft response does not preserve its immutable binding")
         response_revisions.append(revision)
+        response_no_events.append(no_event)
         integrity = raw_draft.get("response_integrity")
         if integrity is not None and (
             not isinstance(integrity, Mapping)
@@ -706,10 +985,11 @@ def _validate_business_draft_evidence(
         )
         or durable.revision != len(audit_types)
         or any(
-            later <= earlier
-            for earlier, later in zip(
+            (later != earlier if no_event else later <= earlier)
+            for earlier, later, no_event in zip(
                 response_revisions,
                 response_revisions[1:],
+                response_no_events[1:],
                 strict=False,
             )
         )
@@ -762,11 +1042,13 @@ def _validate_business_draft_evidence(
             != durable.seal.get("artifact_hash")
         ):
             _fail("Business Draft Preview is not bound to its durable canonical request")
-        preview_binding: Mapping[str, Any] | None = {
-            "transaction_id": durable.seal["transaction_id"],
-            "artifact_hash": durable.seal["artifact_hash"],
-            "transaction_state": durable.seal["transaction_state"],
-        }
+        preview_binding, _cleanup = _sealed_draft_transaction_binding(
+            state_directory=state_directory, canonical=canonical_request,
+            transaction_id=durable.seal["transaction_id"],
+            artifact_hash=durable.seal["artifact_hash"], preview_payload=preview_payload,
+            steps=steps, payloads=payloads, source_copy_chain=source_copy_chain,
+        )
+        preview_binding = {**preview_binding, "transaction_state": durable.seal["transaction_state"]}
     else:
         preview_binding = None
 
@@ -816,6 +1098,150 @@ def _materialize_archived_business_request(
     )
 
 
+def _sealed_draft_transaction_binding(
+    *, state_directory: Path, canonical: Mapping[str, Any],
+    transaction_id: str, artifact_hash: str, preview_payload: Mapping[str, Any],
+    steps: Sequence[Any], payloads: Sequence[Mapping[str, Any]],
+    source_copy_chain: bool = False,
+) -> tuple[Mapping[str, Any], Any]:
+    """Replay the original immutable transaction and full journal for either Draft lane."""
+    preview_agent = _mapping(
+        preview_payload.get("agent_result"),
+        label="Composer Preview agent_result",
+    )
+    if (
+        preview_agent.get("request") != canonical
+        or preview_agent.get("transaction_id") != transaction_id
+        or preview_agent.get("artifact_hash") != artifact_hash
+        or (
+            "cleanup" in preview_payload
+            and preview_agent.get("cleanup") != preview_payload["cleanup"]
+        )
+    ):
+        _fail("Composer Preview agent_result is not bound to the canonical request")
+
+    transaction = load_transaction_archive_snapshot(state_directory, transaction_id)
+    artifact = _mapping(transaction.preview.artifact, label="Composer Preview artifact")
+    prepared = _mapping(
+        artifact.get("prepared_operation"),
+        label="Composer prepared operation",
+    )
+    if (
+        transaction.preview.artifact_hash != artifact_hash
+        or artifact.get("request") != canonical
+        or prepared.get("request") != canonical
+    ):
+        _fail("Composer transaction artifact is not canonical-request equivalent")
+    expected_preview_cleanup = transaction_cleanup_payload(
+        prepared,
+        phase="preview",
+    )
+    if preview_payload.get("cleanup") != expected_preview_cleanup:
+        _fail("Composer Preview cleanup does not replay from its immutable spec")
+    preview_step = next(
+        step for step in steps if step.subcommand == "preview-from-draft"
+    )
+    draft_label = preview_step.name.split(".", 1)[0]
+    transaction_payloads = [
+        payload
+        for step, payload in zip(steps, payloads)
+        if (source_copy_chain or step.name.startswith(f"{draft_label}."))
+        and (step.subcommand in {"transaction-show", "confirm", "reject", "execute", "verify"}
+             or source_copy_chain and step.source_copy_proof_role is not None
+                and step.source_copy_proof_role.kind == 'final_decline')
+    ]
+    if any(payload.get("transaction_id") != transaction_id for payload in transaction_payloads):
+        _fail("Composer transaction commands do not share the sealed transaction ID")
+    for parent in transaction_payloads:
+        if "agent_result" not in parent:
+            # Gateway emits the exact request on every successful terminal
+            # verify, including result-schema-only verification. Execute,
+            # confirmation and summary-only review have distinct compact shapes.
+            if parent.get("command") == "verify" and parent.get("ok") is True:
+                _fail("Composer successful terminal verify is missing its mandatory agent_result")
+            continue
+        agent_result = _mapping(
+            parent["agent_result"],
+            label="Composer transaction agent_result",
+        )
+        if (
+            agent_result.get("request") != canonical
+            or agent_result.get("transaction_id") != transaction_id
+            or agent_result.get("artifact_hash") != artifact_hash
+        ):
+            _fail("Composer transaction agent_result drifted from its sealed request")
+        if "cleanup" in parent and agent_result.get("cleanup") != parent["cleanup"]:
+            _fail("Composer transaction cleanup projections disagree")
+    cleanup = preview_payload.get("cleanup")
+    for payload in reversed(transaction_payloads):
+        if "cleanup" in payload:
+            cleanup = payload["cleanup"]
+            break
+    execution_result: Mapping[str, Any] = {}
+    for event in transaction.events:
+        if event.get("event_type") != "execution_completed":
+            continue
+        details = event.get("details")
+        if isinstance(details, Mapping) and isinstance(
+            details.get("dispatch_result"), Mapping
+        ):
+            execution_result = details["dispatch_result"]
+    final_event_type = transaction.events[-1].get("event_type")
+    cleanup_phase = (
+        "verified"
+        if final_event_type == "verification_recorded"
+        else "indeterminate"
+        if final_event_type == "execution_indeterminate"
+        else "execution_cancelled"
+        if final_event_type == "execution_cancelled"
+        else "executed"
+        if final_event_type == "execution_completed"
+        else "preview"
+    )
+    expected_cleanup = transaction_cleanup_payload(
+        prepared,
+        phase=cleanup_phase,
+        execution_result=execution_result,
+    )
+    if cleanup != expected_cleanup:
+        _fail("Composer cleanup outcome does not replay from its immutable spec")
+    final_event_details = _mapping(
+        transaction.events[-1].get("details"),
+        label="Composer final transaction event details",
+    )
+    final_transaction_payload = transaction_payloads[-1] if transaction_payloads else {}
+    projected_verification = final_transaction_payload.get('verification')
+    journal_verification = final_event_details.get('verification')
+    if (source_copy_chain and isinstance(projected_verification, Mapping)
+            and 'summary_contract' in projected_verification):
+        if (not isinstance(journal_verification, Mapping)
+                or ('verification_scope' in projected_verification) != ('verification_scope' in journal_verification)
+                or projected_verification.get('verification_scope') != journal_verification.get('verification_scope')):
+            _fail('Source Composer verification scope differs from its transaction journal')
+        # Preserve the original full-journal hashes; only the separately bound
+        # Source scope extension is outside the historical compact summary keys.
+        projected_verification = {key: value for key, value in projected_verification.items()
+            if key != 'verification_scope'}
+    if (
+        "verification" in final_transaction_payload
+        and not _verification_projection_matches_journal(
+            projected_verification, journal_verification,
+        )
+    ):
+        _fail("Composer verification result does not match the transaction journal")
+    preview_binding = {
+        "transaction_id": transaction_id,
+        "artifact_hash": artifact_hash,
+        "transaction_final_state": transaction.record.state.value,
+        "transaction_event_count": len(transaction.events),
+        "transaction_last_event_hash": transaction.record.last_event_hash,
+        "cleanup_spec_sha256": canonical_sha256(
+            prepared.get("cleanup", {"kind": "none"})
+        ),
+    }
+    return preview_binding, cleanup
+
+
 def _validate_typed_draft_evidence(
     *,
     state_directory: Path,
@@ -823,10 +1249,11 @@ def _validate_typed_draft_evidence(
     broker_records: Sequence[Mapping[str, Any]],
     durable_records: Mapping[str, OperationDraftRecord],
     allow_cleaned_file_evidence: bool = False,
+    start_subcommand: str = "draft-start",
 ) -> Mapping[str, Any]:
     if len(steps) != len(broker_records):
         _fail("Composer Broker record count does not match the sealed protocol")
-    starts = [step for step in steps if step.subcommand == "draft-start"]
+    starts = [step for step in steps if step.subcommand == start_subcommand]
     if len(starts) > 1:
         prefixes: list[str] = []
         for start in starts:
@@ -882,10 +1309,10 @@ def _validate_typed_draft_evidence(
         arguments_by_step.append(arguments)
 
     start_index = next(
-        index for index, step in enumerate(steps) if step.subcommand == "draft-start"
+        index for index, step in enumerate(steps) if step.subcommand == start_subcommand
     )
     start_payload = payloads[start_index]
-    start_draft = _draft_projection(start_payload, command="draft-start")
+    start_draft = _draft_projection(start_payload, command=start_subcommand)
     draft_id = start_draft.get("draft_id")
     authority = start_payload.get("task_authority")
     binding = _mapping(start_draft.get("binding"), label="draft-start binding")
@@ -916,6 +1343,7 @@ def _validate_typed_draft_evidence(
 
     if operation_uses_business_declaration(operation, version):
         return _validate_business_draft_evidence(
+            state_directory=state_directory,
             operation=operation,
             version=version,
             schema_digest=schema_digest,
@@ -924,6 +1352,7 @@ def _validate_typed_draft_evidence(
             steps=steps,
             payloads=payloads,
             allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            compound_child=start_subcommand == "draft-start-undo-child",
         )
 
     composition = new_composition(operation, version)
@@ -1281,123 +1710,11 @@ def _validate_typed_draft_evidence(
             or preview_payload.get("state") != durable.seal["transaction_state"]
         ):
             _fail("Composer Preview response does not match the durable seal")
-        preview_agent = _mapping(
-            preview_payload.get("agent_result"),
-            label="Composer Preview agent_result",
+        preview_binding, cleanup = _sealed_draft_transaction_binding(
+            state_directory=state_directory, canonical=canonical,
+            transaction_id=transaction_id, artifact_hash=artifact_hash,
+            preview_payload=preview_payload, steps=steps, payloads=payloads,
         )
-        if (
-            preview_agent.get("request") != canonical
-            or preview_agent.get("transaction_id") != transaction_id
-            or preview_agent.get("artifact_hash") != artifact_hash
-            or (
-                "cleanup" in preview_payload
-                and preview_agent.get("cleanup") != preview_payload["cleanup"]
-            )
-        ):
-            _fail("Composer Preview agent_result is not bound to the canonical request")
-
-        transaction = load_transaction_archive_snapshot(state_directory, transaction_id)
-        artifact = _mapping(transaction.preview.artifact, label="Composer Preview artifact")
-        prepared = _mapping(
-            artifact.get("prepared_operation"),
-            label="Composer prepared operation",
-        )
-        if (
-            transaction.preview.artifact_hash != artifact_hash
-            or artifact.get("request") != canonical
-            or prepared.get("request") != canonical
-        ):
-            _fail("Composer transaction artifact is not canonical-request equivalent")
-        expected_preview_cleanup = transaction_cleanup_payload(
-            prepared,
-            phase="preview",
-        )
-        if preview_payload.get("cleanup") != expected_preview_cleanup:
-            _fail("Composer Preview cleanup does not replay from its immutable spec")
-        preview_step = next(
-            step for step in steps if step.subcommand == "preview-from-draft"
-        )
-        draft_label = preview_step.name.split(".", 1)[0]
-        transaction_payloads = [
-            payload
-            for step, payload in zip(steps, payloads)
-            if step.name.startswith(f"{draft_label}.")
-            and step.subcommand
-            in {"transaction-show", "confirm", "reject", "execute", "verify"}
-        ]
-        if any(payload.get("transaction_id") != transaction_id for payload in transaction_payloads):
-            _fail("Composer transaction commands do not share the sealed transaction ID")
-        for parent in transaction_payloads:
-            if "agent_result" not in parent:
-                continue
-            agent_result = _mapping(
-                parent["agent_result"],
-                label="Composer transaction agent_result",
-            )
-            if (
-                agent_result.get("request") != canonical
-                or agent_result.get("transaction_id") != transaction_id
-                or agent_result.get("artifact_hash") != artifact_hash
-            ):
-                _fail("Composer transaction agent_result drifted from its sealed request")
-            if "cleanup" in parent and agent_result.get("cleanup") != parent["cleanup"]:
-                _fail("Composer transaction cleanup projections disagree")
-        cleanup = None
-        for payload in reversed(transaction_payloads):
-            if "cleanup" in payload:
-                cleanup = payload["cleanup"]
-                break
-        execution_result: Mapping[str, Any] = {}
-        for event in transaction.events:
-            if event.get("event_type") != "execution_completed":
-                continue
-            details = event.get("details")
-            if isinstance(details, Mapping) and isinstance(
-                details.get("dispatch_result"), Mapping
-            ):
-                execution_result = details["dispatch_result"]
-        final_event_type = transaction.events[-1].get("event_type")
-        cleanup_phase = (
-            "verified"
-            if final_event_type == "verification_recorded"
-            else "indeterminate"
-            if final_event_type == "execution_indeterminate"
-            else "execution_cancelled"
-            if final_event_type == "execution_cancelled"
-            else "executed"
-            if final_event_type == "execution_completed"
-            else "preview"
-        )
-        expected_cleanup = transaction_cleanup_payload(
-            prepared,
-            phase=cleanup_phase,
-            execution_result=execution_result,
-        )
-        if cleanup != expected_cleanup:
-            _fail("Composer cleanup outcome does not replay from its immutable spec")
-        final_event_details = _mapping(
-            transaction.events[-1].get("details"),
-            label="Composer final transaction event details",
-        )
-        final_transaction_payload = transaction_payloads[-1] if transaction_payloads else {}
-        if (
-            "verification" in final_transaction_payload
-            and not _verification_projection_matches_journal(
-                final_transaction_payload["verification"],
-                final_event_details.get("verification"),
-            )
-        ):
-            _fail("Composer verification result does not match the transaction journal")
-        preview_binding = {
-            "transaction_id": transaction_id,
-            "artifact_hash": artifact_hash,
-            "transaction_final_state": transaction.record.state.value,
-            "transaction_event_count": len(transaction.events),
-            "transaction_last_event_hash": transaction.record.last_event_hash,
-            "cleanup_spec_sha256": canonical_sha256(
-                prepared.get("cleanup", {"kind": "none"})
-            ),
-        }
 
     evidence: dict[str, Any] = {
         "contract": TYPED_DRAFT_EVIDENCE_CONTRACT,

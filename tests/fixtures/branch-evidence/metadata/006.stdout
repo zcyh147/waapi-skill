@@ -1,0 +1,148 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 30847,
+    "url": "ws://127.0.0.1:30847/waapi"
+  },
+  "detected_version": "2021.1",
+  "is_command_line": true,
+  "operation": "detail",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 3,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2021.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": null,
+      "timeout": 29.967874750029296
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 30847,
+      "url": "ws://127.0.0.1:30847/waapi"
+    },
+    "adapter_version": "2021.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:30847/waapi",
+        "adapter_version": "2021.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "selection": "mf1.1792223505.0.c5d9495edb782a6012addee68d34aa9f79bca73fec7a0022870919732e159019",
+    "scope": {
+      "kind": "object_type",
+      "requested": "ObjectSettingAssoc",
+      "resolved": {
+        "classId": 1572880,
+        "name": "ObjectSettingAssoc",
+        "type": "WObject"
+      }
+    },
+    "metadata": {
+      "name": "ContinuePlay",
+      "type": "bool",
+      "default": false,
+      "supports": {
+        "rtpc": "None",
+        "randomizer": false,
+        "unlink": false
+      },
+      "display": {
+        "name": "Continue to play across Switches",
+        "index": 1327,
+        "group": ""
+      },
+      "restriction": {},
+      "dependencies": [
+        {
+          "type": "property",
+          "action": "Enable",
+          "property": "SwitchBehavior",
+          "context": "AssocParent",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "1",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "ui": {
+        "value": {
+          "min": 0.0,
+          "max": 0.0,
+          "decimals": 0,
+          "step": 0.0,
+          "fine": 0.0,
+          "infinity": 0.0
+        },
+        "displayAs": {
+          "lrMix": false,
+          "musicNote": false,
+          "bitfield": false
+        },
+        "dataMeaning": "None",
+        "autoUpdate": false
+      },
+      "audioEngineId": 4294967295,
+      "unit": {
+        "status": "unknown",
+        "value": null
+      },
+      "availability": {
+        "type": "known",
+        "default": "known",
+        "restriction": "known",
+        "dependencies": "known",
+        "supports": "known",
+        "ui": "known"
+      }
+    },
+    "mutation_authority": false
+  }
+}

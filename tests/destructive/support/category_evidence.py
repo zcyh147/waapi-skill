@@ -63,7 +63,7 @@ def exact_transaction_outcomes(state_dir: Path) -> list[dict[str, Any]]:
     return outcomes
 
 
-def append_category_evidence(
+def build_category_evidence_record(
     *,
     repo_root: Path,
     candidate: str,
@@ -74,7 +74,8 @@ def append_category_evidence(
     residual_state: Mapping[str, Any],
     invocation: Mapping[str, Any] | None = None,
     transactions: Sequence[Mapping[str, Any]] | None = None,
-) -> None:
+) -> dict[str, Any]:
+    """Validate and construct an original record before any publication."""
     if len(candidate) != 40 or any(character not in "0123456789abcdef" for character in candidate):
         raise AssertionError("category evidence candidate is not an exact Git commit")
     required_category_fields = {"category", "status", "verifier_strength"}
@@ -188,6 +189,21 @@ def append_category_evidence(
     if invocation is not None and transactions is not None:
         payload["invocation"] = dict(invocation)
         payload["transactions"] = [dict(transaction) for transaction in transactions]
+    return payload
+
+
+def append_category_evidence(
+    *, repo_root: Path, candidate: str, version: str, host: Mapping[str, Any],
+    categories: Sequence[Mapping[str, Any]], source: Mapping[str, Any],
+    residual_state: Mapping[str, Any], invocation: Mapping[str, Any] | None = None,
+    transactions: Sequence[Mapping[str, Any]] | None = None,
+) -> None:
+    payload = build_category_evidence_record(
+        repo_root=repo_root, candidate=candidate, version=version, host=host,
+        categories=categories, source=source, residual_state=residual_state,
+        invocation=invocation, transactions=transactions,
+    )
+    platform_name = payload["platform"]
     configured = os.getenv("WWISE_CATEGORY_EVIDENCE_PATH")
     if configured is None and platform_name == "macos":
         configured = os.getenv("WWISE_MACOS_CATEGORY_EVIDENCE_PATH")
@@ -204,6 +220,7 @@ def append_category_evidence(
 
 __all__ = [
     "append_category_evidence",
+    "build_category_evidence_record",
     "current_evidence_platform",
     "exact_git_candidate",
     "exact_transaction_outcomes",

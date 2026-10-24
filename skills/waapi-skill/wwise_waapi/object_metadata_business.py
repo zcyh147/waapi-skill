@@ -35,7 +35,7 @@ def _object_for_handle(
     field: str,
 ) -> Any:
     try:
-        return session.handles.resolve_object(handle)
+        return session.handles.resolve_property_target(handle)
     except BusinessDeclarationError as exc:
         repair = dict(exc.repair)
         repair["field"] = field
@@ -155,6 +155,9 @@ def materialize_object_metadata_business_request(
         declaration.target.object_handle,
         field="object_handle",
     )
+    from .switch_child_context import BoundContext
+    if isinstance(source, BoundContext) and operation != "object.setProperty":
+        raise business_repair("FIELD_TARGET_OPERATION_UNREVIEWED", field="object_handle", action="use the reviewed scalar property operation")
     fields = _require_fields(operation, version, declaration.fields)
     field = _field_for_handle(
         session,
@@ -164,6 +167,8 @@ def materialize_object_metadata_business_request(
     arguments: dict[str, Any] = {
         "object": {"kind": "id", "value": source.object_id},
     }
+    if isinstance(source, BoundContext):
+        arguments["switch_child_context"] = dict(source.proof)
     if operation == "object.setProperty":
         _require_field_kind(field, "property")
         arguments.update(
