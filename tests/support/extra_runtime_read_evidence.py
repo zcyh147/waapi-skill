@@ -279,7 +279,11 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
     return 'passed',None
 
 
-def write_bundle(output,captures,*,inventory):
+def write_bundle(output,captures,*,inventory,name_prefix=''):
+    contexts={(r['version'],r['host'])for r in inventory['native_coverage']['routes']if r['uri']in URIS}
+    if (not isinstance(name_prefix,str)or name_prefix and (len(contexts)!=1
+            or name_prefix!='extra-'+'-'.join(next(iter(contexts)))+'-')):
+        raise ValueError('Only the closed matching-version-host extra prefix qualifies')
     output=Path(output);output.mkdir(parents=True,exist_ok=False);candidate=inventory['native_coverage']['candidate_sha256']
     index={'contract':'waapi-skill.branch-evidence-index/v1','base':'.','entries':[]};requirements={'contract':'waapi-skill.branch-evidence-requirements/v1','branches':{}};seen=set()
     def write(name,value):return runtime.write_json(output/name,value)
@@ -288,7 +292,7 @@ def write_bundle(output,captures,*,inventory):
         route,=[r for r in inventory['native_coverage']['routes']if r['uri']==native['uri']and all(r[k]==v for k,v in context.items())]
         public,=[r for r in inventory['routes']if r['id']==route['public_route']];mapped=[m for m in mappings(inventory,captured,route)if m['branch']['id']not in seen]
         if not mapped:continue
-        prefix='extra-'+str(number)+'-';cp=write(prefix+'capture.json',captured)
+        prefix=(name_prefix or'extra-')+str(number)+'-';cp=write(prefix+'capture.json',captured)
         program={'candidate_sha256':candidate,'scope_kind':'product','relevant_sources':captured['source_context']['packaged'],'gateway':gateway,'native_call':native,
             'runtime_read_program':captured,'invocation':{'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':captured['nodeid'],'outcome':'PASS'}]},'branch_assertions':{}}
         bindings={'contract':'waapi-skill.branch-bindings/v1','bindings':{}};policies={'contract':requirements['contract'],'branches':{}}

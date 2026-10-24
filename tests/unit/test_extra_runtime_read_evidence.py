@@ -61,7 +61,7 @@ def test_extra_diagnostic_reads_public_teardown_portable_consumer(request,tmp_pa
         for i,(receipt,native,context,trace,calls)in enumerate(captures):
             path=tmp_path/f'capture-{i}.json';runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,
                 source_context=context,native_reads=trace,public_calls=calls);paths.append(path)
-        index=write_bundle(tmp_path/'bundle',paths,inventory=inventory)
+        index=write_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix=f'extra-{version}-'+('wwise-console'if console else'wwise-authoring')+'-')
         policies=json.loads((index.parent/'requirements.json').read_bytes());document,base,_=audit.portable_binding_inputs(index,policies)
         result=completion.evaluate_coverage(audit.ROOT,inventory,document,digest=audit.digest,evidence_base=base,requirements_document=policies)
         runtime.write_json(tmp_path/'consumer-result.json',result)
@@ -100,4 +100,46 @@ def test_extra_diagnostic_reads_public_teardown_portable_consumer(request,tmp_pa
             missing=deepcopy(document);missing['bindings'][route+'|/resultSchema']['evidence'].pop('native')
             blocked=completion.evaluate_coverage(audit.ROOT,inventory,missing,digest=audit.digest,evidence_base=base,requirements_document=policies)
             assert all(r['state']!= 'verified'if r['route']==route else r['state']=='verified'for r in blocked['obligations'])
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_extra_host_version_prefixes_compose_without_rewriting_original_packets(request,tmp_path):
+    from tests.support.extra_runtime_read_evidence import original_call,write_bundle
+    uri=URIS[0];contexts=(('2023.1',True),('2025.1',False))
+    routes=[f'{version}|'+('wwise-console'if console else'wwise-authoring')+f'|{BUILDS[version]}|function|{uri}'for version,console in contexts]
+    inventory=log_inventory(routes,pointers={'/argsSchema','/resultSchema'});captures=[]
+    for (version,console),route in zip(contexts,routes,strict=True):
+        actual=original_call(route+'|/resultSchema')
+        captures.append(public_read(tmp_path/version,uri,version,console,actual['result']['return'],actual['args']['time']))
+    def finalize(phases):
+        defaults=[];components=[]
+        for number,((version,console),route,values)in enumerate(zip(contexts,routes,captures,strict=True)):
+            receipt,native,context,trace,calls=values;path=tmp_path/f'namespace-capture-{number}.json'
+            runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=trace,public_calls=calls)
+            selected=log_inventory(route,pointers={'/argsSchema','/resultSchema'})
+            old=write_bundle(tmp_path/f'default-{number}',[path],inventory=selected)
+            defaults.append((old,json.loads((old.parent/'requirements.json').read_bytes())))
+            host='wwise-console'if console else'wwise-authoring'
+            index=write_bundle(tmp_path/f'named-{number}',[path],inventory=selected,name_prefix=f'extra-{version}-{host}-')
+            components.append((index,json.loads((index.parent/'requirements.json').read_bytes())))
+        with pytest.raises(ValueError,match='duplicates an entry identity|common-base path collision'):
+            runtime.write_runtime_composition(tmp_path/'default-collision',defaults)
+        combined,policies=runtime.write_runtime_composition(tmp_path/'combined',components)
+        bindings,base,_=audit.portable_binding_inputs(combined,policies)
+        assert len(bindings['bindings'])==4
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert {r['state']for r in result['obligations']}=={'verified'}
+        for (version,console),route in zip(contexts,routes,strict=True):
+            label=('console-'if console else'authoring-')+version
+            from tests.support.extra_runtime_read_evidence import review
+            provider=review()['providers'][label]
+            assert (base/(label+'-original.json.gz')).read_bytes()==(audit.ROOT/provider['archive_source']).read_bytes()
+        with pytest.raises(ValueError,match='duplicates an exact branch'):
+            runtime.write_runtime_composition(tmp_path/'duplicate',[*components,components[0]])
+        for prefix in ('../escape-','foreign-','extra-2024.1-wwise-console-','extra-2023.1-wwise-authoring-'):
+            target=tmp_path/('rejected-'+str(len(prefix)))
+            with pytest.raises(ValueError,match='prefix'):
+                write_bundle(target,[tmp_path/'namespace-capture-0.json'],inventory=log_inventory(routes[0],pointers={'/argsSchema','/resultSchema'}),name_prefix=prefix)
+            assert not target.exists()
     register_exact_evidence_finalizer(request.node,finalize)
