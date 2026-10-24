@@ -321,7 +321,7 @@
       "scope": "New versioned closed query/constructor/runtime helper or source resource in the full Skill candidate closure; no new Source effect claim."
     },
     "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
-      "current_sha256": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63",
+      "current_sha256": "50192ce8dd71af490d1585b87cf0718f7a26987efeeaab837605dc96a324f851",
       "historical": null,
       "scope": "New versioned closed query/constructor/runtime helper or source resource in the full Skill candidate closure; no new Source effect claim."
     },
@@ -857,7 +857,7 @@
         }
       ],
       "path": "skills/waapi-skill/wwise_waapi/business_declaration_state.py",
-      "retained_review_or_witness": "R59 owned inputs; R64 Playlist; R74 structural; R84–R90 finite Inner reviews",
+      "retained_review_or_witness": "R59 owned inputs; R64 Playlist; R74 structural; R84\u2013R90 finite Inner reviews",
       "source_relevance": "Session fields/target normalization gain RTPC owned inputs, structural property targets and constructor/list identity checks. Ordinary named Source + empty destination declaration is retained; exercise it through actual current Gateway."
     },
     {
@@ -1013,7 +1013,7 @@
         }
       ],
       "path": "skills/waapi-skill/wwise_waapi/compound_undo_business_contracts.py",
-      "retained_review_or_witness": "R77–R83 compound review/handoffs",
+      "retained_review_or_witness": "R77\u2013R83 compound review/handoffs",
       "source_relevance": "Compound child disclosure changes; Source four transactions are separately previewed, not undoGroup."
     },
     {
@@ -1237,7 +1237,7 @@
         }
       ],
       "path": "skills/waapi-skill/wwise_waapi/object_graph_business.py",
-      "retained_review_or_witness": "R64 Playlist; R84–R90 finite constructor/references",
+      "retained_review_or_witness": "R64 Playlist; R84\u2013R90 finite constructor/references",
       "source_relevance": "_compile_existing_set_fields extends protected constructor/field processing; original Source workflow does not object.set an existing retained Inner. Destination creation still gets current program flow."
     },
     {
@@ -1279,7 +1279,7 @@
         }
       ],
       "path": "skills/waapi-skill/wwise_waapi/object_graph_paths.py",
-      "retained_review_or_witness": "R77–R83 exact-name staged creation/history reviews",
+      "retained_review_or_witness": "R77\u2013R83 exact-name staged creation/history reviews",
       "source_relevance": "Compound result/path context gains staged actual GUID/name graphs; no compound child or result-path reference in the selected Source copy."
     },
     {
@@ -1717,7 +1717,7 @@
         }
       ],
       "path": "skills/waapi-skill/wwise_waapi/planned_references.py",
-      "retained_review_or_witness": "R77–R83 staged native-name reviews",
+      "retained_review_or_witness": "R77\u2013R83 staged native-name reviews",
       "source_relevance": "apply_result_name_choices/graph_result_bindings/prepare_result_context change owned actual-name graph staging. No declared planned reference in selected simple Source copy/destination."
     },
     {
@@ -2507,7 +2507,7 @@
     "skills/waapi-skill/wwise_waapi/platform_paths.py": "00149d5c4213da5d76d748ef21607051677f6364625853e7838c75701693a527",
     "skills/waapi-skill/wwise_waapi/playlist_reference_conditions.py": "e387299d850319a6905f88aed34c2eace36457769e9cc7d829759bd106f3662f",
     "skills/waapi-skill/wwise_waapi/profiler_capture_artifact.py": "12ee2ebd89a17d75fce0f126da57a7b1f001dd49e39e8a45363dea598f77ddec",
-    "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63",
+    "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": "50192ce8dd71af490d1585b87cf0718f7a26987efeeaab837605dc96a324f851",
     "skills/waapi-skill/wwise_waapi/project_setting_business.py": "87e116602cdc4c1b7ad58f6bf4405c4dd6d2cdea4c9e353e8276b7bd9cf84c70",
     "skills/waapi-skill/wwise_waapi/project_setting_business_contracts.py": "5b94b93d61193b1ba69fc06e4d0bc1edee246854b2328e0cd13135ce2ff1df90",
     "skills/waapi-skill/wwise_waapi/recovery.py": "4d62eba5ed05df9acc0f44783520fa831d70427d3f5045f6d7af57478abf9476",
@@ -3586,6 +3586,29 @@
         }
       ],
       "scope": "Same619 memberships, historical_current_sources, earlier increment metadata, predecessors/five actual native Source facts and26 selected shapes remain unchanged. Only exact two product plus two independently reviewed developer-only diagnostic current dependencies; no new native or publication credit."
+    },
+    "meter_output_successor_review": {
+      "candidate": "967abf751a17e505ca1e9a43ab9f2ca5696009f6",
+      "packaged_tree": "d6a056ca3cf89f55cb9ec06b2ec9ae204a065aa7",
+      "changes": {
+        "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
+          "before": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63",
+          "after": "50192ce8dd71af490d1585b87cf0718f7a26987efeeaab837605dc96a324f851"
+        }
+      },
+      "reviewed_steps": [
+        {
+          "candidate": "d9a22dbc157d6d458de2a9c83dcbcd802d6334e5",
+          "before": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63",
+          "after": "e32cc1d8bef16dd8751d0c37c70d5c7bfd9d5ebe96dce7241516173cd826435a"
+        },
+        {
+          "candidate": "967abf751a17e505ca1e9a43ab9f2ca5696009f6",
+          "before": "e32cc1d8bef16dd8751d0c37c70d5c7bfd9d5ebe96dce7241516173cd826435a",
+          "after": "50192ce8dd71af490d1585b87cf0718f7a26987efeeaab837605dc96a324f851"
+        }
+      ],
+      "reason": "Separate R135 meter successor: reviewed d9a22dbc and 967abf75 extend only METER_OUTPUT_NAMES with 26 plus 36 fixed source-backed root getMeters business names and correct its nearby comment. All imports/functions/classes/other assignments, existing output bindings, URI/version/host gates, argument/result validation, limits/absence handling, nonmeter requests/results and Source copy/save/graph protocol remain unchanged. This exact source admission grants no new meter/native/business coverage; historical sources/outcomes and current program requirements remain intact."
     }
   },
   "predecessor_attachments": [

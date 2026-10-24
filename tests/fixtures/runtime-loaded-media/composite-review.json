@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.loaded-media-composite-review/v1",
   "authority": "docs/plans/full-waapi-coverage/RUNTIME_VERIFICATION.md",
-  "positive_review_sha256": "b057658180e471e6dc95dfd6b2854333546770dbedc30e27b5d9016d60945cb9",
+  "positive_review_sha256": "255a847fbce2faf50333718161b0a88760e2a44792f43675cfbb40273696f96b",
   "profiles": {
     "2023.1": {
       "build": "2023.1.19.8928",
@@ -252,10 +252,10 @@
         },
         "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
           "before": "33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b",
-          "after": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63"
+          "after": "50192ce8dd71af490d1585b87cf0718f7a26987efeeaab837605dc96a324f851"
         }
       },
-      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields. Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged. Reviewed fc170122 exact log.addItem message materialization/disclosure and successful log transaction projection/resolved rendered-budget guard only. Profiler read request/result/normalizer, capture cursor, host requirements and Source copy/Save/graph verification paths are unchanged; global24KiB and ordinary non-log output paths remain unchanged. No original native map, fact, failure or archive is rewritten; complete current public replay remains required by existing consumers. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
+      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields. Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged. Reviewed fc170122 exact log.addItem message materialization/disclosure and successful log transaction projection/resolved rendered-budget guard only. Profiler read request/result/normalizer, capture cursor, host requirements and Source copy/Save/graph verification paths are unchanged; global24KiB and ordinary non-log output paths remain unchanged. No original native map, fact, failure or archive is rewritten; complete current public replay remains required by existing consumers. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required. Separate R135 meter successor: reviewed d9a22dbc and 967abf75 extend only METER_OUTPUT_NAMES with 26 plus 36 fixed source-backed root getMeters business names and correct its nearby comment. All imports/functions/classes/other assignments, existing output bindings, URI/version/host gates, argument/result validation, limits/absence handling, nonmeter requests/results and Source copy/save/graph protocol remain unchanged. This exact source admission grants no new meter/native/business coverage; historical sources/outcomes and current program requirements remain intact."
     },
     "2024.1": {
       "build": "2024.1.13.9056",
@@ -507,10 +507,10 @@
         },
         "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
           "before": "33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b",
-          "after": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63"
+          "after": "50192ce8dd71af490d1585b87cf0718f7a26987efeeaab837605dc96a324f851"
         }
       },
-      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields. Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged. Reviewed fc170122 exact log.addItem message materialization/disclosure and successful log transaction projection/resolved rendered-budget guard only. Profiler read request/result/normalizer, capture cursor, host requirements and Source copy/Save/graph verification paths are unchanged; global24KiB and ordinary non-log output paths remain unchanged. No original native map, fact, failure or archive is rewritten; complete current public replay remains required by existing consumers. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
+      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields. Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged. Reviewed fc170122 exact log.addItem message materialization/disclosure and successful log transaction projection/resolved rendered-budget guard only. Profiler read request/result/normalizer, capture cursor, host requirements and Source copy/Save/graph verification paths are unchanged; global24KiB and ordinary non-log output paths remain unchanged. No original native map, fact, failure or archive is rewritten; complete current public replay remains required by existing consumers. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required. Separate R135 meter successor: reviewed d9a22dbc and 967abf75 extend only METER_OUTPUT_NAMES with 26 plus 36 fixed source-backed root getMeters business names and correct its nearby comment. All imports/functions/classes/other assignments, existing output bindings, URI/version/host gates, argument/result validation, limits/absence handling, nonmeter requests/results and Source copy/save/graph protocol remain unchanged. This exact source admission grants no new meter/native/business coverage; historical sources/outcomes and current program requirements remain intact."
     }
   },
   "entries": {
@@ -1351,5 +1351,28 @@
     "path": "docs/branch-coverage-requirements.json",
     "sha256": "99ad508b7fca40ea0db30542115ce90e421e46ed276200d5fbb63a8e39cada3a",
     "candidate": "8b600cfaa45f6670da76187db2dd76e27b613ae3"
+  },
+  "meter_output_successor_review": {
+    "candidate": "967abf751a17e505ca1e9a43ab9f2ca5696009f6",
+    "packaged_tree": "d6a056ca3cf89f55cb9ec06b2ec9ae204a065aa7",
+    "changes": {
+      "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
+        "before": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63",
+        "after": "50192ce8dd71af490d1585b87cf0718f7a26987efeeaab837605dc96a324f851"
+      }
+    },
+    "reviewed_steps": [
+      {
+        "candidate": "d9a22dbc157d6d458de2a9c83dcbcd802d6334e5",
+        "before": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63",
+        "after": "e32cc1d8bef16dd8751d0c37c70d5c7bfd9d5ebe96dce7241516173cd826435a"
+      },
+      {
+        "candidate": "967abf751a17e505ca1e9a43ab9f2ca5696009f6",
+        "before": "e32cc1d8bef16dd8751d0c37c70d5c7bfd9d5ebe96dce7241516173cd826435a",
+        "after": "50192ce8dd71af490d1585b87cf0718f7a26987efeeaab837605dc96a324f851"
+      }
+    ],
+    "reason": "Separate R135 meter successor: reviewed d9a22dbc and 967abf75 extend only METER_OUTPUT_NAMES with 26 plus 36 fixed source-backed root getMeters business names and correct its nearby comment. All imports/functions/classes/other assignments, existing output bindings, URI/version/host gates, argument/result validation, limits/absence handling, nonmeter requests/results and Source copy/save/graph protocol remain unchanged. This exact source admission grants no new meter/native/business coverage; historical sources/outcomes and current program requirements remain intact."
   }
 }

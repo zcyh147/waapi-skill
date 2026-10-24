@@ -13,7 +13,7 @@ from tests.support import runtime_cursor_evidence as cursor
 
 URIS=frozenset('ak.wwise.core.profiler.'+n for n in ('enableProfilerData','startCapture','stopCapture'))
 SUPPORT='tests/fixtures/runtime-capture-controls/support-review.json'
-SUPPORT_SHA='03e872c6671c000a4119c6606adbbb39f3ab2ea6af47ccd22a4528c7b386b651'
+SUPPORT_SHA='d9d4fc32e8896f63d9ec0cc446b769bdc411e0e8c5fab3a2ddf04645497ade56'
 CONTRACT='waapi-skill.retained-capture-control-assessment/v1'
 
 
