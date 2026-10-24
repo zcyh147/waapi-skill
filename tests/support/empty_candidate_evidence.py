@@ -232,6 +232,20 @@ def validate_counterexample(record, descriptor, branch, classification, candidat
             exact_entry(branch, root)
             if branch['id'] not in review(root)['cursor_counterexample_ids']:
                 raise ValueError('only exact two source-owned cursor counterexamples qualify')
+            # These two current public phases perform only connection/project
+            # reads. A valid compiler counterpart must not hide another mutation.
+            traces = []
+            for receipt in (valid, compiled):
+                calls = receipt['native_calls']
+                if (len(calls) != 2 or [call['uri'] for call in calls] != ['ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo']
+                        or any(set(call) != {'ordinal', 'uri', 'args', 'options', 'result'} or type(call['ordinal']) is not int for call in calls)
+                        or calls[1]['ordinal'] != calls[0]['ordinal'] + 1):
+                    raise ValueError('cursor counterpart needs its exact closed read-only context trace')
+                traces.append([{k: call[k] for k in ('uri', 'args', 'options', 'result')} for call in calls])
+            if (not _same(traces[0], traces[1])
+                    or any(not _same(valid['gateway']['payload'].get(key), compiled['gateway']['payload'].get(key))
+                           for key in ('endpoint', 'detected_version', 'is_command_line'))):
+                raise ValueError('cursor counterpart changes its attested session/context')
             field, public_field, meanings = 'position', 'cursor_move', PROFILER_CURSOR_MOVE_MEANINGS
         else:
             raise ValueError('unsupported public flag to selected native field mapping')

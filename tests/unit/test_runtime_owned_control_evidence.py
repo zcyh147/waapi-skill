@@ -305,9 +305,11 @@ def test_cursor_controls_teardown_portable_consumer(request,tmp_path,host):
                 bound['evidence']['program']={**runtime.write_json(base/('bad-cursor-'+damage+'.json'),record),'nodeid':request.node.nodeid}
                 assert next(r for r in evaluate(changed)['obligations']if r['id']==identity)['evidence_results']['program']['outcome']!='passed',damage
             identity=counters[0]['id']
-            for damage in ('borrowed-flag','compiled-field','draft-authority','classification'):
+            for damage in ('extra-counter-call','borrowed-flag','compiled-field','draft-authority','classification'):
                 changed=deepcopy(bindings);bound=changed['bindings'][identity];record=deepcopy(completion.read_sealed_artifact(bound['evidence']['program'],base));proof=record['counterexample']
-                if damage=='borrowed-flag':
+                if damage=='extra-counter-call':
+                    proof['compiled']['native_calls'].append({'ordinal':6,'uri':'ak.wwise.core.log.clear','args':{'channel':'General'},'options':{},'result':{}})
+                elif damage=='borrowed-flag':
                     for target in (record,proof['valid']):target['gateway']['argv'][-2]='--severity'
                     proof['valid']['gateway']['argv'][-1]='message'
                     record['gateway']['stderr']="gateway: error: argument --severity: invalid choice: '' (choose from 'message')\n"
@@ -343,3 +345,15 @@ def test_owned_controls_shared_namespace_uses_actual_host(request,tmp_path):
             assert not out.exists()
         with pytest.raises(ValueError,match='duplicates an exact branch'):runtime.write_runtime_composition(tmp_path/'duplicate',components+components[:1])
     register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_retained_move_modes_keep_whole_original_closure():
+    from tests.support.runtime_owned_control_evidence import original_control
+    original=original_control('2025.1|wwise-authoring|2025.1.7.9143|function|'+PREFIX+'moveCursor')
+    assert original['facts']['modes']==[
+        {'position':'first','returned_time_ms':10133,'observed_time_ms':10133},
+        {'position':'next','returned_time_ms':10144,'observed_time_ms':10144},
+        {'position':'last','returned_time_ms':13600,'observed_time_ms':13600},
+        {'position':'previous','returned_time_ms':13589,'observed_time_ms':13589}]
+    assert original['facts']['original_context']=={'version':'2025.1','host':'wwise-authoring','build':'2025.1.7.9143'}
+    assert original['facts']['physical_cleanup_complete']is True and original['facts']['capture_completeness_verified']is False

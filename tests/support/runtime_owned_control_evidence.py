@@ -15,7 +15,7 @@ PREFIX='ak.wwise.core.profiler.'
 METER_URIS=frozenset(PREFIX+n for n in ('registerMeter','unregisterMeter'))
 URIS=METER_URIS|{PREFIX+n for n in ('saveCapture','moveCursor','setCursorTime')}
 SUPPORT='tests/fixtures/runtime-owned-controls/support-review.json'
-SUPPORT_SHA='78748bfeb8c2805009f48dd74c43f60f8f87c3cc77cf83119a8819ea5bfecfa7'
+SUPPORT_SHA='ca33fb91252bd198d83e363f070b8ebc0219902df6b78018864061d0adcdb86f'
 CONTRACT='waapi-skill.retained-owned-control-assessment/v1'
 
 
@@ -178,7 +178,7 @@ def validate_evidence(record,binding,branch,category,base,root,edges=None):
 def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,binding,root,edges):
     entry=exact_entry(branch,root)
     if branch['pointer']!='/resultSchema'or entry['role']!='native_business_anchor'or scope_kind!='product':raise ValueError('Only exact owned-control roots qualify')
-    original=original_control(branch['route'],base,root=root);p=original['profile'];cp=cursor.review(root)['profiles'][p['cursor_route']]
+    original=original_control(branch['route'],base,root=root);p=original['profile']
     cap=completion.read_sealed_artifact(assessment['program_capture'],base);record=completion.read_sealed_artifact(descriptor,base)
     expected={'contract':CONTRACT,'branch_id':branch['id'],'profile':p,'support_review':assessment['support_review'],'archive':original['archive'],'program_capture':assessment['program_capture'],'facts':original['facts']}
     if branch['route'].endswith('.saveCapture'):
@@ -187,7 +187,7 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
     if (assessment!=expected or assessment['support_review']['sha256']!=SUPPORT_SHA or completion.read_sealed_artifact(assessment['support_review'],base)!=review(root)
             or record!={'candidate_sha256':candidate,'scope_kind':'product','evidence_kind':'qualified_retained_owned_control_fact','branch_id':branch['id'],
                 'native_shape_sha256':branch['shape_sha256'],'assessment_sha256':binding['qualified_runtime_read_attachment']['sha256'],
-                'relevant_sources':cursor.review(root)['source_maps'][cp['candidate']]['sources'],'retained_facts':original['facts']}
+                'relevant_sources':_original_sources(original,root),'retained_facts':original['facts']}
             or cap['native_call']!={'uri':p['request']['api'],'args':expected_args,'options':{},'result':p['result']}):raise ValueError('Exact original owned control/current full replay differs')
     validate_evidence({'gateway':cap['gateway'],'native_call':cap['native_call'],'runtime_read_program':cap,'relevant_sources':cap['source_context']['packaged']},binding,branch,'program',base,root,edges)
     return 'passed',None
@@ -241,17 +241,17 @@ def write_owned_control_bundle(output,captures,*,inventory,name_prefix='',file_b
             validate_evidence(program,binding,branch,'program',output,audit.ROOT,edges)
             bindings['bindings'][identity]=binding;policies['branches'][identity]=remaining.policy(entry);seen.add(identity)
             if entry['role']=='native_business_anchor'and route['id']in review()['profiles']:
-                original=original_control(route['id']);p=original['profile'];cp_profile=cursor.review()['profiles'][p['cursor_route']]
+                original=original_control(route['id']);p=original['profile']
                 expected_args=cap['native_call']['args']if uri==PREFIX+'saveCapture'else p['request']['args']
                 if cap['native_call']!={'uri':uri,'args':expected_args,'options':{},'result':p['result']}:
                     raise ValueError('Capture native root requires actual original complete request/result replay first')
-                name='cursor-'+cp_profile['version']+'-'+cp_profile['host']+'-original.json.gz';shutil.copyfile(audit.ROOT/cp_profile['archive_source'],output/name)
+                name,source=_original_transport(original,audit.ROOT);shutil.copyfile(audit.ROOT/source,output/name)
                 assessment=write(prefix+'assessment.json',{'contract':CONTRACT,'branch_id':identity,'profile':p,'support_review':desc('owned-control-support-review.json'),
                     'archive':desc(name),'program_capture':cp,'facts':original['facts'],
                     **({'destination_binding':{'mode':'exact-authorized-directory-plus-name','original':p['request']['args']['file'],'program':cap['native_call']['args']['file']}}if uri==PREFIX+'saveCapture'else{})})
                 evidence=write(prefix+'qualified.json',{'candidate_sha256':candidate,'scope_kind':'product','evidence_kind':'qualified_retained_owned_control_fact',
                     'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'assessment_sha256':assessment['sha256'],
-                    'relevant_sources':cursor.review()['source_maps'][cp_profile['candidate']]['sources'],'retained_facts':original['facts']})
+                    'relevant_sources':_original_sources(original,audit.ROOT),'retained_facts':original['facts']})
                 index['qualified_runtime_read_attachments'].append(write(prefix+'attachment.json',{'contract':'waapi-skill.qualified-retained-read-attachment/v1',
                     'branch_id':identity,'assessment':assessment,'evidence':evidence}))
         pd={**write(prefix+'program.json',program),'nodeid':cap['nodeid']}
@@ -423,6 +423,7 @@ def original_control(route,base=None,*,root=audit.ROOT):
     uri=route.split('|')[-1]
     if uri in METER_URIS:return original_meter(route,base,root=root)
     if uri==PREFIX+'saveCapture':return original_save(route,base,root=root)
+    if uri==PREFIX+'moveCursor':return original_moves(route,base,root=root)
     p=review(root)['profiles'].get(route)
     if p is None or p['provider']!='cursor-effect':raise ValueError('No exact retained cursor control effect for route')
     original=cursor.original_cursor(p['cursor_route'],base,root=root);cp=original['profile'];read=original['read'];calls=json.loads(read(cp['node_path']))['receipts'];chain=[calls[i]for i in p['receipt_indices']]
@@ -499,3 +500,84 @@ def cursor_counterexample_policy(branch,root=audit.ROOT):
     if classification is None or classification['status']!='rejected':raise ValueError('Exact invalid cursor-position candidate no longer rejects')
     return {'native_shape_sha256':branch['shape_sha256'],'categories':['program'],'empty_candidate':classification,
         'reason':'Resolved reflected schema rejects this concrete synthetic candidate; exact public counterexample program proof required. No native absence/effect or parent credit.'}
+
+
+def original_moves(route,base=None,*,root=audit.ROOT):
+    """Exact R108 four-mode business observations, whole original closure retained."""
+    import gzip
+    data=review(root);p=data['profiles'].get(route);r=data['r108']
+    if p is None or p['provider']!='move-effect'or route!='2025.1|wwise-authoring|2025.1.7.9143|function|'+PREFIX+'moveCursor':
+        raise ValueError('Only exact retained Authoring2025 four-mode cursor facts qualify')
+    archive_path=root/r['archive_source']if base is None else Path(base)/Path(r['archive_source']).name
+    archive={'artifact':archive_path.name,'sha256':r['archive_sha256']};read=runtime.archive_reader(archive,archive_path.parent)
+    encoded=json.loads(gzip.decompress(archive_path.read_bytes()))['files']
+    if len(encoded)!=r['archive_files']or audit.digest(encoded)!=r['archive_map_sha256']:raise ValueError('Complete106-file R108 archive differs')
+    load=lambda path:json.loads(read(path))
+    node=load(r['node_path']);report=load(r['report_path']);rr=load(r['original_root']+'/root-review.json');final=load(r['original_root']+'/evidence/authoring-batch-finalization.json');life=final['lifecycle']
+    context=completion.native_host_context(report['host'],'isCommandLine')
+    if (context!={'version':'2025.1','host':'wwise-authoring','build':'2025.1.7.9143'}or completion.native_host_context({'version':final['host']['version'],'isCommandLine':final['host']['is_command_line']},'isCommandLine')!=context
+            or any(x['candidate']!=r['original_candidate']for x in (node,report,rr,final))
+            or runtime.sha(read(r['node_path']))!=r['node_sha256']or runtime.sha(read(r['report_path']))!=r['report_sha256']
+            or rr['report_sha256']!=r['report_sha256']or rr['formal_outcome']!='PASS'or rr['source_unchanged']is not True
+            or rr['cleanup_complete']is not True or rr['cleanup_errors']!=[]or rr['integrity_errors']!=[]or rr['post_terminal_bare_port_8080_bindable']is not True
+            or report['complete']is not True or report['errors']!=[]or report['cleanup']['complete']is not True or report['cleanup']['errors']!=[]
+            or final['outcome']!='PASS'or life['final_status']!='PASS'or life['errors']!=[]or life['sandbox_retained']is not False
+            or life['source_hash_before']!=life['source_hash_after']or life['source_mtime_before_ns']!=life['source_mtime_after_ns']
+            or final['resources']['port']['released']is not True or final['resources']['residual_processes']!=[]
+            or final['resources']['cleanup_report']['process_exited']is not True or final['resources']['cleanup_report']['residual_processes']!=[]):
+        raise ValueError('Original R108 actual host/source/terminal cleanup facts differ')
+    if (audit.digest(node['source_context'])!=r['source_context_sha256']or final['source_context']!=node['source_context']
+            or {k:v for k,v in node['source_context']['sources'].items()if k.startswith('skills/waapi-skill/')}!=r['original_sources']):
+        raise ValueError('All617 original source entries/native413 subset differ')
+    source=r['original_sources'];current=runtime.program_source_context(root,flow=PREFIX+'moveCursor')['packaged']
+    changes={k:{'before':source.get(k),'after':current.get(k)}for k in source.keys()|current.keys()if source.get(k)!=current.get(k)}
+    if len(source)!=413 or len(current)!=413 or changes!=r['source_changes']:raise ValueError('Exact reviewed R108 full413 source delta differs')
+    checked=0
+    for group in node['artifacts'].values():
+        for item in group['files']:
+            body=read(group['path']+'/'+item['path']);checked+=1
+            if len(body)!=item['bytes']or runtime.sha(body)!=item['sha256']:raise ValueError('Complete original R10899-file node manifest differs')
+    if checked!=99:raise ValueError('Original R108 manifest membership differs')
+    modes=[]
+    if [m['request']['args']['position']for m in p['modes']]!=['first','next','last','previous']:raise ValueError('All four actual interpreted move modes required')
+    for m in p['modes']:
+        raw=load(m['raw_path']);chain=[node['receipts'][i]for i in m['receipt_indices']];preview,shown,confirmed,executed,verified=chain;payload=verified['payload'];witness=report['outcomes'][m['witness']];e=witness['evidence'];time=m['result']['return']
+        if (audit.digest(chain)!=m['receipt_sha256']or runtime.sha(read(m['raw_path']))!=m['raw_sha256']or audit.digest(witness)!=m['witness_sha256']
+                or raw['ok']is not True or raw['dry_run']is not False or raw['api']!=PREFIX+'moveCursor'or raw['version']!='2025.1'or raw['result']!=m['result']
+                or m['request']!={'api':PREFIX+'moveCursor','args':{'position':m['request']['args']['position']},'options':{}}
+                or any(x['exit_code']!=0 or x['payload'].get('ok')is not True for x in chain)
+                or shown['argv']not in [preview['payload']['next_command']['gateway_argv'],['transaction-show',preview['payload']['transaction_id']]]
+                or confirmed['argv']!=shown['payload']['next_command']['gateway_argv']or executed['argv']!=['execute',preview['payload']['transaction_id']]
+                or verified['argv']!=executed['payload']['next_command']['gateway_argv']or any(x['payload']['artifact_hash']!=preview['payload']['artifact_hash']for x in chain)
+                or Path(executed['payload']['dispatch_result']['evidence_path']).name!=Path(m['raw_path']).name
+                or payload['agent_result']['request']['arguments']!=m['request']or payload['agent_result']['result']!=m['result']
+                or payload['verified']is not True or payload['automatic_retry']is not False or payload['verification']['business_state_verified']is not True
+                or payload['verification']['verification_strength']!='independent_profiler_user_cursor_observation'
+                or witness['outcome']!='PASS'or e['transaction']!=payload or e['capture_data_completeness_verified']is not False
+                or type(time)is not int or time<0 or e['returned_time_ms']!=time or e['observed_time_ms']!=time
+                or payload['verification']['verification_scope']['cursor_observation']!={'kind':'profiler-user-cursor-observation','returned_time_ms':time,'observed_time_ms':time,'capture_data_verified':False,'outcome':'matched'}):
+            raise ValueError('Exact original move-mode return/independent user observation/authorization differs')
+        events=[json.loads(line)for line in read(m['journal_path']).splitlines()]
+        verification=next(x['details']['verification']for x in reversed(events)if x['event_type']=='verification_recorded');getter=load(m['getter_raw_path'])
+        native_read={'uri':PREFIX+'getCursorTime','args':{'cursor':'user'},'options':{},'result':{'return':time}}
+        if (audit.digest(verification)!=m['verification_sha256']or audit.digest(verification)!=payload['verification']['canonical_sha256']
+                or verification['readbacks']!=[native_read,payload['verification']['verification_scope']['cursor_observation']]
+                or runtime.sha(read(m['getter_raw_path']))!=m['getter_raw_sha256']or getter['api']!=PREFIX+'getCursorTime'
+                or getter['ok']is not True or getter['dry_run']is not False or getter['version']!='2025.1'or getter['result']!={'return':time}):
+            raise ValueError('Original move independent user getter/full journal differs')
+        modes.append({'position':m['request']['args']['position'],'returned_time_ms':time,'observed_time_ms':time})
+    return {'profile':p,'archive':archive,'archive_source':r['archive_source'],'read':read,'sources':source,'facts':{
+        'original_candidate':r['original_candidate'],'original_context':context,'original_finalization':'PASS','physical_cleanup_complete':True,
+        'global_pass_transferred':False,'actual_control':PREFIX+'moveCursor','modes':modes,'continuing_position_verified':False,'capture_completeness_verified':False}}
+
+
+def _original_sources(original,root):
+    if 'sources'in original:return original['sources']
+    profile=cursor.review(root)['profiles'][original['profile']['cursor_route']]
+    return cursor.review(root)['source_maps'][profile['candidate']]['sources']
+
+
+def _original_transport(original,root):
+    if 'archive_source'in original:return Path(original['archive_source']).name,original['archive_source']
+    p=cursor.review(root)['profiles'][original['profile']['cursor_route']]
+    return 'cursor-'+p['version']+'-'+p['host']+'-original.json.gz',p['archive_source']
