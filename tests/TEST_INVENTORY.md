@@ -19,7 +19,7 @@ On source `c17450c8`, four public replay-to-final-consumer cases passed in
 11 RTPC selectors per version, 32 contribution selectors on 2023 and 28 on
 2024. Thirteen unwitnessed contribution selectors remain unproved. Eight of
 eleven subsequent controls passed initially; three fixture corrections then
-passed in a failed-only 39.03s run. Final roster/cache checks passed twice in
+passed in a failed-only 39.03s run. Two final roster/cache checks passed in
 0.43s. Strict-PASS compatibility, BLOCKED rejection, exact source selection,
 changed native data/host/time/failure/archive and lifecycle-credit rejection
 remain covered. No successful business selection was repeated for review.
