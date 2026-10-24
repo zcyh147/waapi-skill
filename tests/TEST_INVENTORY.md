@@ -5,6 +5,27 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R115 versioned Game Object result handling
+
+Reviewed product `0ff025eb`, integrated at `a71f438d`, repairs the dedicated
+`profiler-game-objects` route against both hosts' matching pinned definitions.
+Legal partial 2022 rows now retain absent fields as null with an exact ordered
+`unreported_fields` list; complete rows keep their existing shape. Present
+timestamp aliases are individually validated and conflicting values rejected.
+IDs use uint64 on 2022/2023 and int64-or-uint64 on 2024/2025. Later required
+fields and the 2021 unavailable-route boundary remain enforced. Request-schema
+discloses these result domains, missing-field semantics and output bounds.
+
+Public empty-row, negative-ID and disclosure cases failed before repair.
+The affected GameObjects selection passed **139 checks**; a nine-case follow-up
+passed in **40.67s**, comprising three added bounds/type controls, four updated
+disclosure checks and two existing fake capture consumers. The last group
+reaches persisted 2022 acceptance and the seven-reader 2025 final categories.
+Independent review reused these logs without rerunning tests. No native/Fresh
+run or full gate is claimed. Historical runtime packages retain their source
+seals; current-source reconciliation remains required before combined evidence
+publication.
+
 ## 2026-10-24 R114 program selection repair
 
 Read-only execution-boundary review found 69 newly added fake-only unit files
