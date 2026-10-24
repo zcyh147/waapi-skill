@@ -540,22 +540,27 @@ RTPC_REVIEWED_SOURCE_CHANGES = {
     UNICODE_CONTEXT_SOURCE: UNICODE_CONTEXT_SOURCE_CHANGE,
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {
         'before': '69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4',
-        'after': '8f8aa5ce579dc9a0c895341b9c835e4e93060ea4c30f1525f0d2a31fc28883c1'},
+        'after': 'f93e41345477d0e3346230c12ebc056511b4c348ee253cb3df33c91d8bd4658d'},
     RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
-        'after': 'cd8367bee13c94d59e4880994468fd2cfd7cc1119969f65c881cfd7739785388'},
+        'after': '0affca686b01dada6262345aa42cb0aadc7062257d2a050435c1aa7c9752a827'},
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {
         'before': '21108e298bc83cdf2eda6269db3d440a0865cacbab7c953d9ef57f84217fe62a',
         'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'},
     'skills/waapi-skill/wwise_waapi/builders/schema.py': {
         'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d',
-        'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}}
+        'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'},
+    'skills/waapi-skill/wwise_waapi/operation_registry.py': {
+        'before': 'f96a2233a98e03dd62de261a24b3f81876284af28f0973758cf1f8a805b5dd5a', 'after': '3b298a11c9326d47b968783e536d09d290a8fff4a5a7080b5f5f99d5e7c2734d'},
+    'skills/waapi-skill/wwise_waapi/runtime_log_effects.py': {
+        'before': '62c28fc9bb92ccd8e8efb3ccbfe5b187d6df1d3086c2def79e1d11dbc81ddfe8', 'after': '1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00'}}
 RTPC_REVIEWED_SOURCE_SYMBOLS = {
     UNICODE_CONTEXT_SOURCE: ['BusinessHandleRegistry._require_context: exact UTF-8 byte comparison; no normalization'],
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': [
         'field ceiling', 'profiler_result_field_choices', 'three fixed row declarations', 'runtime_inspection_business_contract_data',
-        'runtime_transport_requires_authoring', 'runtime_inspection_business_catalog_rows: exact registered-version Console transport admission and metadata-only finalization'],
+        'runtime_transport_requires_authoring', 'runtime_inspection_business_catalog_rows: exact registered-version Console transport admission and metadata-only finalization',
+        'runtime_log_observation_support/CONSOLE_LOG_ADD_OBSERVER; runtime_inspection_business_catalog_rows/runtime_inspection_business_contract_data: exact log metadata only'],
     RTPC_GUARD_FILE: ['module import: builders.query.STRUCTURED_GUID_PATTERN',
         '_validate_rtpc_rows', 'normalize_runtime_inspection_result', 'rtpc_validated_name_compatibility',
         'Sequence/field-contract imports', 'materialize_runtime_inspection_business_request'],
@@ -564,24 +569,31 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
         'module import: builders.stable_reads.MAX_GAME_OBJECT_ROWS/MAX_STABLE_STRING_BYTES',
         'build_parser', 'dispatch_command', 'resolve_profiler_voice_path', 'dispatch_profiler_voice_contributions_request',
         'runtime_authoring_host_required_payload', 'dispatch_offline_command', 'dispatch_business_runtime_control_plan',
-        'dispatch_runtime_inspection_business_read', 'preflight_stable_read_input', 'fixed_command_route_payload', 'preflight_core_business_input'],
+        'dispatch_runtime_inspection_business_read', 'preflight_stable_read_input', 'fixed_command_route_payload', 'preflight_core_business_input',
+        'runtime_log_observation_support import; live_log_topic_boundary; dispatch_command/dispatch_topic_stream: exact log Topic guard',
+        'dispatch_offline_command/dispatch_runtime_inspection_business_read: exact log disclosure only',
+        '_dispatch_transaction_command_with_execution_lease: exact log observation-plan drift/event selection only'],
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': ['build_profiler_voice_contributions_request',
         'normalize_profiler_voice_contributions_result', 'normalize_profiler_game_objects_result'],
     'skills/waapi-skill/wwise_waapi/builders/schema.py': ['validate_resolved_semantic_result',
-        '_validate_resolved_sections', '_runtime_result_reference_schema']}
+        '_validate_resolved_sections', '_runtime_result_reference_schema'],
+    'skills/waapi-skill/wwise_waapi/operation_registry.py': [
+        'prepare_operation/verify_prepared_operation: exact log observation plan, verifier selection and message only'],
+    'skills/waapi-skill/wwise_waapi/runtime_log_effects.py': [
+        'compare_channel: exact Console log observation guard only']}
 RTPC_REVIEWED_SOURCE_REASON = (
-    'Exact reviewed six-file RTPC guard and closed non-RTPC result-validation source delta; '
+    'Exact reviewed eight-file RTPC guard and closed non-RTPC result-validation source delta; '
     'three fixed-reader-only closed result-field selection delta leaves absent result_fields requests unchanged; post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
     'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; '
     'Exact registered-version Console transport predicate/catalog admission and error-message/catalog-docstring finalization does not change these non-transport read paths; '
-    'GameObjects-only optional row fields/versioned ID domains/timestamp aliases and fixed request-schema disclosure do not change RTPC or contribution behavior; exact UTF-8 context comparator preserves successful original ASCII equality decisions with no native non-ASCII claim; original finalized PASS retained')
+    'GameObjects-only optional row fields/versioned ID domains/timestamp aliases and fixed request-schema disclosure do not change RTPC or contribution behavior; exact UTF-8 context comparator preserves successful original ASCII equality decisions with no native non-ASCII claim; exact log-only host/patch observation policy, Topic/transaction guards and metadata leave Profiler reads unchanged; original finalized PASS retained')
 RTPC_ORIGINALS = {
     '2022.1': ('2022.1.19.8584', 'e9d4b86aaccaccb9b1603d37ba5bc7255034c09d2c05b7685beb254e6642adfd', 17, 23637),
     '2025.1': ('2025.1.7.9143', 'e7ef187ef0ed855819cfa007375f3ca8c1d4cfc1e3697f8c5b9e870c1441690c', 5, 30837)}
 
 
 def validate_rtpc_source_review(descriptor, historical_sources, branch, root, base):
-    """Accept only the pinned reviewed six-file delta for original RTPC reads."""
+    """Accept only the pinned reviewed eight-file delta for original RTPC reads."""
     review = completion.read_sealed_artifact(descriptor, base)
     version, host, build, kind, uri = branch['route'].split('|')
     if version not in RTPC_ORIGINALS or host != 'wwise-authoring' or kind != 'function' or uri != RTPC_URI:
