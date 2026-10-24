@@ -14,7 +14,7 @@ from tests.unit.test_runtime_business_gateway import _env
 
 @pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
 @pytest.mark.parametrize('scenario', ('matched', 'native-error'))
-def test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_path, monkeypatch, version, scenario):
+def test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_path, monkeypatch, version, scenario, peer=False):
     monkeypatch.setenv('WWISE_LIVE', '1')
     monkeypatch.setenv('WWISE_DESTRUCTIVE', '1')
     workflow = importlib.import_module('tests.destructive.test_gateway_workflow_transaction_matrix')
@@ -80,6 +80,8 @@ def test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_
     receipt = json.loads(Path(category['receipt_path']).read_text())
     transaction, = final['transactions']
     assert transaction['transaction_id'] == receipt['transaction']['transaction_id']
+    if peer:
+        return client, connections, receipt, final, error, records
     assert client.order == ['subscribed', 'add', 'unsubscribed']
     assert sum(uri == ADD for uri, _, _ in client.calls) == 1
     assert not any(uri.endswith('log.clear') for uri, _, _ in client.calls)
@@ -252,3 +254,113 @@ def test_log_diagnostic_dependency_preflight_blocks_before_any_client(monkeypatc
             pytest.fail('unsupported preflight yielded')
     assert gateway.default_client_factory is original
     assert receipt['delivery_diagnostic']['installed'] is False
+
+
+@pytest.mark.parametrize('scenario', ['both', 'independent-only', 'unrelated', 'neither', 'missing-ack', 'wrong-ack', 'cleanup', 'native-error'])
+def test_independent_console_log_peer_waits_for_ack_and_retains_same_session_result(tmp_path, monkeypatch, scenario):
+    monkeypatch.setenv('WWISE_LIVE', '1')
+    monkeypatch.setenv('WWISE_DESTRUCTIVE', '1')
+    import subprocess
+    import socket
+    import sys
+    import waapi
+    def forbidden(*args, **kwargs):
+        pytest.fail('Console log fake chain forbids real client/socket construction', pytrace=False)
+    monkeypatch.setattr(waapi, 'WaapiClient', forbidden)
+    monkeypatch.setattr(socket, 'socket', forbidden)
+    active, trace = [], []
+    class PeerClient(ConsoleLogClient):
+        def subscribe(self, uri, callback, options=None):
+            assert uri == 'ak.wwise.core.log.itemAdded' and options in (None, {})
+            if not active and scenario == 'missing-ack':
+                raise RuntimeError('controlled independent subscription rejection')
+            independent = not active
+            active.append(callback)
+            trace.append('subscribe-' + str(len(active)))
+            def unsubscribe():
+                active.remove(callback); trace.append('unsubscribe'); return not (independent and scenario == 'cleanup')
+            return SimpleNamespace(unsubscribe=unsubscribe)
+        def call(self, uri, args=None, options=None):
+            if uri == ADD:
+                self.calls.append((uri, deepcopy(args), deepcopy(options)))
+                assert len(active) == 2 and trace[-2:] == ['execute-peer', 'subscribe-2']
+                trace.append('add')
+                payload = {'channel': args['channel'], 'item': {'message': args['message'],
+                    'severity': args['severity'], 'time': 1720000000, 'messageId': 'Custom'}}
+                if scenario == 'native-error':
+                    raise RuntimeError('controlled native add uncertainty')
+                if scenario in ('both', 'cleanup'):
+                    for callback in list(active): callback(**deepcopy(payload))
+                elif scenario == 'independent-only':
+                    active[0](**deepcopy(payload))
+                elif scenario == 'unrelated':
+                    payload['item']['message'] = 'another writer'
+                    active[0](**deepcopy(payload))
+                return {}
+            return super().call(uri, args, options)
+    monkeypatch.setattr(sys.modules[__name__], 'ConsoleLogClient', PeerClient)
+    monkeypatch.setenv('WWISE_CONSOLE_LOG_PEER_DIAGNOSTIC', 'independent-session-v1')
+    from tests.semantic.support import codex_expansion_reconciliation as processes
+    def producer(command, *, environment, timeout_seconds, cwd=None, text=True):
+        workflow = importlib.import_module('tests.destructive.test_gateway_workflow_transaction_matrix')
+        assert active and command[7] in ('execute', 'verify')
+        trace.append(command[7] + '-peer')
+        code, payload = workflow.waapi_gateway.execute_gateway(command[3:], env=environment)
+        return subprocess.CompletedProcess(command, code, json.dumps(payload), '')
+    monkeypatch.setattr(processes, 'run_owned_gateway', producer)
+    workflow = importlib.import_module('tests.destructive.test_gateway_workflow_transaction_matrix')
+    original_raw = workflow._WorkflowSandboxRuntime.raw_gateway
+    def raw(self, argv, *, stream_sink=None):
+        def sink(record):
+            if record.get('record_type') == 'started' and scenario == 'wrong-ack':
+                record = {**record, 'topic_contract_digest': 'wrong'}
+            stream_sink(record)
+        return original_raw(self, argv, stream_sink=sink if stream_sink else None)
+    monkeypatch.setattr(workflow._WorkflowSandboxRuntime, 'raw_gateway', raw)
+    if scenario in ('independent-only', 'unrelated', 'neither'):
+        from wwise_waapi import runtime_log_observer
+        ticks = iter((0, 6))
+        monkeypatch.setattr(runtime_log_observer, 'monotonic', lambda: next(ticks, 6))
+    client, connections, receipt, final, error, records = test_console_log_native_node_persists_final_outcome_and_partial_failure(
+        tmp_path, monkeypatch, '2023.1', 'matched', peer=True)
+    peer = receipt['peer_diagnostic']
+    assert sum(uri == ADD for uri, _, _ in client.calls) == (0 if scenario in ('missing-ack', 'wrong-ack') else 1)
+    assert not active and not any(uri.endswith('log.clear') for uri, _, _ in client.calls)
+    assert final['source']['hash_before'] == final['source']['hash_after']
+    assert len(json.dumps(receipt).encode('utf-8')) <= peer['limits']['receipt_bytes']
+    if scenario == 'both':
+        assert error is None and final['invocation']['outcome'] == 'PASS'
+        assert peer['classification'] == 'both_sessions_matched'
+        assert peer['ack_before_execute'] is True and peer['cleanup'] == 'unsubscribed'
+        assert peer['same_session']['outcome'] == 'matched'
+        event, = peer['events']
+        assert event['matches_expected'] and event['event']['item']['message'] == receipt['expected']['message']
+        assert trace == ['subscribe-1', 'execute-peer', 'subscribe-2', 'add', 'unsubscribe', 'verify-peer', 'unsubscribe']
+        assert final['residual_state']['sandbox'] == 'deleted'
+    else:
+        assert error is not None and final['invocation']['outcome'] == 'FAIL'
+        assert final['residual_state']['sandbox'] == 'quarantined'
+        if scenario in ('missing-ack', 'wrong-ack'):
+            assert peer['execute_attempted'] is False
+            assert 'execute' not in receipt['transaction']
+        elif scenario == 'native-error':
+            assert peer['same_session']['outcome'] == 'native_call_failed'
+            assert 'verify' not in receipt['transaction']
+            assert receipt['transaction']['execute']['automatic_retry'] is False
+        else:
+            internal = receipt['transaction']['execute']['dispatch_result']['log_item_observation']
+            assert peer['same_session'] == internal
+            assert peer['classification'] == ('both_sessions_matched' if scenario == 'cleanup' else
+                'independent_session_only' if scenario == 'independent-only' else 'neither_session_matched')
+            if scenario == 'cleanup':
+                assert peer['cleanup'] != 'unsubscribed' and not peer['complete']
+            else:
+                assert internal['outcome'] == 'timeout' and receipt['transaction']['verify']['state'] == 'result_schema_checked'
+                assert peer['cleanup'] == 'unsubscribed' and peer['complete']
+                assert peer['classification'] != 'both_sessions_matched'
+                if scenario == 'independent-only':
+                    assert peer['events'][0]['matches_expected'] is True
+                elif scenario == 'unrelated':
+                    assert peer['events'][0]['matches_expected'] is False
+                else:
+                    assert peer['events'] == []
