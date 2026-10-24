@@ -118,6 +118,11 @@ def test_remaining_policy_is_exact_and_history_is_immutable():
             original[identity]={**encoded,**packed['contexts'][encoded['context']],
                 'route':route,'native_shape_sha256':packed['shapes'][encoded['shape']]}
     assert len(original)==10977 and len({r['route']for r in original.values()})==169
+    from tests.support.runtime_remaining_evidence import owned_route
+    expected_routes={r['route']for r in original.values()}
+    builds={'2021.1':'2021.1.14.8108','2022.1':'2022.1.19.8584','2023.1':'2023.1.19.8928','2024.1':'2024.1.13.9056','2025.1':'2025.1.7.9143'}
+    candidates={f'{v}|{host}|{build}|function|{uri}'for v,build in builds.items()for host in ('wwise-console','wwise-authoring')for uri in {r.split('|')[-1]for r in expected_routes}}
+    assert {route for route in candidates if owned_route(route)}==expected_routes
     assert sum(e['categories']==['program','native']for e in reviewed['entries'].values())==169
     assert len(reviewed['normalized_input_choices'])==24
     assert {r['public_form']for r in reviewed['normalized_input_choices'].values()}=={'omitted','explicit-default'}
@@ -564,3 +569,42 @@ def test_log_invalid_severity_counterexamples_keep_native_gates(request,tmp_path
             rejected=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=damaged)
             assert next(r for r in rejected['obligations']if r['id']==branch['id'])['state']!='verified'
     register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_remaining_policy_does_not_enter_unrelated_or_empty_scope(tmp_path):
+    from tests.support import runtime_remaining_evidence as remaining
+    unrelated='2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.get|/resultSchema'
+    assert remaining.selected(unrelated,tmp_path) is False
+    assert remaining.preservation_gates(tmp_path,{},[])=={}
+    assert remaining.preservation_gates(tmp_path,{'unrelated':{'categories':['program']}},[{'id':'unrelated','route':'unrelated'}])=={}
+    owned=ROUTE+'|/resultSchema'
+    with pytest.raises(FileNotFoundError):remaining.selected(owned,tmp_path)
+    path=tmp_path/remaining.POLICY;path.parent.mkdir(parents=True);path.write_text('{}')
+    with pytest.raises(ValueError,match='descriptor changed'):remaining.selected(owned,tmp_path)
+
+
+def test_remaining_policy_portable_scope_keeps_history_without_git(tmp_path,monkeypatch):
+    import shutil
+    from tests.support import runtime_remaining_evidence as remaining
+    from pathlib import Path
+    # Export just the complete policy closure; no .git or historical checkout.
+    paths=[remaining.POLICY,'tests/fixtures/runtime/runtime-remaining-prior-r127.json.gz',
+        'tests/fixtures/runtime/runtime-risk-policy-r124.json','tests/fixtures/runtime/runtime-opaque-policy-r126.json']
+    for name in paths:
+        path=tmp_path/name;path.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(audit.ROOT/name,path)
+    import subprocess
+    monkeypatch.setattr(subprocess,'check_output',lambda *a,**k:pytest.fail('Portable policy history must not invoke git'))
+    roster=remaining.review(tmp_path);identity=ROUTE+'|/resultSchema';entry=roster['entries'][identity]
+    branch={**entry,'id':identity,'shape_sha256':entry['native_shape_sha256']}
+    requirements={'contract':'waapi-skill.branch-evidence-requirements/v1','branches':{identity:remaining.policy(entry)}}
+    output=tmp_path/'portable';output.mkdir()
+    program=runtime.write_json(output/'program.json',{'contract':'controlled-policy-path-not-verification'})
+    bindings=runtime.write_json(output/'bindings.json',{'contract':'waapi-skill.branch-bindings/v1','bindings':{identity:{'branch_id':identity,'evidence':{'program':program}}}})
+    req=runtime.write_json(output/'requirements.json',requirements)
+    index=runtime.write_json(output/'index.json',{'contract':'waapi-skill.branch-evidence-index/v1','base':'.','entries':[
+        {'id':'portable-policy','bindings':bindings,'origin':{'bindings':bindings,'program':program,'capture':program,'requirements':req}}]})
+    document,base,_=audit.portable_binding_inputs(output/index['artifact'],requirements)
+    assert set(document['bindings'])=={identity}and base==output
+    assert remaining.preservation_gates(tmp_path,requirements['branches'],[branch])=={identity:[]}
+    historical=tmp_path/'tests/fixtures/runtime/runtime-remaining-prior-r127.json.gz';historical.write_bytes(historical.read_bytes()+b'corrupt')
+    with pytest.raises(ValueError,match='prior.*changed'):remaining.review(tmp_path)

@@ -9,7 +9,6 @@ from functools import lru_cache
 import json
 from pathlib import Path
 import shutil
-import subprocess
 
 from tests.maintenance import branch_coverage_audit as audit
 from tests.maintenance import branch_audit_completion as completion
@@ -24,6 +23,59 @@ LOG_GET = 'ak.wwise.core.log.get'
 LOG_URIS = frozenset('ak.wwise.core.log.' + n for n in ('get','addItem','clear'))
 R122_CANDIDATE = '1f32f9f223cebe11076ca07f168f29fad99adfab'
 R122_ROUTE = '2025.1|wwise-console|2025.1.7.9143|function|'
+
+PRIOR = 'tests/fixtures/runtime/runtime-remaining-prior-r127.json.gz'
+PRIOR_SHA = '7c80a224fb8350c979ed7e4a72598cd5d8f750cbe8817b396467becce108132a'
+_RELEASE_BUILDS = {'2021.1':'2021.1.14.8108','2022.1':'2022.1.19.8584','2023.1':'2023.1.19.8928',
+    '2024.1':'2024.1.13.9056','2025.1':'2025.1.7.9143'}
+# The cheap ownership boundary precedes all fixture access. LoadedMedia here is
+# Console-only; previously accepted Authoring rows belong to their existing scope.
+_ROUTE_START = {
+    **{'ak.wwise.core.'+name:2021 for name in ('log.get','profiler.enableProfilerData','profiler.getCursorTime',
+        'profiler.startCapture','profiler.stopCapture','transport.create','transport.destroy','transport.executeAction',
+        'transport.getList','transport.getState')},
+    'ak.wwise.core.transport.prepare':2022,
+    **{'ak.wwise.core.'+name:2023 for name in ('log.addItem','log.clear','profiler.getCpuUsage','profiler.getLoadedMedia',
+        'profiler.getPerformanceMonitor','profiler.getStreamedMedia','profiler.saveCapture','transport.useOriginals')},
+    **{'ak.wwise.core.profiler.'+name:2024 for name in ('getMeters','registerMeter','unregisterMeter')},
+    **{'ak.wwise.core.profiler.'+name:2025 for name in ('moveCursor','setCursorTime')},
+}
+
+
+def owned_route(route):
+    if not isinstance(route,str):return False
+    parts=route.split('|')
+    if len(parts)!=5:return False
+    version,host,build,kind,uri=parts
+    return (kind=='function'and host in {'wwise-console','wwise-authoring'}and _RELEASE_BUILDS.get(version)==build
+        and uri in _ROUTE_START and int(version[:4])>=_ROUTE_START[uri]
+        and (not uri.endswith('.getLoadedMedia')or host=='wwise-console'))
+
+
+@lru_cache(maxsize=8)
+def _sealed_prior(path,signature):
+    import base64,gzip,io
+    raw=path.read_bytes()
+    if len(raw)>1_000_000 or runtime.sha(raw)!=PRIOR_SHA:
+        raise ValueError('Exact runtime prior originals changed')
+    with gzip.GzipFile(fileobj=io.BytesIO(raw))as stream:body=stream.read(8_000_001)
+    if len(body)>8_000_000:raise ValueError('Exact runtime prior originals size changed')
+    packet=json.loads(body)
+    if set(packet)!={'contract','candidate','files'}or packet['contract']!='waapi-skill.runtime-policy-originals/v1':
+        raise ValueError('Exact runtime prior originals contract changed')
+    return packet['candidate'],{name:base64.b64decode(value,validate=True)for name,value in packet['files'].items()}
+
+
+def _prior_contents(root):
+    path=root/PRIOR;stat=path.stat()
+    return _sealed_prior(path,(stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
+
+
+def _prior_raw(root,candidate,path,seal):
+    observed,files=_prior_contents(root)
+    if observed!=candidate or path not in files or runtime.sha(files[path])!=seal:
+        raise ValueError('Exact runtime prior scope digest/history changed')
+    return files[path]
 
 
 @lru_cache(maxsize=32)
@@ -43,6 +95,9 @@ def review(root=audit.ROOT):
     result = _read_pin(root/POLICY,POLICY_SHA)
     if result['counts'] != {'entries':10977,'routes':169,'native_business_anchors':169,'conditional_rows':10808,'input_rows':3003}:
         raise ValueError('Exact R127 remaining roster counts differ')
+    _,originals=_prior_contents(root)
+    expected={result['prior_policy']['path'],*[p for p in result['prior_scopes']if '/runtime-loaded-media/'in p]}
+    if set(originals)!=expected:raise ValueError('Exact runtime prior scope closure changed')
     for path,seal in result['prior_scopes'].items():
         if '/runtime-loaded-media/'in path:
             _historical_scope(root,result['basis'],path,seal)
@@ -53,19 +108,19 @@ def review(root=audit.ROOT):
 
 @lru_cache(maxsize=16)
 def _historical_scope(root,candidate,path,seal):
-    raw=subprocess.check_output(['git','show',candidate+':'+path],cwd=root)
-    if runtime.sha(raw)!=seal:raise ValueError('Historical Loaded scope differs')
+    _prior_raw(root,candidate,path,seal)
 
 
 @lru_cache(maxsize=8)
 def _check_baseline(root, seal):
     r = _read_pin(root/POLICY,seal); baseline=r['prior_policy']
-    raw=subprocess.check_output(['git','show',baseline['candidate']+':'+baseline['path']],cwd=root)
+    raw=_prior_raw(root,baseline['candidate'],baseline['path'],baseline['sha256'])
     if runtime.sha(raw)!=baseline['sha256'] or set(json.loads(raw)['branches']) & set(r['entries']):
         raise ValueError('Remaining runtime prior-policy absence/history differs')
 
 
 def selected(identity,root=audit.ROOT):
+    if not isinstance(identity,str)or not owned_route(identity.rsplit('|',1)[0]):return False
     return identity in review(root)['entries']
 
 
@@ -94,6 +149,7 @@ def counterexample_policy(branch,root=audit.ROOT):
 
 
 def preservation_gates(root,policies,obligations):
+    if not any(branch['id']in policies and owned_route(branch['id'].rsplit('|',1)[0])for branch in obligations):return {}
     roster=review(root)['entries'];gates={}
     for branch in obligations:
         identity=branch['id']
