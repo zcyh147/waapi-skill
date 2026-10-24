@@ -88,7 +88,7 @@ def test_live_reflection_requires_all_twelve_receipts_and_stops_on_mismatch(tmp_
 from tests.unit.test_authoring_batch_adapter import owned_authoring
 
 
-@pytest.mark.parametrize('failure', [None, 'empty', 'unrelated', 'cleanup', 'schema-mismatch', 'wrong-ui-token', 'ui-timeout'])
+@pytest.mark.parametrize('failure', [None, 'empty', 'unrelated', 'cleanup', 'schema-mismatch', 'wrong-ui-token', 'ui-timeout', 'partial'])
 def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path, monkeypatch, failure):
     """All producer/Gateway/finalizer code runs; only process/UI are fake."""
     import subprocess
@@ -105,7 +105,7 @@ def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path,
     binary.write_bytes(b'fake external SDK executable')
     binary.chmod(0o755)
     batch, call, client, probe = _host(owned_authoring, tmp_path, monkeypatch,
-        failure=failure, demo_context=context)
+        failure=failure, demo_context=context, count=1000 if failure == 'partial' else 1)
     banks = context.bundle.parent / 'SDK/samples/IntegrationDemo/WwiseProject/GeneratedSoundBanks/Mac'
     for name in ('Init.bnk', 'PrepareDemo.bnk', 'Media/124871431.wem'):
         path = banks / name
@@ -180,6 +180,10 @@ def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path,
         argv, kwargs = launches[0]
         assert 'SDK/Mac_Xcode1600/Profile/bin/IntegrationDemo/IntegrationDemo.app/Contents/MacOS/IntegrationDemo' in argv[0]
         assert kwargs['start_new_session'] is True and Path(kwargs['cwd']).is_relative_to(batch.runtime.owned_root)
+    if failure == 'partial':
+        evidence = report['outcomes'][probe.OUTCOME]['evidence']
+        assert len(evidence['pages']) == 8 and evidence['complete'] is False
+        assert evidence['pages'][-1]['next_command']
     if failure is None:
         assert category['owned_identity_observed'] is True
         assert category['attribution_scope'] == 'owned-sdk-prepare-area1'
