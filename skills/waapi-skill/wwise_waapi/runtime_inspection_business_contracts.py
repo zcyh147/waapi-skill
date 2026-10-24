@@ -43,6 +43,7 @@ PROFILER_UNREGISTER_METER_URI = "ak.wwise.core.profiler.unregisterMeter"
 PROFILER_MOVE_CURSOR_URI = "ak.wwise.core.profiler.moveCursor"
 PROFILER_SET_CURSOR_TIME_URI = "ak.wwise.core.profiler.setCursorTime"
 LOG_ADD_ITEM_URI = "ak.wwise.core.log.addItem"
+MAX_LOG_MESSAGE_BYTES = 16 * 1024
 LOG_CLEAR_URI = "ak.wwise.core.log.clear"
 CONSOLE_LOG_ADD_OBSERVER = {
     'topic': 'ak.wwise.core.log.itemAdded',
@@ -410,7 +411,9 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "severity": "message_warning_error_or_fatal",
         },
         "input_forms": {
-            "message": {"flag": "--message", "repeatable": False},
+            "message": {"flag": "--message", "repeatable": False,
+                "maximum_input_bytes": MAX_LOG_MESSAGE_BYTES, "empty_string_allowed": True,
+                "whitespace": "preserve_exactly", "nul_allowed": False},
             "log_channel": {"flag": "--log-channel", "repeatable": False},
             "severity": {"flag": "--severity", "repeatable": False},
         },

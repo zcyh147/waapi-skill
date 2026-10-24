@@ -23,6 +23,7 @@ from .runtime_inspection_business_contracts import (
     MAX_PROFILER_RESULT_FIELDS,
     LOG_GET_URI,
     LOG_ADD_ITEM_URI,
+    MAX_LOG_MESSAGE_BYTES,
     LOG_CLEAR_URI,
     PROFILER_CAPTURE_DATA_CHOICES,
     PROFILER_ENABLE_DATA_URI,
@@ -614,11 +615,14 @@ def materialize_runtime_control_business_request(
         }
     elif operation == LOG_ADD_ITEM_URI:
         require_fields({"message"}, {"log_channel", "severity"})
-        message = _required_text(
-            plan.get("message"),
-            field="message",
-            maximum_bytes=16 * 1024,
-        )
+        message = plan.get("message")
+        if (not isinstance(message, str) or len(message.encode("utf-8")) > MAX_LOG_MESSAGE_BYTES
+                or "\x00" in message):
+            raise business_repair(
+                "BUSINESS_VALUE_INVALID",
+                field="message",
+                action="provide an exact string up to 16384 UTF-8 bytes without NUL; empty and whitespace are allowed",
+            )
         channel = plan.get("log_channel", "general")
         native_channel = _LATER_LOG_CHANNELS.get(channel)
         severity = _LOG_SEVERITIES.get(plan.get("severity", "message"))

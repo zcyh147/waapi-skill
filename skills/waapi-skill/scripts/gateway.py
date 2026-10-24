@@ -379,6 +379,7 @@ from wwise_waapi.media_build_business_cli import (  # noqa: E402  # pyright: ign
 )
 from wwise_waapi.runtime_inspection_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     LOG_ADD_ITEM_URI,
+    MAX_LOG_MESSAGE_BYTES,
     PROFILER_GET_CURSOR_TIME_URI,
     TRANSPORT_CREATE_URI,
     TRANSPORT_DESTROY_URI,
@@ -26691,7 +26692,7 @@ def layout_blueprint_terminal_budget(request: Any) -> int:
 
 
 def transaction_verify_terminal_budget(request: Any) -> int:
-    """Select bounded exceptional capacity only for reviewed closed constructors."""
+    """Select bounded exceptional capacity only for reviewed closed requests."""
     ordinary = TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
     layout_budget = layout_blueprint_terminal_budget(request)
     if layout_budget != ordinary:
@@ -26703,6 +26704,28 @@ def transaction_verify_terminal_budget(request: Any) -> int:
             or request.get('version') not in {'2023.1', '2024.1', '2025.1'}):
         return ordinary
     arguments = request.get('arguments')
+    if (isinstance(arguments, Mapping) and set(arguments) == {'api', 'args', 'options'}
+            and arguments.get('api') == LOG_ADD_ITEM_URI and arguments.get('options') == {}
+            and isinstance(arguments.get('args'), Mapping)):
+        native = arguments['args']
+        try:
+            parse_operation_request(request, expected_version=request['version'])
+            validate_semantic_payload(LOG_ADD_ITEM_URI, native, {}, version=request['version'])
+            message = native.get('message')
+            if (set(native) != {'message', 'channel', 'severity'} or not isinstance(message, str)
+                    or len(message.encode('utf-8')) > MAX_LOG_MESSAGE_BYTES or '\x00' in message):
+                return ordinary
+        except (ValueError, TypeError, KeyError):
+            return ordinary
+        # A UTF-8 input byte can require six JSON bytes (for example \u0001).
+        # Exact closed request framing is below 1 KiB; ordinary terminal framing
+        # stays fixed. No other API or invalid message receives this allowance.
+        rendered_limit = 6 * MAX_LOG_MESSAGE_BYTES + 1024
+        observed = gateway_json_document_size({'agent_result': {'request': request}},
+            stop_after_bytes=rendered_limit)
+        if observed > rendered_limit:
+            return ordinary
+        return ordinary if observed <= TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES else observed + ordinary
     if (not isinstance(arguments, Mapping)
             or set(arguments) != {'api', 'args', 'options', 'io_root'}
             or arguments.get('api') != 'ak.wwise.debug.generateToneWAV'
@@ -26875,6 +26898,23 @@ def project_successful_transaction_verify_payload(
         projection["detail_level"] = "minimal-allowlist-digest"
 
     observed = stabilize_size()
+    if (observed > fixed_limit
+            and agent_result.get("request", {}).get("arguments", {}).get("api") == LOG_ADD_ITEM_URI
+            and isinstance(projected.get("verification", {}).get("verification_scope"), Mapping)):
+        # Large exact messages are already retained in agent_result.request.
+        # The complete duplicate observation remains in verification_recorded.
+        compact_verification = dict(projected["verification"])
+        compact_verification.pop("verification_scope")
+        projected["verification"] = compact_verification
+        # Existing full-verification and component digests still seal every
+        # omitted value; retain guard outcomes/fingerprints, not key rosters.
+        for name in ("guard_validation", "project_call"):
+            component = projected.get(name)
+            if isinstance(component, Mapping) and component.get("key_names_included") is True:
+                projected[name] = {key: value for key, value in component.items() if key != "keys"}
+                projected[name]["key_names_included"] = False
+        projection["detail_level"] = "minimal-log-scope-digest"
+        observed = stabilize_size()
     if observed > fixed_limit:
         raise GatewayResultShapeError(
             "The successful verify projection could not fit its fixed stdout budget",
