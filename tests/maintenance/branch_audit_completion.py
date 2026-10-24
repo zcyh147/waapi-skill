@@ -177,6 +177,9 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/support/runtime_transport_evidence.py',
                  'tests/unit/test_runtime_transport_branch_evidence.py',
                  'tests/fixtures/runtime-transport/support-review.json',
+                 'tests/support/runtime_owned_control_evidence.py',
+                 'tests/unit/test_runtime_owned_control_evidence.py',
+                 'tests/fixtures/runtime-owned-controls/support-review.json',
                  'tests/support/runtime_capture_control_evidence.py',
                  'tests/unit/test_runtime_capture_control_evidence.py',
                  'tests/fixtures/runtime-capture-controls/support-review.json',
@@ -1308,6 +1311,13 @@ def approved_boundary(root, branch, binding, route, public, digest):
         if branch['id']not in owned:return None
         from tests.support.runtime_transport_evidence import approved_media_boundary
         return approved_media_boundary(root,branch,binding)
+    if boundary.get('kind') == 'file_destination':
+        builds={'2023.1':'2023.1.19.8928','2024.1':'2024.1.13.9056','2025.1':'2025.1.7.9143'}
+        owned={f'{v}|{h}|{b}|function|ak.wwise.core.profiler.saveCapture|/argsSchema/properties/file/@empty/string'
+            for v,b in builds.items()for h in ('wwise-console','wwise-authoring')}
+        if branch['id']not in owned:return None
+        from tests.support.runtime_owned_control_evidence import approved_file_boundary
+        return approved_file_boundary(root,branch,binding)
     if boundary.get('kind') != 'prohibited_field':
         return None
     policy = json.loads((root / 'skills/waapi-skill/resources/native_surface_policy.json').read_text())
@@ -1355,6 +1365,9 @@ def validate_boundary_receipt(record, branch, binding, checks, *, root=None):
     if boundary['kind'] == 'explicit_media_choice':
         from tests.support.runtime_transport_evidence import validate_media_boundary_receipt
         validate_media_boundary_receipt(record,branch,binding,checks,root)
+    elif boundary['kind'] == 'file_destination':
+        from tests.support.runtime_owned_control_evidence import validate_file_boundary_receipt
+        validate_file_boundary_receipt(record,branch,binding,checks,root)
     elif boundary['kind'] == 'wrong_host':
         infos = [c['result'] for c in calls if c['uri'] == 'ak.wwise.core.getInfo']
         version, host, build = branch['route'].split('|')[:3]

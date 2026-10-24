@@ -137,8 +137,11 @@ def policy(entry):
 
 
 def counterexample_policy(branch,root=audit.ROOT):
-    """Closed four-ID compiler counterexamples retain their native business gate."""
+    """Closed log/cursor compiler counterexamples retain their native business gate."""
     if branch['id']not in review(root)['schema_counterexample_ids']:
+        if branch['route'].endswith('|ak.wwise.core.profiler.moveCursor'):
+            from tests.support.runtime_owned_control_evidence import cursor_counterexample_policy
+            return cursor_counterexample_policy(branch,root)
         raise ValueError('Only exact four source-owned log counterexamples qualify')
     from tests.support.empty_candidate_evidence import classify_empty_candidate
     classification=classify_empty_candidate(root,branch)
@@ -155,7 +158,7 @@ def preservation_gates(root,policies,obligations):
         identity=branch['id']
         if identity not in roster or identity not in policies:continue
         entry=exact_entry(branch,root)
-        expected=counterexample_policy(branch,root) if identity in review(root)['schema_counterexample_ids'] else policy(entry)
+        expected=counterexample_policy(branch,root) if identity in review(root)['schema_counterexample_ids']or branch['route'].endswith('|ak.wwise.core.profiler.moveCursor')and branch['pointer']=='/argsSchema/properties/position/@empty/string' else policy(entry)
         gates[identity]=entry['required_native_anchor_ids'] if policies[identity]==expected else None
     return gates
 
@@ -439,6 +442,9 @@ def validate_evidence(record,binding,branch,category,base,root,edges=None):
     if branch['route'].split('|')[-1] in {'ak.wwise.core.transport.'+n for n in ('create','destroy','executeAction','prepare','useOriginals','getList','getState')}:
         from tests.support.runtime_transport_evidence import validate_evidence as validate_transport
         return validate_transport(record,binding,branch,category,base,root,edges)
+    if branch['route'].split('|')[-1]in {'ak.wwise.core.profiler.'+n for n in ('registerMeter','unregisterMeter','saveCapture','moveCursor','setCursorTime')}:
+        from tests.support.runtime_owned_control_evidence import validate_evidence as validate_owned_control
+        return validate_owned_control(record,binding,branch,category,base,root,edges)
     if branch['route'].split('|')[-1]in {'ak.wwise.core.profiler.'+n for n in ('enableProfilerData','startCapture','stopCapture')}:
         from tests.support.runtime_capture_control_evidence import validate_evidence as validate_capture_control
         return validate_capture_control(record,binding,branch,category,base,root,edges)
