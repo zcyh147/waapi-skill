@@ -321,7 +321,7 @@ def write_loaded_media_bundle(output,captures,*,inventory,originals=None):
         if not mapped:continue
         prefix=f'flow-{number}-'
         cp=write(prefix+'capture.json',captured)
-        program={'candidate_sha256':candidate,'scope_kind':'product','relevant_sources':sources,
+        program={'candidate_sha256':candidate,'scope_kind':'product','relevant_sources':captured['source_context']['packaged'],
             'gateway':captured['gateway'],'native_call':captured['native_call'],'runtime_read_program':captured,
             'invocation':{'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':captured['nodeid'],'outcome':'PASS'}]},'branch_assertions':{}}
         document={'contract':'waapi-skill.branch-bindings/v1','bindings':{}}
