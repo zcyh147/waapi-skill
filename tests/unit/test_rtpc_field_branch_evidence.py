@@ -17,7 +17,7 @@ BUILDS = {'2021.1': (14, 8108), '2022.1': (19, 8584), '2023.1': (19, 8928),
 FIXTURES = audit.ROOT / 'tests/fixtures/branch-evidence/product'
 
 
-def public_rtpc_read(root, version='2022.1', host='wwise-authoring', position='23637', rows=None):
+def public_rtpc_read(root, version='2022.1', host='wwise-authoring', position='23637', rows=None, native_reads=None):
     from tests.support.runtime_observation_evidence import program_source_context
     source_context = program_source_context()
     root.mkdir(parents=True, exist_ok=True)
@@ -31,14 +31,18 @@ def public_rtpc_read(root, version='2022.1', host='wwise-authoring', position='2
         def call(self, uri, args=None, options=None):
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
             if uri == URI:
-                return {'return': deepcopy(native_rows)}
-            if uri == 'ak.wwise.core.profiler.getCursorTime':
-                return {'return': 12345}
-            result = super().call(uri, args, options)
+                result = {'return': deepcopy(native_rows)}
+            elif uri == 'ak.wwise.core.profiler.getCursorTime':
+                result = {'return': 12345 if args['cursor'] == 'capture' else 23456}
+            else:
+                result = super().call(uri, args, options)
             if uri == 'ak.wwise.core.getInfo':
                 minor, build = BUILDS[version]
                 result['isCommandLine'] = host == 'wwise-console'
                 result['version'].update(minor=minor, build=build, displayName=f'v{version}.{minor}.{build}')
+            if native_reads is not None:
+                native_reads.append({'ordinal': len(self.calls) - 1, 'uri': uri,
+                    'args': deepcopy(args), 'options': deepcopy(options), 'result': deepcopy(result)})
             return result
     client = Client()
     argv = ['core-call', URI, '--profiler-position', position, '--max-results', '64']
@@ -47,7 +51,7 @@ def public_rtpc_read(root, version='2022.1', host='wwise-authoring', position='2
     assert code == 0, json.dumps(payload)
     assert payload['agent_result']['return'] == native_rows
     assert payload['agent_result']['complete'] is True
-    expected_time = int(position) if position.isdecimal() else 12345
+    expected_time = int(position) if position.isdecimal() else 12345 if position == 'capture-latest' else 23456
     assert client.calls[-1] == (URI, {'time': expected_time}, {})
     return {'argv': argv, 'exit_code': code, 'payload': payload}, {
         'uri': URI, 'args': {'time': expected_time}, 'options': {}, 'result': {'return': native_rows}}, source_context
@@ -183,7 +187,7 @@ def test_rtpc_construction_rejects_negative_nondecimal_and_native_inputs(tmp_pat
 @pytest.mark.parametrize('position', ('capture-latest', 'user-cursor'))
 def test_cursor_choices_stay_owned_two_step_reads_without_enum_credit(tmp_path, version, position):
     receipt, dispatch, _ = public_rtpc_read(tmp_path, version, position=position)
-    assert dispatch['args'] == {'time': 12345}
+    assert dispatch['args'] == {'time': 12345 if position == 'capture-latest' else 23456}
     assert receipt['payload']['agent_result']['profiler_position'] == position
 
 
@@ -670,3 +674,219 @@ def test_rtpc_capture_rejects_resealed_request_or_structure_proxy(shape_bundle, 
     changed = evaluate()
     assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
     assert reason in changed['evidence_results']['program']['reason']
+
+
+def rtpc_scalar_rows():
+    return [
+        {'id': '{aBcD1234-16e7-4B8A-b9ca-7BF10ad315B4}', 'name': 'Engine_Load', 'gameObjectId': 0, 'value': 0.0},
+        {'id': RPM, 'name': 'RPM', 'gameObjectId': 18446744073709551615, 'value': 1000.0},
+        {'id': RPM, 'name': 'CC #1: Modulation', 'gameObjectId': 1, 'value': 1.0},
+    ]
+
+
+def test_one_rtpc_scalar_flow_checks_exact_pinned_predicates(tmp_path, inventory):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_field_bundle, write_json
+    receipt, dispatch, context = public_rtpc_read(tmp_path, rows=rtpc_scalar_rows())
+    capture = tmp_path / 'capture.json'
+    write_program_receipt(capture, receipt, dispatch, nodeid='rtpc-scalars',
+        phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context)
+    index = write_field_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
+        version='2022.1', host='wwise-authoring', mode='scalar')
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    selected = [row for row in result['obligations'] if row['id'] in document['bindings']]
+    assert len(selected) == 4
+    assert {row['state'] for row in selected} == {'verified'}, json.dumps(selected)
+    identity = next(key for key in document['bindings'] if key.endswith('/definitions/guid/pattern'))
+    binding = document['bindings'][identity]
+    document['bindings'] = {identity: binding}
+    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    # Update every immediate seal/assertion: the selected reflected predicate,
+    # rather than JSON equality or a stale checksum, must reject this string.
+    for target in (program, program['runtime_read_program']):
+        target['native_call']['result']['return'][0]['id'] = 'malformed-guid'
+        target['gateway']['payload']['agent_result']['return'][0]['id'] = 'malformed-guid'
+    for check in program['branch_assertions'][identity]['checks']:
+        if check['pointer'].endswith('/return/0/id'):
+            check['equals'] = 'malformed-guid'
+    binding['evidence']['program'].update(write_json(base / 'program.json', program))
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    changed = next(row for row in result['obligations'] if row['id'] == identity)
+    assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
+    assert 'pinned scalar predicate' in changed['evidence_results']['program']['reason']
+
+
+@pytest.mark.parametrize('version', BUILDS)
+def test_public_rtpc_discloses_legacy_label_compatibility_after_row_validation(tmp_path, version):
+    from wwise_waapi.builders.schema import validate_semantic_result
+    receipt, dispatch, _ = public_rtpc_read(tmp_path, version, rows=rtpc_scalar_rows())
+    metadata = receipt['payload']['schema_validation']['result']
+    rules = metadata.get('compatibility_rules', [])
+    assert receipt['payload']['agent_result']['return'][2]['name'] == 'CC #1: Modulation'
+    assert metadata['unresolved_refs']  # Conservative traversal remains accurately disclosed.
+    assert not validate_semantic_result(URI, dispatch['result'], version=version).compatibility_rules
+    if version == '2025.1':
+        assert not rules
+    else:
+        assert len(rules) == 1
+        assert rules[0] == {
+            'rule': 'rtpc-legacy-name-label-preservation',
+            'section': '$.return[*].name', 'definition': 'waapi_definitions.json#/definitions/uniqueName',
+            'reflected_pattern': '^[a-zA-Z_]+[a-zA-Z_0-9()]*$',
+            'enforced_type': 'string', 'pattern_enforced': False,
+            'behavior': 'Preserve native labels unchanged, including labels outside the reflected pattern',
+        }
+
+
+def test_one_rtpc_cursor_flow_proves_normalized_construction_and_rejects_resealed_trace(tmp_path, inventory):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_field_bundle, write_json
+    trace = []
+    receipt, dispatch, context = public_rtpc_read(tmp_path, position='capture-latest', native_reads=trace)
+    capture = tmp_path / 'capture.json'
+    write_program_receipt(capture, receipt, dispatch, nodeid='rtpc-cursor', native_reads=trace,
+        phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context)
+    index = write_field_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
+        version='2022.1', host='wwise-authoring', mode='cursor-capture')
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    selected = [row for row in result['obligations'] if row['id'] in document['bindings']]
+    assert len(selected) == 4
+    assert {row['state'] for row in selected} == {'verified'}, json.dumps(selected)
+    identity = next(key for key in document['bindings'] if key.endswith('/profilerCursor/enum/1'))
+    binding = document['bindings'][identity]
+    document['bindings'] = {identity: binding}
+    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    relevant = program['runtime_read_program']['native_reads']
+    cursor = next(row for row in relevant if row['uri'].endswith('getCursorTime'))
+    cursor['result']['return'] += 1
+    binding['evidence']['program'].update(write_json(base / 'program.json', program))
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    changed = next(row for row in result['obligations'] if row['id'] == identity)
+    assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
+    assert 'ordered cursor normalization trace' in changed['evidence_results']['program']['reason']
+
+
+@pytest.fixture(scope='module')
+def frontier_bundle(tmp_path_factory, inventory):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_field_stage
+    root = tmp_path_factory.mktemp('rtpc-frontier')
+    captures = {}
+    for version in BUILDS:
+        for host in ('wwise-console', 'wwise-authoring'):
+            for mode in ('scalar', 'cursor-capture', 'cursor-user'):
+                path = root / f'{version}-{host}-{mode}'
+                trace = []
+                position = {'cursor-capture': 'capture-latest', 'cursor-user': 'user-cursor'}.get(mode, '23637')
+                receipt, dispatch, context = public_rtpc_read(path, version, host, position,
+                    rows=rtpc_scalar_rows() if mode == 'scalar' else None, native_reads=trace)
+                capture = path / 'capture.json'
+                write_program_receipt(capture, receipt, dispatch, nodeid=f'{version}-{host}-{mode}',
+                    native_reads=trace if mode.startswith('cursor-') else None,
+                    phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context)
+                captures[version, host, mode] = capture
+    return write_field_stage(root / 'bundle', captures, {}, inventory=inventory)
+
+
+def test_five_version_rtpc_frontier_proves_exact_88_program_branches(frontier_bundle, inventory):
+    policy = json.loads((frontier_bundle.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(frontier_bundle, policy)
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    selected = [row for row in result['obligations'] if row['id'] in document['bindings']]
+    assert len(selected) == 88
+    assert {row['state'] for row in selected} == {'verified'}, json.dumps(selected)
+    assert sum(row['kind'] == 'constraint' for row in selected) == 38
+    assert sum(row['pointer'].startswith('/argsSchema') for row in selected) == 50
+    assert all(row['requirements'] == ['program'] for row in selected)
+
+
+@pytest.mark.parametrize('damage', ('minimum-bool', 'maximum-overflow', 'name-domain',
+    'trace-missing', 'trace-enum', 'trace-order', 'trace-extra'))
+def test_rtpc_frontier_consumer_rejects_resealed_scalar_and_trace_damage(frontier_bundle, inventory, tmp_path, damage):
+    import shutil
+    from tests.support.runtime_observation_evidence import write_json
+    base = tmp_path / 'bundle'
+    shutil.copytree(frontier_bundle.parent, base)
+    policy = json.loads((base / 'requirements.json').read_bytes())
+    document, _, _ = audit.portable_binding_inputs(base / 'index.json', policy)
+    suffix = {'minimum-bool': '/gameObject/minimum', 'maximum-overflow': '/gameObject/maximum',
+        'name-domain': '/uniqueName/pattern'}.get(damage, '/profilerCursor/enum/1')
+    identity = next(key for key in document['bindings'] if key.startswith('2022.1|wwise-authoring|') and key.endswith(suffix))
+    binding = document['bindings'][identity]
+    document['bindings'] = {identity: binding}
+    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    if damage.startswith('trace-'):
+        trace = program['runtime_read_program']['native_reads']
+        cursor = next(row for row in trace if row['uri'].endswith('getCursorTime'))
+        final = next(row for row in trace if row['uri'] == URI)
+        if damage == 'trace-missing':
+            del program['runtime_read_program']['native_reads']
+        elif damage == 'trace-enum':
+            cursor['args']['cursor'] = 'user'
+        elif damage == 'trace-order':
+            a, b = cursor['ordinal'], final['ordinal']
+            trace[a], trace[b] = final, cursor
+            for index, row in enumerate(trace):
+                row['ordinal'] = index
+        else:
+            trace.append({**deepcopy(cursor), 'ordinal': len(trace)})
+        expected = 'cursor normalization'
+    else:
+        pointer = binding['observation_pointer']
+        index = int(pointer.split('/')[-2])
+        field = pointer.rsplit('/', 1)[1]
+        value = {'minimum-bool': False, 'maximum-overflow': 18446744073709551616,
+            'name-domain': 'CC #1: Modulation'}[damage]
+        for target in (program, program['runtime_read_program']):
+            target['native_call']['result']['return'][index][field] = value
+            target['gateway']['payload']['agent_result']['return'][index][field] = value
+        for check in program['branch_assertions'][identity]['checks']:
+            if check['pointer'] in (pointer, binding['gateway_observation_pointer']):
+                check['equals'] = value
+        expected = 'pinned scalar predicate'
+    binding['evidence']['program'].update(write_json(base / 'program.json', program))
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    selected = next(row for row in result['obligations'] if row['id'] == identity)
+    assert selected['evidence_results']['program']['outcome'] == 'missing', json.dumps(selected)
+    assert expected in selected['evidence_results']['program']['reason']
+
+
+@pytest.mark.parametrize('returned', (-1, True, 1.5))
+def test_rtpc_invalid_cursor_response_stops_before_rtpc_dispatch(tmp_path, returned):
+    calls = []
+    class Client(_RuntimeControlDraftClient):
+        def call(self, uri, args=None, options=None):
+            calls.append(uri)
+            if uri == 'ak.wwise.core.profiler.getCursorTime':
+                return {'return': returned}
+            return super().call(uri, args, options)
+    client = Client(tmp_path, version='2022.1')
+    code, payload = gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'), 'core-call', URI, '--profiler-position', 'capture-latest'],
+        env=_env(tmp_path, version='2022.1'), client_factory=lambda _: client)
+    assert code != 0, payload
+    assert calls.count('ak.wwise.core.profiler.getCursorTime') == 1, payload
+    assert URI not in calls
+
+
+@pytest.mark.parametrize('version', BUILDS)
+@pytest.mark.parametrize('host', ('wwise-console', 'wwise-authoring'))
+@pytest.mark.parametrize('mode', ('scalar', 'cursor-capture', 'cursor-user'))
+def test_rtpc_frontier_program_emits_after_actual_teardown(tmp_path, request, version, host, mode):
+    import os
+    from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+    from tests.support.runtime_observation_evidence import write_program_receipt
+    trace = []
+    position = {'cursor-capture': 'capture-latest', 'cursor-user': 'user-cursor'}.get(mode, '23637')
+    receipt, dispatch, context = public_rtpc_read(tmp_path, version, host, position,
+        rows=rtpc_scalar_rows() if mode == 'scalar' else None, native_reads=trace)
+    destination = Path(os.environ.get('WAAPI_RTPC_FIELD_CAPTURE_DIR', tmp_path)) / f'{version}-{host}-{mode}.json'
+    register_exact_evidence_finalizer(request.node, lambda phases: write_program_receipt(
+        destination, receipt, dispatch, nodeid=request.node.nodeid, phase_reports=phases, source_context=context,
+        native_reads=trace if mode.startswith('cursor-') else None))

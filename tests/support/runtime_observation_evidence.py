@@ -40,7 +40,7 @@ def program_source_context(root=audit.ROOT):
             for group, paths in (('packaged', names), ('capture', dependencies))}
 
 
-def write_program_receipt(path, gateway, native_call, *, nodeid, phase_reports, source_context):
+def write_program_receipt(path, gateway, native_call, *, nodeid, phase_reports, source_context, native_reads=None):
     if phase_reports != {'setup': 'passed', 'call': 'passed', 'teardown': 'passed'}:
         raise ValueError('Runtime program proof requires successful setup/call/teardown')
     if gateway['exit_code'] != 0 or gateway['payload'].get('ok') is not True:
@@ -50,7 +50,8 @@ def write_program_receipt(path, gateway, native_call, *, nodeid, phase_reports, 
     return write_json(path, {'contract': 'waapi-skill.runtime-read-program/v1',
         'phase_reports': phase_reports, 'nodeid': nodeid,
         'source_context': source_context, 'source_unchanged': True,
-        'gateway': gateway, 'native_call': native_call})
+        'gateway': gateway, 'native_call': native_call,
+        **({'native_reads': native_reads} if native_reads is not None else {})})
 
 
 def archive_reader(descriptor, base):
@@ -106,7 +107,7 @@ def _portable_descriptor(descriptor, base):
         raise ValueError('Runtime descriptor escapes portable bundle')
 
 
-def validate_rtpc_program(record, binding, branch, root):
+def validate_rtpc_program(record, binding, branch, root, reference_edges=None):
     """Apply actual read capture requirements to ordinary program evidence."""
     captured = record.get('runtime_read_program')
     if not isinstance(captured, dict):
@@ -167,8 +168,110 @@ def validate_rtpc_program(record, binding, branch, root):
             if (not isinstance(native_parent, dict) or not isinstance(public_parent, dict)
                     or field in native_parent or field in public_parent):
                 raise ValueError('RTPC absence needs an existing native/public row and same absent field')
+    if branch['kind'] == 'constraint' and branch['pointer'].startswith('/resultSchema/'):
+        _validate_rtpc_scalar(record, binding, branch, root)
     if branch['pointer'] in RTPC_STRUCTURE_POINTERS:
         _validate_rtpc_structure(record, binding, branch, root)
+    return _validate_rtpc_cursor(record, binding, branch, root, reference_edges or {})
+
+
+def _validate_rtpc_cursor(record, binding, branch, root, reference_edges):
+    """Return a branch-bound construction proof for the closed cursor chain."""
+    cursor_time = '/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime'
+    cursor = '/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor'
+    allowed = {cursor_time + '/oneOf/1', cursor_time + '/oneOf/1/$ref', cursor,
+               cursor + '/enum/0', cursor + '/enum/1'}
+    if branch['pointer'] not in allowed:
+        return None
+    from wwise_waapi.native_catalog import load_native_catalog
+    version, host, build, _, _ = branch['route'].split('|')
+    catalog = load_native_catalog(version, host, root=root / 'skills/waapi-skill/resources/native-catalog')
+    _, rest = branch['pointer'].split('/@definition/', 1)
+    document, suffix = rest.split('/', 1)
+    node = completion.pointer_value(catalog['definitions']['documents'][document], '/' + suffix)
+    first = branch['route'] + '|/argsSchema/properties/time/$ref'
+    second = branch['route'] + '|' + cursor_time + '/oneOf/1/$ref'
+    chain = [first] if branch['pointer'].startswith(cursor_time) else [first, second]
+    if (catalog['provenance']['build'] != build or audit.digest(node) != branch['shape_sha256']
+            or binding.get('reference_chain') != chain
+            or reference_edges[first]['reference']['target'] != branch['route'] + '|' + cursor_time
+            or reference_edges[second]['reference']['target'] != branch['route'] + '|' + cursor):
+        raise ValueError('RTPC exact cursor normalization branch/reflection differs')
+    # Validate the original RTPC field/reference context independently of the
+    # intermediate getCursorTime occurrence used for construction evidence.
+    completion.exact_observation_pointer(branch,
+        {**binding, 'observation_pointer': '/native_call/args/time'}, '/native_call', 'args', reference_edges)
+    captured = record['runtime_read_program']
+    trace = captured.get('native_reads')
+    if (not isinstance(trace, list) or not 2 <= len(trace) <= 16
+            or any(set(row) != {'ordinal', 'uri', 'args', 'options', 'result'}
+                or type(row['ordinal']) is not int or row['ordinal'] != index for index, row in enumerate(trace))):
+        raise ValueError('RTPC ordered cursor normalization trace missing or invalid')
+    relevant = [row for row in trace if row['uri'] in {RTPC_URI, 'ak.wwise.core.profiler.getCursorTime'}]
+    argv = record['gateway']['argv']
+    choice = argv[argv.index('--profiler-position') + 1]
+    enum = {'capture-latest': 'capture', 'user-cursor': 'user'}.get(choice)
+    if enum is None or len(relevant) != 2:
+        raise ValueError('RTPC ordered cursor normalization trace requires one owned two-read chain')
+    source, final = relevant
+    native = record['native_call']
+    time = source['result'].get('return') if type(source['result']) is dict else None
+    if (source['uri'] != 'ak.wwise.core.profiler.getCursorTime' or source['args'] != {'cursor': enum}
+            or source['options'] != {} or source['result'] != {'return': time}
+            or type(time) is not int or time < 0 or final['uri'] != RTPC_URI
+            or source['ordinal'] >= final['ordinal'] or final['args'] != {'time': time}
+            or type(final['args'].get('time')) is not int or type(native['args'].get('time')) is not int
+            or final['options'] != {} or native['args'] != {'time': time} or native['options'] != {}
+            or audit.digest({key: final[key] for key in ('uri', 'args', 'options', 'result')}) != audit.digest(native)
+            or record['gateway']['payload']['agent_result']['profiler_position'] != choice):
+        raise ValueError('RTPC ordered cursor normalization trace differs from actual public construction')
+    expected = f"/runtime_read_program/native_reads/{source['ordinal']}/args/cursor"
+    if (binding['observation_pointer'] != expected
+            or binding['gateway_observation_pointer'] != '/gateway/payload/agent_result/profiler_position'
+            or branch['kind'] == 'enum_value' and (type(node) is not str or node != enum)):
+        raise ValueError('RTPC exact cursor normalization occurrence/choice differs')
+    return {'branch_id': branch['id'], 'observation_pointer': expected}
+
+
+def _validate_rtpc_scalar(record, binding, branch, root):
+    """Check the exact pinned predicate at its independently mapped scalar."""
+    import re
+    from wwise_waapi.native_catalog import load_native_catalog
+    version, host, _, _, _ = branch['route'].split('|')
+    catalog = load_native_catalog(version, host, root=root / 'skills/waapi-skill/resources/native-catalog')
+    pointer = branch['pointer']
+    if '/@definition/' not in pointer:
+        raise ValueError('RTPC pinned scalar predicate must have its exact definition')
+    _, rest = pointer.split('/@definition/', 1)
+    document, suffix = rest.split('/', 1)
+    predicate = completion.pointer_value(catalog['definitions']['documents'][document], '/' + suffix)
+    if audit.digest(predicate) != branch['shape_sha256']:
+        raise ValueError('RTPC pinned scalar predicate shape differs')
+    predicate_kind = pointer.rsplit('/', 1)[1]
+    field, index = (('gameObjectId', 0 if predicate_kind == 'minimum' else 1)
+        if predicate_kind in {'minimum', 'maximum'} else
+        ('id', 0) if '/definitions/guid/pattern' in pointer else ('name', 1))
+    definition = 'gameObject' if field == 'gameObjectId' else 'guid' if field == 'id' else 'uniqueName'
+    if not pointer.endswith('/definitions/' + definition + '/' + predicate_kind):
+        raise ValueError('RTPC pinned scalar predicate is outside approved scope')
+    expected = f'/native_call/result/return/{index}/{field}'
+    if binding['observation_pointer'] != expected:
+        raise ValueError('RTPC pinned scalar predicate occurrence differs')
+    observed = completion.pointer_value(record, expected)
+    valid = (type(observed) is int and observed == predicate if field == 'gameObjectId'
+        else type(observed) is str and re.search(predicate, observed) is not None)
+    if not valid:
+        raise ValueError('RTPC pinned scalar predicate failed')
+    if field == 'name':
+        metadata = record['gateway']['payload']['schema_validation']['result']
+        expected_rule = {'rule': 'rtpc-legacy-name-label-preservation',
+            'section': '$.return[*].name', 'definition': 'waapi_definitions.json#/definitions/uniqueName',
+            'reflected_pattern': predicate, 'enforced_type': 'string', 'pattern_enforced': False,
+            'behavior': 'Preserve native labels unchanged, including labels outside the reflected pattern'}
+        broader = completion.pointer_value(record, '/native_call/result/return/2/name')
+        if (version == '2025.1' or metadata.get('compatibility_rules') != [expected_rule]
+                or type(broader) is not str or re.search(predicate, broader) is not None):
+            raise ValueError('RTPC legacy matching-name predicate needs explicit broader-label compatibility')
 
 
 def _validate_rtpc_structure(record, binding, branch, root):
@@ -412,26 +515,27 @@ RTPC_ORIGINAL_CANDIDATE = '503688449ba9f9db964a5fb7116ac6be2fb07198'
 RTPC_GUARD_FILE = RTPC_SOURCE.split('#')[0]
 RTPC_GUARD_CHANGE = {
     'before': '62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c',
-    'after': 'a34a6b5f4b54b6f9ab80e3f3a07c6ff7bb2d5dbf34a5757bcf4520f8301a5699'}
+    'after': 'd8b0609ab8233f9b43924491900ee62fe52e721d7e5cf20baee6f40a5bb49b17'}
 RTPC_REVIEWED_SOURCE_CHANGES = {
     RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
-        'after': 'fcaaa2341a14690741e6c3fa4a50a252ac229ab2403173051847b4c4b11a1f8e'},
+        'after': '1851ed071402d562a1f64eba386bb600be7c4defbaace1ec8ed1ec49c65fc0ee'},
     'skills/waapi-skill/wwise_waapi/builders/schema.py': {
         'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d',
         'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}}
 RTPC_REVIEWED_SOURCE_SYMBOLS = {
     RTPC_GUARD_FILE: ['module import: builders.query.STRUCTURED_GUID_PATTERN',
-        '_validate_rtpc_rows', 'normalize_runtime_inspection_result'],
+        '_validate_rtpc_rows', 'normalize_runtime_inspection_result', 'rtpc_validated_name_compatibility'],
     'skills/waapi-skill/scripts/gateway.py': ['module import: builders.schema.validate_resolved_semantic_result',
+        'module import: runtime_inspection_business.rtpc_validated_name_compatibility',
         'resolve_profiler_voice_path', 'dispatch_profiler_voice_contributions_request',
         'dispatch_runtime_inspection_business_read'],
     'skills/waapi-skill/wwise_waapi/builders/schema.py': ['validate_resolved_semantic_result',
         '_validate_resolved_sections', '_runtime_result_reference_schema']}
 RTPC_REVIEWED_SOURCE_REASON = (
     'Exact reviewed RTPC guard and closed non-RTPC result-validation source delta; '
-    'RTPC conservative validator/request/normalizer behavior retained and complete original '
+    'post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
     'arrays unchanged through current public Gateway; original finalized PASS retained')
 RTPC_ORIGINALS = {
     '2022.1': ('2022.1.19.8584', 'e9d4b86aaccaccb9b1603d37ba5bc7255034c09d2c05b7685beb254e6642adfd', 17, 23637),
@@ -545,6 +649,28 @@ def rtpc_field_mappings(inventory, *, version, host, mode):
             if pointer + '/@presence/present' in rows:
                 add(pointer + '/@presence/present', observed)
         add('/resultSchema/properties/return/@cardinality/multiple', '/native_call/result/return')
+    elif mode in {'cursor-capture', 'cursor-user'}:
+        first = rows['/argsSchema/properties/time/$ref']
+        target = first['reference']['target'].split('|', 5)[5]
+        second = rows[target + '/oneOf/1/$ref']
+        reached = second['reference']['target'].split('|', 5)[5]
+        if mode == 'cursor-capture':
+            add(target + '/oneOf/1', '', [first['id']])
+            add(second['pointer'], '', [first['id']])
+            add(reached, '', [first['id'], second['id']])
+        add(reached + ('/enum/1' if mode == 'cursor-capture' else '/enum/0'), '', [first['id'], second['id']])
+    elif mode == 'scalar':
+        for field, index, predicates in (('id', 0, ('pattern',)),
+                ('gameObjectId', 0, ('minimum', 'maximum')), ('name', 1, ('pattern',))):
+            source = '/resultSchema/properties/return/items/properties/' + field + '/$ref'
+            if source not in rows:
+                continue
+            edge = rows[source]
+            target = edge['reference']['target'].split('|', 5)[5]
+            for predicate in predicates:
+                if target + '/' + predicate in rows:
+                    add(target + '/' + predicate,
+                        f'/native_call/result/return/{1 if predicate == "maximum" else index}/{field}', [edge['id']])
     elif mode == 'single':
         add('/resultSchema/properties/return/@cardinality/single', '/native_call/result/return')
         for field in ('id', 'name', 'gameObjectId', 'value'):
@@ -640,9 +766,13 @@ def write_field_bundle(output, program_path, originals, *, inventory, version, h
             'branch_assertions': {}}
     for mapping in mappings:
         branch = mapping['branch']
+        if mode in {'cursor-capture', 'cursor-user'}:
+            trace = captured.get('native_reads', [])
+            cursor_read = next(row for row in trace if row['uri'] == 'ak.wwise.core.profiler.getCursorTime')
+            mapping['program_pointer'] = f"/runtime_read_program/native_reads/{cursor_read['ordinal']}/args/cursor"
         identity, pointer = branch['id'], mapping['program_pointer']
         absent = branch['kind'] == 'optional_presence' and branch.get('value') == 'absent'
-        value = None if absent else completion.pointer_value(captured, pointer)
+        value = None if absent else completion.pointer_value({'runtime_read_program': captured}, pointer) if mode.startswith('cursor-') else completion.pointer_value(captured, pointer)
         public_pointer = (pointer.replace('/native_call/result', '/gateway/payload/agent_result')
             if branch['pointer'].startswith('/resultSchema') else '/gateway/payload/agent_result/profiler_position')
         check = ({'pointer': pointer, 'absent': True} if absent else
@@ -651,6 +781,10 @@ def write_field_bundle(output, program_path, originals, *, inventory, version, h
         checks = [check, ({'pointer': public_pointer, 'absent': True} if absent else
             {'pointer': public_pointer, 'equals': completion.pointer_value(captured, public_pointer)}),
             {'pointer': '/gateway/payload/agent_result/complete', 'equals': True}]
+        if mode == 'scalar' and branch['pointer'].endswith('/uniqueName/pattern'):
+            for extra in ('/gateway/payload/agent_result/return/2/name',
+                    '/gateway/payload/schema_validation/result/compatibility_rules'):
+                checks.append({'pointer': extra, 'equals': completion.pointer_value(captured, extra)})
         if absent:
             parent = public_pointer.rsplit('/', 1)[0]
             checks.append({'pointer': parent, 'equals': completion.pointer_value(captured, parent)})
@@ -660,7 +794,9 @@ def write_field_bundle(output, program_path, originals, *, inventory, version, h
             'categories': ['program', 'native'] if mode == 'data' else ['program'],
             'reason': ('Exact observed RTPC data/reference/presence/cardinality; independent native fact required'
                 if mode == 'data' else 'Deterministic closed numeric time/reference/minimum/empty-options construction; no native data/effect inference'
-                if mode == 'construction' else 'SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit')}
+                if mode == 'construction' else 'SPEC section 5 exact pinned scalar validation/preservation; legacy matching-name domain preserves broader string labels; no actual native occurrence/data/effect claim'
+                if mode == 'scalar' else 'SPEC section 5 exact public choice to ordered cursor read to numeric RTPC construction; no actual native occurrence/data/effect claim'
+                if mode.startswith('cursor-') else 'SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit')}
         binding = {'branch_id': identity, 'native_shape_sha256': branch['shape_sha256'],
             'runtime_read_program': True,
             'public_route': public['id'], 'public_route_sha256': audit.digest(public),
@@ -737,8 +873,10 @@ def write_field_stage(output, captures, originals, *, inventory, guard_replays=N
         for host in ('wwise-console', 'wwise-authoring') for mode in ('construction', 'data')}
     shapes = {(version, host, mode) for version in versions
         for host in ('wwise-console', 'wwise-authoring') for mode in ('structure', 'empty', 'single')}
+    frontier = {(version, host, mode) for version in versions
+        for host in ('wwise-console', 'wwise-authoring') for mode in ('scalar', 'cursor-capture', 'cursor-user')}
     expected = set(captures)
-    if expected not in (fields, shapes, fields | shapes) or set(originals) - {'2022.1', '2025.1'}:
+    if expected not in (fields, shapes, frontier, fields | shapes, fields | shapes | frontier) or set(originals) - {'2022.1', '2025.1'}:
         raise ValueError('RTPC stage requires all exact five-version public flows and only qualified originals')
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)

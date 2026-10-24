@@ -404,6 +404,22 @@ def _validate_rtpc_rows(rows: list[Mapping[str, Any]]) -> None:
             )
 
 
+def rtpc_validated_name_compatibility(version: str) -> Mapping[str, Any] | None:
+    """Describe legacy label compatibility after the public RTPC row guard."""
+    if version not in {"2021.1", "2022.1", "2023.1", "2024.1"}:
+        return None
+    from .schema_inventory import load_definition_graph
+    graph = load_definition_graph(version)
+    pattern = graph.documents["waapi_definitions.json"]["definitions"]["uniqueName"]["pattern"]
+    return {
+        "rule": "rtpc-legacy-name-label-preservation",
+        "section": "$.return[*].name", "definition": "waapi_definitions.json#/definitions/uniqueName",
+        "reflected_pattern": pattern,
+        "enforced_type": "string", "pattern_enforced": False,
+        "behavior": "Preserve native labels unchanged, including labels outside the reflected pattern",
+    }
+
+
 def normalize_runtime_inspection_result(
     operation: str,
     result: Any,
