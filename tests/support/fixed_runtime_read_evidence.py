@@ -26,6 +26,7 @@ R118_ARCHIVE_SHA = '6fb48b4582a02968ca8cce07714c756bbaf5c2d581a26eecf0ff6f296754
 R118_CAPTURE_SHA = 'caa3e3aa450a6982438f4ff050c22bc18aa586fc1cbda8155d57c536041d631f'
 R118_MAP_SHA = '848d75fa50d2f1f8fb620abe87bf74b0a41a18f676c3cb152aaf280edf22b5c6'
 R118_CHANGES = {
+    runtime.UNICODE_CONTEXT_SOURCE: runtime.UNICODE_CONTEXT_SOURCE_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '118f9a62be178b2ad10d9f8525163582f0a1996ec2c2aee4c0856d71ee75c963',
         'after': 'cd8367bee13c94d59e4880994468fd2cfd7cc1119969f65c881cfd7739785388'},
@@ -33,15 +34,68 @@ R118_CHANGES = {
         'before': 'c66426240e65d05559c1266ca32b52b3fd2caad08cf0309b37a892373747291d',
         'after': '8f8aa5ce579dc9a0c895341b9c835e4e93060ea4c30f1525f0d2a31fc28883c1'}}
 R118_SYMBOLS = {
+    'wwise_waapi/business_declarations.py': ['BusinessHandleRegistry._require_context: exact UTF-8 byte comparison; no normalization'],
     'scripts/gateway.py': ['runtime_authoring_host_required_payload: message only'],
     'wwise_waapi/runtime_inspection_business_contracts.py': [
         'runtime_inspection_business_catalog_rows: remove pending development status and expose matching registered Console transport versions',
         'runtime_transport_requires_authoring: docstring and matching registered Console transport admission only']}
 
 
+R119_CANDIDATE = '301a2235f51b1721fb113a1e01311bc59ab67f87'
+R119_CHANGES = {runtime.UNICODE_CONTEXT_SOURCE: runtime.UNICODE_CONTEXT_SOURCE_CHANGE}
+R119_SYMBOLS = {'wwise_waapi/business_declarations.py': [
+    'BusinessHandleRegistry._require_context: exact UTF-8 byte comparison; no normalization']}
+R119_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_older_transport_profiler_diagnostic'
+R119_MAP_SHA = 'f9afa45f46d2d7e193a7d6ad825c008ace08a85dfd711d9b696d52bcd85a8aab'
+R119_PROFILES = {'2021.1': {'name': 'r119-2021',
+            'version': '2021.1',
+            'build': '2021.1.14.8108',
+            'time': 5077,
+            'category_sha': '1c427d8ac5c282f400376437bd7073923ab388bcc6f9fb88cb03d03361b85b12',
+            'archive_sha': '384df9af9fded495af429350c40ac52006d020d87d071adaa19c3da1f19bec71',
+            'capture_sha': '25d3cb0c6038944391b440dbb97dc04df0d554c3cc77d59ddd475d959ac81811',
+            'category_file': 'r119-2021-category.json',
+            'archive_file': 'r119-2021-originals.json.gz'},
+ '2022.1': {'name': 'r119-2022',
+            'version': '2022.1',
+            'build': '2022.1.19.8584',
+            'time': 5280,
+            'category_sha': '0ccfcf947b8f28bb6afe067a030e19a125bd50b790fb15a91aac1f29b7dcfff6',
+            'archive_sha': 'd6c59a51f5b0d82937fba7272089592ee3a81cf03fba7ecaf1f3d4162fa7f43a',
+            'capture_sha': '87ba75235f9156ef27e61b62cc92753acc0cc227ef5355890b1de3365c462119',
+            'category_file': 'r119-2022-category.json',
+            'archive_file': 'r119-2022-originals.json.gz'},
+ '2023.1': {'name': 'r119-2023',
+            'version': '2023.1',
+            'build': '2023.1.19.8928',
+            'time': 6005,
+            'category_sha': '6b77899fb75f0cc572bbb048fa39b35734f8b4494e7066c3a33254e805fd4d6a',
+            'archive_sha': 'eb3e95c21acbfaeb26f1b00cd25f757d07f73a6d9f68cc3e84fbd4e9ba2e3ef7',
+            'capture_sha': 'ea3f7cf21002c347974b2521e73a32d41bfc12f601ba6cf82ec6c1332a1fb421',
+            'category_file': 'r119-2023-category.json',
+            'archive_file': 'r119-2023-originals.json.gz'},
+ '2024.1': {'name': 'r119-2024',
+            'version': '2024.1',
+            'build': '2024.1.13.9056',
+            'time': 5781,
+            'category_sha': '82880810123ab6412f09be6d339e5d199da4a80b1d597fd9f22ed0c4b7723ee4',
+            'archive_sha': 'e6d9e068317da00910187ff5073594badc54b96bab717da7bad18fe3c2340df0',
+            'capture_sha': '55cd97478a40dc78fcceaecb66500617dd887d09129300416e090bb7a91d9d9c',
+            'category_file': 'r119-2024-category.json',
+            'archive_file': 'r119-2024-originals.json.gz'}}
+
+
 def native_profile(branch):
     """Eligibility is owned by exact route identities, never optional markers."""
     version, host, build, kind, uri = branch['route'].split('|')
+    if (version in R119_PROFILES and host == 'wwise-console' and kind == 'function'
+            and uri == 'ak.wwise.core.profiler.getVoices' and build == R119_PROFILES[version]['build']):
+        pinned = R119_PROFILES[version]
+        return dict(pinned, candidate=R119_CANDIDATE, nodeid=R119_NODEID,
+            files=(pinned['category_file'], pinned['archive_file'], 'r119-source-map.json'),
+            map_file='r119-source-map.json', map_sha=R119_MAP_SHA, category=R118_CATEGORY,
+            changes=R119_CHANGES, symbols=R119_SYMBOLS,
+            reason='Exact original R119 Console version/build complete twenty-field Voices at its fixed T; exact one-file UTF-8 context comparator delta preserves original successful ASCII equality; 412 packaged paths unchanged; no native non-ASCII or other reader/data/effect/Topic credit')
     if version != '2025.1' or build != '2025.1.7.9143' or kind != 'function':
         raise ValueError('No qualified fixed-reader native profile for this exact route')
     if host == 'wwise-authoring' and uri in URIS:
@@ -49,47 +103,48 @@ def native_profile(branch):
             category_sha=CATEGORY_SHA, archive_sha=ARCHIVE_SHA, capture_sha=CAPTURE_SHA,
             category_file='r103-category.json', archive_file='r103-originals.json.gz',
             files=('r103-category.json','r103-originals.json.gz'), changes=REVIEWED_CHANGES, symbols=REVIEWED_SYMBOLS,
-            reason='Exact reviewed R103 seven-file read scope; registered-version Console transport predicate/catalog delta leaves fixed reads unchanged; full original request/array/current projection; no lifecycle or mutation effect credit')
+            reason='Exact reviewed R103 eight-file read scope; UTF-8 context comparator preserves original successful ASCII equality; registered-version Console transport predicate/catalog delta leaves fixed reads unchanged; full original request/array/current projection; no lifecycle or mutation effect credit')
     if host == 'wwise-console' and uri == 'ak.wwise.core.profiler.getVoices':
         return dict(name='r118', candidate=R118_CANDIDATE, nodeid=R118_NODEID,
             category_sha=R118_CATEGORY_SHA, archive_sha=R118_ARCHIVE_SHA, capture_sha=R118_CAPTURE_SHA,
             category_file='r118-category.json', archive_file='r118-originals.json.gz',
             files=('r118-category.json','r118-originals.json.gz','r118-source-map.json'), changes=R118_CHANGES, symbols=R118_SYMBOLS,
-            reason='Exact reviewed R118 two-file presentation and registered-version Console transport predicate/catalog source transition; fixed reads and Console2025 transport unchanged; original Console2025 complete identity Voices at T6016; current issued observation/handle; no other native data/effect/Topic credit')
+            version='2025.1', build='2025.1.7.9143', time=6016, category=R118_CATEGORY, map_file='r118-source-map.json', map_sha=R118_MAP_SHA,
+            reason='Exact reviewed R118 three-file UTF-8 context comparator/presentation and registered-version Console transport predicate/catalog source transition; original successful ASCII context equality preserved without native non-ASCII credit; fixed reads and Console2025 transport unchanged; original Console2025 complete identity Voices at T6016; current issued observation/handle; no other native data/effect/Topic credit')
     raise ValueError('No qualified fixed-reader native profile for this exact route')
 
 
-def r118_original_observation(originals, category):
+def console_original_observation(originals, category, *, profile):
     """Original finalized PASS/report/dispatch/retained record, plus Git bridge metadata."""
     base = Path(originals)
-    archive = {'artifact':'r118-originals.json.gz','sha256':runtime.sha((base/'r118-originals.json.gz').read_bytes())}
-    descriptor = {'artifact':'r118-category.json','sha256':runtime.sha((base/'r118-category.json').read_bytes()),'nodeid':R118_NODEID}
-    source_raw = (base/'r118-source-map.json').read_bytes()
-    if (category != R118_CATEGORY or archive['sha256'] != R118_ARCHIVE_SHA
-            or descriptor['sha256'] != R118_CATEGORY_SHA or runtime.sha(source_raw) != R118_MAP_SHA):
-        raise ValueError('Exact original R118 closure/category/immutable Git source map required')
+    archive = {'artifact':profile['archive_file'],'sha256':runtime.sha((base/profile['archive_file']).read_bytes())}
+    descriptor = {'artifact':profile['category_file'],'sha256':runtime.sha((base/profile['category_file']).read_bytes()),'nodeid':profile['nodeid']}
+    source_raw = (base/profile['map_file']).read_bytes()
+    if (category != profile['category'] or archive['sha256'] != profile['archive_sha']
+            or descriptor['sha256'] != profile['category_sha'] or runtime.sha(source_raw) != profile['map_sha']):
+        raise ValueError('Exact original Console profile closure/category/immutable Git source map required')
     source_map = json.loads(source_raw)
-    if source_map['candidate'] != R118_CANDIDATE or len(source_map['sources']) != 413:
-        raise ValueError('Original R118 immutable Git source context differs')
+    if source_map['candidate'] != profile['candidate'] or len(source_map['sources']) != 413:
+        raise ValueError('Original Console profile immutable Git source context differs')
     read = runtime.archive_reader(archive, base)
     context = completion.read_category_run(descriptor, base)
     run = context['record']
-    if (context['candidate'] != R118_CANDIDATE or context['version'] != '2025.1'
-            or context['host'] != 'wwise-console' or context['build'] != '2025.1.7.9143'
-            or run['invocation']['selected_test_nodeids'] != [R118_NODEID]
-            or run['invocation']['node_outcomes'] != [{'nodeid':R118_NODEID,'outcome':'PASS'}]
-            or [(row['category'],row['status']) for row in run['categories']] != [(R118_CATEGORY,'PASS'),('authoring-ui','blocked')]):
-        raise ValueError('Original R118 exact final PASS/node/category/host differs')
+    if (context['candidate'] != profile['candidate'] or context['version'] != profile['version']
+            or context['host'] != 'wwise-console' or context['build'] != profile['build']
+            or run['invocation']['selected_test_nodeids'] != [profile['nodeid']]
+            or run['invocation']['node_outcomes'] != [{'nodeid':profile['nodeid'],'outcome':'PASS'}]
+            or [(row['category'],row['status']) for row in run['categories']] != [(profile['category'],'PASS'),('authoring-ui','blocked')]):
+        raise ValueError('Original Console profile exact final PASS/node/category/host differs')
     capture_path = run['categories'][0]['observation_path']
     capture_raw = read(capture_path)
-    if runtime.sha(capture_raw) != R118_CAPTURE_SHA: raise ValueError('Original R118 report differs')
+    if runtime.sha(capture_raw) != profile['capture_sha']: raise ValueError('Original Console profile report differs')
     capture = json.loads(capture_raw)
-    if (capture['candidate'] != R118_CANDIDATE or capture['version'] != '2025.1' or capture['complete'] is not True
+    if (capture['candidate'] != profile['candidate'] or capture['version'] != profile['version'] or capture['complete'] is not True
             or capture['errors'] or capture['cleanup']['complete'] is not True or capture['cleanup']['errors']
             or capture['outcomes']['voices']['outcome'] != 'PASS'
             or capture['outcomes']['voices']['evidence']['complete'] is not True
             or capture['outcomes']['voices']['evidence']['owned_voice_observed'] is not True):
-        raise ValueError('Original R118 complete owned Voices/preservation/cleanup differs')
+        raise ValueError('Original Console profile complete owned Voices/preservation/cleanup differs')
     receipt, = [row for row in capture['calls'] if row['argv'][:2] == ['core-call','ak.wwise.core.profiler.getVoices']]
     raw_path = receipt['payload']['call']['evidence_path']; raw = json.loads(read(raw_path))
     handle = receipt['payload']['agent_result']['return'][0]['voice_instance_handle']
@@ -98,11 +153,11 @@ def r118_original_observation(originals, category):
     unsigned = {key:value for key,value in observation.items() if key != 'sha256'}
     if (raw['api'] != 'ak.wwise.core.profiler.getVoices' or raw['ok'] is not True or raw['dry_run'] is not False
             or raw['error_code'] is not None or len(raw['result']['return']) != 1
-            or request['args'] != {'time':6016} or request['api'] != raw['api']
+            or request['args'] != {'time':profile['time']} or request['api'] != raw['api']
             or audit.digest(unsigned) != observation['sha256']
             or audit.digest(observation['plan']['result']) != receipt['payload']['agent_result']['snapshot_sha256']
             or receipt['payload']['agent_result'] != capture['outcomes']['voices']['evidence']['agent_result']):
-        raise ValueError('Original R118 exact raw/retained identity observation differs')
+        raise ValueError('Original Console profile exact raw/retained Voices observation differs')
     return dict(context=context, read=read, capture=capture, capture_raw=capture_raw,
         capture_path=capture_path, raw=raw, raw_path=raw_path, request=request, receipt=receipt,
         category_descriptor=descriptor, archive=archive, historical_sources=source_map['sources'])
@@ -417,8 +472,8 @@ def validate_program(record, binding, branch, root, reference_edges=None):
 
 def original_observation(originals, category, *, profile=None):
     """Use strict original PASS; all archive paths are inert logical identities."""
-    if profile is not None and profile['name'] == 'r118':
-        return r118_original_observation(originals, category)
+    if profile is not None and (profile['name'] == 'r118' or profile['name'].startswith('r119-')):
+        return console_original_observation(originals, category, profile=profile)
     originals = Path(originals)
     archive = {'artifact': 'r103-originals.json.gz', 'sha256': runtime.sha((originals / 'r103-originals.json.gz').read_bytes())}
     category_descriptor = {'artifact': 'r103-category.json', 'sha256': runtime.sha((originals / 'r103-category.json').read_bytes()), 'nodeid': NODEID}
@@ -491,8 +546,9 @@ def mappings(inventory, captured, route, selected=None):
     return found
 
 
-REVIEWED_CHANGES = {'skills/waapi-skill/scripts/gateway.py': {'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03', 'after': 'cd8367bee13c94d59e4880994468fd2cfd7cc1119969f65c881cfd7739785388'}, 'skills/waapi-skill/wwise_waapi/builders/schema.py': {'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d', 'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}, 'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {'before': '74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d', 'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'}, 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'before': '691d93149f80e619539c40db64d1b9d34b86771b0660740eb948356c92a034e1', 'after': 'f96a2233a98e03dd62de261a24b3f81876284af28f0973758cf1f8a805b5dd5a'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business.py': {'before': '62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c', 'after': '06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {'before': 'd3ebc12976ef6d8976cf8d136ded7dbcd08cc0728ed365b4a0d70e9420fe2c12', 'after': '8f8aa5ce579dc9a0c895341b9c835e4e93060ea4c30f1525f0d2a31fc28883c1'}, 'skills/waapi-skill/wwise_waapi/transport_action.py': {'before': '3f9828a964b75ce04cc683b8cf0479d4d82b4eddd05c7d26bb4cde6e0b096ec4', 'after': 'f1dfed2fc9e2697d37e022262d440a7d3ace7005d4f5e57b939d7550d7efa2a5'}}
+REVIEWED_CHANGES = {runtime.UNICODE_CONTEXT_SOURCE: runtime.UNICODE_CONTEXT_SOURCE_CHANGE, 'skills/waapi-skill/scripts/gateway.py': {'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03', 'after': 'cd8367bee13c94d59e4880994468fd2cfd7cc1119969f65c881cfd7739785388'}, 'skills/waapi-skill/wwise_waapi/builders/schema.py': {'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d', 'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}, 'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {'before': '74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d', 'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'}, 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'before': '691d93149f80e619539c40db64d1b9d34b86771b0660740eb948356c92a034e1', 'after': 'f96a2233a98e03dd62de261a24b3f81876284af28f0973758cf1f8a805b5dd5a'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business.py': {'before': '62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c', 'after': '06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {'before': 'd3ebc12976ef6d8976cf8d136ded7dbcd08cc0728ed365b4a0d70e9420fe2c12', 'after': '8f8aa5ce579dc9a0c895341b9c835e4e93060ea4c30f1525f0d2a31fc28883c1'}, 'skills/waapi-skill/wwise_waapi/transport_action.py': {'before': '3f9828a964b75ce04cc683b8cf0479d4d82b4eddd05c7d26bb4cde6e0b096ec4', 'after': 'f1dfed2fc9e2697d37e022262d440a7d3ace7005d4f5e57b939d7550d7efa2a5'}}
 REVIEWED_SYMBOLS = {
+    'wwise_waapi/business_declarations.py': ['BusinessHandleRegistry._require_context: exact UTF-8 byte comparison; no normalization'],
     'scripts/gateway.py': ['dispatch_runtime_inspection_business_read', 'dispatch_command:profiler-game-objects', 'fixed_command_route_payload', 'stable-read constant imports', 'build_parser', 'preflight_core_business_input', 'runtime_authoring_host_required_payload', 'dispatch_offline_command',
         'dispatch_business_runtime_control_plan', 'transport-host helper import; fixed readers unaffected'],
     'wwise_waapi/builders/schema.py': ['validate_resolved_semantic_result', '_validate_resolved_sections', '_runtime_result_reference_schema'],
@@ -580,7 +636,7 @@ def write_fixed_bundle(output, program_path, originals, *, inventory, selected=N
     output = Path(output);output.mkdir(parents=True, exist_ok=bool(name_prefix))
     def filename(name):
         if name == 'original-capture.json': return profile['name']+'-capture.json'
-        return name if name.startswith(('r103-','r118-')) else name_prefix + name
+        return name if name.startswith(('r103-','r118-','r119-')) else name_prefix + name
     def write(name, value): return runtime.write_json(output / filename(name), value)
     shutil.copyfile(program_path, output / filename('program-capture.json'))
     def descriptor(name):return {'artifact': filename(name), 'sha256': runtime.sha((output / filename(name)).read_bytes())}
@@ -599,7 +655,7 @@ def write_fixed_bundle(output, program_path, originals, *, inventory, selected=N
         if '--voice-instance-handle' in captured['gateway']['argv']: category = 'profiler-voice-instance-filter'
         elif '--bus-instance-handle' in captured['gateway']['argv']:
             category = 'profiler-audio-objects-bus-filter' if uri.endswith('.getAudioObjects') else 'profiler-bus-instance-filter'
-        if profile['name'] == 'r118': category = R118_CATEGORY
+        if profile['name'] == 'r118' or profile['name'].startswith('r119-'): category = profile['category']
         for name in profile['files']:
             source = (Path(originals) / name).read_bytes()
             if (output / name).exists():
@@ -676,7 +732,7 @@ def write_fixed_bundle(output, program_path, originals, *, inventory, selected=N
     return output/filename('index.json')
 
 
-def write_fixed_stage(output, captures, *, inventory, route_ids=None, selected_ids=None, original_captures=None, originals=None, r118_capture=None, r118_originals=None):
+def write_fixed_stage(output, captures, *, inventory, route_ids=None, selected_ids=None, original_captures=None, originals=None, r118_capture=None, r118_originals=None, r119_captures=None, r119_originals=None):
     """Select each exact branch once from independent shared public flows."""
     routes = [r for r in inventory['native_coverage']['routes'] if r['uri'] in URIS
         and (route_ids is None or r['id'] in route_ids)]
@@ -742,6 +798,21 @@ def write_fixed_stage(output, captures, *, inventory, route_ids=None, selected_i
             raise ValueError('R118 stage needs independently witnessed unique result selectors')
         flow = write_fixed_bundle(output,r118_capture,r118_originals,inventory=inventory,selected=fresh,name_prefix='r118-identity-')
         append_flow(flow,fresh)
+    if r119_captures or r119_originals is not None:
+        if not r119_captures or r119_originals is None or not set(r119_captures) <= R119_PROFILES.keys():
+            raise ValueError('R119 stage needs exact registered original Console profiles and current captures')
+        for version, path in sorted(r119_captures.items()):
+            captured = json.loads(Path(path).read_bytes())
+            route = captured_route(captured)
+            if native_profile({'route':route['id']})['name'] != R119_PROFILES[version]['name']:
+                raise ValueError('R119 stage capture must match its exact original version/build Console Voices profile')
+            fresh = {m['branch']['id'] for m in mappings(inventory,captured,route)
+                if m['categories'] == ['program','native']} & wanted - selected
+            if not fresh:
+                raise ValueError('R119 stage needs independently witnessed unique result selectors')
+            flow = write_fixed_bundle(output,path,r119_originals,inventory=inventory,selected=fresh,
+                name_prefix=R119_PROFILES[version]['name']+'-')
+            append_flow(flow,fresh)
     for number, path in enumerate(captures):
         captured = json.loads(Path(path).read_bytes())
         route = captured_route(captured)

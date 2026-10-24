@@ -534,7 +534,10 @@ RTPC_GUARD_FILE = RTPC_SOURCE.split('#')[0]
 RTPC_GUARD_CHANGE = {
     'before': '62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c',
     'after': '06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d'}
+UNICODE_CONTEXT_SOURCE = 'skills/waapi-skill/wwise_waapi/business_declarations.py'
+UNICODE_CONTEXT_SOURCE_CHANGE = {'before': 'aee2a6cc97e5ccb0340a0f99f520969571e5e2dcf4d48695a396fca29dbeb7b3', 'after': '9f196a80ac7e2d82daf7fe0cb452735c9f50b2da825ba7ac2dafae02da700070'}
 RTPC_REVIEWED_SOURCE_CHANGES = {
+    UNICODE_CONTEXT_SOURCE: UNICODE_CONTEXT_SOURCE_CHANGE,
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {
         'before': '69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4',
         'after': '8f8aa5ce579dc9a0c895341b9c835e4e93060ea4c30f1525f0d2a31fc28883c1'},
@@ -549,6 +552,7 @@ RTPC_REVIEWED_SOURCE_CHANGES = {
         'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d',
         'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}}
 RTPC_REVIEWED_SOURCE_SYMBOLS = {
+    UNICODE_CONTEXT_SOURCE: ['BusinessHandleRegistry._require_context: exact UTF-8 byte comparison; no normalization'],
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': [
         'field ceiling', 'profiler_result_field_choices', 'three fixed row declarations', 'runtime_inspection_business_contract_data',
         'runtime_transport_requires_authoring', 'runtime_inspection_business_catalog_rows: exact registered-version Console transport admission and metadata-only finalization'],
@@ -566,18 +570,18 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
     'skills/waapi-skill/wwise_waapi/builders/schema.py': ['validate_resolved_semantic_result',
         '_validate_resolved_sections', '_runtime_result_reference_schema']}
 RTPC_REVIEWED_SOURCE_REASON = (
-    'Exact reviewed five-file RTPC guard and closed non-RTPC result-validation source delta; '
+    'Exact reviewed six-file RTPC guard and closed non-RTPC result-validation source delta; '
     'three fixed-reader-only closed result-field selection delta leaves absent result_fields requests unchanged; post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
     'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; '
     'Exact registered-version Console transport predicate/catalog admission and error-message/catalog-docstring finalization does not change these non-transport read paths; '
-    'GameObjects-only optional row fields/versioned ID domains/timestamp aliases and fixed request-schema disclosure do not change RTPC or contribution behavior; original finalized PASS retained')
+    'GameObjects-only optional row fields/versioned ID domains/timestamp aliases and fixed request-schema disclosure do not change RTPC or contribution behavior; exact UTF-8 context comparator preserves successful original ASCII equality decisions with no native non-ASCII claim; original finalized PASS retained')
 RTPC_ORIGINALS = {
     '2022.1': ('2022.1.19.8584', 'e9d4b86aaccaccb9b1603d37ba5bc7255034c09d2c05b7685beb254e6642adfd', 17, 23637),
     '2025.1': ('2025.1.7.9143', 'e7ef187ef0ed855819cfa007375f3ca8c1d4cfc1e3697f8c5b9e870c1441690c', 5, 30837)}
 
 
 def validate_rtpc_source_review(descriptor, historical_sources, branch, root, base):
-    """Accept only the pinned reviewed five-file delta for original RTPC reads."""
+    """Accept only the pinned reviewed six-file delta for original RTPC reads."""
     review = completion.read_sealed_artifact(descriptor, base)
     version, host, build, kind, uri = branch['route'].split('|')
     if version not in RTPC_ORIGINALS or host != 'wwise-authoring' or kind != 'function' or uri != RTPC_URI:
