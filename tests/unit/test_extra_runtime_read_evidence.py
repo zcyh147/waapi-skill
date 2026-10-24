@@ -78,6 +78,11 @@ def test_extra_diagnostic_reads_public_teardown_portable_consumer(request,tmp_pa
                 elif field=='page':bad['public_calls'][-1]['gateway']['payload']['agent_result']['page']['offset_from_end']=0
                 else:bad['source_context']['packaged']['skills/waapi-skill/scripts/run.py']='0'*64
                 with pytest.raises((ValueError,KeyError),match='.'):_capture(json.dumps(bad),audit.ROOT)
+            for malformed in (None,0,'false'):
+                bad=deepcopy(sealed)
+                bad['gateway']['payload']['agent_result']['truncated']=malformed
+                for call in bad['public_calls']:call['gateway']['payload']['agent_result']['truncated']=malformed
+                with pytest.raises(ValueError,match='pages/spans/order'):_capture(json.dumps(bad),audit.ROOT)
             # Reseal an internally consistent public-payload corruption. The
             # ordinary consumer must still compare its whole array to transport.
             bad_document=deepcopy(document);root_id=routes[0]+'|/resultSchema'

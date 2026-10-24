@@ -155,7 +155,7 @@ def _capture(captured_json,root):
                 or result['snapshot_sha256']!=snapshot or result['instantaneous_native_resource_authority']is not False
                 or result['observation']!='retained_profiler_capture_snapshot'
                 or result['page']!={'offset_from_end':offset,'next_offset_from_end':offset+len(result['return']),'order':'newest_range_first_native_order_within_range'}
-                or result['truncated']is result['complete']or result['expires_at']!=p['agent_result']['expires_at']):
+                or result['truncated']is not (i<len(calls)-1)or result['expires_at']!=p['agent_result']['expires_at']):
             raise ValueError('Exact public issued diagnostic pages/spans/order required')
         rows=result['return']+rows;offset+=len(result['return']);previous=result
     if rows!=native['result']['return']:raise ValueError('Whole native diagnostic array must survive public pagination')
