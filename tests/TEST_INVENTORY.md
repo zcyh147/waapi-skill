@@ -5,6 +5,25 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R129 source reuse and schema annotations
+
+Reviewed integration `13295ccb` extends the existing exact source compatibility
+tables for the three log-product changes and the collector matrix change.
+Independent Git checks verified all 413 packaged files for seven retained
+families, all 619 Source-copy dependencies and unchanged original evidence.
+The focused compatibility guard passed in 0.56s, including changed-original,
+extra-file and missing-review-pin rejection. No public producer or native run
+was repeated merely because source hashes changed.
+
+A separate two-line accounting repair reuses the existing schema annotation
+registry. `descriptionOverride` and `optionalPositional` are descriptive metadata;
+they no longer cause false unknown classifications. Its affected test passed in
+5.14s, retaining minimum-length rejection and unknown-constraint rejection.
+An exact static check reclassified the ten affected runtime empty-array rows as
+accepted candidates. This grants no business coverage credit. Other unresolved
+schema semantics remain assigned to the shared checker; original classification
+ledgers and failures are preserved. No full gate or global evaluation ran.
+
 ## 2026-10-24 R128 bounded Console log observations
 
 Frozen `d72e935c` ran three sequential owned Console sessions through the
