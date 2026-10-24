@@ -299,7 +299,9 @@ def test_historical_git_map_key_keeps_exact_source_selection(tmp_path, monkeypat
     candidate = 'current-focused-consumer'
     branch = {'id': 'exact-branch', 'shape_sha256': 'exact-shape', 'route': 'exact-route'}
     descriptor = {'sha256': 'original-run'}
-    context = {'candidate': '503688449ba9f9db964a5fb7116ac6be2fb07198'}
+    # This synthetic unchanged-source control uses the immutable current-product
+    # candidate; 50368844 now needs the separately reviewed four-file bridge.
+    context = {'candidate': 'a51e0c3526f513716b52412e46cf2ee0ec867eb6'}
     files = ['skills/waapi-skill/scripts/run.py', 'skills/waapi-skill/scripts/gateway.py',
         'skills/waapi-skill/wwise_waapi/dispatcher.py']
     actual = subprocess.run
@@ -324,6 +326,15 @@ def test_historical_git_map_key_keeps_exact_source_selection(tmp_path, monkeypat
         completion.validate_native_source(context, descriptor, branch, candidate, binding,
             tmp_path, audit.ROOT, historical_sources=cache)
         assert len(calls) == expected
+
+    original = completion.historical_source_seals(audit.ROOT,
+        '503688449ba9f9db964a5fb7116ac6be2fb07198', files[:2], cache)
+    assert len(calls) == 7
+    assert original[files[1]] == '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03'
+    assert original[files[1]] != sources[files[1]]
+    assert completion.historical_source_seals(audit.ROOT,
+        '503688449ba9f9db964a5fb7116ac6be2fb07198', files[:2], cache) == original
+    assert len(calls) == 7
 
 
 @pytest.mark.parametrize('damage,reason', [

@@ -31,6 +31,8 @@ def program_source_context(root=audit.ROOT, *, flow=None):
     names = subprocess.check_output(['git', 'ls-files', '--', 'skills/waapi-skill'],
         cwd=root, text=True).splitlines()
     dependencies = ['tests/support/runtime_observation_evidence.py',
+        'tests/support/qualified_runtime_read_evidence.py',
+        'tests/unit/test_qualified_runtime_read_evidence.py',
         'tests/unit/test_runtime_observation_branch_evidence.py',
         'tests/unit/test_rtpc_field_branch_evidence.py',
         'tests/unit/test_runtime_business_gateway.py', 'tests/support/gateway_config.py',
@@ -707,7 +709,7 @@ def rtpc_field_mappings(inventory, *, version, host, mode):
     return route, selected
 
 
-def write_field_bundle(output, program_path, originals, *, inventory, version, host, mode, name_prefix="", guard_replay=None):
+def write_field_bundle(output, program_path, originals, *, inventory, version, host, mode, name_prefix="", guard_replay=None, mappings=None):
     """One flow publisher owns many independent RTPC assertion identities."""
     import gzip
     import shutil
@@ -718,7 +720,8 @@ def write_field_bundle(output, program_path, originals, *, inventory, version, h
             or captured.get('source_context') != program_source_context()
             or captured.get('source_unchanged') is not True):
         raise ValueError('RTPC fields need current successful setup/call/teardown capture')
-    route, mappings = rtpc_field_mappings(inventory, version=version, host=host, mode=mode)
+    route, default_mappings = rtpc_field_mappings(inventory, version=version, host=host, mode=mode)
+    mappings = default_mappings if mappings is None else mappings
     public = next(row for row in inventory['routes'] if row['id'] == route['public_route'])
     argv = captured['gateway']['argv']
     if argv[:2] != ['core-call', RTPC_URI] or captured['native_call']['uri'] != RTPC_URI:
