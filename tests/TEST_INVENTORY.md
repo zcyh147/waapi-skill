@@ -5,6 +5,37 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R128 bounded Console log observations
+
+Frozen `d72e935c` ran three sequential owned Console sessions through the
+existing destructive lifecycle. Four independently recorded cases passed:
+
+| Console build | Selected cases | Test seconds | Established result |
+| --- | --- | ---: | --- |
+| 2023.1.19.8928 | Clear general log | 14.62 | Successful native ACK; result-schema-only verification |
+| 2024.1.13.9056 | Clear general log | 10.58 | Successful native ACK; result-schema-only verification |
+| 2025.1.7.9143 | Empty message; message with surrounding space, tab and newline | 11.30 | Exact matching addition event and durable verification for each message |
+
+The old-version results explicitly retain `business_state_verified=false` and
+`console_log_unobservable`; they prove command availability, not observed log
+removal. Each 2025 case observed one exact matching event and successful
+unsubscribe, with the same observation preserved in the transaction journal.
+Neither case claims exclusive causation or continuing channel state.
+
+All selected category and final invocation records passed. Source hashes and
+project mtimes stayed unchanged; all owned process groups exited and all three
+sandboxes were deleted. Total pytest time was 36.50s. Roots are
+`.waapi-skill-state/full-coverage/r128-console-log-native-{2023,2024,2025}-r1`.
+There was no retry, extra runtime-reader sweep, GUI, SDK setup or Fresh run.
+This is Mac Console evidence; original failed roots remain unchanged.
+
+The collector was independently reviewed after ten distinct focused fake-client
+cases passed. Cleanup controls corrected a test-only assumption about repeated
+unsubscribe attempts after failure; only those two failed cases were rerun.
+Existing native test bodies, the shared lifecycle and packaged source were
+unchanged by the collector. Exact branch admission and current global publication
+remain separate work; these four cases do not complete #186.
+
 ## 2026-10-24 R128 exact log messages and empty-candidate accounting
 
 Reviewed integration `9ba83f9a` combines the log-message repair and the shared
