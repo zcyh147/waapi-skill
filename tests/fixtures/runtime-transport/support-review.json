@@ -35708,12 +35708,12 @@
     }
   },
   "normalized_identities": {
-    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -35748,12 +35748,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -35788,12 +35788,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -35828,12 +35828,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -35868,12 +35868,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -35908,12 +35908,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -35948,12 +35948,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -35988,12 +35988,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -36028,12 +36028,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -36068,12 +36068,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -36108,12 +36108,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -36148,12 +36148,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -36188,12 +36188,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -36228,12 +36228,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -36268,12 +36268,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -36308,12 +36308,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -36348,12 +36348,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.create|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
@@ -36388,12 +36388,12 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     },
-    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1/$ref": {
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.prepare|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/0/$ref": {
       "selector": "qualified-name",
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
