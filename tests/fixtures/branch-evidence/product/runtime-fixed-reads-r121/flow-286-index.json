@@ -1,0 +1,31 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "flow-286-fixed-2024.1-wwise-console",
+      "bindings": {
+        "artifact": "flow-286-bindings.json",
+        "sha256": "5ad416ce4b7c6eee7b3ffd22b456b2c0922f53b869021a53c18249f5c816fcd7"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "flow-286-bindings.json",
+          "sha256": "5ad416ce4b7c6eee7b3ffd22b456b2c0922f53b869021a53c18249f5c816fcd7"
+        },
+        "program": {
+          "artifact": "flow-286-program.json",
+          "sha256": "f49b243880a569769c6d90653f42220f3b2b79401e06e21096e9821fa70e771f"
+        },
+        "requirements": {
+          "artifact": "flow-286-requirements.json",
+          "sha256": "1b5b9669dd181be01b2d08fff30548efc12c8bcadf60eac46c99ff333d78573a"
+        },
+        "capture": {
+          "artifact": "flow-286-program-capture.json",
+          "sha256": "86e53638fae586b46e21173b68897937bac91eae05a141dba06b82242ad254d5"
+        }
+      }
+    }
+  ]
+}
