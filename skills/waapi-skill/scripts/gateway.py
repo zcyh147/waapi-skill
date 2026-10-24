@@ -385,6 +385,7 @@ from wwise_waapi.runtime_inspection_business_contracts import (  # noqa: E402  #
     TRANSPORT_EXECUTE_ACTION_URI,
     TRANSPORT_GET_STATE_URI,
     runtime_inspection_business_catalog_rows,
+    runtime_transport_requires_authoring,
     runtime_inspection_business_contract_data,
     runtime_inspection_business_operations,
     runtime_inspection_business_read_operations,
@@ -4894,8 +4895,9 @@ def runtime_authoring_host_required_payload(
         operation=api,
     )
     payload["message"] = (
-        "Remote connections and Authoring audition transports require a live "
-        "Wwise Authoring host; WwiseConsole cannot execute them."
+        "This Remote or versioned transport route requires a live Wwise Authoring host. "
+        "Console transport admission is limited to the 2025.1 candidate; "
+        "native playback/data are not established by catalog presence."
     )
     return payload
 
@@ -10679,7 +10681,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "host_requirement": "wwise-console-or-authoring"},
                 "ak.wwise.core.remote.": {"intent": "connect Authoring to one exact remote runtime or Profiler capture",
                     "host_requirement": "wwise-authoring"},
-                "ak.wwise.core.transport.": {"intent": "create, inspect, or control an Authoring audition transport",
+                "ak.wwise.core.transport.": {"intent": "create, inspect, or control a versioned audition transport",
                     "host_requirement": "wwise-authoring"}}
             for prefix, defaults in namespace_defaults.items():
                 # Inheritance must not invent optional fields on routes whose
@@ -12518,7 +12520,7 @@ def dispatch_runtime_inspection_business_read(
     """Execute one bounded runtime-inspection read from business values."""
 
     if (
-        args.api.startswith("ak.wwise.core.transport.")
+        runtime_transport_requires_authoring(args.api, detected_version)
         and live_info.get("isCommandLine") is not False
     ):
         return runtime_authoring_host_required_payload(
@@ -12685,7 +12687,7 @@ def dispatch_runtime_inspection_business_read(
             or len(matches) != 1
         ):
             raise GatewayResultShapeError(
-                "Transport handle does not resolve to exactly one live Authoring transport.",
+                "Transport handle does not resolve to exactly one live transport.",
                 details={
                     "transport_handle": args.runtime_inspection_business_request.get(
                         "transport_handle"
@@ -13611,7 +13613,7 @@ def dispatch_business_runtime_control_plan(
     )
     if (
         pending.operation == "ak.wwise.core.remote.connect"
-        or pending.operation.startswith("ak.wwise.core.transport.")
+        or runtime_transport_requires_authoring(pending.operation, detected_version)
     ) and live_info.get("isCommandLine") is not False:
         return runtime_authoring_host_required_payload(
             api=pending.operation,
@@ -13752,7 +13754,7 @@ def dispatch_business_runtime_control_plan(
             or len(matches) != 1
         ):
             raise GatewayResultShapeError(
-                "Transport handle does not resolve to exactly one live Authoring transport.",
+                "Transport handle does not resolve to exactly one live transport.",
                 details={
                     "transport_handle": plan.get("transport_handle"),
                     "match_count": len(matches),
