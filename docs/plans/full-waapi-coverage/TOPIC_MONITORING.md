@@ -249,3 +249,15 @@ and owned sandbox cleanup. No native build or event was run for this question.
 - #194 retains separate Fresh/Broker/archive routing acceptance, and no Fresh
   expense is authorized. Program and Non-live gates run centrally after the
   combined candidate's source seals are reconciled.
+
+## Console log publication build boundary (WG-80630)
+
+The matching build9143 SDK 2025.1.4 release note establishes Console
+`ak.wwise.core.log.itemAdded` publication and `log.get` contents from 2025.1.4.
+The runtime log observation policy owns this exact host/build condition for
+#186/#187: pinned older Console builds return a native observation boundary
+before subscribing; missing build facts cannot claim support. Authoring stays
+available on its reflected lanes. The Topic remains cataloged with its original
+schema and counts; schema presence does not prove publication. Historical R98
+and R121 zero-event failures are retained unchanged. Current 2025 event evidence
+is distinct from the still-pending nonempty getter/clear native effect proof.

@@ -2029,7 +2029,7 @@ def test_profiler_enablement_input_shape_native_observations(
 def test_console_log_addition_observer(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
-    """Observe one owned addition, never clear or infer Console channel contents."""
+    """Observe one owned addition; optionally prove the supported getter/clear path."""
     runtime = workflow_sandbox_runtime
     builds = {'2023.1': (2023, 1, 19, 8928), '2024.1': (2024, 1, 13, 9056),
         '2025.1': (2025, 1, 7, 9143)}
@@ -2052,6 +2052,11 @@ def test_console_log_addition_observer(
         build = status['wwise']['version']
         assert tuple(build[key] for key in ('year', 'major', 'minor', 'build')) == builds[runtime.version], status
         assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), status
+        getter_mode = os.getenv('WWISE_CONSOLE_LOG_GETTER_WORKFLOW')
+        if getter_mode:
+            assert getter_mode == 'owned-get-clear-v1' and runtime.version == '2025.1'
+            assert not os.getenv('WWISE_CONSOLE_LOG_DIAGNOSTIC') and not os.getenv('WWISE_CONSOLE_LOG_PEER_DIAGNOSTIC')
+            receipt['getter_workflow'] = {'receipt_bytes': 3 * 1024 * 1024}
         draft = _start_business_draft(runtime, 'ak.wwise.core.log.addItem')
         _update_business_draft(runtime, draft, 'draft-declare-runtime-control-plan',
             ['--message', message, '--log-channel', 'general', '--severity', 'message'], live=True)
@@ -2085,6 +2090,28 @@ def test_console_log_addition_observer(
         assert scope['outcome'] == 'matching_item_event' and scope['effect_observed'] is True, scope
         assert scope['execution_observation'] == observation, scope
         assert scope['exclusive_causation_verified'] is False and scope['continuing_channel_state_verified'] is False, scope
+        if getter_mode:
+            observed = receipt['getter_workflow']
+            def require_owned(channel):
+                assert (channel.get('outcome') == 'complete' if 'outcome' in channel else channel.get('truncated') is False), channel
+                assert any(item.get('message') == message and item.get('severity') == 'Message'
+                    for item in channel['items']), channel
+            observed['post_add'] = runtime.gateway(['core-call', 'ak.wwise.core.log.get',
+                '--log-channel', 'general', '--max-results', '1000'], live=True)['agent_result']
+            require_owned(observed['post_add'])
+            clear = _start_business_draft(runtime, 'ak.wwise.core.log.clear')
+            _update_business_draft(runtime, clear, 'draft-declare-runtime-control-plan',
+                ['--log-channel', 'general'], live=True)
+            receipt['clear_transaction'] = {}
+            def require_clear_prestate(preview):
+                artifact = runtime.gateway(['transaction-show', preview['transaction_id']], live=False)['artifact']
+                observed['clear_prestate'] = artifact['prepared_operation']['pre_state']['log_channel_before']
+                require_owned(observed['clear_prestate'])
+            cleared = _complete_business_draft(runtime, clear, inspect_preview=require_clear_prestate,
+                phase_receipt=receipt['clear_transaction'])
+            observed['post_clear'] = cleared['verify']['verification']['verification_scope']['log_observation']['post_channel']
+            assert observed['post_clear']['outcome'] == 'complete', observed['post_clear']
+            assert not any(item.get('message') == message for item in observed['post_clear']['items']), observed['post_clear']
         category['status'] = 'PASS'
     finally:
         # Preserve partial execute/verify replies before a failed assertion reaches
@@ -2092,12 +2119,13 @@ def test_console_log_addition_observer(
         if 'peer_diagnostic' in receipt:
             category['peer_diagnostic'] = {'classification': receipt['peer_diagnostic']['classification'],
                 'complete': receipt['peer_diagnostic']['complete']}
-        transaction_id = receipt['transaction'].get('transaction_id')
-        if transaction_id:
-            category['transaction_ids'] = [transaction_id]
+        category['transaction_ids'] = [receipt[key]['transaction_id']
+            for key in ('transaction', 'clear_transaction') if receipt.get(key, {}).get('transaction_id')]
         raw = json.dumps(receipt, ensure_ascii=False, indent=None if 'peer_diagnostic' in receipt else 2)
         if 'peer_diagnostic' in receipt:
             assert len(raw.encode('utf-8')) <= receipt['peer_diagnostic']['limits']['receipt_bytes'], 'Console peer receipt byte bound exceeded'
+        if 'getter_workflow' in receipt:
+            assert len(raw.encode('utf-8')) <= receipt['getter_workflow']['receipt_bytes'], 'Console getter receipt byte bound exceeded'
         output.write_text(raw, encoding='utf-8')
 
 

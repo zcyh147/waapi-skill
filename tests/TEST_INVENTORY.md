@@ -567,6 +567,30 @@ successful startup under that invocation across the five installed builds,
 not a universal dialog-suppression guarantee. No Fresh or native Windows run,
 broad Program/Non-live gate, or whole-#186 acceptance is claimed here.
 
+## 2026-10-24 R122 Console log version boundary and 2025 getter/clear proof
+
+Matching build9143 SDK release note `whatsnew_2025_1_4.html`, WG-80630,
+states that Console waapi-server now publishes `log.itemAdded` and returns
+results with `log.get`. Member SHA-256 is
+`52e90027565b93b27f36af7a872f5f225ff686da6f880f6f1c8e41f4749cb150`;
+the same entry is present in installed build9262 documentation. This supersedes
+the generic API-page blanket-empty wording for Console 2025.1.4 onward.
+Pinned older Console Topic monitoring is a documented native feature boundary;
+valid reflected add/clear routes remain available with schema-only verification.
+R98/R121 original FAILs, receipts, transactions and quarantines remain unchanged.
+Frozen candidate `1f32f9f223cebe11076ca07f168f29fad99adfab` then passed one
+separately reviewed Mac Console 2025.1.7.9143 owned add → post-get → clear →
+retained verifier-get workflow in **9.49s**, exit 0. The exact General/Message
+marker appeared in the complete post-add getter and complete nonempty clear
+Preview prestate (one row each); the retained complete post-clear getter had
+zero rows. Both separately previewed, once-only transactions verified. Source
+content, tree metadata and project mtime were unchanged; the sandbox was deleted,
+owned processes cleaned up and port32743 was free. Evidence is
+`.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/`
+(`root-review.json`, `result.json` and final `evidence/category.jsonl`). This
+proves the selected 2025 getter/clear workflow; older FAILs retain their original
+verdicts and no other host/runtime or whole-#186 acceptance is claimed.
+
 ## 2026-10-24 R98 Console log and R99 Authoring startup observations
 
 Three separate Mac Console runs on candidate
@@ -578,9 +602,10 @@ Three separate Mac Console runs on candidate
 | 2024.1.13.9056 | FAIL, 18.27s | Acknowledged subscription and addition; zero observed events, schema-only verification. |
 | 2025.1.7.9143 | PASS, 8.65s | Exact unique General/Message event persisted at execution and reused by later verification; transaction verified. |
 
-All three observers unsubscribed. All three Console `log.get` snapshots were
-empty, including the successful event case; empty snapshots do not establish
-whether addition occurred. Timeouts prove neither native Topic absence nor a
+All three observers unsubscribed. All three Console `log.get` prestate snapshots were
+empty, including the successful event case. The 2025 snapshot preceded the
+addition; no post-add getter was collected by that run. Empty prestate does
+not contradict later addition delivery. Timeouts prove neither native Topic absence nor a
 callback defect. Source hash/mtime/tree and process/port cleanup were checked;
 failed sandboxes remain quarantined. Evidence roots below
 `.waapi-skill-state/full-coverage/` are
@@ -602,7 +627,7 @@ Source content/mtime/tree matched, the failed sandbox remains quarantined,
 no native processes remained, and port32343 was free after teardown. Evidence
 is `.waapi-skill-state/full-coverage/r121-console-log-peer-native-2023-r1/`
 with `root-review.json`, category evidence and the partial/final receipt.
-No 2024/2025 retry, new diagnostic or native repeat followed this attempt.
+That diagnostic performed no 2024/2025 retry.
 
 Separately, candidate `664121e48fdf0bc788720f532413a6bfc641ab8d` launched owned
 Authoring 2021.1.14.8108 with the documented `-AutomationMode` argument and

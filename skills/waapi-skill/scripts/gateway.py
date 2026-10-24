@@ -386,6 +386,8 @@ from wwise_waapi.runtime_inspection_business_contracts import (  # noqa: E402  #
     TRANSPORT_GET_STATE_URI,
     runtime_inspection_business_catalog_rows,
     runtime_transport_requires_authoring,
+    CONSOLE_LOG_OBSERVATION_POLICY,
+    runtime_log_observation_support,
     runtime_inspection_business_contract_data,
     runtime_inspection_business_operations,
     runtime_inspection_business_read_operations,
@@ -4959,6 +4961,20 @@ def authoring_host_platform(live_info: Mapping[str, Any]) -> str:
     return mapped
 
 
+def live_log_topic_boundary(api, *, command, live_info, common):
+    if api != 'ak.wwise.core.log.itemAdded':
+        return None
+    support = runtime_log_observation_support(live_info)
+    if support['state'] == 'supported':
+        return None
+    return {'ok': False, 'status': 'native_log_observation_boundary', **common,
+        'command': command, 'api': api,
+        'error_code': ('NATIVE_LOG_OBSERVATION_UNAVAILABLE' if support['state'] == 'unavailable'
+            else 'NATIVE_LOG_OBSERVATION_UNKNOWN'),
+        'message': 'Console log publication requires Wwise2025.1.4 or newer; use a supported Console build or matching Authoring.',
+        'native_observation_support': support, 'executed': False, 'verified': False}
+
+
 def live_authoring_api_boundary(
     api: str,
     *,
@@ -9143,6 +9159,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "offline": True,
             "version": version,
             "topic": args.api,
+            **({'native_log_observation_policy': dict(CONSOLE_LOG_OBSERVATION_POLICY)}
+                if args.api == 'ak.wwise.core.log.itemAdded' else {}),
             "bounds": {
                 "stdout_utf8_bytes": MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
             },
@@ -12847,6 +12865,8 @@ def dispatch_runtime_inspection_business_read(
             "request": request_validation.as_dict(),
             "result": result_validation.as_dict() if result_validation else None,
         },
+        **({'native_observation_support': runtime_log_observation_support(live_info)}
+            if args.api == 'ak.wwise.core.log.get' else {}),
         "agent_result": normalized,
     }
 
@@ -16266,6 +16286,9 @@ def dispatch_command(
             stream_sink=stream_sink,
         )
     if args.command == "wait-topic":
+        log_boundary = live_log_topic_boundary(args.api, command='wait-topic', live_info=live_info, common=common)
+        if log_boundary is not None:
+            return log_boundary
         authoring_boundary = live_authoring_api_boundary(
             args.api,
             command="wait-topic",
@@ -16476,6 +16499,9 @@ def dispatch_topic_stream(
 ) -> dict[str, Any]:
     """Keep one reviewed topic subscription open and publish events immediately."""
 
+    log_boundary = live_log_topic_boundary(args.api, command='stream-topic', live_info=live_info, common=common)
+    if log_boundary is not None:
+        return log_boundary
     authoring_boundary = live_authoring_api_boundary(
         args.api,
         command="stream-topic",
@@ -22158,9 +22184,16 @@ def _dispatch_transaction_command_with_execution_lease(
                 "verified": False,
                 "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
             }
-        role_validation = validate_prepared_roles(prepared, read_call=read_call,
-            history_resolver=gateway_history_resolver(store, artifact["project_guard"]),
-            copy_proof_context=source_copy_proof_context(env=env, project_guard=current_guard, state_dir=store.state_dir))
+        log_plan = prepared.get('verification_plan', {})
+        if (log_plan.get('kind') == 'log-channel-effect'
+                and log_plan.get('native_observation_support') != runtime_log_observation_support(live_info)):
+            role_validation = {'ok': False, 'status': 'repreview_required',
+                'error_code': 'LOG_OBSERVATION_HOST_DRIFT',
+                'message': 'Log observation host/build differs from the immutable Preview.'}
+        else:
+            role_validation = validate_prepared_roles(prepared, read_call=read_call,
+                history_resolver=gateway_history_resolver(store, artifact["project_guard"]),
+                copy_proof_context=source_copy_proof_context(env=env, project_guard=current_guard, state_dir=store.state_dir))
         if role_validation.get("ok") is not True:
             repreview = store.require_repreview(
                 transaction_id,
@@ -22931,7 +22964,8 @@ def _dispatch_transaction_command_with_execution_lease(
                 result = dispatch_owned_result_stages(dispatcher, connection=connection, version=detected_version,
                     prepared=prepared, operation_timeout=float(capability.execution_contract["timeout_seconds"]))
             elif (call_uri == LOG_ADD_ITEM_URI
-                    and prepared.get('verification_plan', {}).get('console') is True):
+                    and prepared.get('verification_plan', {}).get('console') is True
+                    and prepared.get('verification_plan', {}).get('native_observation_support', {}).get('state') == 'supported'):
                 from wwise_waapi.runtime_log_observer import observe_console_log_add
                 result = observe_console_log_add(client=dispatcher.client,
                     plan=prepared['verification_plan'], remaining=connection.deadline.remaining,

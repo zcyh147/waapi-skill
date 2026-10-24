@@ -53,6 +53,39 @@ CONSOLE_LOG_ADD_OBSERVER = {
     'matching': 'exact_sealed_channel_message_severity',
     'boundary': 'One matching addition event; no exclusive writer, continuing channel contents, entry identity, or prior-state restoration proof.',
 }
+CONSOLE_LOG_OBSERVATION_POLICY = {
+    'native_change': 'WG-80630',
+    'console_minimum_version': '2025.1.4',
+    'scope': 'WwiseConsole waapi-server log.itemAdded publication and log.get contents',
+    'authoring': 'available on reflected versions',
+    'console_before_minimum': 'no publication or getter contents on known matching builds',
+    'unknown_build': 'no observation capability inferred',
+}
+_KNOWN_CONSOLE_LOG_OLD_BUILDS = {
+    (2021, 1, 14, 8108), (2022, 1, 19, 8584),
+    (2023, 1, 19, 8928), (2024, 1, 13, 9056),
+}
+
+
+def runtime_log_observation_support(live_info):
+    """Select native log observation from already-bound getInfo, never presence."""
+    version = live_info.get('version')
+    version = version if isinstance(version, dict) else {}
+    observed = {key: version.get(key) for key in ('year', 'major', 'minor', 'build')}
+    host = live_info.get('isCommandLine')
+    state = 'unknown'
+    if host is False:
+        state = 'supported'
+    elif host is True and all(type(value) is int and value >= 0 for value in observed.values()):
+        identity = tuple(observed.values())
+        if identity in _KNOWN_CONSOLE_LOG_OLD_BUILDS:
+            state = 'unavailable'
+        elif identity[:2] == (2025, 1) and identity[2] >= 0:
+            state = 'supported' if identity[2] >= 4 else 'unavailable'
+    return {'state': state, 'is_command_line': host, 'observed_version': observed,
+        'native_change': 'WG-80630', 'console_minimum_version': '2025.1.4'}
+
+
 REMOTE_CONNECT_URI = "ak.wwise.core.remote.connect"
 TRANSPORT_CREATE_URI = "ak.wwise.core.transport.create"
 TRANSPORT_DESTROY_URI = "ak.wwise.core.transport.destroy"
@@ -604,9 +637,9 @@ def runtime_inspection_business_catalog_rows() -> tuple[dict[str, Any], ...]:
         if operation == LOG_GET_URI:
             return "read one bounded Wwise log view in user-facing channel terms"
         if operation == LOG_ADD_ITEM_URI:
-            return "add one message to a named Authoring Log view"
+            return "add one message to a named Wwise Log view"
         if operation == LOG_CLEAR_URI:
-            return "clear one named Authoring Log view"
+            return "clear one named Wwise Log view"
         if operation.startswith("ak.wwise.core.remote."):
             return "connect Authoring to one exact remote runtime or Profiler capture"
         if operation.startswith("ak.wwise.core.transport."):
@@ -619,6 +652,8 @@ def runtime_inspection_business_catalog_rows() -> tuple[dict[str, Any], ...]:
         {
             "api": operation,
             "intent": intent(operation),
+            **({'native_log_observation_policy': dict(CONSOLE_LOG_OBSERVATION_POLICY)}
+                if operation in {LOG_GET_URI, LOG_ADD_ITEM_URI, LOG_CLEAR_URI} else {}),
             "supported_versions": list(runtime_inspection_business_versions(operation)),
             **({"console_versions": list(runtime_inspection_business_versions(operation))}
                 if operation.startswith("ak.wwise.core.transport.") else {}),
@@ -841,9 +876,10 @@ def runtime_inspection_business_contract_data(
                 "add_effect": "matching message/severity multiplicity increases from prestate",
                 "clear_effect": "prior complete row contents absent at one observation; new messages can remain",
                 "unresolved": "oversized, unchanged matching multiplicity, indistinguishable prior rows, or unavailable readback never prove effect",
-                "console_effect": "getter is documented empty; add uses a bounded execute-time addition event; clear effect remains unverified",
+                "console_effect": "Console log observation is available from2025.1.4; known older builds retain result-schema-only add/clear verification.",
+                "native_log_observation_policy": dict(CONSOLE_LOG_OBSERVATION_POLICY),
                 "console_add_observer": dict(CONSOLE_LOG_ADD_OBSERVER),
-                "console_clear_boundary": "Acknowledgment only: the Console getter is empty and the addition-only Topic cannot prove prior contents disappeared.",
+                "console_clear_boundary": "Supported Console builds use complete getter pre/post observations; older or unknown builds do not claim removal. Clearing an already empty channel remains valid.",
                 "concurrency": "no exclusive causation, atomic clear, permanent emptiness or unrelated-channel observation claim",
             }} if operation in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI} else {}),
             **({"field_semantics": {

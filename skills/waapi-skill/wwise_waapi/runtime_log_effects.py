@@ -35,8 +35,9 @@ def compare_channel(plan: Mapping[str, Any], before: Mapping[str, Any], after: M
         "continuing_channel_state_verified": False, "entry_identity_verified": False}
     if after["outcome"] != "complete":
         return {**observation, "outcome": "oversized", "size_bytes": after["size_bytes"], "effect_observed": False}
-    if plan["console"]:
-        return {**observation, "outcome": "console_log_unobservable", "effect_observed": False}
+    if plan["console"] and plan.get("native_observation_support", {}).get("state") != "supported":
+        return {**observation, "outcome": "console_log_unobservable", "effect_observed": False,
+            "native_observation_support": plan.get("native_observation_support")}
     prior, current = before["items"], after["items"]
     if plan["uri"] == LOG_ADD_ITEM_URI:
         matches = lambda row: row["message"] == plan["message"] and row["severity"] == plan["severity"]
