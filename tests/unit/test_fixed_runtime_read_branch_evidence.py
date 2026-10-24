@@ -738,3 +738,169 @@ def test_r119_console_diagnostics_originals_reach_portable_final_consumer(tmp_pa
         write_json(tmp_path / 'r119-foreign-profile-result.json',row)
         assert row['evidence_results']['native']['outcome'] == 'missing', json.dumps(row)
         assert 'original strict-PASS observation/request/replay differs' in row['evidence_results']['native']['reason']
+
+
+# Source compatibility is tested without rebuilding the native obligation
+# universe: these exact schema leaves come from the committed component policy.
+CURRENT_SOURCE_ORIGINALS = [
+    ('r103', '2025.1', category) for category in (
+        'profiler-voices-observation', 'profiler-busses-observation',
+        'profiler-audio-objects-observation', 'profiler-game-objects-observation',
+        'profiler-voice-instance-filter', 'profiler-bus-instance-filter',
+        'profiler-audio-objects-bus-filter')
+] + [('r118', '2025.1', 'console-transport-profiler-probe')] + [
+    ('r119', version, 'console-transport-profiler-probe') for version in ('2021.1', '2022.1', '2023.1', '2024.1')
+] + [(family, version, 'strict') for family in ('rtpc', 'contribution') for version in ('2022.1', '2025.1')] + [
+    (family, version, 'qualified') for family in ('rtpc', 'contribution') for version in ('2023.1', '2024.1')
+]
+
+
+def _current_original_source_review(tmp_path, family, version, category):
+    """Use existing public fakes/readers with fresh unit replay descriptors."""
+    import shutil
+    from tests.support import fixed_runtime_read_evidence as fixed
+    from tests.support import runtime_observation_evidence as runtime
+    from tests.support import qualified_runtime_read_evidence as qualified
+    from tests.unit.test_contribution_branch_evidence import public_contribution_flow, retained_contribution
+    from tests.unit.test_rtpc_field_branch_evidence import public_rtpc_read, BUILDS
+
+    fixed_case = family in {'r103', 'r118', 'r119'}
+    uri = ('ak.wwise.core.profiler.getGameObjects' if 'game-objects' in category else
+        'ak.wwise.core.profiler.getAudioObjects' if 'audio-objects' in category else
+        'ak.wwise.core.profiler.getBusses' if 'bus' in category else URI) if fixed_case else (
+        runtime.RTPC_URI if family == 'rtpc' else runtime.CONTRIBUTION_URI)
+    host = 'wwise-console' if family in {'r118', 'r119'} else 'wwise-authoring'
+    minor, build = BUILDS[version]
+    route = f'{version}|{host}|{version}.{minor}.{build}|function|{uri}'
+    pointer = ('/resultSchema/properties/return/items/properties/id' if uri.endswith('getGameObjects') else
+        '/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID' if uri.endswith('getAudioObjects') else
+        '/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID' if uri.endswith('getBusses') else
+        '/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/objectGUID') if fixed_case else (
+        '/resultSchema/properties/return/items/properties/value' if family == 'rtpc' else
+        '/resultSchema/properties/return/properties/volume')
+    package = 'runtime-fixed-reads-r121' if fixed_case else 'runtime-rtpc-complete-r112' if family == 'rtpc' else 'runtime-contributions-r113'
+    policy = json.loads((audit.ROOT / 'tests/fixtures/branch-evidence/product' / package / 'requirements.json').read_bytes())
+    identity = route + '|' + pointer
+    requirement = policy['branches'][identity]
+    assert requirement['categories'] == ['program', 'native']
+    branch = {'id':identity, 'route':route, 'pointer':pointer, 'kind':'schema',
+        'shape_sha256':requirement['native_shape_sha256']}
+    trace, calls = [], []
+    if fixed_case:
+        profile = fixed.native_profile(branch)
+        for name in profile['files']:
+            shutil.copyfile(FIXTURE / name, tmp_path / name)
+        original = fixed.original_observation(tmp_path, category, profile=profile)
+        historical = original['historical_sources']
+        receipt, native, context, trace = public_fixed_read(tmp_path / 'public', version=version, host=host,
+            rows=original['raw']['result']['return'], position=str(original['request']['args']['time']),
+            uri=uri, filtered='filter' in category, view='identity' if family == 'r118' else 'diagnostics', public_calls=calls)
+    elif family == 'rtpc':
+        if category == 'qualified':
+            original = qualified.retained_read(version, 'profiler-rtpcs-observation')
+            historical = {p:h for p,h in original['sources'].items() if p.startswith('skills/waapi-skill/')}
+            rows = original['raw']['result']['return']; position = qualified.PROFILES[version]['time']
+        else:
+            old = audit.ROOT / ('tests/fixtures/branch-evidence/product/runtime-rtpc-fields-r109/originals/2022.1'
+                if version == '2022.1' else 'tests/fixtures/branch-evidence/product/runtime-read-r108')
+            original = json.loads((old / 'original-capture.json').read_bytes())
+            rows = original['outcomes']['profiler-rtpcs-observation']['evidence']['agent_result']['return']
+            position = runtime.RTPC_ORIGINALS[version][3]
+            review = json.loads((audit.ROOT / 'tests/fixtures/branch-evidence/product/runtime-rtpc-complete-r112' /
+                f'{version}-wwise-authoring-data-guard-source-review.json').read_bytes())
+            historical = review['historical_sources']
+        receipt, native, context = public_rtpc_read(tmp_path / 'public', version, position=str(position), rows=rows)
+    else:
+        retained = qualified.retained_contribution_inputs(version) if category == 'qualified' else retained_contribution(version)
+        receipt, native, context, trace, calls, _ = public_contribution_flow(tmp_path / 'public', version, retained=retained)
+        if category == 'qualified':
+            original = qualified.retained_read(version, 'profiler-contributions-bus-observation')
+            historical = {p:h for p,h in original['sources'].items() if p.startswith('skills/waapi-skill/')}
+        else:
+            review = json.loads((audit.ROOT / 'tests/fixtures/branch-evidence/product/runtime-contributions-r113' /
+                f'{version}-wwise-authoring-original-source-review.json').read_bytes())
+            historical = review['historical_sources']
+            original = json.loads((retained[0] / 'original-capture.json').read_bytes())
+    capture_path = tmp_path / 'current-program.json'
+    # Unit source-review proof only, not formal after-teardown publication.
+    write_program_receipt(capture_path, receipt, native, nodeid='current-original-source-review',
+        phase_reports=dict.fromkeys(('setup','call','teardown'), 'passed'), source_context=context,
+        native_reads=trace or None, public_calls=calls or None)
+    capture_descriptor = {'artifact':capture_path.name, 'sha256':sha(capture_path.read_bytes())}
+    captured = json.loads(capture_path.read_bytes())
+    if fixed_case:
+        review = {'contract':'waapi-skill.fixed-row-source-review/v1', 'historical_candidate':profile['candidate'],
+            'historical_sources':historical, 'current_sources':context['packaged'], 'changed_files':profile['changes'],
+            'changed_symbols':profile['symbols'], 'category':category, 'archive':original['archive'],
+            'program_replay':capture_descriptor}
+        def validate(document):
+            fixed.validate_source_review(write_json(tmp_path / 'current-review.json', document), historical, branch, audit.ROOT, tmp_path)
+    elif category == 'strict':
+        review = deepcopy(review)
+        review.update(current_sources=context['packaged'], changed_files=runtime.RTPC_REVIEWED_SOURCE_CHANGES,
+            changed_symbols=runtime.RTPC_REVIEWED_SOURCE_SYMBOLS, program_replay=capture_descriptor,
+            original_capture=write_json(tmp_path / 'original-capture.json', original))
+        validator = runtime.validate_rtpc_source_review if family == 'rtpc' else runtime.validate_contribution_source_review
+        def validate(document):
+            validator(write_json(tmp_path / 'current-review.json', document), historical, branch, audit.ROOT, tmp_path)
+    else:
+        observed_pointer = '/native_call/result/return/7/value' if family == 'rtpc' else '/native_call/result/return/volume'
+        observed = completion.pointer_value(captured, observed_pointer)
+        candidate = 'a' * 64  # Local validator identity, never a ledger candidate.
+        program = {'candidate_sha256':candidate, 'scope_kind':'product', 'gateway':receipt, 'native_call':native,
+            'runtime_read_program':captured, 'relevant_sources':context['packaged']}
+        binding = {'input':{'gateway_argv':receipt['argv']}, 'observation_pointer':observed_pointer,
+            'gateway_observation_pointer':runtime.contribution_public_pointer(observed_pointer) if family == 'contribution' else
+                observed_pointer.replace('/native_call/result','/gateway/payload/agent_result'), 'reference_chain':[]}
+        archive = qualified.fixture_path(version)
+        shutil.copyfile(archive, tmp_path / archive.name)
+        review = {'contract':'waapi-skill.qualified-retained-read-assessment/v1', 'version':version,
+            'category':'profiler-rtpcs-observation' if family == 'rtpc' else 'profiler-contributions-bus-observation',
+            'original_candidate':qualified.CANDIDATE, 'original_workflow_outcome':'BLOCKED', 'original_finalization':'BLOCKED',
+            'successful_finalization':False, 'qualified_read_fact':'PASS', 'lifecycle_obligations':qualified.lifecycle_obligations(),
+            'archive':{'artifact':archive.name, 'sha256':qualified.PROFILES[version]['archive']},
+            'program_capture':capture_descriptor, 'source_changes':runtime.RTPC_REVIEWED_SOURCE_CHANGES,
+            'changed_symbols':runtime.RTPC_REVIEWED_SOURCE_SYMBOLS}
+        def validate(document):
+            assessment = write_json(tmp_path / 'current-assessment.json', document)
+            binding['qualified_runtime_read_attachment'] = assessment
+            replay = completion.read_sealed_artifact(document['program_capture'], tmp_path)
+            current_program = {**program, 'gateway':replay['gateway'], 'native_call':replay['native_call'], 'runtime_read_program':replay}
+            binding['evidence'] = {'program':write_json(tmp_path / 'current-program-record.json', current_program)}
+            fact = write_json(tmp_path / 'current-fact.json', {'contract':'waapi-skill.qualified-retained-read-fact/v1',
+                'assessment_sha256':assessment['sha256'], 'branch_id':identity, 'native_shape_sha256':branch['shape_sha256'],
+                'native_route':route, 'program_pointer':observed_pointer, 'reference_chain':[], 'observed':observed})
+            assert qualified.qualified_read_result(fact, branch, candidate, 'product', tmp_path, binding, audit.ROOT, {}, {}) == ('passed', None)
+    return review, validate, captured
+
+
+@pytest.mark.parametrize(('family','version','category'), CURRENT_SOURCE_ORIGINALS,
+    ids=['-'.join(case) for case in CURRENT_SOURCE_ORIGINALS])
+def test_current_source_review_preserves_complete_original_public_reads(tmp_path, family, version, category):
+    review, validate, captured = _current_original_source_review(tmp_path, family, version, category)
+    validate(review)
+    # Reuse the same actual public replay for source and full-array controls;
+    # the refreshed immediate descriptors ensure semantics cause rejection.
+    if (family,version,category) not in {
+        ('r103','2025.1','profiler-voices-observation'), ('rtpc','2025.1','strict'),
+        ('contribution','2025.1','strict'), ('rtpc','2023.1','qualified')}:
+        return
+    wrong_hash = deepcopy(review)
+    changes = 'source_changes' if category == 'qualified' else 'changed_files'
+    wrong_hash[changes]['skills/waapi-skill/scripts/gateway.py']['after'] = '0' * 64
+    with pytest.raises(ValueError, match='source|transition'):
+        validate(wrong_hash)
+    incomplete = deepcopy(captured)
+    returned = incomplete['native_call']['result']['return']
+    if isinstance(returned, list):
+        returned.pop()
+        incomplete['gateway']['payload']['agent_result']['return'].pop()
+    else:
+        returned['objects'].pop()
+        incomplete['gateway']['payload']['agent_result']['objects'].pop()
+        incomplete['native_reads'][-1]['result'] = deepcopy(incomplete['native_call']['result'])
+        incomplete['public_calls'][-1]['gateway'] = deepcopy(incomplete['gateway'])
+    bad_replay = write_json(tmp_path / 'incomplete-program.json', incomplete)
+    bad_review = {**review, 'program_capture' if category == 'qualified' else 'program_replay':bad_replay}
+    with pytest.raises(ValueError, match='complete|Complete|preserve'):
+        validate(bad_review)
