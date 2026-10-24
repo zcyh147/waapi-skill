@@ -51,7 +51,7 @@ def program_source_context(root=audit.ROOT, *, flow=None):
             'tests/unit/test_runtime_log_branch_evidence.py'))
     if flow in {'ak.wwise.core.profiler.' + name for name in ('getVoices', 'getBusses', 'getAudioObjects', 'getGameObjects')}:
         dependencies.extend(('tests/support/fixed_runtime_read_evidence.py', 'tests/unit/test_fixed_runtime_read_branch_evidence.py'))
-    if flow in {'ak.wwise.core.profiler.'+n for n in ('registerMeter','unregisterMeter')}:
+    if flow in {'ak.wwise.core.profiler.'+n for n in ('registerMeter','unregisterMeter','saveCapture')}:
         dependencies.extend(('tests/support/runtime_owned_control_evidence.py',
             'tests/unit/test_runtime_owned_control_evidence.py','tests/fixtures/runtime-owned-controls/support-review.json',
             'tests/support/runtime_cursor_evidence.py','tests/fixtures/runtime-cursor/support-review.json',

@@ -1300,6 +1300,13 @@ def approved_boundary(root, branch, binding, route, public, digest):
         if required in ('wwise-console', 'wwise-authoring') and route['host'] != required and boundary.get('required_host') == required:
             return {'kind':'wrong_host','required_host':required,'error_code':'AUTHORING_HOST_REQUIRED' if required == 'wwise-authoring' else 'CONSOLE_HOST_REQUIRED'}
         return None
+    if boundary.get('kind') == 'file_destination':
+        builds={'2023.1':'2023.1.19.8928','2024.1':'2024.1.13.9056','2025.1':'2025.1.7.9143'}
+        owned={f'{v}|{h}|{b}|function|ak.wwise.core.profiler.saveCapture|/argsSchema/properties/file/@empty/string'
+            for v,b in builds.items()for h in ('wwise-console','wwise-authoring')}
+        if branch['id']not in owned:return None
+        from tests.support.runtime_owned_control_evidence import approved_file_boundary
+        return approved_file_boundary(root,branch,binding)
     if boundary.get('kind') != 'prohibited_field':
         return None
     policy = json.loads((root / 'skills/waapi-skill/resources/native_surface_policy.json').read_text())
@@ -1336,7 +1343,7 @@ def approved_boundary(root, branch, binding, route, public, digest):
         'approval_sources': {name:digest((root / name).read_text()) for name in approved_sources}}
 
 
-def validate_boundary_receipt(record, branch, binding, checks):
+def validate_boundary_receipt(record, branch, binding, checks, *, root=None):
     boundary, gateway = branch['approved_boundary'], record['gateway']
     payload, calls = gateway['payload'], record.get('native_calls')
     uri = branch['route'].split('|')[4]
@@ -1344,7 +1351,10 @@ def validate_boundary_receipt(record, branch, binding, checks):
             or not isinstance(calls, list) or any(c['uri'] == uri for c in calls)
             or not any(c['pointer'] == '/gateway/payload/error_code' and c.get('equals') == payload.get('error_code') for c in checks)):
         raise ValueError('exact rejected public input and no-target-dispatch proof missing')
-    if boundary['kind'] == 'wrong_host':
+    if boundary['kind'] == 'file_destination':
+        from tests.support.runtime_owned_control_evidence import validate_file_boundary_receipt
+        validate_file_boundary_receipt(record,branch,binding,checks,root)
+    elif boundary['kind'] == 'wrong_host':
         infos = [c['result'] for c in calls if c['uri'] == 'ak.wwise.core.getInfo']
         version, host, build = branch['route'].split('|')[:3]
         if (len(infos) != 1 or native_host_context(infos[0], 'isCommandLine') != {'version':version,'host':host,'build':build}
@@ -1688,7 +1698,7 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         for artifact in record.get('artifacts', []):
             read_sealed_artifact(artifact, base)
         if boundary is not None:
-            validate_boundary_receipt(record, branch, binding, checks)
+            validate_boundary_receipt(record, branch, binding, checks, root=root)
         if category == 'native' and binding.get('source_copy_native_proof'):
             from tests.support.source_copy_native_evidence import validate_source_native
             validate_source_native(record, binding, branch, base)

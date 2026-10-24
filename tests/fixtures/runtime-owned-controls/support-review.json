@@ -6896,6 +6896,78 @@
         "type": "Bus",
         "path": "\\Busses\\Default Work Unit\\WAAPI_V2_Weapons"
       }
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture": {
+      "provider": "saved-artifact",
+      "cursor_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getCursorTime",
+      "request": {
+        "api": "ak.wwise.core.profiler.saveCapture",
+        "args": {
+          "file": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1/owned/authoring-nodes/d87a1375cafae330c7be7f7f/native-evidence/saved-capture/OwnedCapture.prof"
+        },
+        "io_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1/owned/authoring-nodes/d87a1375cafae330c7be7f7f/native-evidence/saved-capture",
+        "options": {}
+      },
+      "result": {},
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789025392386000-728979760470403f97a8dcc925fbea88-ak_wwise_core_profiler_saveCapture.json",
+      "raw_sha256": "87f459d3b6e9ff808f3e096ccff7bfb64d0f9a9e66a6bca8202de6e937c1003f",
+      "receipt_indices": [
+        100,
+        101,
+        102,
+        103,
+        104
+      ],
+      "receipt_sha256": "f992156c61e141ec0def64fd7e01d5204d1654e0584e6d133d66f65454fa7719",
+      "witness_sha256": "2e09575928ffc72dd41307cbae17527311f3758bba08b8edeed57781753fe0b3"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture": {
+      "provider": "saved-artifact",
+      "cursor_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+      "request": {
+        "api": "ak.wwise.core.profiler.saveCapture",
+        "args": {
+          "file": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/owned/authoring-nodes/d87a1375cafae330c7be7f7f/native-evidence/saved-capture/OwnedCapture.prof"
+        },
+        "io_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/owned/authoring-nodes/d87a1375cafae330c7be7f7f/native-evidence/saved-capture",
+        "options": {}
+      },
+      "result": {},
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789170154366000-8e3fc6aded9046c09e18b372bafbb0ce-ak_wwise_core_profiler_saveCapture.json",
+      "raw_sha256": "b5d43f13ca5b7de9627f625394f442c2b6869b91155656f489413e9f6c19b39a",
+      "receipt_indices": [
+        100,
+        101,
+        102,
+        103,
+        104
+      ],
+      "receipt_sha256": "519329e5b4193ae88743a8e11676da9a157e1b036c92aff5c682b0f7db2d773e",
+      "witness_sha256": "7a65b8d73d4b0078204333088d8839284f0d7809f8032f35e79d9065bc08a140"
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture": {
+      "provider": "saved-artifact",
+      "cursor_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime",
+      "request": {
+        "api": "ak.wwise.core.profiler.saveCapture",
+        "args": {
+          "file": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3/owned/authoring-nodes/f5b183948b1318c348e72a5f/native-evidence/saved-capture/OwnedCapture.prof"
+        },
+        "io_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3/owned/authoring-nodes/f5b183948b1318c348e72a5f/native-evidence/saved-capture",
+        "options": {}
+      },
+      "result": {},
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3/evidence/authoring-node-observations/f5b183948b1318c348e72a5f-native-evidence/1792757517477028000-a0c6df0d01dc48fcbb06e1a2e81d5405-ak_wwise_core_profiler_saveCapture.json",
+      "raw_sha256": "8e4fc8f9828c2c159f8a76b1276c42d1664a63d9eb331d6ee543f43bf32f871a",
+      "receipt_indices": [
+        83,
+        84,
+        85,
+        86,
+        87
+      ],
+      "receipt_sha256": "ae49a9b80c3fdada18330b1dcb60d5d8bc40b62a97b7dc643a9fcfa017c821e6",
+      "witness_sha256": "56e3a9c8995a4113f7d65a6905425baacfc6b1e8b8972e4925c04d2f8220d812"
     }
   },
   "program_objects": {
@@ -7502,5 +7574,26 @@
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor|/argsSchema/properties/position/@empty/string",
     "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor|/argsSchema/properties/position/@empty/string"
   ],
-  "boundary": "All18 native gates remain. Exact Authoring candidates do not establish Console availability; no membership/running-state/restoration claim."
+  "boundary": "All18 native gates remain. Exact Authoring candidates do not establish Console availability; no membership/running-state/restoration claim.",
+  "file_boundary_authority": {
+    "kind": "file_destination",
+    "ids": [
+      "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture|/argsSchema/properties/file/@empty/string",
+      "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture|/argsSchema/properties/file/@empty/string",
+      "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture|/argsSchema/properties/file/@empty/string",
+      "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture|/argsSchema/properties/file/@empty/string",
+      "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture|/argsSchema/properties/file/@empty/string",
+      "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture|/argsSchema/properties/file/@empty/string"
+    ],
+    "native_schema_classification": "accepted",
+    "decision": "Main R134: empty native file identifies no authorized .prof destination; public I/O authorization rejection with valid same-operation counterpart, not native-invalidity or successful save.",
+    "field_types": {
+      "capture_output_directory": "exact_authorized_host_directory",
+      "capture_name": "host_valid_profiler_capture_name"
+    },
+    "flags": {
+      "--capture-output-directory": "capture_output_directory_or_name",
+      "--capture-name": "capture_name"
+    }
+  }
 }

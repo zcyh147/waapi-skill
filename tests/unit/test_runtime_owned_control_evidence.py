@@ -53,29 +53,148 @@ def meter_pair(path,version,host,selector,row):
         runtime.program_source_context(flow=uri),deepcopy(trace),deepcopy(calls))for receipt,uri in ((register,PREFIX+'registerMeter'),(unregister,PREFIX+'unregisterMeter'))]
 
 
-@pytest.mark.parametrize('version',['2025.1','2024.1'])
+@pytest.mark.parametrize('version',['2025.1','remaining'])
 def test_meter_controls_public_pair_teardown_and_consumer(request,tmp_path,version):
-    from tests.support.runtime_owned_control_evidence import original_meter,write_owned_control_bundle
-    hosts=('wwise-authoring',)if version=='2025.1'else('wwise-authoring',)
-    routes=[f'{version}|{host}|{BUILDS[version]}|function|{uri}'for host in hosts for uri in sorted(METER_URIS)]
+    from tests.support.runtime_owned_control_evidence import original_meter,review,write_owned_control_bundle
+    contexts=[('2025.1','wwise-authoring')]if version=='2025.1'else[('2025.1','wwise-console'),('2024.1','wwise-authoring'),('2024.1','wwise-console')]
+    routes=[f'{v}|{host}|{BUILDS[v]}|function|{uri}'for v,host in contexts for uri in sorted(METER_URIS)]
     inventory=log_inventory(routes);captures=[]
-    for host in hosts:
-        actual=original_meter(f'{version}|{host}|{BUILDS[version]}|function|{PREFIX}registerMeter')
+    for v,host in contexts:
+        row=review()['program_objects'][v]
         for selector in ('id','path','exact-type-name'):
-            captures.extend(meter_pair(tmp_path/(host+'-'+selector),version,host,selector,actual['object']))
+            captures.extend(meter_pair(tmp_path/(v+'-'+host+'-'+selector),v,host,selector,row))
     def finalize(phases):
         paths=[]
         for i,(receipt,native,context,trace,calls)in enumerate(captures):
             path=tmp_path/f'capture-{i}.json'
             runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=trace,public_calls=calls);paths.append(path)
-        index=write_owned_control_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='owned-controls-'+version+'-meter-')
-        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
+        components=[]
+        for v in sorted({c[0]for c in contexts}):
+            selected_routes=[r for r in routes if r.startswith(v+'|')]
+            selected_paths=[path for path in paths if json.loads(path.read_bytes())['gateway']['payload']['detected_version']==v]
+            component=write_owned_control_bundle(tmp_path/('bundle-'+v),selected_paths,inventory=log_inventory(selected_routes),name_prefix='owned-controls-'+v+'-meter-')
+            components.append((component,json.loads((component.parent/'requirements.json').read_bytes())))
+        if len(components)==1:index,policies=components[0]
+        else:index,policies=runtime.write_runtime_composition(tmp_path/'combined',components)
+        bindings,base,_=audit.portable_binding_inputs(index,policies)
         def evaluate(document):return completion.evaluate_coverage(audit.ROOT,inventory,document,digest=audit.digest,evidence_base=base,requirements_document=policies)
         result=evaluate(bindings);runtime.write_json(tmp_path/'consumer-result.json',result)
-        assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'])for r in result['obligations']if r['state']!='verified']
+        for row in result['obligations']:
+            assert row['evidence_results']['program']['outcome']=='passed',(row['pointer'],row['evidence_results'])
+            assert row['state']==('verified'if row['route']in review()['profiles']else'implemented_unverified'),row
+        baseline={row['id']:row['state']for row in result['obligations']}
         for route in routes:
+            if 'native'not in bindings['bindings'][route+'|/resultSchema']['evidence']:continue
             missing=deepcopy(bindings);missing['bindings'][route+'|/resultSchema']['evidence'].pop('native')
             checked=evaluate(missing)
             assert all(r['state']!='verified'for r in checked['obligations']if r['route']==route)
-            assert all(r['state']=='verified'for r in checked['obligations']if r['route']!=route)
+            assert all(r['state']==baseline[r['id']]for r in checked['obligations']if r['route']!=route)
+        if version=='2025.1':
+            identity=routes[0]+'|/argsSchema'
+            for damage in ('native-guid','row-drift','handle','pair-cleanup','effect-upgrade','extra-native','source','teardown','candidate'):
+                changed=deepcopy(bindings);bound=changed['bindings'][identity]
+                record=deepcopy(completion.read_sealed_artifact(bound['evidence']['program'],base));cap=record['runtime_read_program']
+                if damage=='native-guid':cap['native_call']['args']['object']='{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}'
+                elif damage=='row-drift':next(x for x in cap['native_reads']if x['uri']=='ak.wwise.core.object.get')['result']['return'][0]['path']+=' changed'
+                elif damage=='handle':cap['public_calls'][2]['gateway']['argv'][-1]='not-the-bound-handle'
+                elif damage=='pair-cleanup':
+                    cap['public_calls']=cap['public_calls'][:9];cap['native_reads']=cap['native_reads'][:cap['public_calls'][-1]['native_end']]
+                elif damage=='effect-upgrade':cap['public_calls'][8]['gateway']['payload']['verification']['business_state_verified']=True
+                elif damage=='extra-native':
+                    cap['native_reads'].append({'ordinal':len(cap['native_reads']),'uri':PREFIX+'stopCapture','args':{},'options':{},'result':{}});cap['public_calls'][-1]['native_end']+=1
+                elif damage=='source':cap['source_context']['capture']['tests/support/runtime_owned_control_evidence.py']='0'*64
+                elif damage=='teardown':cap['phase_reports']['teardown']='failed'
+                else:record['candidate_sha256']='0'*64
+                bound['evidence']['program']={**runtime.write_json(base/('damaged-'+damage+'.json'),record),'nodeid':request.node.nodeid}
+                assert next(r for r in evaluate(changed)['obligations']if r['id']==identity)['state']!='verified',damage
+            normal=next(k for k,b in bindings['bindings'].items()if 'normalized_input_choice'in b)
+            changed=deepcopy(bindings);changed['bindings'][normal]['normalized_input_choice']['native_alias_dispatch_claimed']=True
+            assert next(r for r in evaluate(changed)['obligations']if r['id']==normal)['state']!='verified'
+            for bad in ('../escape-','foreign-','owned-controls-2024.1-meter-'):
+                out=tmp_path/('bad-'+str(len(bad)))
+                with pytest.raises(ValueError,match='prefix'):write_owned_control_bundle(out,paths,inventory=inventory,name_prefix=bad)
+                assert not out.exists()
+            with pytest.raises(ValueError,match='duplicates an exact branch'):
+                runtime.write_runtime_composition(tmp_path/'duplicate',[(index,policies),(index,policies)])
     register_exact_evidence_finalizer(request.node,finalize)
+
+
+def save_capture_flow(path,version,host):
+    path.mkdir(parents=True);output=path/'captures';output.mkdir();destination=output/'Owned.prof';sentinel=output/'unrelated.txt';sentinel.write_bytes(b'preserve')
+    client=_RuntimeControlDraftClient(path,version=version);original=client.call;trace=[];calls=[];rejections=[];uri=PREFIX+'saveCapture'
+    def call(api,args=None,options=None):
+        if api==uri:destination.write_bytes(b'opaque owned capture bytes');value={}
+        else:value=original(api,args,options)
+        if api=='ak.wwise.core.getInfo':
+            year,major,minor,build=map(int,BUILDS[version].split('.'));value['version'].update(year=year,major=major,minor=minor,build=build);value['isCommandLine']=host=='wwise-console'
+        trace.append({'ordinal':len(trace),'uri':api,'args':deepcopy(args),'options':deepcopy(options),'result':deepcopy(value)})
+        return value
+    client.call=call;context=runtime.program_source_context(flow=uri)
+    def invoke(argv,*,reject=False):
+        start=len(trace);code,payload=gateway.execute_gateway(['--state-dir',str(path/'state'),*argv],env=_env(path,version=version),client_factory=lambda _:client)
+        receipt={'argv':list(argv),'exit_code':code,'payload':payload}
+        if reject:
+            assert code==2 and payload['ok']is False and not any(x['uri']==uri for x in trace[start:]),payload
+            rejections.append({'gateway':receipt,'native_calls':deepcopy(trace[start:])});del trace[start:]
+        else:
+            assert code==0,payload;calls.append({'gateway':receipt,'native_start':start,'native_end':len(trace)})
+        return payload
+    started=invoke(['draft-start',uri]);draft=started['draft']['draft_id'];authority=started['task_authority']
+    base=['draft-declare-runtime-control-plan',draft,'--task-authority',authority,'--expected-revision',str(started['draft']['revision'])]
+    for directory,name in (('', 'Owned'),(str(output),'')):
+        invoke([*base,'--capture-output-directory',directory,'--capture-name',name],reject=True)
+    declared=invoke([*base,'--capture-output-directory',str(output),'--capture-name','Owned'])
+    checked=invoke(['draft-check',draft,'--task-authority',authority,'--expected-revision',str(declared['draft']['revision'])])
+    preview=invoke(['preview-from-draft',draft,'--task-authority',authority,'--expected-revision',str(checked['draft']['revision'])])
+    shown=invoke(preview['next_command']['gateway_argv']);invoke(shown['next_command']['gateway_argv'])
+    executed=invoke(['execute',preview['transaction_id']]);verified=invoke(executed['next_command']['gateway_argv']);receipt=calls[-1]['gateway']
+    assert verified['verified']is True and verified['verification']['business_state_verified']is True
+    full=invoke(['transaction-show',preview['transaction_id']])
+    evidence=next(e['details']['verification']for e in reversed(full['events'])if e['event_type']=='verification_recorded')
+    assert evidence['readbacks'][0]['path']==str(destination)and evidence['readbacks'][0]['unrelated_files_preserved']is True
+    assert sentinel.read_bytes()==b'preserve'and destination.read_bytes()==b'opaque owned capture bytes'
+    native,=[x for x in trace if x['uri']==uri]
+    return receipt,{k:native[k]for k in ('uri','args','options','result')},context,trace,calls,rejections
+
+
+@pytest.mark.parametrize('version',['2025.1','2023.1','2024.1'])
+def test_save_capture_boundary_teardown_portable_consumer(request,tmp_path,version):
+    from tests.support.runtime_owned_control_evidence import write_owned_control_bundle,write_file_boundary_capture
+    routes=[f'{version}|wwise-authoring|{BUILDS[version]}|function|{PREFIX}saveCapture'];inventory=log_inventory(routes)
+    receipt,native,context,trace,calls,rejections=save_capture_flow(tmp_path/'public',version,'wwise-authoring')
+    def finalize(phases):
+        capture=tmp_path/'capture.json';runtime.write_program_receipt(capture,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=trace,public_calls=calls)
+        rejected=tmp_path/'boundary.json';write_file_boundary_capture(rejected,rejections,capture,nodeid=request.node.nodeid,phase_reports=phases,source_context=context)
+        index=write_owned_control_bundle(tmp_path/'bundle',[capture],inventory=inventory,name_prefix='owned-controls-'+version+'-save-',file_boundaries=[rejected])
+        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
+        def evaluate(document):return completion.evaluate_coverage(audit.ROOT,inventory,document,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        result=evaluate(bindings);runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'],r['reasons'])for r in result['obligations']if r['state']!='verified']
+        missing=deepcopy(bindings);missing['bindings'][routes[0]+'|/resultSchema']['evidence'].pop('native')
+        assert all(r['state']!='verified'for r in evaluate(missing)['obligations'])
+        if version=='2025.1':
+            identity=routes[0]+'|/argsSchema/properties/file/@empty/string'
+            for damage in ('field-borrow','flag-borrow','authority','dispatched','artifact','teardown','source'):
+                changed=deepcopy(bindings);bound=changed['bindings'][identity]
+                record=deepcopy(completion.read_sealed_artifact(bound['evidence']['program'],base));proof=record['file_destination_boundary']
+                if damage=='field-borrow':proof['rejections'][0]['gateway']['payload']['details']['repair']['field']='capture_name'
+                elif damage=='flag-borrow':proof['rejections'][0]['gateway']['argv'][-4]='--meter-object-handle'
+                elif damage=='authority':proof['rejections'][0]['gateway']['argv'][3]='borrowed-authority'
+                elif damage=='dispatched':proof['rejections'][1]['native_calls'].append(deepcopy(proof['valid']['native_call']))
+                elif damage=='artifact':proof['valid']['public_calls'][-1]['gateway']['payload']['events'][-1]['details']['verification']['readbacks'][0]['nonempty']=False
+                elif damage=='teardown':proof['phase_reports']['teardown']='failed'
+                else:proof['valid']['source_context']['capture']['tests/support/runtime_owned_control_evidence.py']='0'*64
+                bound['evidence']['program']={**runtime.write_json(base/('bad-boundary-'+damage+'.json'),record),'nodeid':request.node.nodeid}
+                row=next(r for r in evaluate(changed)['obligations']if r['id']==identity)
+                assert row['state']!='verified',damage
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_file_boundary_is_exact_and_does_not_load_unrelated_scope(tmp_path):
+    from tests.support.runtime_owned_control_evidence import review,SUPPORT_SHA
+    boundary={'boundary':{'kind':'file_destination','support_sha256':SUPPORT_SHA,'native_field':'file'}}
+    assert completion.approved_boundary(tmp_path,{'id':'unrelated'},boundary,{},None,audit.digest)is None
+    identity=review()['save_boundary_ids'][0]
+    branch={'id':identity,**review()['entries'][identity]}
+    with pytest.raises((ValueError,OSError)):
+        completion.approved_boundary(tmp_path,branch,boundary,{},None,audit.digest)

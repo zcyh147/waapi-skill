@@ -436,7 +436,7 @@ def validate_program(record,binding,branch,root,edges=None):
 
 def validate_evidence(record,binding,branch,category,base,root,edges=None):
     entry=exact_entry(branch,root)
-    if branch['route'].split('|')[-1]in {'ak.wwise.core.profiler.'+n for n in ('registerMeter','unregisterMeter')}:
+    if branch['route'].split('|')[-1]in {'ak.wwise.core.profiler.'+n for n in ('registerMeter','unregisterMeter','saveCapture')}:
         from tests.support.runtime_owned_control_evidence import validate_evidence as validate_owned_control
         return validate_owned_control(record,binding,branch,category,base,root,edges)
     if branch['route'].split('|')[-1]in {'ak.wwise.core.profiler.'+n for n in ('enableProfilerData','startCapture','stopCapture')}:
