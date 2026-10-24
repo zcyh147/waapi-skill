@@ -319,6 +319,7 @@ def _complete_business_draft(
     *,
     inspect_preview=None,
     phase_receipt: dict[str, Any] | None = None,
+    execute_verify=None,
 ) -> dict[str, Mapping[str, Any]]:
     # Opt-in bounded, fixed phase receipt. Preserve replies before gateway
     # assertions raise; unrelated callers retain their existing completion path.
@@ -355,8 +356,11 @@ def _complete_business_draft(
         ["confirm", transaction_id, "--confirmation-token", token],
         live=False,
     )
-    executed = phase(["execute", transaction_id], live=True)
-    verified = phase(["verify", transaction_id], live=True)
+    if execute_verify is None:
+        executed = phase(["execute", transaction_id], live=True)
+        verified = phase(["verify", transaction_id], live=True)
+    else:
+        executed, verified = execute_verify(transaction_id)
     assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
     assert verified["state"] == TransactionState.VERIFIED.value, verified
     assert verified["verification"]["business_state_verified"] is True, verified
@@ -2055,8 +2059,14 @@ def test_console_log_addition_observer(
         if os.getenv('WWISE_CONSOLE_LOG_DIAGNOSTIC'):
             from tests.destructive.support.console_log_diagnostic import decoded_log_diagnostic
             diagnostic = decoded_log_diagnostic(waapi_gateway, receipt, version=runtime.version)
+        execute_verify = None
+        if os.getenv('WWISE_CONSOLE_LOG_PEER_DIAGNOSTIC'):
+            from tests.destructive.support.console_log_peer import observe_peer_execution
+            assert runtime.version == '2023.1' and os.getenv('WWISE_CONSOLE_LOG_PEER_DIAGNOSTIC') == 'independent-session-v1'
+            assert not os.getenv('WWISE_CONSOLE_LOG_DIAGNOSTIC'), 'Select one diagnostic mode'
+            execute_verify = lambda tx: observe_peer_execution(runtime, tx, receipt, output)
         with diagnostic:
-            result = _complete_business_draft(runtime, draft, phase_receipt=receipt['transaction'])
+            result = _complete_business_draft(runtime, draft, phase_receipt=receipt['transaction'], execute_verify=execute_verify)
         transaction_id = result['preview']['transaction_id']
         category['transaction_ids'] = [transaction_id]
         shown = runtime.gateway(['transaction-show', transaction_id], live=False)
@@ -2079,10 +2089,16 @@ def test_console_log_addition_observer(
     finally:
         # Preserve partial execute/verify replies before a failed assertion reaches
         # the existing lifecycle finalizer; no new Wwise process or replay.
+        if 'peer_diagnostic' in receipt:
+            category['peer_diagnostic'] = {'classification': receipt['peer_diagnostic']['classification'],
+                'complete': receipt['peer_diagnostic']['complete']}
         transaction_id = receipt['transaction'].get('transaction_id')
         if transaction_id:
             category['transaction_ids'] = [transaction_id]
-        output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding='utf-8')
+        raw = json.dumps(receipt, ensure_ascii=False, indent=None if 'peer_diagnostic' in receipt else 2)
+        if 'peer_diagnostic' in receipt:
+            assert len(raw.encode('utf-8')) <= receipt['peer_diagnostic']['limits']['receipt_bytes'], 'Console peer receipt byte bound exceeded'
+        output.write_text(raw, encoding='utf-8')
 
 
 @pytest.mark.live
