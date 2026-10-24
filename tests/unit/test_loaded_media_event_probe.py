@@ -105,7 +105,12 @@ def _host(owner, tmp_path, monkeypatch, *, failure=None, count=1, demo_context=N
                     result = deepcopy(json.loads(demo_context.schema_bytes)[args['uri']])
                     return {} if failure == 'schema-mismatch' else result
                 if uri.endswith('remote.getAvailableConsoles'):
-                    return {'consoles': [console]}
+                    if failure in ('discovery-warmup', 'discovery-empty', 'discovery-deadline'):
+                        self.discovery_count = getattr(self, 'discovery_count', 0) + 1
+                        if failure == 'discovery-empty' or self.discovery_count == 1:
+                            packet = json.loads((Path(__file__).parents[1] / 'fixtures/integration-demo-startup-2025.1.11.9262.json').read_text())
+                            return deepcopy(packet['discovery_empty']['result'])
+                    return {'consoles': [console, console] if failure == 'discovery-ambiguous' else [console]}
                 if uri.endswith('remote.getConnectionStatus'):
                     return {'isConnected': connected, 'status': 'Connected' if connected else 'Not connected',
                         **({'console': console} if connected else {})}
@@ -149,13 +154,28 @@ def _host(owner, tmp_path, monkeypatch, *, failure=None, count=1, demo_context=N
         env = _env(runtime.owned_root, version=version)
         set_gateway_config(env, wwise_version=version, project_modification_policy='ask_before_changes')
         env['WWISE_EVIDENCE_DIR'] = runtime.runner_environment['WWISE_EVIDENCE_DIR']
-        def call(argv):
+        def call(argv, *, timeout_seconds=45):
             code, payload = gateway.execute_gateway(['--state-dir', str(runtime.owned_root / 'probe-state'), *argv],
                 env=env, client_factory=lambda _: client)
             receipts.append({'argv': list(argv), 'exit_code': code, 'payload': payload})
             assert code == 0, json.dumps(payload, ensure_ascii=False)
             return payload
         return call
+    if failure in ('discovery-warmup', 'discovery-empty', 'discovery-ambiguous',
+                   'startup-exit', 'startup-timeout', 'startup-deadline', 'discovery-deadline', 'output-overflow', 'cleanup-kill'):
+        # Keep the real private command/timeout adapter; substitute only its external process.
+        from tests.semantic.support import codex_expansion_runtime as fixture_runtime
+        import subprocess
+        client.gateway_timeouts = []
+        def external_gateway(command, *, environment, timeout_seconds):
+            argv = command[command.index('gateway.py') + 1:]
+            client.gateway_timeouts.append((list(argv), timeout_seconds))
+            env = _env(Path(environment['WAAPI_SKILL_CONFIG_PATH']).parent, version='2025.1')
+            env.update(environment)
+            code, payload = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+            return subprocess.CompletedProcess(command, code, json.dumps(payload), '')
+        monkeypatch.setattr(fixture_runtime, 'run_owned_gateway', external_gateway)
+        factory = fixture_runtime.fixture_gateway
     monkeypatch.setattr(authoring_batch, 'fixture_gateway', factory)
     monkeypatch.setattr(probe.time, 'sleep', lambda _: None)
     batch = authoring_batch.AuthoringBatchAdapter(owner=owner, repo_root=tmp_path, selected_nodeids=[DEMO_NODEID if demo_context is not None else probe.NODEID])

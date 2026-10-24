@@ -88,7 +88,7 @@ def test_live_reflection_requires_all_twelve_receipts_and_stops_on_mismatch(tmp_
 from tests.unit.test_authoring_batch_adapter import owned_authoring
 
 
-@pytest.mark.parametrize('failure', [None, 'empty', 'unrelated', 'cleanup', 'schema-mismatch', 'wrong-ui-token', 'ui-timeout', 'partial'])
+@pytest.mark.parametrize('failure', [None, 'empty', 'unrelated', 'cleanup', 'schema-mismatch', 'wrong-ui-token', 'ui-timeout', 'partial', 'discovery-warmup', 'discovery-empty', 'discovery-ambiguous', 'startup-exit', 'startup-timeout', 'output-overflow', 'cleanup-kill', 'startup-deadline', 'discovery-deadline'])
 def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path, monkeypatch, failure):
     """All producer/Gateway/finalizer code runs; only process/UI are fake."""
     import subprocess
@@ -118,15 +118,23 @@ def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path,
     batch.runtime.sandbox.metadata.source_hash = proof
     batch.owner.runtime = batch.runtime = replace(batch.runtime, source_hash_before=proof)
     producer = demo.OwnedIntegrationDemo(context, batch.runtime)
+    startup_case = failure in ('discovery-warmup', 'discovery-empty', 'discovery-ambiguous',
+        'startup-exit', 'startup-timeout', 'startup-deadline', 'discovery-deadline', 'output-overflow', 'cleanup-kill')
+    passed = failure in (None, 'discovery-warmup', 'cleanup-kill')
+    readiness_failure = failure in ('discovery-empty', 'discovery-ambiguous', 'startup-exit', 'startup-timeout', 'startup-deadline', 'discovery-deadline', 'output-overflow')
     launches = []
+    from io import BytesIO
     class Child:
         pid = 23456
-        returncode = None
+        returncode = 7 if failure == 'startup-exit' else None
+        stdout = BytesIO(b'')
+        stderr = BytesIO(b'x' * 65537 if failure == 'output-overflow' else b'optional plugin warning')
         def poll(self):
             return self.returncode
         def wait(self, timeout):
-            self.returncode = 0
-            return 0
+            if failure == 'cleanup-kill' and self.returncode is None:
+                raise subprocess.TimeoutExpired('fake owned Demo', timeout)
+            return self.returncode
     child = Child()
     def popen(argv, **kwargs):
         launches.append((argv, kwargs))
@@ -135,18 +143,32 @@ def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path,
     def no_residual_group(*args):
         raise ProcessLookupError
     monkeypatch.setattr(__import__('os'), 'killpg', no_residual_group)
+    socket_packets = json.loads((Path(__file__).parents[1] / 'fixtures/integration-demo-startup-2025.1.11.9262.json').read_text())
+    socket_calls = []
     def run(argv, **kwargs):
         assert argv[:3] == ['/usr/sbin/lsof', '-nP', '-a']
         assert argv[argv.index('-p') + 1] == '23456'
+        if '-iUDP' in argv:
+            socket_calls.append((argv, kwargs))
+            packet = socket_packets['socket_snapshots'][0 if len(socket_calls) == 1 or failure in ('startup-timeout', 'startup-deadline') else 1]
+            raw = packet['socket_stdout'].replace(str(socket_packets['pid']), '23456').replace('61758', '32123').encode()
+            return SimpleNamespace(returncode=packet['socket_exit'], stdout=raw, stderr=b'')
         assert '-iTCP:32123' in argv
+        assert 0 < kwargs['timeout'] <= 5
         return SimpleNamespace(returncode=0, stdout=b'p23456\n')
     monkeypatch.setattr(subprocess, 'run', run)
-    monkeypatch.setattr(codex_harness, 'terminate_process_group', lambda process: setattr(process, 'returncode', 0))
+    monkeypatch.setattr(codex_harness, 'terminate_process_group', lambda process: None if failure == 'cleanup-kill' else setattr(process, 'returncode', 0))
+    monkeypatch.setattr(codex_harness, 'kill_process_group', lambda process: setattr(process, 'returncode', -9))
     monkeypatch.setattr(sandbox_fixture, 'wait_for_port_release', lambda *args: None)
     elapsed = {'seconds': 0}
     original_clock = probe.time.monotonic
     monkeypatch.setattr(probe.time, 'monotonic', lambda: original_clock() + elapsed['seconds'])
     def main_cua(_seconds):
+        elapsed['seconds'] += _seconds
+        if failure == 'startup-deadline':
+            elapsed['seconds'] += 45
+        if failure == 'discovery-deadline' and getattr(client, 'discovery_count', 0):
+            elapsed['seconds'] += 60
         if failure == 'ui-timeout' and producer.ready.exists():
             elapsed['seconds'] += 121
             return
@@ -158,25 +180,25 @@ def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path,
                 'token': 'wrong' if failure == 'wrong-ui-token' else ready['token'],
                 'action': 'focused-stock-prepare-area1', 'screenshot': str(screenshot)}))
     monkeypatch.setattr(probe.time, 'sleep', main_cua)
-    if failure is None:
+    if passed:
         probe.collect_loaded_event_probe(batch, call, demo=producer)
     else:
         with pytest.raises(AssertionError):
             probe.collect_loaded_event_probe(batch, call, demo=producer)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=failure is None)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=passed)
     report = _archived(batch)
-    assert final['outcome'] == ('PASS' if failure is None else 'FAIL')
+    assert final['outcome'] == ('PASS' if passed else 'FAIL')
     category, = record['categories']
-    assert category['status'] == ('PASS' if failure is None else 'blocked')
+    assert category['status'] == ('PASS' if passed else 'blocked')
     assert report['cleanup']['complete'] is (failure != 'cleanup')
     assert report['fixture_before'] == report['fixture_after']
-    assert sum(uri.endswith('profiler.getLoadedMedia') for uri, _, _ in client.calls) == (0 if failure in ('schema-mismatch', 'wrong-ui-token', 'ui-timeout') else 1)
+    assert sum(uri.endswith('profiler.getLoadedMedia') for uri, _, _ in client.calls) == (0 if readiness_failure or failure in ('schema-mismatch', 'wrong-ui-token', 'ui-timeout') else 1)
     assert not any('.transport.' in uri for uri, _, _ in client.calls)
-    if failure == 'schema-mismatch':
+    if failure == 'schema-mismatch' or readiness_failure:
         assert not any(row['argv'][0] == 'execute' for row in batch.receipts[demo.NODEID])
     assert len(launches) == (0 if failure == 'schema-mismatch' else 1)
     if failure != 'schema-mismatch':
-        assert child.returncode == 0
+        assert child.returncode == (-9 if failure == 'cleanup-kill' else 7 if failure == 'startup-exit' else 0)
         argv, kwargs = launches[0]
         assert 'SDK/Mac_Xcode1600/Profile/bin/IntegrationDemo/IntegrationDemo.app/Contents/MacOS/IntegrationDemo' in argv[0]
         assert kwargs['start_new_session'] is True and Path(kwargs['cwd']).is_relative_to(batch.runtime.owned_root)
@@ -184,7 +206,7 @@ def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path,
         evidence = report['outcomes'][probe.OUTCOME]['evidence']
         assert len(evidence['pages']) == 8 and evidence['complete'] is False
         assert evidence['pages'][-1]['next_command']
-    if failure is None:
+    if passed:
         assert category['owned_identity_observed'] is True
         assert category['attribution_scope'] == 'owned-sdk-prepare-area1'
         assert report['reflection']['build'] == '2025.1.11.9262'
@@ -192,3 +214,48 @@ def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path,
         assert not batch.runtime.owned_root.exists()
     else:
         assert batch.lifecycle_result.quarantine_path
+
+    if startup_case:
+        startup = report['demo_startup']
+        assert len(startup['samples']) <= 24 and len(startup['discovery']) <= 5
+        if failure in ('startup-exit', 'output-overflow'):
+            assert startup['samples'] == []
+        else:
+            assert startup['samples'][0]['ready'] is False
+        assert all(sample[1]['timeout'] <= 2 for sample in socket_calls)
+        discovery_calls = [(argv, timeout) for argv, timeout in client.gateway_timeouts
+            if 'typed-zero-call' in argv and 'ak.wwise.core.remote.getAvailableConsoles' in argv]
+        assert all(timeout <= 3 and float(argv[argv.index('--timeout') + 1]) == timeout
+                   for argv, timeout in discovery_calls)
+        stopped = next(row['result'] for row in report['cleanup']['receipts'] if row['action'] == 'owned-demo-stop')
+        assert stopped['pre_cleanup_returncode'] == (7 if failure == 'startup-exit' else None)
+        assert stopped['final_returncode'] == child.returncode
+        assert stopped['streams']['stderr']['bytes_retained'] <= 65536
+        if failure == 'discovery-warmup':
+            assert len(discovery_calls) == 2
+            assert startup['discovery'][0]['result'] == {'consoles': []}
+            assert startup['discovery'][1]['result']['consoles'][0]['commandPort'] == 32123
+            assert len(startup['samples']) == 2 and startup['samples'][-1]['ready'] is True
+            assert startup['discovery'][0]['before']['elapsed_seconds'] >= startup['samples'][-1]['elapsed_seconds']
+            assert next(i for i, (_, timeout) in enumerate(client.gateway_timeouts) if timeout <= 3) > 0
+            assert sum(uri.endswith('remote.connect') for uri, _, _ in client.calls) == 1
+            assert stopped['streams']['stderr']['text'] == 'optional plugin warning'
+        elif readiness_failure:
+            expected = {'startup-exit': 'Owned Demo exited', 'startup-timeout': 'communication not ready', 'startup-deadline': 'communication not ready',
+                'discovery-deadline': 'discovery empty with live sockets',
+                'discovery-empty': 'discovery empty with live sockets', 'discovery-ambiguous': 'discovery ambiguous',
+                'output-overflow': 'output exceeds'}[failure]
+            assert expected in report['errors'][0]['message']
+            assert not discovery_calls if failure.startswith('startup-') or failure == 'output-overflow' else discovery_calls
+        if failure == 'discovery-empty':
+            assert len(discovery_calls) == 5
+        if failure == 'startup-timeout':
+            assert len(startup['samples']) == 24
+        if failure == 'startup-deadline':
+            assert len(startup['samples']) == 1 and startup['process']['elapsed_seconds'] >= 45
+        if failure == 'discovery-deadline':
+            assert len(discovery_calls) == 1 and startup['process']['elapsed_seconds'] >= 60
+        output_receipt = json.loads(Path(report['demo']['process_output_receipt']).read_text())
+        assert output_receipt['poll'] == child.returncode and stopped['process_group_absent'] is True
+        if failure == 'cleanup-kill':
+            assert stopped['cleanup_action'] == 'kill'

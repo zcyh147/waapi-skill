@@ -58,12 +58,12 @@ def collect_loaded_event_probe(batch, public_call, *, demo=None):
         temporary.write_bytes(raw)
         temporary.replace(path)
 
-    def call(argv):
+    def call(argv, *, timeout_seconds=None):
         assert report['public_call_count'] < 96, 'Loaded probe public call bound exceeded'
         report['public_call_count'] += 1
         before = len(batch.receipts[nodeid])
         try:
-            return public_call(argv)
+            return public_call(argv, **({} if timeout_seconds is None else {'timeout_seconds': timeout_seconds}))
         finally:
             for receipt in batch.receipts[nodeid][before:]:
                 size = len(json.dumps(receipt.get('payload', receipt), ensure_ascii=False).encode())
@@ -144,12 +144,72 @@ def collect_loaded_event_probe(batch, public_call, *, demo=None):
             report['reflection'] = demo.context.reflect(call, expected_info=batch.info)
             cleanup.append(('owned-demo-stop', demo.stop))
             report['demo'] = demo.start()
-            time.sleep(1.0)  # One finite discovery interval, no discovery polling.
-            consoles = read_zero('remote.getAvailableConsoles')['agent_result']['consoles']
-            matches = [row for row in consoles if row.get('appName') == 'Integration Demo']
-            assert len(matches) == 1, 'Owned Demo discovery is absent or ambiguous'
-            console, = matches
-            report['remote_port_ownership'] = demo.owns_port(console['commandPort'], console['host'])
+            startup = report['demo_startup'] = {'samples': [], 'discovery': [],
+                'limits': {'total_seconds': 60, 'socket_seconds': 45, 'socket_samples': 24,
+                    'socket_call_seconds': 2, 'discovery_reads': 5, 'discovery_call_seconds': 3,
+                    'output_bytes_per_stream': 65536}}
+            deadline = demo.started_monotonic + 60
+            socket_deadline = demo.started_monotonic + 45
+            def live():
+                state = demo.process_observation()
+                startup['process'] = state
+                persist()
+                if state['poll'] is not None:
+                    raise ValueError('Owned Demo exited before discovery completed: ' + str(state['poll']))
+                if any(row['overflow'] or row['error'] for row in state['streams'].values()):
+                    raise ValueError('Owned Demo output exceeds bound or capture failed')
+                return state
+            for index in range(24):
+                live()
+                remaining = min(deadline, socket_deadline) - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError('Owned Demo communication not ready within socket deadline')
+                sample = demo.startup_observation(timeout_seconds=min(2, remaining))
+                startup['samples'].append(sample)
+                persist()
+                live()
+                if time.monotonic() >= min(deadline, socket_deadline):
+                    raise TimeoutError('Owned Demo communication not ready within socket deadline')
+                if sample['ready']:
+                    break
+                if index == 23:
+                    raise TimeoutError('Owned Demo communication not ready within 24 socket samples')
+                time.sleep(min(1, max(0, socket_deadline - time.monotonic())))
+            def discovery_call(argv):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError('Owned Demo discovery empty with live sockets: total deadline')
+                return call(argv, timeout_seconds=min(3, remaining))
+            schema = discovery_call(['request-schema', PREFIX + 'remote.getAvailableConsoles'])
+            for index in range(5):
+                before = live()
+                payload = discovery_call(schema['continuation']['gateway_argv'])
+                result = payload['agent_result']
+                startup['discovery'].append({'attempt': index + 1, 'before': before,
+                    'after': demo.process_observation(), 'result': result})
+                persist()
+                live()
+                if time.monotonic() >= deadline:
+                    raise TimeoutError('Owned Demo discovery empty with live sockets: total deadline')
+                matches = [row for row in result['consoles'] if row.get('appName') == 'Integration Demo']
+                if len(matches) > 1:
+                    raise ValueError('Owned Demo discovery ambiguous: multiple matching consoles')
+                if matches:
+                    console, = matches
+                    if console['commandPort'] not in sample['command_ports']:
+                        raise ValueError('Owned Demo discovered port differs from startup listener')
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError('Owned Demo discovery attribution exceeded total deadline')
+                    report['remote_port_ownership'] = demo.owns_port(console['commandPort'], console['host'],
+                        timeout_seconds=min(5, remaining))
+                    live()
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError('Owned Demo discovery attribution exceeded total deadline')
+                    break
+                if index == 4:
+                    raise TimeoutError('Owned Demo discovery empty with live sockets: five reads exhausted')
+                time.sleep(min(1, max(0, deadline - time.monotonic())))
             report['setup'].append(effect('remote.connect', ['--remote-host', console['host'],
                 '--application-name', console['appName'], '--command-port', str(console['commandPort'])],
                 before_execute=lambda: cleanup.append(('remote-disconnect', lambda: zero('remote.disconnect')))))
@@ -231,7 +291,11 @@ def collect_loaded_event_probe(batch, public_call, *, demo=None):
     finally:
         for label, action in reversed(cleanup):
             try:
-                report['cleanup']['receipts'].append({'action': label, 'result': action()})
+                result = action()
+                report['cleanup']['receipts'].append({'action': label, 'result': result})
+                if label == 'owned-demo-stop' and any(row['overflow'] or row['error']
+                        for row in result.get('streams', {}).values()) and not report['errors']:
+                    report['errors'].append({'type': 'ValueError', 'message': 'Owned Demo output exceeds bound or capture failed'})
             except Exception as exc:
                 report['cleanup']['errors'].append({'action': label, 'type': type(exc).__name__, 'message': str(exc)[:4096]})
             persist()

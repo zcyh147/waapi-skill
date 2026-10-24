@@ -183,6 +183,9 @@ class OwnedIntegrationDemo:
         self.ready = runtime.evidence_root / 'integration-demo-ready.json'
         self.action = runtime.evidence_root / 'integration-demo-action.json'
         self.used = False
+        self.started_monotonic = None
+        self._streams = {}
+        self._readers = []
         if self.ready.exists() or self.action.exists():
             raise ValueError('Demo action/ready files must be absent before launch')
 
@@ -221,6 +224,9 @@ class OwnedIntegrationDemo:
         import os
         import shutil
         import subprocess
+        import threading
+        import time
+        from datetime import datetime, timezone
         from tests.semantic.support.codex_harness import subprocess_process_group_options
         expected_project = self.sdk / self.project_relative / 'IntegrationDemo.wproj'
         if self.runtime.sandbox.source_project != expected_project:
@@ -241,30 +247,107 @@ class OwnedIntegrationDemo:
         binary = app / 'Contents/MacOS/IntegrationDemo'
         if not binary.is_file() or not os.access(binary, os.X_OK):
             raise ValueError('Stock Profile Demo executable is unavailable')
+        self.started_monotonic = time.monotonic()
+        started_at = datetime.now(timezone.utc).isoformat()
         self.process = subprocess.Popen([str(binary)], cwd=app.parent,
             env={**os.environ, **self.runtime.runner_environment}, stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **subprocess_process_group_options())
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, **subprocess_process_group_options())
+        for name in ('stdout', 'stderr'):
+            state = self._streams[name] = {'data': bytearray(), 'bytes_seen': 0, 'error': None}
+            def drain(pipe, state):
+                try:
+                    while chunk := getattr(pipe, 'read1', pipe.read)(4096):
+                        state['bytes_seen'] += len(chunk)
+                        state['data'].extend(chunk[:max(0, 65536 - len(state['data']))])
+                except Exception as exc:
+                    state['error'] = str(exc)[:1024]
+                finally:
+                    pipe.close()
+            reader = threading.Thread(target=drain, args=(getattr(self.process, name), state), daemon=True)
+            self._readers.append(reader)
+            reader.start()
         return {'build': self.context.build, 'pid': self.process.pid, 'binary': str(binary),
-            'cwd': str(app.parent), 'source': self.before, 'token': self.token}
+            'cwd': str(app.parent), 'source': self.before, 'token': self.token,
+            'started_at': started_at, 'pgid': self.process.pid,
+            'process_output_receipt': str(self.runtime.evidence_root / ('integration-demo-process-' + self.token + '.json'))}
 
-    def owns_port(self, port, host):
+    def process_observation(self, *, include_output=False):
+        """Bounded exact-child state; output is retained even after a startup failure."""
+        import time
+        streams = {}
+        for name, state in self._streams.items():
+            raw = bytes(state['data'])
+            streams[name] = {'bytes_seen': state['bytes_seen'], 'bytes_retained': len(raw),
+                'overflow': state['bytes_seen'] > 65536, 'error': state['error']}
+            if include_output:
+                streams[name].update(sha256=sha256(raw).hexdigest(), text=raw.decode('utf-8', 'replace'))
+        return {'pid': self.process.pid, 'poll': self.process.poll(),
+            'elapsed_seconds': time.monotonic() - self.started_monotonic, 'streams': streams}
+
+    def startup_observation(self, *, timeout_seconds):
+        """Observe stock SDK communication sockets, without sending network traffic."""
+        import subprocess
+        receipt = self.process_observation()
+        receipt.update(ready=False, command_ports=[])
+        if receipt['poll'] is not None:
+            return receipt
+        argv = ['/usr/sbin/lsof', '-nP', '-a', '-p', str(self.process.pid), '-iUDP', '-iTCP', '-FpcnPT']
+        result = subprocess.run(argv, capture_output=True, timeout=timeout_seconds, check=False)
+        if len(result.stdout) > 16384 or len(result.stderr) > 16384:
+            raise ValueError('Owned Demo socket evidence exceeds byte bound')
+        receipt.update(socket_argv=argv, socket_exit=result.returncode,
+            socket_stdout=result.stdout.decode('utf-8', 'replace'),
+            socket_stderr=result.stderr.decode('utf-8', 'replace'), post_poll=self.process.poll())
+        if result.returncode not in (0, 1) or result.stderr:
+            raise ValueError('Owned Demo socket observation failed: ' + receipt['socket_stderr'][:1024])
+        lines = receipt['socket_stdout'].splitlines()
+        if not lines:
+            return receipt
+        if [line for line in lines if line.startswith('p')] != ['p' + str(self.process.pid)]:
+            raise ValueError('Owned Demo socket PID differs')
+        sockets, current = [], {}
+        for line in lines:
+            if line.startswith('f'):
+                current = {}
+                sockets.append(current)
+            elif line.startswith(('P', 'n')):
+                current[line[0]] = line[1:]
+            elif line.startswith('TST='):
+                current['state'] = line[4:]
+        ports = [int(match.group(1)) for row in sockets
+            if row.get('P') == 'TCP' and row.get('state') == 'LISTEN'
+            and (match := re.search(r':(\d+)$', row.get('n', ''))) and 1 <= int(match.group(1)) <= 65535]
+        receipt['command_ports'] = sorted(set(ports))
+        receipt['ready'] = (receipt['post_poll'] is None and bool(ports)
+            and any(row.get('P') == 'UDP' and row.get('n', '').endswith(':24024') for row in sockets))
+        return receipt
+
+    def owns_port(self, port, host, *, timeout_seconds=5):
         """One bounded OS receipt binds discovery's actual port to our child."""
         import subprocess
+        import time
+        deadline = time.monotonic() + timeout_seconds
+        def remaining():
+            value = deadline - time.monotonic()
+            if value <= 0:
+                raise TimeoutError('Owned Demo port ownership deadline exceeded')
+            return value
         if self.process is None or self.process.poll() is not None or type(port) is not int or not 1 <= port <= 65535:
             raise ValueError('Demo process/port ownership is unavailable')
         result = subprocess.run(['/usr/sbin/lsof', '-nP', '-a', '-p', str(self.process.pid),
-            '-iTCP:' + str(port), '-sTCP:LISTEN', '-Fp'], capture_output=True, timeout=5, check=False)
+            '-iTCP:' + str(port), '-sTCP:LISTEN', '-Fp'], capture_output=True, timeout=remaining(), check=False)
         if result.returncode or len(result.stdout) > 4096 or result.stdout.decode().splitlines() != ['p' + str(self.process.pid)]:
             raise ValueError('Remote command port is not owned by the exact Demo PID')
         import ipaddress
         address = ipaddress.ip_address(host)
         interface_proof = None
         if not address.is_loopback:
-            interfaces = subprocess.run(['/sbin/ifconfig'], capture_output=True, timeout=5, check=False)
+            interfaces = subprocess.run(['/sbin/ifconfig'], capture_output=True, timeout=remaining(), check=False)
             if (interfaces.returncode or len(interfaces.stdout) > 65536
                     or host not in re.findall(r'\binet ([0-9.]+)', interfaces.stdout.decode('utf-8'))):
                 raise ValueError('Discovered Demo host is not a local interface')
             interface_proof = interfaces.stdout.decode('utf-8')
+        remaining()
         self.command_port, self.remote_host = port, host
         return {'pid': self.process.pid, 'host': host, 'command_port': port,
             'stdout': result.stdout.decode(), 'local_interface_proof': interface_proof}
@@ -303,12 +386,20 @@ class OwnedIntegrationDemo:
     def stop(self):
         from tests.semantic.support.codex_harness import terminate_process_group, kill_process_group
         from tests.destructive.support.sandbox_fixture import wait_for_port_release
+        pre_cleanup = None if self.process is None else self.process_observation()
+        output_path = self.runtime.evidence_root / ('integration-demo-process-' + self.token + '.json')
+        if self.process is not None:
+            # Preserve partial output even if termination/group verification later fails.
+            output_path.write_bytes(_json_bytes(self.process_observation(include_output=True)))
+        action = 'already-exited'
         if self.process is not None:
             if self.process.poll() is None:
+                action = 'terminate'
                 terminate_process_group(self.process)
                 try:
                     self.process.wait(timeout=5)
                 except __import__('subprocess').TimeoutExpired:
+                    action = 'kill'
                     kill_process_group(self.process)
                     self.process.wait(timeout=5)
             if self.process.poll() is None:
@@ -320,6 +411,12 @@ class OwnedIntegrationDemo:
                 pass
             else:
                 raise ValueError('Owned Demo process group still has residual processes')
+        for reader in self._readers:
+            reader.join(timeout=2)
+        if any(reader.is_alive() for reader in self._readers):
+            raise ValueError('Owned Demo process output did not close')
+        if self.process is not None:
+            output_path.write_bytes(_json_bytes(self.process_observation(include_output=True)))
         if self.command_port is not None:
             wait_for_port_release(self.remote_host, self.command_port)
         self.context.validate(version='2025.1', host_kind='wwise-authoring',
@@ -328,4 +425,8 @@ class OwnedIntegrationDemo:
         if self.before is not None and self.before != after:
             raise ValueError('Installed Demo source changed')
         return {'process_exited': self.process is None or self.process.poll() is not None,
-            'source_preserved': True, 'command_port_released': self.command_port}
+            'source_preserved': True, 'command_port_released': self.command_port,
+            'pre_cleanup_returncode': None if pre_cleanup is None else pre_cleanup['poll'],
+            'cleanup_action': action, 'final_returncode': None if self.process is None else self.process.poll(),
+            'process_group_absent': True,
+            **({} if self.process is None else self.process_observation(include_output=True))}
