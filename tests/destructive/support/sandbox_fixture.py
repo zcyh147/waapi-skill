@@ -496,6 +496,7 @@ def launch_sandboxed_wwise(
     wine_prefix_path: Path | None = None,
     case_owned_root: Path | None = None,
     host_kind: str = 'wwise-console',
+    developer_observation=None,
 ) -> HeadlessLifecycle:
     """Launch the selected fixed lifecycle strategy against the sandbox copy."""
 
@@ -525,8 +526,16 @@ def launch_sandboxed_wwise(
     if contract.active_destructive_project != sandbox.sandbox_project.resolve(strict=False):
         raise SandboxFixtureError("destructive environment did not select the sandbox project")
     strategy_arguments = {}
+    if developer_observation is not None:
+        from tests.destructive.support.integration_demo import IntegrationDemoObservation
+        if type(developer_observation) is not IntegrationDemoObservation:
+            raise SandboxFixtureError('Expected private Integration Demo observation context')
+        developer_observation.validate(version=contract.version, host_kind=host_kind, console=contract.console_path)
+        if env_map.get('AK_AUTOMATION_MODE') != '1':
+            raise SandboxFixtureError('Integration Demo requires Authoring AutomationMode')
     if host_kind == 'wwise-authoring':
-        build = load_native_catalog(contract.version, 'wwise-authoring')['provenance']['build']
+        build = (developer_observation.build if developer_observation is not None else
+            load_native_catalog(contract.version, 'wwise-authoring')['provenance']['build'])
         strategy_arguments = {'host_kind': host_kind, 'authoring_build': build, 'authoring_owned_root': case_owned_root}
         port = 8080
     else:

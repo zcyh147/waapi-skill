@@ -89,6 +89,15 @@ def test_runtime_owned_2025_loaded_media_event_probe(owned_authoring_layout_node
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_runtime_owned_2025_integration_demo_loaded_media(owned_authoring_layout_node):
+    from tests.destructive.support.integration_demo import OwnedIntegrationDemo
+    from tests.destructive.support.loaded_media_probe import collect_loaded_event_probe
+    batch, call = owned_authoring_layout_node
+    collect_loaded_event_probe(batch, call, demo=OwnedIntegrationDemo(batch.owner.developer_observation, batch.runtime))
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_runtime_owned_2025_profiler_readers(owned_authoring_layout_node):
     from tests.destructive.support.profiler_capture import collect_owned_capture
     collect_owned_capture(*owned_authoring_layout_node)

@@ -17,7 +17,8 @@ def _executable(path):
 
 
 def _bundle(tmp_path, build='2025.1.7.9143'):
-    bundle = tmp_path / ('Wwise ' + build) / 'Wwise.app'
+    folder = ('Wwise_' if build == '2025.1.11.9262' else 'Wwise ') + build
+    bundle = tmp_path / folder / 'Wwise.app'
     console = _executable(bundle / 'Contents/Tools/WwiseConsole.sh')
     (bundle / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleVersion': build}))
     cx = bundle / 'Contents/SharedSupport/Wwise2019x64'
@@ -45,7 +46,7 @@ def _bundle(tmp_path, build='2025.1.7.9143'):
                            owned=owned, project=project, home=home, prefix=prefix, build=build)
 
 
-@pytest.mark.parametrize('build', ['2021.1.14.8108', '2022.1.19.8584', '2023.1.19.8928', '2024.1.13.9056', '2025.1.7.9143'])
+@pytest.mark.parametrize('build', ['2021.1.14.8108', '2022.1.19.8584', '2023.1.19.8928', '2024.1.13.9056', '2025.1.7.9143', '2025.1.11.9262'])
 @pytest.mark.parametrize('automation_requested', [False, True], ids=['normal', 'automation-requested'])
 def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_proof(tmp_path, monkeypatch, build, automation_requested):
     from tests.unit.test_headless_lifecycle import FakeClient
@@ -109,7 +110,8 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
         '2022.1.19.8584': 'c:/Program Files/Audiokinetic/Wwise 2022.1.19.8584/Authoring/x64/Release/bin/Wwise.exe',
         '2023.1.19.8928': 'c:/Program Files/Audiokinetic/Wwise 2023.1.19.8928/Authoring/x64/Release/bin/Wwise.exe',
         '2024.1.13.9056': 'c:/Program Files/Audiokinetic/Wwise 2024.1.13.9056/Authoring/x64/Release/bin/Wwise.exe',
-        '2025.1.7.9143': 'c:/Program Files/Audiokinetic/Wwise 2025.1.7.9143/Authoring/x64/Release/bin/Wwise.exe'}[build]
+        '2025.1.7.9143': 'c:/Program Files/Audiokinetic/Wwise 2025.1.7.9143/Authoring/x64/Release/bin/Wwise.exe',
+        '2025.1.11.9262': 'c:/Program Files/Audiokinetic/Wwise 2025.1.11.9262/Authoring/x64/Release/bin/Wwise.exe'}[build]
     # Actual retained owned 2024/2025 readiness used this direct-Wine route,
     # without native-app alternate-loader/wait-child options.
     # The 2021 SDK documents the flag; exact later Wwiselib.dll builds retain
