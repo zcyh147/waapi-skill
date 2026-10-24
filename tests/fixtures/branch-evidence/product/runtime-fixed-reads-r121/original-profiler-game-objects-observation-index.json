@@ -1,0 +1,89 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "original-profiler-game-objects-observation-fixed-2025.1-wwise-authoring",
+      "bindings": {
+        "artifact": "original-profiler-game-objects-observation-bindings.json",
+        "sha256": "40629cb2e6770ba773ded01367a7f2ad78a725844c196a58770e86cd882b4e21"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "original-profiler-game-objects-observation-bindings.json",
+          "sha256": "40629cb2e6770ba773ded01367a7f2ad78a725844c196a58770e86cd882b4e21"
+        },
+        "program": {
+          "artifact": "original-profiler-game-objects-observation-program.json",
+          "sha256": "07bb6887f4b90b2a93a32755bedd1ac884533ef5bdfd6b5f55086be5f4acf58b"
+        },
+        "requirements": {
+          "artifact": "original-profiler-game-objects-observation-requirements.json",
+          "sha256": "9cdf70f9adf242ce8d10139b22fefc93884a9360052040cf3befa4dd30b4869b"
+        },
+        "capture": {
+          "artifact": "original-profiler-game-objects-observation-program-capture.json",
+          "sha256": "237ee748d146ef90d49af00e43b15c6a839ce12f5e6d14637e4f663c948af1b4"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-0.json",
+      "sha256": "51744f007abf8b3d15aff058bc9f66ffd6a1fd4cfdc88575473b5c6937e1ce29"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-1.json",
+      "sha256": "71d9f95bf8afefa9477f632ac0b64056d519cd5ebb765346e06545d69389d9c8"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-2.json",
+      "sha256": "bde2818a21b99e13f8ed73ff47299713e34c44f375eaafe03245ca2dd16a00be"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-3.json",
+      "sha256": "9b66685a1a02bb6587cc96c6778d905f8a7286f0df74041e039386d61e7bd02b"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-4.json",
+      "sha256": "cfdbee127cb0ec4ba47e2753e2d3e683de3d0ba866eea4cb778fda6be6eb841c"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-5.json",
+      "sha256": "565e1df14e5c333de997610bef09d5aad2180f4f08d9d6191e810fd4176e8754"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-6.json",
+      "sha256": "a2c9364340f6e635711eb60322c03b8137b99579e10623faaa9c4dd364d62aeb"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-7.json",
+      "sha256": "fb7cc7f77fda0d7cd35eed783418a2af9155800c5df92f87d475c366867c386f"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-8.json",
+      "sha256": "8d47edc5a5eefba3dd490bcc90a1ae37938d00fa03c0ba630b3e4602243b4d29"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-9.json",
+      "sha256": "d7c4483bda18dc1897796f5844a3b04068161fca2f6cb0cfef1086f31b5e9cb8"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-10.json",
+      "sha256": "6aa9b26b97e59da264fd5eedb4d47cc26d89b7842ce5a372dcd53f6f1545b193"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-11.json",
+      "sha256": "826563f1ed32a7ac6af92d5456a18b0e8c19d653ac877f389d8a687b1dcb39f0"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-12.json",
+      "sha256": "fc850744c273a621c81e45910a79c49f39df431e1d2f3f932fe705681f0d27bb"
+    },
+    {
+      "artifact": "original-profiler-game-objects-observation-attachment-13.json",
+      "sha256": "da4411170a762b0d801b3a0558114dc805bf86c3e3cd1960d24836f489678f71"
+    }
+  ]
+}

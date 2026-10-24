@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/id64bits/anyOf/1",
+  "proof": {
+    "artifact": "original-profiler-busses-observation-proof-20.json",
+    "sha256": "9d26f88486d58413d4386c68b2b0393ff8d5c404bc72b864612a13ec22769cc2"
+  },
+  "evidence": {
+    "artifact": "original-profiler-busses-observation-native.json",
+    "sha256": "a556589afd1775d4fcf499b874366eb093da41fdd6fd8218852498e24ce33038",
+    "nodeid": "tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_2025_profiler_readers"
+  },
+  "native_equivalence": {
+    "artifact": "original-profiler-busses-observation-equivalence-20.json",
+    "sha256": "0021a2a42292b081cf64bfc7a1d8aa88e7bb6714019f41111a435ef8d53f51e1"
+  }
+}

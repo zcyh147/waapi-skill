@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/gameObjectID/$ref",
+  "proof": {
+    "artifact": "r119-2022-proof-10.json",
+    "sha256": "4d5d72a01769fe4fcbd1f7117c4f60886640c1f9c743db52f12a9dd7e9273a86"
+  },
+  "evidence": {
+    "artifact": "r119-2022-native.json",
+    "sha256": "873f94fecadffe2a3cd8c314031d7db2be9abc58df791acf09ef4b2a99295794",
+    "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_older_transport_profiler_diagnostic"
+  },
+  "native_equivalence": {
+    "artifact": "r119-2022-equivalence-10.json",
+    "sha256": "f5a4be19395893022126a764f72f43aae8e66f915ef56f3078cad49aefeeebb7"
+  }
+}

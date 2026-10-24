@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/focus",
+  "proof": {
+    "artifact": "original-profiler-audio-objects-observation-proof-38.json",
+    "sha256": "461a3a0719821b0fef121bbe926a15f19642e968422b44a9cf00bc3712bd7ad4"
+  },
+  "evidence": {
+    "artifact": "original-profiler-audio-objects-observation-native.json",
+    "sha256": "4734311c5f2eea4bbace40e950251b9ed6375406dd85a69b8d01446919f56de2",
+    "nodeid": "tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_2025_profiler_readers"
+  },
+  "native_equivalence": {
+    "artifact": "original-profiler-audio-objects-observation-equivalence-38.json",
+    "sha256": "e56bae1fb276267da6cd7240afd3f73ec0bd48ad1879d3ceff419ec44fbc9e8e"
+  }
+}
