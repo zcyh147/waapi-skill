@@ -12779,6 +12779,7 @@ def dispatch_runtime_inspection_business_read(
                 source_result,
                 business_request=args.runtime_inspection_business_request,
                 max_results=args.runtime_inspection_limit,
+                version=detected_version,
             )
             if result.get("ok")
             else None

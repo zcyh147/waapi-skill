@@ -451,10 +451,18 @@ def normalize_runtime_inspection_result(
     *,
     business_request: Mapping[str, Any],
     max_results: int,
+    version: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(result, Mapping):
         raise RuntimeInspectionBusinessError("runtime inspection result is malformed")
     if operation == PROFILER_GET_CURSOR_TIME_URI:
+        if "return" not in result and version in {"2021.1", "2022.1"}:
+            return {
+                "profiler_cursor": business_request["profiler_cursor"],
+                "available": False,
+                "position_ms": None,
+                "unavailable_reason": "native-position-not-returned",
+            }
         position = result.get("return")
         if position == -1:
             return {

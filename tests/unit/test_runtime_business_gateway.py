@@ -992,6 +992,55 @@ def test_profiler_cursor_unavailable_sentinel_is_hidden_from_business_result() -
     }
 
 
+@pytest.mark.parametrize('version', ('2021.1', '2022.1'))
+def test_profiler_cursor_optional_position_retains_explicit_unknown_reason(tmp_path, version):
+    for console in (True, False):
+        for number, (native, expected) in enumerate((
+            ({}, {'profiler_cursor':'user-cursor','available':False,'position_ms':None,
+                  'unavailable_reason':'native-position-not-returned'}),
+            ({'return':-1}, {'profiler_cursor':'user-cursor','available':False,'position_ms':None}),
+            *[(value, None) for value in ({'return':None},{'return':True},{'return':-2},
+                                        {'return':1.5},{'return':-1.0},{'return':float('nan')},{'return':'1'})],
+        )):
+            path=tmp_path/(str(console)+'-'+str(number));path.mkdir()
+            client=FakeClient({'ak.wwise.core.getInfo':[{
+                'displayName':'Wwise','isCommandLine':console,'apiVersion':1,
+                'platform':'macosx','configuration':'release',
+                'version':{'year':int(version[:4]),'major':1,'minor':0,'build':1,
+                           'displayName':f'v{version}.0.1'},
+            }], GET_CURSOR_TIME_URI:[native]})
+            code, result=gateway.execute_gateway(['core-call',GET_CURSOR_TIME_URI,'--profiler-cursor','user-cursor'],
+                env=_env(path,version=version),client_factory=lambda _:client)
+            if expected is None:
+                assert code==2 and result['ok']is False and result.get('agent_result')is None
+            else:
+                assert code==0,result
+                assert result['agent_result']==expected
+            assert client.calls.count((GET_CURSOR_TIME_URI,{'cursor':'user'},{}))==1
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_profiler_cursor_required_position_cannot_be_omitted(tmp_path, version):
+    for console in (True,False):
+        client=FakeClient({'ak.wwise.core.getInfo':[{
+            'displayName':'Wwise','isCommandLine':console,'apiVersion':1,
+            'platform':'macosx','configuration':'release',
+            'version':{'year':int(version[:4]),'major':1,'minor':0,'build':1,
+                       'displayName':f'v{version}.0.1'},
+        }], GET_CURSOR_TIME_URI:[{}]})
+        code,result=gateway.execute_gateway(['core-call',GET_CURSOR_TIME_URI,'--profiler-cursor','capture-latest'],
+            env=_env(tmp_path,version=version),client_factory=lambda _:client)
+        assert code==2 and result['ok']is False and 'agent_result'not in result
+
+
+def test_profiler_cursor_omission_needs_an_attested_supported_optional_version():
+    from wwise_waapi.runtime_inspection_business import RuntimeInspectionBusinessError
+    for version in (None,'unknown','2020.1','2023.1','2024.1','2025.1'):
+        with pytest.raises(RuntimeInspectionBusinessError):
+            normalize_runtime_inspection_result(GET_CURSOR_TIME_URI,{},
+                business_request={'profiler_cursor':'user-cursor'},max_results=1,version=version)
+
+
 def test_profiler_cursor_invalid_live_shape_preserves_bounded_diagnostics(
     tmp_path: Path,
 ) -> None:
