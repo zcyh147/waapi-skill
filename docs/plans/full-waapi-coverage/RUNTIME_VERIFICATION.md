@@ -29,6 +29,25 @@ or repeated result rows. Actual metadata association, recursive-child meaning,
 driver alternatives, applicable ray identifiers and host/version differences
 still need their listed native evidence.
 
+### Narrow LoadedMedia representative support
+
+Under the spec's reviewed equivalence-based reuse rule, the next implementation
+may attach the exact R124 Authoring/SDK2025.1.11.9262 data observation to the
+selected 2025.1 Authoring LoadedMedia semantic requirement. Catalog identities
+retain build2025.1.7.9143; evidence must separately disclose observed build9262
+and its representative-support basis. It must never report native9143 execution
+or general compatibility with other patches.
+
+Admission requires an exact reviewed branch/shape map, matching selected
+request/result schemas and referenced definitions, matching documented API
+meaning, complete original source/schema/request/result/cleanup evidence, and
+current full-array public replay. The inspected selected schemas are identical;
+that alone is not sufficient to establish business meaning. All other builds,
+hosts, URIs and older-version obligations keep their existing requirements.
+This authorizes the narrow implementation and its independent review, not current
+coverage credit. It avoids repeating native work solely to package the already
+observed 2025.1 business fact.
+
 ## Standalone controls and workflow observations
 
 | Control / versions | Supported standalone proof | Why the available observation is different |

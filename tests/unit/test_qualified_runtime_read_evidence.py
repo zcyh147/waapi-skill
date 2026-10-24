@@ -183,3 +183,165 @@ def test_qualified_final_reader_rejects_resealed_causal_corruption(
     row = next(row for row in result['obligations'] if row['id'] == identity)
     assert row['evidence_results']['native']['outcome'] == 'missing', json.dumps(row)
     assert reason in row['evidence_results']['native']['reason'], json.dumps(row)
+
+
+def test_r124_qualified_seed_admission_reads_exact_owned_array():
+    from tests.support.qualified_runtime_read_evidence import retained_read
+    original = retained_read('2023.1', 'profiler-voices-seed')
+    assert len(original['raw']['result']['return']) == 1
+    assert len(original['raw']['result']['return'][0]) == 20
+    assert original['receipt']['argv'][3] == '28746'
+    assert original['capture']['cleanup']['complete'] is True
+
+
+def _r124_inventory():
+    """Read only43 selected obligations plus their reference edges; no generator."""
+    import gzip
+    from tests.support.qualified_runtime_read_evidence import ANCHOR_SELECTORS
+    scope = json.loads((audit.ROOT / ANCHOR_SELECTORS).read_bytes())
+    selected = {s['id'] for p in scope['profiles'].values() for s in p['selectors']}
+    routes = {p['route'] for p in scope['profiles'].values()}
+    stored = json.loads((audit.ROOT / 'docs/branch-coverage-inventory.json').read_bytes())
+    packed = json.loads(gzip.decompress((audit.ROOT / 'docs/branch-coverage-inventory.native-obligations.json.gz').read_bytes()))
+    rows = []
+    for encoded in packed['rows']:
+        if encoded.get('route') is None or packed['routes'][encoded['route']] not in routes:
+            continue
+        route = packed['routes'][encoded['route']]
+        if route + '|' + encoded['pointer'] not in selected and encoded['kind'] != 'reference':
+            continue
+        row = dict(encoded); row.update(packed['contexts'][row.pop('context')])
+        row.update(route=route, id=route + '|' + row['pointer'], shape_sha256=packed['shapes'][row.pop('shape')])
+        rows.append(row)
+    native_routes = [r for r in stored['native_coverage']['routes'] if r['id'] in routes]
+    public = {r['public_route'] for r in native_routes}
+    return {'routes': [r for r in stored['routes'] if r['id'] in public], 'native_coverage': {
+        'candidate_sha256': 'b' * 64, 'catalogs': stored['native_coverage']['catalogs'],
+        'routes': native_routes, 'obligations': rows}}
+
+
+@pytest.fixture(scope='module')
+def r124_cases(tmp_path_factory):
+    from tests.support.qualified_runtime_read_evidence import (anchor_profile, retained_read,
+        retained_contribution_inputs, write_qualified_read_bundle, fixture_path)
+    from tests.unit.test_fixed_runtime_read_branch_evidence import public_fixed_read
+    from tests.unit.test_contribution_branch_evidence import public_contribution_flow
+    inventory = _r124_inventory()
+    cases = {}
+    for version in ('2021.1', '2023.1', '2024.1'):
+        categories = ['profiler-voices-seed', 'profiler-busses-seed']
+        if version == '2021.1': categories.append('profiler-contributions-bus-observation')
+        for category in categories:
+            root = tmp_path_factory.mktemp('r124-' + version + '-' + category)
+            retained = retained_read(version, category)
+            if category.endswith('-seed'):
+                receipt, native, context, trace = public_fixed_read(root / 'public', version=version,
+                    uri=retained['raw']['api'], position=str(retained['profile']['time']), rows=retained['raw']['result']['return'])
+                calls = [{'gateway': receipt, 'native_start': 0, 'native_end': len(trace)}]
+            else:
+                receipt, native, context, trace, calls, _ = public_contribution_flow(root / 'public', version,
+                    retained=retained_contribution_inputs(version))
+            assert native['result'] == retained['raw']['result']
+            capture = root / 'program.json'
+            write_program_receipt(capture, receipt, native, nodeid=version + '-' + category,
+                phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context,
+                native_reads=trace, public_calls=calls)
+            selected = {s['id'] for s in anchor_profile(version, category)['selectors']}
+            index = write_qualified_read_bundle(root / 'bundle', capture, fixture_path(version),
+                inventory=inventory, version=version, category=category, selected=selected)
+            policy = json.loads((index.parent / 'requirements.json').read_bytes())
+            document, base, _ = audit.portable_binding_inputs(index, policy)
+            cases[version, category] = (inventory, index, policy, document, base, selected)
+    return cases
+
+
+@pytest.mark.parametrize('version,category', [
+    (v, c) for v in ('2021.1', '2023.1', '2024.1') for c in ('profiler-voices-seed', 'profiler-busses-seed')
+] + [('2021.1', 'profiler-contributions-bus-observation')])
+def test_r124_all43_native_anchors_replay_complete_original_public_packets(r124_cases, version, category):
+    inventory, index, policy, document, base, selected = r124_cases[version, category]
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document, digest=audit.digest,
+        evidence_base=base, requirements_document=policy)
+    observed = [r for r in result['obligations'] if r['id'] in selected]
+    assert len(observed) == (7 if category != 'profiler-busses-seed' else 5)
+    assert all(r['state'] == 'verified' and r['evidence_results']['native']['outcome'] == 'passed' for r in observed), json.dumps(observed)
+    assessment = completion.read_sealed_artifact(next(iter(document['bindings'].values()))['qualified_runtime_read_attachment'], base)
+    assert assessment['original_workflow_outcome'] == assessment['original_finalization'] == 'BLOCKED'
+    assert assessment['successful_finalization'] is False
+    assert len(assessment['lifecycle_obligations']) == (3 if version == '2021.1' else 2)
+    assert all(r['status'] == 'BLOCKED' for r in assessment['lifecycle_obligations'])
+    print('R124_RETAINED_NATIVE_ANCHORS', version, category, len(observed))
+
+
+def test_r124_qualified_anchor_controls_reuse_one_complete_public_capture(tmp_path):
+    """One original packet supports related admission damage controls, not new native credit."""
+    import shutil
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support import qualified_runtime_read_evidence as qualified
+    from tests.support.runtime_observation_evidence import write_json, write_program_receipt
+    from tests.unit.test_fixed_runtime_read_branch_evidence import public_fixed_read
+    inventory = _r124_inventory()
+    retained = qualified.retained_read('2021.1', 'profiler-voices-seed')
+    receipt, native, context, trace = public_fixed_read(tmp_path / 'public', version='2021.1',
+        uri='ak.wwise.core.profiler.getVoices', position='24202', rows=retained['raw']['result']['return'])
+    capture = tmp_path / 'program.json'
+    write_program_receipt(capture, receipt, native, nodeid='r124-control-program',
+        phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context,
+        native_reads=trace, public_calls=[{'gateway': receipt, 'native_start': 0, 'native_end': len(trace)}])
+    source_index = qualified.write_qualified_read_bundle(tmp_path / 'source', capture, qualified.fixture_path('2021.1'),
+        inventory=inventory, version='2021.1', category='profiler-voices-seed')
+    base = tmp_path / 'bundle'
+    shutil.copytree(source_index.parent, base)
+    policy = json.loads((base / 'requirements.json').read_bytes())
+    document, _, _ = audit.portable_binding_inputs(base / source_index.name, policy)
+    target = next(i for i in document['bindings'] if i.endswith('/voiceReturn/properties/baseVolume'))
+    original_binding = document['bindings'][target]
+    policy['branches'] = {target: policy['branches'][target]}
+    for damage in ('value', 'version', 'category', 'time', 'source', 'truncated', 'archive', 'lifecycle', 'missing-program', 'empty'):
+        binding = deepcopy(original_binding)
+        assessment = completion.read_sealed_artifact(binding['qualified_runtime_read_attachment'], base)
+        evidence = completion.read_sealed_artifact(binding['evidence']['native'], base)
+        if damage == 'value':
+            evidence['observed'] += 1.0
+        elif damage == 'version':
+            assessment['version'] = '2024.1'
+        elif damage == 'category':
+            assessment['category'] = 'profiler-busses-seed'
+        elif damage == 'archive':
+            assessment['archive']['sha256'] = '0' * 64
+        elif damage == 'lifecycle':
+            assessment['lifecycle_obligations'] = [r for r in assessment['lifecycle_obligations'] if r['version'] != '2021.1']
+        else:
+            program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+            capture = program['runtime_read_program']
+            if damage == 'time':
+                program['native_call']['args']['time'] += 1
+            elif damage == 'source':
+                capture['source_context']['capture']['tests/support/qualified_runtime_read_evidence.py'] = '0' * 64
+            elif damage == 'empty':
+                program['native_call']['result']['return'] = []
+            elif damage == 'truncated':
+                program['gateway']['payload']['agent_result'].update(complete=False, truncated=True)
+            else:
+                capture['phase_reports']['teardown'] = 'failed'
+            capture['gateway'] = deepcopy(program['gateway']); capture['native_call'] = deepcopy(program['native_call'])
+            assessment['program_capture'] = write_json(base / (damage + '-capture.json'), capture)
+            binding['evidence']['program'].update(write_json(base / (damage + '-program.json'), program))
+        binding['qualified_runtime_read_attachment'] = write_json(base / (damage + '-assessment.json'), assessment)
+        evidence['assessment_sha256'] = binding['qualified_runtime_read_attachment']['sha256']
+        binding['evidence']['native'].update(write_json(base / (damage + '-native.json'), evidence))
+        result = completion.evaluate_coverage(audit.ROOT, inventory,
+            {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': {target: binding}},
+            digest=audit.digest, evidence_base=base, requirements_document=policy)
+        row = next(r for r in result['obligations'] if r['id'] == target)
+        assert row['state'] != 'verified', (damage, row)
+        assert row['evidence_results']['native']['outcome'] == 'missing', (damage, row)
+    assessment = completion.read_sealed_artifact(original_binding['qualified_runtime_read_attachment'], base)
+    capture = base / assessment['program_capture']['artifact']
+    extra = target.rsplit('/', 1)[0] + '/objectName'
+    with pytest.raises(ValueError, match='no independently observed native result fact'):
+        qualified.write_qualified_read_bundle(tmp_path / 'extra', capture, qualified.fixture_path('2021.1'),
+            inventory=inventory, version='2021.1', category='profiler-voices-seed', selected={extra})
+    with pytest.raises(ValueError, match='exact retained read categories'):
+        qualified.retained_read('2021.1', 'profiler-rtpcs-observation')

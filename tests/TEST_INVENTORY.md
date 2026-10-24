@@ -47,6 +47,24 @@ are preserved in the implementation handoff. These are focused mechanism checks,
 not a current 6,292-branch evaluation or full Program/Nonlive gate. No native rerun
 or Fresh test was used for this evidence-policy change.
 
+Reviewed successor `bf256141` admits only 43 additional retained R105 native
+field anchors: 2021 Voices/Busses/contribution and 2023/2024 Voices/Busses.
+Seven unique complete-original-array public Gateway flows passed once in 62.09s.
+The final qualified-admission control passed in 42.14s using one fresh capture
+for ten related damage variants and exact-scope rejection. The seven flows were
+not repeated solely because the negative test was added later; their interim
+captures are mechanism evidence, not final current-source publication receipts.
+
+The 2021 portable archive contains 178 exact original files, including all 172
+node-manifest artifacts. Its whole-gzip SHA-256 is
+`d3fd223608b347e205e9151aeae8ba6820ce478825bcb384b19c426979b53105`;
+independent review compared every decoded file with its retained original.
+The original 15-second port-release failure and separate BLOCKED lifecycle
+obligation remain unchanged. Existing 2023/2024 archives and the strict PASS
+reader are unchanged. This is reuse of actual read facts, not a new native run
+or whole-workflow acceptance. Separately reviewed R104 facts and the LoadedMedia
+consumer are still being implemented; final shared-source publication is held.
+
 ## 2026-10-24 R123 source compatibility and IntegrationDemo checkpoint
 
 Reviewed runtime successor `8a64b499`, integrated as `18065490`, passed
