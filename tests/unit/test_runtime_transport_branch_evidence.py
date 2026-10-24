@@ -53,7 +53,7 @@ class TransportClient(_RuntimeControlDraftClient):
         return result
 
 
-def public_lifecycle(path,version,host,originals,*,selector='id',only_bound=False,rich=False):
+def public_lifecycle(path,version,host,originals,*,selector='id',only_bound=False,rich=False,media_rejections=None,media_only=False):
     path.mkdir(parents=True);target=originals[PREFIX+'create']['call']['args']['object']
     client=TransportClient(path,version,host,target);env=_env(path,version=version);calls=[];stages=[]
     if rich:client.create_ids=[0xffffffff,0]
@@ -76,7 +76,13 @@ def public_lifecycle(path,version,host,originals,*,selector='id',only_bound=Fals
                 else [item for segment in obj['path'].split('\\')[1:]for item in ('--object-path-segment',segment)])
             current=invoke(['draft-bind-object',draft,'--task-authority',authority,'--expected-revision',str(current['draft']['revision']),'--role','target',*binding])
             fields=('--target-handle',current['bound_object']['handle'],*fields)
-        current=invoke(['draft-declare-runtime-control-plan',draft,'--task-authority',authority,'--expected-revision',str(current['draft']['revision']),*fields])
+        declaration=['draft-declare-runtime-control-plan',draft,'--task-authority',authority,'--expected-revision',str(current['draft']['revision'])]
+        if uri==PREFIX+'useOriginals'and media_rejections is not None:
+            start=len(client.trace);code,rejected=gateway.execute_gateway(['--state-dir',str(path/'state'),*declaration],env=env,client_factory=lambda _:client)
+            assert code==2 and rejected['ok']is False and not any(r['uri']==uri for r in client.trace[start:]),rejected
+            media_rejections.append({'stage_index':len(stages),'gateway':{'argv':declaration,'exit_code':code,'payload':rejected},'native_calls':deepcopy(client.trace[start:])})
+            del client.trace[start:]
+        current=invoke([*declaration,*fields])
         current=invoke(['draft-check',draft,'--task-authority',authority,'--expected-revision',str(current['draft']['revision'])])
         preview=invoke(['preview-from-draft',draft,'--task-authority',authority,'--expected-revision',str(current['draft']['revision'])])
         shown=invoke(preview['next_command']['gateway_argv']);invoke(shown['next_command']['gateway_argv'])
@@ -93,6 +99,7 @@ def public_lifecycle(path,version,host,originals,*,selector='id',only_bound=Fals
         stages.append({'uri':PREFIX+'getState','start':first,'end':len(calls),'receipt_index':len(calls)-1})
         assert state['agent_result']=={'transport_handle':handle,'state':expected}
     if not only_bound and PREFIX+'useOriginals'in originals:transaction(PREFIX+'useOriginals',('--audition-media','converted'if rich else'originals'))
+    if media_only:return calls,client.trace,stages,sources
     if PREFIX+'prepare'in originals:transaction(PREFIX+'prepare',bind=True,bound_target=prepare_target)
     created=transaction(PREFIX+'create',('--game-object-id','0')if rich else(),bind=True)
     handle=created['agent_result']['business_result']['transport_handle'];assert handle.startswith('trh1-');handles=[handle]
@@ -367,11 +374,14 @@ def finalize_sessions(output,sessions,phases,nodeid):
 def test_transport_paired_hosts_complete_branch_frontiers(request,tmp_path,version):
     from tests.support.runtime_transport_evidence import original_transport,write_transport_bundle,write_transport_preservation_receipt,review
     profiles={r:p for r,p in review()['profiles'].items()if r.startswith(version+'|')}
-    inventory=log_inventory(profiles);sessions=[];uncertain=[]
+    inventory=log_inventory(profiles);sessions=[];uncertain=[];media_pairs={}
     for host in ('wwise-console','wwise-authoring'):
         originals={r.split('|')[-1]:original_transport(r)for r in profiles if r.split('|')[1]==host}
-        sessions.append(public_lifecycle(tmp_path/(host+'-actual'),version,host,originals))
-        sessions.append(public_lifecycle(tmp_path/(host+'-path-rich'),version,host,originals,selector='path',rich=True))
+        regular_rejections=[];rich_rejections=[];regular_index=len(sessions)
+        sessions.append(public_lifecycle(tmp_path/(host+'-actual'),version,host,originals,media_rejections=regular_rejections if version=='2023.1'else None))
+        rich_index=len(sessions)
+        sessions.append(public_lifecycle(tmp_path/(host+'-path-rich'),version,host,originals,selector='path',rich=True,media_rejections=rich_rejections if version=='2023.1'else None))
+        if version=='2023.1':media_pairs[host]=[(regular_index,regular_rejections[0]),(rich_index,rich_rejections[0])]
         bound={u:o for u,o in originals.items()if u.endswith(('.create','.prepare'))}
         sessions.append(public_lifecycle(tmp_path/(host+'-name'),version,host,bound,selector='qualified-name',only_bound=True))
         for j,value in enumerate(({}, {'list':[{}]})):
@@ -383,7 +393,13 @@ def test_transport_paired_hosts_complete_branch_frontiers(request,tmp_path,versi
             native,=[r for r in trace if r['uri']==PREFIX+'create'];path=tmp_path/f'uncertain-{i}.json'
             write_transport_preservation_receipt(path,calls[-1]['gateway'],{k:native[k]for k in ('uri','args','options','result')},
                 nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=trace,public_calls=calls,journal=journal);paths.append(path)
-        index=write_transport_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='transport-'+version+'-')
+        boundaries=[]
+        for host,pairs in media_pairs.items():
+            boundary=tmp_path/('media-boundary-'+host+'.json')
+            from tests.support.runtime_transport_evidence import write_media_boundary_capture
+            write_media_boundary_capture(boundary,[{'rejected':rejected,'valid_capture':tmp_path/f'capture-{index}-{rejected["stage_index"]}.json'}for index,rejected in pairs],nodeid=request.node.nodeid,phase_reports=phases)
+            boundaries.append(boundary)
+        index=write_transport_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='transport-'+version+'-',boundary_captures=boundaries)
         policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
         result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
         runtime.write_json(tmp_path/'consumer-result.json',result)
@@ -513,4 +529,62 @@ def test_transport_independent_readbacks_bind_action_scope_and_retirement(reques
                 outcome=evaluate(damaged,label);assert outcome[0]!='passed',(scope,label,outcome)
                 controls.append({'scope':scope,'damage':label,'outcome':outcome})
         runtime.write_json(tmp_path/'readback-negative-results.json',controls)
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_transport_2023_explicit_media_boundary_public_teardown_consumer(request,tmp_path):
+    from tests.support import runtime_transport_evidence as transport
+    uri=PREFIX+'useOriginals';sessions=[];rejects=[]
+    routes=[f'2023.1|{h}|{BUILDS["2023.1"]}|function|'+uri for h in ('wwise-console','wwise-authoring')]
+    pointers={'/resultSchema','/argsSchema/@empty/object','/argsSchema/properties/enable/@presence/absent'}
+    inventory=log_inventory(routes,pointers=pointers)
+    for host in ('wwise-console','wwise-authoring'):
+        originals={u:transport.original_transport(f'2023.1|{host}|{BUILDS["2023.1"]}|function|{u}')for u in (PREFIX+'create',uri)}
+        for rich in (False,True):
+            rejected=[];sessions.append(public_lifecycle(tmp_path/(host+str(rich)),'2023.1',host,originals,rich=rich,media_rejections=rejected,media_only=True));rejects.append(rejected[0])
+    runtime.write_json(tmp_path/'actual-missing-choice-replies.json',rejects)
+    def finalize(phases):
+        captures=finalize_sessions(tmp_path,sessions,phases,request.node.nodeid);boundaries=[]
+        for i,host in enumerate(('wwise-console','wwise-authoring')):
+            pairs=[{'rejected':rejects[j],'valid_capture':captures[j]}for j in (i*2,i*2+1)]
+            path=tmp_path/('boundary-'+host+'.json')
+            transport.write_media_boundary_capture(path,pairs,nodeid=request.node.nodeid,phase_reports=phases);boundaries.append(path)
+        index=transport.write_transport_bundle(tmp_path/'bundle',captures,inventory=inventory,name_prefix='transport-2023.1-',boundary_captures=boundaries)
+        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert len(result['obligations'])==6 and {r['state']for r in result['obligations']}=={'verified'},[(r['id'],r['reasons'],r['evidence_results'])for r in result['obligations']if r['state']!='verified']
+        for route in routes:
+            missing=deepcopy(bindings);missing['bindings'][route+'|/resultSchema']['evidence'].pop('native')
+            rejected=completion.evaluate_coverage(audit.ROOT,inventory,missing,digest=audit.digest,evidence_base=base,requirements_document=policies)
+            assert all(r['state']!='verified'for r in rejected['obligations']if r['route']==route)
+            assert all(r['state']=='verified'for r in rejected['obligations']if r['route']!=route)
+        identity=routes[0]+'|/argsSchema/@empty/object';original=completion.read_sealed_artifact(bindings['bindings'][identity]['evidence']['program'],base);controls=[]
+        for damage in ('field','authority','borrowed-draft','dispatched','other-dispatch','version','host','operation','choice','source','teardown','candidate','native-field','missing-pair'):
+            damaged=deepcopy(bindings);bound=damaged['bindings'][identity];record=deepcopy(original);proof=record['explicit_media_boundary'];pair=proof['pairs'][0];cap=pair['valid'];rejected=pair['rejected']
+            if damage=='field':rejected['gateway']['payload']['details']['repair']['required']=['cursor_move']
+            elif damage=='authority':rejected['gateway']['argv'][3]='borrowed-authority'
+            elif damage=='borrowed-draft':rejected['gateway']['argv'][1]='borrowed-draft'
+            elif damage in ('dispatched','other-dispatch'):
+                rejected['native_calls'].append({'ordinal':999,'uri':uri if damage=='dispatched'else'ak.wwise.core.log.clear','args':{},'options':{},'result':{}})
+            elif damage in ('version','host'):
+                for r in cap['native_reads']:
+                    if r['uri']=='ak.wwise.core.getInfo':
+                        if damage=='host':r['result']['isCommandLine']=False
+                        else:r['result']['version']['year']=2024
+            elif damage=='operation':cap['native_call']['uri']='ak.wwise.core.log.clear'
+            elif damage=='choice':cap['native_call']['args']['enable']=False
+            elif damage=='source':cap['source_context']['capture']['tests/support/runtime_transport_evidence.py']='0'*64
+            elif damage=='teardown':proof['phase_reports']['teardown']='failed'
+            elif damage=='candidate':record['candidate_sha256']='0'*64
+            elif damage=='native-field':bound['boundary']['native_field']='cursor'
+            else:proof['pairs'].pop()
+            record['gateway']=proof['pairs'][0]['rejected']['gateway'];record['native_calls']=proof['pairs'][0]['rejected']['native_calls']
+            bound['evidence']['program']={**runtime.write_json(base/('media-damage-'+damage+'.json'),record),'nodeid':request.node.nodeid}
+            outcome=completion.evaluate_coverage(audit.ROOT,inventory,damaged,digest=audit.digest,evidence_base=base,requirements_document=policies)
+            row=next(r for r in outcome['obligations']if r['id']==identity);assert row['state']!='verified',damage;controls.append({'damage':damage,'state':row['state']})
+        runtime.write_json(tmp_path/'boundary-negative-results.json',controls)
+        # Unrelated optional inputs cannot cause this exact boundary to load.
+        for identity in ('2024.1|wwise-console|2024.1.13.9056|function|'+uri+'|/argsSchema/@empty/object',routes[0]+'|/argsSchema/properties/enable/@presence/present',routes[0].replace(uri,'ak.wwise.core.profiler.startCapture')+'|/argsSchema/@empty/object'):
+            assert completion.approved_boundary(tmp_path,{'id':identity},{'boundary':{'kind':'explicit_media_choice'}},{},{},audit.digest)is None
     register_exact_evidence_finalizer(request.node,finalize)

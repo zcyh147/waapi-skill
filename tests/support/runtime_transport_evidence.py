@@ -15,7 +15,7 @@ from tests.support import fixed_runtime_read_evidence as fixed
 PREFIX='ak.wwise.core.transport.'
 URIS=frozenset(PREFIX+n for n in ('create','destroy','executeAction','prepare','useOriginals','getList','getState'))
 SUPPORT='tests/fixtures/runtime-transport/support-review.json'
-SUPPORT_SHA='0d73058e2ff6737b9fcff18b134b130e41be48845c82b48edf393fc1e3f4e85d'
+SUPPORT_SHA='23cfdb2072932511d7fd5893158261486602cfb3d471a6b170fe1c36527d6a96'
 CONTRACT='waapi-skill.retained-transport-assessment/v1'
 
 
@@ -362,6 +362,9 @@ def _normalized_identity(branch,cap,root):
 def validate_evidence(record,binding,branch,category,base,root,edges=None):
     exact_entry(branch,root)
     if category!='program':raise ValueError('Transport root requires closed retained native attachment')
+    if branch.get('approved_boundary',{}).get('kind')=='explicit_media_choice':
+        validate_media_boundary_receipt(record,branch,binding,record['branch_assertions'][branch['id']]['checks'],root)
+        return None
     cap=record['runtime_read_program'];context=_capture(cap,root)
     if (context!={k:v for k,v in zip(('version','host','build'),branch['route'].split('|')[:3])}
             or cap['native_call']['uri']!=branch['route'].split('|')[-1]or record['gateway']!=cap['gateway']or record['native_call']!=cap['native_call']
@@ -398,7 +401,7 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
     return 'passed',None
 
 
-def write_transport_bundle(output,captures,*,inventory,name_prefix=''):
+def write_transport_bundle(output,captures,*,inventory,name_prefix='',boundary_captures=()):
     versions={r['version']for r in inventory['native_coverage']['routes']if r['uri']in URIS}
     if (not isinstance(name_prefix,str)or name_prefix and (len(versions)!=1
             or name_prefix!='transport-'+next(iter(versions))+'-')):
@@ -461,7 +464,111 @@ def write_transport_bundle(output,captures,*,inventory,name_prefix=''):
         bd=write(prefix+'bindings.json',bindings);rd=write(prefix+'requirements.json',policies)
         index['entries'].append({'id':prefix,'bindings':bd,'origin':{'bindings':bd,'program':desc(prefix+'program.json'),'requirements':rd,'capture':cp}})
         requirements['branches'].update(policies['branches'])
+    _write_media_boundaries(output,index,requirements,inventory,boundary_captures,seen,name_prefix)
     if seen!={b['id']for b in inventory['native_coverage']['obligations']}:
         raise ValueError('Missing exact transport branch occurrences: '+str(set(b['id']for b in inventory['native_coverage']['obligations'])-seen))
     write('requirements.json',requirements);write('index.json',index)
     return output/'index.json'
+
+
+def approved_media_boundary(root,branch,binding):
+    exact_entry(branch,root);authority=review(root)['explicit_media_choice_boundary']
+    if (branch['id']not in authority['ids']or binding.get('boundary')!={'kind':'explicit_media_choice','support_sha256':SUPPORT_SHA,'native_field':'enable'}):return None
+    version,host,build,_,uri=branch['route'].split('|')
+    if version!='2023.1'or host not in {'wwise-console','wwise-authoring'}or build!='2023.1.19.8928'or uri!=PREFIX+'useOriginals':return None
+    catalog=remaining._log_catalog(root,version,host);schema=catalog['schemas'][uri]['argsSchema']
+    if 'enable'in schema.get('required',[])or schema['properties']['enable']['type']!='boolean':raise ValueError('Media omission must remain schema-admitted')
+    completion.validate_native_alternative(root,{**branch,'pointer':'/argsSchema','shape_sha256':audit.digest(schema)}, {},catalog=catalog)
+    from wwise_waapi.runtime_inspection_business_contracts import runtime_inspection_business_contract_data
+    contract=runtime_inspection_business_contract_data(uri,version=version)['declaration']
+    if (list(contract['required_fields'])!=authority['required_fields']or contract['field_types']!=authority['field_types']
+            or contract['input_forms']!={'audition_media':{'flag':'--audition-media','repeatable':False}}):raise ValueError('Approved explicit media contract changed')
+    return {'kind':'explicit_media_choice','native_field':'enable','source_review_sha256':SUPPORT_SHA,'native_schema_classification':'accepted'}
+
+
+def media_boundary_code_bindings(branch):
+    prefix='skills/waapi-skill/wwise_waapi/'
+    return {key:{'source':prefix+symbol,'selector':branch['pointer']}for key,symbol in (
+        ('construction','runtime_inspection_business.py#materialize_runtime_control_business_request'),
+        ('validation','runtime_inspection_business.py#materialize_runtime_control_business_request'),
+        ('verifier','operation_registry.py#verify_prepared_operation'))}
+
+
+def write_media_boundary_capture(path,pairs,*,nodeid,phase_reports):
+    if phase_reports!=dict.fromkeys(('setup','call','teardown'),'passed'):raise ValueError('Media boundary requires successful actual teardown')
+    proof={'contract':'waapi-skill.explicit-media-boundary/v1','nodeid':nodeid,'phase_reports':phase_reports,
+        'pairs':[{'rejected':p['rejected'],'valid':json.loads(Path(p['valid_capture']).read_bytes())}for p in pairs]}
+    return runtime.write_json(path,proof)
+
+
+def validate_media_boundary_receipt(record,branch,binding,checks,root=None):
+    root=root or audit.ROOT
+    if approved_media_boundary(root,branch,binding)is None:raise ValueError('Unapproved explicit media boundary')
+    if any(binding.get(k)!=v for k,v in media_boundary_code_bindings(branch).items()):raise ValueError('Media boundary public implementation differs')
+    proof=record['explicit_media_boundary'];pairs=proof['pairs'];choices=set();expected={k:v for k,v in zip(('version','host','build'),branch['route'].split('|')[:3],strict=True)}
+    if proof['contract']!='waapi-skill.explicit-media-boundary/v1'or proof['phase_reports']!=dict.fromkeys(('setup','call','teardown'),'passed')or len(pairs)!=2:
+        raise ValueError('Media boundary actual complete finalization missing')
+    for pair in pairs:
+        cap=pair['valid'];context=_capture(cap,root);stage=cap['transport_stage'];part=cap['public_calls'][stage['start']:stage['end']]
+        rejected=pair['rejected'];gateway=rejected['gateway'];payload=gateway['payload'];accepted=part[1];decl=accepted['gateway']['argv'];flag=review(root)['explicit_media_choice_boundary']['public_flag']
+        if (context!=expected or cap['nodeid']!=proof['nodeid']or cap['phase_reports']!=proof['phase_reports']or stage['uri']!=PREFIX+'useOriginals'
+                or rejected['stage_index']!=cap['transport_stages'].index(stage)or decl.count(flag)!=1):raise ValueError('Exact same-route media counterpart differs')
+        started=part[0]['gateway']['payload'];draft=started['draft']['draft_id'];authority=started['task_authority'];revision=started['draft']['revision']
+        prefix=['draft-declare-runtime-control-plan',draft,'--task-authority',authority,'--expected-revision',str(revision)]
+        declared=accepted['gateway']['payload'];checked=part[2]['gateway']['payload']
+        if (decl[:len(prefix)]!=prefix or declared['draft']['draft_id']!=draft or declared['draft']['revision']!=revision+1
+                or part[2]['gateway']['argv']!=['draft-check',draft,'--task-authority',authority,'--expected-revision',str(declared['draft']['revision'])]
+                or part[3]['gateway']['argv']!=['preview-from-draft',draft,'--task-authority',authority,'--expected-revision',str(checked['draft']['revision'])]):
+            raise ValueError('Media boundary same-Draft authority/revision provenance differs')
+        position=decl.index(flag);choice=decl[position+1];choices.add(choice)
+        if (choice not in {'originals','converted'}or decl[position+2:]or gateway['argv']!=decl[:position]
+                or cap['native_call']!={'uri':PREFIX+'useOriginals','args':{'enable':choice=='originals'},'options':{},'result':{}}
+                or cap['gateway']['payload']['verified']is not False or cap['gateway']['payload']['status']!='result_schema_checked'):
+            raise ValueError('Same-Draft explicit media choice/ACK counterpart differs')
+        read_only=cap['native_reads'][accepted['native_start']:accepted['native_end']]
+        if ([r['uri']for r in read_only]!=['ak.wwise.core.getInfo','ak.wwise.core.getProjectInfo']
+                or any(r['args']is not None or r['options']is not None for r in read_only)
+                or audit.digest(rejected['native_calls'])!=audit.digest(read_only)
+                or any(payload.get(k)!=accepted['gateway']['payload'].get(k)for k in ('endpoint','detected_version','is_command_line'))):
+            raise ValueError('Rejected media choice exact read-only context differs')
+        repair=payload.get('details',{}).get('repair',{})
+        if (gateway['exit_code']!=2 or payload.get('ok')is not False or 'agent_result'in payload
+                or payload.get('error_code')!='RUNTIME_CONTROL_PLAN_FIELDS_INVALID'
+                or repair.get('error_code')!='RUNTIME_CONTROL_PLAN_FIELDS_INVALID'or repair.get('field')!='runtime_control_plan'
+                or repair.get('required')!=['audition_media']or repair.get('optional')!=[]or repair.get('draft_changed')is not False):
+            raise ValueError('Exact missing media choice rejection differs')
+        if record['relevant_sources']!=cap['source_context']['packaged']:raise ValueError('Media boundary source attribution differs')
+    if choices!={'originals','converted'}or record['gateway']!=pairs[0]['rejected']['gateway']or record['native_calls']!=pairs[0]['rejected']['native_calls']:
+        raise ValueError('Both explicit media choices and exact rejection receipt required')
+
+
+def _write_media_boundaries(output,index,requirements,inventory,paths,seen,name_prefix):
+    for number,path in enumerate(paths):
+        proof=json.loads(Path(path).read_bytes());cap=proof['pairs'][0]['valid'];context=_capture(cap,audit.ROOT)
+        route,=[r for r in inventory['native_coverage']['routes']if r['uri']==PREFIX+'useOriginals'and all(r[k]==v for k,v in context.items())]
+        selected=[b for b in inventory['native_coverage']['obligations']if b['route']==route['id']and b['id']in review()['explicit_media_choice_boundary']['ids']]
+        if not selected:raise ValueError('No exact approved media branch selected')
+        prefix=(name_prefix or'transport-')+'media-boundary-'+context['host']+'-'+str(number)+'-'
+        cp=runtime.write_json(output/(prefix+'capture.json'),proof);rejected=proof['pairs'][0]['rejected'];g=rejected['gateway']
+        record={'candidate_sha256':inventory['native_coverage']['candidate_sha256'],'scope_kind':'product','relevant_sources':cap['source_context']['packaged'],
+            'gateway':g,'native_calls':rejected['native_calls'],'explicit_media_boundary':proof,
+            'invocation':{'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':proof['nodeid'],'outcome':'PASS'}]},'branch_assertions':{}}
+        bindings={'contract':'waapi-skill.branch-bindings/v1','bindings':{}};policies={'contract':requirements['contract'],'branches':{}}
+        public,=[r for r in inventory['routes']if r['id']==route['public_route']]
+        for branch in selected:
+            identity=branch['id']
+            if identity in seen:raise ValueError('Duplicate explicit media boundary')
+            entry=exact_entry(branch,audit.ROOT);check={'pointer':'/gateway/payload/error_code','equals':g['payload']['error_code']}
+            record['branch_assertions'][identity]={'native_shape_sha256':branch['shape_sha256'],'native_route':branch['route'],'checks':[check]}
+            binding={'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'public_route':public['id'],'public_route_sha256':audit.digest(public),
+                'input':{'gateway_argv':g['argv'],'selector':'/gateway/argv'},'dispatch_pointer':'/explicit_media_boundary/pairs/0/valid/native_call',
+                'observation_pointer':'/gateway/payload/error_code','gateway_observation_pointer':'/gateway/payload/error_code','reference_chain':[],
+                'relevant_sources':sorted(cap['source_context']['packaged']),'disposition':'approved_boundary',
+                'boundary':{'kind':'explicit_media_choice','support_sha256':SUPPORT_SHA,'native_field':'enable'},**media_boundary_code_bindings(branch)}
+            validate_media_boundary_receipt(record,branch,binding,[check],audit.ROOT);bindings['bindings'][identity]=binding
+            policies['branches'][identity]=remaining.policy(entry);seen.add(identity)
+        pd={**runtime.write_json(output/(prefix+'program.json'),record),'nodeid':proof['nodeid']}
+        for b in bindings['bindings'].values():b['evidence']={'program':pd}
+        bd=runtime.write_json(output/(prefix+'bindings.json'),bindings);rd=runtime.write_json(output/(prefix+'requirements.json'),policies)
+        index['entries'].append({'id':prefix,'bindings':bd,'origin':{'bindings':bd,'program':{'artifact':pd['artifact'],'sha256':pd['sha256']},'requirements':rd,'capture':cp}})
+        requirements['branches'].update(policies['branches'])

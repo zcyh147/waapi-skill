@@ -36428,5 +36428,29 @@
       "native_field": "object",
       "meaning": "Public exact business identity resolves/readbacks one GUID; no literal name/path native dispatch claim"
     }
+  },
+  "explicit_media_choice_boundary": {
+    "ids": [
+      "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals|/argsSchema/@empty/object",
+      "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals|/argsSchema/properties/enable/@presence/absent",
+      "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals|/argsSchema/@empty/object",
+      "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals|/argsSchema/properties/enable/@presence/absent"
+    ],
+    "approval": "SPEC User-approved explicit media choice \u2014 2026-10-24",
+    "native_schema_classification": "accepted",
+    "native_field": "enable",
+    "public_field": "audition_media",
+    "public_flag": "--audition-media",
+    "choices": [
+      "originals",
+      "converted"
+    ],
+    "required_fields": [
+      "audition_media"
+    ],
+    "field_types": {
+      "audition_media": "originals_or_converted"
+    },
+    "meaning": "Exact2023 two-host approved public explicit-choice boundary; no native omitted-value/default/invalidity claim"
   }
 }
