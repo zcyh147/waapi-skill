@@ -5,6 +5,32 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R126 retained-read admission and opaque-result policy
+
+Reviewed integration `a7414f3b` admits the exact106 newly needed Console
+observations from R125. It preserves all29 original packets and five finalized
+native closures; only25 distinct packets need current public replay. The first
+packet passed in6.95s; the remaining24 packets plus a shared corruption-control
+case passed in168.28s (25 tests, first packet deselected). Independent review
+compared every archived file and the exact ID/shape/value selections with the
+finalized originals. These are unit consumer checks; their synthetic phase
+metadata is not a formal post-teardown capture or global publication receipt.
+
+The same integration includes the independently reviewed exact44 opaque-output
+successor. R124 and historical failures remain immutable. All6,292 IDs/shapes/
+owners remain; effective requirements now have2,120 conditional preservation
+rows and272 retained native anchors. The44 fields are validated/copied output,
+without Gateway identity/control interpretation. Actual same-route native
+anchors and current program proof remain mandatory; no rare populated native
+feature is claimed. Six affected admission/gating/history controls passed
+in118.82s, following the causal portable-importer RED and first full-chain GREEN.
+The rule and limits are documented in `RUNTIME_VERIFICATION.md`.
+
+The new Console evidence module is registered in the fixed Program roster;
+the focused manifest check passed in0.30s. No native/Fresh/full-gate rerun was
+used for this integration. Final current captures, global evidence composition
+and evaluation remain pending the settled publication helpers.
+
 ## 2026-10-24 R125 grouped Console runtime reads and source compatibility
 
 Frozen candidate `0d56a083da7a7965d734df3e02c0fb5681a75c70` ran
@@ -30,7 +56,8 @@ each retains its isolated config, launch decision, full reader report and final
 category record. The 2022 fixture retains the previously attested common2025
 PCM source qualification. These observations do not prove arbitrary metadata,
 recursive children, driver alternatives, setter effects or all #186 branches.
-Exact branch attachment and current global publication remain pending.
+Exact106 branch attachment was subsequently integrated in R126; current global
+publication remains pending.
 
 Reviewed successor `8ec4e331` reconciles retained runtime evidence with the
 seven-line Gateway exception-context correction. Historical source maps and
