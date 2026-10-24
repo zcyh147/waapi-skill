@@ -5,6 +5,40 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R130 log, Console LoadedMedia and empty-value integration
+
+Reviewed integration `40001e6f` adds ordinary-consumer evidence for 4,888 log
+branches and 93 Console LoadedMedia branches. These are candidate-scoped
+component results; the current global evaluation has not been regenerated and
+ticket #186 remains open.
+
+The log slice retains all original native outcomes, including old Console
+schema-only clear acknowledgements. Its legal GET expansion initially missed
+the ordinary consumer and some native-root attachments. After fixing that
+chain, the affected canary passed in 32.69s and the remaining nine groups passed
+in 303.21s. ADD, CLEAR and counterexample results were reused; native collection
+was not repeated. Independent review also repaired unrelated-scope fixture
+loading and reliance on unavailable historical Git objects. Exact scope,
+archive-integrity and portability checks passed without rerunning producers.
+
+The three Console LoadedMedia targets passed in 517.68s. They combine matching
+Console empty-result availability with separately attributed Authoring nonempty
+meaning; they do not claim nonempty Console observations. An earlier test-only
+requirement-order failure remains recorded. A dependency-closure correction
+passed its affected check in 0.35s without repeating the 15 public captures.
+
+Concrete empty-value validation resolved the remaining 49 unknown candidates
+without interpreting unused child schemas as active constraints. Nine focused
+checks passed in 6.44s; independent replay verified all 155 previously unknown
+candidates and preserved the four severity rejections. These are classifications,
+not new business coverage. Original ledgers, failed records and native gates
+remain unchanged.
+
+The combined manifest/policy checks passed in 1.38s. The fixed Program roster
+now has 352 entries. Packaged runtime code and all 619 Source-copy dependencies
+were unchanged by this integration. No full gate, Fresh or new native run was
+performed for this merge.
+
 ## 2026-10-24 R129 source reuse and schema annotations
 
 Reviewed integration `13295ccb` extends the existing exact source compatibility

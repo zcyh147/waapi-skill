@@ -67,6 +67,12 @@ version differences after its shared path works. Fresh separately tests Agent
 discovery/use of that interface; it is not required for every code integration
 test and still needs an explicitly approved case budget.
 
+When expanding that flow, keep every new group connected to the ordinary
+consumer and finalizer, including a missing-required-evidence control. Check
+scope, dependency closure and metadata contracts before expensive producers.
+Isolated development may use a frozen dependency that passed its focused tests;
+integration and publication still require independent review.
+
 For a new or changed native evidence collector, that code test must reach the
 existing final report/category writer and its persisted result, not stop at the
 collector's returned dictionary. Substitute the external Wwise execution while
