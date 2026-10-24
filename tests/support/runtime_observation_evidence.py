@@ -537,11 +537,11 @@ RTPC_GUARD_CHANGE = {
 RTPC_REVIEWED_SOURCE_CHANGES = {
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {
         'before': '69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4',
-        'after': '2a8bb6ef98e2ec59ff802a80309aa4554cf78c37014e28f9c30123df2ed810ca'},
+        'after': '79ad5e85c651766af6caf9044f85edf373a133c732c770d1e7f26d286024dc5b'},
     RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
-        'after': '0736194eecf13361bd35b1db8c31d614f6f93c4cf2d14b82e34061490cc05fce'},
+        'after': 'cd8367bee13c94d59e4880994468fd2cfd7cc1119969f65c881cfd7739785388'},
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {
         'before': '21108e298bc83cdf2eda6269db3d440a0865cacbab7c953d9ef57f84217fe62a',
         'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'},
@@ -550,7 +550,8 @@ RTPC_REVIEWED_SOURCE_CHANGES = {
         'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}}
 RTPC_REVIEWED_SOURCE_SYMBOLS = {
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': [
-        'field ceiling', 'profiler_result_field_choices', 'three fixed row declarations', 'runtime_inspection_business_contract_data'],
+        'field ceiling', 'profiler_result_field_choices', 'three fixed row declarations', 'runtime_inspection_business_contract_data',
+        'runtime_transport_requires_authoring', 'runtime_inspection_business_catalog_rows: exact Console2025 transport admission and metadata-only finalization'],
     RTPC_GUARD_FILE: ['module import: builders.query.STRUCTURED_GUID_PATTERN',
         '_validate_rtpc_rows', 'normalize_runtime_inspection_result', 'rtpc_validated_name_compatibility',
         'Sequence/field-contract imports', 'materialize_runtime_inspection_business_request'],
@@ -558,6 +559,7 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
         'module import: runtime_inspection_business.rtpc_validated_name_compatibility',
         'module import: builders.stable_reads.MAX_GAME_OBJECT_ROWS/MAX_STABLE_STRING_BYTES',
         'build_parser', 'dispatch_command', 'resolve_profiler_voice_path', 'dispatch_profiler_voice_contributions_request',
+        'runtime_authoring_host_required_payload', 'dispatch_offline_command', 'dispatch_business_runtime_control_plan',
         'dispatch_runtime_inspection_business_read', 'preflight_stable_read_input', 'fixed_command_route_payload', 'preflight_core_business_input'],
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': ['build_profiler_voice_contributions_request',
         'normalize_profiler_voice_contributions_result', 'normalize_profiler_game_objects_result'],
@@ -567,6 +569,7 @@ RTPC_REVIEWED_SOURCE_REASON = (
     'Exact reviewed five-file RTPC guard and closed non-RTPC result-validation source delta; '
     'three fixed-reader-only closed result-field selection delta leaves absent result_fields requests unchanged; post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
     'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; '
+    'Exact Console2025 transport admission/error-message/catalog-docstring finalization does not change these non-transport read paths; '
     'GameObjects-only optional row fields/versioned ID domains/timestamp aliases and fixed request-schema disclosure do not change RTPC or contribution behavior; original finalized PASS retained')
 RTPC_ORIGINALS = {
     '2022.1': ('2022.1.19.8584', 'e9d4b86aaccaccb9b1603d37ba5bc7255034c09d2c05b7685beb254e6642adfd', 17, 23637),

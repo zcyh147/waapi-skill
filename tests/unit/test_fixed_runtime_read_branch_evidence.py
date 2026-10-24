@@ -61,6 +61,21 @@ def public_fixed_read(tmp_path, *, version='2025.1', host='wwise-authoring', row
     if operation.endswith('.getGameObjects'):
         argv = ['profiler-game-objects', *(['--capture-ms', position] if position.isdecimal() else
             ['--capture', 'latest' if position == 'capture-latest' else 'user-cursor'])]
+    def public_receipt(argv, code, payload):
+        # Evidence-only copy of the Gateway-written immutable issuer record;
+        # the public payload and argv are preserved exactly.
+        receipt = {'argv': argv, 'exit_code': code, 'payload': payload}
+        handles = {row['voice_instance_handle'] for row in payload.get('agent_result', {}).get('return', [])
+            if 'voice_instance_handle' in row}
+        if handles:
+            from wwise_waapi.runtime_inspection_observations import validate_pipeline_handle
+            for handle in handles: validate_pipeline_handle(handle)
+            observation_handles = {'rto1-' + handle[5:].rsplit('-', 1)[0] for handle in handles}
+            assert len(observation_handles) == 1
+            observation_handle, = observation_handles
+            receipt['retained_observation'] = json.loads((tmp_path / 'state/runtime-inspection-observations-v1' /
+                (observation_handle + '.json')).read_bytes())
+        return receipt
     calls = public_calls if public_calls is not None else []
     if filtered:
         seed_uri = URI if operation == URI else 'ak.wwise.core.profiler.getBusses'
@@ -70,7 +85,7 @@ def public_fixed_read(tmp_path, *, version='2025.1', host='wwise-authoring', row
             env=_env(tmp_path, version=version), client_factory=lambda _: client)
         assert code == 0, json.dumps(seed)
         handle = seed['agent_result']['return'][handle_index][kind + '_instance_handle']
-        calls.append({'gateway': {'argv': seed_argv, 'exit_code': code, 'payload': seed}, 'native_start': 0, 'native_end': len(trace)})
+        calls.append({'gateway': public_receipt(seed_argv, code, seed), 'native_start': 0, 'native_end': len(trace)})
         argv.extend(['--' + kind + '-instance-handle', handle])
     start = len(trace)
     code, payload = gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'), *argv],
@@ -81,7 +96,7 @@ def public_fixed_read(tmp_path, *, version='2025.1', host='wwise-authoring', row
     native = {key: trace[-1][key] for key in ('uri', 'args', 'options', 'result')}
     assert native['args']['time'] == (int(position) if position.isdecimal() else
         ('capture' if position == 'capture-latest' else 'user') if operation.endswith('.getGameObjects') else 123)
-    receipt = {'argv': argv, 'exit_code': code, 'payload': payload}
+    receipt = public_receipt(argv, code, payload)
     calls.append({'gateway': receipt, 'native_start': start, 'native_end': len(trace)})
     return receipt, native, context, trace
 
@@ -502,6 +517,7 @@ FIXED_ORIGINAL_CASES = [
     ('getGameObjects', 'profiler-game-objects-observation'),
 ]
 FIXED_PROGRAM_CASES += [('2025.1', 'wwise-authoring', name, 'original-' + category) for name, category in FIXED_ORIGINAL_CASES]
+FIXED_PROGRAM_CASES.append(('2025.1','wwise-console','getVoices','r118-original'))
 
 
 @pytest.mark.parametrize('version,host,name,mode', FIXED_PROGRAM_CASES,
@@ -509,7 +525,12 @@ FIXED_PROGRAM_CASES += [('2025.1', 'wwise-authoring', name, 'original-' + catego
 def test_fixed_reader_program_emits_after_actual_teardown(tmp_path, request, version, host, name, mode):
     import os
     from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-    if mode.startswith('original-'):
+    if mode == 'r118-original':
+        _, raw = r118_original_read()
+        calls = []
+        receipt, native, context, trace = public_fixed_read(tmp_path, host='wwise-console',
+            rows=raw['result']['return'], view='identity', position='6016', public_calls=calls)
+    elif mode.startswith('original-'):
         calls = []
         receipt, native, context, trace = public_fixed_read(tmp_path, version=version, host=host,
             uri='ak.wwise.core.profiler.' + name, filtered='filter' in mode, public_calls=calls)
@@ -532,3 +553,114 @@ def test_fixed_gameobjects_2021_boundary_has_no_native_route_or_connection(tmp_p
     assert code == 2
     assert payload['error_code'] == 'UNSUPPORTED_STABLE_READ_VERSION'
     assert 'agent_result' not in payload
+
+
+def r118_original_read():
+    descriptor = {'artifact':'r118-originals.json.gz',
+        'sha256':'6fb48b4582a02968ca8cce07714c756bbaf5c2d581a26eecf0ff6f296754eaa5'}
+    read = archive_reader(descriptor, FIXTURE)
+    import gzip
+    files = json.loads(gzip.decompress((FIXTURE / descriptor['artifact']).read_bytes()))['files']
+    report_path, = [name for name in files if name.endswith('/state/console-profiler-probe.json')]
+    report = json.loads(read(report_path))
+    receipt, = [r for r in report['calls'] if r['argv'][:2] == ['core-call', URI]]
+    raw = json.loads(read(receipt['payload']['call']['evidence_path']))
+    return receipt, raw
+
+
+def test_r118_console_identity_native_fields_reach_same_portable_consumer(tmp_path, inventory):
+    from tests.support.fixed_runtime_read_evidence import write_fixed_bundle, mappings
+    original, raw = r118_original_read()
+    receipt, native, context, trace = public_fixed_read(tmp_path / 'public', host='wwise-console',
+        rows=raw['result']['return'], view='identity', position='6016')
+    assert native['result'] == raw['result']
+    assert receipt['payload']['agent_result']['return'][0]['objectName'] == 'Outside_Idle_1000'
+    assert 'pipelineID' not in receipt['payload']['agent_result']['return'][0]
+    path = tmp_path / 'capture.json'
+    write_program_receipt(path, receipt, native, nodeid='fixed-r118-identity',
+        phase_reports=dict.fromkeys(('setup','call','teardown'), 'passed'), source_context=context,
+        native_reads=trace, public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)}])
+    route = next(r for r in inventory['native_coverage']['routes'] if r['version'] == '2025.1' and r['host'] == 'wwise-console' and r['uri'] == URI)
+    selected = {m['branch']['id'] for m in mappings(inventory, json.loads(path.read_bytes()), route)
+        if m['categories'] == ['program','native']}
+    index = write_fixed_bundle(tmp_path / 'bundle', path, FIXTURE, inventory=inventory, selected=selected)
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    observed = [r for r in result['obligations'] if r['id'] in selected]
+    assert {r['id'] for r in observed} == selected
+    assert all(r['state'] == 'verified' for r in observed), json.dumps(observed)
+    write_json(tmp_path / 'r118-native-selected.json', {'ids':sorted(selected),'count':len(selected)})
+
+
+def test_r118_current_handle_rejects_resealed_wrong_row_kind_and_observation(tmp_path, inventory):
+    from tests.support.fixed_runtime_read_evidence import write_fixed_bundle
+    from wwise_waapi.runtime_inspection_observations import pipeline_key
+    _, original = r118_original_read()
+    rows = deepcopy(original['result']['return'])
+    second = deepcopy(rows[0])
+    second.update(pipelineID=2, playingID=2, objectName='OtherVoice')
+    rows.append(second)  # Schema-valid program shape; not another native fact.
+    receipt, native, context, trace = public_fixed_read(tmp_path / 'public', host='wwise-console',
+        rows=rows, view='identity', position='6016')
+    path = tmp_path / 'capture.json'
+    write_program_receipt(path, receipt, native, nodeid='fixed-current-handle-controls',
+        phase_reports=dict.fromkeys(('setup','call','teardown'), 'passed'), source_context=context,
+        native_reads=trace, public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)}])
+    route = next(r for r in inventory['native_coverage']['routes'] if r['version'] == '2025.1' and r['host'] == 'wwise-console' and r['uri'] == URI)
+    identity = route['id'] + '|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/pipelineID'
+    index = write_fixed_bundle(tmp_path / 'bundle', path, None, inventory=inventory, selected={identity})
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    binding = document['bindings'][identity]
+    def observed():
+        result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+            digest=audit.digest, evidence_base=base, requirements_document=policy)
+        return next(r for r in result['obligations'] if r['id'] == identity)
+    assert observed()['evidence_results']['program']['outcome'] == 'passed'
+    baseline = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    own_handle = receipt['payload']['agent_result']['return'][0]['voice_instance_handle']
+    replacements = {
+        'wrong-row': receipt['payload']['agent_result']['return'][1]['voice_instance_handle'],
+        'wrong-kind': own_handle.rsplit('-',1)[0] + '-' + pipeline_key('bus',1),
+        'unrelated-observation': 'rph1-' + ('f' * 32 if own_handle[5:37] != 'f' * 32 else 'e' * 32) + '-' + pipeline_key('voice',1),
+    }
+    for mode, handle in replacements.items():
+        program = deepcopy(baseline)
+        program['gateway']['payload']['agent_result']['return'][0]['voice_instance_handle'] = handle
+        program['runtime_read_program']['gateway'] = deepcopy(program['gateway'])
+        program['runtime_read_program']['public_calls'][-1]['gateway'] = deepcopy(program['gateway'])
+        for check in program['branch_assertions'][identity]['checks']:
+            if check['pointer'] == binding['gateway_observation_pointer']: check['equals'] = handle
+        binding['evidence']['program'].update(write_json(base / (mode + '.json'),program))
+        damaged = observed()
+        assert damaged['evidence_results']['program']['outcome'] == 'missing', json.dumps(damaged)
+        assert 'same-row current issued voice handle' in damaged['evidence_results']['program']['reason']
+
+
+def test_r118_native_and_program_selectors_join_without_r103_rebinding(tmp_path, inventory):
+    from tests.support.fixed_runtime_read_evidence import write_fixed_stage
+    _, original = r118_original_read()
+    receipt, native, context, trace = public_fixed_read(tmp_path / 'public', host='wwise-console',
+        rows=original['result']['return'], view='identity', position='6016')
+    path = tmp_path / 'capture.json'
+    write_program_receipt(path, receipt, native, nodeid='r118-stage',
+        phase_reports=dict.fromkeys(('setup','call','teardown'), 'passed'), source_context=context,
+        native_reads=trace, public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)}])
+    route = next(r for r in inventory['native_coverage']['routes'] if r['version'] == '2025.1' and r['host'] == 'wwise-console' and r['uri'] == URI)
+    selected = {route['id'] + '|/argsSchema', route['id'] + '|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/pipelineID'}
+    index = write_fixed_stage(tmp_path / 'bundle', [path], inventory=inventory, selected_ids=selected,
+        r118_capture=path, r118_originals=FIXTURE)
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    attached = [binding for binding in document['bindings'].values() if binding.get('runtime_observation_attachment')]
+    assert len(attached) == 1
+    proof = completion.read_sealed_artifact(attached[0]['runtime_observation_attachment'], base)
+    assert proof['archive']['artifact'] == 'r118-originals.json.gz'
+    assert not (base / 'r103-originals.json.gz').exists()
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    observed = [r for r in result['obligations'] if r['id'] in selected]
+    assert {r['id'] for r in observed} == selected
+    assert {r['state'] for r in observed} == {'verified'}, json.dumps(observed)
