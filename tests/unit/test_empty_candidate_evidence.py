@@ -307,3 +307,141 @@ def test_empty_classification_preserves_native_valid_message_and_exact_local_def
                 assert classified['parent_schema_sha256'] == direct_class['parent_schema_sha256']
                 aliases.append(branch['id'])
     assert len(aliases) == 12
+
+
+@pytest.mark.parametrize('route,pointer', [
+    ('2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.ui.layout.getLayout',
+     '/resultSchema/@definition/waapi_ui_definitions.json/definitions/StackPanel/properties/@Children/@cardinality/empty'),
+    ('2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.ui.model.registerWafm',
+     '/argsSchema/@definition/wafm_definitions.json/definitions/binLayoutDefinition/properties/Children/@cardinality/empty'),
+    ('2025.1|wwise-console|2025.1.7.9143|topic|ak.wwise.core.object.structureChanged',
+     '/publishSchema/properties/objects/@cardinality/empty'),
+], ids=['capital-OneOf-unused', 'not-unused-minItems0', 'string-false-unused'])
+def test_empty_candidate_skips_unused_items_but_nonempty_reaches_native_unknown(route, pointer):
+    from tests.support.empty_candidate_evidence import classify_empty_candidate
+    from tests.maintenance.branch_audit_completion import validate_native_alternative
+    branch = next(row for row in _native_rows(route) if row['pointer'] == pointer)
+    classified = classify_empty_candidate(ROOT, branch)
+    assert classified['status'] == 'accepted', classified
+    assert classified['candidate'] == []
+    assert classified['pointer'] == pointer
+    parent = {**branch, 'pointer': classified['parent_pointer'],
+              'shape_sha256': classified['parent_schema_sha256']}
+    with pytest.raises(ValueError, match='unrecognized'):
+        validate_native_alternative(ROOT, parent, [{}], require_known=True)
+
+
+@pytest.mark.parametrize('host', ['wwise-console', 'wwise-authoring'])
+def test_empty_legacy_candidates_keep_original_shape_and_explicit_validation_view(host):
+    from tests.support.empty_candidate_evidence import classify_empty_candidate
+    route = f'2021.1|{host}|2021.1.14.8108|topic|ak.wwise.core.soundbank.generated'
+    item = '/publishSchema/properties/bankInfo/items'
+    switch = item + '/properties/IncludedEvents/items/SwitchContainers'
+    pointers = [item + '/@empty/object', item + '/properties/IncludedEvents/items/@empty/object',
+                switch + '/@cardinality/empty', switch.replace('/publishSchema', '/publishSchema/@definition/<schema>', 1) + '/@cardinality/empty']
+    rows = {row['pointer']: row for row in _native_rows(route)}
+    cache = {}
+    for pointer in pointers:
+        branch = rows[pointer]
+        classified = classify_empty_candidate(ROOT, branch, cache=cache)
+        assert classified['status'] == 'accepted', classified
+        assert classified['pointer'] == branch['pointer']
+        view = classified['validation_provenance']
+        assert view['original_parent_schema_sha256'] == classified['parent_schema_sha256']
+        if branch['kind'] == 'empty_object':
+            assert view['rule'] == 'legacy-2021-soundbank-implicit-properties/v1'
+            assert view['projected_parent_schema_sha256'] != classified['parent_schema_sha256']
+            assert view['original_context_sha256'] == classified['context_sha256']
+            assert view['projected_context_sha256'] != classified['context_sha256']
+        else:
+            assert view['legacy_id_resolutions'] == [{'id': 'soundBankInfoSwitchContainer',
+                'document': '<schema>', 'pointer': '/properties/bankInfo/items/properties/IncludedEvents/items/SwitchContainers',
+                'target_schema_sha256': classified['parent_schema_sha256']}]
+        assert classify_empty_candidate(ROOT, branch, cache=cache) == classified
+
+
+def test_concrete_empty_keeps_active_bounds_refs_unions_and_unknown_shapes_strict():
+    from tests.maintenance.branch_audit_completion import validate_native_alternative
+    from wwise_waapi.native_catalog import load_native_catalog
+    catalog = deepcopy(load_native_catalog('2025.1', 'wwise-console', root=ROOT / 'skills/waapi-skill/resources/native-catalog'))
+    uri = ROUTE.split('|')[-1]
+    def check(schema, value, error=None):
+        catalog['schemas'][uri]['argsSchema'] = schema
+        branch = {'route': ROUTE, 'pointer': '/argsSchema', 'shape_sha256': audit.digest(schema)}
+        if error:
+            with pytest.raises(ValueError, match=error):
+                validate_native_alternative(ROOT, branch, value, catalog=catalog, require_known=True)
+        else:
+            assert validate_native_alternative(ROOT, branch, value, catalog=catalog, require_known=True) is None
+    unused = {'not': {'required': ['Type']}}
+    check({'type': 'array', 'minItems': 1, 'items': unused}, [], 'does not satisfy')
+    check({'type': 'object', 'required': ['needed'], 'properties': {'needed': unused}}, {}, 'does not satisfy')
+    check({'type': 'array', '$ref': '#/definitions/missing', 'items': unused}, [], 'Unresolved')
+    check({'$ref': '#/definitions/list', 'definitions': {'list': {'type': 'array', 'minItems': 1}}}, [], 'does not satisfy')
+    check({'oneOf': [{'type': 'array'}, {'type': 'array'}]}, [], 'does not satisfy')
+    check({'anyOf': [{'type': 'array', 'minItems': 1}, {'type': 'array', 'maxItems': 0}]}, [])
+    check({'allOf': [{'type': 'array'}, {'minItems': 1}]}, [], 'does not satisfy')
+    check({'anyOf': [{'type': 'array'}, unused]}, [], 'unrecognized')
+    check({'type': 'array', 'minItems': 1, 'OneOf': []}, [], 'unrecognized')
+    check({'type': 'object', 'additionalProperties': 'false'}, {}, 'unrecognized')
+    check({'type': 'object', 'required': 'needed'}, {}, 'unrecognized')
+    check({'type': 'array', '$ref': None}, [], 'unrecognized')
+    check({'type': 'array', 'minItems': '0'}, [], 'unrecognized')
+    check({'type': 'array', 'minimum': '0'}, [], 'unrecognized')
+    check({'type': 'object', 'minProperties': 1}, {}, 'unrecognized')
+    check({'$ref': '#'}, [], 'budget')
+
+
+def test_legacy_empty_view_rejects_ambiguous_ids_and_unlisted_projection_contexts():
+    from tests.maintenance.branch_audit_completion import validate_native_alternative, pointer_value
+    from wwise_waapi.native_catalog import load_native_catalog
+    uri = 'ak.wwise.core.soundbank.generated'
+    route = '2021.1|wwise-console|2021.1.14.8108|topic|' + uri
+    original = load_native_catalog('2021.1', 'wwise-console', root=ROOT / 'skills/waapi-skill/resources/native-catalog')
+    item = '/publishSchema/properties/bankInfo/items'
+    switch = item + '/properties/IncludedEvents/items/SwitchContainers'
+    def reject(catalog, pointer, value, *, changed_route=route):
+        selected_uri = changed_route.split('|')[-1]
+        schema = pointer_value(catalog['schemas'][selected_uri], pointer)
+        branch = {'route': changed_route, 'pointer': pointer, 'shape_sha256': audit.digest(schema)}
+        with pytest.raises(ValueError, match='unrecognized'):
+            validate_native_alternative(ROOT, branch, value, catalog=catalog, require_known=True)
+    for marker in (None, '#'):
+        damaged = deepcopy(original)
+        pointer_value(damaged['schemas'][uri], switch)['id'] = marker
+        reject(damaged, switch, [])
+    duplicate = deepcopy(original)
+    duplicate['schemas'][uri]['publishSchema'].setdefault('definitions', {})['duplicate'] = {'id': 'soundBankInfoSwitchContainer'}
+    reject(duplicate, switch, [])
+    unlisted = deepcopy(original)
+    unlisted['schemas'][uri]['publishSchema']['properties']['alien'] = {'type': 'object',
+        'IncludedMemoryFiles': {'type': 'array', 'items': {'type': 'string'}}}
+    reject(unlisted, '/publishSchema/properties/alien', {})
+    unlisted_uri = deepcopy(original)
+    unlisted_uri['schemas']['unlisted.topic'] = deepcopy(original['schemas'][uri])
+    reject(unlisted_uri, item, {}, changed_route=route.replace(uri, 'unlisted.topic'))
+    later = deepcopy(load_native_catalog('2022.1', 'wwise-console', root=ROOT / 'skills/waapi-skill/resources/native-catalog'))
+    later['schemas'][uri] = deepcopy(original['schemas'][uri])
+    reject(later, item, {}, changed_route='2022.1|wwise-console|2022.1.19.8584|topic|' + uri)
+    extra = deepcopy(original)
+    pointer_value(extra['schemas'][uri], item)['UnknownConstraint'] = True
+    reject(extra, item, {})
+    wrong_shape = {'route': route, 'pointer': item, 'shape_sha256': '0' * 64}
+    with pytest.raises(ValueError, match='shape changed'):
+        validate_native_alternative(ROOT, wrong_shape, {}, catalog=original, require_known=True)
+
+
+def test_rejected_projected_empty_keeps_explicit_original_validation_provenance():
+    from tests.maintenance.branch_audit_completion import validate_native_alternative, pointer_value
+    from wwise_waapi.native_catalog import load_native_catalog
+    uri = 'ak.wwise.core.soundbank.generated'
+    catalog = deepcopy(load_native_catalog('2021.1', 'wwise-console', root=ROOT / 'skills/waapi-skill/resources/native-catalog'))
+    pointer = '/publishSchema/properties/bankInfo/items'
+    schema = pointer_value(catalog['schemas'][uri], pointer)
+    schema['required'] = ['mandatory']
+    branch = {'route': '2021.1|wwise-console|2021.1.14.8108|topic|' + uri,
+              'pointer': pointer, 'shape_sha256': audit.digest(schema)}
+    with pytest.raises(ValueError, match='does not satisfy') as error:
+        validate_native_alternative(ROOT, branch, {}, catalog=catalog, require_known=True)
+    assert error.value.validation_provenance['rule'] == 'legacy-2021-soundbank-implicit-properties/v1'
+    assert error.value.validation_provenance['original_parent_schema_sha256'] == branch['shape_sha256']
