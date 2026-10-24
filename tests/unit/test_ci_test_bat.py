@@ -352,13 +352,15 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
 
-    assert len(nodes) == 350
+    assert len(nodes) == 352
     assert nodes[0] == "tests/unit/test_gateway_session_context.py"
     assert nodes[-1] == "tests/unit/test_branch_evidence_readers.py"
     assert {
         "tests/unit/test_gateway_connection_binding.py",
         "tests/unit/test_console_runtime_read_batch.py",
         "tests/unit/test_console_runtime_read_evidence.py",
+        "tests/unit/test_runtime_log_branch_evidence.py",
+        "tests/unit/test_console_loaded_media_evidence.py",
         "tests/unit/test_empty_candidate_evidence.py",
         "tests/unit/test_loaded_media_runtime_evidence.py",
         "tests/unit/test_loaded_media_composite_evidence.py",
