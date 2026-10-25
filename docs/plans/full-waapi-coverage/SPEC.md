@@ -92,7 +92,7 @@ The deliverable is a usable interface with no remaining known in-scope rejection
 
 - Track at least: unresolved, missing implementation, implemented but missing required evidence, blocked by environment, verified, proven native absence, and explicitly approved exclusion. Missing Skill support must never be classified as native absence.
 - Completion is computed from exact mappings, reachable public contracts and required evidence, not a fixed incomplete flag, a declared family status or a test-definition filename. Reproducibility and functional coverage are separate results.
-- Maintain a per-branch evidence requirement: deterministic public-interface proof for every applicable lane; native evidence where effects, metadata semantics or version/host behavior need it; Fresh only for selected interaction mechanisms. Existing evidence may be reused only when its relevant source, native shape, host and behavior are demonstrably unchanged.
+- Keep complete five-version native-to-public field/option mappings as the gap detector. Prove public behavior with representative cases for meaningful branches and shared mechanisms under the 2026-10-26 policy below; mapping rows are not separate execution obligations. Reuse relevant unchanged evidence and select native checks for actual business or host/version risk.
 - An explicit native observation limitation may require a truthfully weaker public result. Missing Skill verifier implementation is not such a limitation and remains work. Never claim verified business state from a schema-only success.
 - An execution profile's count includes only correctly classified rows. Approved exclusions and proven native absence remain visible but are not successful execution credit. An API's absence does not by itself prove the requested business outcome has no supported alternative.
 - Every discovered in-scope gap receives a linked implementation/evidence obligation before the discovery task closes. Investigation milestones may finish; the implementation parent cannot close while any such obligation remains unresolved.
@@ -103,8 +103,8 @@ The deliverable is a usable interface with no remaining known in-scope rejection
 
 - Use the existing public Gateway parser and execution entrypoint as the primary seam. Drive real public schemas, continuations and requests with injected native clients and isolated configuration/state; assert observable outputs, exact native dispatch and absence of unintended effects. Internal helper tests supplement this seam rather than substituting for it.
 - Prior art includes the current metadata list/detail/change chain, five-version configuration-binding tests, GameParameter class-field and staged-workflow tests, independent ShareSet topology tests, policy recovery tests and authenticated query-refinement archive tests.
-- Cover every applicable five-version contract lane with positives and meaningful invalid-input controls. Include defaults versus omission, nested/union alternatives, applicable targets, version/host mismatches, stale handles, dependency conflicts and partial outcomes. Do not use implementation-mirroring assertions as the sole proof.
-- Test the completeness checker by removing a route, legal field/enum/union branch, applicable version, mapping or required evidence; substituting a URI at unchanged count; misclassifying missing implementation as native absence; and attributing parent/family PASS to an unproven leaf. Every such corruption must prevent completion.
+- Parameterize structural contract and option-mapping checks over the five pinned definitions. Aim for one or two representative public cases for each meaningful parameter branch or shared mechanism, with negative controls for material risks such as invalid shapes, stale identity, conflicts and partial outcomes. Defaults, omission and alternatives remain selectable where legal; each option value does not require its own execution.
+- Test the completeness checker against missing routes, legal choices, versions and mappings, unchanged-count URI substitutions, false native-absence claims and missing required representative proof. Keep structural coverage separate from the selected functional evidence; a missing per-leaf receipt alone is not a failure when that leaf is mapped to a tested shared mechanism.
 - Run focused tests while implementing, then the established full five-version Program and full Non-live gates on the combined candidate. Rerun affected gates after material changes; preserve exact candidate attribution instead of relabeling historical counts.
 - Run deterministic real Wwise validation sequentially in the existing owned sandbox lifecycle. Prove the business effect and preservation appropriate to the API, including real event delivery/resource cleanup where relevant. Use matching versions/hosts for native differences and record explicit proof for any proposed equivalence-based reuse.
 - Separate reflection, fake-client proof and real execution evidence. Reflection alone proves neither a usable Gateway wrapper nor a successful business outcome.
@@ -207,6 +207,35 @@ downstream business work until a new user instruction. No Fresh is authorized
 for #197. Preserve original evidence and avoid additional verification-depth
 expansion without the existing required user decision.
 
+## User-approved representative functional testing — 2026-10-26
+
+Complete legitimate parameter and option support remains the goal. Retain the
+five-version native inventory and native-to-public mapping so omitted choices,
+wrong schemas and real unsupported business uses stay visible. These structural
+rows do not each need an execution receipt or an evidence ID.
+
+Aim for one or two representative public cases for each meaningful parameter
+branch or shared mechanism, using the five pinned definitions. Remaining legal
+values stay available as choices. Select native checks for actual business
+risk, independent behavior and host/version differences; reuse matching valid
+observations. Known Wwise defects or native absence receive explicit
+source-supported boundaries rather than Wwise repair or QA work. Simple APIs
+use an ordinary happy path and relevant existing proof. Do not expand this into every enum value, optional-field permutation,
+collection cardinality or per-leaf evidence collection.
+
+CRUD, queries and compound changes retain appropriate identity, policy,
+execute-once, outcome and cleanup checks. A shared mechanism pass does not
+conceal an unsupported normal-user function. The final checker must accept
+this representative evidence policy while continuing to detect missing routes,
+fields, options, versions and required business proof. Any necessary checker or
+ledger adaptation remains owned by #195; it does not require a new framework.
+
+Fresh remains centralized in #194 with budget zero until separately approved.
+#195 coordinates the required full Program/Non-live gates on the stable combined
+candidate; functional tickets run affected checks and do not each repeat them.
+This successor policy governs current acceptance; historical results and original
+contracts remain unchanged.
+
 ## User-approved internal Debug verification boundary — 2026-10-26
 
 `ak.wwise.debug.getWalTree` and `ak.wwise.debug.validateCall` retain their
@@ -214,6 +243,13 @@ existing closed wrappers. The user instructed that further verification and
 Debug-environment work be skipped. New real Debug execution is therefore not
 required for #203, #193 or #174 closure. Preserve existing program proof and
 the explicit current-host unavailable behavior; claim neither native execution
-nor native availability. This exception changes no other API obligation or
-historical result. Removing these routes from normal discovery is not part of
-this change.
+nor native availability. The same keep-wrapper/no-additional-verification
+decision applies to the
+existing internal Debug controls `ak.wwise.debug.enableAsserts`,
+`ak.wwise.debug.enableAutomationMode`, `ak.wwise.debug.restartWaapiServers`,
+`ak.wwise.debug.testAssert` and `ak.wwise.debug.testCrash` in #204. All five
+already have closed named contracts; no new Debug execution or environment
+work is a delivery prerequisite. No unwrapped internal Debug URI was identified
+in this fixed roster. It excludes neither `ak.wwise.debug.generateToneWAV` nor
+ordinary Authoring functionality. Historical results remain unchanged. Removing
+these routes from normal discovery is not part of this change.

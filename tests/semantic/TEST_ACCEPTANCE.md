@@ -48,14 +48,23 @@ votes on the same sealed notice is not a substitute for that diagnosis.
 
 ### Test selection and evidence reuse (approved 2026-10-23)
 
-Native acceptance is selected by business risk (reconfirmed 2026-10-24).
-Keep five-version program coverage for every in-scope API, parameter and
-branch. Real Wwise checks establish meaningful nonempty results, business
-effects, version/host differences and cleanup. Do not manufacture every
-true/false combination, multiple metadata rows or duplicate list entries on
-every version solely for cardinality coverage. Record and review each evidence
-reuse or test-selection rationale; preserve original failed outcomes. Missing
-business semantics or required native proof remains unresolved.
+The user reconfirmed representative functional testing on 2026-10-26.
+Keep complete native-to-public parameter/option mapping against all five pinned
+definitions. Aim for one or two representative public cases per meaningful
+parameter branch or shared mechanism; remaining legal values stay selectable.
+Simple APIs use an ordinary happy path and reusable relevant proof. Structural
+mapping rows, enum values, optional-field permutations and collection sizes are
+not individual execution or evidence-ID quotas.
+
+Select real Wwise checks for actual business risk, independent behavior and
+host/version differences. Reuse matching valid observations; preserve original
+failed outcomes. CRUD, queries and compound changes retain appropriate identity,
+policy, execute-once, outcome and cleanup checks. Unsupported normal-user
+functions and missing required business proof remain unresolved. The completion
+checker must distinguish complete option mapping from selected representative
+evidence; necessary reconciliation is owned by #195, not a new per-leaf test
+framework. Fresh remains under #194 with budget zero until separately approved;
+#195 coordinates the required stable-candidate full Program/Non-live gates.
 
 Select tests from the changed implementation and its callers. Group independent
 cases into one affected run while retaining separate assertions, outcomes and

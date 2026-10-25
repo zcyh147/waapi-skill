@@ -4,7 +4,7 @@ Use this sequence for the current coverage implementation. Historical acceptance
 belongs in [the test inventory](../../../tests/TEST_INVENTORY.md); current Fresh
 scheduling and failure classification belong in [business acceptance](../../../tests/semantic/TEST_ACCEPTANCE.md).
 
-The 2026-10-23 test-selection and evidence-reuse rules in that document govern
+The current representative-testing and evidence-reuse rules in that document govern
 batch planning and reruns. Each active ticket's execution note identifies its
 next complete business flow, reusable checks and remaining native evidence.
 The five-version scope and existing blocking edges remain unchanged.
@@ -14,7 +14,15 @@ its remaining acceptance steps with existing evidence pointers. Finish already
 reviewed work and required dependencies alongside it; assign new independent
 work only when it advances that ticket. Keep other obligations assigned to
 their original tickets. Report whole-ticket completion separately from merged
-components, without changing the original acceptance criteria.
+components, applying the current user-approved acceptance policy in the spec.
+
+Keep the complete five-version native-to-public parameter/option mapping, but
+select one or two representative cases for each meaningful branch or shared
+mechanism. Reuse matching evidence and run native cases for actual business risk
+or host/version differences. Simple APIs need an ordinary happy path; inventory
+leaves and enum values are not individual execution quotas. #195 owns any
+required completion-checker adaptation to this policy and the stable combined
+Program/Non-live gates. #194 remains the sole Fresh owner, with budget zero.
 
 For a shared mechanism repair, inspect the complete operation's declared
 changes and its affected consumers before handoff. Review that mechanism and
