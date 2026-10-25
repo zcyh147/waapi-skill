@@ -7,11 +7,22 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import uuid
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture
+def native_sandbox_parent():
+    # Physical Console assets must not inherit pytest's arbitrary report depth.
+    # TemporaryDirectory owns and cleans only this newly allocated directory.
+    with tempfile.TemporaryDirectory(prefix='wb-', dir='/tmp' if os.name == 'posix' else None) as directory:
+        parent = Path(directory).resolve()
+        yield parent
+    assert not parent.exists()
 
 
 @pytest.fixture
@@ -74,7 +85,7 @@ def test_public_batch_keeps_independent_outcomes_and_deduplicates(checkout, tmp_
 
 
 @pytest.mark.parametrize('source_ready,sandbox_kind', [(True, 'short'), (True, 'overlong'), (False, 'short')])
-def test_public_native_plan_without_pythonpath_records_prelaunch_failure(tmp_path, source_ready, sandbox_kind):
+def test_public_native_plan_without_pythonpath_records_prelaunch_failure(tmp_path, native_sandbox_parent, source_ready, sandbox_kind):
     """The actual launcher fingerprints a private project before blocked preflight."""
     from ci.test_batch import CONSOLE_NODE
     project = tmp_path / 'source/SampleProject.wproj'
@@ -86,7 +97,7 @@ def test_public_native_plan_without_pythonpath_records_prelaunch_failure(tmp_pat
     console.write_text('#!/bin/sh\ntouch "' + str(launched) + '"\nexit 99\n')
     console.chmod(0o755)
     config = tmp_path / 'live-config.json'
-    sandbox_parent = tmp_path / ('s' if sandbox_kind == 'short' else 'x' * 150)
+    sandbox_parent = native_sandbox_parent / ('s' if sandbox_kind == 'short' else 'x' * 150)
     config.write_text(json.dumps({'versions': {'2025.1': {
         'sample_project': str(project), 'wwise_console': str(console),
         'sandbox_root': str(sandbox_parent)}}}))
@@ -276,7 +287,7 @@ def test_partial_rerun_retains_passes_in_same_group_and_missing_evidence_blocks(
 
 
 @pytest.mark.parametrize('unsafe', [False, True])
-def test_five_native_lanes_use_existing_preflight_and_authoritative_cleanup(checkout, tmp_path, unsafe):
+def test_five_native_lanes_use_existing_preflight_and_authoritative_cleanup(checkout, tmp_path, native_sandbox_parent, unsafe):
     from ci.test_driver import main, SUPPORTED_VERSIONS, WWISE_BUILDS
     from tests.destructive.support.category_evidence import build_category_evidence_record
     native = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_runtime_read_batch'
@@ -300,7 +311,7 @@ def test_five_native_lanes_use_existing_preflight_and_authoritative_cleanup(chec
         console = source / 'WwiseConsole'; console.write_text('fake external process boundary')
         console.chmod(0o755)
         configs[version] = {'wwise_console': str(console), 'sample_project': str(project),
-                            'sandbox_root': str(tmp_path / ('s-' + version))}
+                            'sandbox_root': str(native_sandbox_parent / ('s-' + version))}
         catalog = 'skills/waapi-skill/resources/native-catalog/' + version + '/wwise-console.json'
         (checkout / catalog).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / catalog, checkout / catalog)
@@ -353,6 +364,8 @@ def test_five_native_lanes_use_existing_preflight_and_authoritative_cleanup(chec
     assert order == ['none', *SUPPORTED_VERSIONS[:2 if unsafe else 5]]
     summary = json.loads((root / 'summary.json').read_bytes())
     assert summary['groups'][0]['id'] == 'collector-preflight'
+    assert all(scope['native_path_budget']['utf16_units_including_nul'] <= 260
+               for scope in summary['source_identity']['native_scopes'].values())
     assert summary['groups'][2]['failure_layer'] == ('evidence' if unsafe else 'case')
     assert summary['groups'][-1]['outcome'] == ('BLOCKED' if unsafe else 'PASS')
     if not unsafe:
