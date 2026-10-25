@@ -5,6 +5,53 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #178 Playlist construction and verified-node continuation
+
+Reviewed runtime implementation through `3db7e527` adds source-certified 2025
+PlaylistSlot append, replaceAll and root `object.create` list placement. Required
+PlaylistObject stays inline, native names remain empty, and declaration labels
+and returned handles retain their separate meaning. The public two-Preview
+new-owner/new-child workflow uses Gateway-issued verified-node bindings; forged,
+unverified and changed identities are rejected. Ordinary-root continuation and
+MetadataSlot compatibility remain covered by focused checks. Two indistinguishable
+Playlist members exposed and fixed a real result-handle retention omission.
+
+The selected Python groups cover the meaningful constructor modes, metadata and
+owner/target drift, replacement absence/order, partial results, policies, selected
+verified handles and actual final report persistence. Their separate results and
+original RED/setup failures are recorded in
+`.waapi-skill-state/full-coverage/playlist-178-followup-closeout/`; these are not
+an aggregate Program/Non-live gate. No Fresh or native-Windows run was added.
+
+The first Mac Console 2025.1.7.9143 native root,
+`.waapi-skill-state/full-coverage/playlist-178-native-r1`, ran at `3db7e527` and
+retains **FAIL in 13.99s**. Append independently proved the new GUID, exact class,
+owner, target, original peer order and references. Replacement reached VERIFIED,
+independent new-roster/reference observations and three sealed old-GUID absence
+readbacks. The collector then incorrectly expected successful empty rows from
+an extra exact-ID WAQL query for a deleted GUID; Wwise returned its exact
+structured `Object not found` error. Root create had not run. Original failure,
+raw error and quarantine are preserved; acceptance of the separate append and
+replacement effects is recorded alongside them, without regrading or replay.
+
+Test-only `b6293502` repairs that exact absence oracle, rejects unrelated errors,
+and exposes a root-create-only node through the same collector/lifecycle. The
+root-only positive/failure and affected combined consumer passed **3 in 5.51s**
+through the persisted final writer. Only the unexecuted constructor then ran:
+`.waapi-skill-state/full-coverage/playlist-178-root-create-native-r1` passed
+**1 in 8.59s** on the same exact Console build. Its dispatcher recorded one
+`object.create` and zero `object.set` calls; the new unnamed class5636096 member,
+owner/reference, ordered two-existing-plus-one-new roster and preservation passed.
+Final source full hashes, tree metadata and mtimes were unchanged in both roots;
+process cleanup completed. The passing sandbox was deleted, the failed one retained.
+
+These are cumulative scoped native effects across two frozen roots, not a green
+three-phase run. The new-owner/new-child continuation is program-tested here.
+#178 remains open for single-Preview planned dependencies and older-version
+Playlist work. The 2023/2024 reference-list representation remains distinct;
+missing named 2021/2022 examples do not establish native absence. #195 retains
+source reconciliation and final combined gates; Fresh remains under #194.
+
 ## 2026-10-26 #200/#201 representative Console outcomes
 
 One macOS WwiseConsole 2025.1.7.9143 session on `68445296` ran the owned
