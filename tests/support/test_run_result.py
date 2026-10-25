@@ -14,6 +14,7 @@ class BatchResult:
         self.nodes = []
         self.phases = {}
         self.failures = []
+        self.context = json.loads(os.getenv('WAAPI_TEST_BATCH_CONTEXT', 'null'))
         self.duplicates_removed = int(os.getenv('WAAPI_TEST_BATCH_DUPLICATES', '0'))
 
     @pytest.hookimpl(trylast=True)
@@ -49,5 +50,6 @@ class BatchResult:
         temporary = self.path.with_suffix('.pending')
         temporary.write_text(json.dumps({'terminal': terminal, 'exit_code': exit_code,
             'node_outcomes': outcomes, 'phase_reports': self.phases,
-            'duplicates_removed': self.duplicates_removed, 'failures': self.failures}) + '\n', encoding='utf-8')
+            'duplicates_removed': self.duplicates_removed, 'failures': self.failures,
+            'batch_context': self.context}) + '\n', encoding='utf-8')
         temporary.replace(self.path)

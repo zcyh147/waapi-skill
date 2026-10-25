@@ -28,6 +28,9 @@ COLLECTOR_PREFLIGHT = (
 # Gateway assertion, native fake, evidence writer or ordinary consumer.
 PREFLIGHT_WRAPPER_PATHS = {'ci/test_driver.py', 'ci/test_batch.py', 'tests/unit/test_ci_batch.py',
                            'tests/support/test_run_result.py'}
+BATCH_SOURCE_FILES = {'ci/test_driver.py', 'ci/test_batch.py', 'ci/test_readiness.py',
+    'ci/run_live_test_command.py', 'ci/resolve_live_test_config.py', 'tests/conftest.py',
+    'tests/support/test_run_result.py', 'tests/support/exact_evidence_finalization.py'}
 
 
 class BatchError(ValueError):
@@ -61,10 +64,12 @@ def relative_file(root, name):
 
 def validate_plan(plan, repo):
     if (not isinstance(plan, dict) or not {'contract', 'root', 'groups'} <= set(plan)
-            or set(plan) - {'contract', 'root', 'groups', 'previous', 'irrelevant_changes', 'preflight_evidence'}
+            or set(plan) - {'contract', 'root', 'groups', 'previous', 'irrelevant_changes', 'preflight_evidence', 'recover_from'}
             or plan['contract'] != CONTRACT or not isinstance(plan['groups'], list)
             or not 1 <= len(plan['groups']) <= 64):
         raise BatchError('Invalid bounded batch plan')
+    if plan.get('recover_from') and (plan.get('previous') or plan.get('preflight_evidence')):
+        raise BatchError('Report recovery cannot select execution or preflight reuse')
     root = Path(plan['root'])
     if (not root.is_absolute() or root != root.resolve() or os.path.lexists(root)
             or any(p.is_symlink() for p in root.parents)
@@ -135,11 +140,8 @@ def write_json(path, value):
     temporary.replace(path)
 
 
-def source_identity(driver, plan):
-    files = {'ci/test_driver.py', 'ci/test_batch.py', 'ci/test_readiness.py',
-        'ci/run_live_test_command.py', 'ci/resolve_live_test_config.py',
-        'tests/conftest.py', 'tests/support/test_run_result.py',
-        'tests/support/exact_evidence_finalization.py'}
+def source_identity(driver, plan, *, include_native_scopes=True):
+    files = set(BATCH_SOURCE_FILES)
     for group in plan['groups']:
         files.update(group['sources'])
         files.update(n.split('::')[0] for n in group['nodes'])
@@ -149,7 +151,8 @@ def source_identity(driver, plan):
                                     cwd=driver.repo_root, text=True).splitlines()
     return {'commit': commit, 'sources': {name: hashlib.sha256(
         relative_file(driver.repo_root, name).read_bytes()).hexdigest() for name in sorted(files)},
-        'native_scopes': {g['id']: native_scope(driver, g) for g in plan['groups'] if g['mode'] != 'nonlive'},
+        'native_scopes': {g['id']: native_scope(driver, g) for g in plan['groups']
+                          if include_native_scopes and g['mode'] != 'nonlive'},
         'worktree_changes': {name: hashlib.sha256((driver.repo_root / name).read_bytes()).hexdigest()
             if (driver.repo_root / name).is_file() else None for name in sorted(set(dirty))}}
 
@@ -207,11 +210,7 @@ def retained_preflight(driver, plan, frozen):
         r['nodeid'] for r in g['node_outcomes'] if r['outcome'] == 'PASS'}]
     if prior['outcome'] not in {'PASS', 'REUSED'}:
         raise BatchError('Original collector preflight did not pass')
-    for node in required:
-        result = read_json(read_descriptor(prior['node_results'][node]))
-        if (result.get('terminal') is not True or result['phase_reports'].get(node)
-                != dict.fromkeys(('setup', 'call', 'teardown'), 'passed')):
-            raise BatchError('Original collector preflight lacks final node evidence')
+    validate_retained_passes(prior, required, previous['source_identity'])
     ignored = plan.get('irrelevant_changes', {})
     if set(ignored) & set(previous['source_identity']['sources']):
         raise BatchError('Irrelevance cannot override original preflight sources')
@@ -226,11 +225,58 @@ def retained_preflight(driver, plan, frozen):
         'preflight_evidence': plan['preflight_evidence']}
 
 
+def validate_context(reference, spec, before, *, node=None):
+    context = read_json(read_descriptor(reference))
+    if (context.get('contract') != 'waapi-skill.test-batch-context/v1'
+            or {k: v for k, v in context['spec'].items() if k != 'id'}
+            != {k: v for k, v in spec.items() if k != 'id'}):
+        raise BatchError('Original result belongs to a different planned group')
+    names = BATCH_SOURCE_FILES | set(spec['sources']) | {n.split('::')[0] for n in spec['nodes']}
+    original = context['source_identity']
+    if (not names <= original['sources'].keys() or not names <= before['sources'].keys()
+            or any(original['sources'][name] != before['sources'][name] for name in names)
+            or original.get('native_scopes', {}).get(context['spec']['id'])
+            != before.get('native_scopes', {}).get(spec['id'])):
+        raise BatchError('Original result source or native scope differs')
+    if node is not None and not any(matches_node(node, n) for n in context['selection']):
+        raise BatchError('Original node was not in its saved execution selection')
+    return context
+
+
+def matches_node(node, selector):
+    return node == selector or node.startswith(selector + '[') or node.startswith(selector + '::')
+
+
+def validate_retained_passes(prior, nodes, before):
+    """A PASS pointer is reusable only with its original complete receipt."""
+    if prior.get('preflight_evidence'):
+        before = read_json(read_descriptor(prior['preflight_evidence']))['source_identity']
+    for node in nodes:
+        path = read_descriptor(prior['node_results'][node])
+        observed = read_json(path)
+        checked_result(path, observed['exit_code'])
+        if ({'nodeid': node, 'outcome': 'PASS'} not in observed['node_outcomes']
+                or observed['phase_reports'].get(node)
+                != dict.fromkeys(('setup', 'call', 'teardown'), 'passed')):
+            raise BatchError('Original successful node lacks complete final evidence: ' + node)
+        if observed.get('batch_context') is not None:
+            validate_context(observed['batch_context'], prior['spec'], before, node=node)
+        elif prior.get('context') is not None:
+            raise BatchError('Original result lacks its planned source context')
+
+
 def affected_selection(driver, plan, frozen):
     previous = read_json(plan['previous']) if plan.get('previous') else None
     selections, retained, unknown = {}, {}, []
     if previous is None:
         return {g['id']: g['nodes'] for g in plan['groups']}, retained, unknown
+    previous_root = Path(plan['previous']).parent
+    recorded = {g['id'] for g in previous['groups']}
+    old_plan = read_json(previous_root / 'plan.json')
+    if (previous.get('outcome') == 'RUNNING' or any(
+            g['id'] not in recorded and (previous_root / 'groups' / g['id']).exists()
+            for g in old_plan['groups'])):
+        raise BatchError('Incomplete previous report; use recover_from without replaying producers')
     before = previous['source_identity']
     changed = changed_paths(driver, before, frozen)
     sources = before['sources'].keys() | frozen['sources'].keys()
@@ -251,10 +297,7 @@ def affected_selection(driver, plan, frozen):
             selections[group['id']] = group['nodes']
         elif prior['outcome'] in {'PASS', 'REUSED'}:
             original = prior.get('original_result', prior.get('result'))
-            for node, reference in prior['node_results'].items():
-                observed = read_json(read_descriptor(reference))
-                if {'nodeid': node, 'outcome': 'PASS'} not in observed['node_outcomes']:
-                    raise BatchError('Original successful node has no retained PASS: ' + node)
+            validate_retained_passes(prior, prior['node_results'], before)
             if group['mode'] != 'nonlive':
                 reference = prior['native_result']
                 if descriptor(reference['artifact'])['sha256'] != reference['sha256']:
@@ -267,6 +310,8 @@ def affected_selection(driver, plan, frozen):
                                      'original_result': original, 'reuse_reason': 'Relevant inputs unchanged; original verdict retained'}
             selections[group['id']] = []
         else:
+            validate_retained_passes(prior, [r['nodeid'] for r in prior['node_outcomes']
+                                             if r['outcome'] == 'PASS'], before)
             selections[group['id']] = [r['nodeid'] for r in prior['node_outcomes'] if r['outcome'] != 'PASS']
     return selections, retained, unknown
 
@@ -332,6 +377,80 @@ def native_result(path, group, result, candidate, scope):
     return reference
 
 
+def recover_report(plan, root, report_source):
+    """Rebuild a report from saved validated group facts, without dispatch."""
+    original_path = Path(plan['recover_from'])
+    original = read_json(original_path)
+    original_root = original_path.parent
+    saved_plan = read_json(original_root / 'plan.json')
+    if (original.get('contract') != CONTRACT or original.get('root') != str(original_root)
+            or saved_plan['groups'] != plan['groups']):
+        raise BatchError('Recovery scope differs from the original owned batch')
+    before = original['source_identity']
+    indexed = {r['id']: r for r in original['groups']}
+    recovered = []
+    for group in saved_plan['groups']:
+        checkpoint = original_root / 'groups' / group['id'] / 'completion.json'
+        if checkpoint.is_file():
+            completion = read_json(checkpoint)
+            row = completion['row']
+            context = validate_context(completion['context'], group, before)
+            if (completion.get('contract') != 'waapi-skill.test-batch-completion/v1'
+                    or completion.get('source_unchanged') is not True
+                    or context['source_identity'] != before or row['spec'] != group
+                    or row['context'] != completion['context'] or row['source_commit'] != before['commit']):
+                raise BatchError('Saved completion lacks original source/context proof')
+            result = checked_result(read_descriptor(row['result']), row['exit_code'])
+            if (result.get('batch_context') != completion['context']
+                    or row['selection'] != context['selection']
+                    or any(not any(matches_node(r['nodeid'], n) for n in context['selection'])
+                           or row['node_results'].get(r['nodeid']) != row['result']
+                           for r in result['node_outcomes'])):
+                raise BatchError('Saved completion differs from actual selected pytest result')
+        else:
+            # A preflight reused before this interrupted run has no new producer
+            # checkpoint. Its already-persisted original references remain the
+            # only proof; an attempted but unfinished producer never enters here.
+            row = indexed.get(group['id'])
+            if row is None or row.get('outcome') != 'REUSED' or row.get('executed') is not False:
+                raise BatchError('Missing trusted group completion; producer replay is blocked: ' + group['id'])
+        validate_retained_passes(row, [r['nodeid'] for r in row['node_outcomes']
+                                      if r['outcome'] == 'PASS'], before)
+        for outcome in row['node_outcomes']:
+            observed = read_json(read_descriptor(row['node_results'][outcome['nodeid']]))
+            checked_result(Path(row['node_results'][outcome['nodeid']]['artifact']), observed['exit_code'])
+            if (outcome not in observed['node_outcomes']
+                    or not any(matches_node(outcome['nodeid'], n) for n in group['nodes'])):
+                raise BatchError('Saved node outcome differs from its original receipt or planned scope')
+        expected = 'PASS' if all(r['outcome'] == 'PASS' for r in row['node_outcomes']) else 'FAIL'
+        if (not row['node_outcomes'] or (row['outcome'] != expected
+                and not (row['outcome'] == 'REUSED' and expected == 'PASS'))):
+            raise BatchError('Saved group verdict is not a complete original outcome')
+        if group['mode'] != 'nonlive':
+            reference = row['native_result']
+            if (descriptor(reference['artifact'])['sha256'] != reference['sha256']
+                    or native_result(reference['artifact'], group,
+                        read_json(read_descriptor(row['result'])), row['source_commit'],
+                        before['native_scopes'][group['id']]) != reference):
+                raise BatchError('Saved native cleanup/finalizer facts differ')
+        recovered.append({**row, 'executed': False, 'original_outcome': expected,
+            'outcome': 'REUSED' if expected == 'PASS' else 'FAIL',
+            'original_result': row.get('original_result', row['result']),
+            'recovered_completion': descriptor(checkpoint) if checkpoint.is_file() else None,
+            'reuse_reason': 'Report-only recovery of original validated results; no producer executed'})
+    outcome = 'PASS' if all(r['outcome'] == 'REUSED' for r in recovered) else 'FAIL'
+    summary = {'contract': CONTRACT, 'outcome': outcome, 'groups': recovered, 'root': str(root),
+        'source_identity': before, 'report_source_identity': report_source,
+        'recovered_from': descriptor(original_path), 'unknown_impact': [],
+        'rerun': [{'group': r['id'], 'nodes': [n['nodeid'] for n in r['node_outcomes'] if n['outcome'] != 'PASS'],
+                   'reason': 'original failure retained; not replayed during recovery'}
+                  for r in recovered if r['outcome'] == 'FAIL']}
+    write_json(root / 'summary.json', summary)
+    print(json.dumps({'outcome': outcome, 'recovered_groups': len(recovered),
+                      'executed': 0, 'summary': str(root / 'summary.json')}))
+    return 0 if outcome == 'PASS' else 1
+
+
 def run_batch(driver, plan_path):
     root = None
     try:
@@ -355,6 +474,8 @@ def execute_batch(driver, plan, root):
         from test_driver import TestRequest
     root.mkdir(parents=True, exist_ok=False)
     write_json(root / 'plan.json', plan)
+    if plan.get('recover_from'):
+        return recover_report(plan, root, source_identity(driver, plan, include_native_scopes=False))
     frozen = source_identity(driver, plan)
     selections, retained, unknown = affected_selection(driver, plan, frozen)
     preflight = retained_preflight(driver, plan, frozen)
@@ -407,7 +528,12 @@ def execute_batch(driver, plan, root):
         result_path = destination / 'result.json'
         previous = driver.environment
         nodes = selections[group['id']]
+        context_path = destination / 'context.json'
+        write_json(context_path, {'contract': 'waapi-skill.test-batch-context/v1',
+            'spec': group, 'selection': nodes, 'source_identity': frozen})
+        context_reference = descriptor(context_path)
         driver.environment = {**previous, 'WAAPI_TEST_BATCH_RESULT': str(result_path),
+                              'WAAPI_TEST_BATCH_CONTEXT': json.dumps(context_reference),
                               'WAAPI_TEST_BATCH_DUPLICATES': str(len(nodes) - len(set(nodes))),
                               'PYTEST_ADDOPTS': ''}
         driver.environment.pop('PYTEST_PLUGINS', None)
@@ -455,12 +581,18 @@ def execute_batch(driver, plan, root):
             node_results = {**prior['node_results'], **node_results}
             merged.update({r['nodeid']: r for r in outcomes})
             outcomes = list(merged.values())
-        summary['groups'].append({'id': group['id'], 'node_outcomes': outcomes,
+        row = {'id': group['id'], 'node_outcomes': outcomes,
             'spec': group, 'executed': True, 'selection': nodes,
             'outcome': state, 'failure_layer': layer, 'error': error,
             'failures': result.get('failures', []) if result_path.is_file() else [],
             'exit_code': code, 'result': result_reference, 'node_results': node_results,
-            'native_result': native_reference, 'source_commit': frozen['commit']})
+            'native_result': native_reference, 'source_commit': frozen['commit'],
+            'context': context_reference}
+        if not stopped and state in {'PASS', 'FAIL'}:
+            write_json(destination / 'completion.json', {
+                'contract': 'waapi-skill.test-batch-completion/v1', 'context': context_reference,
+                'source_unchanged': True, 'row': row})
+        summary['groups'].append(row)
         if stopped:
             summary['outcome'] = 'BLOCKED'
         elif state != 'PASS':

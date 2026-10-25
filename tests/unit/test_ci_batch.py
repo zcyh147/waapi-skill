@@ -234,6 +234,7 @@ def test_five_native_lanes_use_existing_preflight_and_authoritative_cleanup(chec
     plan = tmp_path / 'native.plan.json'; plan.write_text(json.dumps({
         'contract': 'waapi-skill.test-batch/v1', 'root': str(root), 'groups': groups}))
     order = []
+    report_fault = {'enabled': False}
     def external(command, **options):
         env = options['env']; version = env.get('WWISE_VERSION', 'none')
         order.append(version)
@@ -244,7 +245,8 @@ def test_five_native_lanes_use_existing_preflight_and_authoritative_cleanup(chec
         path = Path(env['WAAPI_TEST_BATCH_RESULT']); path.parent.mkdir(parents=True, exist_ok=True)
         phases = {n: {'setup': 'passed', 'call': 'failed' if failed else 'passed', 'teardown': 'passed'} for n in nodes}
         path.write_text(json.dumps({'terminal': True, 'exit_code': code, 'duplicates_removed': 0,
-            'node_outcomes': [{'nodeid': n, 'outcome': 'FAIL' if failed else 'PASS'} for n in nodes], 'phase_reports': phases}))
+            'node_outcomes': [{'nodeid': n, 'outcome': 'FAIL' if failed else 'PASS'} for n in nodes],
+            'phase_reports': phases, 'batch_context': json.loads(env['WAAPI_TEST_BATCH_CONTEXT'])}))
         if version != 'none':
             outcome = 'FAIL' if failed else 'PASS'
             quarantine = path.parent / 'quarantine'; quarantine.mkdir()
@@ -263,6 +265,8 @@ def test_five_native_lanes_use_existing_preflight_and_authoritative_cleanup(chec
                 invocation={'selected_test_nodeids': nodes, 'node_outcomes': [{'nodeid': n, 'outcome': outcome} for n in nodes],
                     'started_at_unix_ns': 1, 'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': outcome}, transactions=[])
             Path(env['WWISE_CATEGORY_EVIDENCE_PATH']).write_text(json.dumps(record) + '\n')
+            if report_fault['enabled']:
+                (path.parents[2] / 'summary.pending').mkdir()
         return subprocess.CompletedProcess(command, code)
     code = main(['--batch-plan', str(plan)], repo_root=checkout, python_executable=sys.executable,
         command_runner=external, environment={**os.environ, 'WWISE_TEST_CONFIG': str(config),
@@ -298,6 +302,35 @@ def test_five_native_lanes_use_existing_preflight_and_authoritative_cleanup(chec
         assert main(['--batch-plan', str(plan)], repo_root=checkout, python_executable=sys.executable,
             command_runner=external, environment={**os.environ, 'WWISE_TEST_CONFIG': str(config)}) == 0
         assert order == []
+        # Report recovery also reopens native finalizer/cleanup evidence and
+        # requires no current native environment or child process.
+        report_fault['enabled'] = True
+        failed_report_root = tmp_path / 'native-report-failed'
+        plan.write_text(json.dumps({'contract': 'waapi-skill.test-batch/v1',
+            'root': str(failed_report_root), 'groups': [groups[-1]]}))
+        assert main(['--batch-plan', str(plan)], repo_root=checkout, python_executable=sys.executable,
+            command_runner=external, environment={**os.environ, 'WWISE_TEST_CONFIG': str(config)}) == 2
+        assert (failed_report_root / 'groups/native-2025/completion.json').is_file()
+        recovery = {'contract': 'waapi-skill.test-batch/v1',
+            'root': str(tmp_path / 'native-report-recovered'), 'groups': [groups[-1]],
+            'recover_from': str(failed_report_root / 'summary.json')}
+        plan.write_text(json.dumps(recovery)); order.clear()
+        assert main(['--batch-plan', str(plan)], repo_root=checkout, python_executable=sys.executable,
+            command_runner=external, environment={}) == 0
+        assert order == []
+        category = failed_report_root / 'groups/native-2025/category.jsonl'
+        row = json.loads(category.read_text()); row['residual_state']['process_cleanup'] = 'unknown'
+        category.write_text(json.dumps(row) + '\n')
+        completion_path = failed_report_root / 'groups/native-2025/completion.json'
+        completion = json.loads(completion_path.read_bytes())
+        completion['row']['native_result']['sha256'] = hashlib.sha256(category.read_bytes()).hexdigest()
+        completion_path.write_text(json.dumps(completion))
+        recovery['root'] = str(tmp_path / 'unsafe-native-report')
+        plan.write_text(json.dumps(recovery))
+        assert main(['--batch-plan', str(plan)], repo_root=checkout, python_executable=sys.executable,
+            command_runner=external, environment={}) == 2
+        assert order == []
+        report_fault['enabled'] = False
         # A different source fixture is a meaningful native dependency even
         # when the selected test node and Git candidate are unchanged.
         project = Path(configs['2025.1']['sample_project'])
@@ -362,3 +395,108 @@ def test_abrupt_child_exit_retains_completed_phase_records_and_stops(checkout, t
     assert partial['phase_reports'][prefix + 'test_good'] == dict.fromkeys(('setup', 'call', 'teardown'), 'passed')
     assert not (root / 'groups/later/result.json').exists()
     assert json.loads((root / 'summary.json').read_bytes())['outcome'] == 'BLOCKED'
+
+
+@pytest.mark.parametrize('damage', ['missing', 'changed', 'nonterminal', 'source-context', 'valid'])
+def test_partial_repair_reopens_every_retained_pass_before_dispatch(checkout, tmp_path, monkeypatch, damage):
+    import hashlib
+    counter = tmp_path / 'invocations.jsonl'
+    monkeypatch.setenv('BATCH_COUNTER', str(counter))
+    monkeypatch.delenv('BATCH_REPAIRED', raising=False)
+    case = checkout / 'tests/unit/test_cases.py'
+    case.write_text('import os\nfrom pathlib import Path\n'
+        'def record(name):\n    with Path(os.environ["BATCH_COUNTER"]).open("a") as f: f.write(name + "\\n")\n'
+        'def test_good():\n    record("good")\n'
+        'def test_bad():\n    record("bad")\n    assert os.getenv("BATCH_REPAIRED") == "yes"\n')
+    prefix = 'tests/unit/test_cases.py::'
+    groups = [group('one', [prefix + 'test_good', prefix + 'test_bad'])]
+    first = tmp_path / 'first'
+    assert run_batch(checkout, first, groups).returncode == 1
+    receipt = first / 'groups/one/result.json'
+    if damage == 'missing':
+        receipt.unlink()
+    elif damage == 'changed':
+        receipt.write_text(receipt.read_text() + '\n')
+    elif damage in {'nonterminal', 'source-context'}:
+        value = json.loads(receipt.read_bytes())
+        if damage == 'nonterminal':
+            value['terminal'] = False
+        else:
+            context_path = first / 'groups/one/context.json'
+            context = json.loads(context_path.read_bytes())
+            context['source_identity']['sources']['tests/unit/test_cases.py'] = '0' * 64
+            context_path.write_text(json.dumps(context))
+            value['batch_context'] = {'artifact': str(context_path),
+                'sha256': hashlib.sha256(context_path.read_bytes()).hexdigest()}
+        receipt.write_text(json.dumps(value))
+        summary_path = first / 'summary.json'; summary = json.loads(summary_path.read_bytes())
+        ref = {'artifact': str(receipt), 'sha256': hashlib.sha256(receipt.read_bytes()).hexdigest()}
+        summary['groups'][0]['node_results'][prefix + 'test_good'] = ref
+        summary_path.write_text(json.dumps(summary))
+    monkeypatch.setenv('BATCH_REPAIRED', 'yes')
+    second = tmp_path / 'repaired'
+    result = run_batch(checkout, second, groups, previous=str(first / 'summary.json'))
+    assert result.returncode == (0 if damage == 'valid' else 2), result.stdout + result.stderr
+    assert counter.read_text().splitlines() == (['good', 'bad', 'bad'] if damage == 'valid' else ['good', 'bad'])
+    if damage != 'valid':
+        assert not (second / 'groups/one/result.json').exists()
+        assert json.loads((second / 'summary.json').read_bytes())['outcome'] == 'BLOCKED'
+
+
+@pytest.mark.parametrize('producer_fails', [False, True])
+def test_report_only_recovery_reuses_saved_completion_without_producer_replay(checkout, tmp_path, monkeypatch, producer_fails):
+    counter = tmp_path / 'invocations.jsonl'
+    monkeypatch.setenv('BATCH_COUNTER', str(counter))
+    (checkout / 'tests/unit/test_cases.py').write_text('import os\nfrom pathlib import Path\n'
+        'def test_good():\n'
+        '    with Path(os.environ["BATCH_COUNTER"]).open("a") as f: f.write("producer\\n")\n'
+        '    root = Path(os.environ["WAAPI_TEST_BATCH_RESULT"]).parents[2]\n'
+        '    (root / "summary.pending").mkdir()\n' + ('    assert False, "original producer failure"\n' if producer_fails else ''))
+    groups = [group('one', ['tests/unit/test_cases.py::test_good'])]
+    first = tmp_path / 'report-failed'
+    result = run_batch(checkout, first, groups)
+    assert result.returncode != 0
+    original_summary = (first / 'summary.json').read_bytes()
+    original_receipt = (first / 'groups/one/result.json').read_bytes()
+    assert json.loads(original_receipt)['terminal'] is True
+    assert json.loads(original_summary)['outcome'] == 'RUNNING'
+    second = tmp_path / 'report-recovered'
+    result = run_batch(checkout, second, groups, recover_from=str(first / 'summary.json'))
+    assert result.returncode == int(producer_fails), result.stdout + result.stderr
+    assert counter.read_text().splitlines() == ['producer']
+    assert (first / 'summary.json').read_bytes() == original_summary
+    assert (first / 'groups/one/result.json').read_bytes() == original_receipt
+    summary = json.loads((second / 'summary.json').read_bytes())
+    assert summary['groups'][0]['outcome'] == ('FAIL' if producer_fails else 'REUSED')
+    assert summary['groups'][0]['executed'] is False
+    assert summary['source_identity'] == json.loads(original_summary)['source_identity']
+    assert summary['recovered_from']['artifact'] == str(first / 'summary.json')
+
+
+@pytest.mark.parametrize('damage', ['missing-completion', 'receipt', 'unsafe-source'])
+def test_report_recovery_blocks_missing_or_unsafe_saved_facts(checkout, tmp_path, monkeypatch, damage):
+    counter = tmp_path / 'invocations.jsonl'
+    monkeypatch.setenv('BATCH_COUNTER', str(counter))
+    (checkout / 'tests/unit/test_cases.py').write_text('import os\nfrom pathlib import Path\n'
+        'def test_good():\n'
+        '    with Path(os.environ["BATCH_COUNTER"]).open("a") as f: f.write("producer\\n")\n'
+        '    (Path(os.environ["WAAPI_TEST_BATCH_RESULT"]).parents[2] / "summary.pending").mkdir()\n')
+    groups = [group('one', ['tests/unit/test_cases.py::test_good'])]
+    first = tmp_path / 'report-failed'
+    assert run_batch(checkout, first, groups).returncode != 0
+    completion = first / 'groups/one/completion.json'
+    assert completion.is_file()
+    if damage == 'missing-completion':
+        completion.unlink()
+    elif damage == 'receipt':
+        path = first / 'groups/one/result.json'; path.write_text(path.read_text() + '\n')
+    else:
+        value = json.loads(completion.read_bytes()); value['source_unchanged'] = False
+        completion.write_text(json.dumps(value))
+    # An incomplete ordinary --previous never silently retries the producer.
+    assert run_batch(checkout, tmp_path / 'no-replay', groups,
+                     previous=str(first / 'summary.json')).returncode == 2
+    result = run_batch(checkout, tmp_path / 'recovery-blocked', groups,
+                       recover_from=str(first / 'summary.json'))
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert counter.read_text().splitlines() == ['producer']
