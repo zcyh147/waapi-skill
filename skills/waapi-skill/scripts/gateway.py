@@ -3233,6 +3233,8 @@ def build_parser() -> argparse.ArgumentParser:
     object_selector.add_argument("--object-id")
     object_selector.add_argument("--verified-created-from", metavar="TRANSACTION",
         help="Bind the independently verified root of one durable creation transaction; recheck its exact identity")
+    draft_bind_object.add_argument("--created-result-handle",
+        help="Copy one returned ordinary created result handle with --verified-created-from; recheck its exact sealed identity")
     object_selector.add_argument("--object-path-segment", action="append")
     object_selector.add_argument(
         "--exact-type-name",
@@ -19623,11 +19625,14 @@ class _BusinessObjectSelector:
     expected_path: str | None = None
     expected_type: str | None = None
     expected_name: str | None = None
+    expected_class_id: int | None = None
 
 
 def _business_object_selector_from_namespace(
     args: argparse.Namespace,
 ) -> _BusinessObjectSelector:
+    if getattr(args, "created_result_handle", None) is not None and args.verified_created_from is None:
+        raise GatewayInputError("A created result handle requires its exact --verified-created-from transaction")
     parent_supplied = (
         args.parent_id is not None or args.parent_path_segment is not None
     )
@@ -19991,8 +19996,11 @@ def dispatch_business_object_binding(
         snapshot = resolve_transaction_store(args, env=env).load_snapshot(args.verified_created_from)
         artifact = snapshot.preview.artifact
         request = artifact.get("request", {})
-        if (request.get("operation") != "object.create" or snapshot.record.state not in {
-                TransactionState.VERIFIED, TransactionState.VERIFICATION_FAILED}):
+        selected_result = getattr(args, "created_result_handle", None)
+        allowed_operations = {"object.create", "object.set"} if selected_result is not None else {"object.create"}
+        allowed_states = {TransactionState.VERIFIED} if selected_result is not None else {
+            TransactionState.VERIFIED, TransactionState.VERIFICATION_FAILED}
+        if request.get("operation") not in allowed_operations or snapshot.record.state not in allowed_states:
             raise GatewayInputError("Staged configuration requires recorded independent creation verification; diagnose uncertainty without replaying creation.")
         if artifact.get("connection_configuration") != selected_connection_binding(env):
             raise GatewayInputError("Creation connection configuration changed; its identity cannot authorize this staged binding.")
@@ -20002,13 +20010,18 @@ def dispatch_business_object_binding(
             raise GatewayInputError("Creation project/runtime context changed; stop staged configuration and diagnose the exact object read-only.")
         verifications = [event.get("details", {}).get("verification", {}) for event in snapshot.events
                          if event.get("event_type") == "verification_recorded"]
-        identity = (_verified_created_root_identity(verifications[0]) if len(verifications) == 1 else None)
+        if selected_result is None:
+            identity = (_verified_created_root_identity(verifications[0]) if len(verifications) == 1 else None)
+        else:
+            from wwise_waapi.creation_observations import verified_created_occurrence_identity
+            identity = (verified_created_occurrence_identity(verifications[0], selected_result) if len(verifications) == 1 else None)
         if identity is None:
-            raise GatewayInputError("No independent verified created-root identity is sealed; diagnose the object read-only and never guess or repeat creation.")
+            raise GatewayInputError("No independent verified created identity matches this transaction/selection; diagnose the object read-only and never guess or repeat creation.")
         closed_selector = _BusinessObjectSelector(
-            request={"from": {"id": [identity["id"]]}}, kind="verified-created-root",
+            request={"from": {"id": [identity["id"]]}}, kind="verified-created-node" if selected_result is not None else "verified-created-root",
             expected_id=identity["id"], expected_name=identity["name"],
             expected_type=identity["type"], expected_path=identity["path"],
+            expected_class_id=identity.get("classId"),
         )
     raw = binding.read_call(
         OBJECT_GET_URI,
@@ -20073,6 +20086,8 @@ def dispatch_business_object_binding(
             closed_selector.expected_name is not None
             and identity.name != closed_selector.expected_name
         )
+        or (closed_selector.expected_class_id is not None
+            and (type(row.get("classId")) is not int or row["classId"] != closed_selector.expected_class_id))
     ):
         raise GatewayResultShapeError(
             "Live business object row does not match its exact selector.",
@@ -23566,6 +23581,15 @@ def _dispatch_transaction_command_with_execution_lease(
             from wwise_waapi.creation_observations import verified_created_objects
             created_objects = verified_created_objects(verification.as_dict())
             if created_objects:
+                for created in created_objects:
+                    if ("parent_id" in created and "owner_id" not in created
+                            and "compound_child_index" not in created and isinstance(created.get("result_handle"), str)
+                            and transaction_request.get("operation") in {"object.create", "object.set"}):
+                        created["configuration_binding"] = {
+                            "append": ["--verified-created-from", transaction_id, "--created-result-handle", created["result_handle"]],
+                            "requires_separate_Draft_and_Preview": True,
+                            "identity": "sealed_created_node_then_fresh_exact_GUID_name_type_path",
+                            "repeat_creation": False}
                 agent_result.setdefault("business_result", {}).update(created_objects=created_objects,
                     configuration_complete=verification.business_state_verified,
                     identity_source="independently_verified_creation_occurrences")
@@ -28093,6 +28117,9 @@ def _business_next_action_binding(
     by_verified_creation = operation_draft_prefix_copy_binding(object_bind_prefix)
     by_verified_creation["append"] = ["--verified-created-from", "<creation-transaction-id>"]
     by_verified_creation["requires"] = "sealed_independent_root_identity_and_fresh_exact_GUID_name_type_path_match"
+    by_verified_creation["selected_created_node"] = {"append": ["--created-result-handle", "<returned-created-result-handle>"],
+        "requires": "same_transaction_verified_ordinary_created_node; copy_its_configuration_binding",
+        "default_without_selection": "created_root_only"}
     by_path_segments = operation_draft_prefix_copy_binding(object_bind_prefix)
     by_path_segments["append_repeated"] = [
         "--object-path-segment",

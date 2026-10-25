@@ -370,14 +370,14 @@ def prove_source_owned_empty_list(evidence, owner_row, *, read, platform=None):
     owner = scope.get("scope_value")
     if (evidence.get("kind") != "documented-list" or scope.get("scope_kind") != "object"
             or (name not in {"RTPC", "Effects"} and owned_inner_identity(evidence, 5570560) is None
-                and not is_manual_marker_list_source(evidence))
+                and owned_inner_identity(evidence, 5636096) is None and not is_manual_marker_list_source(evidence))
             or not isinstance(owner_row, Mapping)
             or set(owner_row) != {"id"} or owner_row.get("id", "").upper() != owner
             or not isinstance(evidence.get("source_sha256"), str)):
         raise ValueError("Missing List projection requires its exact documented owner/source and supported empty-list representation")
     from .operation_registry import _prove_omitted_object_list_empty
     empty = _prove_omitted_object_list_empty(owner, name, read=read, platform=platform,
-        **({"documented_list": evidence} if name in {"Metadata", "Markers"} else {}))
+        **({"documented_list": evidence} if name in {"Metadata", "Playlist", "Markers"} else {}))
     return {"kind": "missing-empty-object-list", "version": evidence["version"],
         "field": "@" + name, "observed_row_keys": ["id"], "normalized_value": [],
         "list_source": dict(evidence), "emptiness_readback": empty}

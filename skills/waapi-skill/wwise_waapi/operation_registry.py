@@ -10701,10 +10701,10 @@ def _prove_omitted_object_list_empty(
     an unbounded list or treat a failed/malformed query as an empty result.
     """
     from .documented_list_fields import owned_inner_identity, is_manual_marker_list_source
-    certified_metadata = (list_name == "Metadata" and isinstance(documented_list, Mapping)
+    certified_metadata = (list_name in {"Metadata", "Playlist"} and isinstance(documented_list, Mapping)
         and documented_list.get("scope", {}).get("scope_kind") == "object"
         and documented_list["scope"].get("scope_value") == object_id
-        and owned_inner_identity(documented_list, 5570560) is not None)
+        and owned_inner_identity(documented_list, {"Metadata": 5570560, "Playlist": 5636096}[list_name]) is not None)
     certified_marker = (list_name == "Markers" and isinstance(documented_list, Mapping)
         and documented_list.get("scope", {}).get("scope_value") == object_id
         and is_manual_marker_list_source(documented_list))
@@ -10791,7 +10791,8 @@ def _read_object_list_rows_with_evidence(
     compatibility_normalization: dict[str, Any] | None = None
     if list_field not in owner_row:
         if (version in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"} and canonical_name in {"RTPC", "Effects"}
-                or version in {"2023.1", "2024.1", "2025.1"} and canonical_name == "Markers"):
+                or version in {"2023.1", "2024.1", "2025.1"} and canonical_name == "Markers"
+                or version == "2025.1" and canonical_name == "Playlist"):
             from .documented_list_fields import resolve_live_list_evidence, prove_source_owned_empty_list
             try:
                 source = resolve_live_list_evidence(version, object_id, canonical_name, read=read)

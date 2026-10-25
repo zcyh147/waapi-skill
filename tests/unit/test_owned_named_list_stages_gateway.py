@@ -703,6 +703,10 @@ def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', 
         return original(uri, args, options)
     task.call = call
     owner, target = task.bind(owner_id), task.bind(target_id)
+    return declare_playlist_member(task, owner, target, reference=reference, list_behavior=list_behavior)
+
+
+def declare_playlist_member(task, owner, target, *, reference=True, list_behavior='append'):
     if list_behavior != 'append':
         code, configured = task.step('draft-business-configure', '--name-conflict', 'fail', '--list-behavior', list_behavior)
         assert code == 0, json.dumps(configured)
@@ -911,4 +915,106 @@ def test_playlist_replacement_preserves_prewrite_guards_and_requires_old_guid_ab
     code, result = task.run('verify' if damage == 'old-guid-retained' else 'execute', tx)
     assert code == 2, result
     assert len(task.writes) == (damage == 'old-guid-retained')
+    assert task.run('execute', tx)[0] == 2
+
+
+def new_playlist_hierarchy_task(tmp_path):
+    from tests.unit.test_new_object_conditions_gateway import restart
+    task = playlist_creation_task(tmp_path)
+    task.objects = {SECOND: {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'classId': 1638416,
+        'path': r'\Containers\Default Work Unit', 'notes': 'Keep parent'}}
+    task.types.append({'name': 'WorkUnit', 'classId': 1638416, 'type': 'WObject'})
+    task.metadata['RandomOrSequence'] = {'name': 'RandomOrSequence', 'type': 'int32', 'default': 0,
+        'restriction': {'type': 'range', 'min': 0, 'max': 1}}
+    original = task.call
+    task.hierarchy_writes = []
+    def call(uri, args=None, options=None):
+        if uri == 'ak.wwise.core.object.create':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.hierarchy_writes.append(deepcopy(args))
+            assert args['type'] == 'RandomSequenceContainer' and args['name'] == 'Numbers' and args['@RandomOrSequence'] == 1
+            child, = args['children']
+            assert child == {'type': 'Sound', 'name': 'First'}
+            path = task.objects[SECOND]['path'] + r'\Numbers'
+            task.objects[ROOT] = {'id': ROOT, 'name': 'Numbers', 'type': 'RandomSequenceContainer', 'classId': 589840,
+                'path': path, 'parent': {'id': SECOND}, 'notes': '', '@RandomOrSequence': 1, '@Playlist': []}
+            task.objects[FIRST] = {'id': FIRST, 'name': 'First', 'type': 'Sound', 'classId': 65552,
+                'path': path + r'\First', 'parent': {'id': ROOT}, 'notes': ''}
+            return {'id': ROOT, 'name': 'Numbers', 'children': [{'id': FIRST, 'name': 'First'}]}
+        result = original(uri, args, options)
+        if (uri == 'ak.wwise.core.object.get' and options == {'return': ['id', '@Playlist']}
+                and ROOT in task.objects and task.objects[ROOT]['@Playlist'] == []):
+            for row in result.get('return', []):
+                row.pop('@Playlist', None)
+        return result
+    task.call = call
+    restart(task, 'object.create')
+    parent = task.bind(SECOND)
+    kinds = {}
+    for name in ('RandomSequenceContainer', 'Sound'):
+        code, kinds_result = task.step('draft-discover-types', '--role', 'object', '--meaning', name)
+        assert code == 0, kinds_result
+        kinds[name] = kinds_result['type_candidates'][0]['handle']
+    code, fields = task.step('draft-discover-fields', '--type-handle', kinds['RandomSequenceContainer'], '--meaning', 'RandomOrSequence')
+    assert code == 0, fields
+    mode = fields['meaning_results'][0]['candidates'][0]['handle']
+    code, owner = task.step('draft-declare-new', '--declaration-id', 'owner', '--parent-handle', parent,
+        '--name', 'Numbers', '--kind', kinds['RandomSequenceContainer'], '--field-value', mode, '1')
+    assert code == 0, owner
+    code, child = task.step('draft-declare-new', '--declaration-id', 'child',
+        '--parent-handle', owner['draft']['declared_object']['result_handle'], '--name', 'First', '--kind', kinds['Sound'])
+    assert code == 0, child
+    task.child_result_handle = child['draft']['declared_object']['result_handle']
+    return task
+
+
+def test_new_owner_and_child_continue_to_playlist_through_two_verified_previews(tmp_path):
+    from tests.unit.test_new_object_conditions_gateway import restart
+    task = new_playlist_hierarchy_task(tmp_path)
+    tx, shown = task.preview()
+    code, created = task.finish(tx, shown)
+    assert code == 0 and created['verified'] is True, created
+    roster = {row['object']['type']: row for row in created['agent_result']['business_result']['created_objects']}
+    assert set(roster) == {'RandomSequenceContainer', 'Sound'}
+    assert all('configuration_binding' in row for row in roster.values()), json.dumps(roster)
+    restart(task, 'object.set')
+    handles = []
+    for kind in ('RandomSequenceContainer', 'Sound'):
+        binding = roster[kind]['configuration_binding']
+        code, bound = task.step('draft-bind-object', *binding['append'])
+        assert code == 0, bound
+        handles.append(bound['bound_object']['handle'])
+    declare_playlist_member(task, *handles)
+    slot_tx, shown = task.preview()
+    assert slot_tx != tx
+    assert task.run('execute', slot_tx)[0] == 2 and task.writes == []
+    assert task.run('confirm', slot_tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, executed = task.run('execute', slot_tx)
+    assert code == 0, executed
+    code, verified = task.run('verify', slot_tx)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects[ROOT]['@Playlist'] == [{'id': SLOT}] and task.objects[SLOT]['PlaylistObject'] == {'id': FIRST}
+    assert len(task.hierarchy_writes) == len(task.writes) == 1
+    assert task.run('execute', tx)[0] == task.run('execute', slot_tx)[0] == 2
+
+
+@pytest.mark.parametrize('damage', ['forged', 'unverified', 'class-drift'])
+def test_created_node_continuation_rejects_unproved_selection_without_recreating(tmp_path, damage):
+    from tests.unit.test_new_object_conditions_gateway import restart
+    task = new_playlist_hierarchy_task(tmp_path)
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    if damage != 'unverified':
+        code, verified = task.run('verify', tx)
+        assert code == 0 and verified['verified'] is True, verified
+    if damage == 'class-drift':
+        task.objects[FIRST]['classId'] = 589840
+    result_handle = 'bnh1-' + 'f' * 32 if damage == 'forged' else task.child_result_handle
+    restart(task, 'object.set')
+    revision = task.revision
+    code, rejected = task.step('draft-bind-object', '--verified-created-from', tx, '--created-result-handle', result_handle)
+    assert code == 2 and task.revision == revision, rejected
+    assert len(task.hierarchy_writes) == 1 and task.writes == []
     assert task.run('execute', tx)[0] == 2

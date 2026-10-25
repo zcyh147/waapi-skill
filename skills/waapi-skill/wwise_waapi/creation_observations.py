@@ -236,3 +236,17 @@ def verified_created_objects(verification):
         **({"compound_child_index": row["compound_child_index"]} if "compound_child_index" in row else {})}
         for row in verification.get("assertions", [])
         if row.get("kind") in {"verified_created_node_identity", "verified_created_list_member_identity"} and row.get("passed") is True]
+
+
+def verified_created_occurrence_identity(verification, result_handle):
+    """Select one sealed ordinary creation witness, never a changed existing node."""
+    rows = [row for row in verified_created_objects(verification)
+        if row.get('result_handle') == result_handle and 'parent_id' in row
+        and 'owner_id' not in row and 'compound_child_index' not in row]
+    if len(rows) != 1 or type(rows[0].get('class_id')) is not int:
+        return None
+    try:
+        identity = normalize_live_object_identity({**rows[0]['object'], 'classId': rows[0]['class_id']})
+    except (ValueError, KeyError, TypeError):
+        return None
+    return {'id': identity.object_id, 'name': identity.name, 'type': identity.object_type, 'path': identity.path, 'classId': rows[0]['class_id']}

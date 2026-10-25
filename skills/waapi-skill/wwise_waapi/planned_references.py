@@ -38,7 +38,7 @@ def compile_result_reference(session, field, handle, *, native_type, allowed_typ
     return {"kind": "id", "value": handle}
 
 
-def graph_result_bindings(roots, result_handles):
+def graph_result_bindings(roots, result_handles, *, retain_created_results=False):
     bindings, targets = [], set()
     def visit(node, path):
         handle = result_handles.get(id(node))
@@ -74,7 +74,7 @@ def graph_result_bindings(roots, result_handles):
                 and "rtpc" not in child and child.get("anonymous") is not True]
             names = [child["name"].casefold() for child in ordinary]
             return len(names) != len(set(names)) or any(has_duplicate_children(child) for child in ordinary)
-        if not any(has_rtpc(node) or has_duplicate_children(node) for node, _ in roots):
+        if not retain_created_results and not any(has_rtpc(node) or has_duplicate_children(node) for node, _ in roots):
             return []
     if targets - {row["result_handle"] for row in bindings}:
         raise ValueError("Every planned reference target must belong to this compiled graph")

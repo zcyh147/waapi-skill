@@ -942,7 +942,7 @@ def _materialize_create(
         **root_node,
         **_compile_create_settings(session),
     }
-    result_bindings = graph_result_bindings([(root_node, "$")], node_result_handles)
+    result_bindings = graph_result_bindings([(root_node, "$")], node_result_handles, retain_created_results=True)
     if result_bindings:
         arguments["graph_result_bindings"] = result_bindings
     if "list" in root_node:
