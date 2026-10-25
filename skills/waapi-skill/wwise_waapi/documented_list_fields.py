@@ -21,6 +21,40 @@ METADATA_INNER_OWNERS = {
 }
 
 
+# Matching installed WObjects.xml, not the 2025 PlaylistSlot scalar profile.
+LEGACY_PLAYLIST_SOURCES = {
+    "2023.1": {"build": "2023.1.19.8928",
+        "wobjects_sha256": "bae4d5fdd821fef226f1939d34ba1810e08bf79578fb8edc4ae3bdc3c66bd468",
+        "example_sha256": "1cb2959e6e7584c431c88722f1db6784dfbef037820709ddafdce9af76694c83"},
+    "2024.1": {"build": "2024.1.13.9056",
+        "wobjects_sha256": "28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f",
+        "example_sha256": "5e03c8041ff9fd4214b3d3b9a6b2cd9b409282d47bbc82531ac25bcb39dbe27b"},
+}
+
+
+def legacy_playlist_authority(evidence):
+    """Closed version/owner/List profile; ordinary hierarchy targets survive removal."""
+    version = evidence.get("version")
+    if (version not in LEGACY_PLAYLIST_SOURCES or evidence.get("scope", {}).get("class_id") != 589840
+            or evidence.get("declaration", {}).get("name") != "Playlist"):
+        return None
+    catalog = load_catalog(version)
+    row, = [row for row in catalog["classes"] if row["class_id"] == 589840]
+    field, = [field for field in row["lists"] if field["name"] == "Playlist"]
+    if (catalog["source"]["build"] != LEGACY_PLAYLIST_SOURCES[version]["build"]
+            or evidence.get("catalog_sha256") != catalog["catalog_sha256"]
+            or evidence.get("source_member") != row["source_member"]
+            or evidence.get("source_sha256") != row["source_sha256"] or evidence.get("declaration") != field
+            or field["element_classes"] != [{"name": name, "class_id": identity} for name, identity in
+                [("Sound", 65552), ("RandomSequenceContainer", 589840), ("SwitchContainer", 655376), ("BlendContainer", 1900560)]]):
+        raise ValueError("Legacy Playlist lost its exact documented reference-list source")
+    return {**LEGACY_PLAYLIST_SOURCES[version], "version": version,
+        "wobjects_member": "Authoring/Data/WObjects/WObjects.xml",
+        "restriction_path": "ObjectBase[RandomSequenceContainer]/ObjectLists/ObjectList[Playlist]/Restrictions",
+        "object_must_child_of": True, "ordered_repeated_references": True,
+        "example_member": "ak_wwise_core_object_set_example_changing_the_playlist_of_a_random_sequence_object.html"}
+
+
 def discovery_contract():
     return {"append": ["--field-source", "documented-lists", "--list"],
         "scope": "copy_exact_bound_owner_handle_or_type_handle", "selection": "copy_one_returned_scoped_selection",
@@ -387,11 +421,12 @@ def observe_list_binding(evidence, *, read, preserve_reference_ids=(), after_wri
     """Observe ordered member IDs, exact classes, and actual owner presence."""
     if not isinstance(evidence, Mapping) or evidence.get("kind") != "documented-list":
         raise ValueError("An exact documented-list proof is required")
+    authority = legacy_playlist_authority(evidence)
     reference_targets = evidence.get("reference_targets")
     if reference_targets is not None and (not isinstance(reference_targets, list) or len(reference_targets) > 32
-            or len(set(reference_targets)) != len(reference_targets)
+            or authority is None and len(set(reference_targets)) != len(reference_targets)
             or any(not isinstance(value, str) or not re.fullmatch(r"\{[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}", value) for value in reference_targets)):
-        raise ValueError("Documented List reference assignment needs bounded exact distinct GUIDs")
+        raise ValueError("Documented List reference assignment needs bounded exact GUIDs; repeats require a certified source profile")
     source_evidence = {key: value for key, value in evidence.items() if key != "reference_targets"}
     scope = evidence["scope"]
     if scope["scope_kind"] != "object":
@@ -428,11 +463,12 @@ def observe_list_binding(evidence, *, read, preserve_reference_ids=(), after_wri
     if any(not isinstance(value, str) or not re.fullmatch(r"\{[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}", value) for value in ids):
         raise ValueError("List membership must contain canonical GUIDs")
     ids = [value.upper() for value in ids]
-    if len(set(ids)) != len(ids):
+    if authority is None and len(set(ids)) != len(ids):
         raise ValueError("List membership contains duplicate GUIDs")
     reference_ids = list(dict.fromkeys([*ids, *(reference_targets or []), *preserve_reference_ids]))
     if not reference_ids:
-        return {"evidence": dict(evidence), "members": [], **({"reference_objects": [],
+        return {"evidence": dict(evidence), "members": [],
+            **({"reference_list_authority": authority} if authority is not None else {}), **({"reference_objects": [],
             "ownership_scope": "actual_key_presence_and_value_retained; not_inferred_from_List_or_native_type"}
             if reference_targets is not None else {})}
     projection = ["id", "name", "type", "path", "classId", "owner", "parent", "notes"]
@@ -457,8 +493,15 @@ def observe_list_binding(evidence, *, read, preserve_reference_ids=(), after_wri
         owner_id = native_owner.get("id") if isinstance(native_owner, Mapping) else native_owner
         if reference_targets is None and ("owner" not in member or not isinstance(owner_id, str) or owner_id.upper() != owner):
             raise ValueError("Actual member ownership is unproved or differs from the selected List owner")
+        if authority is not None:
+            parent = member.get("parent")
+            parent_id = parent.get("id") if isinstance(parent, Mapping) else parent
+            if not isinstance(parent_id, str) or parent_id.upper() != owner:
+                raise ValueError("Legacy Playlist reference must remain an actual direct child of its exact owner")
         observed[identity] = {key: member[key] for key in projection if key in member}
     result = {"evidence": dict(evidence), "members": [observed[identity] for identity in ids]}
+    if authority is not None:
+        result["reference_list_authority"] = authority
     if reference_targets is not None:
         result["reference_objects"] = [observed[identity] for identity in sorted(reference_ids)]
         result["ownership_scope"] = "actual_key_presence_and_value_retained; not_inferred_from_List_or_native_type"
@@ -520,24 +563,27 @@ def slot_reference_preservation_assertions(before, *, read):
 
 def observe_planned_reference_targets(binding, *, read):
     identities = binding.get("reference_targets")
-    if (not isinstance(identities, list) or len(identities) > 32 or len(set(identities)) != len(identities)
+    authority = legacy_playlist_authority(binding)
+    if (not isinstance(identities, list) or len(identities) > 32
+            or authority is None and len(set(identities)) != len(identities)
             or any(not isinstance(value, str) or not re.fullmatch(r"\{[A-F0-9]{8}(?:-[A-F0-9]{4}){3}-[A-F0-9]{12}\}", value) for value in identities)):
         raise ValueError("Planned reference Lists require bounded distinct canonical target GUIDs")
     if not identities:
         return []
-    result = read("ak.wwise.core.object.get", {"from": {"id": identities}},
+    unique_ids = list(dict.fromkeys(identities))
+    result = read("ak.wwise.core.object.get", {"from": {"id": unique_ids}},
         {"return": ["id", "name", "type", "path", "classId", "parent", "owner", "notes"]})
     rows = result.get("return") if isinstance(result, Mapping) else None
     allowed = {item["class_id"] for item in binding["declaration"]["element_classes"]}
     actual = {row.get("id"): row for row in rows if isinstance(row, Mapping)} if isinstance(rows, list) else {}
-    if (not isinstance(rows, list) or len(rows) != len(identities) or len(actual) != len(identities)
+    if (not isinstance(rows, list) or len(rows) != len(unique_ids) or len(actual) != len(unique_ids)
             or set(actual) != set(identities) or binding["declaration"]["unresolved_element_types"]
             or any(isinstance(row.get("classId"), bool) or row.get("classId") not in allowed for row in rows)):
         raise ValueError("Each actual planned reference List target must have one exact permitted class")
     return [actual[identity] for identity in identities]
 
 
-def planned_reference_guard_assertions(guards, *, read):
+def planned_reference_guard_assertions(guards, *, read, after_write=False):
     assertions = []
     for guard in guards:
         try:
@@ -548,6 +594,10 @@ def planned_reference_guard_assertions(guards, *, read):
                 {key: expected.get(key) for key in ("id", "classId")} if row["id"] in mutable else row == expected)
                 for row, expected in zip(actual, guard["targets"], strict=True))
             evidence = {"expected": guard["targets"], "actual": actual}
+            if guard.get("reference_list_guard") is not None:
+                owner_checks = list_guard_assertions([guard["reference_list_guard"]], read=read, after_write=after_write)
+                passed = passed and all(check["passed"] for check in owner_checks)
+                evidence["owner_checks"] = owner_checks
         except (ValueError, KeyError, TypeError) as exc:
             evidence, passed = {"error": str(exc)}, False
         assertions.append({"name": "planned reference List source, target classes and unchanged external state remain bound",
