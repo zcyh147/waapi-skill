@@ -68,7 +68,14 @@ def test_legacy_playlist_native_workflow_persists_completed_phases_and_failures(
             if verified_count == 2 and fault == 'missing-target-proof' and identity == up:
                 rows = []
             return {'return': task.project_rows(rows, options)}
-        return original(uri, args, options)
+        result = original(uri, args, options)
+        if uri.endswith('object.get') and task.objects[owner].get('@Playlist') == []:
+            # Retained 2023 clear packets: the direct owner projection omits
+            # @Playlist while the independent select @Playlist returns [].
+            for row in result.get('return', []):
+                if row.get('id') == owner:
+                    row.pop('@Playlist', None)
+        return result
     task.call = call
     def raw(argv):
         nonlocal verified_count
