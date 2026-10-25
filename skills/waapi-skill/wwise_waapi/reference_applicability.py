@@ -1,7 +1,7 @@
-"""Source-backed existing-reference visibility, shared by fields and transactions.
+"""Source-backed existing-reference applicability for fields and transactions.
 
-This proves an exact structural Show condition. It never reports a native
-property-enabled result, changes topology, or supplies a property default.
+Structural Show conditions and explicit Master Sink target denials stay distinct.
+Neither reports native property-enabled state, changes topology, or supplies defaults.
 """
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from .metadata_restrictions import is_master_bus_visibility_dependency
 from .operation_object import DEFAULT_MAX_DEPTH
 
 _SOURCE = Path(__file__).resolve().parents[1] / "resources/metadata/reference-master-bus-applicability.json"
+_SINK_SOURCE = _SOURCE.with_name("reference-master-sink-capabilities.json")
 _GUID = re.compile(r"\{[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}")
 _FIELDS = ("id", "name", "type", "path", "classId", "parent")
 
@@ -119,3 +120,53 @@ def proof_current(proof, *, read, info, after_write=False, edits=()):
     observed = prove(version=proof["version"], object_id=proof["object_id"], info=info,
         read=read, platform=proof["platform"])
     return _native_snapshot_equal(observed, expected)
+
+
+def master_sink_target(*, version, source_id, target_id, info, read):
+    """Bind the explicit target denial to an existing Bus/reference and live class.
+
+    Unspecified capabilities do not become false or true. The installed SDK is
+    provenance only; runtime uses this sealed resource and fresh WAAPI facts.
+    """
+    if source_id is None or info.name != "AudioDevice" or not is_reference(info):
+        return None
+    owner = _row(read, source_id)
+    if owner.get("type") != "Bus":
+        return None
+    raw = _SINK_SOURCE.read_bytes()
+    if len(raw) > 65536:
+        raise ValueError("Master Sink capability source exceeds its fixed bound")
+    source = json.loads(raw)
+    if (source.get("contract") != "waapi-skill.reference-master-sink-capabilities/v1"
+            or canonical_sha256({key: value for key, value in source.items() if key != "sha256"}) != source.get("sha256")):
+        raise ValueError("Master Sink capability source seal is invalid")
+    lane = source["versions"].get(version)
+    if lane is None:
+        raise ValueError("No matching Master Sink target capability source for this version")
+    catalog_bytes = (_SOURCE.parent / version / "object-types.json").read_bytes()
+    if hashlib.sha256(catalog_bytes).hexdigest() != lane["types_sha256"]:
+        raise ValueError("Master Sink capability class source has changed")
+    denied_class = source["target_class"]
+    catalog = json.loads(catalog_bytes)["types"]
+    owner_class = source["source_role"]["classId"]
+    if (catalog.count(denied_class) != 1 or type(owner.get("classId")) is not int
+            or owner["classId"] != owner_class
+            or len([item for item in catalog if item.get("name") == "Bus" and item.get("classId") == owner_class]) != 1):
+        raise ValueError("Master Sink capability classes contradict matching source")
+    target = _row(read, target_id)
+    class_id = target.get("classId")
+    live = parse_get_types_result(read("ak.wwise.core.object.getTypes", {}, {}))
+    matches = [item for item in live if item.class_id == class_id]
+    if (type(class_id) is not int or target.get("type") != "AudioDevice"
+            or len(matches) != 1 or matches[0].type != "AudioDevice"
+            or not isinstance(matches[0].name, str) or not matches[0].name
+            or len([item for item in live if item.name == matches[0].name]) != 1):
+        raise ValueError("Master Sink target requires one fresh installed AudioDevice class")
+    actual_class = matches[0].as_dict()
+    known = class_id == denied_class["classId"] or actual_class["name"] == denied_class["name"]
+    if known and actual_class != denied_class:
+        raise ValueError("Installed Master Sink target class contradicts matching capability source")
+    return {"kind": "master_sink_target", "version": version, "source_id": source_id,
+        "target_id": target_id, "reference": info.name, "source_class_id": owner["classId"],
+        "class": actual_class, "source_sha256": source["sha256"],
+        "CanBeMasterSink": source["capability"]["CanBeMasterSink"] if known else "unspecified"}

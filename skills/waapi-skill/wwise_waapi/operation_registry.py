@@ -26854,6 +26854,20 @@ def _require_reference_target_allowed(
     wwise_version=None,
     allow_playlist_slot=False,
 ) -> None:
+    if read is not None and conditions is not None:
+        from .reference_applicability import master_sink_target
+        try:
+            sink_condition = master_sink_target(version=wwise_version, source_id=source_id,
+                target_id=target.object, info=metadata, read=read)
+        except (ValueError, KeyError, TypeError, OSError) as exc:
+            raise OperationContractError("REFERENCE_APPLICABILITY_UNPROVEN", str(exc)) from exc
+        if sink_condition is not None:
+            if sink_condition["CanBeMasterSink"] is False:
+                raise OperationContractError("INVALID_REFERENCE_TARGET",
+                    "The selected Audio Device class explicitly cannot be a Master Sink.",
+                    details={**sink_condition, "mutation_dispatched": False})
+            if sink_condition not in conditions:
+                conditions.append(sink_condition)
     if "mustChildOf" in (metadata.restriction.get("restrictions") or []):
         if not allow_playlist_slot or source_id is None or read is None or conditions is None:
             raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "PlaylistSlot hierarchy requires the existing object.setReference business path.")
@@ -27117,6 +27131,18 @@ def _reference_target_condition_assertions(pre_state, *, read, after_write):
     conditions = pre_state.get("reference_target_conditions", []) if isinstance(pre_state, Mapping) else []
     assertions = []
     for condition in conditions:
+        if condition.get("kind") == "master_sink_target":
+            from .reference_applicability import master_sink_target
+            info = _read_property_info(read, object_id=condition["source_id"], name=condition["reference"])
+            try:
+                actual = master_sink_target(version=condition["version"], source_id=condition["source_id"],
+                    target_id=condition["target_id"], info=info, read=read)
+                valid = _native_snapshot_equal(actual, condition)
+            except (ValueError, KeyError, TypeError, OSError) as exc:
+                actual, valid = {"error": str(exc)}, False
+            assertions.append({"name": "Audio Device retains its source-bound Master Sink target class",
+                "passed": valid, "evidence": {"expected": condition, "actual": actual}})
+            continue
         if condition.get("kind") == "prospective_playlist_slot_direct_child":
             from .playlist_reference_conditions import prospective_assertion
             assertions.append(prospective_assertion(condition, read=read, after_write=after_write))
