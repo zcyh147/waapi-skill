@@ -4967,6 +4967,7 @@ def _prepare_object_create(
         normalized.nodes,
         root_parent=parent,
         root_collection=list_name or "children",
+        playlist_owner=parent if list_name == "Playlist" else None,
         version=request.version,
         type_catalog=type_catalog,
         read=read,
@@ -5009,6 +5010,9 @@ def _prepare_object_create(
         if proof["declaration"]["unresolved_element_types"] or node_specs[0]["class_id"] not in allowed_classes:
             raise OperationContractError("DOCUMENTED_LIST_ELEMENT_CLASS_INVALID", "The requested root class is not proved by this exact List source")
         node_specs[0]["documented_list_element_class"] = node_specs[0]["class_id"]
+        if request.version == "2025.1" and list_name == "Playlist":
+            from .documented_list_fields import owned_inner_identity
+            node_specs[0]["inner_identity"] = owned_inner_identity(proof, node_specs[0]["class_id"])
         _merge_observed_list_guards(documented_guards, [observe_list_binding(proof, read=read)])
         list_before = _normalize_object_list_snapshot(
             _read_object_list(
@@ -5017,6 +5021,7 @@ def _prepare_object_create(
                 fields=OBJECT_LIST_SNAPSHOT_FIELDS,
                 read=read,
                 platform=platform,
+                version=request.version,
             ),
             owner_id=parent.object,
             list_name=list_name,
@@ -5262,6 +5267,8 @@ def _prepare_object_create(
         native_nodes=render_native_nodes,
         prepared_names=result_context["prepared_names"] if result_context else None,
     )
+    if node_specs[0].get("inner_identity", {}).get("collection") == "Playlist":
+        trusted_root["name"] = ""
     null_reference_omissions = _omit_new_sound_null_reference_assignments(
         version=request.version, conflict=conflict, root_path=root_path, list_name=list_name,
         node_specs=node_specs, native_nodes=render_native_nodes, path_snapshots=path_snapshots,
@@ -8822,7 +8829,7 @@ def _prepare_object_node_specs(
         if version == "2025.1" and type_info.class_id == 5636096 and merge_target is None:
             if playlist_owner is None or root_collection != "Playlist" or node.parent_request_path in node_paths:
                 raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
-                    "New PlaylistSlot construction requires the source-proven object.set List path on an exact existing owner.")
+                    "New PlaylistSlot construction requires the source-proven root object.create or object.set List path on an exact existing owner.")
             if not any(field.name == "PlaylistObject" for field in node.references):
                 raise OperationContractError("PLAYLIST_CONSTRUCTOR_TARGET_REQUIRED",
                     "Choose the exact existing direct child before constructing this Playlist member. Empty-slot construction remains unproven.",
@@ -21547,8 +21554,8 @@ def verify_prepared_operation(
             staged_voice_root = (kind == "object-set-batch" and stage_record.get("stage") == "voice"
                 and request_path == "$.objects[0].children[0]" and len(specs) == 2
                 and not spec.get("existing_target") and not spec.get("preexisting_id"))
-            if ((kind == "object-create-graph" and parent_request_path is None and not spec.get("preexisting_id"))
-                    or staged_voice_root):
+            if ((kind == "object-create-graph" and parent_request_path is None and not spec.get("preexisting_id")
+                    and not spec.get("inner_identity")) or staged_voice_root):
                 identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
                 relation = ("owner" if spec.get("collection") not in {None, "children"} else "parent")
                 identity_ok = (

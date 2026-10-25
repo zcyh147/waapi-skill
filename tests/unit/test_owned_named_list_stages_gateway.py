@@ -686,6 +686,15 @@ def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', 
                 value = task.objects[match[1]].get('@Playlist' if match[2] == 'Playlist' else 'PlaylistObject')
                 ids = [row['id'] for row in value] if isinstance(value, list) else [value['id']]
                 return {'return': task.project_rows([task.objects[oid] for oid in ids], options)}
+        if uri == 'ak.wwise.core.object.create' and args.get('list') == 'Playlist':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.writes.append(deepcopy(args))
+            assert args['parent'] == owner_id and args['type'] == 'PlaylistSlot' and args['name'] == ''
+            assert args['@PlaylistObject'] == target_id and 'objects' not in args
+            task.objects[new_slot_id] = {'id': new_slot_id, 'name': '', 'type': 'PluginInnerObject', 'classId': 5636096,
+                'path': base + r'\[PlaylistSlot: (First)]', 'owner': {'id': owner_id}, 'notes': '', 'PlaylistObject': {'id': target_id}}
+            task.objects[owner_id]['@Playlist'].append({'id': new_slot_id})
+            return {'id': new_slot_id, 'name': ''}
         if uri == SET:
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             task.writes.append(deepcopy(args))
@@ -874,15 +883,32 @@ def test_new_playlist_member_requires_selected_child_in_its_constructor(tmp_path
     assert task.writes == []
 
 
-@pytest.mark.parametrize('mode', ['object.create'])
-def test_new_playlist_member_does_not_extrapolate_its_constructor_contract(tmp_path, mode):
-    task = playlist_creation_task(tmp_path, operation='object.create' if mode == 'object.create' else 'object.set')
-    if mode == 'replace-all':
-        code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
-        assert code == 0, configured
-    code, result = task.step('draft-check')
-    assert code == 2 and 'CONSTRAINED_REFERENCE_BOUNDARY' in json.dumps(result), result
-    assert task.writes == []
+def test_playlist_object_create_uses_root_list_placement_and_plain_result(tmp_path):
+    task = playlist_creation_task(tmp_path, operation='object.create')
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    result = verified['agent_result']['business_result']
+    assert result['verified_root'] is None and result['identity_status'] == 'verified_owned_list_member'
+    assert result['configuration_operations'] == ['object.setReference', 'object.setNotes']
+    assert '--verified-created-from' not in json.dumps(result)
+    member, = result['created_objects']
+    assert member['object']['id'] == SLOT and member['owner_id'] == ROOT and member['list_name'] == 'Playlist'
+    assert 'result_schema' not in json.dumps(result)
+    assert task.objects[ROOT]['@Playlist'] == [{'id': OLD_SLOT}, {'id': SECOND_SLOT}, {'id': SLOT}]
+    assert len(task.writes) == 1 and task.writes[0]['list'] == 'Playlist'
+
+
+def test_playlist_object_create_rejects_wrong_actual_owner_without_recreating(tmp_path):
+    task = playlist_creation_task(tmp_path, operation='object.create')
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    task.objects[SLOT]['owner'] = {'id': FIRST}
+    code, result = task.run('verify', tx)
+    assert code == 2 and result.get('verified') is not True, result
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 1
 
 
 def test_new_playlist_member_replacement_removes_old_guids_and_verifies_exact_roster(tmp_path):

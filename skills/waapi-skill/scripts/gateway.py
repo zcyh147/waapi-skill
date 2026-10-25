@@ -19867,6 +19867,16 @@ def _verified_created_root_identity(verification: Mapping[str, Any]) -> dict[str
 
 def _created_root_business_result(verification: Mapping[str, Any], transaction_id: str) -> dict[str, Any]:
     identity = _verified_created_root_identity(verification)
+    from wwise_waapi.creation_observations import verified_created_objects
+    owned_roots = [row for row in verified_created_objects(verification)
+        if row.get("request_path") == "$" and row.get("list_name") == "Playlist"
+        and row.get("class_id") == 5636096 and row.get("name_role") == "declaration_label" and "owner_id" in row]
+    if identity is None and len(owned_roots) == 1:
+        return {"contract": "waapi-skill.verified-created-owned-list/v1", "identity_status": "verified_owned_list_member",
+            "verified_root": None, "verified_member": owned_roots[0]["object"], "configuration_complete": True,
+            "configuration_operations": ["object.setReference", "object.setNotes"],
+            "configuration_binding": {"append": ["--object-id", owned_roots[0]["object"]["id"]],
+                "requires_separate_Draft_and_Preview": True}, "repeat_creation": False}
     return {
         "contract": "waapi-skill.verified-created-root/v1",
         "identity_status": "verified" if identity is not None else "unavailable",
