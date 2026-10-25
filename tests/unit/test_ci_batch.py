@@ -500,3 +500,70 @@ def test_report_recovery_blocks_missing_or_unsafe_saved_facts(checkout, tmp_path
                        recover_from=str(first / 'summary.json'))
     assert result.returncode == 2, result.stdout + result.stderr
     assert counter.read_text().splitlines() == ['producer']
+
+
+def test_multigroup_report_recovery_preserves_completed_and_runs_only_proven_unstarted(checkout, tmp_path, monkeypatch):
+    counter = tmp_path / 'invocations.jsonl'
+    monkeypatch.setenv('BATCH_COUNTER', str(counter))
+    (checkout / 'tests/unit/test_cases.py').write_text('import os\nfrom pathlib import Path\n'
+        'def record(name):\n    with Path(os.environ["BATCH_COUNTER"]).open("a") as f: f.write(name + "\\n")\n'
+        'def test_first():\n    record("first")\n'
+        '    (Path(os.environ["WAAPI_TEST_BATCH_RESULT"]).parents[2] / "summary.pending").mkdir()\n'
+        'def test_later():\n    record("later")\n')
+    prefix = 'tests/unit/test_cases.py::'
+    groups = [group('first', [prefix + 'test_first']),
+              group('later', [prefix + 'test_later'], depends_on=['first'])]
+    first = tmp_path / 'report-failed'
+    assert run_batch(checkout, first, groups).returncode != 0
+    original_summary = (first / 'summary.json').read_bytes()
+    assert (first / 'groups/first/completion.json').is_file()
+    recovered = tmp_path / 'recovered'
+    result = run_batch(checkout, recovered, groups, recover_from=str(first / 'summary.json'))
+    assert result.returncode == 2, result.stdout + result.stderr
+    rows = json.loads((recovered / 'summary.json').read_bytes())['groups']
+    assert [(r['id'], r['outcome']) for r in rows] == [('first', 'REUSED'), ('later', 'BLOCKED')]
+    assert rows[1]['execution_state'] == 'NOT_STARTED'
+    assert counter.read_text().splitlines() == ['first']
+    assert (first / 'summary.json').read_bytes() == original_summary
+    repaired = tmp_path / 'repaired'
+    result = run_batch(checkout, repaired, groups, previous=str(recovered / 'summary.json'))
+    assert result.returncode == 0, result.stdout + result.stderr
+    rows = json.loads((repaired / 'summary.json').read_bytes())['groups']
+    assert [r['outcome'] for r in rows] == ['REUSED', 'PASS']
+    assert counter.read_text().splitlines() == ['first', 'later']
+    assert not (repaired / 'groups/first/result.json').exists()
+    # A legacy/missing dispatch record cannot turn absence of a later result
+    # into evidence that the producer never started.
+    (first / 'dispatch.json').unlink()
+    legacy = tmp_path / 'legacy-unknown'
+    assert run_batch(checkout, legacy, groups, recover_from=str(first / 'summary.json')).returncode == 2
+    rows = json.loads((legacy / 'summary.json').read_bytes())['groups']
+    assert rows[0]['outcome'] == 'REUSED' and rows[1]['execution_state'] == 'UNKNOWN'
+    assert run_batch(checkout, tmp_path / 'no-legacy-retry', groups,
+                     previous=str(legacy / 'summary.json')).returncode == 2
+    assert counter.read_text().splitlines() == ['first', 'later']
+
+
+def test_started_without_terminal_completion_remains_unknown_and_never_auto_retries(checkout, tmp_path, monkeypatch):
+    counter = tmp_path / 'invocations.jsonl'
+    monkeypatch.setenv('BATCH_COUNTER', str(counter))
+    (checkout / 'tests/unit/test_cases.py').write_text('import os\nfrom pathlib import Path\n'
+        'def record(name):\n    with Path(os.environ["BATCH_COUNTER"]).open("a") as f: f.write(name + "\\n")\n'
+        'def test_first():\n    record("first")\n'
+        'def test_started():\n    record("started")\n    os._exit(2)\n')
+    prefix = 'tests/unit/test_cases.py::'
+    groups = [group('first', [prefix + 'test_first']), group('started', [prefix + 'test_started'])]
+    first = tmp_path / 'interrupted'
+    assert run_batch(checkout, first, groups).returncode == 2
+    recovered = tmp_path / 'recovered'
+    result = run_batch(checkout, recovered, groups, recover_from=str(first / 'summary.json'))
+    assert result.returncode == 2, result.stdout + result.stderr
+    summary = json.loads((recovered / 'summary.json').read_bytes())
+    assert [r['outcome'] for r in summary['groups']] == ['REUSED', 'BLOCKED']
+    assert summary['groups'][1]['execution_state'] == 'UNKNOWN'
+    assert summary['requires_resolution'] == ['started']
+    for previous in (first, recovered):
+        result = run_batch(checkout, tmp_path / ('no-retry-' + previous.name), groups,
+                           previous=str(previous / 'summary.json'))
+        assert result.returncode == 2, result.stdout + result.stderr
+    assert counter.read_text().splitlines() == ['first', 'started']
