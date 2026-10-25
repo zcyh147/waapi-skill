@@ -419,7 +419,9 @@ def _controls_context(tmp_path, monkeypatch, fault=None):
     context = _console_context(tmp_path, monkeypatch, 'cleanup' if fault == 'cleanup' else None)
     _, runtime, client, _, _ = context
     original = client.call
-    bus_id = client.rows[CAPTURE_CAR_ID]['OutputBus']['id']
+    # The 2025.1 committed Busses/Default Work Unit.wwu defines this default
+    # meter witness. Cars registration is a separate acknowledged control.
+    meter_object = {'id': '{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}', 'name': 'Main Audio Bus'}
 
     def call(uri, args=None, options=None):
         if fault == 'stop-unknown' and uri == PREFIX + 'stopCapture':
@@ -428,10 +430,12 @@ def _controls_context(tmp_path, monkeypatch, fault=None):
         if uri in {PREFIX + suffix for suffix in ('registerMeter', 'unregisterMeter', 'getMeters', 'moveCursor', 'saveCapture')}:
             client.calls.append((uri, deepcopy(args), deepcopy(options)))
             if uri.endswith('getMeters'):
-                row = client.rows[bus_id]
-                return {'meters': [{'object': {key: deepcopy(row[key]) for key in options.get('return', ['id', 'name']) if key in row},
-                    'source': 'Bus', 'configurationName': '1.0', 'configurationMask': 4,
-                    'configurationType': 'Standard', 'channels': [{'name': 'C', 'value': -12.5}]}]}
+                row = meter_object if fault != 'meter-wrong-witness' else client.rows[client.rows[CAPTURE_CAR_ID]['OutputBus']['id']]
+                return {'meters': [{'object': {key: deepcopy(row[key]) for key in ('id', 'name')},
+                    'source': 'Bus', 'configurationName': 'Anonymous (20 channels)', 'configurationMask': 0,
+                    'configurationType': 'Anonymous', 'channels': [
+                        {'name': str(index), 'value': -13.25 if index <= 2 else -764.5}
+                        for index in range(1, 21)]}]}
             if uri.endswith('moveCursor'):
                 client.user_time -= 10
                 return {'return': client.user_time}
@@ -460,15 +464,46 @@ def test_console_meter_cursor_save_reaches_final_writer(tmp_path, monkeypatch):
     assert report['outcomes']['cursor_set']['evidence']['returned_time_ms'] == 1500
     assert report['outcomes']['cursor_move']['evidence']['returned_time_ms'] == 1490
     assert report['outcomes']['meters']['evidence']['registration_membership_verified'] is False
+    assert report['outcomes']['meters']['evidence']['registration_causality_verified'] is False
+    meter, = report['outcomes']['meters']['evidence']['meters']
+    assert meter['object'] == {'id': '{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}', 'name': 'Main Audio Bus'}
+    assert meter['object']['id'] != report['fixture_before']['bus']['id']
+    assert len(meter['channels']) == 20 and meter['channels'][0] == {'name': '1', 'value': -13.25}
     assert report['outcomes']['capture_file']['evidence']['file']['size'] > 0
     assert final['residual_state']['sandbox'] == 'deleted' and report['cleanup']['complete']
     uris = [uri for uri, _, _ in client.calls]
     for suffix in ('registerMeter', 'unregisterMeter', 'getMeters', 'setCursorTime', 'moveCursor', 'saveCapture', 'stopCapture'):
         assert uris.count(PREFIX + suffix) == 1
+    assert [args for uri, args, _ in client.calls if uri in (PREFIX + 'registerMeter', PREFIX + 'unregisterMeter')] == [
+        {'object': report['fixture_before']['bus']['id']}, {'object': report['fixture_before']['bus']['id']}]
     assert uris.index(PREFIX + 'getMeters') < uris.index(PREFIX + 'stopCapture') < uris.index(PREFIX + 'setCursorTime')
     assert not any(uri.endswith(('getVoices', 'getBusses', 'getRTPCs')) for uri in uris)
     assert report['public_call_count'] < report['limits']['public_calls']
     assert report['fixture_before'] == report['fixture_after']
+
+
+def test_console_wrong_meter_witness_preserves_siblings_and_final_failure(tmp_path, monkeypatch):
+    context = _controls_context(tmp_path, monkeypatch, 'meter-wrong-witness')
+    workflow, runtime, client, _, _ = context
+    with pytest.raises(AssertionError, match='Console playback/data probe incomplete') as caught:
+        getattr(workflow, CONTROL_NODE)(runtime)
+    final = _finish(context, tmp_path, monkeypatch, [(CONTROL_NODE, caught.value)])[-1]
+    category, = final['categories']
+    report = json.loads(Path(category['observation_path']).read_text())
+    assert final['invocation']['outcome'] == 'FAIL' and final['residual_state']['sandbox'] == 'quarantined'
+    assert category['status'] == 'blocked' and not report['complete']
+    assert {key: row['outcome'] for key, row in report['outcomes'].items()} == {
+        'meters': 'FAIL', 'cursor_set': 'PASS', 'cursor_move': 'PASS', 'capture_file': 'PASS'}
+    evidence = report['outcomes']['meters']['evidence']
+    row, = evidence['agent_result']['meters']
+    assert evidence['agent_result']['complete'] and row['channels']
+    assert row['object']['id'] == report['fixture_before']['bus']['id'] and row['object']['name'] == 'Cars'
+    assert evidence['meters'] == []
+    assert evidence['gateway_result']['agent_result'] == evidence['agent_result']
+    assert evidence['registration_membership_verified'] is evidence['registration_causality_verified'] is False
+    assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
+    assert [args for uri, args, _ in client.calls if uri in (PREFIX + 'registerMeter', PREFIX + 'unregisterMeter')] == [
+        {'object': row['object']['id']}, {'object': row['object']['id']}]
 
 
 def test_unavailable_console_cursor_preserves_meter_and_saved_file(tmp_path, monkeypatch):

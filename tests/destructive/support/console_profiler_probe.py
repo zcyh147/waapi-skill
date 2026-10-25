@@ -648,15 +648,18 @@ def _collect_owned_controls(call, report, persist, *, effect, clean_one, positio
         while not pages[-1]['complete']:
             assert len(pages) < report['limits']['meter_pages'], 'Meter page bound exceeded'
             pages.append(call(pages[-1]['next_command']['gateway_argv'])['agent_result'])
-        bus = report['fixture_before']['bus']
-        owned = [row for page in pages for row in page['meters'] if row['object'].get('id') == bus['id']]
+        # This mode is pinned to 2025.1: getMeters documents Main Audio Bus as
+        # the default. Its exact identity is committed in Busses/Default Work
+        # Unit.wwu. Cars register/unregister ACKs do not guarantee Cars data.
+        witness = {'id': '{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}', 'name': 'Main Audio Bus'}
+        witnessed = [row for page in pages for row in page['meters'] if row['object'].get('id') == witness['id']]
         observation['evidence'].update(gateway_result=payload, agent_result=payload['agent_result'],
-            agent_result_pages=pages, position_ms=position_ms, meters=owned,
+            agent_result_pages=pages, position_ms=position_ms, meters=witnessed,
             registration_membership_verified=False, registration_causality_verified=False,
-            boundary='Accepted registration controls and attributable captured data; no current membership, reference-count or causal-registration claim')
-        assert owned, 'Complete attributable Console meter data unavailable'
-        for row in owned:
-            assert row['object']['name'] == bus['name']
+            boundary='Known default Main Audio Bus captured data; separate accepted Cars registration controls do not prove current membership, reference counts or registration causality')
+        assert witnessed, 'Complete known default Main Audio Bus meter data unavailable'
+        for row in witnessed:
+            assert row['object']['name'] == witness['name']
             assert row['source'] and row['configurationName'] and row['configurationType']
             assert type(row['configurationMask']) is int and row['configurationMask'] >= 0
             assert row['channels'] and all(isinstance(channel['name'], str) and channel['name']
