@@ -12,8 +12,8 @@ independent verification. No native process was launched for this increment.
 | 2021.1.14.8108 | Discovery; constructor unresolved | Discovery; constructor unresolved | Discovery; constructor unresolved | Discovery; attachment alternative unresolved | Discovery; constructor unresolved |
 | 2022.1.19.8584 | Source child | Owner fixed slots / independent ShareSet | Independent AudioDevice ShareSet | Discovery; attachment alternative unresolved | Independent Metadata ShareSet |
 | 2023.1.19.8928 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Discovery; attachment alternative unresolved | Independent Metadata ShareSet |
-| 2024.1.13.9056 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Existing setConversionPlugin route | Independent Metadata ShareSet |
-| 2025.1.7.9143 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Existing setConversionPlugin route | Independent Metadata ShareSet |
+| 2024.1.13.9056 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Installed Type Handle / platform setter; exact codec Field Handles | Independent Metadata ShareSet |
+| 2025.1.7.9143 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Installed Type Handle / platform setter; exact codec Field Handles | Independent Metadata ShareSet |
 
 Creation rows describe implemented Gateway construction and model controls.
 They do not establish successful native creation or a host/build equivalence.
@@ -80,9 +80,18 @@ succeeds. No committed project was opened or modified.
 - **Sink attachment (#179):** selection on a Bus is distinct from independent
   AudioDevice creation. Use the existing exact-object Reference Field Handle
   route where supported; complete applicability and effect proof separately.
-- **Conversion (#179/#183):** older alternatives, live installed-class selection,
-  complete platform codec field reachability and independent attachment outcome
-  verification remain required. The existing route's presence is insufficient.
+- **Conversion (#179/#183):** the 2024/25 setter now binds a discovered installed
+  Conversion Type Handle and an exact live platform, revalidates the codec
+  snapshots before writing, verifies class/owner and other platform fields, and
+  retains the verified codec GUID for a separate exact-object Field Handle
+  Preview. Focused fake-Gateway and persisted-finalizer tests prove this path.
+  Native per-platform codec enumeration and actual anonymous identity shape
+  still require the selected prewrite observation; multiple/unknown rows stop
+  before mutation. Older arbitrary replacement/configuration remains unresolved;
+  whole-Conversion donor copy is a separate existing alternative. Matching
+  getProjectInfo.defaultConversion supplies the Project's default Conversion
+  GUID without assuming the setter accepts Project GUIDs. See
+  [the source and mapping note](../../research/conversion-plugin-placement-179.md).
 - **Condition semantics (#177/#178):** unresolved mustChildOf/related-owner,
   mixed partial restriction semantics, unknown target classifiers and class
   default/controller shapes retain their original owners. Known same-object

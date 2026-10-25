@@ -9978,6 +9978,16 @@ def test_source_plugin_active_selection_acceptance(workflow_sandbox_runtime: _Wo
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_conversion_plugin_placement_and_field_configuration(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version not in {"2024.1", "2025.1"}:
+        pytest.skip("The codec setter is reflected on 2024.1/2025.1; older replacement remains unresolved")
+    from tests.destructive.support.conversion_plugin_acceptance import collect_conversion_plugin_acceptance
+    category = collect_conversion_plugin_acceptance(workflow_sandbox_runtime)
+    assert category["status"] == "PASS", category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_source_plugin_explicit_current_platform_alternative(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
     if workflow_sandbox_runtime.version != '2022.1':
         pytest.skip('This explicit-current-platform alternative diagnostic is pinned to Console2022.1')

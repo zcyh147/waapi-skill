@@ -13,19 +13,20 @@ WINDOWS = "{33333333-3333-3333-3333-333333333333}"
 MAC = "{44444444-4444-4444-4444-444444444444}"
 CODEC = "{55555555-5555-5555-5555-555555555555}"
 OTHER_CODEC = "{66666666-6666-6666-6666-666666666666}"
+OLD_CODEC = "{99999999-9999-9999-9999-999999999999}"
 
 
 class ConversionClient(BindingClient):
-    def __init__(self, version):
+    def __init__(self, version, conversion_id=CONVERSION):
         super().__init__(version)
         self.calls = []
         self.available = True
         self.attached = False
         self.no_effect = False
         self.change_other = False
-        self.codec_owner = CONVERSION
+        self.codec_owner = conversion_id
         self.quality = 3.0
-        self.target = {"id": CONVERSION, "name": "Voice", "type": "Conversion",
+        self.target = {"id": conversion_id, "name": "Voice", "type": "Conversion", "classId": 3604496,
                        "path": "\\Conversion Settings\\Default Work Unit\\Voice"}
 
     def call(self, uri, args=None, options=None):
@@ -40,8 +41,11 @@ class ConversionClient(BindingClient):
             self.attached = True
             return {}
         if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
-            return {"return": ["QualityFactor"] if args["object"] == CODEC and self.attached else []}
+            return {"return": ["QualityFactor"] if args["object"] == CODEC and self.attached and not self.no_effect else ["MaxBitDepth"]}
         if uri == "ak.wwise.core.object.getPropertyInfo":
+            if args["property"] == "MaxBitDepth":
+                return {"name": "MaxBitDepth", "type": "int32", "default": 16,
+                    "restriction": {"type": "enum", "values": [{"value": 16}, {"value": 24}]}}
             return {"name": "QualityFactor", "type": "Real32", "default": 3.0,
                 "restriction": {"type": "range", "min": -2.0, "max": 10.0}}
         if uri == "ak.wwise.core.object.isPropertyEnabled":
@@ -52,15 +56,18 @@ class ConversionClient(BindingClient):
         if uri == "ak.wwise.core.object.get" and "conversionplugin" in args.get("waql", "").lower():
             is_windows = options["platform"] in {WINDOWS, "Windows"}
             selected = (self.attached and not self.no_effect) if is_windows else self.change_other
-            return {"return": [{"id": CODEC if is_windows else OTHER_CODEC,
+            row = {"id": (CODEC if selected else OLD_CODEC) if is_windows else OTHER_CODEC, "name": "", "type": "ConversionPlugin", "path": self.target["path"],
                 "owner": {"id": self.codec_owner}, "classId": 262145 if selected else 65537,
-                "pluginName": "Vorbis" if selected else "PCM"}]}
+                "pluginName": "Vorbis" if selected else "PCM"}
+            return {"return": [{field: row[field] for field in options["return"] if field in row}]}
         if uri == "ak.wwise.core.object.get" and "from type Project" not in args.get("waql", ""):
-            if CODEC in json.dumps(args):
-                row = {"id": CODEC, "name": "", "type": "ConversionPlugin",
-                    "path": self.target["path"], "owner": {"id": CONVERSION},
-                    "classId": 262145, "pluginName": "Vorbis", "@QualityFactor": self.quality,
-                    "QualityFactor": self.quality}
+            if any(identity in json.dumps(args) for identity in (CODEC, OTHER_CODEC, OLD_CODEC)):
+                is_windows = any(identity in json.dumps(args) for identity in (CODEC, OLD_CODEC))
+                selected = (self.attached and not self.no_effect) if is_windows else self.change_other
+                row = {"id": (CODEC if selected else OLD_CODEC) if is_windows else OTHER_CODEC, "name": "", "type": "ConversionPlugin",
+                    "path": self.target["path"], "owner": {"id": self.codec_owner},
+                    "classId": 262145 if selected else 65537, "pluginName": "Vorbis" if selected else "PCM",
+                    "@QualityFactor": self.quality, "QualityFactor": self.quality, "@MaxBitDepth": 16, "MaxBitDepth": 16}
                 return {"return": [{field: row[field] for field in options["return"] if field in row}]}
             return {"return": [self.target]}
         return super().call(uri, args, options)
@@ -131,6 +138,7 @@ def test_native_acknowledgement_does_not_prove_conversion_or_other_platform_pres
     code, result = gateway.execute_gateway(["verify", tx], env=env, client_factory=lambda _: client)
     assert code == 2, result
     assert result["state"] == "verification_failed"
+    assert "conversion_codec" not in result.get("agent_result", {}).get("business_result", {})
     assert sum(uri == URI for uri, _, _ in client.calls) == 1
 
 
@@ -159,10 +167,11 @@ def test_verified_attached_codec_can_be_configured_with_exact_object_field_handl
     for command in ("execute", "verify"):
         code, result = gateway.execute_gateway([command, tx], env=env, client_factory=lambda _: client)
         assert code == 0, json.dumps(result, indent=2)
-    readbacks = result["verification"]["readbacks"]
-    codec = next(row for packet in readbacks if packet["uri"] == "ak.wwise.core.object.get"
-        for row in packet["result"]["return"] if row.get("classId") == 262145)
-    assert codec["owner"]["id"] == CONVERSION
+    codec = result["agent_result"]["business_result"]["conversion_codec"]
+    assert result["stdout_projection"]["full_verification_evidence_in_stdout"] is False
+    assert list(result)[-1] == "agent_result"
+    assert codec["conversion_id"] == CONVERSION and codec["plugin_class"]["classId"] == 262145
+    assert codec["configuration_requires_separate_preview"] is True
     code, result = gateway.execute_gateway(["draft-start", "object.setProperty"], env=env)
     assert code == 0, result
     draft_id, authority = result["draft"]["draft_id"], result["task_authority"]
@@ -173,7 +182,7 @@ def test_verified_attached_codec_can_be_configured_with_exact_object_field_handl
             "--expected-revision", str(result["draft"]["revision"]), *args], env=env, client_factory=lambda _: client)
         return code, result
 
-    code, bound = field_step("draft-bind-object", "--object-id", codec["id"])
+    code, bound = field_step("draft-bind-object", "--object-id", codec["object_id"])
     assert code == 0, json.dumps(bound, indent=2)
     code, fields = field_step("draft-discover-fields", "--object-handle", bound["bound_object"]["handle"],
         "--platform", "Windows", "--meaning", "quality")

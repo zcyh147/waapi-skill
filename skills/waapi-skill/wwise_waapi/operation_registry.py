@@ -19962,6 +19962,12 @@ def verify_prepared_operation(
                 check(item["name"], item["passed"], item.get("evidence", {}))
         business_state_verified = all(item.get("passed") is True for item in assertions)
         verification_strength = "platform_codec_class_owner_and_other_platform_fields"
+        if business_state_verified:
+            selected = after["codecs"][plan["platform_id"]]
+            readbacks.append({"kind": "verified-conversion-codec", "object_id": selected["id"],
+                "conversion_id": selected["owner_id"], "platform": after["selected_platform"],
+                "plugin_class": after["selected_class"], "configuration_operation": "object.setProperty",
+                "configuration_requires_separate_preview": True})
     elif kind == "blend-assignment":
         from .blend_assignment import observe as observe_blend, compare as compare_blend, BlendAssignmentError
         check_result_schema(str(plan["uri"]), str(plan["version"]))

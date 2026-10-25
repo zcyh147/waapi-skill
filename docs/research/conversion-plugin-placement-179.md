@@ -20,7 +20,12 @@ The matching 2024/2025 SDK example
 `classid` projections. `waql_reference.html` documents owner expressions;
 `object.get` documents its platform option. Gateway-owned observation filters
 by the exact owner's GUID, fixes a two-row ambiguity sentinel, and reads each
-project platform by its GUID. Before one setter execution it rechecks the
+project platform by its GUID. The documented platform option supplies value
+context; it does not by itself establish that the ConversionPlugin source
+enumerates exactly one instance for that platform. That native enumeration
+remains a precondition to be established by the selected read-only preflight.
+Multiple rows stop before the setter; no row-order choice is permitted.
+Before one setter execution the Gateway rechecks the
 Conversion identity, platform catalog, installed class and complete bounded
 codec field snapshots. Final verification checks the selected codec's class,
 name and owner independently of the setter's empty result, preserving the
@@ -34,6 +39,9 @@ elements have `Name=""`; the shared identity rules now admit that exact
 anonymous type, preserving the existing path validation. Actual native path
 representation still needs the selected native observation; no reconstructed
 path or synthetic name is provided to callers.
+The verified codec identity is an operation-owned business outcome in the final
+`agent_result`, so ordinary verification compaction cannot remove the GUID,
+observed platform/class or separate configuration requirement.
 
 ## Five pinned source lanes
 
@@ -59,8 +67,15 @@ scalar audio settings, not a codec reference/list for those older APIs.
 known donor Conversion's codec setup, but does not establish arbitrary codec
 replacement or platform isolation. Absence of the newer setter, missing getter
 examples or these source findings do not prove native impossibility. Earlier
-attachment/configuration and implicit Project/default target applicability
-remain assigned to #179 with #183 coordination.
+attachment/configuration remain assigned to #179 with #183 coordination.
+The matching 2024/2025 `getProjectInfo` definitions expose the required
+`defaultConversion` reference (`id`, `name`), explicitly described as the
+Project's default Conversion Settings object. This supplies the ordinary
+Conversion GUID for the existing setter; it does not establish Project GUID
+acceptance. The collector records that reference and its exact-ID/type/class
+readback, reusing the named PCM observation when it is the actual project
+default. An unresolved default diagnostic remains separate from the named
+Conversion workflow outcome.
 
 ## Complete installed DefaultConversions field mapping
 
@@ -115,3 +130,16 @@ failed business result after an empty native acknowledgement, other-platform
 preservation, and the separate exact-object field workflow. They do not prove
 native codec creatability, native accessor admission, Windows, build or Fresh
 behavior. #195 retains the stable combined Program/Non-live gates.
+
+The selected native node is
+`test_gateway_workflow_transaction_matrix.py::test_conversion_plugin_placement_and_field_configuration`.
+It uses the existing owned SampleProject lifecycle and its pinned existing PCM
+Conversion directly, performs read-only identity/platform/codec/field checks
+before mutation, then selects Vorbis and changes one discovered scalar in two
+separate transactions. Independent public reads compare every other platform
+and returned codec field after each effect. Unexpected anonymous identity
+shapes stop before writes and persist the partial observations. Four fake
+producer/consumer cases exercise this actual collector, independent post-verify
+corruption, setup stop, unresolved default reference, and the existing
+two-phase finalizer through its persisted category-v3 writer. Native admission
+and native effects remain pending; this collector has not launched Wwise.

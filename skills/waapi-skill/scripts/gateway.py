@@ -23638,6 +23638,15 @@ def _dispatch_transaction_command_with_execution_lease(
                 if isinstance(transaction_arguments, Mapping)
                 else None
             )
+            if transaction_api == "ak.wwise.core.audio.setConversionPlugin" and verification.business_state_verified:
+                codec_outcomes = [row for row in verification.readbacks if row.get("kind") == "verified-conversion-codec"]
+                if len(codec_outcomes) != 1:
+                    raise GatewayResultShapeError("Verified codec selection lacks its unique configuration identity.",
+                        details={"transaction_id": transaction_id, "verification_recorded": True,
+                            "automatic_retry": False}, error_code="INVALID_CONVERSION_CODEC_OUTCOME")
+                # Keep the Gateway-owned verified identity reachable even when
+                # complete verification packets receive the normal compaction.
+                agent_result.setdefault("business_result", {})["conversion_codec"] = dict(codec_outcomes[0])
             if transaction_api == MODEL_READ_URI:
                 observed = canonical_state_result(execution_result.get('result'), transaction_arguments['args'])
                 agent_result['business_result'] = {'widgets': [{'widget': key, 'attributes': values} for key, values in observed.items()],
