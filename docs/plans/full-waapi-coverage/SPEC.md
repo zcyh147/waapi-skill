@@ -206,3 +206,14 @@ problems and the evidence-backed causes of repeated attempts. Do not start
 downstream business work until a new user instruction. No Fresh is authorized
 for #197. Preserve original evidence and avoid additional verification-depth
 expansion without the existing required user decision.
+
+## User-approved internal Debug verification boundary — 2026-10-26
+
+`ak.wwise.debug.getWalTree` and `ak.wwise.debug.validateCall` retain their
+existing closed wrappers. The user instructed that further verification and
+Debug-environment work be skipped. New real Debug execution is therefore not
+required for #203, #193 or #174 closure. Preserve existing program proof and
+the explicit current-host unavailable behavior; claim neither native execution
+nor native availability. This exception changes no other API obligation or
+historical result. Removing these routes from normal discovery is not part of
+this change.

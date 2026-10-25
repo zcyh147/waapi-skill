@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from tests.support.gateway_config import set_gateway_config
 
+import base64
+import gzip
 import importlib.util
 import json
 import math
@@ -417,6 +419,95 @@ def test_status_uses_live_detection_and_dispatcher_evidence(tmp_path: Path) -> N
     assert client.disconnected is True
 
 
+def _retained_status_results(version: str) -> dict[str, Any]:
+    """Read the first original R125 native packets, without changing their data."""
+    archive = Path(__file__).resolve().parents[1] / "fixtures" / "runtime-console-reads" / f"{version}-original.json.gz"
+    files = json.loads(gzip.decompress(archive.read_bytes()))["files"]
+    project_api = "ak.wwise.core.object.get" if version == "2021.1" else "ak.wwise.core.getProjectInfo"
+    results = {}
+    for api in ("ak.wwise.core.getInfo", project_api):
+        suffix = "-" + api.replace(".", "_") + ".json"
+        member = min(name for name in files if name.endswith(suffix))
+        packet = json.loads(base64.b64decode(files[member]))
+        assert packet["ok"] is True and packet["version"] == version
+        results[api] = packet["result"]
+    return results
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_status_detail_delivers_complete_retained_native_results_through_main(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], version: str,
+) -> None:
+    results = _retained_status_results(version)
+    client = FakeClient(results)
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version=version)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(waapi_gateway, "default_client_factory", lambda _url: client)
+
+    assert waapi_gateway.main(["status", "--detail"]) == 0
+    stdout = capsys.readouterr().out
+    payload = json.loads(stdout)
+    fallback = version == "2021.1"
+    project_api = "ak.wwise.core.object.get" if fallback else "ak.wwise.core.getProjectInfo"
+    project = results[project_api]["return"][0] if fallback else results[project_api]
+    assert payload["agent_result"] == {
+        "wwise": results["ak.wwise.core.getInfo"],
+        "project": project,
+        "project_source": {
+            "api": project_api,
+            "get_project_info": "not_reflected" if fallback else "available",
+        },
+    }
+    assert list(payload)[-1] == "agent_result"
+    assert len(stdout.encode("utf-8")) < waapi_gateway.MAX_GATEWAY_RESULT_JSON_BYTES
+    assert [call[0] for call in client.calls] == [
+        "ak.wwise.core.getInfo", "ak.wwise.core.getInfo", project_api,
+    ]
+    assert client.disconnected is True
+
+
+@pytest.mark.parametrize("version,api", (
+    ("2021.1", "ak.wwise.core.getInfo"),
+    ("2025.1", "ak.wwise.core.getProjectInfo"),
+))
+def test_status_request_schema_discloses_optional_complete_detail_view(
+    tmp_path: Path, version: str, api: str,
+) -> None:
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version=version)
+    code, payload = waapi_gateway.execute_gateway(
+        ["request-schema", api], env=env,
+        client_factory=lambda _url: pytest.fail("status discovery must remain offline"),
+    )
+    assert code == 0
+    status = next(command for command in payload["commands"] if command["subcommand"] == "status")
+    assert status["optional_inputs"] == ["detail"]
+    assert status["input_forms"]["detail"]["arguments"] == ["--detail"]
+    assert ["status", "--detail"] in status["command_templates"]
+
+
+def test_status_detail_rejects_malformed_nested_work_unit_reference(tmp_path: Path) -> None:
+    results = _retained_status_results("2025.1")
+    results["ak.wwise.core.getProjectInfo"]["defaultWorkUnits"]["Events"]["id"] = "not-a-guid"
+    client = FakeClient(results)
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version="2025.1")
+
+    code, payload = waapi_gateway.execute_gateway(
+        ["status", "--detail"], env=env, client_factory=lambda _url: client,
+    )
+    assert code == 2
+    assert payload["error_code"] == "SemanticValidationError"
+    assert payload["details"]["section"] == "result.defaultWorkUnits.Events.id"
+    assert "agent_result" not in payload
+    assert [call[0] for call in client.calls] == [
+        "ak.wwise.core.getInfo", "ak.wwise.core.getInfo", "ak.wwise.core.getProjectInfo",
+    ]
+    assert client.disconnected is True
+
+
 def test_gateway_outer_exception_normalization_contains_broken_string_hook(tmp_path: Path) -> None:
     class BrokenStringError(RuntimeError):
         def __str__(self) -> str:
@@ -543,7 +634,16 @@ def test_status_rejects_malformed_or_identity_free_modern_project_result(
     )
 
     assert exit_code == 2
-    assert payload["error_code"] == "INVALID_STATUS_RESULT"
+    if project_result is None:
+        assert payload["ok"] is False
+        assert payload["calls"][-1]["error_code"] == "WAAPI_RESPONSE_MISSING"
+        assert payload["project"] is None
+        assert "agent_result" not in payload
+        assert [call[0] for call in client.calls] == [
+            "ak.wwise.core.getInfo", "ak.wwise.core.getInfo", "ak.wwise.core.getProjectInfo",
+        ]
+    else:
+        assert payload["error_code"] == "INVALID_STATUS_RESULT"
 
 
 def test_status_rejects_malformed_second_get_info_result(tmp_path: Path) -> None:

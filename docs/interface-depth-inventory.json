@@ -54183,6 +54183,115 @@
     {
       "model_values": [
         {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "capture",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "capture"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "capture-ms",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "capture-ms"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "voice-object-id",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "voice-object-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "voice-instance-handle",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "voice-instance-handle"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "game-object-id",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "game-object-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "bus-object-id",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "bus-object-id"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "bus-instance-handle",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "bus-instance-handle"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "bus-path",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "bus-path"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        }
+      ],
+      "sha256": "5304225f4aca2d2e54d66182e2f5719e25b462c79a2ae63bb201208bb65f2468"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "gameObject",
           "path": [
@@ -77373,102 +77482,6 @@
         }
       ],
       "sha256": "6e3fee17b9dfa782db154d1ca7eca26594b3b1d00267def8c1370103b4dfd231"
-    },
-    {
-      "model_values": [
-        {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "capture",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "capture"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "capture-ms",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "capture-ms"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "voice-object-id",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "voice-object-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "voice-instance-handle",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "voice-instance-handle"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "game-object-id",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "game-object-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "bus-object-id",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "bus-object-id"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "bus-instance-handle",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "bus-instance-handle"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004"
     },
     {
       "model_values": [
@@ -152625,6 +152638,24 @@
     {
       "model_values": [
         {
+          "channel": "fixed.status",
+          "name": "detail",
+          "path": [
+            "fixed_command",
+            "status",
+            "detail"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "d071e26c33c40260d1dc2bc3565b99c1f423567728ef7be4468ecea5a8d4e73f"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "object",
           "path": [
@@ -174538,7 +174569,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 897
   },
-  "inventory_sha256": "11cbcdb68f93960040f38de7496e125a3cffe1595798216ea5521567a9009453",
+  "inventory_sha256": "619bf04f719dfc5b75e438546867f90aa0755e9f535f88b1751cf9e7f7f02dd3",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -175778,15 +175809,15 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
-      "classification": "generic-fixed-command-audited-deep",
+      "audit_evidence": "The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes.",
+      "classification": "generic-fixed-query-metadata",
       "construction_shape": "zero",
       "continuation_commands": [
         "status"
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "c28318cecc02ce090d04aea49cad0cd363794b0d5e04eb562949cf09e5f02783",
-      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "field_contract_sha256": "d071e26c33c40260d1dc2bc3565b99c1f423567728ef7be4468ecea5a8d4e73f",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -176558,7 +176589,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "5507cd9e0844d900099a6c5aaa2308b959cd741e8d40bbed07b01fcc8f588f3a",
-      "field_contract_sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004",
+      "field_contract_sha256": "5304225f4aca2d2e54d66182e2f5719e25b462c79a2ae63bb201208bb65f2468",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -180082,15 +180113,15 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
-      "classification": "generic-fixed-command-audited-deep",
+      "audit_evidence": "The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes.",
+      "classification": "generic-fixed-query-metadata",
       "construction_shape": "zero",
       "continuation_commands": [
         "status"
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "999b9125fdc73905ba179cdc50c84187e09fd720d293cec45dcf521590f85b3a",
-      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "field_contract_sha256": "d071e26c33c40260d1dc2bc3565b99c1f423567728ef7be4468ecea5a8d4e73f",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -180115,8 +180146,8 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
-      "classification": "generic-fixed-command-audited-deep",
+      "audit_evidence": "The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes.",
+      "classification": "generic-fixed-query-metadata",
       "construction_shape": "zero",
       "continuation_commands": [
         "status",
@@ -180124,7 +180155,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "cc498a7422f470cd6fee99c69454e65d2ae354eb5f006ee55bacac79d83b76f3",
-      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "field_contract_sha256": "d071e26c33c40260d1dc2bc3565b99c1f423567728ef7be4468ecea5a8d4e73f",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -181029,7 +181060,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "d0a704eca6fc2a9569be9d0f20ef492d941e0669c97ce42e3a2e79fa629160b2",
-      "field_contract_sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004",
+      "field_contract_sha256": "5304225f4aca2d2e54d66182e2f5719e25b462c79a2ae63bb201208bb65f2468",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -185251,15 +185282,15 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
-      "classification": "generic-fixed-command-audited-deep",
+      "audit_evidence": "The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes.",
+      "classification": "generic-fixed-query-metadata",
       "construction_shape": "zero",
       "continuation_commands": [
         "status"
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "c03253a8f12eed535a94a50af2a3956dad6d30ff755a2f7cfa5006b5cd7fbba4",
-      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "field_contract_sha256": "d071e26c33c40260d1dc2bc3565b99c1f423567728ef7be4468ecea5a8d4e73f",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -185284,8 +185315,8 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
-      "classification": "generic-fixed-command-audited-deep",
+      "audit_evidence": "The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes.",
+      "classification": "generic-fixed-query-metadata",
       "construction_shape": "zero",
       "continuation_commands": [
         "status",
@@ -185293,7 +185324,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "e00ed613df8cf642efe6ffcb760d83779411c59d2f3b7b070721e4409ab965d2",
-      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "field_contract_sha256": "d071e26c33c40260d1dc2bc3565b99c1f423567728ef7be4468ecea5a8d4e73f",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -186533,7 +186564,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "4e388d81936a5e97408b65b58f9436bb1c75eb4d247c8ac443e71f7f4eee0f88",
-      "field_contract_sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004",
+      "field_contract_sha256": "5304225f4aca2d2e54d66182e2f5719e25b462c79a2ae63bb201208bb65f2468",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -191516,15 +191547,15 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
-      "classification": "generic-fixed-command-audited-deep",
+      "audit_evidence": "The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes.",
+      "classification": "generic-fixed-query-metadata",
       "construction_shape": "zero",
       "continuation_commands": [
         "status"
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "5be56f1fb53707f19bcd21c7295649094d20418bc3773348e14a4d5cf8149860",
-      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "field_contract_sha256": "d071e26c33c40260d1dc2bc3565b99c1f423567728ef7be4468ecea5a8d4e73f",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -191549,8 +191580,8 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
-      "classification": "generic-fixed-command-audited-deep",
+      "audit_evidence": "The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes.",
+      "classification": "generic-fixed-query-metadata",
       "construction_shape": "zero",
       "continuation_commands": [
         "status",
@@ -191558,7 +191589,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "b3d35ceade8e56b1ba0432564c0b9bb2c480797901f1460195e91ed578921248",
-      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "field_contract_sha256": "d071e26c33c40260d1dc2bc3565b99c1f423567728ef7be4468ecea5a8d4e73f",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -192865,7 +192896,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "db9fead7f8bf51ff78dfd92f94a33b25c05acdff469a21ae554603c3fbe053a3",
-      "field_contract_sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004",
+      "field_contract_sha256": "5304225f4aca2d2e54d66182e2f5719e25b462c79a2ae63bb201208bb65f2468",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -198781,15 +198812,15 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
-      "classification": "generic-fixed-command-audited-deep",
+      "audit_evidence": "The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes.",
+      "classification": "generic-fixed-query-metadata",
       "construction_shape": "zero",
       "continuation_commands": [
         "status"
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "efc331193d59b1b4addfbea350977cd69c6b1148f3a804a958f175d65e5acf1c",
-      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "field_contract_sha256": "d071e26c33c40260d1dc2bc3565b99c1f423567728ef7be4468ecea5a8d4e73f",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -198814,8 +198845,8 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
-      "classification": "generic-fixed-command-audited-deep",
+      "audit_evidence": "The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes.",
+      "classification": "generic-fixed-query-metadata",
       "construction_shape": "zero",
       "continuation_commands": [
         "status",
@@ -198823,7 +198854,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "425ba5445c3f94d20ea29f4000fbaddb92e575788827558e81aa4ec8e606bb26",
-      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "field_contract_sha256": "d071e26c33c40260d1dc2bc3565b99c1f423567728ef7be4468ecea5a8d4e73f",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -200197,7 +200228,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "72fe287054d05d9875c1fb3ba00ebc4625ecdee2e4d6716c87de314ae175f1d8",
-      "field_contract_sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004",
+      "field_contract_sha256": "5304225f4aca2d2e54d66182e2f5719e25b462c79a2ae63bb201208bb65f2468",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -208604,9 +208635,9 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "6dc4cb03ba12b6a935006231270bc431187ba9367575efc15718fe645d0af3bb",
+    "gateway_parser_sha256": "73309b23de133e29fea37cdd7fb15eccc913cc3f0d5eff6fd98f92143184c5f9",
     "operation_contract_sha256": "b2d76899195fbd342375b80651c80b8d5229af2330cd0ee8d991645d242b5b59",
-    "public_continuation_sha256": "7e63798666897561b08432f6016228adb55199bd4a47f15d48314ea1bcaf5584",
+    "public_continuation_sha256": "74461fb6908cb5e2f66b89765cf07db12a6887895d06966883d93672c20f827b",
     "typed_request_surface_sha256": "829f71b2cca1e2779e14f7c681cc3802b94945f9a9a9e111c070c82478151150"
   },
   "summary": {

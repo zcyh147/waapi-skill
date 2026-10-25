@@ -1570,7 +1570,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("status", help="Return live Wwise version and current project information")
+    status = subparsers.add_parser("status", help="Return live Wwise version and current project information")
+    status.add_argument(
+        "--detail", action="store_true",
+        help="Include complete version-validated Wwise and current project results",
+    )
     subparsers.add_parser("buses", help="Return all Bus objects with id, name, type, and path")
     selected = subparsers.add_parser(
         "selected",
@@ -7489,6 +7493,17 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         }
         for command in capability.fixed_commands
     ]
+    if capability.uri in {GET_INFO_URI, GET_PROJECT_INFO_URI}:
+        next(command for command in commands if command["subcommand"] == "status").update({
+            "optional_inputs": ["detail"],
+            "input_forms": {
+                "detail": {
+                    "arguments": ["--detail"],
+                    "meaning": "Return complete version-validated Wwise and project results; omission keeps the compact summary",
+                },
+            },
+            "command_templates": [["status"], ["status", "--detail"]],
+        })
     if capability.uri == "ak.wwise.core.profiler.getGameObjects":
         row_fields = ["id", "name", "register_time", "unregister_time"]
         unsigned_ids = capability.version in {"2022.1", "2023.1"}
@@ -14925,7 +14940,7 @@ def dispatch_command(
                 error_code="INVALID_STATUS_RESULT",
             )
         ok = bool(info.get("ok") and project_call.get("ok") and project is not None)
-        return {
+        payload = {
             "ok": ok,
             "status": "ok" if ok else "error",
             **common,
@@ -14933,6 +14948,25 @@ def dispatch_command(
             "wwise": status_wwise_summary(info_payload),
             "project": status_project_summary(project),
         }
+        if args.detail and ok:
+            project_api = OBJECT_GET_URI if detected_version == "2021.1" else GET_PROJECT_INFO_URI
+            payload["schema_validation"] = {
+                "wwise": validate_resolved_semantic_result(
+                    GET_INFO_URI, info_payload, version=detected_version,
+                ).as_dict(),
+                "project": validate_resolved_semantic_result(
+                    project_api, project_call["result"], version=detected_version,
+                ).as_dict(),
+            }
+            payload["agent_result"] = {
+                "wwise": info_payload,
+                "project": project,
+                "project_source": {
+                    "api": project_api,
+                    "get_project_info": "not_reflected" if detected_version == "2021.1" else "available",
+                },
+            }
+        return payload
     if args.command == "project-default-work-units":
         if detected_version == "2021.1":
             projection = normalize_project_default_work_units_result(
