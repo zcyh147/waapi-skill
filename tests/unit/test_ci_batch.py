@@ -72,6 +72,54 @@ def test_public_batch_keeps_independent_outcomes_and_deduplicates(checkout, tmp_
     assert 'ordinary case failure' in result.stdout
 
 
+@pytest.mark.parametrize('source_ready', [True, False])
+def test_public_native_plan_without_pythonpath_records_prelaunch_failure(tmp_path, source_ready):
+    """The actual launcher fingerprints a private project before blocked preflight."""
+    from ci.test_batch import CONSOLE_NODE
+    project = tmp_path / 'source/SampleProject.wproj'
+    if source_ready:
+        project.parent.mkdir()
+        project.write_text('<Project/>')
+    launched = tmp_path / 'unexpected-console-launch'
+    console = tmp_path / 'fake-console'
+    console.write_text('#!/bin/sh\ntouch "' + str(launched) + '"\nexit 99\n')
+    console.chmod(0o755)
+    config = tmp_path / 'live-config.json'
+    config.write_text(json.dumps({'versions': {'2025.1': {
+        'sample_project': str(project), 'wwise_console': str(console)}}}))
+    root = tmp_path / 'prelaunch-failure'
+    plan = tmp_path / 'native.plan.json'
+    plan.write_text(json.dumps({'contract': 'waapi-skill.test-batch/v1', 'root': str(root),
+        'groups': [group('native', [CONSOLE_NODE], mode='destructive', version='2025.1',
+                         host='wwise-console', sources=[CONSOLE_NODE.split('::')[0]])],
+        'preflight_evidence': {'artifact': str(tmp_path / 'deliberately-absent-preflight.json'),
+                               'sha256': '0' * 64}}))
+    env = {k: v for k, v in os.environ.items() if k not in {
+        'PYTHONPATH', 'PYTEST_ADDOPTS', 'WWISE_CONSOLE', 'WWISE_SAMPLE_PROJECT_PATH',
+        'WWISE_SANDBOX_ROOT'}}
+    env.update(WAAPI_TEST_PYTHON=sys.executable, WWISE_TEST_CONFIG=str(config),
+               PYTEST_DISABLE_PLUGIN_AUTOLOAD='1')
+    launcher = (['cmd.exe', '/d', '/c', str(ROOT / 'ci/test.bat')] if os.name == 'nt'
+                else ['bash', str(ROOT / 'ci/test.sh')])
+    result = subprocess.run([*launcher, '--batch-plan', str(plan)], cwd=ROOT, env=env,
+                            text=True, capture_output=True, timeout=30)
+    (tmp_path / 'launcher.stdout').write_text(result.stdout)
+    (tmp_path / 'launcher.stderr').write_text(result.stderr)
+    assert result.returncode == 2, result.stdout + result.stderr
+    summary = json.loads((root / 'summary.json').read_bytes())
+    assert summary['contract'] == 'waapi-skill.test-batch/v1'
+    assert summary['outcome'] == 'BLOCKED' and summary['groups'] == []
+    assert not (root / 'dispatch.json').exists() and not (root / 'groups').exists()
+    assert not launched.exists() and 'Traceback' not in result.stderr
+    if source_ready:
+        # Known SHA256 of b'SampleProject.wproj\0<Project/>\0', independent of the helper.
+        assert summary['source_identity']['native_scopes']['native']['source_hash'] == (
+            '7f412d5aaba6050d2f5ec9b358df2295c3388463974f156105a853006fe8dab6')
+        assert 'deliberately-absent-preflight' in summary['error']
+    else:
+        assert 'source_identity' not in summary and 'source' in summary['error']
+
+
 def test_ordinary_failure_blocks_dependents_but_collects_independent_groups(checkout, tmp_path):
     node = 'tests/unit/test_cases.py::'
     root = tmp_path / 'dependency-batch'

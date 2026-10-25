@@ -515,8 +515,8 @@ def run_batch(driver, plan_path):
         plan = read_json(plan_path)
         root = validate_plan(plan, driver.repo_root)
         return execute_batch(driver, plan, root)
-    except (BatchError, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
-        error = {'outcome': 'BLOCKED', 'failure_layer': 'batch', 'error': str(exc)}
+    except (BatchError, OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError) as exc:
+        error = {'outcome': 'BLOCKED', 'failure_layer': 'batch', 'error': str(exc)[:2000]}
         if root is not None and root.is_dir():
             target = root / 'summary.json'
             previous = read_json(target) if target.exists() else {'groups': []}
@@ -532,9 +532,14 @@ def execute_batch(driver, plan, root):
         from test_driver import TestRequest
     root.mkdir(parents=True, exist_ok=False)
     write_json(root / 'plan.json', plan)
+    summary = {'contract': CONTRACT, 'outcome': 'RUNNING', 'groups': [], 'rerun': [],
+               'root': str(root), 'unknown_impact': []}
+    write_json(root / 'summary.json', summary)
     if plan.get('recover_from'):
         return recover_report(plan, root, source_identity(driver, plan, include_native_scopes=False))
     frozen = source_identity(driver, plan)
+    summary['source_identity'] = frozen
+    write_json(root / 'summary.json', summary)
     selections, retained, unknown = affected_selection(driver, plan, frozen)
     preflight = retained_preflight(driver, plan, frozen)
     if preflight is not None:
