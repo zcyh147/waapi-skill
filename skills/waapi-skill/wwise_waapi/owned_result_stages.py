@@ -191,7 +191,10 @@ def observe_lists(prepared, identities, *, read):
 
 
 def prepare(uri, args, options, specs, context, version, *, force=False, root_parent=None, parent_children=(), list_guards=()):
-    if not force and (not context or not (context.get('renames') or context.get('duplicate_sibling_groups'))):
+    constructor_references = [{'source': node['request_path'], 'field': field['name'], 'target': field['target_request_path']}
+        for node in specs for field in node.get('references', []) if 'target_request_path' in field
+        and field['name'] in node.get('constructor_inputs', {}).get('required_references', [])]
+    if not force and not constructor_references and (not context or not (context.get('renames') or context.get('duplicate_sibling_groups'))):
         return None
     if force and not any(not node.get('existing_target') for node in specs):
         return None
@@ -215,11 +218,13 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
     deferred = [{'source': node['request_path'], 'field': field['name'], 'target': field['target_request_path'],
                  'platform': node.get('platform', args.get('platform'))}
         for node in specs for field in node.get('references', []) if 'target_request_path' in field]
-    # Required constructor references cannot be repaired after creation. This
-    # stage seam only substitutes owned parents, not reference dependencies.
-    if any(field['field'] in node.get('constructor_inputs', {}).get('required_references', [])
-            for field in deferred for node in specs if node['request_path'] == field['source']):
-        raise ValueError('Mandatory constructor reference needs a previously verified target; planned-target staging remains assigned to #178/#179/#192')
+    # Mandatory fields remain inline; their created targets are bound before
+    # this occurrence's constructor, never repaired through a later setter.
+    if any(node.get('constructor_inputs', {}).get('class_id') != 5636096 for field in constructor_references
+            for node in specs if node['request_path'] == field['source']):
+        raise ValueError('This mandatory constructor dependency needs its separate source-certified staging contract')
+    deferred = [field for field in deferred if not any(
+        all(field[key] == required[key] for key in ('source', 'field', 'target')) for required in constructor_references)]
     if len(deferred) > DEFAULT_MAX_NODES:
         raise ValueError('Native-name staging requires bounded ordinary result-reference dependencies')
     by_path = {node['request_path']: node for node in specs}
@@ -271,6 +276,7 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
             chunk = deepcopy(native_node(creation, root['request_path'], specs))
             prune(chunk, root['request_path'])
             stages.append({'root': root['request_path'], 'parent': parent['request_path'], 'node_paths': paths,
+                'constructor_references': [field for field in constructor_references if field['source'] in paths],
                 **({'owned_parent': True} if not parent.get('existing_target') else {}),
                 'args': {**deepcopy(creation), 'objects': [{**parent_args, ('children' if root.get('collection') in {None, 'children'} else '@' + root['collection']): [chunk]}]}})
     if uri == CREATE and creation_stage_count(specs) > 1:
@@ -284,8 +290,14 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
             stages.append({'constructor': CREATE, 'root': root['request_path'], 'parent': parent_path,
                 'node_paths': paths, **({'owned_parent': True} if parent_path is not None else {}),
                 'args': {**chunk, **controls}})
+    available = {node['request_path'] for node in specs if node.get('existing_target')}
+    for stage in stages:
+        if any(field['target'] not in available for field in stage.get('constructor_references', [])):
+            raise ValueError('Mandatory constructor dependency cycle or unavailable earlier target')
+        available.update(stage['node_paths'])
     return {'kind': KIND, 'version': version, 'uri': uri, 'creation_args': creation,
             'options': deepcopy(options), 'deferred': deferred,
+            **({'constructor_references': constructor_references} if constructor_references else {}),
             **({'lists': profiles} if profiles else {}),
             **({'creation_stages': stages, 'pre_creation_roster_check': True} if stages else {}),
             'prospective_paths': prospective_paths(specs, root_parent=root_parent),
@@ -307,7 +319,9 @@ def creation_chunks(specs):
             for collection in dict.fromkeys(child.get('collection') for child in descendants):
                 group = [child for child in descendants if child.get('collection') == collection]
                 if (len({child['requested_name'].casefold() for child in group}) != len(group)
-                        or len(group) > 1 and any(child.get('inner_identity') for child in group)):
+                        or len(group) > 1 and any(child.get('inner_identity') for child in group)
+                        or any(any('target_request_path' in field and field['name'] in child.get('constructor_inputs', {}).get('required_references', [])
+                            for field in child.get('references', [])) for child in group)):
                     deferred.extend(group)
                 else:
                     for child in group:
@@ -340,6 +354,16 @@ def materialize_creation_args(stage, identities):
             args['parent'] = parent['id']
         else:
             args['objects'][0]['object'] = parent['id']
+    for field in stage.get('constructor_references', []):
+        target = identities.get(field['target'])
+        if target is None:
+            raise ValueError('Mandatory constructor reference lacks its earlier independently verified GUID')
+        # A mandatory occurrence is a separate root of this existing stage.
+        if field['source'] != stage['root']:
+            raise ValueError('Mandatory constructor occurrence was not separated from its dependencies')
+        node = args if stage.get('constructor') == CREATE else next(value for key, value in args['objects'][0].items()
+            if key.startswith('@') or key == 'children')[0]
+        node['@' + field['field']] = target['id']
     return args
 
 
@@ -488,7 +512,9 @@ def observe_reference_metadata(prepared, identities, *, read):
             payload = read(GET, {'from': {'id': [identities[path]['id']]}}, {'return': fields_for(by_path[path])})
             if not isinstance(payload, Mapping) or payload.get('return') != [identities[path]]:
                 raise ValueError('Owned reference source/target drifted after its actual creation stage')
-    for field in plan['deferred']:
+    for field in [*plan['deferred'], *plan.get('constructor_references', [])]:
+        if field['source'] not in identities:
+            continue
         source = by_path[field['source']]
         metadata = [row['metadata'] for row in context['metadata'] if row['name'] == field['field']
             and (row.get('class_id') == source['class_id'] or isinstance(row.get('object_id'), str) and _same_identity(row['object_id'], source.get('target_id')))]
@@ -522,7 +548,11 @@ def split_stage_prepared(prepared, stage, identities):
     removed = {row['id'].upper() for scope in replacements if scope['root'] == stage['root'] for row in scope['rows']}
     parent['preexisting_children'] = [child for child in [*parent.get('preexisting_children', []), *children]
         if child['id'].upper() not in removed]
-    scoped = [parent, *(node for node in nodes if node['request_path'] in stage['node_paths'])]
+    scoped = [parent, *(deepcopy(node) for node in nodes if node['request_path'] in stage['node_paths'])]
+    for field in stage.get('constructor_references', []):
+        source = next(node for node in scoped if node['request_path'] == field['source'])
+        reference, = [ref for ref in source['references'] if ref['name'] == field['field']]
+        reference['target_id'] = identities[field['target']]['id']
     stage_plan = {**prepared['pre_state']['owned_result_stages'], 'deferred': []}
     scoped_paths = {node['request_path'] for node in scoped}
     if stage_plan.get('lists'):
@@ -590,7 +620,7 @@ def bind_split_stage(prepared, stage, result, identities, *, read, context, bind
     return actual, binding['readbacks'], preserved
 
 
-def observe_before_creation(prepared, identities, *, read, context, binding):
+def observe_before_creation(prepared, identities, *, read, context, binding, stage=None):
     if not identities:
         return
     def observed(uri, args, options):
@@ -598,6 +628,21 @@ def observe_before_creation(prepared, identities, *, read, context, binding):
         binding['before_readbacks'].append({'uri': uri, 'args': args, 'options': options, 'result': result})
         return result
     observe_owned_roster(prepared, identities, read=observed)
+    for field in (stage or {}).get('constructor_references', []):
+        from .constructor_inputs import authority
+        from .operation_registry import _read_property_info, _same_identity, _reference_identity
+        source = next(node for node in prepared['verification_plan']['nodes'] if node['request_path'] == field['source'])
+        proof = authority(source, version=prepared['pre_state']['owned_result_stages']['version'])
+        parent, target = identities.get(source.get('parent_request_path')), identities.get(field['target'])
+        if (proof != source.get('constructor_inputs') or proof['class_id'] != 5636096
+                or parent is None or target is None or parent.get('classId') != 589840
+                or not _same_identity(_reference_identity(target.get('parent')), parent['id'])):
+            raise ValueError('Mandatory Playlist constructor target lost its independently verified direct parent')
+        metadata = _read_property_info(observed, class_id=source['class_id'], name=field['field'])
+        expected = [row['metadata'] for row in prepared['pre_state']['planned_reference_context']['metadata']
+            if row.get('class_id') == source['class_id'] and row['name'] == field['field']]
+        if not expected or any(metadata.as_dict() != row for row in expected):
+            raise ValueError('Mandatory constructor reference metadata changed before its write')
     binding['before_preservation'] = observe_preservation(prepared, identities, read=read, context=context)
     if not all(row['passed'] for row in binding['before_preservation']):
         raise ValueError('Earlier creation changed its sealed preservation scope; later write stopped')
@@ -667,7 +712,7 @@ def execute_split(prepared, *, write, read, context):
         for stage in plan['creation_stages']:
             binding = {'readbacks': [], 'preservation': [], 'before_readbacks': [], 'before_preservation': []}
             bindings.append(binding)
-            observe_before_creation(prepared, identities, read=read, context=context, binding=binding)
+            observe_before_creation(prepared, identities, read=read, context=context, binding=binding, stage=stage)
             args = materialize_creation_args(stage, identities)
             result = write(plan['uri'], args, plan['options'])
             records.append({'uri': plan['uri'], 'args': args, 'options': plan['options'], 'dispatch_result': result})
@@ -730,7 +775,7 @@ def validate_split(prepared, execution, *, context):
             before_reads = [*binding.get('before_readbacks', []), *preservation_reads(before_preserved)]
             rebuilt_before = {'before_readbacks': [], 'before_preservation': []}
             replay(before_reads, lambda read: observe_before_creation(prepared, identities,
-                read=read, context=context, binding=rebuilt_before))
+                read=read, context=context, binding=rebuilt_before, stage=stage))
             if rebuilt_before != {key: binding.get(key, []) for key in rebuilt_before}:
                 raise ValueError('Before-creation proof differs from its sealed partial roster')
         preserved = binding.get('preservation', [])

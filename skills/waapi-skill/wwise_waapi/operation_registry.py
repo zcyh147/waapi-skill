@@ -8354,12 +8354,19 @@ def _prepare_prospective_reference_hierarchy(
         # Keep all existing type/classifier boundaries. Only the independently
         # checked parent edges are removed from this ordinary target check.
         if "mustChildOf" in rows and playlist_owner is not None:
-            from .playlist_reference_conditions import observe_prospective
+            from .playlist_reference_conditions import observe_prospective, discovery_class_target_types
             try:
-                if class_id != 5636096 or isinstance(target, PlannedReferenceTarget):
-                    raise ValueError("New PlaylistSlot needs an exact already verified direct-child target")
-                condition = observe_prospective(version=version, owner_id=playlist_owner.object,
-                    target_id=target.object, name=info.name, restriction=info.restriction, read=read, list_mode=playlist_mode)
+                allowed = discovery_class_target_types(version=version, class_id=class_id, name=info.name, restriction=info.restriction)
+                if isinstance(target, PlannedReferenceTarget) or isinstance(playlist_owner, PlannedReferenceTarget):
+                    if (target.row.get('type') not in allowed
+                            or not _same_identity(_reference_identity(target.row.get('parent')), playlist_owner.object)):
+                        raise ValueError('Planned Playlist target must be a direct child of its declared owner')
+                    condition = {'kind': 'planned_reference_parent', 'class_id': class_id,
+                        'reference': info.name, 'target_id': target.object, 'parent_id': playlist_owner.object,
+                        'metadata': {info.name: {'normalized': info.as_dict(), 'native': dict(info.raw)}}}
+                else:
+                    condition = observe_prospective(version=version, owner_id=playlist_owner.object,
+                        target_id=target.object, name=info.name, restriction=info.restriction, read=read, list_mode=playlist_mode)
             except ValueError as exc:
                 raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", str(exc)) from exc
             conditions.append(condition)
@@ -8826,8 +8833,14 @@ def _prepare_object_node_specs(
                 )
             spec["construction_language"] = {"requested": node.language, "role": "voice-construction-context",
                 "mode": "new", "expected_sources": [], "version": version}
+        planned_playlist_owner = None
         if version == "2025.1" and type_info.class_id == 5636096 and merge_target is None:
-            if playlist_owner is None or root_collection != "Playlist" or node.parent_request_path in node_paths:
+            parent = next((item for item in specs if item['request_path'] == node.parent_request_path), None)
+            if (parent is not None and parent['class_id'] == 589840 and node.collection == 'Playlist'
+                    and result_context and node.parent_request_path in result_context['facts']):
+                from .planned_references import PlannedReferenceTarget
+                planned_playlist_owner = PlannedReferenceTarget(result_context['facts'][node.parent_request_path])
+            if planned_playlist_owner is None and (playlist_owner is None or root_collection != "Playlist" or node.parent_request_path in node_paths):
                 raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
                     "New PlaylistSlot construction requires the source-proven root object.create or object.set List path on an exact existing owner.")
             if not any(field.name == "PlaylistObject" for field in node.references):
@@ -8964,7 +8977,7 @@ def _prepare_object_node_specs(
         if merge_target is None:
             hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id,
                 class_info=type_info, version=version, read=read, platform=platform,
-                playlist_owner=(playlist_owner if root_collection == "Playlist" and node.parent_request_path not in node_paths else None),
+                playlist_owner=(planned_playlist_owner or (playlist_owner if root_collection == "Playlist" and node.parent_request_path not in node_paths else None)),
                 playlist_mode=playlist_mode)
         else:
             desired_references = {row["name"].casefold(): row.get("target_id", row.get("curve")) for row in spec["references"]}

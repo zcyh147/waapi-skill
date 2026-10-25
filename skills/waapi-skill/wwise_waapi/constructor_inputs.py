@@ -1,7 +1,8 @@
 """Exact source-certified constructor inputs, separate from setter nullability.
 
-MetadataSlot's owned Metadata placement is certified by matching WObjects/SDK
-and the retained 9143 constructor rejection. This is not a generic notNull rule.
+MetadataSlot's input is certified by matching WObjects/SDK and the retained
+9143 rejection. PlaylistSlot preserves its source-certified inline input and
+direct-child requirement. Neither profile is a generic notNull rule.
 """
 from copy import deepcopy
 from collections.abc import Mapping
@@ -25,6 +26,16 @@ SOURCE = {
 
 
 def authority(spec, *, version=VERSION):
+    if (version == VERSION and spec.get('class_id') == 5636096 and spec.get('collection') == 'Playlist'
+            and not spec.get('existing_target') and not spec.get('preexisting_id')):
+        from .documented_list_fields import resolve_class_list_evidence, owned_inner_identity
+        source = resolve_class_list_evidence(version, 589840, 'Playlist')
+        profile = owned_inner_identity(source, 5636096)
+        if profile is None:
+            raise ValueError('Playlist constructor lost its exact owned List source')
+        return {'version': version, 'build': '2025.1.7.9143', 'class_id': 5636096,
+            'class_name': 'PlaylistSlot', 'collection': 'Playlist', 'required_references': ['PlaylistObject'],
+            'list_source': source, 'inner_identity': profile}
     if (version != VERSION or spec.get('class_id') != CLASS_ID
             or spec.get('collection') != 'Metadata' or spec.get('existing_target') or spec.get('preexisting_id')):
         return None
@@ -40,7 +51,7 @@ def public_requirements(proof):
     """Project the business requirement without exposing developer provenance."""
     if not isinstance(proof, Mapping):
         return None
-    return {"version": proof["version"], "class_name": "MetadataSlot",
+    return {"version": proof["version"], "class_name": proof.get('class_name', "MetadataSlot"),
         "class_id": proof["class_id"], "collection": proof["collection"],
         "required_references": list(proof["required_references"])}
 
@@ -69,7 +80,7 @@ def complete(spec):
 def local_reference_field(spec, name):
     """Select the observed local getter for this sealed constructor input only."""
     proof = authority(spec)
-    constructor = proof is not None and spec.get('constructor_inputs') == proof and name in proof['required_references']
+    constructor = proof is not None and proof['class_id'] == CLASS_ID and spec.get('constructor_inputs') == proof and name in proof['required_references']
     owned = spec.get('owned_identity')
     retained = False
     if owned is not None:
@@ -107,13 +118,14 @@ def observe(specs, identities, *, read):
             raise ValueError('Required constructor input proof is incomplete')
         fields = proof['required_references']
         result = read('ak.wwise.core.object.get', {'from': {'id': [identity['id']]}},
-            {'return': ['id', *('@' + name for name in fields)]})
+            {'return': ['id', *(local_reference_field(spec, name) for name in fields)]})
         rows = result.get('return')
         if not isinstance(rows, list) or len(rows) != 1 or str(rows[0].get('id')).upper() != identity['id'].upper():
             raise ValueError('Required constructor reference owner is not one exact GUID')
         for name in fields:
             field, = [row for row in spec['references'] if row['name'] == name]
-            actual = local_reference_value(spec, name, rows[0].get('@' + name))
+            actual = local_reference_value(spec, name, rows[0].get(local_reference_field(spec, name)))
             actual = actual.get('id') if isinstance(actual, dict) else actual
-            if not isinstance(actual, str) or actual.upper() != field.get('target_id', '').upper():
+            target = identities.get(field.get('target_request_path'), {}).get('id', field.get('target_id', ''))
+            if not isinstance(actual, str) or actual.upper() != target.upper():
                 raise ValueError('Required constructor reference changed before dependent write')
