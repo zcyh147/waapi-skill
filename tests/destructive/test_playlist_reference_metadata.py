@@ -165,7 +165,7 @@ def test_new_playlist_slot_append_preserves_existing_peers(workflow_sandbox_runt
 
 
 def _observe_new_playlist_slot_append(runtime):
-    """One new member on the retained Minigun owner; no setup objects or replay."""
+    """Append, replaceAll, then root-list create on one retained Minigun owner."""
     from uuid import UUID
     version = runtime.sandbox.metadata.get_info_version
     assert runtime.version == '2025.1' and tuple(version.get(key) for key in
@@ -177,8 +177,8 @@ def _observe_new_playlist_slot_append(runtime):
     assert not output.exists(), 'Never overwrite a prior new-slot observation'
     output.parent.mkdir(parents=True, exist_ok=True)
     observation = {'candidate': runtime.candidate, 'version': runtime.version, 'build': version,
-        'operation': 'object.set', 'calls': [], 'reads': [], 'transactions': [], 'business_effect_verified': False}
-    category = {'category': 'new-playlist-slot-append', 'status': 'FAIL', 'observation_path': str(output),
+        'operations': ['object.set', 'object.set', 'object.create'], 'calls': [], 'reads': [], 'transactions': [], 'business_effect_verified': False}
+    category = {'category': 'playlist-slot-append-replace-root-create', 'status': 'FAIL', 'observation_path': str(output),
         'verifier_strength': 'independent_new_GUID_class_owner_reference_ordered_peers_and_target_readback'}
     runtime.category_results.append(category)
     status = 'FAIL'
@@ -204,7 +204,7 @@ def _observe_new_playlist_slot_append(runtime):
     gateway = ReceiptGateway()
 
     def read(label, selector):
-        assert len(observation['reads']) < 16
+        assert len(observation['reads']) < 32
         observation['reads'].append({'label': label, 'call_index': len(observation['calls'])})
         payload = gateway.gateway(['query-object', *selector, '--max-results', '4',
             '--include', 'class-id', '--include', 'owner', '--include', 'parent', '--include', 'notes'], live=True)
@@ -226,19 +226,13 @@ def _observe_new_playlist_slot_append(runtime):
         assert len(rows) == 1, rows
         return rows[0]
 
-    try:
-        before_owner = observation['before_owner'] = exact('before-owner', owner)
-        before_target = observation['before_target'] = exact('before-target', target)
-        before = observation['before_members'] = read('before-members', ['--advanced-waql', f'from object "{owner}" select @Playlist'])
-        assert before_owner['type'] == 'RandomSequenceContainer' and before_owner['class_id'] == 589840
-        assert before_target['type'] == 'Sound' and before_target['class_id'] == 65552 and before_target['parent']['id'] == owner
-        assert [row['id'] for row in before] == peers, before
-        assert all(row['class_id'] == 5636096 and row['type'] == 'PluginInnerObject'
-            and row['name'] == '' and row['owner']['id'] == owner and 'parent' not in row for row in before), before
-        old_references = observation['before_references'] = [reference('before-peer-reference', identity) for identity in peers]
-        draft = _start_business_draft(gateway, 'object.set')
+    def construct(operation='object.set', behavior='append'):
+        draft = _start_business_draft(gateway, operation)
         owner_handle = _bind_business_object(gateway, draft, object_id=owner)
         target_handle = _bind_business_object(gateway, draft, object_id=target)
+        if behavior == 'replace-all':
+            _update_business_draft(gateway, draft, 'draft-business-configure',
+                ['--list-behavior', behavior], live=False)
         kind = _discover_business_type(gateway, draft, meaning='PlaylistSlot', role='object', expected_label='PlaylistSlot')
         listing = _update_business_draft(gateway, draft, 'draft-discover-fields',
             ['--object-handle', owner_handle, '--field-source', 'documented-lists', '--list'], live=True)
@@ -259,6 +253,19 @@ def _observe_new_playlist_slot_append(runtime):
         observation['transactions'].append(receipt)
         receipt.update(_complete_business_draft(gateway, draft))
         assert receipt['execute']['automatic_retry'] is False
+        return receipt
+
+    try:
+        before_owner = observation['before_owner'] = exact('before-owner', owner)
+        before_target = observation['before_target'] = exact('before-target', target)
+        before = observation['before_members'] = read('before-members', ['--advanced-waql', f'from object "{owner}" select @Playlist'])
+        assert before_owner['type'] == 'RandomSequenceContainer' and before_owner['class_id'] == 589840
+        assert before_target['type'] == 'Sound' and before_target['class_id'] == 65552 and before_target['parent']['id'] == owner
+        assert [row['id'] for row in before] == peers, before
+        assert all(row['class_id'] == 5636096 and row['type'] == 'PluginInnerObject'
+            and row['name'] == '' and row['owner']['id'] == owner and 'parent' not in row for row in before), before
+        old_references = observation['before_references'] = [reference('before-peer-reference', identity) for identity in peers]
+        receipt = construct()
         created, = receipt['verify']['agent_result']['business_result']['created_objects']
         identity = created['object']['id']
         assert UUID(identity).int != 0 and identity not in {*peers, owner, target}
@@ -275,6 +282,49 @@ def _observe_new_playlist_slot_append(runtime):
         after_references = observation['after_references'] = [reference('after-peer-reference', identity) for identity in peers]
         assert after_references == old_references
         assert exact('after-owner', owner) == before_owner and exact('after-target', target) == before_target
+        observation['append_business_effect_verified'] = True
+        replacement_before = observation['replacement_before'] = read('before-replacement',
+            ['--advanced-waql', f'from object "{owner}" select @Playlist'])
+        assert replacement_before == after
+        replacement_receipt = construct(behavior='replace-all')
+        replaced, = replacement_receipt['verify']['agent_result']['business_result']['created_objects']
+        replacement_id = replaced['object']['id']
+        removed_ids = [row['id'] for row in replacement_before]
+        assert UUID(replacement_id).int != 0 and replacement_id not in {*removed_ids, owner, target}
+        replacement = exact('replacement-slot', replacement_id)
+        observation['replacement_created'] = replacement
+        assert replacement['name'] == '' and replacement['type'] == 'PluginInnerObject' and replacement['class_id'] == 5636096
+        assert replacement['owner']['id'] == owner and 'parent' not in replacement
+        assert reference('replacement-reference', replacement_id) == before_target
+        replacement_members = observation['replacement_members'] = read('after-replacement',
+            ['--advanced-waql', f'from object "{owner}" select @Playlist'])
+        assert replacement_members == [replacement]
+        for removed in removed_ids:
+            assert read('removed-slot', ['--exact-id', removed]) == []
+        observation['removed_member_ids'] = removed_ids
+        assert exact('replacement-owner', owner) == before_owner and exact('replacement-target', target) == before_target
+        observation['replacement_business_effect_verified'] = True
+        root_create_before = observation['root_create_before'] = read('before-root-create',
+            ['--advanced-waql', f'from object "{owner}" select @Playlist'])
+        assert root_create_before == replacement_members
+        root_receipt = construct(operation='object.create')
+        root_result = root_receipt['verify']['agent_result']['business_result']
+        assert root_result['identity_status'] == 'verified_owned_list_member' and root_result['verified_root'] is None
+        assert root_result['configuration_operations'] == ['object.setReference', 'object.setNotes']
+        root_member, = root_result['created_objects']
+        root_id = root_member['object']['id']
+        assert UUID(root_id).int != 0 and root_id not in {*removed_ids, replacement_id, owner, target}
+        root_created = exact('root-created-slot', root_id)
+        observation['root_created'] = root_created
+        assert root_created['name'] == '' and root_created['type'] == 'PluginInnerObject' and root_created['class_id'] == 5636096
+        assert root_created['owner']['id'] == owner and 'parent' not in root_created
+        assert reference('root-created-reference', root_id) == before_target
+        root_members = observation['root_members'] = read('after-root-create',
+            ['--advanced-waql', f'from object "{owner}" select @Playlist'])
+        assert root_members == [replacement, root_created]
+        assert reference('retained-replacement-reference', replacement_id) == before_target
+        assert exact('root-create-owner', owner) == before_owner and exact('root-create-target', target) == before_target
+        observation['root_create_business_effect_verified'] = True
         observation['business_effect_verified'] = True
         status = 'PASS'
     except BaseException as exc:

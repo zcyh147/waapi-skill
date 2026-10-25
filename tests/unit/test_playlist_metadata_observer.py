@@ -41,7 +41,7 @@ def test_playlist_observer_preserves_disclosed_restrictions(tmp_path, has_flag):
     assert (tmp_path / "observations" / "playlist-reference-metadata.json").is_file()
 
 
-@pytest.mark.parametrize('fault', ['none', 'missing-independent-created'])
+@pytest.mark.parametrize('fault', ['none', 'missing-independent-root-created'])
 def test_new_playlist_append_collector_persists_independent_outcome_with_real_gateway(tmp_path, monkeypatch, fault):
     import hashlib
     import importlib
@@ -58,19 +58,20 @@ def test_new_playlist_append_collector_persists_independent_outcome_with_real_ga
     new = '{77777777-7777-7777-7777-777777777777}'
     task = playlist_creation_task(tmp_path, fixture_ids=(owner, target, first, peer, new))
     original = task.call
-    independent_phase = False
+    verified_count = 0
+    root_created_id = '{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}'
     def call(uri, args=None, options=None):
-        if (fault == 'missing-independent-created' and independent_phase and uri.endswith('object.get')
-                and (args == {'from': {'id': [new]}} or args.get('waql', '').startswith(f'from object "{new}" take '))):
+        if (fault == 'missing-independent-root-created' and verified_count == 3 and uri.endswith('object.get')
+                and (args == {'from': {'id': [root_created_id]}} or args.get('waql', '').startswith(f'from object "{root_created_id}" take '))):
             task.calls.append((uri, args, options))
             return {'return': []}
         return original(uri, args, options)
     task.call = call
     def raw(argv):
-        nonlocal independent_phase
+        nonlocal verified_count
         result = task.run(*argv)
         if argv[0] == 'verify' and result[0] == 0:
-            independent_phase = True
+            verified_count += 1
         return result
     runtime = SimpleNamespace(version='2025.1', candidate='program-only', state_dir=tmp_path / 'state',
         sandbox=SimpleNamespace(metadata=SimpleNamespace(get_info_version=dict(year=2025, major=1, minor=7, build=9143))),
@@ -102,10 +103,10 @@ def test_new_playlist_append_collector_persists_independent_outcome_with_real_ga
     body = Path(category['observation_path']).read_bytes()
     observation = json.loads(body)
     assert category['observation_sha256'] == hashlib.sha256(body).hexdigest()
-    assert len(task.writes) == 1
-    assert observation['transactions'][0]['verify']['verified'] is True
-    assert [row['argv'][0] for row in observation['calls']].count('execute') == 1
-    assert [row['argv'][0] for row in observation['calls']].count('verify') == 1
+    assert len(task.writes) == 3
+    assert len(observation['transactions']) == 3 and all(tx['verify']['verified'] is True for tx in observation['transactions'])
+    assert [row['argv'][0] for row in observation['calls']].count('execute') == 3
+    assert [row['argv'][0] for row in observation['calls']].count('verify') == 3
     monkeypatch.setattr(finalizer, 'MODULE', 'tests/destructive/test_playlist_reference_metadata.py::')
     module = SimpleNamespace(__file__=collector.__file__, REPO_ROOT=workflow.REPO_ROOT)
     node = 'test_new_playlist_slot_append_preserves_existing_peers'
@@ -116,7 +117,7 @@ def test_new_playlist_append_collector_persists_independent_outcome_with_real_ga
         'outcome': 'PASS' if error is None else 'FAIL'}]
     assert final['source']['hash_before'] == final['source']['hash_after'] == proof.digest
     assert final['residual_state']['process_cleanup'] == 'cleaned'
-    assert final['transactions'][0]['state'] == 'verified'
+    assert len(final['transactions']) == 3 and all(tx['state'] == 'verified' for tx in final['transactions'])
     final_category, = final['categories']
     assert final_category['observation_sha256'] == hashlib.sha256(body).hexdigest()
     if fault == 'none':
@@ -125,11 +126,14 @@ def test_new_playlist_append_collector_persists_independent_outcome_with_real_ga
         assert observation['created']['class_id'] == 5636096 and observation['created']['owner']['id'] == owner
         assert [row['id'] for row in observation['after_members']] == [first, peer, new]
         assert observation['new_reference']['id'] == target
+        assert observation['replacement_business_effect_verified'] is True and observation['root_create_business_effect_verified'] is True
+        assert [row['id'] for row in observation['root_members']] == ['{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}', root_created_id]
         assert final['invocation']['outcome'] == final_category['status'] == 'PASS'
         assert final['residual_state']['sandbox'] == 'deleted'
     else:
         assert category['status'] == 'FAIL' and observation['business_effect_verified'] is False
-        assert 'error' in observation and 'created' not in observation
+        assert 'error' in observation and 'root_created' not in observation
+        assert observation['append_business_effect_verified'] is observation['replacement_business_effect_verified'] is True
         assert final['invocation']['outcome'] == final_category['status'] == 'FAIL'
         assert final['residual_state']['sandbox'] == 'quarantined'
         assert Path(final['residual_state']['quarantine_path']).is_dir()

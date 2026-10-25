@@ -689,15 +689,17 @@ def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', 
         if uri == 'ak.wwise.core.object.create' and args.get('list') == 'Playlist':
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             task.writes.append(deepcopy(args))
+            created_slot_id = (new_slot_id, '{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}', '{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}')[len(task.writes) - 1]
             assert args['parent'] == owner_id and args['type'] == 'PlaylistSlot' and args['name'] == ''
             assert args['@PlaylistObject'] == target_id and 'objects' not in args
-            task.objects[new_slot_id] = {'id': new_slot_id, 'name': '', 'type': 'PluginInnerObject', 'classId': 5636096,
+            task.objects[created_slot_id] = {'id': created_slot_id, 'name': '', 'type': 'PluginInnerObject', 'classId': 5636096,
                 'path': base + r'\[PlaylistSlot: (First)]', 'owner': {'id': owner_id}, 'notes': '', 'PlaylistObject': {'id': target_id}}
-            task.objects[owner_id]['@Playlist'].append({'id': new_slot_id})
-            return {'id': new_slot_id, 'name': ''}
+            task.objects[owner_id]['@Playlist'].append({'id': created_slot_id})
+            return {'id': created_slot_id, 'name': ''}
         if uri == SET:
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             task.writes.append(deepcopy(args))
+            created_slot_id = (new_slot_id, '{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}', '{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}')[len(task.writes) - 1]
             item, = args['objects']
             slot, = item['@Playlist']
             assert item['object'] == owner_id and slot == {'type': 'PlaylistSlot', 'name': '', '@PlaylistObject': target_id}
@@ -705,10 +707,10 @@ def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', 
                 for previous in task.objects[owner_id]['@Playlist']:
                     del task.objects[previous['id']]
                 task.objects[owner_id]['@Playlist'] = []
-            task.objects[new_slot_id] = {'id': new_slot_id, 'name': '', 'type': 'PluginInnerObject', 'classId': 5636096,
+            task.objects[created_slot_id] = {'id': created_slot_id, 'name': '', 'type': 'PluginInnerObject', 'classId': 5636096,
                 'path': base + r'\[PlaylistSlot: (First)]', 'owner': {'id': owner_id}, 'notes': '', 'PlaylistObject': {'id': target_id}}
-            task.objects[owner_id]['@Playlist'].append({'id': new_slot_id})
-            return {'objects': [{'id': owner_id, 'name': 'Numbers', '@Playlist': [{'id': new_slot_id, 'name': ''}]}]}
+            task.objects[owner_id]['@Playlist'].append({'id': created_slot_id})
+            return {'objects': [{'id': owner_id, 'name': 'Numbers', '@Playlist': [{'id': created_slot_id, 'name': ''}]}]}
         return original(uri, args, options)
     task.call = call
     owner, target = task.bind(owner_id), task.bind(target_id)
