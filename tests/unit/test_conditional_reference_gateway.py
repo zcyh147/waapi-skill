@@ -1563,9 +1563,10 @@ class MasterBusDeviceTask(AttenuationTask):
         self.objects[SECOND].update(classId=11403271, name="System", type="AudioDevice", path=r"\Audio Devices\Default Work Unit\System")
         self.metadata = {"AudioDevice": {"name": "AudioDevice", "type": "",
             "restriction": {"type": "reference", "restrictions": [{"type": ["AudioDevice"]}, "notNull"]},
-            "dependencies": [{"type": "isMasterBus", "value": True, "action": "Show", "context": "Self"}]}}
-        self.types = [{"classId": class_id, "name": name, "type": "WObject"}
-                      for class_id, name in ((1376272, "Bus"), (11403271, "AudioDevice"), (1638416, "WorkUnit"), (131088, "Folder"))]
+            "dependencies": ([{"type": "isMasterBus", "value": True, "action": "Show", "context": "Self"}]
+                             if version in {"2024.1", "2025.1"} else [])}}
+        self.types = [{"classId": class_id, "name": name, "type": "AudioDevice" if name == "System" else "WObject"}
+                      for class_id, name in ((1376272, "Bus"), (11403271, "System"), (1638416, "WorkUnit"), (131088, "Folder"))]
 
     def call(self, uri, args=None, options=None):
         if uri.endswith("isPropertyEnabled"):
@@ -1576,6 +1577,103 @@ class MasterBusDeviceTask(AttenuationTask):
             self.enabled_reads.append({"uri": uri, "args": deepcopy(args), "options": options, "result": deepcopy(result)})
             return result
         return super().call(uri, args, options)
+
+
+def _declare_device_reference(task, name="AudioDevice"):
+    source, target = task.bind(FIRST), task.bind(SECOND)
+    field = task.discover(source, name)
+    code, declared = (task.step("draft-declare-field-change", "--object-handle", source,
+        "--field-handle", field, "--target-handle", target) if task.operation == "object.setReference" else
+        task.step("draft-declare-existing", "--declaration-id", "device", "--object-handle", source,
+            "--field-value", field, target))
+    assert code == 0, declared
+
+
+@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
+    for operation in (["object.setReference"] if version == "2021.1" else ["object.setReference", "object.set"])])
+def test_master_bus_refuses_source_incompatible_sink_before_preview(tmp_path, version, operation):
+    task = MasterBusDeviceTask(tmp_path, version, operation)
+    task.objects[SECOND].update(classId=11862023, name="Renamed No Output",
+        path=r"\Audio Devices\Default Work Unit\Renamed No Output")
+    task.types = [row for row in task.types if row["classId"] != 11403271]
+    task.types.append({"classId": 11862023, "name": "No Output", "type": "AudioDevice"})
+    before = deepcopy(task.objects)
+    _declare_device_reference(task)
+    code, checked = task.step("draft-check")
+    assert code == 2, checked
+    assert "INVALID_REFERENCE_TARGET" in json.dumps(checked), checked
+    assert task.objects == before
+    assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1"])
+def test_older_master_bus_keeps_system_target_without_newer_show_condition(tmp_path, version):
+    task = MasterBusDeviceTask(tmp_path, version)
+    before = deepcopy(task.objects)
+    _declare_device_reference(task)
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    assert not shown["artifact"]["prepared_operation"]["pre_state"]["condition_metadata"]["structural_applicability"]
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects == {**before, FIRST: {**before[FIRST], "AudioDevice": {"id": SECOND}}}
+
+
+@pytest.mark.parametrize("damage", ["uninstalled", "contradictory-class", "prewrite-class-drift"])
+def test_master_sink_target_requires_fresh_installed_class_through_execution(tmp_path, damage):
+    task = MasterBusDeviceTask(tmp_path, "2025.1")
+    _declare_device_reference(task)
+    if damage == "uninstalled":
+        task.types = [row for row in task.types if row["classId"] != 11403271]
+    elif damage == "contradictory-class":
+        next(row for row in task.types if row["classId"] == 11403271)["type"] = "Effect"
+    code, checked = task.step("draft-check")
+    if damage != "prewrite-class-drift":
+        assert code == 2, checked
+    else:
+        assert code == 0, checked
+        code, preview = task.step("preview-from-draft")
+        assert code == 0, preview
+        tx = preview["transaction_id"]
+        code, shown = task.run("transaction-show", tx)
+        assert code == 0, shown
+        code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+        assert code == 0, confirmed
+        # Same object identity/name/path, different plug-in class.
+        task.objects[SECOND]["classId"] = 11862023
+        task.types.append({"classId": 11862023, "name": "No Output", "type": "AudioDevice"})
+        code, executed = task.run("execute", tx)
+        assert code == 2, executed
+    assert task.objects[FIRST]["AudioDevice"] is None
+    assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+
+
+def test_no_output_restriction_does_not_spread_to_unrelated_audio_device_reference(tmp_path):
+    task = MasterBusDeviceTask(tmp_path, "2025.1")
+    task.objects[SECOND]["classId"] = 11862023
+    task.types.append({"classId": 11862023, "name": "No Output", "type": "AudioDevice"})
+    task.objects[FIRST]["SecondaryDevice"] = None
+    task.metadata = {"SecondaryDevice": {"name": "SecondaryDevice", "type": "",
+        "restriction": {"type": "reference", "restrictions": [{"type": ["AudioDevice"]}]}}}
+    _declare_device_reference(task, "SecondaryDevice")
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    code, shown = task.run("transaction-show", preview["transaction_id"])
+    assert code == 0, shown
+    assert not shown["artifact"]["prepared_operation"]["pre_state"].get("reference_target_conditions")
+    assert task.objects[FIRST]["AudioDevice"] is None
+    assert task.objects[FIRST]["SecondaryDevice"] is None
 
 
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
