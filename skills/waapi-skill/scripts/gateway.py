@@ -32787,6 +32787,14 @@ def transaction_show_summary(
         derived_notice['optional_none_state_materialization'] = notice
 
     plugin_verification_plan = prepared.get("verification_plan")
+    staged_arrays = [field for field in prepared.get('pre_state', {}).get('owned_result_stages', {}).get('deferred', [])
+        if 'targets' in field]
+    if staged_arrays:
+        derived_notice['staged_reference_lists'] = [{'field': field['field'], 'mode': field['list_mode'],
+            'target_count': len(field['targets']), 'target_binding': 'independently_verified_created_GUIDs',
+            'constructor_roster': 'observed_after_creation_before_assignment',
+            'append_prefix': 'retain_the_complete_observed_constructor_roster',
+            'replacement': 'exact_requested_order', 'hierarchy_targets': 'preserved'} for field in staged_arrays]
     inner_nodes = ([node for node in plugin_verification_plan.get("nodes", []) if node.get("inner_identity") and not node.get("preexisting_id")]
         if isinstance(plugin_verification_plan, Mapping) else [])
     if inner_nodes:

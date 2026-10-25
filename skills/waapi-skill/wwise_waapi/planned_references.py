@@ -52,8 +52,9 @@ def graph_result_bindings(roots, result_handles, *, retain_created_results=False
             if isinstance(target, Mapping) and "new_control_input" in target:
                 bindings.append({"result_handle": result_handles[id(target["new_control_input"])],
                     "request_path": path + ".owned_control_input"})
-            if isinstance(target, Mapping) and target.get("kind") == "id" and str(target.get("value", "")).startswith("bnh1-"):
-                targets.add(target["value"])
+            for item in target if isinstance(target, list) else [target]:
+                if isinstance(item, Mapping) and item.get("kind") == "id" and str(item.get("value", "")).startswith("bnh1-"):
+                    targets.add(item["value"])
         for index, child in enumerate(node.get("children", [])):
             visit(child, f"{path}.children[{index}]")
         for index, descriptor in enumerate(node.get("lists", [])):
@@ -104,8 +105,8 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, refere
         handles[binding["result_handle"]] = binding["request_path"]
         paths[binding["request_path"]] = binding["result_handle"]
     all_references = [reference for node in nodes for reference in node.references] + list(references)
-    used = {reference.target.value for reference in all_references
-        if getattr(reference.target, "kind", None) == "id" and str(reference.target.value).startswith("bnh1-")}
+    used = {target.value for reference in all_references for target in reference.targets
+        if getattr(target, "kind", None) == "id" and str(target.value).startswith("bnh1-")}
     if used - set(handles):
         raise ObjectOperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "A scalar result target left this normalized graph")
     selected = {handles[handle] for handle in used}

@@ -191,10 +191,13 @@ def observe_lists(prepared, identities, *, read):
 
 
 def prepare(uri, args, options, specs, context, version, *, force=False, root_parent=None, parent_children=(), list_guards=()):
+    arrays = [{'source': node['request_path'], 'field': field['name'], 'targets': field['target_results'],
+        'list_mode': field['list_mode'], 'binding': field['list_binding'], 'platform': node.get('platform', args.get('platform'))}
+        for node in specs for field in node.get('references', []) if 'target_results' in field]
     constructor_references = [{'source': node['request_path'], 'field': field['name'], 'target': field['target_request_path']}
         for node in specs for field in node.get('references', []) if 'target_request_path' in field
         and field['name'] in node.get('constructor_inputs', {}).get('required_references', [])]
-    if not force and not constructor_references and (not context or not (context.get('renames') or context.get('duplicate_sibling_groups'))):
+    if not force and not arrays and not constructor_references and (not context or not (context.get('renames') or context.get('duplicate_sibling_groups'))):
         return None
     if force and not any(not node.get('existing_target') for node in specs):
         return None
@@ -217,14 +220,14 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
         raise ValueError('Native-name staging needs the complete ordinary new-child graph; richer alternatives remain #178/#192 obligations')
     deferred = [{'source': node['request_path'], 'field': field['name'], 'target': field['target_request_path'],
                  'platform': node.get('platform', args.get('platform'))}
-        for node in specs for field in node.get('references', []) if 'target_request_path' in field]
+        for node in specs for field in node.get('references', []) if 'target_request_path' in field] + arrays
     # Mandatory fields remain inline; their created targets are bound before
     # this occurrence's constructor, never repaired through a later setter.
     if any(node.get('constructor_inputs', {}).get('class_id') != 5636096 for field in constructor_references
             for node in specs if node['request_path'] == field['source']):
         raise ValueError('This mandatory constructor dependency needs its separate source-certified staging contract')
     deferred = [field for field in deferred if not any(
-        all(field[key] == required[key] for key in ('source', 'field', 'target')) for required in constructor_references)]
+        all(field.get(key) == required[key] for key in ('source', 'field', 'target')) for required in constructor_references)]
     if len(deferred) > DEFAULT_MAX_NODES:
         raise ValueError('Native-name staging requires bounded ordinary result-reference dependencies')
     by_path = {node['request_path']: node for node in specs}
@@ -507,13 +510,18 @@ def observe_reference_metadata(prepared, identities, *, read):
     if plan.get('creation_stages') and plan['deferred']:
         # Earlier roots may have been created before other owned stages. A
         # dependent reference must still consume their exact actual identity.
-        paths = list(dict.fromkeys(path for field in plan['deferred'] for path in (field['source'], field['target'])))
+        paths = list(dict.fromkeys(path for field in plan['deferred'] for path in
+            (field['source'], *([target['request_path'] for target in field['targets']] if 'targets' in field else [field['target']]))))
         for path in paths:
             payload = read(GET, {'from': {'id': [identities[path]['id']]}}, {'return': fields_for(by_path[path])})
             if not isinstance(payload, Mapping) or payload.get('return') != [identities[path]]:
                 raise ValueError('Owned reference source/target drifted after its actual creation stage')
     for field in [*plan['deferred'], *plan.get('constructor_references', [])]:
         if field['source'] not in identities:
+            continue
+        if 'targets' in field:
+            from .documented_list_fields import validate_planned_list_source
+            validate_planned_list_source(field['binding'], read=read)
             continue
         source = by_path[field['source']]
         metadata = [row['metadata'] for row in context['metadata'] if row['name'] == field['field']
@@ -651,13 +659,18 @@ def observe_before_creation(prepared, identities, *, read, context, binding, sta
 def reference_args(plan, identities):
     rows = []
     for field in plan['deferred']:
-        source, target = identities[field['source']], identities[field['target']]
+        source = identities[field['source']]
         row = next((row for row in rows if row['object'] == source['id'] and row.get('platform') == field['platform']), None)
         if row is None:
             row = {'object': source['id'], **({'platform': field['platform']} if field['platform'] is not None else {})}
             rows.append(row)
         owned_list_paths = {path for profile in plan.get('lists', []) for path in profile['members']}
-        row['@' + field['field']] = target['id'] if field['target'] in owned_list_paths else target['path']
+        if 'targets' in field:
+            row['@' + field['field']] = [identities[target['request_path']]['id'] for target in field['targets']]
+            row['listMode'] = field['list_mode']
+        else:
+            target = identities[field['target']]
+            row['@' + field['field']] = target['id'] if field['target'] in owned_list_paths else target['path']
     return {'objects': rows}
 
 
@@ -667,6 +680,45 @@ def reference_calls(plan, identities):
     return [{'uri': SET_REFERENCE, 'args': {'object': identities[field['source']]['id'], 'reference': field['field'],
         'value': identities[field['target']]['id'], **({'platform': field['platform']} if field['platform'] is not None else {})},
         'options': {}} for field in plan['deferred']]
+
+
+def capture_reference_lists(prepared, identities, *, read):
+    """Bind the actual constructor roster before an ordered reference assignment."""
+    from .documented_list_fields import resolve_live_list_evidence, observe_list_binding
+    captured = []
+    for field in prepared['pre_state']['owned_result_stages']['deferred']:
+        if 'targets' not in field:
+            continue
+        owner = identities[field['source']]['id']
+        targets = [identities[target['request_path']]['id'] for target in field['targets']]
+        source = resolve_live_list_evidence(prepared['pre_state']['owned_result_stages']['version'], owner, field['field'], read=read)
+        if any(source[key] != field['binding'][key] for key in ('version', 'catalog_sha256', 'source_member', 'source_sha256', 'declaration')):
+            raise ValueError('Created reference List source differs from its sealed class authority')
+        guard = observe_list_binding({**source, 'reference_targets': targets}, read=read)
+        expected = [*( [row['id'] for row in guard['members']] if field['list_mode'] == 'append' else []), *targets]
+        if len(expected) > DEFAULT_MAX_NODES:
+            raise ValueError('Observed constructor prefix and requested references exceed the complete roster bound')
+        captured.append({'source': field['source'], 'field': field['field'], 'expected_roster': expected, 'guard': guard})
+    return captured
+
+
+def reference_list_assertions(prepared, execution, *, read):
+    from .documented_list_fields import observe_list_binding, list_guard_assertions
+    assertions = []
+    for record in execution.get('owned_result_execution', {}).get('reference_lists', []):
+        guard = record['guard']
+        try:
+            actual = observe_list_binding(guard['evidence'], read=read, after_write=True,
+                preserve_reference_ids=[row['id'] for row in guard['reference_objects']])
+            preserved = list_guard_assertions([guard], read=read, after_write=True)
+            passed = ([row['id'] for row in actual['members']] == record['expected_roster']
+                and all(row['passed'] for row in preserved))
+            evidence = {'expected_roster': record['expected_roster'], 'actual': actual, 'preservation': preserved}
+        except (ValueError, KeyError, TypeError) as exc:
+            passed, evidence = False, {'error': str(exc)}
+        assertions.append({'name': 'staged reference List order, generated prefix and hierarchy targets remain bound',
+            'passed': bool(passed), 'evidence': evidence})
+    return assertions
 
 
 def execute(prepared, *, write, read, context=None):
@@ -684,6 +736,11 @@ def execute(prepared, *, write, read, context=None):
     try:
         validate_semantic_result(plan['uri'], first.get('result'), version=plan['version'])
         identities, observations = bind(prepared, first['result'], read=read)
+        def observed(uri, args, options):
+            result = read(uri, args, options)
+            observations.append({'uri': uri, 'args': args, 'options': options, 'result': result})
+            return result
+        reference_lists = capture_reference_lists(prepared, identities, read=observed)
         preservation = observe_preservation(prepared, identities, read=read, context=context)
         if not all(row['passed'] for row in preservation):
             raise ValueError('Creation changed its sealed retained parent/collision scope; dependent write stopped')
@@ -695,6 +752,7 @@ def execute(prepared, *, write, read, context=None):
             validate_semantic_result(call['uri'], second.get('result'), version=plan['version'])
         return {**first, 'owned_result_execution': {'kind': KIND, 'plan_sha256': canonical_sha256(plan),
             'stages': records, 'identities': identities, 'readbacks': observations,
+            'reference_lists': reference_lists,
             'preservation': preservation, 'phase_context': context}}
     except Exception as exc:
         return {**first, 'ok': False, 'error_code': 'OWNED_RESULT_STAGE_INDETERMINATE', 'message': str(exc),
@@ -727,6 +785,7 @@ def execute_split(prepared, *, write, read, context):
             metadata_reads.append({'uri': uri, 'args': args, 'options': options, 'result': result})
             return result
         observe_reference_metadata(prepared, identities, read=metadata_read)
+        reference_lists = capture_reference_lists(prepared, identities, read=metadata_read)
         for call in reference_calls(plan, identities):
             result = write(call['uri'], call['args'], call['options'])
             records.append({**call, 'dispatch_result': result})
@@ -734,7 +793,8 @@ def execute_split(prepared, *, write, read, context):
                 raise ValueError('Dependent reference stage was not acknowledged; do not replay')
             validate_semantic_result(call['uri'], result.get('result'), version=plan['version'])
         return {**first, 'owned_result_execution': {'kind': KIND, 'plan_sha256': canonical_sha256(plan), 'stages': records,
-            'creation_bindings': bindings, 'identities': identities, 'readbacks': metadata_reads, 'phase_context': context}}
+            'creation_bindings': bindings, 'identities': identities, 'readbacks': metadata_reads,
+            'reference_lists': reference_lists, 'phase_context': context}}
     except Exception as exc:
         return {**first, 'ok': False, 'error_code': 'OWNED_RESULT_STAGE_INDETERMINATE', 'message': str(exc),
             'owned_result_execution': {'kind': KIND, 'plan_sha256': canonical_sha256(plan), 'stages': records,
@@ -784,7 +844,11 @@ def validate_split(prepared, execution, *, context):
             actual.get('dispatch_result', {}).get('result'), identities, read=read, context=context))
         if observations != binding.get('readbacks') or rebuilt != preserved:
             raise ValueError('Creation stage readbacks differ from the actual ownership proof')
-    replay(proof.get('readbacks', []), lambda read: observe_reference_metadata(prepared, identities, read=read))
+    def final_reads(read):
+        observe_reference_metadata(prepared, identities, read=read)
+        return capture_reference_lists(prepared, identities, read=read)
+    if replay(proof.get('readbacks', []), final_reads) != proof.get('reference_lists', []):
+        raise ValueError('Staged reference Lists differ from their actual pre-assignment roster')
     if identities != proof.get('identities'):
         raise ValueError('Owned business roster differs from its actual per-stage observations')
     for stage, call in zip(stages[len(creations):], reference_calls(plan, identities), strict=True):
@@ -820,6 +884,8 @@ def validate(prepared, execution, *, context=None):
         validate_semantic_result(uri, row.get('result'), version=plan['version'])
         return row['result']
     identities, _ = bind(prepared, execution['result'], read=retained)
+    if capture_reference_lists(prepared, identities, read=retained) != proof.get('reference_lists', []):
+        raise ValueError('Reference List stage lost its actual post-construction prefix and targets')
     if next(reads, None) is not None or identities != proof.get('identities'):
         raise ValueError('Owned result proof contains missing, extra or changed identity observations')
     preservation = iter(proof.get('preservation', []))

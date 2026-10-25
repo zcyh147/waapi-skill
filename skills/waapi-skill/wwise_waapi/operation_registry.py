@@ -8939,6 +8939,33 @@ def _prepare_object_node_specs(
                     raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "The planned reference List owner/source/version/shape does not match")
                 binding = documented[0]
                 validate_planned_list_source(binding, read=read)
+                if result_context and any(target.value in result_context['handles'] for target in descriptor.targets):
+                    from .documented_list_fields import legacy_playlist_authority
+                    if legacy_playlist_authority(binding) is None:
+                        raise OperationContractError('PLANNED_LIST_TARGET_UNAVAILABLE', 'Planned List targets require their exact source contract')
+                    entries, expressions, existing = [], [], []
+                    owner_handle = result_context['facts'][node.request_path]['result_handle']
+                    allowed = {row['class_id'] for row in binding['declaration']['element_classes']}
+                    for target in descriptor.targets:
+                        target_path = result_context['handles'].get(target.value)
+                        if target_path is None:
+                            raise OperationContractError('PLAYLIST_TARGET_PARENT_UNRESOLVED',
+                                'An existing target cannot be a direct child of this new planned owner')
+                        fact = result_context['facts'][target_path]
+                        if (fact['class_id'] not in allowed or fact['relation'] != 'parent'
+                                or fact['parent_identity'] != owner_handle):
+                            raise OperationContractError('INVALID_REFERENCE_TARGET', 'Planned Playlist target must be a direct child of its exact declared owner')
+                        entries.append({'request_path': target_path})
+                        expressions.append(fact['path'])
+                    if [target.value for target in descriptor.targets] != binding['reference_targets']:
+                        raise OperationContractError('DOCUMENTED_LIST_BINDING_INVALID', 'Planned List target order differs from its declaration')
+                    live_binding = {**binding, 'reference_targets': existing}
+                    spec.setdefault('documented_reference_lists', []).append({'binding': live_binding, 'targets': []})
+                    spec['documented_list_owner_class'] = type_info.class_id
+                    resolved_references[descriptor.request_path] = expressions
+                    spec['references'].append({'name': descriptor.name, 'target_results': entries,
+                        'list_mode': playlist_mode, 'list_binding': binding, 'metadata_evidence': 'documented-list'})
+                    continue
                 identities = []
                 for offset, target_descriptor in enumerate(descriptor.targets):
                     role = f"{descriptor.request_path}[{offset}]"
@@ -21216,6 +21243,9 @@ def verify_prepared_operation(
             else:
                 check("Actual owned result stages match their immutable declaration and independent observations", True,
                     {"sha256": canonical_sha256(execution_result['owned_result_execution'])})
+                from .owned_result_stages import reference_list_assertions
+                for assertion in reference_list_assertions(prepared, execution_result, read=read_call):
+                    check(assertion['name'], assertion['passed'], assertion['evidence'])
             if kind in {"object-create-graph", "object-set-batch"}:
                 from .creation_observations import ordinary_staged_creation_graphs
                 try:
@@ -21704,6 +21734,8 @@ def verify_prepared_operation(
             for field_spec in spec.get("references", []):
                 if not isinstance(field_spec, Mapping):
                     continue
+                if 'target_results' in field_spec:
+                    continue  # The retained staged List guard owns ordered arrays and target preservation.
                 field_name = field_spec.get("name")
                 if "target_request_path" in field_spec:
                     continue

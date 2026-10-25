@@ -540,8 +540,16 @@ def _compile_graph_field_reference(session: BusinessDeclarationSession, field: A
                       action="split the reference array into a bounded request")
     identities = []
     for item in values:
-        if isinstance(item, str) and item.startswith("bnh1-") and field.field_kind == "reference":
-            identities.append(compile_result_reference(session, field, item, native_type=_resolve_native_object_type))
+        if isinstance(item, str) and item.startswith("bnh1-"):
+            allowed = None
+            if field.field_kind == 'list':
+                from .documented_list_fields import legacy_playlist_authority
+                source = field.restrictions['documented_list']
+                if legacy_playlist_authority(source) is None:
+                    raise _repair(session, 'PLANNED_LIST_TARGET_UNAVAILABLE', field=field.token,
+                        action='select existing objects for this List; planned targets require their exact source contract')
+                allowed = [row['name'] for row in source['declaration']['element_classes']]
+            identities.append(compile_result_reference(session, field, item, native_type=_resolve_native_object_type, allowed_types=allowed))
             continue
         handle = (session.handles.resolve_object(item).handle if field.field_kind == "list"
                   else session.handles.validate_field_value(field, item))
