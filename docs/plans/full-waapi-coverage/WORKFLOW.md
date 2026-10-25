@@ -108,3 +108,88 @@ the official [checkout v7.0.1](https://github.com/actions/checkout/releases/tag/
 and [setup-python v7.0.0](https://github.com/actions/setup-python/releases/tag/v7.0.0)
 actions pinned to their full release commit IDs. Local preflight success does not
 prove hosted CI, Windows or native-Wwise acceptance.
+
+## Opt-in developer batches
+
+Use the existing launcher with exactly one JSON plan path; batch selection is
+separate from the unchanged `--mode program` and ordinary mode entrypoints:
+
+```bash
+ci/test.sh --batch-plan /absolute/path/to/batch.json
+```
+
+A minimal non-live plan is:
+
+```json
+{
+  "contract": "waapi-skill.test-batch/v1",
+  "root": "/absolute/path/to/new-batch-root",
+  "groups": [
+    {
+      "id": "launcher",
+      "mode": "nonlive",
+      "version": "none",
+      "host": "none",
+      "nodes": ["tests/unit/test_ci_test_bat.py::test_python_driver_owns_all_platform_defaults_and_pytest_nodes"],
+      "sources": ["tests/unit/test_ci_test_bat.py"],
+      "depends_on": []
+    }
+  ]
+}
+```
+
+Plans contain 1–64 ordered groups, each with those seven fields and 1–256
+explicit test selectors. `sources` lists the finite relevant repository files;
+the driver also fingerprints selected test files and its shared batch plumbing.
+`depends_on` names earlier groups. Repeated selectors and compatible duplicate
+groups share original outcomes. Ordinary test failures block their dependents
+while independent groups continue; source, evidence or cleanup faults stop
+further dispatch. This is an explicit dependency map, not automatic discovery of
+all callers.
+
+Every attempt needs a fresh absolute, unaliased `root`. Repository-local roots
+must be below `.waapi-skill-state/`. `summary.json` links per-node original
+results and records failures, reuse and the next selection. Child pytest roots
+live beneath this durable root, so later default pytest retention cannot prune
+them. Preserve failed roots and original receipts.
+
+Add `"previous": "/absolute/path/to/old-root/summary.json"` to a new-root plan
+to select failed and affected tests. Unchanged passes are reused only after
+reopening their exact original terminal receipts, source/context and outcomes.
+Relevant source or native-context changes select affected groups and declared
+dependents. Unmapped changes produce `unknown_impact` and block dispatch; a
+new hash or documentation edit alone does not establish equivalence. Optional
+`irrelevant_changes` maps changed paths to explicit reviewed reasons and cannot
+override relevant source files. Source planning neither rewrites historical
+hashes nor issues a new PASS for retained results.
+
+For an interrupted report, use
+`"recover_from": "/absolute/path/to/old-root/summary.json"` with the same
+declared groups and a fresh root. This reporting-only path executes no producer
+and cannot combine with `previous` or `preflight_evidence`. It reconstructs
+validated saved terminal completions with their original source/verdict. A
+persisted not-started fact can leave a group BLOCKED/`NOT_STARTED`; missing,
+unsafe or started-without-terminal evidence stays BLOCKED/`UNKNOWN`. A later
+`previous` plan may run proven unstarted/failed/affected work while retaining
+completed siblings; unknown execution requires resolution before replay.
+
+Native batch admission is deliberately limited to the existing
+`tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_runtime_read_batch`
+selector, with `mode: destructive`, `host: wwise-console` and one pinned version
+per group. Versions run sequentially through the existing owned lifecycle;
+singleton collectors retain their isolation. The driver first inserts the
+existing collector-to-final-consumer checks. Optional `preflight_evidence` is
+an original summary descriptor, `{"artifact": "/absolute/path/to/summary.json",
+"sha256": "<original SHA-256>"}`: it reopens the complete consumer receipts and
+checks relevant sources before reuse. It does not replace native semantics
+review or relax source/cleanup requirements.
+
+Keep the durable report root separate from the physical native sandbox parent.
+The latter follows existing `WWISE_TEST_CONFIG` / `WWISE_SANDBOX_ROOT`
+configuration, with unique lifecycle-owned copies. For example, an explicitly
+short owned `WWISE_SANDBOX_ROOT=/private/tmp/waapi-batch-console-new` may accompany
+a deeper durable root. The admitted Console workflow validates source/sandbox
+separation and projects its fixed fixture path before dispatch; paths exceeding
+the existing 260 UTF-16-unit Windows/Wine limit, including NUL, are blocked.
+The authoritative live path guard remains in force. A representative native
+batch and focused developer passes do not replace the prescribed final gates.

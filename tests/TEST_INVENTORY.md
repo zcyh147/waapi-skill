@@ -5,6 +5,41 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-25 #197 developer batching and evidence retention prerequisite
+
+Reviewed implementation through `0399649d` extends the existing developer
+driver/pytest path with explicit deduplicated batches, durable per-node results,
+ordinary-failure collection, failed/affected selection, fail-closed original
+receipt reuse and reporting-only recovery. Separate candidate-scoped focused
+groups cover those mechanisms, source/cleanup boundaries and future test-file
+admission; they are not an aggregate Program or Non-live gate. The final
+test-only fixture correction passed four affected checks in 2.63s under a deep
+outer pytest root, with independent short owned physical sandbox parents.
+
+The macOS WwiseConsole 2025.1.7.9143 representative at candidate `0399649d`
+passed its one existing grouped-reader node in **10.74s**. Its root is
+`.waapi-skill-state/full-coverage/prerequisite-197-console-2025-r3`.
+`summary.json` records one executed group and 14 collector-preflight checks
+REUSED from their original receipts, with no consumer repeat. The native
+reference points to `groups/console-2025/category.jsonl`, record index 1:
+`phase: final`, `outcome: PASS`, rather than the earlier prepared record.
+The saved observation independently records PASS for voices, busses,
+audio objects, RTPCs, dry contributions and game objects. Source content,
+project mtime and tree metadata were unchanged; process cleanup was complete,
+no owned processes remained and the owned sandbox was deleted.
+
+Earlier roots remain failures: `prerequisite-197-console-2025-r1` stopped before
+pytest/Wwise launch because the standalone driver could not import the existing
+test helper; r2 was the first actual native attempt and failed the existing
+original-media path limit before playback/setup mutations. Its sandbox remains
+quarantined. The repaired r3 used a separate short physical sandbox parent;
+neither earlier verdict was rewritten or replayed.
+
+No Fresh, full Program/Non-live gate or native Windows run was added for this
+prerequisite. This validates the bounded framework and representative Console
+path, not downstream business coverage. #174's prescribed final gates remain
+assigned to #195; the mandatory pause after accepted #197 remains in force.
+
 ## 2026-10-24 R135 known meter output construction
 
 Reviewed product changes `d9a22dbc` and `967abf75` add 62 fixed business names
