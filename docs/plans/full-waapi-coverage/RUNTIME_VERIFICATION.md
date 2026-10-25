@@ -244,6 +244,59 @@ This completes the transport component's development evidence, not the current
 global coverage publication or ticket #186. The packaged Skill was unchanged by
 this integration. The final combined Program/Nonlive gates remain pending.
 
+## Transport ticket #199 acceptance reconciliation — 2026-10-26
+
+At integration candidate `c9c65f93`, the seven function URIs assigned to
+[#199](https://github.com/zcyh147/waapi-skill/issues/199) have exactly 1,486
+original obligation identities and shapes, with no missing or additional row.
+The existing transport support review retains their #186/#174 ownership and
+#195 aggregation dependency. Delivery through #199 does not remove those rows
+or close the rest of #186. The separate `transport.stateChanged` Topic is outside
+this seven-function child.
+
+| Version | Both-host original consumer results | Applicable function profiles |
+| --- | ---: | ---: |
+| 2021.1 | 246 verified | 10 |
+| 2022.1 | 292 verified | 12 |
+| 2023.1 | 320 verified | 14 |
+| 2024.1 | 314 verified | 14 |
+| 2025.1 | 314 verified | 14 |
+
+These are cumulative component results on their recorded development sources,
+not a new current-source machine evaluation. The 2021, 2022, 2024 and 2025
+consumer seals were reopened from the R133 freeze; the final R138 2023 consumer
+was reopened separately. Their disjoint union equals the exact original subset.
+All 64 route profiles reopened their existing complete native archive,
+request/result, version/build/host, source and cleanup validation chains through
+`runtime_transport_evidence.original_transport`; no native producer ran.
+`prepare` is natively absent in 2021.1, and `useOriginals` is natively absent in
+2021.1/2022.1. Both hosts remain covered wherever each function exists.
+
+| #199 acceptance criterion | Reconciled evidence and result |
+| --- | --- |
+| Closed public discovery, construction and behavior | Existing versioned business contracts and public Gateway lifecycle cases cover all 64 applicable profiles and 1,486 original shapes. Exact native absences stay distinct from public limitations. |
+| Five-version state/list and cleanup paths | Original paired-host cases prove issued ownership, actual state/list observations, all supported action choices and cleanup. The independently reviewed `ad8799c2` readback repair binds action peers and retirement to actual verify-span reads; its retained 50 honest-session checks and focused consumer negatives remain applicable. |
+| Batch, failed/affected selection and durable original results | #197's accepted batch mechanism is available; its original R2 consumer report retains separate PASS outcomes for transport cardinality and namespace/composition. Reuse those original outcomes and the five existing paired-host reports. No failed root is regraded or producer repeated for a new source hash. |
+| Connection, policy and transaction boundaries | The packaged Gateway and transport implementation are byte-identical to reviewed `fe1b13f8`: configuration-only connections, three modification policies, immutable Preview, confirmation or policy authorization, execute once, bounded verification and cleanup remain unchanged. No raw native or direct-client fallback was added. |
+| Exact original subset and independent review | R136's readback finding was repaired and independently cleared at `ad8799c2`; the exact four user-approved 2023 omitted-media-choice identities were independently cleared at `fe1b13f8`. The final 2023 consumer includes them. This reconciliation is ready for independent closeout review and integration. |
+
+The relevant-source comparison from `fe1b13f8` to `c9c65f93` finds no packaged
+Skill, transport helper or transport test change. Adjacent completion changes
+only enumerate additional candidate dependencies and admit the exact
+`profiler.saveCapture` file-destination boundary. Added capture-source selectors
+apply to profiler controls/meters, not transport. Earlier development-source
+differences retain their original attribution and reviewed repair evidence;
+this reconciliation does not rewrite their hashes or claim a new execution.
+
+Uncertain creation still yields no issued handle. `prepare` remains
+acknowledgment/schema-only; explicit Original/Converted selection does not prove
+global mode, restoration or acoustic output. The four 2023 omitted-choice
+boundaries remain the only approved omissions. Historical FAILs and quarantines
+remain unchanged. No additional #199 business requirement was found; final
+combined Program/Nonlive gates and global publication remain with #195, and
+Fresh acceptance remains with #194. This closeout adds no new pytest, native,
+Fresh or Windows execution evidence.
+
 ## Authoritative sources and accounting
 
 Use matching `skills/waapi-skill/resources/native-catalog/<version>/`
