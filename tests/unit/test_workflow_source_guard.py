@@ -4462,39 +4462,27 @@ def test_anonymous_count_tone_diagnostic_owns_one_36_channel_transaction_and_kee
     phase = receipt['phases'][0]
     assert Path(phase['wav']['archive_path']).read_bytes() == native_files[phase['output_path']]
     assert phase['signal_verified'] is False and phase['verification']['state'] == 'verified'
-    assert phase['verification']['verification_strength'] == 'tone_wav_artifact'
+    assert phase['verification']['verification_strength'] == 'tone_file_creation'
     shown = json.loads(Path(phase['transaction']['path']).read_text())
     verification = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    wav = verification['readbacks'][0]['wav']
-    assert (wav['channels'], wav['speaker_mask'], wav['frames']) == (36, 0, 1080)
-    assert all(len(segment['channels']) == 36 for segment in wav['sine_envelope']['segments'])
+    assert verification['verification_scope']['business_outcome'] == 'file_creation_only'
     assert len(receipt['lifecycle_final_reference']['transaction_ids']) == 1
     assert receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
 
 
-@pytest.mark.parametrize('fault', ['native-error', 'wrong-anonymous-count'])
-def test_anonymous_count_tone_diagnostic_preserves_unknown_or_wrong_effect_and_never_retries(tmp_path, workflow, fault):
-    runtime, commands, writes, native_files = _stationary_tone_runtime(tmp_path, workflow,
-        anonymous_count=True, fault=fault)
-    if fault == 'native-error':
-        with pytest.raises(Exception):
-            workflow._collect_tone_anonymous_count_characterization(runtime)
-    else:
-        category = workflow._collect_tone_anonymous_count_characterization(runtime)
-        assert category['status'] == 'blocked'
+def test_anonymous_count_tone_diagnostic_preserves_unknown_execution_and_never_retries(tmp_path, workflow):
+    runtime, commands, writes, _ = _stationary_tone_runtime(tmp_path, workflow,
+        anonymous_count=True, fault='native-error')
+    with pytest.raises(Exception):
+        workflow._collect_tone_anonymous_count_characterization(runtime)
     receipt = json.loads((runtime.state_dir / 'tone-anonymous-count-characterization.json').read_text())
     assert len(writes) == 1 and sum(argv[0] == 'execute' for argv in commands) == 1
     assert receipt['business_effect_verified'] is False
     phase = receipt['phases'][0]
     shown = json.loads(Path(phase['transaction']['path']).read_text())
-    if fault == 'native-error':
-        assert receipt['collection_complete'] is False and shown['state'] == 'indeterminate'
-        assert runtime.category_results[-1]['status'] == 'FAIL'
-        assert not any(argv[0] == 'verify' for argv in commands)
-    else:
-        assert receipt['collection_complete'] is True and shown['state'] == 'verification_failed'
-        assert phase['verification']['business_state_verified'] is False
-        assert Path(phase['wav']['archive_path']).read_bytes() == native_files[phase['output_path']]
+    assert receipt['collection_complete'] is False and shown['state'] == 'indeterminate'
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert not any(argv[0] == 'verify' for argv in commands)
 
 
 def test_remaining_tone_diagnostic_archives_exact_public_requests_without_certifying_wrong_signals(tmp_path, workflow, monkeypatch):
@@ -4520,11 +4508,10 @@ def test_remaining_tone_diagnostic_archives_exact_public_requests_without_certif
     assert receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
     for phase in receipt['phases']:
         assert phase['signal_verified'] is False
-        assert phase['verification']['business_state_verified'] is False
-        expected_state = 'verification_failed' if phase['business_values']['waveform'] in {'sine', 'square'} else 'result_schema_checked'
+        assert phase['verification']['business_state_verified'] is True
+        expected_state = 'verified'
         assert phase['verification']['state'] == expected_state
-        if expected_state == 'result_schema_checked':
-            assert phase['verification']['verification_strength'] == 'partial_tone_artifact'
+        assert phase['verification']['verification_strength'] == 'tone_file_creation'
         assert Path(phase['wav']['archive_path']).read_bytes() == native_files[phase['output_path']]
         shown = json.loads(Path(phase['transaction']['path']).read_text())
         assert shown['artifact']['request']['arguments']['args'] == next(row for row in writes if row['path'] == phase['output_path'])
@@ -4547,7 +4534,7 @@ def test_remaining_tone_diagnostic_archives_exact_public_requests_without_certif
     assert final['residual_state']['process_cleanup'] == 'cleaned'
     assert final['residual_state']['residual_processes'] == []
     assert len(final['transactions']) == 6
-    assert sorted(row['state'] for row in final['transactions']) == ['result_schema_checked'] * 2 + ['verification_failed'] * 4
+    assert [row['state'] for row in final['transactions']] == ['verified'] * 6
     calls_before = len(commands)
     with pytest.raises(AssertionError, match='overwrite'):
         workflow._collect_tone_waveform_envelope_characterization(runtime)
@@ -4681,7 +4668,7 @@ def test_stationary_tone_diagnostic_stops_on_wrong_host_or_generation_failure_wi
         assert final['state'] == ('indeterminate' if fault == 'native-error' else 'executed_unverified')
 
 
-def test_stationary_tone_diagnostic_retains_unrecognized_output_and_failed_verification_without_effect_credit(tmp_path, workflow):
+def test_stationary_tone_diagnostic_retains_uninterpreted_output_without_audio_quality_credit(tmp_path, workflow):
     runtime, commands, writes, native_files = _stationary_tone_runtime(tmp_path, workflow, fault='unrecognized-file')
     category = workflow._collect_stationary_tone_characterization(runtime)
     receipt = json.loads(Path(category['observation_path']).read_text())
@@ -4689,7 +4676,7 @@ def test_stationary_tone_diagnostic_retains_unrecognized_output_and_failed_verif
     assert receipt['business_effect_verified'] is False and len(writes) == 4
     for phase in receipt['phases']:
         assert Path(phase['wav']['archive_path']).read_bytes() == native_files[phase['output_path']]
-        assert phase['verification']['exit_code'] == 2 and phase['verification']['state'] == 'verification_failed'
+        assert phase['verification']['exit_code'] == 0 and phase['verification']['state'] == 'verified'
         assert phase['signal_verified'] is False
 
 

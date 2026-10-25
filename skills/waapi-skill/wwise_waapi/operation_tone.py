@@ -20,6 +20,11 @@ from .operation_soundbank import (
 )
 
 TONE_URI = "ak.wwise.debug.generateToneWAV"
+TONE_FILE_VERIFICATION_SCOPE = {
+    "business_outcome": "file_creation_only",
+    "observed": ["exact_owned_output_path", "regular_file", "created_or_rewritten"],
+    "not_checked": ["file_format", "channels", "sample_rate", "markers", "waveform", "audio_quality"],
+}
 
 
 def tone_output_snapshot(path: str, root: str) -> dict[str, Any]:
@@ -38,6 +43,7 @@ def prepare_tone_verification(args: Mapping[str, Any], audit: Mapping[str, Any],
     return {"kind": "tone-wav-artifact", "uri": TONE_URI, "version": version,
         "args": dict(args), "effective": effective, "artifact_budget": budget,
         "explicit_fields": sorted(args),
+        "verification_scope": TONE_FILE_VERIFICATION_SCOPE,
         "schema_sha256": canonical_sha256(SemanticSchemaValidator(version=version).schema_for(TONE_URI)),
         "path": path, "io_root": root,
         "before": tone_output_snapshot(path, root)}
@@ -70,6 +76,7 @@ def validate_tone_binding(plan, args, audit, version):
             or plan.get('effective') != {**TONE_DEFAULTS, **dict(args)}
             or plan.get('artifact_budget') != tone_artifact_budget({**TONE_DEFAULTS, **dict(args)})
             or plan.get('explicit_fields') != sorted(args)
+            or plan.get('verification_scope') != TONE_FILE_VERIFICATION_SCOPE
             or plan.get('schema_sha256') != canonical_sha256(SemanticSchemaValidator(version=version).schema_for(TONE_URI))
             or plan.get('io_root') != audit.get('io_root')
             or [row['resolved_path'] for row in audit['paths'] if row['json_path'] == '$.args.path'] != [plan.get('path')]):
@@ -77,7 +84,31 @@ def validate_tone_binding(plan, args, audit, version):
     if tone_output_snapshot(plan['path'], plan['io_root']) != plan['before']:
         raise SoundBankContractError('FILE_CHANGED', 'Tone output or isolated root changed after preview; prepare again.')
 
+
+def verify_tone_output_file(plan: Mapping[str, Any]) -> dict[str, Any]:
+    """Prove only the approved file-creation outcome, without parsing audio."""
+    if _root_identity(plan['io_root']) != plan['before']['root']:
+        raise SoundBankContractError('FILE_CHANGED', 'Tone isolated output root changed after preview.')
+    after = tone_output_snapshot(plan['path'], plan['io_root'])
+    if after['root'] != plan['before']['root'] or _root_identity(plan['io_root']) != plan['before']['root']:
+        raise SoundBankContractError('FILE_CHANGED', 'Tone isolated output root changed during verification.')
+    if after['file'] is None:
+        raise SoundBankContractError('MISSING_ARTIFACT', 'Requested Tone output file is missing.')
+    before = plan['before']['file']
+    if before is not None and all(before[key] == after['file'][key]
+            for key in ('size', 'sha256', 'mtime_ns', 'device', 'inode')):
+        raise SoundBankContractError('ARTIFACT_UNCHANGED',
+            'The existing Tone output file has no observable creation or rewrite; do not retry execution.')
+    return {
+        'artifact': {'path': after['path'], 'file': after['file']},
+        'created': before is None,
+        'changed': before is None or any(before[key] != after['file'][key] for key in ('size', 'sha256')),
+        'rewritten': before is not None,
+    }
+
+
 def verify_tone_artifact(plan: Mapping[str, Any]) -> dict[str, Any]:
+    """Retained internal content diagnostic; not a business completion gate."""
     if _root_identity(plan['io_root']) != plan['before']['root']:
         raise SoundBankContractError('FILE_CHANGED', 'Tone isolated output root changed after preview.')
     parsed = inspect_tone_wav(plan["path"], plan["io_root"], plan["effective"])

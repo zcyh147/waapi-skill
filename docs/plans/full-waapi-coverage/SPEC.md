@@ -217,3 +217,23 @@ the explicit current-host unavailable behavior; claim neither native execution
 nor native availability. This exception changes no other API obligation or
 historical result. Removing these routes from normal discovery is not part of
 this change.
+
+## User-approved Tone file-creation outcome — 2026-10-26
+
+For #202, `ak.wwise.debug.generateToneWAV` must construct the correct closed,
+versioned call and establish that the exact owned output file was created or
+observably rewritten. The user explicitly excluded file-internal quality
+assurance: headers, channels, rate, markers, waveform mathematics, noise,
+envelopes and audibility are not acceptance requirements. This supersedes the
+previous Tone content-verification obligations, including their partial-result
+completion barriers; historical receipts and verdicts remain unchanged.
+
+Keep legitimate parameter construction and native version/host boundaries,
+configuration-only connections, the three modification policies, immutable
+Preview, one execution, owned output confinement, stale-file and drift checks,
+source preservation and cleanup. Public verification states its
+`file_creation_only` scope and `tone_file_creation` strength, without certifying
+file contents or audio quality. Retained WAVs and matching native creation
+receipts may be reused; no new Wwise or Fresh run is required merely to refresh
+that proof. Existing nonnegative marker-position and embedded-NUL guards remain
+disclosed Gateway input constraints, not claims that Wwise rejects these values.

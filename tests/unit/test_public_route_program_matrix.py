@@ -661,16 +661,11 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
     if entry.uri == "ak.wwise.debug.generateToneWAV":
         assert verification.status == "verified"
         assert verification.business_state_verified is True
-        assert verification.verification_strength == "tone_wav_artifact"
+        assert verification.verification_strength == "tone_file_creation"
         observed = verification.readbacks[0]
         assert observed["created"] is True
         assert observed["changed"] is True
-        assert observed["unresolved"] == []
-        assert observed["wav"]["channels"] == 1
-        assert observed["wav"]["sample_rate"] == 48000
-        assert observed["wav"]["sample_format"] == "int16"
-        assert observed["wav"]["frames"] == 48000
-        assert observed["wav"]["nonzero_samples_by_channel"] == [0]
+        assert verification.verification_scope["business_outcome"] == "file_creation_only"
         assert len(observed["artifact"]["file"]["sha256"]) == 64
     elif entry.uri in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"}:
         assert verification.status == "verified"

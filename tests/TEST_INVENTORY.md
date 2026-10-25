@@ -5,6 +5,28 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #202 Tone file-creation acceptance
+
+The user narrowed Tone acceptance to the correct closed versioned call and
+creation of the exact owned output file. Public verification now reports
+`tone_file_creation` with explicit `file_creation_only` scope; no file contents
+or audio quality are certified. Missing, nonregular, stale unchanged or drifted
+outputs still fail. The internal audio parser and every historical WAV, receipt
+and original outcome remain preserved. Forty-three superseded public content-QA
+test functions were removed from current collection; their code remains in Git,
+and no active CI/unit/semantic selector references them.
+
+On the component worktree based on `e557cea9`, the three-version public tracer
+passed **3 in 1.86s** after its retained partial-to-verified RED. The affected
+selection passed **128 in 36.76s** (current Tone/discovery) and **9 in 12.24s**
+(exact callers, three Tone route rows and persisted diagnostic report consumers).
+The final marker-constraint disclosure, stale-output cases and existing machine
+contract seal passed **4 in 1.50s**. These separate source-sealed developer batches
+are not an aggregate Program/Non-live gate. The earlier fixture/projection test
+mistakes remain failed receipts. No Wwise, Fresh, full gate or new Windows run
+occurred; native creation/source/cleanup observations cited in earlier Tone
+entries are reused without changing their historical verdicts.
+
 ## 2026-10-25 #197 developer batching and evidence retention prerequisite
 
 Reviewed implementation through `0399649d` extends the existing developer

@@ -297,6 +297,9 @@ def test_tone_schema_owns_version_deltas_and_closed_choices() -> None:
     assert {"anonymous_channels", "waveform_channels"} <= set(v24["public_fields"])
     assert "markers" not in v24["public_fields"]
     assert "markers" in v25["public_fields"]
+    assert v25['input_forms']['markers']['position_seconds'] == {
+        'minimum': 0, 'constraint_owner': 'Gateway business input'}
+    assert v25['input_forms']['markers']['label']['embedded_nul'] == 'not accepted by the Gateway'
     assert v25["input_forms"]["waveform"]["choices"] == [
         "silence",
         "sine",
@@ -857,7 +860,7 @@ def _tone_collection_preview(tmp_path, version, fields, *, policy='ask_before_ch
     return env, state, client, output, schema, declaration, preview
 
 
-def _finish_tone_collection(env, state, client, preview, *, expect_failure=False, expected_state='result_schema_checked', return_verify_outcome=False):
+def _finish_tone_collection(env, state, client, preview, *, expect_failure=False, expected_state='verified', return_verify_outcome=False):
     tx = preview['transaction_id']
     if preview['state'] == 'awaiting_confirmation':
         _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
@@ -882,6 +885,26 @@ def _finish_tone_collection(env, state, client, preview, *, expect_failure=False
     return verified
 
 
+@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
+def test_tone_business_completion_proves_file_creation_without_audio_quality_checks(tmp_path, version):
+    fixture = Path(__file__).resolve().parents[1] / 'fixtures/tone/console-2025.1.7.9143/waveforms/square-stationary.wav'
+    env, state, client, output, schema, _, preview = _tone_collection_preview(tmp_path, version, [],
+        values={'waveform': 'white_noise', 'channel_layout': '1.0', 'sample_rate_hz': '48000',
+            'bit_depth': 'float32', 'frequency_hz': '440', 'sustain_seconds': '0.25', 'sustain_db': '-6'})
+    # Reuse real native bytes. Their signal deliberately differs from the
+    # request: file creation is the approved business verification boundary.
+    client.artifact_bytes = fixture.read_bytes()
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    assert output.is_file()
+    assert verified['verification_strength'] == 'tone_file_creation'
+    assert verified['verification']['business_state_verified'] is True
+    assert verified['agent_result']['request'] == preview['agent_result']['request']
+    assert verified['verification']['readbacks'][0]['created'] is True
+    assert verified['verification']['verification_scope']['business_outcome'] == 'file_creation_only'
+    assert schema['business_adapter']['safety']['tone_artifact_verification']['business_outcome'] == 'file_creation_only'
+    assert 'audio quality were not checked' in verified['verification']['message']
+
+
 def test_tone_explicit_empty_choices_survive_public_draft_preview_execute_verify(tmp_path):
     env, state, client, output, schema, declaration, preview = _tone_collection_preview(tmp_path, '2025.1',
         ['--empty', 'waveform_channels', '--empty', 'markers'], is_command_line=False)
@@ -896,11 +919,7 @@ def test_tone_explicit_empty_choices_survive_public_draft_preview_execute_verify
     assert not output.exists()
     verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
     assert verified['agent_result']['request'] == request
-    import wave
-    with wave.open(str(output), 'rb') as artifact:
-        assert (artifact.getnchannels(), artifact.getsampwidth(), artifact.getframerate(), artifact.getnframes()) == (2, 2, 8000, 4)
-        assert artifact.readframes(4) == b'\x00' * 16
-    # Synthetic output checks the public artifact oracle, not native Wwise behavior.
+    assert output.is_file()
     assert verified['verification']['business_state_verified'] is True
 
 
@@ -922,7 +941,7 @@ def test_tone_collection_omission_empty_and_populated_states_stay_distinct(tmp_p
     if expected.get('markers'):
         client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(7, 2000, '入口\\cue'.encode('utf-8'))]))
     verified = _finish_tone_collection(env, state, client, preview,
-        expected_state='verified' if expected.get('waveformChannelMask') == 0 else 'result_schema_checked')
+        expected_state='verified')
     dispatched = [call[1] for call in client.calls if call[0] == 'ak.wwise.debug.generateToneWAV']
     assert dispatched == [native]
     assert verified['agent_result']['request'] == preview['agent_result']['request']
@@ -977,55 +996,13 @@ def test_tone_verifier_rejects_missing_artifact_after_one_native_dispatch(tmp_pa
     assert 'artifact' in str(verified['verification']).lower()
 
 
-def test_tone_verifier_rejects_malformed_artifact_despite_success_reply(tmp_path):
-    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels', '--empty', 'markers'])
-    client.artifact_bytes = b'not a wave artifact'
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
-    assert output.read_bytes() == b'not a wave artifact'
-    assert verified['verification']['business_state_verified'] is False
-
-
-
-
-
-@pytest.mark.parametrize('floating', [False, True], ids=['pcm16', 'float32'])
-def test_tone_verifier_checks_all_silent_samples_and_exact_format(tmp_path, floating):
-    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels', '--empty', 'markers'],
-        values={'bit_depth': 'float32' if floating else 'int16'})
-    client.artifact_bytes = _tone_wav_bytes(floating=floating)
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    assert verified['verification']['business_state_verified'] is True
-    assert verified['stdout_projection']['stdout_budget_bytes'] == 24576
-    assert verified['agent_result']['request'] == preview['agent_result']['request']
-
-
-@pytest.mark.parametrize('defect', ['rate', 'frames', 'last_off_channel', 'format'])
-def test_tone_verifier_rejects_wrong_requested_artifact_state(tmp_path, defect):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels', '--empty', 'markers'])
-    kwargs = {'rate': 16000} if defect == 'rate' else {'samples': [0] * 10} if defect == 'frames' else (
-        {'samples': [0] * 7 + [1]} if defect == 'last_off_channel' else {'floating': True})
-    client.artifact_bytes = _tone_wav_bytes(**kwargs)
-    _finish_tone_collection(env, state, client, preview, expect_failure=True)
-
-
-
-
-
-@pytest.mark.parametrize('metadata', ['cue', 'orphan-label'])
-def test_tone_explicit_empty_markers_rejects_unrequested_cues_and_labels(tmp_path, metadata):
-    import struct
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels', '--empty', 'markers'])
-    if metadata == 'cue':
-        extra = _riff_chunk(b'cue ', struct.pack('<I', 1) + struct.pack('<II4sIII', 7, 0, b'data', 0, 0, 0))
-    else:
-        extra = _riff_chunk(b'LIST', b'adtl' + _riff_chunk(b'labl', struct.pack('<I', 7) + b'unrequested\0'))
-    client.artifact_bytes = _tone_wav_bytes(extra=extra)
-    _finish_tone_collection(env, state, client, preview, expect_failure=True)
-
+def test_tone_file_creation_does_not_inspect_contents(tmp_path):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [])
+    client.artifact_bytes = b'opaque generated bytes; no WAV parsing is required'
+    verified = _finish_tone_collection(env, state, client, preview)
+    assert output.read_bytes() == client.artifact_bytes
+    assert verified['verification_strength'] == 'tone_file_creation'
+    assert 'wav' not in verified['verification']['readbacks'][0]
 
 
 def test_tone_prewrite_rejects_replaced_isolated_root_before_dispatch(tmp_path):
@@ -1043,18 +1020,21 @@ def test_tone_prewrite_rejects_replaced_isolated_root_before_dispatch(tmp_path):
     assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 0
 
 
-
 @pytest.mark.parametrize('overwrite', [False, True], ids=['unchanged-valid', 'rewritten-identical'])
-def test_tone_existing_valid_output_verifies_state_without_claiming_content_change(tmp_path, overwrite):
+def test_tone_existing_output_requires_an_observable_rewrite(tmp_path, overwrite):
     expected_bytes = _tone_wav_bytes()
     env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
         ['--empty', 'waveform_channels', '--empty', 'markers'], existing_bytes=expected_bytes,
         write_output=overwrite)
     client.artifact_bytes = expected_bytes
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    readback = verified['verification']['readbacks'][0]
-    assert readback['created'] is False
-    assert readback['changed'] is False
+    verified = _finish_tone_collection(env, state, client, preview, expect_failure=not overwrite)
+    if overwrite:
+        readback = verified['verification']['readbacks'][0]
+        assert readback['created'] is False
+        assert readback['changed'] is False
+        assert readback['rewritten'] is True
+    else:
+        assert verified['verification']['assertions'][-1]['evidence']['code'] == 'ARTIFACT_UNCHANGED'
     assert output.read_bytes() == expected_bytes
 
 
@@ -1093,56 +1073,6 @@ def test_tone_artifact_verification_rejects_wrong_existing_or_nonregular_effect(
     _finish_tone_collection(env, state, client, preview, expect_failure=True)
 
 
-@pytest.mark.parametrize('sample', [float('nan'), float('inf'), -float('inf')])
-def test_tone_float_verification_rejects_nonfinite_samples_anywhere(tmp_path, sample):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels'], values={'bit_depth': 'float32'})
-    client.artifact_bytes = _tone_wav_bytes(floating=True, samples=[0.0] * 7 + [sample])
-    _finish_tone_collection(env, state, client, preview, expect_failure=True)
-
-
-@pytest.mark.parametrize('defect', ['truncated', 'chunk-extent', 'duplicate-data', 'byte-rate', 'block-align', 'unknown-subtype', 'wrong-speakers', 'short-list'])
-def test_tone_parser_rejects_bounded_malformed_or_wrong_format_artifacts(tmp_path, defect):
-    import struct
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels'])
-    if defect == 'truncated':
-        blob = _tone_wav_bytes()[:-1]
-    elif defect == 'chunk-extent':
-        blob = bytearray(_tone_wav_bytes())
-        blob[40:44] = struct.pack('<I', 0xffffffff)
-    elif defect == 'duplicate-data':
-        blob = _tone_wav_bytes(extra=_riff_chunk(b'data', b''))
-    elif defect == 'short-list':
-        blob = _tone_wav_bytes(extra=_riff_chunk(b'LIST', b'x'))
-    elif defect in {'byte-rate', 'block-align'}:
-        fmt = struct.pack('<HHIIHH', 1, 2, 8000, 42 if defect == 'byte-rate' else 32000,
-            2 if defect == 'block-align' else 4, 16)
-        blob = _tone_wav_bytes(fmt_override=fmt)
-    else:
-        subtype = bytes.fromhex('0100000000001000800000aa00389b71') if defect == 'wrong-speakers' else b'\0' * 16
-        fmt = struct.pack('<HHIIHHHHI', 65534, 2, 8000, 32000, 4, 16, 22, 16, 4) + subtype
-        blob = _tone_wav_bytes(fmt_override=fmt)
-    client.artifact_bytes = bytes(blob)
-    _finish_tone_collection(env, state, client, preview, expect_failure=True)
-
-
-@pytest.mark.parametrize('floating', [False, True])
-def test_tone_extensible_exact_pcm_float_subtype_and_empty_cue_are_verified(tmp_path, floating):
-    import struct
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels', '--empty', 'markers'],
-        values={'bit_depth': 'float32' if floating else 'int16'})
-    subtype = bytes.fromhex(('03000000' if floating else '01000000') + '00001000800000aa00389b71')
-    bits, align = (32, 8) if floating else (16, 4)
-    fmt = struct.pack('<HHIIHHHHI', 65534, 2, 8000, 8000 * align, align, bits, 22, bits, 3) + subtype
-    extra = _riff_chunk(b'cue ', struct.pack('<I', 0)) + _riff_chunk(b'JUNK', b'abc')
-    client.artifact_bytes = _tone_wav_bytes(floating=floating, fmt_override=fmt, extra=extra)
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    assert verified['verification']['readbacks'][0]['wav']['markers']['cue_count'] == 0
-
-
-
 def test_tone_output_estimate_rejects_resource_overflow_before_dispatch(tmp_path):
     rejected, client = _tone_collection_preview(tmp_path, '2025.1', [],
         values={'sustain_seconds': '1000000'}, reject_preparation=True)
@@ -1168,8 +1098,6 @@ def test_tone_large_marker_request_survives_exact_terminal_delivery(tmp_path, mo
     assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
 
 
-
-
 @pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
 def test_tone_pinned_omitted_defaults_bind_to_independently_generated_audio(tmp_path, version):
     values = {field: None for field in ('waveform', 'channel_layout', 'sample_rate_hz', 'bit_depth',
@@ -1178,49 +1106,7 @@ def test_tone_pinned_omitted_defaults_bind_to_independently_generated_audio(tmp_
     assert preview['agent_result']['request']['arguments']['args'] == {'path': str(output)}
     client.artifact_bytes = _tone_wav_bytes(channels=1, rate=48000, samples=[0] * 48000)
     verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    assert verified['verification']['readbacks'][0]['wav']['frames'] == 48000
-
-
-@pytest.mark.parametrize('layout,channels,mask', [('0.1', 1, 8), ('1.0', 1, 4), ('2.1', 3, 11), ('3.0', 3, 7)])
-def test_tone_layout_verification_uses_exact_speaker_positions_not_just_channel_count(tmp_path, layout, channels, mask):
-    import struct
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels'], values={'channel_layout': layout})
-    fmt = struct.pack('<HHIIHHHHI', 65534, channels, 8000, 16000 * channels, channels * 2, 16, 22, 16, mask)
-    fmt += bytes.fromhex('0100000000001000800000aa00389b71')
-    client.artifact_bytes = _tone_wav_bytes(channels=channels, samples=[0] * channels * 4, fmt_override=fmt)
-    _finish_tone_collection(env, state, client, preview, expected_state='verified')
-
-
-@pytest.mark.parametrize('negative', [False, True])
-def test_tone_partial_mask_scans_silent_channel_while_active_waveform_stays_unproven(tmp_path, negative):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--item', 'waveform_channels', '0'])
-    client.artifact_bytes = _tone_wav_bytes(samples=[1, 0, -1, 0, 1, 0, -1, 1 if negative else 0])
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=negative)
-    if not negative:
-        assert verified['verification_strength'] == 'partial_tone_artifact'
-        assert 'active waveform' in str(verified['verification']['readbacks'][0]['unresolved'])
-
-
-@pytest.mark.parametrize('branch', ['fractional-rate', 'fractional-segment', 'anonymous', 'ambisonic'])
-def test_tone_unresolved_native_interpretations_remain_explicit_without_fabricated_success(tmp_path, branch):
-    values, wav = {}, {}
-    if branch == 'fractional-rate':
-        values['sample_rate_hz'] = '8000.5'
-    elif branch == 'fractional-segment':
-        values['sustain_seconds'] = '0.00051'
-    elif branch == 'anonymous':
-        values['anonymous_channels'] = 'true'
-    else:
-        values.update(channel_layout='Ambisonics 1st order', waveform='silence')
-        wav = {'channels': 4, 'samples': [0] * 16}
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels'], values=values)
-    client.artifact_bytes = _tone_wav_bytes(**wav)
-    verified = _finish_tone_collection(env, state, client, preview)
-    assert verified['verification_strength'] == 'partial_tone_artifact'
-    assert verified['verification']['readbacks'][0]['unresolved']
+    assert verified['verification']['readbacks'][0]['created'] is True
 
 
 def test_tone_zero_duration_is_a_valid_empty_audio_state(tmp_path):
@@ -1228,8 +1114,7 @@ def test_tone_zero_duration_is_a_valid_empty_audio_state(tmp_path):
         ['--empty', 'waveform_channels'], values={'sustain_seconds': '0'})
     client.artifact_bytes = _tone_wav_bytes(samples=[])
     verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    assert verified['verification']['readbacks'][0]['wav']['frames'] == 0
-
+    assert verified['verification']['readbacks'][0]['created'] is True
 
 
 def test_tone_verification_digest_comes_from_one_confined_opened_artifact(tmp_path, monkeypatch):
@@ -1249,7 +1134,6 @@ def test_tone_verification_digest_comes_from_one_confined_opened_artifact(tmp_pa
     assert target_opens == [str(output)]
     observed = verified['verification']['readbacks'][0]
     assert observed['artifact']['file']['sha256'] == hashlib.sha256(literal).hexdigest()
-    assert observed['wav']['nonzero_samples_by_channel'] == [0, 0]
 
 
 def test_tone_verification_rejects_owned_root_replacement_during_native_effect(tmp_path):
@@ -1263,13 +1147,11 @@ def test_tone_verification_rejects_owned_root_replacement_during_native_effect(t
     _finish_tone_collection(env, state, client, preview, expect_failure=True)
 
 
-
 def test_tone_removed_output_root_is_a_recorded_verification_failure(tmp_path):
     env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
         ['--empty', 'waveform_channels'])
     client.after_write = lambda path: path.parent.rename(tmp_path / 'removed-owned-root')
     _finish_tone_collection(env, state, client, preview, expect_failure=True)
-
 
 
 def test_tone_preparation_normalizes_post_hash_output_disappearance(tmp_path, monkeypatch):
@@ -1295,7 +1177,6 @@ def test_tone_preparation_normalizes_post_hash_output_disappearance(tmp_path, mo
     assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 0
 
 
-
 def test_tone_verification_normalizes_root_disappearance_between_stat_and_resolve(tmp_path, monkeypatch):
     env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
         ['--empty', 'waveform_channels'])
@@ -1308,7 +1189,6 @@ def test_tone_verification_normalizes_root_disappearance_between_stat_and_resolv
     client.after_write = lambda _: monkeypatch.setattr(Path, 'resolve', disappearing_resolve)
     _finish_tone_collection(env, state, client, preview, expect_failure=True)
     assert injected
-
 
 
 def _maximum_marker_fields(tmp_path, unit):
@@ -1348,7 +1228,7 @@ def test_maximum_tone_marker_plan_and_count_survive_artifact_and_actual_stdout(t
     assert len(adtl) < 131072
     client.artifact_bytes = _tone_wav_bytes(extra=_riff_chunk(b'cue ', cue) + _riff_chunk(b'LIST', adtl))
     verified = _finish_tone_collection(env, state, client, preview,
-        expected_state='verified' if unit.isascii() else 'result_schema_checked')
+        expected_state='verified')
     rendered = gateway.gateway_stdout_json_encoder(verified).encode(gateway.gateway_stdout_payload(verified)) + '\n'
     with monkeypatch.context() as emitting:
         emitting.setattr(gateway, 'execute_gateway', lambda argv: (0, verified))
@@ -1370,7 +1250,6 @@ def test_maximum_tone_marker_plan_and_count_survive_artifact_and_actual_stdout(t
     (tmp_path / 'terminal.stdout.json').write_text(rendered, encoding='utf-8')
 
 
-
 @pytest.mark.parametrize('branch', ['marker-metadata', 'extensible-header'])
 def test_tone_prewrite_artifact_budget_accounts_for_metadata_and_format_header(tmp_path, monkeypatch, branch):
     from wwise_waapi import operation_tone
@@ -1387,7 +1266,6 @@ def test_tone_prewrite_artifact_budget_accounts_for_metadata_and_format_header(t
         values=values, reject_preparation=True)
     assert rejected['error_code'] == 'LIMIT_EXCEEDED', rejected
     assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 0
-
 
 
 def test_tone_one_byte_over_business_plan_budget_is_rejected_before_mutation(tmp_path):
@@ -1438,115 +1316,10 @@ def test_unowned_tone_shapes_cannot_gain_extra_terminal_capacity(tmp_path, defec
     assert caught.value.error_code == 'VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED'
 
 
-
-
-def test_tone_populated_ascii_markers_verify_exact_pairs_and_duplicate_positions(tmp_path):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels', '--marker', '0', 'B', '--marker', '0.00025', 'C', '--marker', '0', 'A'])
-    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(91, 0, b'A\0'), (13, 2, b'C'), (42, 0, b'B\0')]))
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    from wwise_waapi.transactions import TransactionStore
-    journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(preview['transaction_id'])
-                   if event['event_type'] == 'verification_recorded')
-    observed = journal['readbacks'][0]['wav']['markers']
-    assert observed['cue_count'] == 3
-    assert observed['label_count'] == 3
-    assert observed['requested_positions_checked'] is True
-    assert observed['requested_labels_checked'] is True
-
-
-@pytest.mark.parametrize('rows', [
-    [(91, 0, b'A'), (13, 2, b'C')],
-    [(91, 0, b'A'), (13, 3, b'C'), (42, 0, b'B')],
-    [(91, 2, b'A'), (13, 0, b'C'), (42, 0, b'B')],
-    [(91, 0, b'A'), (13, 2, b'wrong'), (42, 0, b'B')],
-    [(91, 0, b'A'), (13, 2, b'C'), (42, 2, b'B')],
-    [(91, 0, b'A'), (13, 2, None), (42, 0, b'B')],
-    [(91, 0, b'A'), (13, 2, b'C'), (91, 0, b'B')],
-], ids=['missing', 'wrong-position', 'swapped-associations', 'wrong-label', 'lost-duplicate-position', 'missing-label', 'duplicate-cue-id'])
-def test_tone_populated_markers_reject_wrong_observable_effect_after_one_dispatch(tmp_path, rows):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels', '--marker', '0', 'B', '--marker', '0.00025', 'C', '--marker', '0', 'A'])
-    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks(rows))
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
-    assert 'marker' in str(verified).lower() or 'cue' in str(verified).lower()
-    assert [row[0] for row in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
-
-
-@pytest.mark.parametrize('fields', [['--marker', '0'], ['--marker', '0', '']])
-def test_tone_explicit_empty_marker_label_can_be_omitted_in_native_label_chunks(tmp_path, fields):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels', *fields])
-    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(77, 0, None)]))
-    _finish_tone_collection(env, state, client, preview, expected_state='verified')
-
-
-@pytest.mark.parametrize('position,label', [('0.00013', 'A'), ('0', '界')])
-def test_tone_marker_native_interpretation_gaps_retain_known_checks_and_do_not_claim_completion(tmp_path, position, label):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels', '--marker', position, label])
-    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(77, 1 if position != '0' else 0, label.encode('utf-8'))]))
-    verified = _finish_tone_collection(env, state, client, preview)
-    assert verified['verified'] is False
-    assert 'marker' in str(verified).lower()
-
-
-@pytest.mark.parametrize('position,label,frame,actual_label', [('0', '界', 1, '界'.encode('utf-8')), ('0.00013', 'A', 1, b'wrong')])
-def test_tone_partial_marker_interpretations_still_reject_known_wrong_postconditions(tmp_path, position, label, frame, actual_label):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--empty', 'waveform_channels', '--marker', position, label])
-    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(77, frame, actual_label)]))
-    _finish_tone_collection(env, state, client, preview, expect_failure=True)
-
-
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-@pytest.mark.parametrize('floating', [False, True], ids=['pcm16', 'float32'])
-@pytest.mark.parametrize('layout,channels', [('5.1', 6), ('Ambisonics 1st order', 4)])
-def test_tone_anonymous_extensible_header_proves_unassigned_requested_channel_count(tmp_path, version, floating, layout, channels):
-    import struct
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, version, [],
-        values={'anonymous_channels': 'true', 'channel_layout': layout, 'waveform': 'silence',
-                'bit_depth': 'float32' if floating else 'int16'})
-    width = 4 if floating else 2
-    fmt = struct.pack('<HHIIHHHHI', 65534, channels, 8000, 8000 * channels * width,
-        channels * width, width * 8, 22, width * 8, 0)
-    fmt += bytes.fromhex('0300000000001000800000aa00389b71' if floating else '0100000000001000800000aa00389b71')
-    client.artifact_bytes = _tone_wav_bytes(floating=floating, channels=channels, samples=[0] * channels * 4, fmt_override=fmt)
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    assert verified['agent_result']['request']['arguments']['args']['setAnonymous'] is True
-
-
-@pytest.mark.parametrize('defect', ['assigned-speakers', 'wrong-count', 'nonzero-last-sample'])
-def test_tone_anonymous_header_proof_rejects_wrong_requested_effect(tmp_path, defect):
-    import struct
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'anonymous_channels': 'true', 'channel_layout': '5.1', 'waveform': 'silence'})
-    channels = 4 if defect == 'wrong-count' else 6
-    mask = 3 if defect == 'assigned-speakers' else 0
-    fmt = struct.pack('<HHIIHHHHI', 65534, channels, 8000, 16000 * channels,
-        channels * 2, 16, 22, 16, mask) + bytes.fromhex('0100000000001000800000aa00389b71')
-    samples = [0] * channels * 4
-    if defect == 'nonzero-last-sample':
-        samples[-1] = 1
-    client.artifact_bytes = _tone_wav_bytes(channels=channels, samples=samples, fmt_override=fmt)
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
-    if defect == 'assigned-speakers':
-        assert 'anonymous' in str(verified)
-        assert 'malformed' not in str(verified)
-
-
 def test_tone_2023_anonymous_field_rejected_before_mutation(tmp_path):
     rejected = _tone_collection_preview(tmp_path, '2023.1', [],
         values={'anonymous_channels': 'true', 'waveform': 'silence'}, reject_declaration=True)
     assert rejected['error_code'] == 'GatewayInputError'
-
-
-def test_tone_legacy_anonymous_header_retains_unresolved_representation(tmp_path):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'anonymous_channels': 'true', 'waveform': 'silence'})
-    client.artifact_bytes = _tone_wav_bytes()
-    verified = _finish_tone_collection(env, state, client, preview)
-    assert 'anonymous' in str(verified)
 
 
 def test_tone_128_empty_label_markers_verify_through_actual_main_with_ordinary_output_budget(tmp_path, monkeypatch, capsys):
@@ -1586,69 +1359,9 @@ def test_tone_128_empty_label_markers_verify_through_actual_main_with_ordinary_o
     from wwise_waapi.transactions import TransactionStore
     journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(tx)
         if event['event_type'] == 'verification_recorded')
-    assert journal['readbacks'][0]['wav']['markers']['cue_count'] == 128
-    assert journal['readbacks'][0]['wav']['markers']['label_count'] == 0
+    assert journal['readbacks'][0]['created'] is True
     assert decoded['stdout_projection']['verification_canonical_sha256'] == canonical_sha256(journal)
     (tmp_path / 'terminal.stdout.json').write_text(rendered, encoding='utf-8')
-
-
-@pytest.mark.parametrize('name', ['int16-0db', 'int16-6db', 'float32-0db', 'float32-6db'])
-@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
-def test_tone_retained_native_stationary_sine_conforms_to_requested_signal_policy(tmp_path, name, version):
-    import hashlib
-    fixture_root = Path(__file__).resolve().parents[1] / 'fixtures' / 'tone' / 'console-2025.1.7.9143'
-    manifest = json.loads((fixture_root / 'manifest.json').read_text())
-    specimen = manifest['files'][name + '.wav']
-    raw = (fixture_root / (name + '.wav')).read_bytes()
-    assert len(raw) == specimen['size'] and hashlib.sha256(raw).hexdigest() == specimen['sha256']
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, version, [],
-        values={'waveform': 'sine', 'channel_layout': '1.0', 'sample_rate_hz': '48000',
-            'bit_depth': specimen['bit_depth'], 'attack_seconds': '0', 'sustain_seconds': '0.25',
-            'release_seconds': '0', 'sustain_db': str(specimen['sustain_db'])})
-    client.artifact_bytes = raw
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    from wwise_waapi.transactions import TransactionStore
-    journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(preview['transaction_id'])
-        if event['event_type'] == 'verification_recorded')
-    wav = journal['readbacks'][0]['wav']
-    assert (wav['format_tag'], wav['sample_format'], wav['bits'], wav['valid_bits']) == (
-        65534, specimen['bit_depth'], 16 if specimen['bit_depth'] == 'int16' else 32, 0)
-    assert (wav['channels'], wav['speaker_mask'], wav['sample_rate'], wav['frames']) == (1, 4, 48000, 12000)
-    assert verified['verification_strength'] == 'tone_wav_artifact'
-    assert journal['business_state_verified'] is True
-    signal = wav['stationary_sine']
-    assert signal['policy'] == 'stationary-sine-numerical-conformance-v1'
-    assert signal['gain_tolerance_db'] == 0.02
-    assert signal['shape_tolerance_relative'] == 0.002
-    assert signal['channels'][0]['max_sample_error'] <= signal['sample_error_limit']
-    assert signal['channels'][0]['measured_gain'] > 0
-    assert signal['observability_reason'] is None
-
-
-@pytest.mark.parametrize('defect', ['contradictory-valid-bits', 'excess-valid-bits', 'unknown-subtype',
-    'subtype-container-mismatch', 'extension-length', 'block-alignment'])
-def test_tone_zero_union_field_never_bypasses_contradictory_format_checks(tmp_path, defect):
-    import struct
-    fixture_root = Path(__file__).resolve().parents[1] / 'fixtures' / 'tone' / 'console-2025.1.7.9143'
-    raw = bytearray((fixture_root / 'int16-0db.wav').read_bytes())
-    if defect in {'contradictory-valid-bits', 'excess-valid-bits'}:
-        struct.pack_into('<H', raw, 38, 15 if defect == 'contradictory-valid-bits' else 17)
-    elif defect == 'unknown-subtype':
-        raw[44:60] = bytes(16)
-    elif defect == 'subtype-container-mismatch':
-        raw[44] = 3  # Explicit IEEE-float GUID with an unchanged16-bit container.
-    elif defect == 'extension-length':
-        struct.pack_into('<H', raw, 36, 21)
-    else:
-        struct.pack_into('<H', raw, 32, 3)
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'waveform': 'sine', 'channel_layout': '1.0', 'sample_rate_hz': '48000',
-            'attack_seconds': '0', 'sustain_seconds': '0.25', 'release_seconds': '0'})
-    client.artifact_bytes = bytes(raw)
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
-    failed = [row for row in verified['verification']['assertions'] if not row['passed']]
-    assert len(failed) == 1 and failed[0]['evidence']['code'] == 'INVALID_TONE_WAV'
-    assert [row[0] for row in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1'])
@@ -1658,232 +1371,6 @@ def test_tone_older_pinned_routes_remain_unavailable_without_native_calls(tmp_pa
         client_factory=lambda _: pytest.fail('older route discovery must remain offline'))
     assert code != 0 and rejected['ok'] is False, rejected
     assert 'continuation' not in rejected
-
-
-def test_stationary_triangle_retained_native_bytes_verify_without_relabelling_original_collection(tmp_path):
-    import hashlib
-    fixtures = Path(__file__).resolve().parents[1] / 'fixtures/tone/console-2025.1.7.9143/waveforms'
-    manifest = json.loads((fixtures / 'manifest.json').read_text())
-    specimen = manifest['files']['triangle-stationary.wav']
-    raw = (fixtures / 'triangle-stationary.wav').read_bytes()
-    assert len(raw) == specimen['size'] and hashlib.sha256(raw).hexdigest() == specimen['sha256']
-    assert manifest['native_business_acceptance'] is False
-    assert manifest['original_verification_state'] == 'result_schema_checked'
-    env, state, client, _, schema, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={key: str(value) for key, value in specimen['request'].items()})
-    client.artifact_bytes = raw
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    assert verified['verification_strength'] == 'tone_wav_artifact'
-    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    signal = journal['readbacks'][0]['wav']['stationary_triangle']
-    assert signal['policy'] == 'stationary-triangle-numerical-conformance-v1'
-    assert signal['feasibility_search_complete'] is False
-    assert signal['channels'][0]['sufficient_witness_found'] is True
-    assert signal['channels'][0]['measured_gain'] == pytest.approx(.5006684064865112, abs=2e-6)
-    assert signal['channels'][0]['max_sample_error'] <= signal['sample_error_limit']
-    assert signal['observability_reason'] is None
-    disclosure = schema['business_adapter']['safety']['tone_artifact_verification']['stationary_triangle_checks']
-    assert disclosure['maximum_phase_candidates_per_channel'] == 2
-    assert disclosure['feasibility_search_complete'] is False
-
-
-@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
-@pytest.mark.parametrize('floating', [True, False], ids=['float32', 'pcm16'])
-@pytest.mark.parametrize('frequency,phase,db', [(800, .13, -6), (125.5, .73, 0), (1000, .25, 0)])
-def test_stationary_triangle_phase_varied_independent_signals_verify_through_versioned_gateway(tmp_path, version, floating, frequency, phase, db):
-    import math
-    channels = 1 if version == '2023.1' else 2
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, version,
-        [] if channels == 1 else ['--item', 'waveform_channels', '0'],
-        is_command_line=version != '2024.1',
-        values={'waveform': 'triangle', 'channel_layout': '1.0' if channels == 1 else '2.0',
-            'frequency_hz': str(frequency), 'sample_rate_hz': '8000', 'sustain_seconds': '0.1',
-            'bit_depth': 'float32' if floating else 'int16', 'sustain_db': str(db)})
-    gain = 1 if db == 0 else .5011872336272722
-    samples = []
-    for frame in range(800):
-        # Independent trigonometric identity, not the production piecewise inverse.
-        sample = gain * 2 / math.pi * math.asin(math.sin(math.tau * (frequency * frame / 8000 + phase)))
-        if not floating:
-            sample = max(-32768, min(32767, round(sample * 32768)))
-        samples.extend([sample] + [0] * (channels - 1))
-    client.artifact_bytes = _tone_wav_bytes(floating=floating, channels=channels, samples=samples)
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    assert verified['verification_strength'] == 'tone_wav_artifact'
-    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    signal = journal['readbacks'][0]['wav']['stationary_triangle']
-    assert signal['observability_reason'] is None
-    assert signal['feasibility_search_complete'] is False
-    assert [row['channel'] for row in signal['channels']] == [0]
-    row = signal['channels'][0]
-    assert row['sufficient_witness_found'] is True
-    assert 1 <= len(row['candidate_checks']) <= 2
-    assert row['max_sample_error'] <= signal['sample_error_limit']
-    assert row['candidate_checks'][row['witness_candidate']]['gain_matches'] is True
-
-
-@pytest.mark.parametrize('defect', ['frequency', 'sine', 'square', 'sawtooth', 'dc', 'ramp',
-    'silence', 'gain-only', 'large-gain', 'late-sample', 'late-level-after-no-witness', 'late-nonfinite', 'late-silent'])
-def test_stationary_triangle_wrong_effects_never_verify_and_known_contradictions_cannot_hide(tmp_path, defect):
-    import math
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--item', 'waveform_channels', '0'],
-        values={'waveform': 'triangle', 'frequency_hz': '800', 'sample_rate_hz': '8000',
-            'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'})
-    gain = .5011872336272722
-    samples = []
-    for frame in range(80):
-        angle = math.tau * (frame / 10 + .13)
-        sample = gain * 2 / math.pi * math.asin(math.sin(angle))
-        if defect in {'frequency', 'late-level-after-no-witness'}:
-            sample = gain * 2 / math.pi * math.asin(math.sin(2 * angle))
-        elif defect == 'sine':
-            sample = gain * math.sin(angle)
-        elif defect == 'square':
-            sample = gain if math.sin(angle) >= 0 else -gain
-        elif defect == 'sawtooth':
-            sample = gain * (2 * ((frame / 10 + .13) % 1) - 1)
-        elif defect == 'dc':
-            sample = .02
-        elif defect == 'ramp':
-            sample *= frame / 79
-        elif defect == 'silence':
-            sample = 0
-        elif defect == 'gain-only':
-            sample *= 1.003
-        elif defect == 'large-gain':
-            sample *= 1.1
-        elif defect == 'late-sample' and frame == 79:
-            sample += .02
-        if defect == 'late-level-after-no-witness' and frame == 79:
-            sample = 2 * gain
-        if defect == 'late-nonfinite' and frame == 79:
-            sample = float('nan')
-        samples.extend([sample, .1 if defect == 'late-silent' and frame == 79 else 0])
-    client.artifact_bytes = _tone_wav_bytes(floating=True, samples=samples)
-    known = defect in {'large-gain', 'late-level-after-no-witness', 'late-nonfinite', 'late-silent'}
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=known)
-    writes = [call for call in client.calls if call[0] == 'ak.wwise.debug.generateToneWAV']
-    assert len(writes) == 1 and writes[0][1] == preview['agent_result']['request']['arguments']['args']
-    if known:
-        assert any(text in str(verified['verification']) for text in ('gain bound', 'non-finite', 'silent channel'))
-    else:
-        assert verified['verification_strength'] == 'partial_tone_artifact'
-        _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-        journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-        row = journal['readbacks'][0]['wav']['stationary_triangle']['channels'][0]
-        assert row['sufficient_witness_found'] is False
-        assert 'complete phase feasibility is not searched' in row['observability_reason']
-        if defect == 'gain-only':
-            assert any(check['first_sample_mismatch_frame'] is None and check['gain_matches'] is False
-                for check in row['candidate_checks'])
-        if defect == 'late-sample':
-            assert any(check['first_sample_mismatch_frame'] == 79 for check in row['candidate_checks'])
-
-
-def test_stationary_triangle_near_equal_frequency_is_bounded_conformance_without_request_rounding(tmp_path):
-    import math
-    frequency = '800.0000000000001'
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'waveform': 'triangle', 'channel_layout': '1.0', 'frequency_hz': frequency,
-            'sample_rate_hz': '8000', 'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'})
-    client.artifact_bytes = _tone_wav_bytes(floating=True, channels=1,
-        samples=[.5011872336272722 * 2 / math.pi * math.asin(math.sin(math.tau * (frame / 10 + .13))) for frame in range(80)])
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    writes = [call for call in client.calls if call[0] == 'ak.wwise.debug.generateToneWAV']
-    assert len(writes) == 1 and writes[0][1]['frequency'] == float(frequency)
-    assert writes[0][1] == preview['agent_result']['request']['arguments']['args']
-    assert verified['agent_result']['request'] == preview['agent_result']['request']
-
-
-@pytest.mark.parametrize('case', ['short', 'empty', 'quantized', 'aliased', 'fractional-frames', 'fractional-rate', 'triangle-envelope'])
-def test_stationary_triangle_inconclusive_observations_keep_their_partial_attribution(tmp_path, case):
-    import math
-    values = {'waveform': 'triangle', 'channel_layout': '1.0', 'frequency_hz': '800',
-        'sample_rate_hz': '8000', 'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'}
-    frames = 80
-    if case == 'short':
-        frames, values['sustain_seconds'] = 1, '0.000125'
-    elif case == 'empty':
-        frames, values['sustain_seconds'] = 0, '0'
-    elif case == 'quantized':
-        values.update(bit_depth='int16', sustain_db='-96')
-    elif case == 'aliased':
-        values['frequency_hz'] = '4000'
-    elif case == 'fractional-frames':
-        values['sustain_seconds'] = '0.01001'
-    elif case == 'fractional-rate':
-        values['sample_rate_hz'] = '8000.5'
-    elif case == 'triangle-envelope':
-        values.update(attack_seconds='0.002', sustain_seconds='0.008')
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [], values=values)
-    samples = ([0] * frames if case == 'quantized' else
-        [.5011872336272722 * 2 / math.pi * math.asin(math.sin(math.tau * (frame / 10 + (.13 if case == 'short' else 0)))) for frame in range(frames)])
-    client.artifact_bytes = _tone_wav_bytes(floating=case != 'quantized', channels=1, samples=samples)
-    verified = _finish_tone_collection(env, state, client, preview)
-    assert verified['verification_strength'] == 'partial_tone_artifact'
-    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    wav = journal['readbacks'][0]['wav']
-    if case == 'triangle-envelope':
-        assert 'stationary_triangle' not in wav
-        assert 'active waveform' in str(journal['readbacks'][0]['unresolved'])
-    else:
-        reason = wav['stationary_triangle']['observability_reason']
-        assert {'short': 'recurrence', 'empty': 'empty', 'quantized': 'quantization', 'aliased': 'Nyquist',
-            'fractional-frames': 'fractional', 'fractional-rate': 'fractional'}[case] in reason
-
-
-def test_stationary_triangle_missing_seed_witness_never_claims_complete_phase_infeasibility(tmp_path):
-    import math
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'waveform': 'triangle', 'channel_layout': '1.0', 'frequency_hz': '800',
-            'sample_rate_hz': '8000', 'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'})
-    gain = .5011872336272722
-    samples = [gain * 2 / math.pi * math.asin(math.sin(math.tau * (frame / 10 + .13))) for frame in range(80)]
-    # The original phase has <=.004 G error at both altered samples and the
-    # opposite projection perturbations cancel. Seeding from the first altered
-    # sample instead gives a phase whose error at frame 10 is about .008 G.
-    samples[0] += .004 * gain
-    samples[10] -= .004 * gain
-    client.artifact_bytes = _tone_wav_bytes(floating=True, channels=1, samples=samples)
-    verified = _finish_tone_collection(env, state, client, preview)
-    assert verified['verification_strength'] == 'partial_tone_artifact'
-    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    signal = journal['readbacks'][0]['wav']['stationary_triangle']
-    assert .004 * gain < signal['sample_error_limit'] < .008 * gain
-    assert signal['feasibility_search_complete'] is False
-    row = signal['channels'][0]
-    assert row['sufficient_witness_found'] is False
-    assert 'complete phase feasibility is not searched' in row['observability_reason']
-    assert 'exact_cadence_conforms' not in row
-    assert any(check['first_sample_mismatch_frame'] == 10 for check in row['candidate_checks'])
-
-
-@pytest.mark.parametrize('defect', [None, 'late-independent-level'])
-def test_stationary_triangle_partial_channel_keeps_another_channel_checks(tmp_path, defect):
-    import math
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'waveform': 'triangle', 'frequency_hz': '800', 'sample_rate_hz': '8000',
-            'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'})
-    samples = []
-    for frame in range(80):
-        sample = .5011872336272722 * 2 / math.pi * math.asin(math.sin(math.tau * (frame / 10 + .13)))
-        samples.extend([0, 2 if defect and frame == 79 else sample])
-    client.artifact_bytes = _tone_wav_bytes(floating=True, samples=samples)
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=defect is not None)
-    if defect:
-        assert 'gain bound' in str(verified['verification'])
-        return
-    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    rows = journal['readbacks'][0]['wav']['stationary_triangle']['channels']
-    assert rows[0]['sufficient_witness_found'] is False and rows[0]['observability_reason']
-    assert rows[1]['sufficient_witness_found'] is True and rows[1]['observability_reason'] is None
-    assert verified['verification_strength'] == 'partial_tone_artifact'
 
 
 @pytest.mark.parametrize('version', ['2024.1', '2025.1'])
@@ -1929,267 +1416,10 @@ def test_stationary_triangle_36_anonymous_channels_preserve_exact_terminal_resul
     assert list(decoded)[-1] == 'agent_result'
     journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(tx)
         if event['event_type'] == 'verification_recorded')
-    wav = journal['readbacks'][0]['wav']
-    assert (wav['channels'], wav['speaker_mask']) == (36, 0)
-    signal = wav['stationary_triangle']
-    assert [row['channel'] for row in signal['channels']] == list(range(36))
-    assert all(row['sufficient_witness_found'] and row['observability_reason'] is None for row in signal['channels'])
-    assert all(1 <= len(row['candidate_checks']) <= 2 for row in signal['channels'])
+    assert journal['readbacks'][0]['created'] is True
     assert decoded['stdout_projection']['verification_canonical_sha256'] == canonical_sha256(journal)
     assert [row[0] for row in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
     (tmp_path / 'triangle-36-terminal.stdout.json').write_text(rendered, encoding='utf-8')
-
-
-def test_stationary_square_does_not_certify_retained_wrong_requested_frequency_after_one_execution(tmp_path):
-    import hashlib
-    fixtures = Path(__file__).resolve().parents[1] / 'fixtures/tone/console-2025.1.7.9143/waveforms'
-    manifest = json.loads((fixtures / 'manifest.json').read_text())
-    specimen = manifest['files']['square-stationary.wav']
-    raw = (fixtures / 'square-stationary.wav').read_bytes()
-    assert hashlib.sha256(raw).hexdigest() == specimen['sha256'] and len(raw) == specimen['size']
-    assert manifest['native_business_acceptance'] is False
-    values = {key: str(value) for key, value in specimen['request'].items()}
-    values['frequency_hz'] = '880'
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [], values=values)
-    client.artifact_bytes = raw
-    verified = _finish_tone_collection(env, state, client, preview)
-    writes = [call for call in client.calls if call[0] == 'ak.wwise.debug.generateToneWAV']
-    assert len(writes) == 1 and writes[0][1] == preview['agent_result']['request']['arguments']['args']
-    assert writes[0][1]['frequency'] == 880
-    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    signal = journal['readbacks'][0]['wav']['stationary_square']
-    assert signal['channels'][0]['exact_cadence_conforms'] is False
-    assert 'native phase arithmetic precision is unspecified' in signal['observability_reason']
-    assert verified['verification_strength'] == 'partial_tone_artifact'
-
-
-def test_stationary_sine_rejects_retained_wrong_requested_frequency_after_one_execution(tmp_path):
-    fixture = Path(__file__).resolve().parents[1] / 'fixtures' / 'tone' / 'console-2025.1.7.9143' / 'float32-0db.wav'
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'waveform': 'sine', 'frequency_hz': '880', 'channel_layout': '1.0',
-            'sample_rate_hz': '48000', 'bit_depth': 'float32', 'attack_seconds': '0',
-            'sustain_seconds': '0.25', 'release_seconds': '0', 'sustain_db': '0'})
-    client.artifact_bytes = fixture.read_bytes()
-    frozen_request = preview['agent_result']['request']
-    assert frozen_request['arguments']['args']['frequency'] == 880
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
-    writes = [call for call in client.calls if call[0] == 'ak.wwise.debug.generateToneWAV']
-    assert len(writes) == 1 and writes[0][1] == frozen_request['arguments']['args']
-    assert 'sine' in str(verified['verification']).lower()
-
-
-def test_stationary_square_rejects_gain_even_when_every_sign_has_the_requested_cadence(tmp_path):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'waveform': 'square', 'frequency_hz': '800', 'sample_rate_hz': '8000',
-            'bit_depth': 'float32', 'channel_layout': '1.0', 'sustain_seconds': '0.01', 'sustain_db': '-6'})
-    # Worked ten-sample cycle with .13-cycle initial phase; independent of the
-    # verifier's phase intersection and with the correct cadence at wrong gain.
-    signs = [1, 1, 1, 1, -1, -1, -1, -1, -1, 1]
-    client.artifact_bytes = _tone_wav_bytes(floating=True, channels=1, samples=[.7 * sign for sign in signs] * 8)
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
-    assert 'gain' in str(verified['verification']).lower()
-
-
-def test_stationary_square_retained_native_bytes_verify_without_relabelling_original_collection(tmp_path):
-    import hashlib
-    fixtures = Path(__file__).resolve().parents[1] / 'fixtures/tone/console-2025.1.7.9143/waveforms'
-    manifest = json.loads((fixtures / 'manifest.json').read_text())
-    specimen = manifest['files']['square-stationary.wav']
-    raw = (fixtures / 'square-stationary.wav').read_bytes()
-    assert hashlib.sha256(raw).hexdigest() == specimen['sha256'] and len(raw) == specimen['size']
-    assert manifest['original_verification_strength'] == 'partial_tone_artifact'
-    assert manifest['native_business_acceptance'] is False
-    env, state, client, _, schema, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={key: str(value) for key, value in specimen['request'].items()})
-    client.artifact_bytes = raw
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    assert verified['agent_result']['request'] == preview['agent_result']['request']
-    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    signal = journal['readbacks'][0]['wav']['stationary_square']
-    assert signal['observability_reason'] is None
-    assert signal['channels'][0]['measured_gain'] == .5006684064865112
-    assert signal['requested_gain'] == .5011872336272722
-    assert signal['channels'][0]['max_sample_error'] > signal['representation_error']
-    disclosure = schema['business_adapter']['safety']['tone_artifact_verification']['stationary_square_checks']
-    assert (disclosure['gain_tolerance_db'], disclosure['shape_tolerance_relative'], disclosure['representation_units']) == (.02, .002, 2)
-    assert disclosure['phase'] == 'one common unparameterized phase per active channel; exact rational cadence; either limiting sign at exact discontinuities only'
-
-
-@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
-@pytest.mark.parametrize('floating', [True, False], ids=['float32', 'pcm16'])
-@pytest.mark.parametrize('frequency,phase,db', [(800, .13, -6), (125.5, .27, 0), (1000, .5, -6)])
-def test_stationary_square_phase_varied_analytic_signals_verify_through_versioned_gateway(tmp_path, version, floating, frequency, phase, db):
-    import math
-    channels = 1 if version == '2023.1' else 2
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, version,
-        [] if channels == 1 else ['--item', 'waveform_channels', '0'],
-        values={'waveform': 'square', 'channel_layout': '1.0' if channels == 1 else '2.0',
-            'frequency_hz': str(frequency), 'sample_rate_hz': '8000', 'sustain_seconds': '0.1',
-            'bit_depth': 'float32' if floating else 'int16', 'sustain_db': str(db)})
-    gain = 1 if db == 0 else .5011872336272722
-    samples = []
-    for frame in range(800):
-        # Independent mathematical reference, not the production interval solver.
-        sample = gain if math.sin(math.tau * (frequency * frame / 8000 + phase)) >= 0 else -gain
-        if not floating:
-            sample = max(-32768, min(32767, round(sample * 32768)))
-        samples.extend([sample] + [0] * (channels - 1))
-    client.artifact_bytes = _tone_wav_bytes(floating=floating, channels=channels, samples=samples)
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    assert verified['verification_strength'] == 'tone_wav_artifact'
-    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    signal = journal['readbacks'][0]['wav']['stationary_square']
-    assert signal['frequency_hz'] == frequency and signal['observability_reason'] is None
-    assert [row['channel'] for row in signal['channels']] == [0]
-    assert len(signal['channels'][0]['phase_relative_intervals_units']) <= 2
-    assert signal['channels'][0]['max_sample_error'] <= signal['sample_error_limit']
-
-
-@pytest.mark.parametrize('defect', ['frequency', 'duty', 'sine', 'triangle', 'dc', 'ramp',
-    'silence', 'late-magnitude', 'off-edge-sign', 'late-silent', 'mean-gain', 'mean-gain-with-cadence'])
-def test_stationary_square_wrong_effects_never_verify_without_fitting_gain_frequency_or_edges(tmp_path, defect):
-    import math
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--item', 'waveform_channels', '0'],
-        values={'waveform': 'square', 'frequency_hz': '800', 'sample_rate_hz': '8000',
-            'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'})
-    gain = .5011872336272722
-    signs = [1, 1, 1, 1, -1, -1, -1, -1, -1, 1]
-    samples = []
-    for frame in range(80):
-        sample = gain * signs[frame % 10]
-        if defect == 'frequency':
-            sample = gain * signs[(2 * frame) % 10]
-        elif defect == 'duty':
-            sample = gain if frame % 10 < 7 else -gain
-        elif defect in {'sine', 'triangle'}:
-            phase = math.tau * (frame / 10 + .13)
-            sample = gain * (math.sin(phase) if defect == 'sine' else 2 / math.pi * math.asin(math.sin(phase)))
-        elif defect == 'dc':
-            sample += .02
-        elif defect == 'ramp':
-            sample *= frame / 79
-        elif defect == 'silence':
-            sample = 0
-        elif defect == 'late-magnitude' and frame == 79:
-            sample += .02
-        elif defect == 'off-edge-sign' and frame == 77:
-            sample = -sample
-        elif defect in {'mean-gain', 'mean-gain-with-cadence'}:
-            # Inside the combined per-sample budget but outside .02 dB gain:
-            # this needs the independent gain check, not only shape membership.
-            sample *= 1.003
-            if defect == 'mean-gain-with-cadence':
-                sample = gain * 1.003 * signs[(2 * frame) % 10]
-        samples.extend([sample, .1 if defect == 'late-silent' and frame == 79 else 0])
-    client.artifact_bytes = _tone_wav_bytes(floating=True, samples=samples)
-    cadence_only = defect in {'frequency', 'duty', 'off-edge-sign'}
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=not cadence_only)
-    if cadence_only:
-        assert verified['verification_strength'] == 'partial_tone_artifact'
-        _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-        journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-        assert journal['readbacks'][0]['wav']['stationary_square']['channels'][0]['exact_cadence_conforms'] is False
-    else:
-        assert 'square' in str(verified['verification']).lower() or 'silent channel' in str(verified['verification'])
-    if defect in {'mean-gain', 'mean-gain-with-cadence'}:
-        assert 'mean absolute gain' in str(verified['verification'])
-
-
-@pytest.mark.parametrize('defect', [None, 'off-edge-sign', 'near-frequency'])
-def test_stationary_square_exact_discontinuities_have_no_neighboring_transition_window(tmp_path, defect):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'waveform': 'square', 'frequency_hz': '2000.0000000000002' if defect == 'near-frequency' else '2000',
-            'sample_rate_hz': '8000', 'channel_layout': '1.0', 'bit_depth': 'float32',
-            'sustain_seconds': '0.01', 'sustain_db': '-6'})
-    # At phase zero, frames 0 and 2 of each four-frame cycle are exact edges.
-    # Their limiting signs may vary; frames 1 and 3 are strictly + and -.
-    signs = ([1, 1, 1, -1] + [-1, 1, -1, -1]) * 10
-    if defect == 'off-edge-sign':
-        signs[-1] = 1
-    client.artifact_bytes = _tone_wav_bytes(floating=True, channels=1,
-        samples=[.5011872336272722 * sign for sign in signs])
-    verified = _finish_tone_collection(env, state, client, preview,
-        expected_state='verified' if defect is None else 'result_schema_checked')
-    if defect is not None:
-        assert verified['verification_strength'] == 'partial_tone_artifact'
-        _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-        journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-        signal = journal['readbacks'][0]['wav']['stationary_square']
-        assert signal['channels'][0]['exact_cadence_conforms'] is False
-        assert 'native phase arithmetic precision is unspecified' in signal['observability_reason']
-
-
-@pytest.mark.parametrize('defect', [None, 'wrong-observable-channel'])
-def test_stationary_square_partial_channel_does_not_hide_another_channel_effect(tmp_path, defect):
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'waveform': 'square', 'frequency_hz': '800', 'sample_rate_hz': '8000',
-            'bit_depth': 'float32', 'sustain_seconds': '0.001', 'sustain_db': '-6'})
-    first = [1, 1, 1, 1, 1, -1, -1, -1]  # No recurrence yet.
-    second = [1, 1, -1, -1, -1, -1, -1, 1]
-    if defect:
-        second[5] = 1
-    client.artifact_bytes = _tone_wav_bytes(floating=True,
-        samples=[.5011872336272722 * sign for pair in zip(first, second) for sign in pair])
-    verified = _finish_tone_collection(env, state, client, preview)
-    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    signal = journal['readbacks'][0]['wav']['stationary_square']
-    assert 'recurrence' in signal['channels'][0]['observability_reason']
-    if defect is None:
-        assert signal['channels'][1]['observability_reason'] is None
-    else:
-        assert signal['channels'][1]['exact_cadence_conforms'] is False
-        assert 'precision is unspecified' in signal['channels'][1]['observability_reason']
-    assert verified['verification_strength'] == 'partial_tone_artifact'
-
-
-@pytest.mark.parametrize('case', ['short', 'empty', 'quantized', 'aliased', 'fractional-frames', 'fractional-rate',
-    'wrong-level-despite-alias', 'square-envelope', 'triangle', 'noise'])
-def test_stationary_square_known_checks_and_unfinished_effects_remain_distinct(tmp_path, case):
-    values = {'waveform': 'square', 'frequency_hz': '800', 'sample_rate_hz': '8000',
-        'bit_depth': 'float32', 'channel_layout': '1.0', 'sustain_seconds': '0.01', 'sustain_db': '-6'}
-    frames = 80
-    if case == 'short':
-        frames, values['sustain_seconds'] = 1, '0.000125'
-    elif case == 'empty':
-        frames, values['sustain_seconds'] = 0, '0'
-    elif case == 'quantized':
-        values.update(bit_depth='int16', sustain_db='-96')
-    elif case in {'aliased', 'wrong-level-despite-alias'}:
-        values['frequency_hz'] = '4000'
-    elif case == 'fractional-frames':
-        values['sustain_seconds'] = '0.01001'
-    elif case == 'fractional-rate':
-        values['sample_rate_hz'] = '8000.5'
-    elif case == 'square-envelope':
-        values.update(attack_seconds='0.002', sustain_seconds='0.008')
-    elif case in {'triangle', 'noise'}:
-        values['waveform'] = 'triangle' if case == 'triangle' else 'white_noise'
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [], values=values)
-    signs = [1, 1, 1, 1, -1, -1, -1, -1, -1, 1]
-    gain = .7 if case == 'wrong-level-despite-alias' else .5011872336272722
-    samples = [0] * frames if case == 'quantized' else [gain * signs[frame % 10] for frame in range(frames)]
-    client.artifact_bytes = _tone_wav_bytes(floating=case != 'quantized', channels=1, samples=samples)
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=case == 'wrong-level-despite-alias')
-    if case == 'wrong-level-despite-alias':
-        assert 'gain' in str(verified['verification'])
-        return
-    assert verified['verification_strength'] == 'partial_tone_artifact'
-    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    wav = journal['readbacks'][0]['wav']
-    if case in {'square-envelope', 'triangle', 'noise'}:
-        assert 'stationary_square' not in wav
-        assert 'active waveform' in str(journal['readbacks'][0]['unresolved'])
-    else:
-        reason = wav['stationary_square']['observability_reason']
-        expected = {'short': 'recurrence', 'empty': 'empty', 'quantized': 'quantization', 'aliased': 'Nyquist',
-            'fractional-frames': 'fractional', 'fractional-rate': 'fractional'}[case]
-        assert expected in reason
 
 
 @pytest.mark.parametrize('version', ['2024.1', '2025.1'])
@@ -2234,243 +1464,10 @@ def test_stationary_square_36_anonymous_channels_preserve_exact_terminal_result(
     assert list(decoded)[-1] == 'agent_result'
     journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(tx)
         if event['event_type'] == 'verification_recorded')
-    wav = journal['readbacks'][0]['wav']
-    assert (wav['channels'], wav['speaker_mask']) == (36, 0)
-    signal = wav['stationary_square']
-    assert [row['channel'] for row in signal['channels']] == list(range(36))
-    assert all(row['observability_reason'] is None for row in signal['channels'])
+    assert journal['readbacks'][0]['created'] is True
     assert decoded['stdout_projection']['verification_canonical_sha256'] == canonical_sha256(journal)
     assert [row[0] for row in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
     (tmp_path / 'square-36-terminal.stdout.json').write_text(rendered, encoding='utf-8')
-
-
-@pytest.mark.parametrize('defect', [None, 'frequency', 'waveform', 'gain', 'attack', 'release', 'silent-active', 'late-silent'])
-def test_stationary_sine_full_signal_and_selected_channel_effects_are_request_bound(tmp_path, defect):
-    import math
-    # Independent analytic signal: -6 dB amplitude is a fixed worked reference;
-    # no implementation helper, retained output or measured fit generates it.
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
-        ['--item', 'waveform_channels', '0'],
-        values={'waveform': 'sine', 'frequency_hz': '800', 'sample_rate_hz': '8000',
-            'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'})
-    samples = []
-    for frame in range(80):
-        phase = math.tau * (1600 if defect == 'frequency' else 800) * frame / 8000 + 0.37
-        sample = (1 if defect == 'gain' else 0.5011872336272722) * math.sin(phase)
-        if defect == 'waveform':
-            # A harmonic-distorted wave has the correct fundamental gain;
-            # rejecting it requires full shape proof, not only a level check.
-            sample += 0.1 * 0.5011872336272722 * math.sin(3 * phase)
-        elif defect == 'attack':
-            sample *= frame / 79
-        elif defect == 'release':
-            sample *= 1 - frame / 79
-        elif defect == 'silent-active':
-            sample = 0
-        samples.extend([sample, 0.1 if defect == 'late-silent' and frame == 79 else 0])
-    client.artifact_bytes = _tone_wav_bytes(floating=True, samples=samples)
-    verified = _finish_tone_collection(env, state, client, preview,
-        expect_failure=defect is not None, expected_state='verified')
-    writes = [row for row in client.calls if row[0] == 'ak.wwise.debug.generateToneWAV']
-    assert len(writes) == 1
-    assert writes[0][1]['frequency'] == 800 and writes[0][1]['sustainLevel'] == -6
-    if defect is not None:
-        assert 'sine' in str(verified['verification']).lower() or 'silent channel' in str(verified['verification'])
-        if defect != 'late-silent':
-            assert 'stationary-sine-numerical-conformance-v1' in str(verified['verification'])
-    else:
-        from wwise_waapi.transactions import TransactionStore
-        journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(preview['transaction_id'])
-            if event['event_type'] == 'verification_recorded')
-        observed = journal['readbacks'][0]['wav']
-        assert observed['nonzero_samples_by_channel'] == [80, 0]
-        assert observed['stationary_sine']['channels'][0]['phase_radians'] == pytest.approx(0.37, abs=1e-6)
-        assert [row['channel'] for row in observed['stationary_sine']['channels']] == [0]
-
-
-@pytest.mark.parametrize('case', ['short', 'aliased', 'quantized', 'fractional', 'other-waveform'])
-def test_stationary_sine_inconclusive_and_unimplemented_effects_remain_distinct_and_partial(tmp_path, case):
-    values = {'waveform': 'sine', 'frequency_hz': '800', 'sample_rate_hz': '8000',
-        'bit_depth': 'float32', 'channel_layout': '1.0', 'sustain_seconds': '0.01'}
-    frames = 80
-    if case == 'short':
-        frames, values['sustain_seconds'] = 1, '0.000125'
-    elif case == 'aliased':
-        values['frequency_hz'] = '4000'
-    elif case == 'quantized':
-        values.update(bit_depth='int16', sustain_db='-96')
-    elif case == 'fractional':
-        values['sustain_seconds'] = '0.01001'
-    elif case == 'other-waveform':
-        values['waveform'] = 'triangle'
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [], values=values)
-    client.artifact_bytes = _tone_wav_bytes(floating=case != 'quantized', channels=1, samples=[0] * frames)
-    verified = _finish_tone_collection(env, state, client, preview)
-    assert verified['verification_strength'] == 'partial_tone_artifact'
-    from wwise_waapi.transactions import TransactionStore
-    journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(preview['transaction_id'])
-        if event['event_type'] == 'verification_recorded')
-    observed = journal['readbacks'][0]
-    assert observed['unresolved']
-    if case == 'other-waveform':
-        assert 'stationary_sine' not in observed['wav']
-        assert 'active waveform' in str(observed['unresolved'])
-    else:
-        reason = observed['wav']['stationary_sine']['observability_reason']
-        assert {'short': 'rank deficient', 'aliased': 'Nyquist', 'quantized': 'quantization',
-            'fractional': 'fractional'}[case] in reason
-
-
-def test_stationary_sine_short_but_resolvable_record_proves_digital_conformance(tmp_path):
-    import math
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'waveform': 'sine', 'frequency_hz': '800', 'sample_rate_hz': '8000',
-            'bit_depth': 'float32', 'channel_layout': '1.0', 'sustain_seconds': '0.0005'})
-    client.artifact_bytes = _tone_wav_bytes(floating=True, channels=1,
-        samples=[math.sin(math.tau * frame / 10 + 0.37) for frame in range(4)])
-    _finish_tone_collection(env, state, client, preview, expected_state='verified')
-
-
-@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
-@pytest.mark.parametrize('floating', [True, False])
-def test_sine_envelope_verifies_requested_linear_segments_with_independent_unparameterized_phases(tmp_path, version, floating):
-    import math
-    env, state, client, _, schema, _, preview = _tone_collection_preview(tmp_path, version,
-        ['--item', 'waveform_channels', '0'] if version != '2023.1' else [],
-        values={'waveform': 'sine', 'frequency_hz': '800', 'sample_rate_hz': '8000',
-            'channel_layout': '2.0' if version != '2023.1' else '1.0',
-            'bit_depth': 'float32' if floating else 'int16', 'sustain_db': '-6', 'attack_seconds': '0.0025',
-            'sustain_seconds': '0.005', 'release_seconds': '0.00375'})
-    samples = []
-    for frame in range(90):
-        if frame < 20:
-            amplitude, phase = frame / 20, .37
-        elif frame < 60:
-            amplitude, phase = 1, -.52
-        else:
-            amplitude, phase = (90 - frame) / 30, 1.12
-        sample = .5011872336272722 * amplitude * math.sin(math.tau * frame / 10 + phase)
-        samples.append(sample if floating else round(sample * 32768))
-        if version != '2023.1':
-            samples.append(0)
-    client.artifact_bytes = _tone_wav_bytes(floating=floating, samples=samples, channels=1 if version == '2023.1' else 2)
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    assert verified['verification_strength'] == 'tone_wav_artifact'
-    code, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    assert code == 0
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    signal = journal['readbacks'][0]['wav']['sine_envelope']
-    assert signal['policy'] == 'sine-envelope-numerical-conformance-v1'
-    assert signal['phase_relationship_checked'] is False
-    assert [row['name'] for row in signal['segments']] == ['attack', 'sustain', 'release']
-    assert [row['frames'] for row in signal['segments']] == [20, 40, 30]
-    assert [row['channels'][0]['phase_radians'] for row in signal['segments']] == pytest.approx([.37, -.52, 1.12], abs=1e-6 if floating else 1e-4)
-    assert signal['observability_reason'] is None
-    disclosure = schema['business_adapter']['safety']['tone_artifact_verification']['sine_envelope_checks']
-    assert disclosure['phase_relationship_checked'] is False
-
-
-@pytest.mark.parametrize('name', ['sine-attack-only', 'sine-release-only', 'sine-attack-release'])
-def test_sine_envelope_retained_2025_native_bytes_verify_without_relabelling_original_characterization(tmp_path, name):
-    import hashlib
-    fixtures = Path(__file__).resolve().parents[1] / 'fixtures/tone/console-2025.1.7.9143/envelopes'
-    manifest = json.loads((fixtures / 'manifest.json').read_text())
-    specimen = manifest['files'][name + '.wav']
-    raw = (fixtures / (name + '.wav')).read_bytes()
-    assert hashlib.sha256(raw).hexdigest() == specimen['sha256'] and len(raw) == specimen['size']
-    assert manifest['native_business_acceptance'] is False
-    assert manifest['original_verification_strength'] == 'partial_tone_artifact'
-    values = {key: str(value) for key, value in {**manifest['common_request'], **specimen['request']}.items()}
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [], values=values)
-    client.artifact_bytes = raw
-    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
-    assert verified['verification_strength'] == 'tone_wav_artifact'
-    assert verified['agent_result']['request'] == preview['agent_result']['request']
-    code, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-    assert code == 0
-    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-    signal = journal['readbacks'][0]['wav']['sine_envelope']
-    assert signal['observability_reason'] is None and signal['phase_relationship_checked'] is False
-    assert (signal['gain_tolerance_db'], signal['shape_tolerance_relative']) == (.02, .002)
-    assert journal['business_state_verified'] is True
-
-
-@pytest.mark.parametrize('defect', ['curve', 'swapped-segments', 'gain', 'frequency', 'silence', 'missing-envelope', 'late-sample'])
-def test_sine_envelope_rejects_wrong_requested_signal_after_exactly_one_execution(tmp_path, defect):
-    import math
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'waveform': 'sine', 'channel_layout': '1.0', 'frequency_hz': '800',
-            'sample_rate_hz': '8000', 'bit_depth': 'float32', 'sustain_db': '-6',
-            'attack_seconds': '0.0025', 'sustain_seconds': '0.005', 'release_seconds': '0.00375'})
-    samples = []
-    for frame in range(90):
-        attack, sustain_end, release = (30, 70, 20) if defect == 'swapped-segments' else (20, 60, 30)
-        amplitude = frame / attack if frame < attack else (90 - frame) / release if frame >= sustain_end else 1
-        if defect == 'curve':
-            amplitude *= amplitude
-        elif defect == 'missing-envelope':
-            amplitude = 1
-        frequency = 1600 if defect == 'frequency' else 800
-        gain = .7 if defect == 'gain' else .5011872336272722
-        sample = gain * amplitude * math.sin(math.tau * frequency * frame / 8000 + .37)
-        if defect == 'silence':
-            sample = 0
-        if defect == 'late-sample' and frame == 89:
-            sample += .02
-        samples.append(sample)
-    client.artifact_bytes = _tone_wav_bytes(floating=True, channels=1, samples=samples)
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
-    assert 'sine-envelope-numerical-conformance-v1' in str(verified['verification'])
-    writes = [call for call in client.calls if call[0] == 'ak.wwise.debug.generateToneWAV']
-    assert len(writes) == 1 and writes[0][1] == preview['agent_result']['request']['arguments']['args']
-
-
-@pytest.mark.parametrize('case', ['rank-deficient', 'quantized', 'fractional', 'aliased', 'wrong-observable-segment'])
-def test_sine_envelope_inconclusive_segments_remain_partial_and_keep_other_segment_checks(tmp_path, case):
-    import math
-    values = {'waveform': 'sine', 'channel_layout': '1.0', 'frequency_hz': '800',
-        'sample_rate_hz': '8000', 'bit_depth': 'float32', 'sustain_db': '-6',
-        'attack_seconds': '0.000125', 'sustain_seconds': '0.005', 'release_seconds': '0.0025'}
-    if case == 'quantized':
-        values.update(bit_depth='int16', sustain_db='-96')
-    elif case == 'fractional':
-        values['attack_seconds'] = '0.000126'
-    elif case == 'aliased':
-        values['frequency_hz'] = '4000'
-    samples = []
-    for frame in range(61):
-        envelope = 0 if frame == 0 else (61 - frame) / 20 if frame >= 41 else 1
-        gain = .7 if case == 'wrong-observable-segment' else .5011872336272722
-        samples.append(0 if case in {'quantized', 'aliased'} else gain * envelope * math.sin(math.tau * frame / 10 + .37))
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [], values=values)
-    client.artifact_bytes = _tone_wav_bytes(floating=case != 'quantized', channels=1, samples=samples)
-    verified = _finish_tone_collection(env, state, client, preview, expect_failure=case == 'wrong-observable-segment')
-    if case == 'wrong-observable-segment':
-        assert 'gain differs' in str(verified['verification'])
-    else:
-        assert verified['verification_strength'] == 'partial_tone_artifact'
-        code, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
-        assert code == 0
-        journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
-        signal = journal['readbacks'][0]['wav']['sine_envelope']
-        reason = signal['segments'][1]['observability_reason'] if case == 'quantized' else signal['observability_reason']
-        assert {'rank-deficient': 'rank deficient', 'quantized': 'quantization',
-            'fractional': 'fractional', 'aliased': 'Nyquist'}[case] in reason
-        if case == 'rank-deficient':
-            assert signal['segments'][0]['observability_reason']
-            assert signal['segments'][1]['channels'] and signal['segments'][2]['channels']
-
-
-def test_sine_envelope_rejects_nonzero_zero_weight_frame_even_when_segment_phase_is_unobservable(tmp_path):
-    import math
-    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
-        values={'waveform': 'sine', 'channel_layout': '1.0', 'frequency_hz': '800',
-            'sample_rate_hz': '8000', 'bit_depth': 'float32', 'sustain_db': '-6',
-            'attack_seconds': '0.000125', 'sustain_seconds': '0.005', 'release_seconds': '0.0025'})
-    samples = [.1] + [.5011872336272722 * (1 if frame < 41 else (61 - frame) / 20)
-        * math.sin(math.tau * frame / 10 + .37) for frame in range(1, 61)]
-    client.artifact_bytes = _tone_wav_bytes(floating=True, channels=1, samples=samples)
-    _finish_tone_collection(env, state, client, preview, expect_failure=True)
 
 
 def test_sine_envelope_all_supported_standard_channels_preserve_exact_terminal_agent_result(tmp_path, monkeypatch, capsys):
@@ -2531,7 +1528,7 @@ def test_tone_anonymous_override_uses_fifth_order_count_with_full_36_channel_pro
             'attack_seconds': '0.0025', 'sustain_seconds': '0.005', 'release_seconds': '0.00375'})
     frozen_args = preview['agent_result']['request']['arguments']['args']
     assert frozen_args['channelConfig'] == 'Ambisonics 5th order' and frozen_args['setAnonymous'] is True
-    assert 'anonymous_layout_override' in schema['business_adapter']['safety']['tone_artifact_verification']
+    assert schema['business_adapter']['safety']['tone_artifact_verification']['business_outcome'] == 'file_creation_only'
     samples = []
     for frame in range(90):
         amplitude = frame / 20 if frame < 20 else (90 - frame) / 30 if frame >= 60 else 1
@@ -2570,9 +1567,7 @@ def test_tone_anonymous_override_uses_fifth_order_count_with_full_36_channel_pro
     assert list(decoded)[-1] == 'agent_result'
     journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(tx)
         if event['event_type'] == 'verification_recorded')
-    wav = journal['readbacks'][0]['wav']
-    assert (wav['channels'], wav['speaker_mask']) == (36, 0)
-    assert all([row['channel'] for row in segment['channels']] == list(range(36)) for segment in wav['sine_envelope']['segments'])
+    assert journal['readbacks'][0]['created'] is True
     assert decoded['stdout_projection']['verification_canonical_sha256'] == canonical_sha256(journal)
     assert [row[0] for row in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
     (tmp_path / 'anonymous-36-terminal.stdout.json').write_text(rendered)

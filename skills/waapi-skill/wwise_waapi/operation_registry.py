@@ -195,7 +195,7 @@ from .operation_ui_commands import (
     validate_ui_command_runtime_preconditions,
     verify_ui_command_inventory_postcondition,
 )
-from .operation_tone import TONE_URI, prepare_tone_verification, validate_tone_binding, verify_tone_artifact
+from .operation_tone import TONE_URI, prepare_tone_verification, validate_tone_binding, verify_tone_output_file
 from .operation_soundbank import (
     SoundBankContractError,
     build_external_sources_operation_plan,
@@ -19684,19 +19684,16 @@ def verify_prepared_operation(
     elif kind == 'tone-wav-artifact':
         check_result_schema(TONE_URI, plan['version'])
         business_state_verified = False
-        success_status = 'result_schema_checked'
-        verification_strength = 'partial_tone_artifact'
+        verification_strength = 'tone_file_creation'
         try:
-            observed = verify_tone_artifact(plan)
+            observed = verify_tone_output_file(plan)
         except SoundBankContractError as exc:
-            check('Requested Tone WAV artifact exists and matches its observable postconditions', False,
+            check('Requested owned Tone output file was created or rewritten', False,
                 {'code': exc.error_code, 'message': str(exc), **exc.details})
         else:
-            business_state_verified = not observed['unresolved']
-            success_status = 'verified' if business_state_verified else 'result_schema_checked'
-            verification_strength = 'tone_wav_artifact' if business_state_verified else 'partial_tone_artifact'
             readbacks.append(observed)
-            check('Requested Tone WAV artifact exists and matches its observable postconditions', True, observed)
+            check('Requested owned Tone output file was created or rewritten', True, observed)
+            business_state_verified = all(item.get('passed') is True for item in assertions)
     elif kind == 'console-project-open':
         check_result_schema(plan['uri'], plan['version'])
         readbacks.append({'kind': 'console-open-project-identity', 'project': dict(plan['project']),
@@ -24772,13 +24769,12 @@ def verify_prepared_operation(
             message + "Native capture format validity and capture-data completeness remain unverified.",
             outcome.verification_strength, outcome.business_state_verified, plan["verification_scope"])
     if kind == 'tone-wav-artifact':
-        message = ('The requested Tone WAV artifact failed independent verification.'
+        message = ('The requested Tone output file creation could not be verified; do not retry execution.'
             if outcome.status == 'verification_failed' else
-            'The requested observable Tone WAV artifact state passed independent verification.'
-            if outcome.business_state_verified else
-            'Applicable Tone WAV artifact checks passed; requested postconditions remain explicitly unresolved.')
+            'The exact owned Tone output file was created or rewritten. File contents and audio quality were not checked.')
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
-            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified,
+            plan['verification_scope'])
     if kind == "authoring-project-create":
         message = ("The saved project artifact does not match the requested creation; do not replay the executed call."
             if outcome.status == "verification_failed" else

@@ -6633,7 +6633,7 @@ def test_generic_isolated_call_runs_full_chain_with_bound_io_audit(tmp_path: Pat
     assert verify_payload["state"] == TransactionState.VERIFICATION_FAILED.value
     assert verify_payload["verified"] is False
     assert verify_payload["result_schema_checked"] is False
-    assert verify_payload["verification_strength"] == "partial_tone_artifact"
+    assert verify_payload["verification_strength"] == "tone_file_creation"
     # A successful empty WAAPI reply cannot establish the missing artifact.
     assert not (io_root / "tone.wav").exists()
     events = TransactionStore(state_dir).read_events(transaction['transaction_id'])
