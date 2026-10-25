@@ -66,6 +66,10 @@ evidence; necessary reconciliation is owned by #195, not a new per-leaf test
 framework. Fresh remains under #194 with budget zero until separately approved;
 #195 coordinates the required stable-candidate full Program/Non-live gates.
 
+Apply the explicit API exceptions in the [coverage specification](../../docs/plans/full-waapi-coverage/SPEC.md):
+internal Debug needs no further verification; Tone acceptance is correct invocation
+and requested-file creation only. Use its exact-URI scope classifications.
+
 Select tests from the changed implementation and its callers. Group independent
 cases into one affected run while retaining separate assertions, outcomes and
 isolated mutable state. Share expensive setup only when it cannot leak state

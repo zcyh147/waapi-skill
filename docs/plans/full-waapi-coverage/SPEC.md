@@ -249,7 +249,11 @@ existing internal Debug controls `ak.wwise.debug.enableAsserts`,
 `ak.wwise.debug.enableAutomationMode`, `ak.wwise.debug.restartWaapiServers`,
 `ak.wwise.debug.testAssert` and `ak.wwise.debug.testCrash` in #204. All five
 already have closed named contracts; no new Debug execution or environment
-work is a delivery prerequisite. No unwrapped internal Debug URI was identified
-in this fixed roster. It excludes neither `ak.wwise.debug.generateToneWAV` nor
-ordinary Authoring functionality. Historical results remain unchanged. Removing
-these routes from normal discovery is not part of this change.
+work is a delivery prerequisite. Unwrapped internal Debug capabilities may be
+skipped as user-approved scope exclusions. Record each exact URI and that
+classification; do not call it native absence. No unwrapped internal Debug URI
+was identified in this fixed roster. This rule excludes neither
+`ak.wwise.debug.generateToneWAV` nor ordinary Authoring functionality; a Debug
+prefix alone does not establish an internal Debug classification. Historical
+results remain unchanged. Removing the retained wrappers from normal discovery
+is not part of this change.
