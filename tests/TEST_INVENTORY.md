@@ -5,6 +5,58 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #178 planned Playlist arrays and older native boundary
+
+Combined `04bf7f8f` adds one immutable SET Preview for a new 2023/2024
+RandomSequenceContainer, direct children and an ordered/repeated Playlist
+reference array. Actual GUIDs and the complete constructor roster are observed
+before assignment; append retains that observed prefix. The exact legacy
+omitted-empty consumer now requires a separate bounded empty-membership read,
+preserving null/error distinctions and all hierarchy targets. Independent
+Standards/Spec reviews found no scoped issue; the six selected combined
+intersection checks passed **6 in 4.64s**. These are program results, not new
+native constructor evidence.
+
+Retained Console 2023.1.19.8928 roots remain unchanged: replacement at `37af4ea5`
+matched the requested `[Up, Loop, Loop]` roster with owner/targets preserved, but
+the original root remains **FAIL, 12.26s** because its result consumer rejected
+schema-valid reference associations. The fresh append/clear root at `2e4c9d13`
+remains **FAIL, 7.40s**: append verified with `[Up, Loop, Up]`; clear independently
+produced `[]` and preserved owner/targets, but verification rejected the omitted
+direct List projection. The repaired consumers reuse those actual effects;
+neither failure was regraded or replayed. Evidence roots below
+`.waapi-skill-state/full-coverage/` are `legacy-playlist178-2023-native-r1` and
+`legacy-playlist178-2023-append-clear-r1`, each with `main-assessment.json`.
+
+Two read-only probes at `04bf7f8f` finished on exact Console builds
+2021.1.14.8108 (**17.54s**) and 2022.1.19.8584 (**11.88s**). Both original final
+verdicts remain **SKIP**, with zero transactions/mutations: after exact copied
+project/owner/target proof, native `select @Playlist` returned
+`ak.wwise.query.invalid_query`, `Unknown property Playlist (61)`. Both source
+trees and project mtimes were preserved, processes cleaned, and sandboxes
+quarantined. Roots: `older-playlist178-2021-read-r1` and
+`older-playlist178-2022-read-r1`, including original observations and assessments.
+
+Installed 2023.1 release note **WG-47295** explicitly introduces Sequence
+Container object-list access; its New Features page names Playlist in
+Random/Sequence Container as newly accessible through WAAPI/WAQL. Combined with
+the matching older observations, this establishes the precise older Playlist
+native boundary; generic List support and MusicPlaylistContainer are distinct.
+The canonical versioned `references/semantic/*/playlist-native-boundary.json`
+files retain exact primary source and native-observation hashes. Structured
+discovery and exact missing-choice repairs disclose that boundary without
+issuing a selectable unsupported field, suppressing 2022 Metadata/RTPC Lists,
+or claiming class-wide native absence. Unknown fields remain unresolved.
+
+Focused public TDD checks passed **4 in 0.60s** for both older object/class
+discovery scopes, **6 in 0.95s** for reachable live/planned repairs and unknown
+field controls, then **6 in 0.79s** for existing five-version discovery and
+unrelated missing-source callers. Original RED/setup observations are retained
+in the boundary closeout handoff. No further native attempt, Fresh or full gate
+was run. Final #178 tracker closure follows review; #195 retains final mapping
+reconciliation and stable combined Program/Non-live gates, while #194 Fresh
+budget remains zero.
+
 ## 2026-10-26 #178 Playlist construction and verified-node continuation
 
 Reviewed runtime implementation through `3db7e527` adds source-certified 2025

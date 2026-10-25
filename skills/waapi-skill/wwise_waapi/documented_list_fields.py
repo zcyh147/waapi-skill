@@ -1,6 +1,7 @@
 """Pinned List declarations, distinct from live getPropertyInfo evidence."""
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -12,6 +13,10 @@ from .canonical import canonical_sha256
 CATALOG_ROOT = Path(__file__).resolve().parents[1] / "resources" / "metadata"
 VERSIONS = frozenset({"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"})
 MAX_CATALOG_BYTES = 2 * 1024 * 1024
+PLAYLIST_BOUNDARY_SHA256 = {
+    "2021.1": "3d6e9034576e9f601a6df4d0b33fe4890200bbcc9d582d51c5e7a396ac0ef301",
+    "2022.1": "76ddb7909a6c7770c2e8eb772cc86f1552359a69c9e1683a879d2ab09bbe5295",
+}
 # These exact 2025 classes inherit the same MetadataReferences InnerType.
 METADATA_INNER_OWNERS = {
     3997712: "AuxBus", 1900560: "BlendContainer", 1376272: "Bus",
@@ -133,6 +138,29 @@ def field_evidence(catalog, row, scope, field):
         "scope": scope, "declaration": field}
 
 
+def known_native_boundaries(version, class_id):
+    """Only the source-proved older Playlist boundary, never class-wide absence."""
+    if version not in PLAYLIST_BOUNDARY_SHA256 or class_id != 589840:
+        return []
+    path = Path(__file__).resolve().parents[1] / "references" / "semantic" / version / "playlist-native-boundary.json"
+    with path.open("rb") as source:
+        raw = source.read(8193)
+    if len(raw) > 8192 or hashlib.sha256(raw).hexdigest() != PLAYLIST_BOUNDARY_SHA256[version]:
+        raise ValueError("Pinned Playlist native-boundary source changed")
+    return [json.loads(raw)]
+
+
+def _reject_known_native_list(version, class_id, name):
+    if name != "Playlist":
+        return
+    boundaries = known_native_boundaries(version, class_id)
+    if boundaries:
+        from .business_declarations import business_repair
+        raise business_repair("NATIVE_LIST_UNAVAILABLE", field="object_list",
+            action="Random/Sequence Container Playlist object-list access requires Wwise 2023.1 or newer",
+            native_boundary=boundaries[0])
+
+
 def browse_lists(version, *, scope_kind, scope_value, read, context, page_size=20, page=None, selection=None):
     if isinstance(page_size, bool) or not isinstance(page_size, int) or not 1 <= page_size <= 64:
         raise ValueError("Documented-list page size must be 1..64")
@@ -161,6 +189,7 @@ def browse_lists(version, *, scope_kind, scope_value, read, context, page_size=2
         "next_page": locator("dlp1", offset + page_size) if offset + page_size < len(fields) else None,
         "scope": scope, "catalog_sha256": catalog["catalog_sha256"], "source_coverage": catalog["coverage"],
         "availability": "documented_fields" if fields else "source_does_not_establish_list_fields_for_this_class",
+        "known_native_boundaries": known_native_boundaries(version, scope["class_id"]),
         "native_unavailability_proven": False}
 
 
@@ -202,6 +231,7 @@ def resolve_live_list_evidence(version, owner_id, name, *, read):
     fields = row["lists"] if row else []
     matches = [field for field in fields if field["name"] == name]
     if len(matches) != 1:
+        _reject_known_native_list(version, scope["class_id"], name)
         raise business_repair("DOCUMENTED_LIST_SELECTION_REQUIRED", field="object_list",
             action="choose one documented List of the exact live owner class; unlisted source scope remains unresolved",
             choices=[field["name"] for field in fields])
@@ -214,6 +244,7 @@ def resolve_class_list_evidence(version, class_id, name):
     fields = row["lists"] if row else []
     matches = [field for field in fields if field["name"] == name]
     if len(matches) != 1:
+        _reject_known_native_list(version, class_id, name)
         raise business_repair("DOCUMENTED_LIST_SELECTION_REQUIRED", field="object_list",
             action="choose one documented List of this exact planned class; unlisted source remains unresolved",
             choices=[field["name"] for field in fields])

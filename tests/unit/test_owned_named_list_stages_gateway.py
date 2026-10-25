@@ -880,6 +880,68 @@ def test_playlist_creation_discovery_preserves_five_version_list_representations
         assert [row['name'] for row in playlist['element_classes']] == element_names
 
 
+@pytest.mark.parametrize('version', ['2021.1', '2022.1'])
+@pytest.mark.parametrize('scope', ['object', 'class'])
+def test_older_playlist_discovery_explains_exact_native_version_boundary(tmp_path, version, scope):
+    task = OwnedGraphTask(tmp_path, version, 'object.create')
+    task.types = [{'name': 'RandomSequenceContainer', 'classId': 589840, 'type': 'WObject'}]
+    task.objects[FIRST] = {'id': FIRST, 'name': 'Numbers', 'type': 'RandomSequenceContainer', 'classId': 589840,
+        'path': r'\Actor-Mixer Hierarchy\Numbers', '@RandomOrSequence': 1}
+    owner = task.bind(FIRST)
+    if scope == 'object':
+        selector = ['--object-handle', owner]
+    else:
+        code, kinds = task.step('draft-discover-types', '--role', 'object', '--meaning', 'RandomSequenceContainer')
+        assert code == 0, kinds
+        selector = ['--type-handle', kinds['type_candidates'][0]['handle']]
+    code, fields = task.step('draft-discover-fields', *selector, '--field-source', 'documented-lists', '--list')
+    assert code == 0, fields
+    result = fields['agent_result']
+    boundary, = result['known_native_boundaries']
+    assert (boundary['class_id'], boundary['field'], boundary['version'], boundary['introduced_in']) == (
+        589840, 'Playlist', version, '2023.1')
+    assert boundary['status'] == 'native_unavailable' and boundary['source']['change_id'] == 'WG-47295'
+    assert boundary['source']['member_sha256'] == '84371706b26f09b7ddd83c68b6022d2107f8bd24c92e8185d38a865f7d5206bc'
+    assert boundary['observation']['original_verdict'] == 'SKIP' and boundary['observation']['project_mutation_count'] == 0
+    assert result['native_unavailability_proven'] is False
+    assert [row['name'] for row in result['items']] == ([] if version == '2021.1' else ['Metadata', 'RTPC'])
+    assert not any(uri.endswith(('object.create', 'object.set', 'object.setReference')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version,scope', [('2021.1', 'object'), ('2022.1', 'object'), ('2022.1', 'class')])
+@pytest.mark.parametrize('field', ['Playlist', 'UnknownList'])
+def test_older_playlist_missing_choice_reports_only_known_field_boundary(tmp_path, version, scope, field):
+    task = OwnedGraphTask(tmp_path, version, 'object.set' if scope == 'class' else 'object.create')
+    task.types = [{'name': 'RandomSequenceContainer', 'classId': 589840, 'type': 'WObject'},
+        {'name': 'Sound', 'classId': 65552, 'type': 'WObject'}]
+    task.objects[FIRST] = {'id': FIRST, 'name': 'Numbers', 'type': 'RandomSequenceContainer', 'classId': 589840,
+        'path': r'\Actor-Mixer Hierarchy\Numbers', '@RandomOrSequence': 1}
+    owner = task.bind(FIRST)
+    if scope == 'class':
+        code, kinds = task.step('draft-discover-types', '--role', 'object', '--meaning', 'RandomSequenceContainer')
+        assert code == 0, kinds
+        code, declared = task.step('draft-declare-new', '--declaration-id', 'owner', '--parent-handle', owner,
+            '--name', 'New sequence', '--kind', kinds['type_candidates'][0]['handle'])
+        assert code == 0, declared
+        owner = declared['draft']['declared_object']['result_handle']
+    code, rejected = task.step('draft-declare-new', '--declaration-id', 'member', '--parent-handle', owner,
+        '--name', 'First', '--kind', 'sound-sfx', '--field', 'object_list', field)
+    if code == 0:
+        code, rejected = task.step('draft-check')
+    assert code == 2, rejected
+    repair = rejected['details']['repair']
+    if field == 'Playlist':
+        assert rejected['error_code'] == 'NATIVE_LIST_UNAVAILABLE', rejected
+        boundary = repair['native_boundary']
+        assert (boundary['field'], boundary['class_id'], boundary['version'], boundary['introduced_in']) == (
+            'Playlist', 589840, version, '2023.1')
+        assert boundary['source']['change_id'] == 'WG-47295'
+    else:
+        assert rejected['error_code'] == 'DOCUMENTED_LIST_SELECTION_REQUIRED', rejected
+        assert 'native_boundary' not in repair
+    assert not any(uri.endswith(('object.create', 'object.set', 'object.setReference')) for uri, _, _ in task.calls)
+
+
 def test_new_playlist_member_requires_selected_child_in_its_constructor(tmp_path):
     task = playlist_creation_task(tmp_path, reference=False)
     code, result = task.step('draft-check')
