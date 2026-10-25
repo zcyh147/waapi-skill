@@ -9,6 +9,8 @@ from tests.destructive.test_gateway_workflow_transaction_matrix import (
     _bind_business_object,
     _complete_business_draft,
     _complete_object_metadata_business_transaction,
+    _discover_business_type,
+    discovered_business_field_handle,
     _start_business_draft,
     _update_business_draft,
     workflow_sandbox_runtime,
@@ -156,3 +158,131 @@ def _observe_existing_playlist_reference_change(runtime, *, staged_notes=None):
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(body)
         category.update(status=status, observation_sha256=hashlib.sha256(body).hexdigest())
+
+
+def test_new_playlist_slot_append_preserves_existing_peers(workflow_sandbox_runtime):
+    _observe_new_playlist_slot_append(workflow_sandbox_runtime)
+
+
+def _observe_new_playlist_slot_append(runtime):
+    """One new member on the retained Minigun owner; no setup objects or replay."""
+    from uuid import UUID
+    version = runtime.sandbox.metadata.get_info_version
+    assert runtime.version == '2025.1' and tuple(version.get(key) for key in
+        ('year', 'major', 'minor', 'build')) == (2025, 1, 7, 9143), version
+    owner = '{8C0FD1AD-E45D-408D-9BF3-874970CCC123}'
+    target = '{DB017C8E-EC99-415B-93CF-F7A6136D1AC2}'
+    peers = ['{7571D6B0-D614-40B5-B02D-0012FE3743A7}', '{6298C41E-F7C6-40B6-BFFE-E0B02EE7DC72}']
+    output = runtime.state_dir / 'playlist-new-slot-append-effect.json'
+    assert not output.exists(), 'Never overwrite a prior new-slot observation'
+    output.parent.mkdir(parents=True, exist_ok=True)
+    observation = {'candidate': runtime.candidate, 'version': runtime.version, 'build': version,
+        'operation': 'object.set', 'calls': [], 'reads': [], 'transactions': [], 'business_effect_verified': False}
+    category = {'category': 'new-playlist-slot-append', 'status': 'FAIL', 'observation_path': str(output),
+        'verifier_strength': 'independent_new_GUID_class_owner_reference_ordered_peers_and_target_readback'}
+    runtime.category_results.append(category)
+    status = 'FAIL'
+
+    class ReceiptGateway:
+        def raw_gateway(self, argv):
+            assert len(observation['calls']) < 96, 'Playlist public command bound exceeded'
+            record = {'argv': list(argv)}
+            observation['calls'].append(record)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                record.update(exit_code=code, payload=payload)
+                return code, payload
+            except BaseException as exc:
+                record['error'] = f'{type(exc).__name__}: {exc}'
+                raise
+
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            return payload
+
+    gateway = ReceiptGateway()
+
+    def read(label, selector):
+        assert len(observation['reads']) < 16
+        observation['reads'].append({'label': label, 'call_index': len(observation['calls'])})
+        payload = gateway.gateway(['query-object', *selector, '--max-results', '4',
+            '--include', 'class-id', '--include', 'owner', '--include', 'parent', '--include', 'notes'], live=True)
+        assert payload.get('projection_complete') is not False and payload.get('status') != 'partial', payload
+        assert payload.get('limit_reached') is not True and list(payload)[-1] == 'agent_result', payload
+        rows = payload['agent_result']
+        assert isinstance(rows, list) and len(rows) < 4 and len({row['id'] for row in rows}) == len(rows), payload
+        return rows
+
+    def exact(label, identity):
+        rows = read(label, ['--exact-id', identity])
+        assert len(rows) == 1, rows
+        row = rows[0]
+        assert row['id'] == identity, row
+        return row
+
+    def reference(label, identity):
+        rows = read(label, ['--advanced-waql', f'from object "{identity}" select @PlaylistObject'])
+        assert len(rows) == 1, rows
+        return rows[0]
+
+    try:
+        before_owner = observation['before_owner'] = exact('before-owner', owner)
+        before_target = observation['before_target'] = exact('before-target', target)
+        before = observation['before_members'] = read('before-members', ['--advanced-waql', f'from object "{owner}" select @Playlist'])
+        assert before_owner['type'] == 'RandomSequenceContainer' and before_owner['class_id'] == 589840
+        assert before_target['type'] == 'Sound' and before_target['class_id'] == 65552 and before_target['parent']['id'] == owner
+        assert [row['id'] for row in before] == peers, before
+        assert all(row['class_id'] == 5636096 and row['type'] == 'PluginInnerObject'
+            and row['name'] == '' and row['owner']['id'] == owner and 'parent' not in row for row in before), before
+        old_references = observation['before_references'] = [reference('before-peer-reference', identity) for identity in peers]
+        draft = _start_business_draft(gateway, 'object.set')
+        owner_handle = _bind_business_object(gateway, draft, object_id=owner)
+        target_handle = _bind_business_object(gateway, draft, object_id=target)
+        kind = _discover_business_type(gateway, draft, meaning='PlaylistSlot', role='object', expected_label='PlaylistSlot')
+        listing = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            ['--object-handle', owner_handle, '--field-source', 'documented-lists', '--list'], live=True)
+        choice, = [row for row in listing['agent_result']['items'] if row['name'] == 'Playlist']
+        assert choice['element_classes'] == [{'name': 'PlaylistSlot', 'class_id': 5636096}], choice
+        selected = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            ['--object-handle', owner_handle, '--field-source', 'documented-lists', '--selection', choice['selection']], live=True)
+        list_candidate, = [row for result in selected['meaning_results'] for row in result['candidates']]
+        assert list_candidate['field_kind'] == 'list' and list_candidate['evidence']['declaration']['name'] == 'Playlist'
+        list_field = list_candidate['handle']
+        field = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            ['--type-handle', kind, '--meaning', 'Playlist Object'], live=True)
+        reference_field = discovered_business_field_handle(field, 'Playlist Object')
+        _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'playlist-slot',
+            '--parent-handle', owner_handle, '--name', 'Requested occurrence', '--kind', kind,
+            '--field', 'object_list', list_field, '--field-value', reference_field, target_handle], live=False)
+        receipt = {}
+        observation['transactions'].append(receipt)
+        receipt.update(_complete_business_draft(gateway, draft))
+        assert receipt['execute']['automatic_retry'] is False
+        created, = receipt['verify']['agent_result']['business_result']['created_objects']
+        identity = created['object']['id']
+        assert UUID(identity).int != 0 and identity not in {*peers, owner, target}
+        assert created['name_role'] == 'declaration_label' and created['native_name'] == ''
+        actual = exact('new-slot', identity)
+        observation['created'] = actual
+        assert actual['name'] == '' and actual['type'] == 'PluginInnerObject' and actual['class_id'] == 5636096
+        assert actual['owner']['id'] == owner and 'parent' not in actual
+        new_reference = observation['new_reference'] = reference('new-reference', identity)
+        assert new_reference == before_target
+        after = observation['after_members'] = read('after-members', ['--advanced-waql', f'from object "{owner}" select @Playlist'])
+        assert [row['id'] for row in after] == [*peers, identity] and after[:len(peers)] == before
+        assert after[-1] == actual
+        after_references = observation['after_references'] = [reference('after-peer-reference', identity) for identity in peers]
+        assert after_references == old_references
+        assert exact('after-owner', owner) == before_owner and exact('after-target', target) == before_target
+        observation['business_effect_verified'] = True
+        status = 'PASS'
+    except BaseException as exc:
+        observation['error'] = f'{type(exc).__name__}: {exc}'
+        raise
+    finally:
+        body = json.dumps(observation, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 8 * 1024 * 1024
+        output.write_bytes(body)
+        category.update(status=status, business_effect_verified=observation['business_effect_verified'],
+            observation_sha256=hashlib.sha256(body).hexdigest())

@@ -1,7 +1,7 @@
-"""Pinned existing 2025 PlaylistSlot reference proof, never a generic hierarchy rule.
+"""Pinned 2025 PlaylistSlot reference and prospective owner/direct-child proof.
 
-The matching WObjects definition and SDK playlist example establish only this
-owner/direct-child case. Older List restrictions and new slots remain separate.
+The matching WObjects definition, SDK constructor and retained exact native
+identity establish this finite case. Older List representations stay separate.
 """
 from __future__ import annotations
 
@@ -119,4 +119,52 @@ def assertion(expected, *, read, after_write):
     except (ValueError, KeyError, TypeError) as exc:
         actual, passed = {'error': str(exc)}, False
     return {'name': 'PlaylistSlot exact class, owner, direct-child target and ordered Playlist remain bound',
+        'passed': passed, 'evidence': {'expected': expected, 'actual': actual}}
+
+
+def discovery_class_target_types(*, version, class_id, name, restriction):
+    if (version, class_id, name, restriction) != ('2025.1', 5636096, 'PlaylistObject', RESTRICTION):
+        raise ValueError('Only the pinned 2025 PlaylistSlot class reference is implemented')
+    catalog = load_catalog(version)
+    slots = [row for row in catalog['classes'] if row['class_id'] == class_id]
+    if len(slots) != 1 or slots[0]['name'] != 'PlaylistSlot' or name not in slots[0]['scalar_references']:
+        raise ValueError('PlaylistSlot lost its exact scalar-reference source')
+    return TARGET_TYPES
+
+
+def observe_prospective(*, version, owner_id, target_id, name, restriction, read):
+    discovery_class_target_types(version=version, class_id=5636096, name=name, restriction=restriction)
+    evidence = resolve_live_list_evidence(version, owner_id, 'Playlist', read=read)
+    if evidence['scope']['class_id'] != 589840 or evidence['scope']['owner']['type'] != 'RandomSequenceContainer':
+        raise ValueError('New PlaylistSlot requires its exact RandomSequenceContainer owner')
+    guard = observe_list_binding(evidence, read=read)
+    references = (_rows(read, [row['id'].upper() for row in guard['members']], ['id', 'PlaylistObject'])
+                  if guard['members'] else [])
+    for row in references:
+        _guid(row.get('PlaylistObject'))
+    target = _rows(read, [target_id], FIELDS)[0]
+    classes = {row['name']: row['class_id'] for row in load_catalog(version)['classes'] if row['name'] in TARGET_TYPES}
+    if (target.get('type') not in classes or type(target.get('classId')) is not int
+            or target['classId'] != classes[target['type']] or _guid(target.get('parent')) != owner_id):
+        raise ValueError('Playlist target must have an allowed exact class and be a direct child of its owner')
+    return {'kind': 'prospective_playlist_slot_direct_child', 'version': version, 'owner_id': owner_id,
+        'target_id': target_id, 'reference': name, 'restriction': deepcopy(restriction),
+        'target': target, 'list_guard': guard, 'references': references}
+
+
+def prospective_assertion(expected, *, read, after_write):
+    try:
+        actual = observe_prospective(version=expected['version'], owner_id=expected['owner_id'],
+            target_id=expected['target_id'], name=expected['reference'], restriction=expected['restriction'], read=read)
+        compared = deepcopy(actual)
+        if after_write:
+            # The graph verifier proves every new occurrence and final roster;
+            # this condition retains the original ordered peers and references.
+            count = len(expected['list_guard']['members'])
+            compared['list_guard']['members'] = compared['list_guard']['members'][:count]
+            compared['references'] = compared['references'][:count]
+        passed = compared == expected
+    except (ValueError, KeyError, TypeError) as exc:
+        actual, passed = {'error': str(exc)}, False
+    return {'name': 'new PlaylistSlot direct-child target and original ordered peers remain bound',
         'passed': passed, 'evidence': {'expected': expected, 'actual': actual}}

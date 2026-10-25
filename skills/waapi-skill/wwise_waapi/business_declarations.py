@@ -1232,10 +1232,13 @@ def bind_live_field(
         if field_kind == "reference" and "mustChildOf" in (info.restriction.get("restrictions") or []):
             from .playlist_reference_conditions import discovery_target_types
             try:
-                if scope_kind != "object":
-                    raise ValueError("Playlist hierarchy requires an existing exact object")
-                playlist_types = discovery_target_types(version=registry.context.wwise_version,
-                    source_id=live_scope["object"], name=info.name, restriction=info.restriction, read=read_call)
+                if scope_kind == "class":
+                    from .playlist_reference_conditions import discovery_class_target_types
+                    playlist_types = discovery_class_target_types(version=registry.context.wwise_version,
+                        class_id=live_scope["classId"], name=info.name, restriction=info.restriction)
+                else:
+                    playlist_types = discovery_target_types(version=registry.context.wwise_version,
+                        source_id=live_scope["object"], name=info.name, restriction=info.restriction, read=read_call)
             except ValueError as exc:
                 raise MetadataRestrictionError("CONSTRAINED_REFERENCE_BOUNDARY", str(exc)) from exc
         restrictions = _restrictions_from_live_metadata(

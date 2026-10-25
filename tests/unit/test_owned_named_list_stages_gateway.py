@@ -653,3 +653,222 @@ def test_metadata_local_relation_is_strict_in_final_graph_verification(tmp_path,
     assert code == 2 and rejected['verified'] is False and rejected['state'] == 'verification_failed', rejected
     assert len(task.writes) == 3
     assert task.run('execute', tx)[0] == 2 and len(task.writes) == 3
+
+
+def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', fixture_ids=None):
+    from tests.unit.test_playlist_reference_gateway import FACTS
+    owner_id, target_id, old_slot_id, peer_id, new_slot_id = fixture_ids or (ROOT, FIRST, OLD_SLOT, SECOND_SLOT, SLOT)
+    task = OwnedGraphTask(tmp_path, '2025.1', operation)
+    base = r'\Containers\Default Work Unit\Numbers'
+    task.types = [{'classId': cid, 'name': name, 'type': category} for cid, name, category in (
+        (589840, 'RandomSequenceContainer', 'WObject'), (65552, 'Sound', 'WObject'), (5636096, 'PlaylistSlot', 'Inner'))]
+    task.metadata = {'PlaylistObject': deepcopy(FACTS['metadata'])}
+    task.objects = {
+        owner_id: {'id': owner_id, 'name': 'Numbers', 'type': 'RandomSequenceContainer', 'classId': 589840,
+            'path': base, 'notes': 'Keep owner', '@RandomOrSequence': 1, '@Playlist': [{'id': old_slot_id}, {'id': peer_id}]},
+        target_id: {'id': target_id, 'name': 'First', 'type': 'Sound', 'classId': 65552,
+            'path': base + r'\First', 'parent': {'id': owner_id}, 'notes': 'Keep target'},
+    }
+    for oid in (old_slot_id, peer_id):
+        task.objects[oid] = {'id': oid, 'name': '', 'type': 'PluginInnerObject', 'classId': 5636096,
+            'path': base + r'\[PlaylistSlot: (First)]', 'owner': {'id': owner_id}, 'notes': 'Keep peer',
+            'PlaylistObject': {'id': target_id}}
+    original = task.call
+    task.writes = []
+    def call(uri, args=None, options=None):
+        if uri == 'ak.wwise.core.object.get' and args and 'waql' in args:
+            import re
+            match = re.fullmatch(r'from object "([^"\n]+)"(?: select @(Playlist|PlaylistObject))? take [0-9]+', args['waql'])
+            if match:
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                if match[2] is None:
+                    return {'return': task.project_rows([task.objects[match[1]]] if match[1] in task.objects else [], options)}
+                value = task.objects[match[1]].get('@Playlist' if match[2] == 'Playlist' else 'PlaylistObject')
+                ids = [row['id'] for row in value] if isinstance(value, list) else [value['id']]
+                return {'return': task.project_rows([task.objects[oid] for oid in ids], options)}
+        if uri == SET:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.writes.append(deepcopy(args))
+            item, = args['objects']
+            slot, = item['@Playlist']
+            assert item['object'] == owner_id and slot == {'type': 'PlaylistSlot', 'name': '', '@PlaylistObject': target_id}
+            task.objects[new_slot_id] = {'id': new_slot_id, 'name': '', 'type': 'PluginInnerObject', 'classId': 5636096,
+                'path': base + r'\[PlaylistSlot: (First)]', 'owner': {'id': owner_id}, 'notes': '', 'PlaylistObject': {'id': target_id}}
+            task.objects[owner_id]['@Playlist'].append({'id': new_slot_id})
+            return {'objects': [{'id': owner_id, 'name': 'Numbers', '@Playlist': [{'id': new_slot_id, 'name': ''}]}]}
+        return original(uri, args, options)
+    task.call = call
+    owner, target = task.bind(owner_id), task.bind(target_id)
+    code, kinds = task.step('draft-discover-types', '--role', 'object', '--meaning', 'PlaylistSlot')
+    assert code == 0, kinds
+    kind = kinds['type_candidates'][0]['handle']
+    code, fields = task.step('draft-discover-fields', '--object-handle', owner, '--field-source', 'documented-lists', '--list')
+    assert code == 0, fields
+    selected = next(row for row in fields['agent_result']['items'] if row['name'] == 'Playlist')
+    code, field = task.step('draft-discover-fields', '--object-handle', owner, '--field-source', 'documented-lists', '--selection', selected['selection'])
+    assert code == 0, field
+    list_field = field['meaning_results'][0]['candidates'][0]['handle']
+    code, field = task.step('draft-discover-fields', '--type-handle', kind, '--meaning', 'Playlist Object')
+    assert code == 0, field
+    reference_field = field['meaning_results'][0]['candidates'][0]['handle']
+    reference_args = ['--field-value', reference_field, target] if reference else []
+    code, declared = task.step('draft-declare-new', '--declaration-id', 'playlist-slot', '--parent-handle', owner,
+        '--name', 'Requested occurrence', '--kind', kind, '--field', 'object_list', list_field, *reference_args)
+    assert code == 0, declared
+    return task
+
+
+def test_new_playlist_member_keeps_ordered_peers_and_targets_exact_direct_child(tmp_path):
+    task = playlist_creation_task(tmp_path)
+    before = deepcopy(task.objects)
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    naming = preview['preview_summary']['owned_inner_naming']
+    assert naming['class_name'] == 'PlaylistSlot' and naming['collection'] == 'Playlist'
+    assert naming['declaration_name_role'] == 'label' and naming['native_name'] == ''
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects[ROOT]['@Playlist'] == [{'id': OLD_SLOT}, {'id': SECOND_SLOT}, {'id': SLOT}]
+    assert all(task.objects[oid] == row for oid, row in before.items() if oid != ROOT)
+    assert task.objects[SLOT]['PlaylistObject'] == {'id': FIRST}
+    created, = verified['agent_result']['business_result']['created_objects']
+    assert created['declaration_label'] == 'Requested occurrence' and created['name_role'] == 'declaration_label'
+    assert created['native_name'] == created['object']['name'] == ''
+    assert created['owner_id'] == ROOT and created['list_name'] == 'Playlist'
+    assert len(task.writes) == 1
+    code, replay = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == 1, replay
+
+
+def test_new_playlist_member_rejects_wrong_parent_before_preview(tmp_path):
+    task = playlist_creation_task(tmp_path)
+    task.objects[FIRST]['parent'] = {'id': SECOND_SLOT}
+    before = deepcopy(task.objects)
+    code, result = task.step('draft-check')
+    assert code == 2 and 'CONSTRAINED_REFERENCE_BOUNDARY' in json.dumps(result), result
+    assert task.objects == before and task.writes == []
+
+
+@pytest.mark.parametrize('change', ['target-parent', 'owner-class', 'membership', 'metadata', 'peer-reference'])
+@pytest.mark.parametrize('stage', ['before-execute', 'after-execute'])
+def test_new_playlist_member_rejects_drift_without_replaying_creation(tmp_path, change, stage):
+    task = playlist_creation_task(tmp_path)
+    tx, shown = task.preview()
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if stage == 'after-execute':
+        code, executed = task.run('execute', tx)
+        assert code == 0, executed
+    if change == 'target-parent':
+        task.objects[FIRST]['parent'] = {'id': SECOND_SLOT}
+    elif change == 'owner-class':
+        task.objects[ROOT]['classId'] = 65552
+    elif change == 'membership':
+        task.objects[ROOT]['@Playlist'].reverse()
+    elif change == 'metadata':
+        task.metadata['PlaylistObject']['restriction']['restrictions'].remove('mustChildOf')
+    else:
+        task.objects[OLD_SLOT]['PlaylistObject'] = {'id': ROOT}
+    before = deepcopy(task.objects)
+    code, result = task.run('execute' if stage == 'before-execute' else 'verify', tx)
+    assert code == 2, result
+    assert task.objects == before and len(task.writes) == (stage == 'after-execute')
+    code, replay = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == (stage == 'after-execute'), replay
+
+
+def test_new_playlist_member_does_not_recreate_after_missing_result_identity(tmp_path):
+    task = playlist_creation_task(tmp_path)
+    tx, shown = task.preview()
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    original = task.call
+    def interrupted(uri, args=None, options=None):
+        result = original(uri, args, options)
+        return {} if uri == SET else result
+    task.call = interrupted
+    code, executed = task.run('execute', tx)
+    # Acknowledged native change without the returned GUID is never repaired by
+    # creating again or by selecting an object from its display path.
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified
+    code, replay = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == 1, replay
+    assert task.objects[ROOT]['@Playlist'] == [{'id': OLD_SLOT}, {'id': SECOND_SLOT}, {'id': SLOT}]
+
+
+@pytest.mark.parametrize('policy', ['read_only', 'ask_before_changes', 'allow_changes'])
+def test_new_playlist_member_retains_each_modification_policy(tmp_path, policy):
+    task = playlist_creation_task(tmp_path)
+    code, configured = task.run('config-set', '--project-modification-policy', policy)
+    assert code == 0, configured
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft', *(['--apply'] if policy == 'allow_changes' else []))
+    if policy == 'read_only':
+        if code == 0:
+            code, result = task.run('execute', preview['transaction_id'])
+            assert code == 2, result
+        assert task.writes == []
+        return
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    if policy == 'ask_before_changes':
+        code, result = task.run('execute', tx)
+        assert code == 2 and task.writes == [], result
+        code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, result
+    else:
+        assert shown['authorization']['mode'] == 'policy_authorization'
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True and len(task.writes) == 1, verified
+
+
+@pytest.mark.parametrize('version,element_names', [
+    ('2021.1', None), ('2022.1', None),
+    ('2023.1', ['Sound', 'RandomSequenceContainer', 'SwitchContainer', 'BlendContainer']),
+    ('2024.1', ['Sound', 'RandomSequenceContainer', 'SwitchContainer', 'BlendContainer']),
+    ('2025.1', ['PlaylistSlot']),
+])
+def test_playlist_creation_discovery_preserves_five_version_list_representations(tmp_path, version, element_names):
+    task = OwnedGraphTask(tmp_path, version, 'object.create' if version == '2021.1' else 'object.set')
+    task.types = [{'name': 'RandomSequenceContainer', 'classId': 589840, 'type': 'WObject'}]
+    task.objects[FIRST] = {'id': FIRST, 'name': 'Numbers', 'type': 'RandomSequenceContainer', 'classId': 589840,
+        'path': r'\Containers\Numbers', '@RandomOrSequence': 1}
+    owner = task.bind(FIRST)
+    code, fields = task.step('draft-discover-fields', '--object-handle', owner,
+        '--field-source', 'documented-lists', '--list')
+    assert code == 0, fields
+    playlists = [row for row in fields['agent_result']['items'] if row['name'] == 'Playlist']
+    if element_names is None:
+        assert playlists == [] and fields['agent_result']['native_unavailability_proven'] is False
+    else:
+        playlist, = playlists
+        assert [row['name'] for row in playlist['element_classes']] == element_names
+
+
+def test_new_playlist_member_requires_selected_child_in_its_constructor(tmp_path):
+    task = playlist_creation_task(tmp_path, reference=False)
+    code, result = task.step('draft-check')
+    assert code == 2 and 'PLAYLIST_CONSTRUCTOR_TARGET_REQUIRED' in json.dumps(result), result
+    assert task.writes == []
+
+
+@pytest.mark.parametrize('mode', ['replace-all', 'object.create'])
+def test_new_playlist_member_does_not_extrapolate_its_constructor_contract(tmp_path, mode):
+    task = playlist_creation_task(tmp_path, operation='object.create' if mode == 'object.create' else 'object.set')
+    if mode == 'replace-all':
+        code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
+        assert code == 0, configured
+    code, result = task.step('draft-check')
+    assert code == 2 and 'CONSTRAINED_REFERENCE_BOUNDARY' in json.dumps(result), result
+    assert task.writes == []

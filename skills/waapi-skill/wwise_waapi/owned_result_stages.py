@@ -51,13 +51,15 @@ def certify_inner_occurrences(specs, version):
     counts = {}
     for member in specs:
         owner = owners.get(member.get('parent_request_path'))
-        if (member.get('existing_target') or version != '2025.1' or member.get('collection') != 'Metadata'
-                or member.get('class_id') != 5570560 or owner is None
-                or owner.get('class_id') not in METADATA_INNER_OWNERS):
+        if (member.get('existing_target') or version != '2025.1' or owner is None or not (
+                    member.get('collection') == 'Metadata' and member.get('class_id') == 5570560
+                    and owner.get('class_id') in METADATA_INNER_OWNERS
+                    or member.get('collection') == 'Playlist' and member.get('class_id') == 5636096
+                    and owner.get('class_id') == 589840)):
             continue
-        source = resolve_class_list_evidence(version, owner['class_id'], 'Metadata')
+        source = resolve_class_list_evidence(version, owner['class_id'], member['collection'])
         inner = owned_inner_identity(source, member['class_id'])
-        if member.get('class_metadata') != {'classId': 5570560, 'name': 'MetadataSlot', 'type': 'Inner'}:
+        if member.get('class_metadata') != {'classId': inner['element_class_id'], 'name': inner['class_name'], 'type': 'Inner'}:
             raise ValueError('Owned Inner occurrence requires its exact live class/category')
         member['inner_identity'] = inner
         key = (member['parent_request_path'], member['collection'])

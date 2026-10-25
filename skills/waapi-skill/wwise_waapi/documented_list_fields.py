@@ -268,23 +268,28 @@ def certify_anonymous_marker(spec, binding):
 
 
 def owned_inner_identity(binding, member_class):
-    """One observed Inner representation, bound to its exact List source.
+    """Finite Inner profiles, each bound to its exact owner/List source.
 
-    The R87 native MetadataSlot result is unnamed PluginInnerObject. Other
-    Inner classes/versions retain their own unresolved representation rules.
+    R87 proves MetadataSlot results. For PlaylistSlot, the matching SDK
+    constructor explicitly supplies an empty name and R63 proves its native
+    class/owner representation. Other classes/versions remain separate.
     """
     owner_class = binding.get("scope", {}).get("class_id")
-    if (type(owner_class) is not int or owner_class not in METADATA_INNER_OWNERS
+    playlist = (binding.get("version"), owner_class, binding.get("declaration", {}).get("name"), member_class) == (
+        "2025.1", 589840, "Playlist", 5636096)
+    if not playlist and (type(owner_class) is not int or owner_class not in METADATA_INNER_OWNERS
             or (binding.get("version"), binding.get("declaration", {}).get("name"), member_class)
                 != ("2025.1", "Metadata", 5570560)):
         return None
-    expected = resolve_class_list_evidence("2025.1", owner_class, "Metadata")
-    if expected["declaration"]["element_classes"] != [{"name": "MetadataSlot", "class_id": 5570560}]:
-        raise ValueError("Inner identity requires the sole exact MetadataSlot element class")
+    collection, class_name = ("Playlist", "PlaylistSlot") if playlist else ("Metadata", "MetadataSlot")
+    expected = resolve_class_list_evidence("2025.1", owner_class, collection)
+    if expected["declaration"]["element_classes"] != [{"name": class_name, "class_id": member_class}]:
+        raise ValueError("Inner identity requires its sole exact element class")
     if any(binding.get(key) != expected[key] for key in ("kind", "version", "catalog_sha256", "source_member", "source_sha256", "declaration")):
         raise ValueError("Inner identity requires its matching exact owner/List/element source")
-    return {"kind": "source-certified-owned-inner/v1", "version": "2025.1", "owner_class_id": owner_class,
-        "collection": "Metadata", "element_class_id": 5570560, "class_name": "MetadataSlot",
+    return {**({"constructor_example_sha256": "7bcb80cc80a3604f03dfe472b30c345c5e0af3bdd5d2722e5b5b8163a9a5e14d"} if playlist else {}),
+        "kind": "source-certified-owned-inner/v1", "version": "2025.1", "owner_class_id": owner_class,
+        "collection": collection, "element_class_id": member_class, "class_name": class_name,
         "catalog_sha256": expected["catalog_sha256"], "source_member": expected["source_member"],
         "source_sha256": expected["source_sha256"], "native_type": "PluginInnerObject", "native_name": "",
         "declaration_name_role": "label"}

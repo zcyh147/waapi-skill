@@ -32753,8 +32753,12 @@ def transaction_show_summary(
     inner_nodes = ([node for node in plugin_verification_plan.get("nodes", []) if node.get("inner_identity") and not node.get("preexisting_id")]
         if isinstance(plugin_verification_plan, Mapping) else [])
     if inner_nodes:
+        inner_profiles = {(node["inner_identity"]["class_name"], node["inner_identity"]["collection"]) for node in inner_nodes}
+        inner_class, inner_collection = next(iter(inner_profiles)) if len(inner_profiles) == 1 else ("multiple", "multiple")
         derived_notice["owned_inner_naming"] = {"occurrence_count": len(inner_nodes),
-            "class_name": "MetadataSlot", "collection": "Metadata",
+            "class_name": inner_class, "collection": inner_collection,
+            **({"profiles": [{"class_name": name, "collection": collection} for name, collection in sorted(inner_profiles)]}
+                if len(inner_profiles) > 1 else {}),
             "declaration_name_role": "label", "native_name": "",
             "identity": "actual_GUID_exact_class_owner_and_ordered_List",
             "notice": "The supplied name labels the declaration; Wwise returns an unnamed owned member."}

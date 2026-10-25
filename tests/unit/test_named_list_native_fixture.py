@@ -175,6 +175,7 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
         notices = [row['payload']['preview_summary']['owned_inner_naming'] for row in observation['calls']
             if 'owned_inner_naming' in row.get('payload', {}).get('preview_summary', {})]
         assert notices and notices[-1]['declaration_name_role'] == 'label' and notices[-1]['native_name'] == ''
+        assert notices[-1]['class_name'] == 'MetadataSlot' and notices[-1]['collection'] == 'Metadata'
         assert observation['independent_created']['slot']['class_id'] == 5570560
         assert observation['independent_created']['slot']['owner']['id'] == new['sound']
         assert observation['output_bus_field']['restrictions']['allowed_target_types'] == ['Audio Bus']
