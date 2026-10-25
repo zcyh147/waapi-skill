@@ -5,6 +5,40 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #200/#201 representative Console outcomes
+
+One macOS WwiseConsole 2025.1.7.9143 session on `68445296` ran the owned
+meter/cursor/capture node in **38.98s**. The original result remains **FAIL**:
+its meter assertion expected the Sound's Cars Bus, while the complete native
+and public result contained the exact fixture Main Audio Bus with 20 named
+numeric channels. The pinned 2025 definition names Main as the default meter;
+the separate Cars register/unregister calls prove accepted paired controls,
+not registration membership or causal meter population.
+
+Independent outcomes in that same record passed: user-cursor setter/readback
+6976 ms, previous-frame/readback 6965 ms, and creation of the exact requested
+`OwnedCapture.prof` (778,532 bytes) with sibling preservation. No capture-file
+content or format QA is claimed. Final evidence confirms unchanged source full
+hash, tree and project mtime, completed cleanup and no residual processes.
+The failed sandbox stays quarantined. Evidence root:
+`.waapi-skill-state/full-coverage/console-runtime-200-201-native-r2`; its
+`category.jsonl` remains final FAIL and its observation retains separate outcomes.
+An earlier r1 setup failed before sandbox/Wwise creation because Main omitted
+the explicit pytest basetemp parent; that failure grants no native credit.
+
+The collector expectation correction `2657a3fb` uses the exact fixture Main
+GUID/name for data, independently of Cars control acknowledgments. Its public
+collector-to-final-writer TDD retained a Main-only RED, then a passing tracer;
+the four final affected checks passed **4 in 27.48s**. They cover Main-only
+success, a complete nonempty wrong witness, unavailable-cursor partial results,
+and once-only unknown-stop failure. The original native run was not replayed,
+regraded or repeated. No packaged runtime, public mapping or contract changed.
+
+These are representative component outcomes, not a full Program/Non-live,
+Fresh or native-Windows pass. #195 retains final combined gates and exact
+source reconciliation, including unresolved legacy meter-literal contracts;
+canonical business selections do not establish exact native alias equivalence.
+
 ## 2026-10-26 #202 Tone file-creation acceptance
 
 The user narrowed Tone acceptance to the correct closed versioned call and
