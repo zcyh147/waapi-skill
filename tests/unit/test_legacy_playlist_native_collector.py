@@ -11,8 +11,10 @@ import pytest
 from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask
 
 
-@pytest.mark.parametrize('fault', ['none', 'unrelated-read', 'missing-target-proof', 'append-replaces'])
-def test_legacy_playlist_native_workflow_persists_completed_phases_and_failures(tmp_path, monkeypatch, fault):
+@pytest.mark.parametrize('flow,fault', [('full', 'none'), ('full', 'unrelated-read'),
+    ('full', 'missing-target-proof'), ('full', 'append-replaces'), ('full', 'unrequested-association'),
+    ('append-clear', 'none'), ('append-clear', 'missing-target-proof'), ('clear', 'none')])
+def test_legacy_playlist_native_workflow_persists_completed_phases_and_failures(tmp_path, monkeypatch, flow, fault):
     monkeypatch.setenv('WWISE_LIVE', '1')
     monkeypatch.setenv('WWISE_DESTRUCTIVE', '1')
     collector = importlib.import_module('tests.destructive.test_legacy_playlist_reference_workflow')
@@ -50,7 +52,10 @@ def test_legacy_playlist_native_workflow_persists_completed_phases_and_failures(
             values = item['@Playlist']
             prefix = task.objects[owner]['@Playlist'] if mode == 'append' and fault != 'append-replaces' else []
             task.objects[owner]['@Playlist'] = [*deepcopy(prefix), *({'id': value} for value in values)]
-            return {'objects': [{'id': owner, 'name': 'Minigun_Barrel_Start'}]}
+            result = {'objects': [{'id': owner, 'name': 'Minigun_Barrel_Start', '@Playlist': [{} for _ in values]}]}
+            if fault == 'unrequested-association':
+                result['objects'][0]['@Unrequested'] = [{}]
+            return result
         query = (args or {}).get('waql', '')
         if uri.endswith('object.get') and query.startswith('from object "'):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -89,7 +94,9 @@ def test_legacy_playlist_native_workflow_persists_completed_phases_and_failures(
     runtime = SimpleNamespace(version='2023.1', candidate=workflow.exact_git_candidate(workflow.REPO_ROOT),
         sandbox=sandbox, state_dir=tmp_path / 'state', category_results=[], raw_gateway=raw)
     lock = sandbox_fixture.LiveSandboxLock(tmp_path / 'locks'); lock.__enter__()
-    node = 'test_legacy_playlist_replace_append_clear_preserves_hierarchy'
+    node = {'full': 'test_legacy_playlist_replace_append_clear_preserves_hierarchy',
+        'append-clear': 'test_legacy_playlist_append_clear_preserves_hierarchy',
+        'clear': 'test_legacy_playlist_clear_preserves_hierarchy'}[flow]
     error = None
     try:
         getattr(collector, node)(runtime)
@@ -103,23 +110,42 @@ def test_legacy_playlist_native_workflow_persists_completed_phases_and_failures(
     monkeypatch.setattr(finalizer, 'MODULE', 'tests/destructive/test_legacy_playlist_reference_workflow.py::')
     module = SimpleNamespace(__file__=collector.__file__, REPO_ROOT=workflow.REPO_ROOT)
     final = finalizer._finish((module, runtime, task, lock, proof), tmp_path, monkeypatch, [(node, error)])[-1]
-    expected_count = 3 if fault == 'none' else 2
+    expected_count = (3 if flow == 'full' else 2 if flow == 'append-clear' else 1) if fault == 'none' else 1 if fault == 'unrequested-association' else 2
     assert len(final['transactions']) == expected_count
     assert sum(uri.endswith('object.set') for uri, _, _ in task.calls) == expected_count
     assert final['categories'][0]['observation_sha256'] == hashlib.sha256(body).hexdigest()
     assert final['source']['hash_before'] == final['source']['hash_after'] == proof.digest
     assert final['residual_state']['process_cleanup'] == 'cleaned'
-    assert observation['phases'][0]['business_effect_verified'] is True
-    assert observation['phases'][0]['actual_roster'] == [up, loop, loop]
+    assert observation['phases'][0]['business_effect_verified'] is (fault != 'unrequested-association')
+    expected_first = [up, loop, loop] if flow == 'full' else [up, loop, up] if flow == 'append-clear' else []
+    assert observation['phases'][0]['actual_roster'] == expected_first
+    native_writes = [args for uri, args, _ in task.calls if uri.endswith('object.set')]
+    if flow == 'append-clear':
+        assert [args['objects'][0]['@Playlist'] for args in native_writes] == [[up], []]
+        assert native_writes[0]['objects'][0].get('listMode', native_writes[0].get('listMode', 'append')) == 'append'
+        assert not any('--list-behavior' in call['argv'] and
+            call['argv'][call['argv'].index('--list-behavior') + 1] == 'replace-all' for call in observation['calls'])
+    elif flow == 'clear':
+        assert [args['objects'][0]['@Playlist'] for args in native_writes] == [[]]
+    assert not any(uri.endswith('object.create') for uri, _, _ in task.calls)
+    code, shown = task.run('transaction-show', observation['transactions'][0]['transaction_id'])
+    assert code == 0, shown
+    completed, = [event for event in shown['events'] if event['event_type'] == 'execution_completed']
+    raw_result = {'objects': [{'id': owner, 'name': 'Minigun_Barrel_Start', '@Playlist': [{} for _ in native_writes[0]['objects'][0]['@Playlist']]}]}
+    if fault == 'unrequested-association':
+        raw_result['objects'][0]['@Unrequested'] = [{}]
+    assert completed['details']['dispatch_result']['result'] == raw_result
     if fault == 'none':
         assert observation['business_effect_verified'] is True
-        assert observation['phases'][1]['actual_roster'] == [up, loop, loop, up]
-        assert observation['phases'][2]['actual_roster'] == []
+        if flow == 'full':
+            assert observation['phases'][1]['actual_roster'] == [up, loop, loop, up]
+        assert observation['phases'][-1]['actual_roster'] == []
         assert final['invocation']['outcome'] == final['categories'][0]['status'] == 'PASS'
         assert final['residual_state']['sandbox'] == 'deleted'
     else:
         assert observation['business_effect_verified'] is False and observation['phases'][1]['business_effect_verified'] is False
-        assert observation['phases'][2]['status'] == 'not_attempted'
+        if flow == 'full':
+            assert observation['phases'][2]['status'] == 'not_attempted'
         assert final['invocation']['outcome'] == final['categories'][0]['status'] == 'FAIL'
         assert final['residual_state']['sandbox'] == 'quarantined'
         assert Path(final['residual_state']['quarantine_path']).is_dir()
