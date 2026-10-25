@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import uuid
 
 import pytest
 
@@ -72,8 +73,8 @@ def test_public_batch_keeps_independent_outcomes_and_deduplicates(checkout, tmp_
     assert 'ordinary case failure' in result.stdout
 
 
-@pytest.mark.parametrize('source_ready', [True, False])
-def test_public_native_plan_without_pythonpath_records_prelaunch_failure(tmp_path, source_ready):
+@pytest.mark.parametrize('source_ready,sandbox_kind', [(True, 'short'), (True, 'overlong'), (False, 'short')])
+def test_public_native_plan_without_pythonpath_records_prelaunch_failure(tmp_path, source_ready, sandbox_kind):
     """The actual launcher fingerprints a private project before blocked preflight."""
     from ci.test_batch import CONSOLE_NODE
     project = tmp_path / 'source/SampleProject.wproj'
@@ -85,9 +86,11 @@ def test_public_native_plan_without_pythonpath_records_prelaunch_failure(tmp_pat
     console.write_text('#!/bin/sh\ntouch "' + str(launched) + '"\nexit 99\n')
     console.chmod(0o755)
     config = tmp_path / 'live-config.json'
+    sandbox_parent = tmp_path / ('s' if sandbox_kind == 'short' else 'x' * 150)
     config.write_text(json.dumps({'versions': {'2025.1': {
-        'sample_project': str(project), 'wwise_console': str(console)}}}))
-    root = tmp_path / 'prelaunch-failure'
+        'sample_project': str(project), 'wwise_console': str(console),
+        'sandbox_root': str(sandbox_parent)}}}))
+    root = tmp_path / ('durable-report-' + 'd' * 80) / ('retained-evidence-' + 'e' * 50) / 'prelaunch-failure'
     plan = tmp_path / 'native.plan.json'
     plan.write_text(json.dumps({'contract': 'waapi-skill.test-batch/v1', 'root': str(root),
         'groups': [group('native', [CONSOLE_NODE], mode='destructive', version='2025.1',
@@ -111,11 +114,36 @@ def test_public_native_plan_without_pythonpath_records_prelaunch_failure(tmp_pat
     assert summary['outcome'] == 'BLOCKED' and summary['groups'] == []
     assert not (root / 'dispatch.json').exists() and not (root / 'groups').exists()
     assert not launched.exists() and 'Traceback' not in result.stderr
-    if source_ready:
+    if source_ready and sandbox_kind == 'short':
         # Known SHA256 of b'SampleProject.wproj\0<Project/>\0', independent of the helper.
         assert summary['source_identity']['native_scopes']['native']['source_hash'] == (
             '7f412d5aaba6050d2f5ec9b358df2295c3388463974f156105a853006fe8dab6')
         assert 'deliberately-absent-preflight' in summary['error']
+        scope = summary['source_identity']['native_scopes']['native']
+        assert scope['sandbox_root'] == str(sandbox_parent)
+        assert scope['native_path_budget']['utf16_units_including_nul'] <= 260
+        assert not Path(scope['sandbox_root']).is_relative_to(root)
+        # The ordinary lifecycle still owns unique copies and their cleanup;
+        # this exercises only copy/metadata helpers, without launching Wwise.
+        from tests.destructive.support.sandbox_fixture import prepare_sample_project_sandbox, cleanup_sandbox
+        lifecycle_env = {**env, 'WWISE_VERSION': '2025.1', 'WWISE_LIVE': '1',
+            'WWISE_CONSOLE': str(console), 'WWISE_SAMPLE_PROJECT_PATH': str(project),
+            'WWISE_SANDBOX_ROOT': scope['sandbox_root']}
+        before = project.stat().st_mtime_ns
+        copies = [prepare_sample_project_sandbox(lifecycle_env,
+            sandbox_root=sandbox_parent / ('gateway-workflows-' + uuid.uuid4().hex))
+            for _ in range(2)]
+        assert copies[0].sandbox_path != copies[1].sandbox_path
+        for sandbox in copies:
+            assert sandbox.sandbox_path.is_relative_to(sandbox_parent)
+            assert sandbox.metadata.source_path == str(project)
+            assert sandbox.metadata.source_hash.digest == scope['source_hash']
+            cleanup_sandbox(sandbox)
+            assert sandbox.metadata.keep_decision == 'deleted' and not sandbox.sandbox_path.exists()
+        assert project.stat().st_mtime_ns == before and project.read_text() == '<Project/>'
+    elif source_ready:
+        assert 'source_identity' not in summary and '260' in summary['error']
+        assert 'path' in summary['error'] and not sandbox_parent.exists()
     else:
         assert 'source_identity' not in summary and 'source' in summary['error']
 
@@ -271,7 +299,8 @@ def test_five_native_lanes_use_existing_preflight_and_authoritative_cleanup(chec
         project = source / 'SampleProject.wproj'; project.write_text('<Project WwiseVersion="' + version + '"/>')
         console = source / 'WwiseConsole'; console.write_text('fake external process boundary')
         console.chmod(0o755)
-        configs[version] = {'wwise_console': str(console), 'sample_project': str(project)}
+        configs[version] = {'wwise_console': str(console), 'sample_project': str(project),
+                            'sandbox_root': str(tmp_path / ('s-' + version))}
         catalog = 'skills/waapi-skill/resources/native-catalog/' + version + '/wwise-console.json'
         (checkout / catalog).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / catalog, checkout / catalog)
@@ -296,6 +325,7 @@ def test_five_native_lanes_use_existing_preflight_and_authoritative_cleanup(chec
             'node_outcomes': [{'nodeid': n, 'outcome': 'FAIL' if failed else 'PASS'} for n in nodes],
             'phase_reports': phases, 'batch_context': json.loads(env['WAAPI_TEST_BATCH_CONTEXT'])}))
         if version != 'none':
+            assert env['WWISE_SANDBOX_ROOT'] == configs[version]['sandbox_root']
             outcome = 'FAIL' if failed else 'PASS'
             quarantine = path.parent / 'quarantine'; quarantine.mkdir()
             report = path.parent / 'observation.json'; report.write_text(json.dumps({'cleanup': {'complete': True}}))

@@ -164,15 +164,35 @@ def native_scope(driver, group):
     else:
         from test_driver import default_live_paths
         from run_live_test_command import build_live_test_environment
-    from tests.destructive.support.sandbox_fixture import hash_project
+    from tests.destructive.support.sandbox_fixture import (
+        hash_project, resolve_safe_sandbox_root, SandboxFixtureError)
+    from tests.destructive.support.live_environment import LiveEnvironmentError
+    from tests.destructive.support.profiler_capture import CAPTURE_CAR_MEDIA
     defaults = default_live_paths(group['version'], group['mode'], repo_root=driver.repo_root,
                                   windows=driver.windows)
     env = build_live_test_environment(driver.environment, version=group['version'], mode=group['mode'],
         repo_root=driver.repo_root, default_config=defaults.config, default_console=defaults.console,
         default_project=defaults.project, default_sandbox=defaults.sandbox)
     project, config = Path(env['WWISE_SAMPLE_PROJECT_PATH']), Path(env['WWISE_TEST_CONFIG'])
+    try:
+        sandbox_root = resolve_safe_sandbox_root(env)
+    except (SandboxFixtureError, LiveEnvironmentError) as exc:
+        raise BatchError(str(exc)) from exc
+    # The admitted workflow owns these two fixed-width UUID directories. Its
+    # Windows Console (also Wine on macOS) retains the existing AK_MAX_PATH
+    # bound; durable report directories must not become physical media paths.
+    media = (sandbox_root / ('gateway-workflows-' + '0' * 32)
+             / ('sample-project-' + '0' * 32) / CAPTURE_CAR_MEDIA)
+    native_media = str(media) if driver.windows else 'Z:' + media.as_posix()
+    units = len(native_media.encode('utf-16-le')) // 2 + 1
+    if units > 260:
+        raise BatchError(f'Planned Console original path {units} UTF-16 units including NUL exceeds allowed 260; '
+                         'configure a shorter WWISE_SANDBOX_ROOT')
     return {'project': str(project), 'source_hash': hash_project(project.parent, preferred_strategy='full').digest,
             'console': env['WWISE_CONSOLE'], 'config': str(config),
+            'sandbox_root': str(sandbox_root), 'native_path_budget': {
+                'projected_original': native_media, 'utf16_units_including_nul': units,
+                'allowed_units_including_nul': 260},
             'config_sha256': hashlib.sha256(config.read_bytes()).hexdigest() if config.is_file() else None}
 
 
@@ -608,7 +628,7 @@ def execute_batch(driver, plan, root):
         category_path = destination / 'category.jsonl'
         if group['mode'] != 'nonlive':
             driver.environment.update(WWISE_CATEGORY_EVIDENCE_PATH=str(category_path),
-                                      WWISE_SANDBOX_ROOT=str(destination / 'sandboxes'))
+                WWISE_SANDBOX_ROOT=frozen['native_scopes'][group['id']]['sandbox_root'])
         dispatch['groups'][group['id']] = 'STARTED'
         write_json(root / 'dispatch.json', dispatch)
         try:
