@@ -191,3 +191,46 @@ def test_reference_list_result_association_cannot_move_to_another_requested_owne
     code, verified = task.finish(tx, shown)
     assert code == 2 and verified.get('verified') is not True, verified
     assert 'not sealed for this exact result owner' in json.dumps(verified), verified
+
+
+@pytest.mark.parametrize('version', ['2023.1', '2024.1'])
+@pytest.mark.parametrize('fault', [None, 'nonempty-proof', 'wrong-owner', 'wrong-metadata', 'unrelated-query-error', 'explicit-null'])
+def test_legacy_playlist_clear_omission_requires_exact_source_and_independent_empty_proof(tmp_path, version, fault):
+    task, before = playlist_task(tmp_path, version, 'clear')
+    original = task.call
+    cleared = False
+    def call(uri, args=None, options=None):
+        nonlocal cleared
+        if uri.endswith('object.get') and args == {'waql': f'from object "{FIRST}" select @Playlist take 1'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert cleared
+            if fault == 'nonempty-proof':
+                return {'return': [{'id': ROOT}]}
+            if fault == 'unrelated-query-error':
+                from tests.unit.test_debug_read_gateway import WaapiRequestFailed
+                raise WaapiRequestFailed('ak.wwise.query.invalid_query', {'message': 'Unrelated query failure'})
+            return {'return': []}
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.object.set':
+            cleared = True
+            if fault == 'wrong-metadata':
+                task.objects[FIRST]['classId'] = 65552
+                task.objects[FIRST]['type'] = 'Sound'
+        if cleared and uri.endswith('object.get'):
+            for row in result.get('return', []):
+                if row.get('id') == FIRST:
+                    row.pop('@Playlist', None)
+                    if fault == 'wrong-owner' and options == {'return': ['id', '@Playlist']}:
+                        row['id'] = SECOND
+                    elif fault == 'explicit-null':
+                        row['@Playlist'] = None
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == (0 if fault is None else 2), verified
+    assert (verified.get('verified') is True) == (fault is None), verified
+    assert task.objects[ROOT] == before[ROOT] and task.objects[CHILD] == before[CHILD]
+    assert len([uri for uri, _, _ in task.calls if uri.endswith('object.set')]) == 1
+    if fault is None:
+        assert any(args == {'waql': f'from object "{FIRST}" select @Playlist take 1'} for uri, args, _ in task.verification_calls)

@@ -10767,12 +10767,16 @@ def _prove_omitted_object_list_empty(
 ) -> dict[str, Any]:
     """Prove absence independently of a missing owner return projection.
 
-    Only fixed operation-owned lists or certified owned Metadata/Marker profiles enter
-    this compatibility path. WAQL list selection is distinct from the legacy transform.select relationship enum.
+    Only fixed operation-owned lists or exact certified Inner/Marker/legacy
+    reference-Playlist profiles enter this compatibility path. WAQL list selection is distinct from the legacy transform.select relationship enum.
     One returned member is sufficient to disprove emptiness; never enumerate
     an unbounded list or treat a failed/malformed query as an empty result.
     """
-    from .documented_list_fields import owned_inner_identity, is_manual_marker_list_source
+    from .documented_list_fields import owned_inner_identity, is_manual_marker_list_source, legacy_playlist_authority
+    certified_legacy_playlist = (list_name == "Playlist" and isinstance(documented_list, Mapping)
+        and documented_list.get("scope", {}).get("scope_kind") == "object"
+        and documented_list["scope"].get("scope_value") == object_id
+        and legacy_playlist_authority(documented_list) is not None)
     certified_metadata = (list_name in {"Metadata", "Playlist"} and isinstance(documented_list, Mapping)
         and documented_list.get("scope", {}).get("scope_kind") == "object"
         and documented_list["scope"].get("scope_value") == object_id
@@ -10781,7 +10785,7 @@ def _prove_omitted_object_list_empty(
         and documented_list.get("scope", {}).get("scope_value") == object_id
         and is_manual_marker_list_source(documented_list))
     if (
-        (list_name not in {"RTPC", "Effects"} and not certified_metadata and not certified_marker)
+        (list_name not in {"RTPC", "Effects"} and not certified_metadata and not certified_marker and not certified_legacy_playlist)
         or not isinstance(object_id, str)
         or not _PLUGIN_GUID.fullmatch(object_id)
     ):
@@ -21739,12 +21743,23 @@ def verify_prepared_operation(
                 local_key = "@" + str(field_name)
                 if field_name not in row and "@@" + str(field_name) not in row and local_key in row:
                     reference_row = {**row, local_key: local_reference_value(spec, field_name, row[local_key])}
-                actual = _reference_identity(_field_value(reference_row, str(field_name)))
                 expected_reference = field_spec.get("expected_roster", field_spec.get("target_id"))
+                empty_proof = None
+                if (version in {"2023.1", "2024.1"} and field_name == "Playlist"
+                        and field_spec.get("metadata_evidence") == "documented-list" and expected_reference == []
+                        and not _has_field(reference_row, str(field_name))):
+                    from .documented_list_fields import resolve_live_list_evidence, prove_source_owned_empty_list, legacy_playlist_authority
+                    source = resolve_live_list_evidence(version, object_id, str(field_name), read=read_call)
+                    if legacy_playlist_authority(source) is not None:
+                        empty_proof = prove_source_owned_empty_list(source, {"id": row.get("id")}, read=read_call, platform=platform)
+                        reference_row = {**reference_row, local_key: empty_proof["normalized_value"]}
+                actual = (empty_proof["normalized_value"] if empty_proof is not None else
+                    _reference_identity(_field_value(reference_row, str(field_name))))
                 check(
                     f"{request_path}.{field_name} reference matches",
                     _reference_requirement_matches(reference_row, str(field_name), expected_reference),
-                    {"expected": expected_reference, "actual": actual},
+                    {"expected": expected_reference, "actual": actual,
+                        **({"compatibility_normalization": empty_proof} if empty_proof is not None else {})},
                 )
             if "source_plugin" in spec:
                 source_plan = spec["source_plugin"]

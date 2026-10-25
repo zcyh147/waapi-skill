@@ -393,18 +393,19 @@ def planned_list_guard_assertions(guards, *, read, after_write=False):
 
 
 def prove_source_owned_empty_list(evidence, owner_row, *, read, platform=None):
-    """Normalize only a source-proven fixed owned List with an independent empty read.
+    """Normalize only an exact source-certified List with an independent empty read.
 
-    A missing projection alone is never membership evidence. The fixed owned
-    Lists, certified 2025 MetadataSlot and modern manual Marker profiles require an independently
-    empty bounded relationship read; other Lists need their own authority.
+    A missing projection alone is never membership evidence. Fixed owned Lists,
+    certified Inner/Marker profiles and legacy reference Playlist require an
+    independently empty bounded relationship read; other Lists remain separate.
     """
     scope = evidence.get("scope", {})
     name = evidence.get("declaration", {}).get("name")
     owner = scope.get("scope_value")
     if (evidence.get("kind") != "documented-list" or scope.get("scope_kind") != "object"
             or (name not in {"RTPC", "Effects"} and owned_inner_identity(evidence, 5570560) is None
-                and owned_inner_identity(evidence, 5636096) is None and not is_manual_marker_list_source(evidence))
+                and owned_inner_identity(evidence, 5636096) is None and not is_manual_marker_list_source(evidence)
+                and legacy_playlist_authority(evidence) is None)
             or not isinstance(owner_row, Mapping)
             or set(owner_row) != {"id"} or owner_row.get("id", "").upper() != owner
             or not isinstance(evidence.get("source_sha256"), str)):
