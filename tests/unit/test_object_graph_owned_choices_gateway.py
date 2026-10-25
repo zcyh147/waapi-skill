@@ -81,6 +81,8 @@ def test_documented_arguments_assigns_existing_references_with_order_and_preserv
     preserved = deepcopy(task.objects)
     owner = task.bind(FIRST)
     targets = [task.bind(ROOT), task.bind(SECOND)]
+    code, configured = task.step("draft-business-configure", "--list-behavior", "replace-all")
+    assert code == 0, configured
     code, listed = task.step("draft-discover-fields", "--object-handle", owner,
         "--field-source", "documented-lists", "--list")
     assert code == 0, listed

@@ -6105,6 +6105,22 @@ def _prepare_object_set(
             read=read,
             identity_cache=identity_cache,
         )
+        # Legacy Playlist holds hierarchy references, not deletable owned slots.
+        # Resolve the source at Preview even when clear used a lexical alias.
+        if request.version in {"2023.1", "2024.1"} and any(
+                descriptor.get("name") == "Playlist" and descriptor.get("objects") == []
+                for descriptor in item.get("lists", [])):
+            from .documented_list_fields import resolve_live_list_evidence, legacy_playlist_authority
+            proof = resolve_live_list_evidence(request.version, target.object, "Playlist", read=read)
+            if legacy_playlist_authority(proof) is not None:
+                if any(reference.get("name") == "Playlist" for reference in item.get("references", [])):
+                    raise OperationContractError("DUPLICATE_FIELD", "Choose one Playlist assignment or clear outcome")
+                item = {**item, "lists": [descriptor for descriptor in item["lists"] if descriptor["name"] != "Playlist"],
+                    "references": [*item.get("references", []), {"name": "Playlist", "target": []}]}
+                documented_bindings = [binding for binding in documented_bindings
+                    if not (binding.get("scope", {}).get("scope_value") == target.object
+                        and binding.get("declaration", {}).get("name") == "Playlist")]
+                documented_bindings.append({**proof, "reference_targets": []})
         platform = (
             _non_empty_string(item.get("platform"), field=f"objects[{index}].platform")
             if "platform" in item
@@ -6319,7 +6335,7 @@ def _prepare_object_set(
             )
         reference_targets = []
         for descriptor in references:
-            documented = [binding for binding in arguments.get("documented_list_bindings", [])
+            documented = [binding for binding in documented_bindings
                 if binding.get("scope", {}).get("scope_kind") == "object"
                 and binding["scope"]["scope_value"] == target.object
                 and binding.get("declaration", {}).get("name") == descriptor.name
@@ -6474,6 +6490,7 @@ def _prepare_object_set(
             merge_guards=early_merge_guards,
             platform=platform,
             live_source_parent=live_source_parent,
+            playlist_mode=row_list_mode,
         )
         child_spec_by_path = {
             str(spec["request_path"]): spec for spec in child_specs
@@ -7353,6 +7370,23 @@ def _prepare_object_set(
                 for evidence in documented_bindings]
         except (ValueError, KeyError, TypeError) as exc:
             raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", str(exc)) from exc
+    for spec in node_specs:
+        if not spec.get("existing_target"):
+            continue
+        for reference in spec.get("references", []):
+            if reference.get("metadata_evidence") != "documented-list":
+                continue
+            guards = [guard for guard in state.get("documented_list_guards", [])
+                if guard["evidence"]["scope"]["scope_value"] == spec.get("target_id")
+                and guard["evidence"]["declaration"]["name"] == reference["name"]
+                and "reference_targets" in guard["evidence"]]
+            if len(guards) != 1:
+                raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Reference List requires one complete sealed pre-write roster")
+            reference["expected_roster"] = [
+                *([row["id"] for row in guards[0]["members"]] if spec["list_mode"] == "append" else []),
+                *reference["target_id"]]
+            if len(reference["expected_roster"]) > OBJECT_LIST_MAX_SUBTREE_NODES:
+                raise OperationContractError("LIST_SNAPSHOT_LIMIT_EXCEEDED", "The complete reference List result exceeds the Gateway roster bound before dispatch")
     if result_context or stage_new_graphs:
         from .owned_result_stages import prepare as prepare_owned_stages
         try:
@@ -8901,10 +8935,28 @@ def _prepare_object_node_specs(
                 if identities != binding["reference_targets"]:
                     raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Planned List target order differs from its exact declaration")
                 targets = observe_planned_reference_targets(binding, read=read)
-                spec.setdefault("documented_reference_lists", []).append({"binding": binding, "targets": targets})
+                reference_guard = {"binding": binding, "targets": targets}
+                from .documented_list_fields import legacy_playlist_authority, resolve_live_list_evidence, observe_list_binding
+                if legacy_playlist_authority(binding) is not None:
+                    if identities and merge_target is None:
+                        raise OperationContractError("PLAYLIST_TARGET_PARENT_UNRESOLVED",
+                            "An existing Playlist target must be an actual direct child of the resolved owner; create the owner and children first or select an existing merge owner.")
+                    before = []
+                    if merge_target is not None:
+                        owner_source = resolve_live_list_evidence(version, merge_target.object, descriptor.name, read=read)
+                        owner_guard = observe_list_binding({**owner_source, "reference_targets": identities}, read=read)
+                        reference_guard["reference_list_guard"] = owner_guard
+                        before = [row["id"] for row in owner_guard["members"]]
+                    spec_reference_roster = [*(before if playlist_mode == "append" else []), *identities]
+                    if len(spec_reference_roster) > OBJECT_LIST_MAX_SUBTREE_NODES:
+                        raise OperationContractError("LIST_SNAPSHOT_LIMIT_EXCEEDED", "The complete reference List result exceeds the Gateway roster bound before dispatch")
+                else:
+                    spec_reference_roster = None
+                spec.setdefault("documented_reference_lists", []).append(reference_guard)
                 spec["documented_list_owner_class"] = type_info.class_id
                 resolved_references[descriptor.request_path] = identities
-                spec["references"].append({"name": descriptor.name, "target_id": identities, "metadata_evidence": "documented-list"})
+                spec["references"].append({"name": descriptor.name, "target_id": identities, "metadata_evidence": "documented-list",
+                    **({"expected_roster": spec_reference_roster} if spec_reference_roster is not None else {})})
                 continue
             info = _read_property_info_cached(
                 read,
@@ -9764,7 +9816,7 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferr
         assertions.extend(slot_reference_preservation_assertions(pre_state["documented_list_reference_targets"], read=read))
     if isinstance(pre_state, Mapping) and pre_state.get("documented_planned_reference_guards"):
         from .documented_list_fields import planned_reference_guard_assertions
-        assertions.extend(planned_reference_guard_assertions(pre_state["documented_planned_reference_guards"], read=read))
+        assertions.extend(planned_reference_guard_assertions(pre_state["documented_planned_reference_guards"], read=read, after_write=after_write))
     if isinstance(pre_state, Mapping) and pre_state.get("effect_render_chains"):
         from .effect_render_conditions import chain_assertions
         assertions.extend(chain_assertions([chain for chain in pre_state["effect_render_chains"]
@@ -21664,10 +21716,11 @@ def verify_prepared_operation(
                 if field_name not in row and "@@" + str(field_name) not in row and local_key in row:
                     reference_row = {**row, local_key: local_reference_value(spec, field_name, row[local_key])}
                 actual = _reference_identity(_field_value(reference_row, str(field_name)))
+                expected_reference = field_spec.get("expected_roster", field_spec.get("target_id"))
                 check(
                     f"{request_path}.{field_name} reference matches",
-                    _reference_requirement_matches(reference_row, str(field_name), field_spec.get("target_id")),
-                    {"expected": field_spec.get("target_id"), "actual": actual},
+                    _reference_requirement_matches(reference_row, str(field_name), expected_reference),
+                    {"expected": expected_reference, "actual": actual},
                 )
             if "source_plugin" in spec:
                 source_plan = spec["source_plugin"]
@@ -25829,13 +25882,14 @@ def _validate_nested_request_shape(
                     allow_import=version in OBJECT_SET_IMPORT_VERSIONS,
                 )
                 nested_lists = [descriptor for node in [*forest.nodes, *(node for descriptor in lists for node in descriptor.nodes)] for descriptor in node.lists]
-                saw_list_assignment = saw_list_assignment or bool(lists) or bool(nested_lists)
                 list_nodes = sum(len(descriptor.nodes) for descriptor in lists)
                 total_nodes += list_nodes + sum(isinstance(reference.target, ObjectCurveDescriptor)
                     for descriptor in lists for node in descriptor.nodes for reference in node.references)
                 all_references = [*normalized_references,
                     *(reference for node in forest.nodes for reference in node.references),
                     *(reference for descriptor in lists for node in descriptor.nodes for reference in node.references)]
+                reference_lists = any(isinstance(reference.target, tuple) for reference in all_references)
+                saw_list_assignment = saw_list_assignment or bool(lists) or bool(nested_lists) or reference_lists
                 if version not in OBJECT_SET_REFERENCE_ARRAY_VERSIONS and any(
                     isinstance(reference.target, tuple) for reference in all_references
                 ):
@@ -25850,18 +25904,18 @@ def _validate_nested_request_shape(
                     )
                 if (
                     item.get("list_mode") == "replaceAll"
-                    and not lists and not nested_lists
+                    and not lists and not nested_lists and not reference_lists
                 ):
                     raise OperationContractError(
                         "NO_OP",
-                        f"object.set objects[{index}] list_mode=replaceAll requires one closed lists[] assignment.",
+                        f"object.set objects[{index}] list_mode=replaceAll requires one closed List assignment (owned objects or documented references).",
                     )
             except ObjectOperationContractError as exc:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if list_mode == "replaceAll" and not saw_list_assignment:
             raise OperationContractError(
                 "NO_OP",
-                "object.set list_mode=replaceAll requires at least one closed lists[] assignment.",
+                "object.set list_mode=replaceAll requires at least one closed List assignment (owned objects or documented references).",
             )
         if total_nodes > DEFAULT_MAX_NODES:
             raise OperationContractError(
