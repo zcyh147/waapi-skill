@@ -6,8 +6,15 @@ import subprocess
 import sys
 
 
+if __package__:
+    from .test_admission import check_test_admission
+else:
+    from test_admission import check_test_admission
+
+
 ROOT = Path(__file__).resolve().parents[1]
 NODES = (
+    "tests/unit/test_test_admission.py",
     "tests/unit/test_ci_test_bat.py::test_program_manifest_is_the_single_ordered_cross_platform_node_source",
     "tests/unit/test_operation_composer_gateway.py::test_non_object_set_operation_schema_digest_inventory_is_reviewed",
     "tests/unit/test_gateway_error_context.py::test_packaged_gateway_shape_errors_supply_context_at_each_call_site",
@@ -21,6 +28,11 @@ NODES = (
 def main() -> int:
     if len(sys.argv) != 1:
         print("preflight takes no arguments; use ci/test.sh for other selections", file=sys.stderr)
+        return 2
+    try:
+        check_test_admission(ROOT)
+    except (OSError, ValueError) as exc:
+        print(f'test admission error: {exc}', file=sys.stderr)
         return 2
     return subprocess.run(
         [sys.executable, str(ROOT / "ci/test_driver.py"), "--mode", "nonlive",
