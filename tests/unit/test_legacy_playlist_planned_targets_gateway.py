@@ -27,7 +27,9 @@ def planned_playlist_task(tmp_path, version='2023.1', mode='replace-all', wrong_
     code, selected = task.step('draft-discover-fields', '--type-handle', kinds['RandomSequenceContainer'],
         '--field-source', 'documented-lists', '--selection', choice['selection'])
     assert code == 0, selected
-    field = selected['meaning_results'][0]['candidates'][0]['handle']
+    candidate = selected['meaning_results'][0]['candidates'][0]
+    assert 'json_array_of_same_draft_result_handles' in candidate['value_input']['accepted_forms']
+    field = candidate['handle']
     code, owner = task.step('draft-declare-new', '--declaration-id', 'owner', '--parent-handle', parent,
         '--name', 'Numbers', '--kind', kinds['RandomSequenceContainer'])
     assert code == 0, owner
@@ -63,7 +65,8 @@ def planned_playlist_task(tmp_path, version='2023.1', mode='replace-all', wrong_
                 task.objects[oid] = {'id': oid, 'name': name, 'type': 'Sound', 'classId': 65552,
                     'path': path + '\\' + name, 'parent': {'id': FIRST}, 'notes': 'Keep ' + name}
             return {'objects': [{'id': SECOND, 'name': 'Default Work Unit', 'children': [
-                {'id': FIRST, 'name': 'Numbers', 'children': [{'id': ROOT, 'name': 'One'}, {'id': CHILD, 'name': 'Two'}]}]}]}
+                {'id': FIRST, 'name': 'Numbers', '@Playlist': [{}],
+                    'children': [{'id': ROOT, 'name': 'One'}, {'id': CHILD, 'name': 'Two'}]}]}]}
         assert node['object'] == FIRST and node['@Playlist'] == [CHILD, ROOT, CHILD]
         assert node['listMode'] == ('replaceAll' if mode == 'replace-all' else 'append')
         prefix = task.objects[FIRST]['@Playlist'] if mode == 'append' else []

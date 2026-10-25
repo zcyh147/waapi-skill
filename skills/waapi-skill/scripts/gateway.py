@@ -20490,14 +20490,19 @@ def dispatch_business_field_discovery(
             payload["agent_result"] = result
         else:
             bound = captured[0]
+            from wwise_waapi.documented_list_fields import legacy_playlist_authority
+            planned_array = (binding.record.operation == 'object.set' and result['scope']['scope_kind'] == 'class'
+                and legacy_playlist_authority(result) is not None)
             payload["meaning_results"] = [{"meaning": result["declaration"]["display_name"], "candidates": [{
                 "handle": bound.handle, "label": result["declaration"]["display_name"], "field_kind": "list",
                 "value_type": "list", "evidence": result,
                 "value_input": {"use": "object_list_or_clear_list_selection", "native_token_input": "forbidden",
                     "accepted_forms": ["owned_list_construction", "owned_list_clear"] +
                         (["json_array_of_bound_object_handles"] if binding.record.operation == "object.set"
-                         and detected_version in {"2023.1", "2024.1", "2025.1"} else []),
+                         and detected_version in {"2023.1", "2024.1", "2025.1"} else []) +
+                        (["json_array_of_same_draft_result_handles"] if planned_array else []),
                     "maximum_array_members": 32,
+                    **({'planned_array_validation': 'new_direct_children_of_this_declared_owner; independently_bind_GUIDs_before_SET'} if planned_array else {}),
                     "array_validation": "exact_source_element_classes_and_fresh_native_members; ownership_not_inferred"}}]}]
         return payload
     read_call = metadata_cached_read_call(

@@ -394,13 +394,19 @@ def bind(prepared, result, *, read):
     specs = prepared['verification_plan']['nodes']
     plan = prepared['pre_state']['owned_result_stages']
     by_path = {node['request_path']: node for node in specs}
-    returned = flatten_create_result(result) if plan['uri'] == CREATE else flatten_set_result(result, allowed_lists=[row['name'] for row in plan.get('lists', [])])
+    returned = flatten_create_result(result) if plan['uri'] == CREATE else flatten_set_result(result,
+        allowed_lists=[row['name'] for row in plan.get('lists', [])],
+        reference_lists=[field['name'] for spec in specs for field in spec.get('references', [])
+            if field.get('metadata_evidence') == 'documented-list'])
     returned_children, bound, seen = {}, {}, set()
     for node in returned:
         if node.parent_request_path is not None:
             returned_children.setdefault(node.parent_request_path, []).append(node)
     def bind_occurrence(node, spec):
         path, identity = spec['request_path'], node.object.upper()
+        reference_names = {field['name'] for field in spec.get('references', []) if field.get('metadata_evidence') == 'documented-list'}
+        if not set(node.reference_lists) <= reference_names:
+            raise ValueError('Native result included a reference List outside its exact sealed receiver')
         if path in bound or identity in seen:
             raise ValueError('Native result contains a duplicate occurrence or GUID')
         bound[path] = node
