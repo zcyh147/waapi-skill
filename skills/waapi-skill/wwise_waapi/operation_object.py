@@ -411,6 +411,7 @@ class ObjectResultNode:
     name: str
     child_count: int
     collection: str | None = None
+    reference_lists: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1130,8 +1131,9 @@ def flatten_set_result(
     base_path: str = "$.objects",
     max_nodes: int = DEFAULT_MAX_NODES,
     allowed_lists: Sequence[str] = (),
+    reference_lists: Sequence[str] = (),
 ) -> tuple[ObjectResultNode, ...]:
-    """Flatten an ``object.set`` result body, including reviewed list fields."""
+    """Flatten created objects; sealed reference associations carry no new identities."""
 
     mapping = _mapping(payload, path="$result")
     unknown_root = set(mapping) - {"objects"}
@@ -1156,6 +1158,8 @@ def flatten_set_result(
         )
         for index, item in enumerate(allowed_lists)
     }
+    normalized_references = {normalize_object_list_name(item, request_path=f"$reference_lists[{index}]")
+        for index, item in enumerate(reference_lists)}
     counter = [0]
     result: list[ObjectResultNode] = []
     for index, item in enumerate(objects):
@@ -1166,7 +1170,8 @@ def flatten_set_result(
             for key in row
             if key.startswith("@")
         }
-        unexpected = sorted(set(dynamic_fields) - normalized_lists)
+        reference_fields = _reference_result_associations(row, normalized_references, request_path=request_path)
+        unexpected = sorted(set(dynamic_fields) - normalized_lists - normalized_references)
         if unexpected:
             raise ObjectOperationContractError(
                 "INVALID_RESULT_SHAPE",
@@ -1188,7 +1193,7 @@ def flatten_set_result(
                 request_path=f"{request_path}.{wire_name}",
                 allow_single=True,
             )
-            for list_name, wire_name in dynamic_fields.items()
+            for list_name, wire_name in dynamic_fields.items() if wire_name not in reference_fields
         }
         counter[0] += 1
         if counter[0] > limit:
@@ -1205,6 +1210,7 @@ def flatten_set_result(
                 name,
                 len(children) + sum(len(rows) for rows in list_rows.values()),
                 None,
+                tuple(sorted(key[1:] for key in reference_fields)),
             )
         )
         for child_index, child in enumerate(children):
@@ -1217,6 +1223,7 @@ def flatten_set_result(
                     counter=counter,
                     collection="children",
                     allowed_lists=normalized_lists,
+                    reference_lists=normalized_references,
                 )
             )
         for list_name, rows in list_rows.items():
@@ -1230,6 +1237,7 @@ def flatten_set_result(
                         counter=counter,
                         collection=list_name,
                         allowed_lists=normalized_lists,
+                    reference_lists=normalized_references,
                     )
                 )
     return tuple(result)
@@ -1802,6 +1810,22 @@ def normalize_object_identity(
     )
 
 
+def _reference_result_associations(row, names, *, request_path):
+    """Validate opaque reference occurrences without assigning object identities.
+
+    Matching object.set schemas admit empty occurrence objects. Their business
+    meaning is proved by the complete ordered reference readback, never by these
+    result fragments. Keep the original native payload unchanged.
+    """
+    fields = {key for key in row if key.startswith("@") and key[1:] in names}
+    for key in fields:
+        values = _result_collection_rows(row[key], request_path=f"{request_path}.{key}", allow_single=True)
+        if len(values) > 128:
+            raise ObjectOperationContractError("RESULT_NODE_LIMIT_EXCEEDED",
+                "Reference result associations exceed the complete reference roster bound.")
+    return fields
+
+
 def _flatten_result_node(
     payload: Any,
     *,
@@ -1811,6 +1835,7 @@ def _flatten_result_node(
     counter: list[int],
     collection: str = "children",
     allowed_lists: Sequence[str] = (),
+    reference_lists: Sequence[str] = (),
 ) -> list[ObjectResultNode]:
     counter[0] += 1
     if counter[0] > max_nodes:
@@ -1821,7 +1846,8 @@ def _flatten_result_node(
         )
     mapping = _mapping(payload, path=request_path)
     dynamic_fields = sorted(key for key in mapping if key.startswith("@"))
-    if any(key[1:] not in allowed_lists for key in dynamic_fields):
+    reference_fields = _reference_result_associations(mapping, reference_lists, request_path=request_path)
+    if any(key[1:] not in allowed_lists and key[1:] not in reference_lists for key in dynamic_fields):
         raise ObjectOperationContractError(
             "INVALID_RESULT_SHAPE",
             "Nested object results contain an unreviewed object-list association.",
@@ -1834,7 +1860,7 @@ def _flatten_result_node(
     )
     list_rows = {
         key: _result_collection_rows(mapping[key], request_path=f"{request_path}.{key}", allow_single=True)
-        for key in dynamic_fields
+        for key in dynamic_fields if key not in reference_fields
     }
     result = [
         ObjectResultNode(
@@ -1844,6 +1870,7 @@ def _flatten_result_node(
             name,
             len(children) + sum(len(rows) for rows in list_rows.values()),
             collection,
+            tuple(sorted(key[1:] for key in reference_fields)),
         )
     ]
     for index, child in enumerate(children):
@@ -1856,12 +1883,13 @@ def _flatten_result_node(
                 counter=counter,
                 collection="children",
                 allowed_lists=allowed_lists,
+                reference_lists=reference_lists,
             )
         )
     for key, rows in list_rows.items():
         for index, child in enumerate(rows):
             result.extend(_flatten_result_node(child, request_path=f"{request_path}.{key}[{index}]", parent_path=request_path,
-                                              max_nodes=max_nodes, counter=counter, collection=key[1:], allowed_lists=allowed_lists))
+                                              max_nodes=max_nodes, counter=counter, collection=key[1:], allowed_lists=allowed_lists, reference_lists=reference_lists))
     return result
 
 

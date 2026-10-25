@@ -170,3 +170,24 @@ def test_legacy_playlist_merged_owner_retains_reference_parent_and_preservation_
         tx, shown = task.preview()
         code, verified = task.finish(tx, shown)
         assert code == 2 and verified.get("verified") is not True, verified
+
+
+def test_reference_list_result_association_cannot_move_to_another_requested_owner(tmp_path):
+    task, _ = playlist_task(tmp_path, '2023.1', 'replace-all')
+    parent = task.bind(SECOND)
+    code, declared = task.step('draft-declare-existing', '--declaration-id', 'parent-notes',
+        '--object-handle', parent, '--field', 'notes', 'Requested parent note')
+    assert code == 0, declared
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.object.set':
+            task.objects[SECOND]['notes'] = 'Requested parent note'
+            return {'objects': [{'id': FIRST, 'name': 'Numbers', '@Playlist': [{}, {}]},
+                {'id': SECOND, 'name': 'Default Work Unit', '@Playlist': []}]}
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified.get('verified') is not True, verified
+    assert 'not sealed for this exact result owner' in json.dumps(verified), verified

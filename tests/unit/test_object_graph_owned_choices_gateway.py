@@ -111,7 +111,7 @@ def test_documented_arguments_assigns_existing_references_with_order_and_preserv
                 task.objects[SECOND]["notes"] = "Unrequested change"
             elif fault == "missing-effect-field":
                 del task.objects[FIRST]["@Arguments"]
-            return {"objects": [{"id": FIRST, "name": "Music"}]}
+            return {"objects": [{"id": FIRST, "name": "Music", "@Arguments": [{}, {}]}]}
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
@@ -603,7 +603,7 @@ def test_documented_reference_list_class_handle_assigns_array_on_planned_owner_w
                 task.objects[fresh_owner]["@Arguments"].reverse()
             elif fault == "target-notes-effect":
                 task.objects[ROOT]["notes"] = "Unexpected"
-            return {"objects": [{"id": SECOND, "name": "Default Work Unit", "children": [{"id": fresh_owner, "name": "Music"}]}]}
+            return {"objects": [{"id": SECOND, "name": "Default Work Unit", "children": [{"id": fresh_owner, "name": "Music", "@Arguments": [{}, {}]}]}]}
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()

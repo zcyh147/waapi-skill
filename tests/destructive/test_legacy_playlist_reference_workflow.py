@@ -26,17 +26,28 @@ PROJECT_SHA256 = '6936b9719114606e3e9883afa970979b5d5105246506a14b6d939033ac0f54
 
 
 def test_legacy_playlist_replace_append_clear_preserves_hierarchy(workflow_sandbox_runtime):
-    """Replace with a repeated target, append to the observed prefix, then clear."""
-    runtime = workflow_sandbox_runtime
-    output = runtime.state_dir / 'legacy-playlist-reference-workflow.json'
+    _observe_legacy_playlist_reference_workflow(workflow_sandbox_runtime, ('replace-all', 'append', 'clear'))
+
+
+def test_legacy_playlist_append_clear_preserves_hierarchy(workflow_sandbox_runtime):
+    _observe_legacy_playlist_reference_workflow(workflow_sandbox_runtime, ('append', 'clear'))
+
+
+def test_legacy_playlist_clear_preserves_hierarchy(workflow_sandbox_runtime):
+    _observe_legacy_playlist_reference_workflow(workflow_sandbox_runtime, ('clear',))
+
+
+def _observe_legacy_playlist_reference_workflow(runtime, phases):
+    """Use one selected continuation; never repeat a completed earlier mutation."""
+    assert phases in {('replace-all', 'append', 'clear'), ('append', 'clear'), ('clear',)}
+    suffix = '-'.join(phases)
+    output = runtime.state_dir / ('legacy-playlist-reference-' + suffix + '.json')
     assert not output.exists(), 'Never overwrite an earlier Playlist workflow observation'
     output.parent.mkdir(parents=True, exist_ok=True)
     observation = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [],
-        'transactions': [], 'business_effect_verified': False,
-        'phases': [{'name': name, 'expected_roster': expected, 'status': 'not_attempted',
-            'business_effect_verified': False} for name, expected in
-            [('replace-all', [UP, LOOP, LOOP]), ('append', [UP, LOOP, LOOP, UP]), ('clear', [])]]}
-    category = {'category': 'legacy-playlist-reference-replace-append-clear', 'status': 'FAIL',
+        'flow': list(phases), 'transactions': [], 'business_effect_verified': False,
+        'phases': [{'name': name, 'status': 'not_attempted', 'business_effect_verified': False} for name in phases]}
+    category = {'category': 'legacy-playlist-reference-' + suffix, 'status': 'FAIL',
         'business_effect_verified': False, 'observation_path': str(output),
         'verifier_strength': 'independent_ordered_reference_roster_and_all_hierarchy_target_preservation'}
     runtime.category_results.append(category)
@@ -174,12 +185,16 @@ def test_legacy_playlist_replace_append_clear_preserves_hierarchy(workflow_sandb
             assert row['type'] == 'Sound' and row['class_id'] == 65552 and row['parent']['id'] == OWNER
         assert [row['id'] for row in before['roster_rows']] == xml_roster
         assert all(row == before['targets'][row['id']] for row in before['roster_rows'])
+        prefix = [row['id'] for row in before['roster_rows']]
         for phase in observation['phases']:
+            phase['expected_roster'] = ([UP, LOOP, LOOP] if phase['name'] == 'replace-all' else
+                [*prefix, UP] if phase['name'] == 'append' else [])
             phase['status'] = 'started'
             construct(phase)
             current = gateway.gateway(['status'], live=True)
             assert current['wwise'] == baseline_host['wwise'] and current['project']['id'] == PROJECT, current
             phase.update(status='PASS', business_effect_verified=True)
+            prefix = phase['actual_roster']
         observation['business_effect_verified'] = True
     except BaseException as exc:
         observation['error'] = f'{type(exc).__name__}: {exc}'

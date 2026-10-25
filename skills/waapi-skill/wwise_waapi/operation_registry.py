@@ -19043,6 +19043,8 @@ def _bind_object_set_result_nodes(
         *,
         import_parent_path: str,
     ) -> None:
+        if node.reference_lists:
+            raise ObjectOperationContractError("INVALID_RESULT_SHAPE", "Implicit import objects have no sealed reference-list associations.")
         result_id_key = _identity_key(node.object)
         previous_path = seen_result_ids.get(result_id_key)
         if previous_path is not None:
@@ -19097,6 +19099,12 @@ def _bind_object_set_result_nodes(
                 "object.set returned a different identity for a sealed existing node.",
                 details={"request_path": request_path, "expected": sealed_id, "actual": node.object},
             )
+        reference_names = {reference["name"] for reference in spec.get("references", [])
+            if reference.get("metadata_evidence") == "documented-list"}
+        if not set(node.reference_lists) <= reference_names:
+            raise ObjectOperationContractError("INVALID_RESULT_SHAPE",
+                "Returned reference-list associations are not sealed for this exact result owner.",
+                details={"request_path": request_path, "unrequested_lists": sorted(set(node.reference_lists) - reference_names)})
         bound[request_path] = node
         seen_result_ids[result_id_key] = request_path
 
@@ -21318,6 +21326,9 @@ def verify_prepared_operation(
                 result_nodes = flatten_set_result(
                     payload,
                     allowed_lists=raw_list_names,
+                    reference_lists=sorted({reference["name"] for spec in specs
+                        for reference in spec.get("references", [])
+                        if reference.get("metadata_evidence") == "documented-list"}),
                 )
                 observed_rtpcs, observed_owned_controls = {}, {}
                 if any(spec.get("rtpc_binding") for spec in specs):
