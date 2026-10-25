@@ -380,6 +380,9 @@ def execute_batch(driver, plan, root):
                 'failure_layer': 'framework' if stopped else 'prerequisite', 'blocked_by': blocked})
             if summary['outcome'] == 'PASS':
                 summary['outcome'] = 'FAIL'
+            if blocked and not stopped:
+                summary['rerun'].append({'group': group['id'], 'nodes': group['nodes'],
+                                         'reason': 'prerequisite'})
             write_json(root / 'summary.json', summary)
             continue
         if group['id'] in retained:

@@ -83,6 +83,9 @@ def test_ordinary_failure_blocks_dependents_but_collects_independent_groups(chec
     assert [row['outcome'] for row in summary['groups']] == ['FAIL', 'BLOCKED', 'PASS']
     assert summary['groups'][1]['failure_layer'] == 'prerequisite'
     assert summary['groups'][2]['node_outcomes'][0]['outcome'] == 'PASS'
+    assert summary['rerun'] == [
+        {'group': 'failed', 'nodes': [node + 'test_bad'], 'reason': 'failed'},
+        {'group': 'dependent', 'nodes': [node + 'test_good'], 'reason': 'prerequisite'}]
     assert not (root / 'groups/dependent/result.json').exists()
 
 
