@@ -410,3 +410,100 @@ def test_additional_console_reader_node_rejects_older_versions_before_dispatch(t
         getattr(workflow, ADDITIONAL_NODE)(runtime)
     assert client.calls == before and runtime.category_results == []
     assert not (runtime.state_dir / 'console-additional-runtime-read-batch.json').exists()
+
+
+CONTROL_NODE = 'test_console_owned_2025_meter_cursor_capture'
+
+
+def _controls_context(tmp_path, monkeypatch, fault=None):
+    context = _console_context(tmp_path, monkeypatch, 'cleanup' if fault == 'cleanup' else None)
+    _, runtime, client, _, _ = context
+    original = client.call
+    bus_id = client.rows[CAPTURE_CAR_ID]['OutputBus']['id']
+
+    def call(uri, args=None, options=None):
+        if fault == 'stop-unknown' and uri == PREFIX + 'stopCapture':
+            client.calls.append((uri, deepcopy(args), deepcopy(options)))
+            raise RuntimeError('external capture stop outcome unknown; never retry')
+        if uri in {PREFIX + suffix for suffix in ('registerMeter', 'unregisterMeter', 'getMeters', 'moveCursor', 'saveCapture')}:
+            client.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if uri.endswith('getMeters'):
+                row = client.rows[bus_id]
+                return {'meters': [{'object': {key: deepcopy(row[key]) for key in options.get('return', ['id', 'name']) if key in row},
+                    'source': 'Bus', 'configurationName': '1.0', 'configurationMask': 4,
+                    'configurationType': 'Standard', 'channels': [{'name': 'C', 'value': -12.5}]}]}
+            if uri.endswith('moveCursor'):
+                client.user_time -= 10
+                return {'return': client.user_time}
+            if uri.endswith('saveCapture'):
+                Path(args['file']).write_bytes(b'opaque external capture; no format claim')
+            return {}
+        if fault == 'cursor-unavailable' and uri == PREFIX + 'setCursorTime':
+            client.calls.append((uri, deepcopy(args), deepcopy(options)))
+            client.user_time = -1
+            return {'return': -1}
+        return original(uri, args, options)
+    client.call = call
+    return context
+
+
+def test_console_meter_cursor_save_reaches_final_writer(tmp_path, monkeypatch):
+    context = _controls_context(tmp_path, monkeypatch)
+    workflow, runtime, client, _, _ = context
+    getattr(workflow, CONTROL_NODE)(runtime)
+    final = _finish(context, tmp_path, monkeypatch, [(CONTROL_NODE, None)])[-1]
+    category, = final['categories']
+    report = json.loads(Path(category['observation_path']).read_text())
+    assert final['invocation']['outcome'] == 'PASS' and report['complete']
+    assert {key: row['outcome'] for key, row in report['outcomes'].items()} == {
+        'meters': 'PASS', 'cursor_set': 'PASS', 'cursor_move': 'PASS', 'capture_file': 'PASS'}
+    assert report['outcomes']['cursor_set']['evidence']['returned_time_ms'] == 1500
+    assert report['outcomes']['cursor_move']['evidence']['returned_time_ms'] == 1490
+    assert report['outcomes']['meters']['evidence']['registration_membership_verified'] is False
+    assert report['outcomes']['capture_file']['evidence']['file']['size'] > 0
+    assert final['residual_state']['sandbox'] == 'deleted' and report['cleanup']['complete']
+    uris = [uri for uri, _, _ in client.calls]
+    for suffix in ('registerMeter', 'unregisterMeter', 'getMeters', 'setCursorTime', 'moveCursor', 'saveCapture', 'stopCapture'):
+        assert uris.count(PREFIX + suffix) == 1
+    assert uris.index(PREFIX + 'getMeters') < uris.index(PREFIX + 'stopCapture') < uris.index(PREFIX + 'setCursorTime')
+    assert not any(uri.endswith(('getVoices', 'getBusses', 'getRTPCs')) for uri in uris)
+    assert report['public_call_count'] < report['limits']['public_calls']
+    assert report['fixture_before'] == report['fixture_after']
+
+
+def test_unavailable_console_cursor_preserves_meter_and_saved_file(tmp_path, monkeypatch):
+    context = _controls_context(tmp_path, monkeypatch, 'cursor-unavailable')
+    workflow, runtime, client, _, _ = context
+    with pytest.raises(AssertionError, match='Console playback/data probe incomplete') as caught:
+        getattr(workflow, CONTROL_NODE)(runtime)
+    final = _finish(context, tmp_path, monkeypatch, [(CONTROL_NODE, caught.value)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    assert final['invocation']['outcome'] == 'FAIL' and final['residual_state']['sandbox'] == 'quarantined'
+    assert report['outcomes']['cursor_set']['outcome'] == report['outcomes']['cursor_move']['outcome'] == 'BLOCKED'
+    assert report['outcomes']['cursor_set']['evidence']['transaction']['state'] == 'result_schema_checked'
+    assert report['outcomes']['meters']['outcome'] == report['outcomes']['capture_file']['outcome'] == 'PASS'
+    assert report['outcomes']['meters']['evidence']['gateway_result']['agent_result'] == report['outcomes']['meters']['evidence']['agent_result']
+    assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
+    uris = [uri for uri, _, _ in client.calls]
+    assert uris.count(PREFIX + 'setCursorTime') == uris.count(PREFIX + 'saveCapture') == 1
+    assert PREFIX + 'moveCursor' not in uris
+
+
+def test_unknown_console_capture_stop_is_not_replayed_or_reported_clean(tmp_path, monkeypatch):
+    context = _controls_context(tmp_path, monkeypatch, 'stop-unknown')
+    workflow, runtime, client, _, _ = context
+    with pytest.raises(AssertionError, match='Console playback/data probe incomplete') as caught:
+        getattr(workflow, CONTROL_NODE)(runtime)
+    final = _finish(context, tmp_path, monkeypatch, [(CONTROL_NODE, caught.value)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    assert final['invocation']['outcome'] == 'FAIL' and final['residual_state']['sandbox'] == 'quarantined'
+    assert report['mutation_outcome_unknown'] and not report['cleanup']['complete']
+    assert report['cleanup']['errors'][0]['action'] == 'stop-capture'
+    assert report['outcomes']['meters']['outcome'] == 'PASS'
+    assert all(report['outcomes'][key]['outcome'] == 'BLOCKED' for key in ('cursor_set', 'cursor_move', 'capture_file'))
+    uris = [uri for uri, _, _ in client.calls]
+    assert uris.count(PREFIX + 'stopCapture') == 1
+    assert uris.count(PREFIX + 'unregisterMeter') <= 1
+    assert uris.count('ak.wwise.core.transport.destroy') == 1
+    assert not any(uri == PREFIX + suffix for uri in uris for suffix in ('setCursorTime', 'moveCursor', 'saveCapture'))
+    assert any(tx['state'] == 'indeterminate' for tx in final['transactions'])

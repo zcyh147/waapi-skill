@@ -27,17 +27,21 @@ ADDITIONAL_NAME = 'test_console_owned_additional_runtime_read_batch'
 ADDITIONAL_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + ADDITIONAL_NAME
 ADDITIONAL_READERS = {'loaded_media':'getLoadedMedia', 'cpu':'getCpuUsage',
     'performance':'getPerformanceMonitor', 'streamed_media':'getStreamedMedia'}
+CONTROL_NAME = 'test_console_owned_2025_meter_cursor_capture'
+CONTROL_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + CONTROL_NAME
 PREFIX = 'ak.wwise.core.'
 
 
-def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads=False, additional_runtime_reads=False):
-    assert sum(bool(v) for v in (diagnostic,grouped_runtime_reads,additional_runtime_reads)) <= 1, 'Select one closed collector mode'
+def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads=False, additional_runtime_reads=False, owned_controls=False):
+    assert sum(bool(v) for v in (diagnostic,grouped_runtime_reads,additional_runtime_reads,owned_controls)) <= 1, 'Select one closed collector mode'
+    if owned_controls:
+        assert runtime.version == '2025.1', 'Owned Console controls require exact2025.1 lane'
     if additional_runtime_reads:
         assert runtime.version in ('2023.1','2024.1','2025.1'), 'Additional Console reader versions are exact2023/2024/2025'
     assert runtime.version in BUILDS and (additional_runtime_reads or grouped_runtime_reads or diagnostic or runtime.version == '2025.1'), 'Select one pinned Console lane'
-    report_path = runtime.state_dir / ('console-additional-runtime-read-batch.json' if additional_runtime_reads else 'console-runtime-read-batch.json' if grouped_runtime_reads else 'console-profiler-probe.json')
+    report_path = runtime.state_dir / ('console-owned-controls.json' if owned_controls else 'console-additional-runtime-read-batch.json' if additional_runtime_reads else 'console-runtime-read-batch.json' if grouped_runtime_reads else 'console-profiler-probe.json')
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    category = {'category': 'console-additional-runtime-read-batch' if additional_runtime_reads else 'console-runtime-read-batch' if grouped_runtime_reads else 'console-transport-profiler-probe', 'status': 'blocked',
+    category = {'category': 'console-owned-controls' if owned_controls else 'console-additional-runtime-read-batch' if additional_runtime_reads else 'console-runtime-read-batch' if grouped_runtime_reads else 'console-transport-profiler-probe', 'status': 'blocked',
         'observation_task_status': 'BLOCKED', 'diagnostic_enabled': diagnostic, 'observation_path': str(report_path),
         'transaction_ids': [], 'verifier_strength': 'owned_playback_and_complete_same_time_voice',
         'native_host_support_inferred': False}
@@ -67,9 +71,17 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
         report['outcomes']={name:{'outcome':'BLOCKED','reason':'Shared setup not completed'} for name in ADDITIONAL_READERS}
         report['limits']['retained_pages_per_reader']=4
         report['limits']['reader_rows']=256
+    if owned_controls:
+        category['verifier_strength'] = 'independent_meter_data_cursor_readbacks_and_exact_capture_file'
+        report['contract'] = 'waapi-skill.console-owned-controls/v1'
+        report['outcomes'] = {name: {'outcome': 'BLOCKED', 'reason': 'Shared setup not completed'}
+            for name in ('meters', 'cursor_set', 'cursor_move', 'capture_file')}
+        report['limits'].update(public_calls=192, cleanup_reserve_calls=64,
+            total_reply_bytes=12 * 1024 * 1024, cleanup_reserve_bytes=4 * 1024 * 1024,
+            ordinary_seconds=180, meter_pages=4)
     cleanup = []
     cleanup_active = False
-    deadline = time.monotonic() + 120
+    deadline = time.monotonic() + report['limits']['ordinary_seconds']
 
     def persist():
         raw = (json.dumps(report, ensure_ascii=False, separators=(',', ':')) + '\n').encode('utf-8')
@@ -81,10 +93,10 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
 
     def call(argv, *, producer=False, stream_sink=None, strict=True):
         reserve = 0 if cleanup_active else report['limits']['cleanup_reserve_calls']
-        assert report['public_call_count'] < 128 - reserve, 'Console public call budget exhausted'
-        assert report['total_reply_bytes'] + 1024 * 1024 <= 8 * 1024 * 1024, 'Console total reply budget exhausted'
+        assert report['public_call_count'] < report['limits']['public_calls'] - reserve, 'Console public call budget exhausted'
+        assert report['total_reply_bytes'] + 1024 * 1024 <= report['limits']['total_reply_bytes'], 'Console total reply budget exhausted'
         if not cleanup_active:
-            assert report['total_reply_bytes'] + 1024 * 1024 <= 5 * 1024 * 1024, 'Console cleanup byte reserve unavailable'
+            assert report['total_reply_bytes'] + 1024 * 1024 <= report['limits']['total_reply_bytes'] - report['limits']['cleanup_reserve_bytes'], 'Console cleanup byte reserve unavailable'
         remaining = deadline - time.monotonic()
         assert remaining > 0, 'Console elapsed-time budget exhausted'
         entry = {'argv': list(argv), 'cleanup_phase': cleanup_active,
@@ -97,7 +109,17 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
             entry.update(exit_code=code, payload=payload)
             size = len(json.dumps(payload, ensure_ascii=False).encode('utf-8'))
             report['total_reply_bytes'] += size
-            assert size <= 1024 * 1024 and report['total_reply_bytes'] <= 8 * 1024 * 1024, 'Console reply byte bound exceeded'
+            assert size <= 1024 * 1024 and report['total_reply_bytes'] <= report['limits']['total_reply_bytes'], 'Console reply byte bound exceeded'
+            if owned_controls and not cleanup_active:
+                code_name = payload.get('error_code') or payload.get('call', {}).get('error_code')
+                if code_name in ('TIMEOUT', 'ConnectionError', 'ConnectionRefusedError', 'ConnectionResetError',
+                        'ConnectionClosed', 'ConnectionClosedError', 'OSError', 'VERSION_MISMATCH'):
+                    report['shared_failure'] = True
+                if 'endpoint' in payload and 'endpoint' in report:
+                    if (payload.get('endpoint') != report['endpoint'] or payload.get('detected_version') != runtime.version
+                            or payload.get('is_command_line') is not True):
+                        report['shared_failure'] = True
+                assert not report.get('shared_failure'), 'Shared connection/version/Console context lost'
             if strict:
                 assert code == 0 and payload.get('ok') is True, payload
             return payload
@@ -114,7 +136,7 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
         assert row['id'] == identity and all(isinstance(row.get(key), str) for key in ('name', 'type', 'path')), row
         return row
 
-    def effect(suffix, fields=(), *, identity=None, before_execute=None, zero=False):
+    def effect(suffix, fields=(), *, identity=None, before_execute=None, zero=False, role="target"):
         operation = PREFIX + suffix
         if zero:
             schema = call(['request-schema', operation])
@@ -131,8 +153,8 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
                 return result
             declared = list(fields)
             if identity is not None:
-                bound = step('draft-bind-object', ['--role', 'target', '--object-id', identity])
-                declared = ['--target-handle', bound['bound_object']['handle'], *declared]
+                bound = step('draft-bind-object', ['--role', role, '--object-id', identity])
+                declared = ['--' + role.replace('_', '-') + '-handle', bound['bound_object']['handle'], *declared]
             step('draft-declare-runtime-control-plan', declared)
             step('draft-check')
             preview = step('preview-from-draft')
@@ -145,7 +167,12 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
         if diagnostic and suffix == 'transport.executeAction' and 'play' in fields:
             verified = observe_play(tx)
         else:
-            executed = call(['execute', tx])
+            try:
+                executed = call(['execute', tx])
+            except Exception:
+                if owned_controls:
+                    report['mutation_outcome_unknown'] = True
+                raise
             assert executed.get('state') == 'executed_unverified', executed
             verified = call(['verify', tx])
         assert verified.get('state') in ('verified', 'result_schema_checked'), verified
@@ -224,6 +251,15 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
     def own(label, action):
         cleanup.append((label, action))
 
+    def clean_one(label):
+        index = next(i for i, (name, _) in enumerate(cleanup) if name == label)
+        _, action = cleanup.pop(index)  # Remove before dispatch; never replay an uncertain write.
+        try:
+            return action()
+        except Exception as exc:
+            report['cleanup']['errors'].append({'action': label, 'type': type(exc).__name__, 'message': str(exc)[:1024]})
+            raise
+
     query_fields = ['--include', 'parent', '--include', 'active-source', '--include', 'output-bus',
         '--include-field', 'IsLoopingEnabled', '--include-field', 'IsLoopingInfinite']
     if runtime.version == '2021.1':
@@ -232,7 +268,7 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
     try:
         status = call(['status'])
         report['host'] = info = status['wwise']
-        if grouped_runtime_reads or additional_runtime_reads:
+        if grouped_runtime_reads or additional_runtime_reads or owned_controls:
             report['endpoint'] = status['endpoint']
         assert info.get('isCommandLine') is True
         assert tuple(info['version'][key] for key in ('year', 'major', 'minor', 'build')) == BUILDS[runtime.version]
@@ -280,7 +316,7 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
             report['setup']['originals'] = effect('transport.useOriginals', ['--audition-media', 'originals'])
         if runtime.version != '2021.1':
             report['setup']['prepare'] = effect('transport.prepare', identity=CAPTURE_CAR_ID)
-        datasets = ['voices']
+        datasets = ['meters'] if owned_controls else ['voices']
         if grouped_runtime_reads:
             parameter = exact(CAPTURE_RPM_ID)
             assert parameter['type'] == 'GameParameter' and parameter['name'] == 'RPM', parameter
@@ -295,7 +331,11 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
         def directives(mode):
             return [token for dataset in datasets for token in ('--capture-data', dataset, mode)]
         report['setup']['enable'] = effect('profiler.enableProfilerData', directives('enable'),
-            before_execute=lambda: own('disable-voices', lambda: effect('profiler.enableProfilerData', directives('disable'))))
+            before_execute=lambda: own('disable-meters' if owned_controls else 'disable-voices', lambda: effect('profiler.enableProfilerData', directives('disable'))))
+        if owned_controls:
+            report['setup']['meter_register'] = effect('profiler.registerMeter', identity=bus['id'], role='meter_object',
+                before_execute=lambda: own('unregister-meter', lambda: effect('profiler.unregisterMeter',
+                    identity=bus['id'], role='meter_object')))
         report['setup']['capture'] = effect('profiler.startCapture', zero=True,
             before_execute=lambda: own('stop-capture', lambda: effect('profiler.stopCapture', zero=True)))
         # Creation cleanup is Gateway-bound to its exact execution result. Never
@@ -322,10 +362,15 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
         membership = call(schema['continuation']['gateway_argv'])['agent_result']['list']
         association, = [row for row in membership if row['object'] == CAPTURE_CAR_ID]
         report['transport_association'] = association
+        if owned_controls:
+            time.sleep(0.25)  # One fixed acquisition interval; no polling.
         position = call(['core-call', PREFIX + 'profiler.getCursorTime', '--profiler-cursor', 'capture-latest'])['agent_result']
         report['capture_position'] = position
         assert position['available'] is True and type(position['position_ms']) is int and position['position_ms'] >= 0
-        if additional_runtime_reads:
+        if owned_controls:
+            _collect_owned_controls(call, report, persist, effect=effect, clean_one=clean_one,
+                position_ms=position['position_ms'], output_root=runtime.sandbox.sandbox_path)
+        elif additional_runtime_reads:
             _collect_additional_runtime_read_batch(call,report,persist,position_ms=position['position_ms'])
         elif grouped_runtime_reads:
             _collect_runtime_read_batch(call, report, persist, position_ms=position['position_ms'])
@@ -365,7 +410,7 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
             report['cleanup']['errors'].append({'action': 'create-transport',
                 'message': 'Creation attempted without a verified issued handle; owned host teardown required; no retry'})
         report['cleanup']['complete'] = not report['cleanup']['errors']
-        readers_complete = (all(row['outcome']=='PASS' for row in report['outcomes'].values()) if additional_runtime_reads else
+        readers_complete = (all(row['outcome']=='PASS' for row in report['outcomes'].values()) if additional_runtime_reads or owned_controls else
             all(row['outcome'] == ('UNAVAILABLE' if name == 'game_objects' and runtime.version == '2021.1' else 'PASS')
             for name, row in report['outcomes'].items()) if grouped_runtime_reads else report['outcomes'].get('voices', {}).get('outcome') == 'PASS')
         report['complete'] = not report['errors'] and report['cleanup']['complete'] and readers_complete
@@ -581,3 +626,76 @@ def _collect_additional_runtime_read_batch(call, report, persist, *, position_ms
         elif observation['outcome'] != 'FAIL':
             observation['reason'] = 'Complete bounded retained array unavailable; no native repeat, polling or absence claim'
         persist()
+
+
+def _collect_owned_controls(call, report, persist, *, effect, clean_one, position_ms, output_root):
+    """One data frame, then one frozen buffer; local outcomes remain independent."""
+    def observe(name, action):
+        observation = report['outcomes'][name] = {'outcome': 'BLOCKED', 'evidence': {}}
+        try:
+            action(observation)
+        except Exception as exc:
+            observation.update(outcome='FAIL', error={'type': type(exc).__name__, 'message': str(exc)[:2048]})
+            if report.get('shared_failure') or report.get('mutation_outcome_unknown'):
+                raise
+        finally:
+            persist()
+
+    def meters(observation):
+        payload = call(['core-call', PREFIX + 'profiler.getMeters', '--profiler-position', str(position_ms),
+            '--max-results', '64'])
+        pages = [payload['agent_result']]
+        while not pages[-1]['complete']:
+            assert len(pages) < report['limits']['meter_pages'], 'Meter page bound exceeded'
+            pages.append(call(pages[-1]['next_command']['gateway_argv'])['agent_result'])
+        bus = report['fixture_before']['bus']
+        owned = [row for page in pages for row in page['meters'] if row['object'].get('id') == bus['id']]
+        observation['evidence'].update(gateway_result=payload, agent_result=payload['agent_result'],
+            agent_result_pages=pages, position_ms=position_ms, meters=owned,
+            registration_membership_verified=False, registration_causality_verified=False,
+            boundary='Accepted registration controls and attributable captured data; no current membership, reference-count or causal-registration claim')
+        assert owned, 'Complete attributable Console meter data unavailable'
+        for row in owned:
+            assert row['object']['name'] == bus['name']
+            assert row['source'] and row['configurationName'] and row['configurationType']
+            assert type(row['configurationMask']) is int and row['configurationMask'] >= 0
+            assert row['channels'] and all(isinstance(channel['name'], str) and channel['name']
+                and type(channel['value']) in (int, float) and math.isfinite(channel['value']) for channel in row['channels'])
+        observation['outcome'] = 'PASS'
+    observe('meters', meters)
+    report['setup']['stopped_capture'] = clean_one('stop-capture')
+
+    def cursor(observation, *, move=False):
+        verified = effect('profiler.moveCursor' if move else 'profiler.setCursorTime',
+            ['--cursor-move', 'previous-frame'] if move else ['--cursor-target-ms', str(position_ms)])
+        scope = verified['verification']['verification_scope']['cursor_observation']
+        observation['evidence'].update(transaction=verified, **scope)
+        if scope['outcome'] == 'unavailable':
+            observation['reason'] = 'Returned or independently read user cursor unavailable; no retry or GUI inference'
+            return
+        assert verified['verification']['business_state_verified'] is True and scope['outcome'] == 'matched', verified
+        if move:
+            assert scope['returned_time_ms'] < report['outcomes']['cursor_set']['evidence']['returned_time_ms'], 'Previous frame did not move earlier'
+        observation['outcome'] = 'PASS'
+    observe('cursor_set', cursor)
+    if report['outcomes']['cursor_set']['outcome'] == 'PASS':
+        observe('cursor_move', lambda observation: cursor(observation, move=True))
+    else:
+        report['outcomes']['cursor_move']['reason'] = 'No verified available setter position; meaningful relative move not attempted'
+
+    def saved(observation):
+        output = output_root / 'console-owned-capture'
+        output.mkdir(exist_ok=False)
+        sibling = output / 'preserve.txt'
+        sibling.write_bytes(b'owned sibling preservation sentinel\n')
+        sibling_sha = hashlib.sha256(sibling.read_bytes()).hexdigest()
+        expected = output / 'OwnedCapture.prof'
+        assert not expected.exists()
+        verified = effect('profiler.saveCapture', ['--capture-output-directory', str(output), '--capture-name', 'OwnedCapture'])
+        observation['evidence']['transaction'] = verified
+        assert verified['verification']['business_state_verified'] is True, verified
+        proof = capture_file_proof(expected, field='exact owned capture', io_root=output_root, max_bytes=512 * 1024 * 1024)
+        observation['evidence'].update(file=proof, sibling_sha256=sibling_sha, internal_capture_format_verified=False)
+        assert proof['size'] > 0 and hashlib.sha256(sibling.read_bytes()).hexdigest() == sibling_sha
+        observation['outcome'] = 'PASS'
+    observe('capture_file', saved)
