@@ -610,8 +610,12 @@ def materialize_core_business_request(
     elif operation == "ak.wwise.core.audio.setConversionPlugin":
         _require_plan_fields(
             plan,
-            required={"conversion_handle", "platform_name", "plugin_name"},
+            required={"conversion_handle", "platform_name", "plugin_type_handle"},
         )
+        codec = session.handles.resolve_type(plan["plugin_type_handle"])
+        if codec.type_category != "Conversion":
+            raise business_repair("TYPE_HANDLE_ROLE_MISMATCH", field="plugin_type_handle",
+                action="discover one installed Conversion codec through role conversion")
         args = {
             "conversion": _object_id(
                 session,
@@ -622,7 +626,7 @@ def materialize_core_business_request(
             "platform": _business_name(
                 plan["platform_name"], field="platform_name"
             ),
-            "plugin": _business_name(plan["plugin_name"], field="plugin_name"),
+            "plugin": codec.name,
         }
     elif operation == "ak.wwise.core.object.setAttenuationCurve":
         _require_plan_fields(

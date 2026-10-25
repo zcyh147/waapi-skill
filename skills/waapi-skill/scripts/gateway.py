@@ -2842,6 +2842,10 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("ROLE", "BOUND_OBJECT_HANDLE"),
     )
     draft_declare_core_plan.add_argument(
+        "--type", action="append", nargs=2, default=[],
+        metavar=("BUSINESS_FIELD", "BOUND_TYPE_HANDLE"),
+    )
+    draft_declare_core_plan.add_argument(
         "--field",
         action="append",
         nargs=2,
@@ -13375,6 +13379,8 @@ def dispatch_business_core_plan(
             raise GatewayInputError(
                 f"Core business role {name!r} is not disclosed for this operation"
             )
+    for name, handle in args.type:
+        put_scalar(name, handle, accepted={"bound_type_handle"})
     for name, handle in args.field:
         value_type = field_types.get(name)
         if value_type == "bound_field_handle":
@@ -13396,7 +13402,6 @@ def dispatch_business_core_plan(
         elif value_type in {
             "attenuation_curve_kind",
             "attenuation_curve_source",
-            "installed_conversion_plugin_name",
             "paste_list_mode",
             "platform_name",
             "wwise_object_name",
@@ -28998,6 +29003,12 @@ def _business_next_action_binding(
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
         }
+        if record.operation == "ak.wwise.core.audio.setConversionPlugin":
+            shared["type_discovery"] = {
+                **operation_draft_prefix_copy_binding([*base, "draft-discover-types", *binding]),
+                "append": ["--role", "conversion", "--meaning", "<requested-codec-name>"],
+                "result": "copy_one_returned_type_candidate.handle_into_plugin_type_handle",
+            }
         if session is not None and adapter.is_complete(session):
             return {
                 **shared,
@@ -32747,6 +32758,10 @@ def transaction_show_summary(
             "proof_sha256": canonical_sha256(proof)} for proof in structural]
     source_linkage = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("source_linkage")
     blend_assignment = prepared.get("pre_state", {}).get("blend_assignment")
+    conversion_plugin = prepared.get("pre_state", {}).get("conversion_plugin")
+    if isinstance(conversion_plugin, Mapping):
+        from wwise_waapi.conversion_plugin import notice as conversion_plugin_notice
+        derived_notice["conversion_plugin"] = conversion_plugin_notice(conversion_plugin)
     if isinstance(blend_assignment, Mapping):
         from wwise_waapi.blend_assignment import notice as blend_assignment_notice
         derived_notice["blend_assignment"] = blend_assignment_notice(blend_assignment)

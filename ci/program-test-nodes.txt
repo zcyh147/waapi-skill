@@ -369,3 +369,4 @@ tests/unit/test_transport_older_native_fixture.py
 tests/unit/test_transport_semantics_native_fixture.py
 tests/unit/test_voice_source_staging_gateway.py
 tests/unit/test_branch_evidence_readers.py
+tests/unit/test_conversion_plugin_gateway.py

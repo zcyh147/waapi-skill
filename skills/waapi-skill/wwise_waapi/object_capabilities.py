@@ -85,6 +85,10 @@ _BY_OBJECT_TYPE = {
     "Panner": _EMBEDDED_VALUE,
     "Position": _EMBEDDED_VALUE,
     "RTPC": _EMBEDDED_VALUE,
+    # Matching ConversionPluginInfoList Work Unit sources store unnamed codec
+    # objects, and the SDK queries them by the ConversionPlugin type. Keep
+    # native path text under the existing hierarchy/derived-display checks.
+    "ConversionPlugin": _EMBEDDED_VALUE,
     "CustomState": _OWNED_COLLECTION_ENTRY,
     "MultiSwitchEntry": _OWNED_COLLECTION_ENTRY,
     "MusicPlaylistItem": _OWNED_COLLECTION_ENTRY,

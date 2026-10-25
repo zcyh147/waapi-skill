@@ -366,6 +366,11 @@ def _bind_property(
     ).handle
 
 
+def _bind_codec(session: BusinessDeclarationSession) -> str:
+    return session.handles.bind_type(class_id=262145, name="Vorbis", type_category="Conversion",
+        catalog_digest="a" * 64).handle
+
+
 def test_metadata_core_business_fields_compile_bound_tokens_and_platform() -> None:
     session, handles, ids = _role_session(("object",))
     volume = _bind_property(
@@ -491,7 +496,7 @@ def test_paste_convert_and_conversion_plugin_compile_business_collections(
             "core_plan": {
                 "conversion_handle": plugin_handles[0],
                 "platform_name": "Windows",
-                "plugin_name": "Vorbis",
+                "plugin_type_handle": _bind_codec(plugin_session),
             }
         }
     )
@@ -725,7 +730,7 @@ def _valid_lane_session(
         plan = {
             "conversion_handle": handles[0],
             "platform_name": "Windows",
-            "plugin_name": "Vorbis",
+            "plugin_type_handle": _bind_codec(session),
         }
     elif operation == "ak.wwise.core.blendContainer.addAssignment":
         plan = {"blend_track_handle": handles[0], "child_handle": handles[1]}
@@ -871,7 +876,7 @@ def test_core_business_rejects_hostile_name_and_unavailable_save_choice() -> Non
             "ak.wwise.core.audio.setConversionPlugin",
             plugin_session,
         )
-    assert plugin_error.value.error_code == "BUSINESS_VALUE_INVALID"
+    assert plugin_error.value.error_code == "CORE_PLAN_FIELDS_INVALID"
 
     unsupported, _handles, _ids = _role_session((), version="2022.1")
     unsupported = unsupported.with_settings({"core_plan": {"auto_check_out": False}})

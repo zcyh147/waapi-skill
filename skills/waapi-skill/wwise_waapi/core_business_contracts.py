@@ -208,13 +208,20 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
     "ak.wwise.core.audio.setConversionPlugin": {
         "versions": ("2024.1", "2025.1"),
         "roles": ("conversion",),
-        "required_fields": ("conversion_handle", "platform_name", "plugin_name"),
+        "role_live_types": {"conversion": "Conversion"},
+        "required_fields": ("conversion_handle", "platform_name", "plugin_type_handle"),
         "optional_fields": (),
         "field_types": {
             "conversion_handle": "bound_object_handle",
             "platform_name": "platform_name",
-            "plugin_name": "installed_conversion_plugin_name",
+            "plugin_type_handle": "bound_type_handle",
         },
+        "field_semantics": {"plugin_type_handle": {
+            "discovery": "draft-discover-types --role conversion",
+            "selection": "one installed Conversion class; its discovered name becomes the native codec name",
+            "configuration": "after verified attachment, use the exact returned codec GUID with object.setProperty and live Field Handles in a separate Preview",
+        }, "platform_name": {"selection": "exact unique live project platform; Gateway binds its GUID",
+            "preservation": "all other project platform codec identities and classes"}},
         "execution_shape": "draft_mutation",
     },
     "ak.wwise.core.blendContainer.addAssignment": {
@@ -360,6 +367,8 @@ _CATALOG_INTENTS = {
 
 
 def _mutation_input_form(field: str, value_type: str) -> dict[str, Any]:
+    if value_type == "bound_type_handle":
+        return {"flag": "--type", "repeatable": False, "arguments": [field, "HANDLE"]}
     if value_type == "bound_object_handle":
         return {"flag": "--role", "repeatable": False, "arguments": [field, "HANDLE"]}
     if value_type == "bound_object_handle_list":

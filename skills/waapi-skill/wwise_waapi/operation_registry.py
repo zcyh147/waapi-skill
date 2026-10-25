@@ -11677,6 +11677,15 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             arguments,
         )
         call_metadata = {"execution_contract": execution_contract, "model_authored_code": False}
+        conversion_plan = None
+        if api == "ak.wwise.core.audio.setConversionPlugin":
+            from .conversion_plugin import prepare as prepare_conversion, notice as conversion_notice, ConversionPluginError
+            try:
+                conversion_plan = prepare_conversion(call_args, read=read, version=request.version)
+            except ConversionPluginError as exc:
+                raise OperationContractError("INVALID_CONVERSION_PLUGIN_OBSERVATION", str(exc)) from exc
+            metadata["conversion_plugin"] = conversion_plan
+            call_metadata["conversion_plugin"] = conversion_notice(conversion_plan)
         if api == "ak.wwise.core.sound.setActiveSource":
             from .project_setting_business_contracts import active_source_linkage_disclosure
             call_metadata["source_linkage"] = active_source_linkage_disclosure()
@@ -11749,6 +11758,9 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             warnings.append("Log verification compares one bounded channel observation; concurrent identical messages cannot be attributed, and continuing channel state is unverified.")
         if blend_plan is not None:
             verification = {"kind": "blend-assignment", "uri": api, "version": request.version, **blend_plan}
+        if conversion_plan is not None:
+            verification = {"kind": "conversion-plugin", "uri": api, "version": request.version,
+                "args": dict(call_args), **conversion_plan}
         if api == SAVE_CAPTURE_URI:
             try:
                 verification = prepare_capture_artifact(call_args, arguments["io_root"], execution_contract["io_audit"], request.version)
@@ -17142,6 +17154,17 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             if any(current[key] != value for key, value in plan["before"].items() if key != "native_assignments"):
                 raise OperationContractError("STALE_BLEND_ASSIGNMENT", "Blend identities, owner membership or assignments changed after Preview")
             call_args = materialize_index(call_args, len(current["assignments"]))
+        if api == "ak.wwise.core.audio.setConversionPlugin":
+            from .conversion_plugin import observe as observe_conversion, ConversionPluginError
+            plan = prepared.get("pre_state", {}).get("conversion_plugin")
+            if not isinstance(plan, Mapping):
+                raise OperationContractError("INVALID_PREVIEW", "Conversion codec selection lacks its immutable observation")
+            try:
+                current = observe_conversion(call_args, read=read_call, version=version)
+            except ConversionPluginError as exc:
+                raise OperationContractError("STALE_CONVERSION_PLUGIN", str(exc)) from exc
+            if current != plan["before"]:
+                raise OperationContractError("STALE_CONVERSION_PLUGIN", "Conversion, platform, installed class or codec fields changed after Preview")
         if api in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI}:
             from .runtime_log_effects import channel_snapshot, same_channel_contents
             before = prepared.get("pre_state", {}).get("log_channel_before")
@@ -19923,6 +19946,22 @@ def verify_prepared_operation(
                 {"expected_value_id": plan["expected_value_id"], "actual_value_id": actual_id,
                     "scope": plan["getter_args"]})
         verification_strength = "independent_soundengine_state_observation"
+    elif kind == "conversion-plugin":
+        from .conversion_plugin import observe as observe_conversion, compare as compare_conversion, ConversionPluginError
+        check_result_schema(str(plan["uri"]), str(plan["version"]))
+        def conversion_read(uri, args, options):
+            result = read_call(uri, args, options)
+            readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": result})
+            return result
+        try:
+            after = observe_conversion(plan["args"], read=conversion_read, version=plan["version"])
+        except ConversionPluginError as exc:
+            check("Complete attached codec and other platform readbacks are available", False, {"error": str(exc)})
+        else:
+            for item in compare_conversion(plan, after):
+                check(item["name"], item["passed"], item.get("evidence", {}))
+        business_state_verified = all(item.get("passed") is True for item in assertions)
+        verification_strength = "platform_codec_class_owner_and_other_platform_fields"
     elif kind == "blend-assignment":
         from .blend_assignment import observe as observe_blend, compare as compare_blend, BlendAssignmentError
         check_result_schema(str(plan["uri"]), str(plan["version"]))
