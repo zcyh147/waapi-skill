@@ -19,6 +19,7 @@ class ObjectIdentitySemantics:
     mutable_intrinsic_name: bool
     display_identity_source: str
     relative_display_paths: tuple[str, ...] = ()
+    opaque_display_path: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,10 +86,12 @@ _BY_OBJECT_TYPE = {
     "Panner": _EMBEDDED_VALUE,
     "Position": _EMBEDDED_VALUE,
     "RTPC": _EMBEDDED_VALUE,
-    # Matching ConversionPluginInfoList Work Unit sources store unnamed codec
-    # objects, and the SDK queries them by the ConversionPlugin type. Keep
-    # native path text under the existing hierarchy/derived-display checks.
-    "ConversionPlugin": _EMBEDDED_VALUE,
+    # Codec GUIDs are owned, anonymous objects, not hierarchy nodes. Retained
+    # native packets return opaque display text rather than a hierarchy path.
+    "ConversionPlugin": ObjectIdentitySemantics(
+        name_mode="embedded_value", empty_name_allowed=True, mutable_intrinsic_name=False,
+        display_identity_source="owner_and_embedded_role", opaque_display_path=True,
+    ),
     "CustomState": _OWNED_COLLECTION_ENTRY,
     "MultiSwitchEntry": _OWNED_COLLECTION_ENTRY,
     "MusicPlaylistItem": _OWNED_COLLECTION_ENTRY,

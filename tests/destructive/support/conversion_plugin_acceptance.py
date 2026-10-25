@@ -206,3 +206,105 @@ def collect_conversion_plugin_acceptance(runtime):
         raise
     finally:
         persist()
+
+
+def collect_conversion_platform_metadata_probe(runtime):
+    """Observe both retained native candidates; never infer or change a codec."""
+    assert runtime.version == "2025.1"
+    fixture = Path(__file__).parents[2] / "fixtures/metadata/conversion-plugin-native-2025.json"
+    retained = json.loads(fixture.read_text())["rows"]
+    expected_ids = {row["id"] for row in retained}
+    output = runtime.state_dir / "conversion-platform-metadata-probe.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    assert not output.exists(), "Never overwrite original platform-association observations"
+    category = {"category": "conversion-platform-metadata-observation", "status": "FAIL", "transaction_ids": [],
+        "observation_path": str(output), "verifier_strength": "read_only_exact_codec_identity_and_native_field_metadata"}
+    runtime.category_results.append(category)
+    receipt = {"contract": "waapi-skill.conversion-platform-metadata-probe/v1", "candidate": runtime.candidate,
+        "version": runtime.version, "calls": [], "candidates": [], "collection_complete": False,
+        "business_effect_verified": False, "association_status": "unresolved", "mutation_allowed": False,
+        "limits": {"calls": 64, "receipt_bytes": 4 * 1024 * 1024, "reply_bytes": 1024 * 1024,
+            "candidates": 2, "fields_per_candidate": 32, "field_list_pages": 2, "detail_pages_per_field": 4}}
+    endpoint = {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}
+
+    def persist():
+        raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(raw) <= receipt["limits"]["receipt_bytes"]
+        temporary = output.with_suffix(".tmp"); temporary.write_bytes(raw); temporary.replace(output)
+        category["observation_sha256"] = hashlib.sha256(raw).hexdigest()
+
+    def read(argv):
+        assert argv[0] in {"status", "query-object", "metadata"}, "Read-only probe rejects every other command"
+        assert len(receipt["calls"]) < receipt["limits"]["calls"], "Read-only probe call bound exceeded"
+        item = {"argv": list(argv)}; receipt["calls"].append(item)
+        try:
+            code, payload = runtime.raw_gateway(argv)
+            item.update(exit_code=code, payload=payload)
+            assert len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) <= receipt["limits"]["reply_bytes"]
+            assert code == 0 and payload.get("ok") is True, payload
+            assert payload.get("detected_version") == runtime.version and payload.get("endpoint") == endpoint
+            return payload
+        finally:
+            persist()
+
+    projection = [arg for field in ("class-id", "owner", "plugin-name") for arg in ("--include", field)]
+    try:
+        status = read(["status", "--detail"]); receipt["initial_status"] = status
+        info = status["agent_result"]["project"]
+        version = status["agent_result"]["wwise"]["version"]
+        assert (version["year"], version["major"], version["minor"], version["build"]) == (2025, 1, 7, 9143)
+        actual_project = Path(localize_waapi_host_path(info["path"])).resolve(strict=True)
+        assert actual_project == runtime.sandbox.sandbox_project.resolve(strict=True)
+        assert actual_project != runtime.sandbox.source_project.resolve(strict=True)
+        result = read(["query-object", "--advanced-waql", f'from type ConversionPlugin where owner.id = "{PCM}"',
+            "--max-results", "3", "--platform", info["currentPlatformId"], *projection])
+        rows = result["objects"]
+        assert result.get("limit_reached") is not True and result.get("projection_complete") is not False
+        assert result["count"] == len(rows) == 2 and {row["id"] for row in rows} == expected_ids
+        receipt["owner_query"] = result
+        for row in rows:
+            assert row["owner"]["id"] == PCM and row["class_id"] == 65537 and row["plugin_name"] == "PCM"
+            candidate = {"object": row, "field_lists": [], "fields": [], "reference_values": []}
+            receipt["candidates"].append(candidate)
+            exact = read(["query-object", "--exact-id", row["id"], "--max-results", "2", *projection])
+            assert exact["count"] == 1 and exact["objects"] == [row], exact
+            candidate["exact_identity"] = exact
+            command = ["metadata", "list", "--exact-id", row["id"], "--page-size", "64"]
+            fields = []
+            for _ in range(receipt["limits"]["field_list_pages"]):
+                listed = read(command)["agent_result"]; candidate["field_lists"].append(listed)
+                fields.extend(listed["fields"])
+                assert len(fields) <= receipt["limits"]["fields_per_candidate"]
+                if listed["complete"] is True:
+                    assert len(fields) == listed["total_count"] == len({field["name"] for field in fields})
+                    break
+                command = listed["next_command"]["gateway_argv"]
+            else:
+                raise AssertionError("Codec field list did not complete within the read-only probe bound")
+            for field in fields:
+                detail = {"listed": field, "pages": []}; candidate["fields"].append(detail)
+                command = ["metadata", "detail", "--exact-id", row["id"], "--selection", field["selection"]]
+                for _ in range(receipt["limits"]["detail_pages_per_field"]):
+                    page = read(command)["agent_result"]; detail["pages"].append(page)
+                    if page["complete"] is True:
+                        break
+                    command = page["next_command"]["gateway_argv"]
+                else:
+                    raise AssertionError("Codec field detail did not complete within the read-only probe bound")
+                metadata = detail["pages"][0].get("metadata", detail["pages"][0].get("field", {}))
+                restriction = metadata.get("restriction", metadata.get("constraints", {}))
+                if str(metadata.get("type", "")).casefold() == "reference" or restriction.get("type") == "reference":
+                    values = read(["query-object", "--exact-id", row["id"], "--max-results", "2",
+                        "--include-local-reference", field["name"], "--platform", info["currentPlatformId"]])
+                    assert values["count"] == 1 and values["objects"][0]["id"] == row["id"]
+                    candidate["reference_values"].append({"field": field["name"], "result": values})
+        # Metadata collection is not native absence or mutation authority.
+        # Review the exact typed fields/values before changing any selector.
+        receipt.update(collection_complete=True, association_status="metadata_observed_requires_review")
+        category["status"] = "blocked"
+        return category
+    except Exception as exc:
+        receipt["failure"] = {"type": type(exc).__name__, "message": str(exc)[:2048]}
+        raise
+    finally:
+        persist()

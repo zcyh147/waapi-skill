@@ -9988,6 +9988,16 @@ def test_conversion_plugin_placement_and_field_configuration(workflow_sandbox_ru
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_conversion_platform_metadata_read_only_probe(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("This read-only association probe is pinned to retained Console2025.1.7.9143 candidates")
+    from tests.destructive.support.conversion_plugin_acceptance import collect_conversion_platform_metadata_probe
+    category = collect_conversion_platform_metadata_probe(workflow_sandbox_runtime)
+    assert category["status"] == "blocked", category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_source_plugin_explicit_current_platform_alternative(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
     if workflow_sandbox_runtime.version != '2022.1':
         pytest.skip('This explicit-current-platform alternative diagnostic is pinned to Console2022.1')

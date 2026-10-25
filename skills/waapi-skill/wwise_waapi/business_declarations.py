@@ -2558,7 +2558,10 @@ def normalize_live_object_identity(row: Any, *, owned_identity=None, version: st
         field="path",
         maximum_bytes=MAX_BUSINESS_PATH_BYTES,
     )
-    if path.startswith("\\"):
+    semantics = object_identity_semantics(object_type)
+    if semantics.opaque_display_path and any(ord(character) < 32 or 127 <= ord(character) <= 159 for character in path):
+        raise ValueError("opaque native display identity cannot contain control characters")
+    if path.startswith("\\") and not semantics.opaque_display_path:
         path = path.rstrip("\\")
     derived_display_path = (
         not object_identity_semantics(object_type).mutable_intrinsic_name
@@ -2585,7 +2588,8 @@ def normalize_live_object_identity(row: Any, *, owned_identity=None, version: st
             and descriptor['owner_class_id'] == 16 and descriptor['collection'] == 'Markers'
             and path == '[Marker]')
     )
-    if not path.startswith("\\") and not derived_display_path and not reviewed_relative_display_path:
+    opaque_display_path = semantics.opaque_display_path
+    if not path.startswith("\\") and not derived_display_path and not reviewed_relative_display_path and not opaque_display_path:
         raise ValueError(
             "path must be an absolute Wwise path or a reviewed derived display identity"
         )

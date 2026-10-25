@@ -1,0 +1,48 @@
+{
+  "provenance": {
+    "candidate": "144acba75809e89514ae3fddd6ca5bf2e6a1bc31",
+    "host": {
+      "display_name": "WwiseConsole",
+      "is_command_line": true,
+      "version": {
+        "build": 9143,
+        "displayName": "v2025.1.7",
+        "major": 1,
+        "minor": 7,
+        "nickname": "",
+        "schema": 133,
+        "year": 2025
+      }
+    },
+    "original_outcome": "FAIL",
+    "source": "conversion-179-2025-native-r1/main-assessment.json",
+    "source_sha256": "601ecdb953a4f285fd4a7bbc6566b87da2b18cd36830b21e8e3e7c4590b6ca9f",
+    "scope": "read-only returned identity facts; no mutation or platform association proof"
+  },
+  "rows": [
+    {
+      "id": "{4C7C9678-C9AC-4618-AF6D-665E4F73EA49}",
+      "name": "",
+      "type": "ConversionPlugin",
+      "path": "<Unnamed Conversion plugin>",
+      "class_id": 65537,
+      "owner": {
+        "id": "{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}",
+        "name": "PCM"
+      },
+      "plugin_name": "PCM"
+    },
+    {
+      "id": "{34D4B790-40BF-4FFE-8149-4065DE66C9CA}",
+      "name": "",
+      "type": "ConversionPlugin",
+      "path": "<Unnamed Conversion plugin>",
+      "class_id": 65537,
+      "owner": {
+        "id": "{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}",
+        "name": "PCM"
+      },
+      "plugin_name": "PCM"
+    }
+  ]
+}

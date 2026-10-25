@@ -10,7 +10,9 @@ import pytest
 from tests.unit.test_conversion_plugin_gateway import ConversionClient, CODEC, OTHER_CODEC, OLD_CODEC, WINDOWS, MAC
 from tests.unit.test_gateway_session_context import configured_env, waapi_gateway as gateway
 from tests.unit.test_workflow_source_guard import workflow, _fixture_run
-from tests.destructive.support.conversion_plugin_acceptance import collect_conversion_plugin_acceptance, PCM, PCM_PATH
+from tests.destructive.support.conversion_plugin_acceptance import (
+    collect_conversion_plugin_acceptance, collect_conversion_platform_metadata_probe, PCM, PCM_PATH,
+)
 from tests.destructive.support import exact_real_evidence, category_evidence
 
 
@@ -125,4 +127,84 @@ def test_conversion_collector_reaches_persisted_existing_finalizer(tmp_path, wor
     assert [row for row in final["categories"] if row["category"] == "conversion-plugin-placement"] == runtime.category_results
     assert len(final["transactions"]) == (0 if fault == "prewrite-shape" else 2)
     assert final["residual_state"]["sandbox"] == ("deleted" if expected_pass else "quarantined")
+    assert events.index("shutdown") < events.index("release")
+
+
+@pytest.mark.parametrize("mode", ["scalar", "reference", "missing-detail"])
+def test_read_only_codec_platform_probe_preserves_actual_candidates_and_final_report(tmp_path, workflow, monkeypatch, mode):
+    missing_detail = mode == "missing-detail"
+    owned = tmp_path / "collector"; owned.mkdir()
+    runtime, commands, client = runtime_fixture(owned)
+    retained = json.loads((Path(__file__).parents[1] / "fixtures/metadata/conversion-plugin-native-2025.json").read_text())["rows"]
+    native_rows = [{**{key: row[key] for key in ("id", "name", "type", "path", "owner")},
+        "classId": row["class_id"], "pluginName": row["plugin_name"]} for row in retained]
+    original = client.call
+
+    def call(uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri == "ak.wwise.core.object.get" and (
+            "conversionplugin" in args.get("waql", "").casefold()
+            or any(row["id"] in json.dumps(args) for row in native_rows)
+        ):
+            selected = list(reversed(native_rows)) if "conversionplugin" in args.get("waql", "").casefold() else [
+                row for row in native_rows if row["id"] in json.dumps(args)]
+            return {"return": [{**{field: row[field] for field in options["return"] if field in row},
+                **({"@Platform": {"id": WINDOWS if row["id"] == native_rows[0]["id"] else MAC}}
+                    if "@Platform" in options["return"] else {})} for row in selected]}
+        if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+            assert args["object"] in {row["id"] for row in native_rows}
+            return {"return": ["Platform" if mode == "reference" else "MaxBitDepth"]}
+        if uri == "ak.wwise.core.object.getPropertyInfo":
+            assert args["object"] in {row["id"] for row in native_rows}
+            if mode == "reference":
+                assert args["property"] == "Platform"
+                return {"name": "Platform", "type": "Reference", "default": None,
+                    "restriction": {"type": "reference", "restrictions": [{"type": ["Platform"]}]}}
+            assert args["property"] == "MaxBitDepth"
+            if missing_detail:
+                return {"name": "MaxBitDepth", "type": 42}
+            return {"name": "MaxBitDepth", "type": "int32", "default": 16,
+                "restriction": {"type": "enum", "values": [{"value": 16}, {"value": 24}]}}
+        return original(uri, args, options)
+    client.call = call
+    failure = None
+    try:
+        category = collect_conversion_platform_metadata_probe(runtime)
+    except AssertionError as exc:
+        failure = exc; category = runtime.category_results[-1]
+    receipt = json.loads(Path(category["observation_path"]).read_text())
+    assert receipt["collection_complete"] is (not missing_detail)
+    assert receipt["business_effect_verified"] is False and receipt["mutation_allowed"] is False
+    assert all(command[0] in {"status", "query-object", "metadata"} for command in commands)
+    assert len(commands) <= 64 and receipt["candidates"][0]["object"]["id"] == retained[1]["id"]
+    if missing_detail:
+        assert category["status"] == "FAIL" and failure is not None and receipt["failure"]
+        assert receipt["candidates"][0]["field_lists"][0]["fields"][0]["name"] == "MaxBitDepth"
+    else:
+        assert category["status"] == "blocked" and failure is None
+        assert len(commands) == (10 if mode == "reference" else 8)
+        assert {row["object"]["id"] for row in receipt["candidates"]} == {row["id"] for row in retained}
+        assert all(row["fields"][0]["pages"][0]["metadata"]["type"] == (
+            "Reference" if mode == "reference" else "int32") for row in receipt["candidates"])
+        if mode == "reference":
+            assert all(row["reference_values"][0]["result"]["objects"][0]["local_references"]["Platform"]["id"] in {WINDOWS, MAC}
+                for row in receipt["candidates"])
+
+    lifecycle = tmp_path / "lifecycle"; lifecycle.mkdir()
+    fixture, events, _ = _fixture_run(lifecycle, workflow, monkeypatch)
+    target = tmp_path / "probe-final.jsonl"
+    monkeypatch.setenv("WWISE_CATEGORY_EVIDENCE_PATH", str(target))
+    monkeypatch.setattr(exact_real_evidence, "append_category_evidence", category_evidence.append_category_evidence)
+    monkeypatch.setattr(exact_real_evidence, "exact_transaction_outcomes",
+        lambda _state: category_evidence.exact_transaction_outcomes(runtime.state_dir))
+    fixture_runtime = next(fixture); fixture_runtime.category_results.extend(runtime.category_results)
+    if failure is None:
+        with pytest.raises(StopIteration): next(fixture)
+    else:
+        with pytest.raises(AssertionError): fixture.throw(failure)
+    final = json.loads(target.read_text().splitlines()[-1])
+    assert final["invocation"]["phase"] == "final" and final["transactions"] == []
+    assert final["invocation"]["outcome"] == ("FAIL" if missing_detail else "PASS")
+    assert next(row for row in final["categories"] if row["category"] == category["category"])["status"] == ("FAIL" if missing_detail else "blocked")
+    assert final["residual_state"]["sandbox"] == ("quarantined" if missing_detail else "deleted")
     assert events.index("shutdown") < events.index("release")

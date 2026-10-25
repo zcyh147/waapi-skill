@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import pytest
 
 from test_gateway_connection_binding import BindingClient
@@ -198,3 +199,39 @@ def test_verified_attached_codec_can_be_configured_with_exact_object_field_handl
         assert code == 0, json.dumps(result, indent=2)
     assert result["state"] == "verified"
     assert sum(uri == "ak.wwise.core.object.setProperty" for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version, altered_path, object_type, expected", [
+    ("2025.1", None, "ConversionPlugin", 0), ("2024.1", "<插件显示名称>", "ConversionPlugin", 0),
+    ("2025.1", "<Unnamed Conversion plugin>\n", "ConversionPlugin", 2),
+    ("2025.1", "<Unnamed Conversion plugin>", "Sound", 2),
+])
+def test_retained_2025_codec_identity_can_be_bound_without_a_reconstructed_path(tmp_path, version, altered_path, object_type, expected):
+    observed = json.loads((Path(__file__).parents[1] / "fixtures/metadata/conversion-plugin-native-2025.json").read_text())
+    row = observed["rows"][0]
+    assert row["name"] == "" and row["path"] == "<Unnamed Conversion plugin>"
+    if altered_path is not None:
+        row["path"] = altered_path
+    row["type"] = object_type
+    if object_type == "Sound":
+        row["name"] = "Named ordinary object"
+
+    class RetainedIdentityClient(BindingClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.object.get" and row["id"] in json.dumps(args):
+                return {"return": [{key: row[key] for key in ("id", "name", "type", "path")}]}
+            return super().call(uri, args, options)
+
+    env = configured_env(tmp_path, version=version)
+    env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
+    code, started = gateway.execute_gateway(["draft-start", "object.setProperty"], env=env)
+    assert code == 0, started
+    code, bound = gateway.execute_gateway(["draft-bind-object", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]),
+        "--object-id", row["id"]], env=env, client_factory=lambda _: RetainedIdentityClient(version))
+    assert code == expected, json.dumps(bound, indent=2)
+    if code == 0:
+        assert bound["bound_object"]["name"] == ""
+        assert bound["bound_object"]["handle"].startswith("boh1-")
+    else:
+        assert bound["error_code"] == "BUSINESS_OBJECT_BINDING_MISMATCH"

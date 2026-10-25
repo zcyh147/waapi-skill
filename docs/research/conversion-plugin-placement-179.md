@@ -35,10 +35,13 @@ After successful attachment, the returned codec GUID can enter the existing
 `object.setProperty` Draft. Live exact-object Field Handles select scalar
 properties, value domains and conditions; configuration has its own Preview,
 authorization, single execution and readback. ConversionPlugin Work Unit
-elements have `Name=""`; the shared identity rules now admit that exact
-anonymous type, preserving the existing path validation. Actual native path
-representation still needs the selected native observation; no reconstructed
-path or synthetic name is provided to callers.
+elements have `Name=""`. The retained Console2025.1.7.9143 read-only packet
+returns the opaque path `<Unnamed Conversion plugin>`. The existing type
+semantics now mark only ConversionPlugin paths as opaque display text, preserving
+their bounded, non-control native spelling unchanged. This adds no selector
+authority and does not relax ordinary hierarchy paths. Setter verification owns
+its class/owner checks; the separate ordinary field binding retains its existing
+GUID/name/type/path and Field Handle metadata revalidation contract.
 The verified codec identity is an operation-owned business outcome in the final
 `agent_result`, so ordinary verification compaction cannot remove the GUID,
 observed platform/class or separate configuration requirement.
@@ -141,5 +144,34 @@ and returned codec field after each effect. Unexpected anonymous identity
 shapes stop before writes and persist the partial observations. Four fake
 producer/consumer cases exercise this actual collector, independent post-verify
 corruption, setup stop, unresolved default reference, and the existing
-two-phase finalizer through its persisted category-v3 writer. Native admission
-and native effects remain pending; this collector has not launched Wwise.
+two-phase finalizer through its persisted category-v3 writer. Main's selected
+native attempt is recorded below; setter and configuration effects remain
+unproved.
+
+## Native2025 read-only setup failure and next probe
+
+Main's frozen144acba7 Console2025.1.7.9143 attempt ended in the original
+**FAIL**,14.60s, after three public read calls and before any transaction.
+With explicit Mac platform GUID, the owner-filtered query returned both PCM
+codec GUIDs. This proves that the platform option did not filter those object
+identities; no first-row or saved-file association may be inferred. The source
+full-tree hash/metadata/project mtime were preserved, process cleanup completed,
+and the failed sandbox was quarantined. The original category and assessment
+remain under `.waapi-skill-state/full-coverage/conversion-179-2025-native-r1/`.
+DefaultConversion independently resolved to the named PCM Conversion GUID.
+
+Matching objectReturn/WAQL named-accessor definitions expose no explicit codec
+platform identity, and WObjects Conversion/DefaultConversions PCM sources do
+not declare a platform association. That source finding is not native absence:
+live object field/reference metadata remains the next authoritative discovery
+surface. The next prepared node is
+`test_gateway_workflow_transaction_matrix.py::test_conversion_platform_metadata_read_only_probe`.
+It preserves both actual candidate identities, reads their exact field lists
+and details, and reads only metadata-proven reference values. Its fixed command
+set contains status, query-object and metadata only; it cannot create a Draft,
+confirm or execute a transaction. Complete observations are diagnostic/blocked
+pending association review, never codec-placement PASS or mutation authority.
+Three fake consumer cases cover scalar metadata, an explicitly disclosed
+reference/value branch and failed required detail through the actual existing
+final category writer. Main owns any new native attempt; the original root is
+never replayed or regraded.

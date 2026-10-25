@@ -85,9 +85,13 @@ succeeds. No committed project was opened or modified.
   snapshots before writing, verifies class/owner and other platform fields, and
   retains the verified codec GUID for a separate exact-object Field Handle
   Preview. Focused fake-Gateway and persisted-finalizer tests prove this path.
-  Native per-platform codec enumeration and actual anonymous identity shape
-  still require the selected prewrite observation; multiple/unknown rows stop
-  before mutation. Older arbitrary replacement/configuration remains unresolved;
+  Main's native2025.1.7.9143 prewrite observation returned both PCM codec GUIDs
+  despite an explicit platform, so the original attempt is retained FAIL with
+  no transactions. Exact platform association is unresolved; the setter remains
+  fail-closed rather than choosing a row. The actual anonymous display path is
+  now preserved by ConversionPlugin-only opaque identity semantics. A bounded
+  read-only candidate metadata/reference probe is prepared before any further
+  writes. Older arbitrary replacement/configuration remains unresolved;
   whole-Conversion donor copy is a separate existing alternative. Matching
   getProjectInfo.defaultConversion supplies the Project's default Conversion
   GUID without assuming the setter accepts Project GUIDs. See
