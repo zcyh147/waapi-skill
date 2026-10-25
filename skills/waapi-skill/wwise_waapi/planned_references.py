@@ -74,7 +74,14 @@ def graph_result_bindings(roots, result_handles, *, retain_created_results=False
                 and "rtpc" not in child and child.get("anonymous") is not True]
             names = [child["name"].casefold() for child in ordinary]
             return len(names) != len(set(names)) or any(has_duplicate_children(child) for child in ordinary)
-        if not retain_created_results and not any(has_rtpc(node) or has_duplicate_children(node) for node, _ in roots):
+        def has_named_inner_list(node):
+            # These candidates need their declaration handles even without a
+            # planned reference; Registry still owns exact class/List proof.
+            return any(child.get("type") in {"MetadataSlot", "PlaylistSlot"} or has_named_inner_list(child)
+                for descriptor in node.get("lists", []) for child in descriptor["objects"]) or any(
+                    has_named_inner_list(child) for child in node.get("children", []))
+        if not retain_created_results and not any(has_rtpc(node) or has_duplicate_children(node) or has_named_inner_list(node)
+                for node, _ in roots):
             return []
     if targets - {row["result_handle"] for row in bindings}:
         raise ValueError("Every planned reference target must belong to this compiled graph")

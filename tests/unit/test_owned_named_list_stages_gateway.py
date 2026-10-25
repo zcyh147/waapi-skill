@@ -717,7 +717,8 @@ def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', 
     return declare_playlist_member(task, owner, target, reference=reference, list_behavior=list_behavior)
 
 
-def declare_playlist_member(task, owner, target, *, reference=True, list_behavior='append'):
+def declare_playlist_member(task, owner, target, *, reference=True, list_behavior='append', declaration_id='playlist-slot', label='Requested occurrence'):
+    task.playlist_bound_handles = (owner, target)
     if list_behavior != 'append':
         code, configured = task.step('draft-business-configure', '--name-conflict', 'fail', '--list-behavior', list_behavior)
         assert code == 0, json.dumps(configured)
@@ -734,9 +735,10 @@ def declare_playlist_member(task, owner, target, *, reference=True, list_behavio
     assert code == 0, field
     reference_field = field['meaning_results'][0]['candidates'][0]['handle']
     reference_args = ['--field-value', reference_field, target] if reference else []
-    code, declared = task.step('draft-declare-new', '--declaration-id', 'playlist-slot', '--parent-handle', owner,
-        '--name', 'Requested occurrence', '--kind', kind, '--field', 'object_list', list_field, *reference_args)
+    code, declared = task.step('draft-declare-new', '--declaration-id', declaration_id, '--parent-handle', owner,
+        '--name', label, '--kind', kind, '--field', 'object_list', list_field, *reference_args)
     assert code == 0, declared
+    task.playlist_result_handles = [*getattr(task, 'playlist_result_handles', []), declared['draft']['declared_object']['result_handle']]
     return task
 
 
@@ -1046,3 +1048,24 @@ def test_created_node_continuation_rejects_unproved_selection_without_recreating
     assert code == 2 and task.revision == revision, rejected
     assert len(task.hierarchy_writes) == 1 and task.writes == []
     assert task.run('execute', tx)[0] == 2
+
+
+def test_playlist_replacement_binds_two_unnamed_members_across_owned_fragments(tmp_path):
+    task = playlist_creation_task(tmp_path, list_behavior='replace-all')
+    task.objects[ROOT]['parent'] = {'id': SECOND}
+    declare_playlist_member(task, *task.playlist_bound_handles, declaration_id='second-slot', label='Second occurrence')
+    assert len(set(task.playlist_result_handles)) == 2
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    second = '{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}'
+    assert task.objects[ROOT]['@Playlist'] == [{'id': SLOT}, {'id': second}]
+    assert OLD_SLOT not in task.objects and SECOND_SLOT not in task.objects
+    assert all(task.objects[oid]['name'] == '' and task.objects[oid]['PlaylistObject'] == {'id': FIRST} for oid in (SLOT, second))
+    created = verified['agent_result']['business_result']['created_objects']
+    assert {row['result_handle'] for row in created} == set(task.playlist_result_handles)
+    assert {row['declaration_label']: row['object']['id'] for row in created} == {'Requested occurrence': SLOT, 'Second occurrence': second}
+    assert len(task.writes) == 2
+    assert task.writes[0]['objects'][0].get('listMode', task.writes[0]['listMode']) == 'replaceAll'
+    assert task.writes[1]['objects'][0].get('listMode', task.writes[1]['listMode']) == 'append'
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 2
