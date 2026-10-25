@@ -132,8 +132,10 @@ def discovery_class_target_types(*, version, class_id, name, restriction):
     return TARGET_TYPES
 
 
-def observe_prospective(*, version, owner_id, target_id, name, restriction, read):
+def observe_prospective(*, version, owner_id, target_id, name, restriction, read, list_mode="append"):
     discovery_class_target_types(version=version, class_id=5636096, name=name, restriction=restriction)
+    if list_mode not in {'append', 'replaceAll'}:
+        raise ValueError('Playlist construction requires a closed native List mode')
     evidence = resolve_live_list_evidence(version, owner_id, 'Playlist', read=read)
     if evidence['scope']['class_id'] != 589840 or evidence['scope']['owner']['type'] != 'RandomSequenceContainer':
         raise ValueError('New PlaylistSlot requires its exact RandomSequenceContainer owner')
@@ -147,7 +149,7 @@ def observe_prospective(*, version, owner_id, target_id, name, restriction, read
     if (target.get('type') not in classes or type(target.get('classId')) is not int
             or target['classId'] != classes[target['type']] or _guid(target.get('parent')) != owner_id):
         raise ValueError('Playlist target must have an allowed exact class and be a direct child of its owner')
-    return {'kind': 'prospective_playlist_slot_direct_child', 'version': version, 'owner_id': owner_id,
+    return {'kind': 'prospective_playlist_slot_direct_child', 'version': version, 'owner_id': owner_id, 'list_mode': list_mode,
         'target_id': target_id, 'reference': name, 'restriction': deepcopy(restriction),
         'target': target, 'list_guard': guard, 'references': references}
 
@@ -155,14 +157,21 @@ def observe_prospective(*, version, owner_id, target_id, name, restriction, read
 def prospective_assertion(expected, *, read, after_write):
     try:
         actual = observe_prospective(version=expected['version'], owner_id=expected['owner_id'],
-            target_id=expected['target_id'], name=expected['reference'], restriction=expected['restriction'], read=read)
+            target_id=expected['target_id'], name=expected['reference'], restriction=expected['restriction'], read=read,
+            list_mode=expected.get('list_mode', 'append'))
         compared = deepcopy(actual)
         if after_write:
             # The graph verifier proves every new occurrence and final roster;
             # this condition retains the original ordered peers and references.
-            count = len(expected['list_guard']['members'])
-            compared['list_guard']['members'] = compared['list_guard']['members'][:count]
-            compared['references'] = compared['references'][:count]
+            if expected.get('list_mode') == 'replaceAll':
+                # Replacement intentionally removes old member GUIDs. The
+                # existing graph verifier owns their absence and new roster.
+                compared['list_guard']['members'] = expected['list_guard']['members']
+                compared['references'] = expected['references']
+            else:
+                count = len(expected['list_guard']['members'])
+                compared['list_guard']['members'] = compared['list_guard']['members'][:count]
+                compared['references'] = compared['references'][:count]
         passed = compared == expected
     except (ValueError, KeyError, TypeError) as exc:
         actual, passed = {'error': str(exc)}, False

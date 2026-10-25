@@ -299,7 +299,7 @@ def object_graph_business_contract_data(
                     "additional_profiles": [{"version": "2025.1", "owner_class": "RandomSequenceContainer",
                         "collection": "Playlist", "class": "PlaylistSlot", "native_name": "Gateway_owned_empty_string",
                         "initial_reference": "selected_existing_exact_direct_child",
-                        "scope": "new_member_with_inline_PlaylistObject; older_list_representations_remain_separate"}],
+                        "scope": "new_member_with_inline_PlaylistObject; append_or_replaceAll; older_list_representations_remain_separate"}],
                     "name_meaning": "declaration_label_not_intrinsic_Wwise_name",
                     "observed_native_name": "", "identity": "actual_GUID_class_owner_ordered_collection",
                     "other_profiles": "require_their_own_source_and_representation_proof"},

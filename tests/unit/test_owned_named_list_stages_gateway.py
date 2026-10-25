@@ -655,7 +655,7 @@ def test_metadata_local_relation_is_strict_in_final_graph_verification(tmp_path,
     assert task.run('execute', tx)[0] == 2 and len(task.writes) == 3
 
 
-def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', fixture_ids=None):
+def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', fixture_ids=None, list_behavior='append'):
     from tests.unit.test_playlist_reference_gateway import FACTS
     owner_id, target_id, old_slot_id, peer_id, new_slot_id = fixture_ids or (ROOT, FIRST, OLD_SLOT, SECOND_SLOT, SLOT)
     task = OwnedGraphTask(tmp_path, '2025.1', operation)
@@ -692,6 +692,10 @@ def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', 
             item, = args['objects']
             slot, = item['@Playlist']
             assert item['object'] == owner_id and slot == {'type': 'PlaylistSlot', 'name': '', '@PlaylistObject': target_id}
+            if item.get('listMode', args.get('listMode', 'append')) == 'replaceAll':
+                for previous in task.objects[owner_id]['@Playlist']:
+                    del task.objects[previous['id']]
+                task.objects[owner_id]['@Playlist'] = []
             task.objects[new_slot_id] = {'id': new_slot_id, 'name': '', 'type': 'PluginInnerObject', 'classId': 5636096,
                 'path': base + r'\[PlaylistSlot: (First)]', 'owner': {'id': owner_id}, 'notes': '', 'PlaylistObject': {'id': target_id}}
             task.objects[owner_id]['@Playlist'].append({'id': new_slot_id})
@@ -699,6 +703,9 @@ def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', 
         return original(uri, args, options)
     task.call = call
     owner, target = task.bind(owner_id), task.bind(target_id)
+    if list_behavior != 'append':
+        code, configured = task.step('draft-business-configure', '--name-conflict', 'fail', '--list-behavior', list_behavior)
+        assert code == 0, json.dumps(configured)
     code, kinds = task.step('draft-discover-types', '--role', 'object', '--meaning', 'PlaylistSlot')
     assert code == 0, kinds
     kind = kinds['type_candidates'][0]['handle']
@@ -863,7 +870,7 @@ def test_new_playlist_member_requires_selected_child_in_its_constructor(tmp_path
     assert task.writes == []
 
 
-@pytest.mark.parametrize('mode', ['replace-all', 'object.create'])
+@pytest.mark.parametrize('mode', ['object.create'])
 def test_new_playlist_member_does_not_extrapolate_its_constructor_contract(tmp_path, mode):
     task = playlist_creation_task(tmp_path, operation='object.create' if mode == 'object.create' else 'object.set')
     if mode == 'replace-all':
@@ -872,3 +879,36 @@ def test_new_playlist_member_does_not_extrapolate_its_constructor_contract(tmp_p
     code, result = task.step('draft-check')
     assert code == 2 and 'CONSTRAINED_REFERENCE_BOUNDARY' in json.dumps(result), result
     assert task.writes == []
+
+
+def test_new_playlist_member_replacement_removes_old_guids_and_verifies_exact_roster(tmp_path):
+    task = playlist_creation_task(tmp_path, list_behavior='replace-all')
+    target = deepcopy(task.objects[FIRST])
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects[ROOT]['@Playlist'] == [{'id': SLOT}]
+    assert OLD_SLOT not in task.objects and SECOND_SLOT not in task.objects
+    assert task.objects[FIRST] == target
+    assert len(task.writes) == 1 and task.writes[0]['listMode'] == 'replaceAll'
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 1
+
+
+@pytest.mark.parametrize('damage', ['old-guid-retained', 'target-parent', 'metadata'])
+def test_playlist_replacement_preserves_prewrite_guards_and_requires_old_guid_absence(tmp_path, damage):
+    task = playlist_creation_task(tmp_path, list_behavior='replace-all')
+    old = deepcopy(task.objects[OLD_SLOT])
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    if damage == 'old-guid-retained':
+        code, executed = task.run('execute', tx)
+        assert code == 0, executed
+        task.objects[OLD_SLOT] = old
+    elif damage == 'target-parent':
+        task.objects[FIRST]['parent'] = {'id': SECOND_SLOT}
+    else:
+        task.metadata['PlaylistObject']['restriction']['restrictions'].remove('mustChildOf')
+    code, result = task.run('verify' if damage == 'old-guid-retained' else 'execute', tx)
+    assert code == 2, result
+    assert len(task.writes) == (damage == 'old-guid-retained')
+    assert task.run('execute', tx)[0] == 2

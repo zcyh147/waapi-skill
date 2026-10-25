@@ -6752,7 +6752,8 @@ def _prepare_object_set(
                 list_bindings=planned_bindings,
                 result_context=result_context,
                 root_collection=descriptor.name,
-                playlist_owner=target if descriptor.name == "Playlist" and row_list_mode == "append" else None,
+                playlist_owner=target if descriptor.name == "Playlist" else None,
+                playlist_mode=row_list_mode,
                 rtpc_replace_all=row_list_mode == "replaceAll",
                 rtpc_snapshots=rtpc_snapshots,
                 merge_existing=row_conflict == "merge" and row_list_mode == "append",
@@ -8319,7 +8320,7 @@ def _resolve_object_set_import_type(
 
 
 def _prepare_prospective_reference_hierarchy(
-    references, *, class_id, class_info=None, version=None, read=None, platform=None, playlist_owner=None,
+    references, *, class_id, class_info=None, version=None, read=None, platform=None, playlist_owner=None, playlist_mode="append",
 ):
     """Validate new-node reference edges against explicit prospective values."""
     from .planned_references import PlannedReferenceTarget
@@ -8351,7 +8352,7 @@ def _prepare_prospective_reference_hierarchy(
                 if class_id != 5636096 or isinstance(target, PlannedReferenceTarget):
                     raise ValueError("New PlaylistSlot needs an exact already verified direct-child target")
                 condition = observe_prospective(version=version, owner_id=playlist_owner.object,
-                    target_id=target.object, name=info.name, restriction=info.restriction, read=read)
+                    target_id=target.object, name=info.name, restriction=info.restriction, read=read, list_mode=playlist_mode)
             except ValueError as exc:
                 raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", str(exc)) from exc
             conditions.append(condition)
@@ -8695,6 +8696,7 @@ def _prepare_object_node_specs(
     platform: str | None = None,
     live_source_parent: bool = False,
     playlist_owner: ResolvedObject | None = None,
+    playlist_mode: str = "append",
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
     node_paths = {node.request_path for node in nodes}
@@ -8820,7 +8822,7 @@ def _prepare_object_node_specs(
         if version == "2025.1" and type_info.class_id == 5636096 and merge_target is None:
             if playlist_owner is None or root_collection != "Playlist" or node.parent_request_path in node_paths:
                 raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
-                    "New PlaylistSlot construction requires the source-proven object.set append path on an exact existing owner.")
+                    "New PlaylistSlot construction requires the source-proven object.set List path on an exact existing owner.")
             if not any(field.name == "PlaylistObject" for field in node.references):
                 raise OperationContractError("PLAYLIST_CONSTRUCTOR_TARGET_REQUIRED",
                     "Choose the exact existing direct child before constructing this Playlist member. Empty-slot construction remains unproven.",
@@ -8955,7 +8957,8 @@ def _prepare_object_node_specs(
         if merge_target is None:
             hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id,
                 class_info=type_info, version=version, read=read, platform=platform,
-                playlist_owner=(playlist_owner if root_collection == "Playlist" and node.parent_request_path not in node_paths else None))
+                playlist_owner=(playlist_owner if root_collection == "Playlist" and node.parent_request_path not in node_paths else None),
+                playlist_mode=playlist_mode)
         else:
             desired_references = {row["name"].casefold(): row.get("target_id", row.get("curve")) for row in spec["references"]}
             for info, targets in reference_targets:
