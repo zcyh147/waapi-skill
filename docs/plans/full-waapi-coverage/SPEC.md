@@ -173,3 +173,36 @@ dispatch, the same-operation valid choice, and the existing native route gates.
 Record them as the approved explicit-choice boundary, not successful native
 omission, native absence or an invalid native schema. Historical failures remain
 unchanged. Every other version, branch and unresolved capability stays in scope.
+
+
+## User-approved prerequisite and delivery batches — 2026-10-25
+
+Implement [#197](https://github.com/zcyh147/waapi-skill/issues/197) before
+resuming business-feature work. Retrospect the main task and relevant subagent
+incidents, deduplicate causes, repair confirmed framework gaps, and exercise
+batch selection, failed/affected reruns, durable results and relevant evidence
+reuse through the existing test entrypoints. Existing verified fixes and new
+fixes must be counted separately; measured time must not be presented as a
+complete accounting of unmeasured elapsed hours.
+
+The published child split and native dependency edges are recorded in
+[delivery-batches.json](delivery-batches.json): #198–201 partition #186 and
+#202–204 partition #193. Original canonical owners, branch identities, scope
+and historical outcomes remain intact. Each child retains every applicable
+2021.1–2025.1 obligation and can be accepted independently of unrelated children.
+No obligation is completed or excluded merely by splitting a ticket.
+
+Group compatible object/property, media/file, runtime/event and Authoring
+tests while isolating mutable state and preserving independent outcomes. Use
+Python program tests plus proportional real-Wwise effects for functional work.
+Centralize separately budgeted Mac Fresh interaction testing in #194; #195
+aggregates its results and coordinates the required final combined gates,
+without a duplicate Fresh campaign or per-ticket full-repository sweeps.
+
+**Mandatory stopping point:** after #197 is implemented, reviewed, integrated
+and accepted, pause the existing Goal and report the unique problems found,
+already-fixed problems, newly fixed and regression-proven problems, remaining
+problems and the evidence-backed causes of repeated attempts. Do not start
+downstream business work until a new user instruction. No Fresh is authorized
+for #197. Preserve original evidence and avoid additional verification-depth
+expansion without the existing required user decision.

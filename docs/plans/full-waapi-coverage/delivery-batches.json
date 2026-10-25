@@ -1,0 +1,346 @@
+{
+  "prerequisite": 197,
+  "original_parent": 174,
+  "children": [
+    {
+      "key": "runtime_reads",
+      "parent": 186,
+      "title": "Complete runtime data and log workflows",
+      "number": 198,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/198",
+      "routes": [
+        "ak.wwise.core.log.addItem",
+        "ak.wwise.core.log.clear",
+        "ak.wwise.core.log.get",
+        "ak.wwise.core.profiler.getAudioObjects",
+        "ak.wwise.core.profiler.getBusses",
+        "ak.wwise.core.profiler.getCpuUsage",
+        "ak.wwise.core.profiler.getGameObjects",
+        "ak.wwise.core.profiler.getLoadedMedia",
+        "ak.wwise.core.profiler.getPerformanceMonitor",
+        "ak.wwise.core.profiler.getRTPCs",
+        "ak.wwise.core.profiler.getStreamedMedia",
+        "ak.wwise.core.profiler.getVoiceContributions",
+        "ak.wwise.core.profiler.getVoices"
+      ]
+    },
+    {
+      "key": "transport",
+      "parent": 186,
+      "title": "Complete transport creation, playback and cleanup workflows",
+      "number": 199,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/199",
+      "routes": [
+        "ak.wwise.core.transport.create",
+        "ak.wwise.core.transport.destroy",
+        "ak.wwise.core.transport.executeAction",
+        "ak.wwise.core.transport.getList",
+        "ak.wwise.core.transport.getState",
+        "ak.wwise.core.transport.prepare",
+        "ak.wwise.core.transport.useOriginals"
+      ]
+    },
+    {
+      "key": "capture",
+      "parent": 186,
+      "title": "Complete profiler capture, cursor and saved-file workflows",
+      "number": 200,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/200",
+      "routes": [
+        "ak.wwise.core.profiler.enableProfilerData",
+        "ak.wwise.core.profiler.getCursorTime",
+        "ak.wwise.core.profiler.moveCursor",
+        "ak.wwise.core.profiler.saveCapture",
+        "ak.wwise.core.profiler.setCursorTime",
+        "ak.wwise.core.profiler.startCapture",
+        "ak.wwise.core.profiler.stopCapture"
+      ]
+    },
+    {
+      "key": "meters",
+      "parent": 186,
+      "title": "Complete meter registration, query choices and result delivery",
+      "number": 201,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/201",
+      "routes": [
+        "ak.wwise.core.profiler.getMeters",
+        "ak.wwise.core.profiler.registerMeter",
+        "ak.wwise.core.profiler.unregisterMeter"
+      ]
+    },
+    {
+      "key": "core_files",
+      "parent": 193,
+      "title": "Complete generated audio-file business operations",
+      "number": 202,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/202",
+      "routes": [
+        "ak.wwise.debug.generateToneWAV"
+      ]
+    },
+    {
+      "key": "core_inspection",
+      "parent": 193,
+      "title": "Complete fixed Core and debug inspection workflows",
+      "number": 203,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/203",
+      "routes": [
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.getProjectInfo",
+        "ak.wwise.core.ping",
+        "ak.wwise.debug.getWalTree",
+        "ak.wwise.debug.validateCall",
+        "ak.wwise.waapi.getFunctions",
+        "ak.wwise.waapi.getSchema",
+        "ak.wwise.waapi.getTopics"
+      ]
+    },
+    {
+      "key": "host_control",
+      "parent": 193,
+      "title": "Complete permitted host, server and existing user-source execution workflows",
+      "number": 204,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/204",
+      "routes": [
+        "ak.wwise.cli.executeLuaScript",
+        "ak.wwise.cli.waapiServer",
+        "ak.wwise.core.executeLuaScript",
+        "ak.wwise.debug.enableAsserts",
+        "ak.wwise.debug.enableAutomationMode",
+        "ak.wwise.debug.restartWaapiServers",
+        "ak.wwise.debug.testAssert",
+        "ak.wwise.debug.testCrash"
+      ]
+    }
+  ],
+  "native_parent_edges": [
+    [
+      174,
+      197
+    ],
+    [
+      186,
+      198
+    ],
+    [
+      186,
+      199
+    ],
+    [
+      186,
+      200
+    ],
+    [
+      186,
+      201
+    ],
+    [
+      193,
+      202
+    ],
+    [
+      193,
+      203
+    ],
+    [
+      193,
+      204
+    ]
+  ],
+  "native_blocking_edges": [
+    [
+      177,
+      197
+    ],
+    [
+      178,
+      197
+    ],
+    [
+      179,
+      197
+    ],
+    [
+      180,
+      197
+    ],
+    [
+      181,
+      197
+    ],
+    [
+      182,
+      197
+    ],
+    [
+      183,
+      197
+    ],
+    [
+      184,
+      197
+    ],
+    [
+      185,
+      197
+    ],
+    [
+      186,
+      197
+    ],
+    [
+      187,
+      197
+    ],
+    [
+      188,
+      197
+    ],
+    [
+      189,
+      197
+    ],
+    [
+      190,
+      197
+    ],
+    [
+      191,
+      197
+    ],
+    [
+      192,
+      197
+    ],
+    [
+      193,
+      197
+    ],
+    [
+      194,
+      197
+    ],
+    [
+      195,
+      197
+    ],
+    [
+      198,
+      197
+    ],
+    [
+      199,
+      197
+    ],
+    [
+      200,
+      197
+    ],
+    [
+      201,
+      197
+    ],
+    [
+      202,
+      197
+    ],
+    [
+      203,
+      197
+    ],
+    [
+      204,
+      197
+    ],
+    [
+      186,
+      198
+    ],
+    [
+      186,
+      199
+    ],
+    [
+      186,
+      200
+    ],
+    [
+      186,
+      201
+    ],
+    [
+      193,
+      202
+    ],
+    [
+      193,
+      203
+    ],
+    [
+      193,
+      204
+    ],
+    [
+      195,
+      198
+    ],
+    [
+      195,
+      199
+    ],
+    [
+      195,
+      200
+    ],
+    [
+      195,
+      201
+    ],
+    [
+      195,
+      202
+    ],
+    [
+      195,
+      203
+    ],
+    [
+      195,
+      204
+    ]
+  ],
+  "original_tickets_updated": [
+    177,
+    178,
+    179,
+    180,
+    181,
+    182,
+    183,
+    184,
+    185,
+    186,
+    187,
+    188,
+    189,
+    190,
+    191,
+    192,
+    193,
+    194,
+    195
+  ],
+  "stop_after": 197,
+  "fresh_budget": 0,
+  "verified": true,
+  "approved_date": "2026-10-25",
+  "versions": [
+    "2021.1",
+    "2022.1",
+    "2023.1",
+    "2024.1",
+    "2025.1"
+  ],
+  "status": "published_prerequisite_in_progress",
+  "canonical_parent_ownership_unchanged": true
+}

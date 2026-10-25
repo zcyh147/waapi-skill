@@ -112,3 +112,22 @@ The machine-readable proposal maps every local draft ID to its published issue.
 - [19: Complete permitted host-control and remaining fixed Core contracts](https://github.com/zcyh147/waapi-skill/issues/193)
 - [20: Validate Skill discovery and formal-harness compatibility end to end](https://github.com/zcyh147/waapi-skill/issues/194)
 - [21: Complete integrated five-version coverage and scoped acceptance](https://github.com/zcyh147/waapi-skill/issues/195)
+
+
+## Approved delivery adjustment — 2026-10-25
+
+The original 21 issues remain. New prerequisite [#197](https://github.com/zcyh147/waapi-skill/issues/197)
+blocks every open original issue and the seven new implementation children:
+
+| Original parent | Implementation children |
+| --- | --- |
+| #186 | #198 runtime/log reads; #199 playback transport; #200 capture/cursor/files; #201 meters |
+| #193 | #202 generated audio files; #203 fixed/debug inspection; #204 host/server and existing user-source execution |
+
+All children block their parent and #195. Native parent and blocking links were
+read back after publication. Exact URI partitions and 40 added blocking edges
+are in [delivery-batches.json](delivery-batches.json). This changes delivery
+scheduling, not canonical coverage ownership or required functionality.
+Complete #197, then pause and report before starting the children or other
+business work. #194 owns separately approved Fresh selection; #195 reuses its
+results and coordinates final combined gates.
