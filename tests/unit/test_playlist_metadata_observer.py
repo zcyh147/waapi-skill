@@ -41,8 +41,11 @@ def test_playlist_observer_preserves_disclosed_restrictions(tmp_path, has_flag):
     assert (tmp_path / "observations" / "playlist-reference-metadata.json").is_file()
 
 
-@pytest.mark.parametrize('fault', ['none', 'missing-independent-root-created'])
-def test_new_playlist_append_collector_persists_independent_outcome_with_real_gateway(tmp_path, monkeypatch, fault):
+@pytest.mark.parametrize('mode,fault', [
+    ('combined', 'none'), ('combined', 'missing-independent-root-created'), ('combined', 'unrelated-absence-error'),
+    ('root-create-only', 'none'), ('root-create-only', 'missing-independent-root-created'),
+])
+def test_new_playlist_append_collector_persists_independent_outcome_with_real_gateway(tmp_path, monkeypatch, mode, fault):
     import hashlib
     import importlib
     import json
@@ -59,9 +62,17 @@ def test_new_playlist_append_collector_persists_independent_outcome_with_real_ga
     task = playlist_creation_task(tmp_path, fixture_ids=(owner, target, first, peer, new))
     original = task.call
     verified_count = 0
-    root_created_id = '{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}'
+    root_only = mode == 'root-create-only'
+    root_created_id = new if root_only else '{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}'
     def call(uri, args=None, options=None):
-        if (fault == 'missing-independent-root-created' and verified_count == 3 and uri.endswith('object.get')
+        query = (args or {}).get('waql', '')
+        if (verified_count == 2 and uri.endswith('object.get')
+                and any(query == f'from object "{identity}" take 4' for identity in (first, peer, new))):
+            from tests.unit.test_debug_read_gateway import WaapiRequestFailed
+            task.calls.append((uri, args, options))
+            raise WaapiRequestFailed('ak.wwise.query.invalid_query', {'details': {'procedureUri': uri},
+                'message': query + (' - Unexpected query failure' if fault == 'unrelated-absence-error' else ' - Object not found')})
+        if (fault == 'missing-independent-root-created' and verified_count == (1 if root_only else 3) and uri.endswith('object.get')
                 and (args == {'from': {'id': [root_created_id]}} or args.get('waql', '').startswith(f'from object "{root_created_id}" take '))):
             task.calls.append((uri, args, options))
             return {'return': []}
@@ -94,8 +105,10 @@ def test_new_playlist_append_collector_persists_independent_outcome_with_real_ga
     lock = sandbox_fixture.LiveSandboxLock(tmp_path / 'locks')
     lock.__enter__()
     error = None
+    node = ('test_new_playlist_slot_root_create_preserves_existing_peers' if root_only
+        else 'test_new_playlist_slot_append_preserves_existing_peers')
     try:
-        collector.test_new_playlist_slot_append_preserves_existing_peers(runtime)
+        getattr(collector, node)(runtime)
     except AssertionError as exc:
         error = exc
     assert (error is not None) == (fault != 'none'), error
@@ -103,13 +116,20 @@ def test_new_playlist_append_collector_persists_independent_outcome_with_real_ga
     body = Path(category['observation_path']).read_bytes()
     observation = json.loads(body)
     assert category['observation_sha256'] == hashlib.sha256(body).hexdigest()
-    assert len(task.writes) == 3
-    assert len(observation['transactions']) == 3 and all(tx['verify']['verified'] is True for tx in observation['transactions'])
-    assert [row['argv'][0] for row in observation['calls']].count('execute') == 3
-    assert [row['argv'][0] for row in observation['calls']].count('verify') == 3
+    expected_transactions = 1 if root_only else (2 if fault == 'unrelated-absence-error' else 3)
+    assert len(task.writes) == expected_transactions
+    assert len(observation['transactions']) == expected_transactions and all(tx['verify']['verified'] is True for tx in observation['transactions'])
+    assert [row['argv'][0] for row in observation['calls']].count('execute') == expected_transactions
+    assert [row['argv'][0] for row in observation['calls']].count('verify') == expected_transactions
+    if root_only:
+        assert observation['operations'] == ['object.create']
+        assert not any(uri == 'ak.wwise.core.object.set' for uri, _, _ in task.calls)
+        native_creates = [args for uri, args, _ in task.calls if uri == 'ak.wwise.core.object.create']
+        assert native_creates == [{'parent': owner, 'type': 'PlaylistSlot', 'name': '',
+            'list': 'Playlist', '@PlaylistObject': target, 'onNameConflict': 'fail', 'autoAddToSourceControl': False}]
+        assert not any(row['argv'][0] == 'draft-start' and 'object.set' in row['argv'] for row in observation['calls'])
     monkeypatch.setattr(finalizer, 'MODULE', 'tests/destructive/test_playlist_reference_metadata.py::')
     module = SimpleNamespace(__file__=collector.__file__, REPO_ROOT=workflow.REPO_ROOT)
-    node = 'test_new_playlist_slot_append_preserves_existing_peers'
     records = finalizer._finish((module, runtime, task, lock, proof), tmp_path, monkeypatch, [(node, error)])
     final = records[-1]
     assert final['invocation']['phase'] == 'final'
@@ -117,23 +137,35 @@ def test_new_playlist_append_collector_persists_independent_outcome_with_real_ga
         'outcome': 'PASS' if error is None else 'FAIL'}]
     assert final['source']['hash_before'] == final['source']['hash_after'] == proof.digest
     assert final['residual_state']['process_cleanup'] == 'cleaned'
-    assert len(final['transactions']) == 3 and all(tx['state'] == 'verified' for tx in final['transactions'])
+    assert len(final['transactions']) == expected_transactions and all(tx['state'] == 'verified' for tx in final['transactions'])
     final_category, = final['categories']
     assert final_category['observation_sha256'] == hashlib.sha256(body).hexdigest()
     if fault == 'none':
         assert category['status'] == 'PASS' and observation['business_effect_verified'] is True
-        assert observation['created']['id'] == new and observation['created']['name'] == ''
-        assert observation['created']['class_id'] == 5636096 and observation['created']['owner']['id'] == owner
-        assert [row['id'] for row in observation['after_members']] == [first, peer, new]
-        assert observation['new_reference']['id'] == target
-        assert observation['replacement_business_effect_verified'] is True and observation['root_create_business_effect_verified'] is True
-        assert [row['id'] for row in observation['root_members']] == ['{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}', root_created_id]
+        assert observation['root_created']['id'] == root_created_id and observation['root_created']['name'] == ''
+        assert observation['root_created']['class_id'] == 5636096 and observation['root_created']['owner']['id'] == owner
+        assert observation['root_create_business_effect_verified'] is True
+        if root_only:
+            assert observation['root_create_before'] == observation['before_members']
+            assert [row['id'] for row in observation['root_members']] == [first, peer, new]
+            assert observation['root_members'][:2] == observation['before_members']
+            assert observation['root_peer_references'] == observation['before_references']
+        else:
+            assert observation['created']['id'] == new
+            assert [row['id'] for row in observation['after_members']] == [first, peer, new]
+            assert observation['new_reference']['id'] == target
+            assert observation['replacement_business_effect_verified'] is True
+            assert [row['id'] for row in observation['root_members']] == ['{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}', root_created_id]
         assert final['invocation']['outcome'] == final_category['status'] == 'PASS'
         assert final['residual_state']['sandbox'] == 'deleted'
     else:
         assert category['status'] == 'FAIL' and observation['business_effect_verified'] is False
         assert 'error' in observation and 'root_created' not in observation
-        assert observation['append_business_effect_verified'] is observation['replacement_business_effect_verified'] is True
+        if root_only:
+            assert 'append_business_effect_verified' not in observation and 'replacement_business_effect_verified' not in observation
+        else:
+            assert observation['append_business_effect_verified'] is True
+            assert observation.get('replacement_business_effect_verified', False) is (fault != 'unrelated-absence-error')
         assert final['invocation']['outcome'] == final_category['status'] == 'FAIL'
         assert final['residual_state']['sandbox'] == 'quarantined'
         assert Path(final['residual_state']['quarantine_path']).is_dir()
