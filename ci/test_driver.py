@@ -126,6 +126,7 @@ class TestRequest:
     version: str
     mode: str
     pytest_args: tuple[str, ...]
+    batch_plan: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -147,6 +148,7 @@ def usage(*, windows: bool | None = None) -> str:
     )
     return f"""Usage:
   {launcher} --version <version> --mode <mode> [-- <extra pytest args...>]
+  {launcher} --batch-plan /absolute/path/to/plan.json
   {launcher} -v <version> -m <mode> [-- <extra pytest args...>]
   {launcher} <version> <mode> [-- <extra pytest args...>]  # backwards compatible
 
@@ -165,6 +167,8 @@ Modes:
   focused      Alias for matrix
 
 Notes:
+  - Opt-in test-batch/v1 plans select finite groups, sources and dependencies.
+    See ci/test_batch.py; an existing evidence root is never reused.
   - Environment overrides are respected if already set:
       WWISE_TEST_CONFIG, WWISE_CONSOLE, WWISE_SAMPLE_PROJECT_PATH,
       WWISE_SANDBOX_ROOT, WWISE_STARTUP_TIMEOUT, WWISE_READINESS_TIMEOUT,
@@ -234,6 +238,10 @@ def _standalone_scalar_program_requested(arguments: Sequence[str], repo_root: Pa
 
 
 def parse_request(arguments: Sequence[str]) -> TestRequest | None:
+    if arguments and arguments[0] == '--batch-plan':
+        if len(arguments) != 2:
+            raise TestDriverError('--batch-plan requires exactly one plan path')
+        return TestRequest('none', 'batch', (), Path(arguments[1]))
     version = ""
     mode = ""
     positional: list[str] = []
@@ -413,6 +421,12 @@ class TestDriver:
         self.windows = os.name == "nt" if windows is None else windows
 
     def run(self, request: TestRequest) -> int:
+        if request.batch_plan is not None:
+            if __package__:
+                from .test_batch import run_batch
+            else:
+                from test_batch import run_batch
+            return run_batch(self, request.batch_plan)
         if request.mode == "notice-fast":
             return self._run_notice_fast(request.pytest_args)
         if request.mode == "program":

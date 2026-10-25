@@ -22,6 +22,10 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "live: tests that require Wwise and WAAPI access")
     config.addinivalue_line("markers", "destructive: tests that may mutate a fixture Wwise project")
     config.addinivalue_line("markers", "active_gate_policy: fake tests for active gate skip/fail semantics")
+    result = os.getenv('WAAPI_TEST_BATCH_RESULT')
+    if result:
+        from tests.support.test_run_result import BatchResult
+        config.pluginmanager.register(BatchResult(result), 'waapi-batch-result')
 
 
 @pytest.hookimpl(hookwrapper=True, tryfirst=True)
