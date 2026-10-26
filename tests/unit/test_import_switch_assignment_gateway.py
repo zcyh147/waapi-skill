@@ -178,3 +178,65 @@ def test_import_switch_value_does_not_accept_caller_native_directive_grammar(tmp
     command('draft-revise-declaration', '--declaration-id', 'snow', '--switch-value', '<Switch Group:Surface>Snow')
     command('draft-check', expected_error='INVALID_SWITCH_VALUE')
     assert not any(u == 'ak.wwise.core.audio.import' for u, _, _ in client.calls)
+
+
+class ExistingSfxSwitchImportClient(SwitchImportClient):
+    """Existing Sound reuse with no unrelated field to force owner splitting."""
+
+    def __init__(self, tmp_path):
+        super().__init__(tmp_path, media=True)
+        self.created = True
+        self.child.pop('@Volume')
+        self.child['notes'] = 'keep owner notes'
+        self.source['notes'] = 'keep source notes'
+        self.source['audioSource:language']['id'] = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+        self.source['originalFilePath'] = str(tmp_path / 'project/Originals/SFX/Footsteps/Snow.wav')
+        original = Path(self.source['originalFilePath'])
+        original.parent.mkdir(parents=True, exist_ok=True)
+        original.write_bytes(_tone_wav_bytes(samples=[100] * 8))
+
+    def call(self, uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri == 'ak.wwise.core.object.get' and args.get('waql') == f'from object "{self.CHILD}" select children take 129':
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': [{k: deepcopy(self.source[k]) for k in options['return'] if k in self.source}]}
+        if uri == 'ak.wwise.core.audio.import':
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args['importOperation'] == 'useExisting'
+            owner_row, source_row = args['imports']
+            assert owner_row == {'objectPath': self.child['path'], 'objectType': 'Sound SFX',
+                                 'switchAssignation': '<Switch Group:Surface>Snow'}
+            assert source_row == {'objectPath': '', 'importLocation': self.source['id'],
+                                  'audioFile': str(self.tmp_path / 'Snow.wav'), 'importLanguage': 'SFX',
+                                  'originalsSubFolder': 'Footsteps'}
+            Path(self.source['originalFilePath']).write_bytes(Path(source_row['audioFile']).read_bytes())
+            self.assignments.append({'child': self.CHILD, 'stateOrSwitch': self.VALUE})
+            return {'objects': deepcopy([self.child, self.source]), 'log': [], 'files': [self.source['originalFilePath']]}
+        return super().call(uri, args, options)
+
+
+def test_existing_sfx_media_and_switch_only_reimport_keeps_directive_on_owner(tmp_path):
+    client = ExistingSfxSwitchImportClient(tmp_path)
+    before_owner, before_source = deepcopy(client.child), deepcopy(client.source)
+    before_assignments = deepcopy(client.assignments)
+    command, _, _ = _import_fields_draft(tmp_path, '2025.1', client)
+    (tmp_path / 'Snow.wav').write_bytes(WAV_BYTES)
+    bound = command('draft-bind-object', '--object-id', client.CHILD)
+    command('draft-declare-existing', '--declaration-id', 'snow', '--object-handle', bound['bound_object']['handle'],
+            '--field', 'media_file', str(tmp_path / 'Snow.wav'), '--switch-value', 'Snow')
+    command('draft-check')
+    tx = command('preview-from-draft')['transaction_id']
+    shown = command('transaction-show', tx)
+    rows = shown['artifact']['prepared_operation']['dispatch']['args']['imports']
+    assert len(rows) == 2, rows
+    assert rows[0]['switchAssignation'] == '<Switch Group:Surface>Snow'
+    assert 'audioFile' not in rows[0] and 'switchAssignation' not in rows[1]
+    command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    command('execute', tx)
+    verified = command('verify', tx)
+    assert verified['verified'] is True, verified
+    assert client.assignments == [*before_assignments, {'child': client.CHILD, 'stateOrSwitch': client.VALUE}]
+    assert client.child == before_owner and client.source == before_source
+    assert Path(client.source['originalFilePath']).read_bytes() == WAV_BYTES
+    assert len([u for u, _, _ in client.calls if u == 'ak.wwise.core.audio.import']) == 1
+    assert not any(u.endswith('.addAssignment') or u.endswith('.setReference') for u, _, _ in client.calls)

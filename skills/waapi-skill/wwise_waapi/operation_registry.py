@@ -14582,6 +14582,7 @@ def _normalize_existing_sfx_imports(
 def _import_requires_explicit_source(target: Mapping[str, Any]) -> bool:
     return target.get("media_expected") is True and (
         bool(target.get("validated_properties") or target.get("validated_references"))
+        or isinstance(target.get("switch_assignment_binding"), Mapping)
         or (bool(target.get("pre_state_rows"))
             and _localized_import_read_language(target.get("requested_language")) is not None
             and "requested_audio_source_notes" in target)
@@ -14608,6 +14609,8 @@ def _materialize_audio_import_dynamic_rows(
     explicit ``AudioFileSource`` media row, while the WAAPI call count remains
     exactly one. MusicTrack media always uses an explicit source: importing
     onto an already-created Track path alone can silently create no media.
+    Bound Switch assignments also belong on that owner row, including when
+    reuse targets a Source GUID and no property/reference/Event was requested.
     Events on an exact existing source binding likewise require a separate
     owner row: an AudioFileSource cannot be the Event Action's Sound target.
     Localized Audio Source notes also use the explicit Source row so their
