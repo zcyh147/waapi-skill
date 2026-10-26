@@ -6,6 +6,9 @@ from pathlib import Path
 
 from tests.unit.test_audio_import_business_gateway import ImportFieldsClient, _import_fields_draft, PARENT_ID, waapi_gateway, _env
 from tests.support.gateway_config import set_gateway_config
+from tests.support.riff_wave import _tone_wav_bytes
+
+WAV_BYTES = _tone_wav_bytes()
 
 
 class SwitchImportClient(ImportFieldsClient):
@@ -86,7 +89,7 @@ def _draft(tmp_path, *, effect=True, media=False):
     client = SwitchImportClient(tmp_path, effect=effect, media=media)
     command, parent, _ = _import_fields_draft(tmp_path, '2025.1', client)
     if media:
-        (tmp_path / 'Snow.wav').write_bytes(b'RIFF requested media')
+        (tmp_path / 'Snow.wav').write_bytes(WAV_BYTES)
     command('draft-declare-new', '--declaration-id', 'snow', '--parent-handle', parent,
             '--name', 'SnowSounds', '--kind', 'sound-sfx' if media else 'random-container', '--switch-value', 'Snow',
             *(('--field', 'media_file', str(tmp_path / 'Snow.wav'), '--field', 'volume_db', '-6') if media else ()))
@@ -120,7 +123,7 @@ def test_import_media_assignment_stays_on_sound_owner_during_source_expansion(tm
     verified = command('verify', tx)
     assert verified['verified'] is True, verified
     assert client.assignments[-1] == {'child': client.CHILD, 'stateOrSwitch': client.VALUE}
-    assert Path(client.source['originalFilePath']).read_bytes() == b'RIFF requested media'
+    assert Path(client.source['originalFilePath']).read_bytes() == WAV_BYTES
     assert len([u for u, _, _ in client.calls if u == 'ak.wwise.core.audio.import']) == 1
 
 
@@ -151,7 +154,7 @@ def test_import_media_success_does_not_verify_an_ignored_switch_assignment(tmp_p
         env=set_gateway_config(_env(tmp_path), wwise_version='2025.1'), client_factory=lambda _url: client)
     assert code == 2, result
     assert result['verified'] is False
-    assert Path(client.source['originalFilePath']).read_bytes() == b'RIFF requested media'
+    assert Path(client.source['originalFilePath']).read_bytes() == WAV_BYTES
     assert any(not row['passed'] and 'Switch assignment effect' in row['name'] for row in result['verification']['assertions'])
 
 
