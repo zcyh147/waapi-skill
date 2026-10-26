@@ -1317,3 +1317,31 @@ Legacy import Render/source-parent verification, richer history/graph/list
 branches, Authoring readiness, evidence reconciliation and final broad gates
 remain required. No additional ticket closes; no Fresh, Windows or final-review
 acceptance is claimed.
+
+## #183 current implementation and scoped evidence — 2026-10-27
+
+Candidate `e6bb933f` integrates Core generation omission/default, temporary and
+bounded all-user Bank choices; external conversion's omitted output mapping;
+and Definition repeated-bank/object rows across ordered distinct files plus
+GameSync exclusions. All applicable pinned lanes retain closed public inputs,
+configuration/policy/Preview/execute-once guards and honest verification. Memory
+generation and complex/nonempty-prestate Definition imports disclose their
+result-only limit before authorization. Simple empty-before Definition inputs
+retain exact inclusion verification. Table imports require code proof only.
+Both review axes passed; optional test-helper naming feedback is nonblocking.
+
+The single macOS Console 2025.1.7/build 9143 native node at
+`soundbank183-core-files-2025-r1` independently proved ordinary audio.convert
+and temporary Bank generation, then failed external omitted-output artifact
+verification. Its overall original FAIL and failed sandbox are retained; source
+and cleanup checks passed. See the dated Test Inventory entry for exact scope,
+receipts and focused code runs. Diagnose the third mechanism from retained data;
+any necessary follow-up selects only that failed mechanism, not the successful
+first two. No Fresh or final Program/Nonlive gate ran.
+
+The owned `audio.setConversionPlugin` route still depends on #179's explicit
+platform-association verification decision; native GitHub #183 now records that
+blocking edge. The existing global branch generator also encountered a retained
+Source successor-context mismatch once; #195 owns its final reconciliation.
+Neither problem is hidden by the local public contract checks or treated as
+native absence. #183 and #174 remain open.

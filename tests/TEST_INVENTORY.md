@@ -5,6 +5,47 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-27 #183 Core file workflows and Definition coverage
+
+Integrated candidate `e6bb933f` includes the reviewed Core option mappings,
+Definition completion and one three-effect native witness. Definition's focused
+program run passed **115 checks in 11.65s**; the combined seal/policy/admission
+selection passed **4 checks in 3.85s**. The later audio.convert witness extension
+passed its **2 producer-to-persisted-writer controls in 2.62s**. These are separate
+focused runs, not a full Program/Non-live gate or an additive campaign total.
+The Program roster contains 375 entries; that is a structural count.
+
+On macOS WwiseConsole **2025.1.7/build 9143**, root
+`.waapi-skill-state/full-coverage/soundbank183-core-files-2025-r1`, the selected
+node `test_core_audio_conversion_temporary_bank_and_default_external_conversion`
+ended **FAIL, 7.71s**, after three independently authorized transactions:
+
+- `audio.convert`: independent exact Sound/active Source readbacks identified a
+  new nonempty owned WEM; input and identity preservation passed. The Gateway
+  itself still reports `result_schema_checked`, not business verification.
+- Temporary SoundBank generation: independent nonempty Bank artifact and
+  identity/input preservation passed; the transaction was verified.
+- External-source conversion with omitted output: native result was `{}`, but
+  the expected WEM was absent from the bound default output directory.
+  Verification failed. Conversion success and the default location are not
+  accepted from this result.
+
+The final category row retains the first two scoped PASS observations and the
+third FAIL; the whole selected node remains FAIL. The original observation
+SHA-256 is `ac7541f885fa4048c245b11566341daf4b2d2147e0d59f7dea839bbff1819d09`.
+Source full hash, tree metadata and project mtime were unchanged; owned processes
+were cleaned, and the failed sandbox was quarantined. The root's
+`main-assessment.json` and copied original category rows retain exact paths.
+Read-only diagnosis precedes any failed-only follow-up; neither successful
+mechanism needs repetition solely because the combined node failed.
+
+Definition/table imports use the approved wrapper/code-test acceptance and had
+no new native run. No Fresh, Windows-host, 2024 native-effect or final broad-gate
+credit is added. The global branch snapshot generator failed once on the
+retained Source successor context; original snapshots remain unchanged and
+#195 owns reconciliation. #183 remains open, including its #179 codec-setter
+dependency and unresolved external conversion effect.
+
 ## 2026-10-27 #182 Source-identity boundary approved
 
 The user approved the precise [localized TSV Source-identity boundary](../docs/plans/full-waapi-coverage/SPEC.md#user-approved-localized-tsv-source-identity-boundary--2026-10-27):
