@@ -14909,6 +14909,42 @@ def _is_tab_audio_file_source_target(target: Mapping[str, Any], source_operation
             and _object_type_token(target.get("requested_object_type")) == "audiofilesource")
 
 
+def _reconcile_import_media_ownership(targets: Sequence[Mapping[str, Any]]) -> None:
+    """One logical row owns each actual language-scoped media Source."""
+    claims: dict[tuple[str, ...], tuple[int, Mapping[str, Any]]] = {}
+    for index, target in enumerate(targets):
+        source_path = target.get("expected_audio_file_source_result_path")
+        if target.get("media_expected") is not True or not isinstance(source_path, str):
+            continue
+        language = target.get("requested_language")
+        if not isinstance(language, str):
+            raise OperationContractError("INVALID_PREVIEW", "A media Source ownership claim lacks its requested language.")
+        source_id = target.get("localized_audio_file_source_id") or target.get("existing_sfx_source_id")
+        explicit_rows = target.get("explicit_audio_file_source_pre_state_rows")
+        if source_id is None and isinstance(explicit_rows, list) and len(explicit_rows) == 1:
+            source_id = explicit_rows[0].get("id")
+        keys = [("path", source_path.casefold(), language.casefold())]
+        if _valid_object_id(source_id):
+            keys.append(("id", source_id.casefold()))
+        for key in keys:
+            prior = claims.get(key)
+            if prior is not None:
+                prior_index, prior_target = prior
+                raise OperationContractError(
+                    "DUPLICATE_TARGET",
+                    "Only one import row may own media for each language-scoped AudioFileSource.",
+                    details={
+                        "source_path": source_path,
+                        "source_id": source_id,
+                        "language": language,
+                        "rows": [prior_target.get("row_number", prior_index), target.get("row_number", index)],
+                        "target_paths": [prior_target.get("canonical_target_path"), target.get("canonical_target_path")],
+                    },
+                )
+        for key in keys:
+            claims[key] = (index, target)
+
+
 def _prepare_closed_import_plan(
     request: OperationRequest,
     *,
@@ -15646,6 +15682,8 @@ def _prepare_closed_import_plan(
             targets, dispatch_args, originals_context, version=request.version, read=read,
         )
         plan = {**dict(plan), "dispatch_args": dispatch_args}
+    _reconcile_import_media_ownership(targets)
+
     from .effect_render_conditions import prepare_import, EffectRenderConditionError
     try:
         render_state = prepare_import(targets, version=request.version, operation=source_operation,
