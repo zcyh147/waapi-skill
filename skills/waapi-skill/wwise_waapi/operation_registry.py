@@ -15229,7 +15229,7 @@ def _reconcile_import_media_ownership(targets: Sequence[Mapping[str, Any]]) -> N
 
 def _read_import_dialogue_referrers(owner_id: Any, *, read: ReadCall) -> list[dict[str, Any]]:
     if not _valid_object_id(owner_id):
-        raise OperationContractError("INVALID_READBACK", "Dialogue association membership requires an exact Sound GUID.")
+        raise OperationContractError("INVALID_READBACK", "Dialogue association membership requires an exact imported owner GUID.")
     rows = _rows(read(OBJECT_GET_URI, {"waql": f'from object "{owner_id}" select referencesTo take 129'},
         {"return": [*IDENTITY_RETURN_FIELDS, "classId", "owner", "AudioNode"]}))
     if len(rows) > 128 or any(not _valid_object_id(row.get("id")) for row in rows):
@@ -15260,8 +15260,6 @@ def _prepare_import_dialogue_association(target: dict[str, Any], *, index: int,
         roles: dict[str, ResolvedObject], path_snapshots: list[dict[str, Any]], read: ReadCall) -> None:
     declaration = target["requested_dialogue_event"]
     event_path = declaration["path"]
-    if _object_type_token(target.get("metadata_object_type")) != "sound":
-        raise OperationContractError("IMPORT_DIALOGUE_OWNER_UNSUPPORTED", "This closed Dialogue import association requires a Sound owner; other owner forms remain unimplemented.")
     parent = _resolve_identity({"kind": "path", "value": event_path.rpartition("\\")[0]},
         role=f"import_dialogue[{index}].parent", read=read)
     if parent.row.get("type") not in {"WorkUnit", "Folder"}:
@@ -15286,8 +15284,8 @@ def _prepare_import_dialogue_association(target: dict[str, Any], *, index: int,
     event_class = _resolve_object_type("DialogueEvent", catalog=catalog)
     if existing and not _object_class_matches(existing[0].get("classId"), event_class.class_id):
         raise OperationContractError("INVALID_TARGET_TYPE", "Existing Dialogue Event class differs from live class metadata.")
-    # A name-only declaration creates the Event. AudioNode metadata/Entry
-    # availability is not a prerequisite without an explicit decision path.
+    # Sound name-only creation retains its proven no-Entry prerequisite. New
+    # owner forms require live AudioNode admission, even without a decision path.
     entry_classes = [row for row in catalog if row.name == "MultiSwitchEntry"]
     conditions = declaration.get("conditions", [])
     directive = event_path
@@ -15317,13 +15315,15 @@ def _prepare_import_dialogue_association(target: dict[str, Any], *, index: int,
         roles[f"import_dialogue[{index}].group[{position}]"] = group
         directive += ("@Path:" if position == 0 else ".") + f"<{ 'Switch Group' if root == 'Switches' else 'State Group'}:{relative}>" + value_name
     entry_field_metadata = []
-    if conditions and len(entry_classes) != 1:
-        raise OperationContractError("INVALID_METADATA", "Explicit Dialogue paths require the live MultiSwitchEntry class.")
-    if conditions:
+    validate_owner = bool(conditions) or _object_type_token(target.get("metadata_object_type")) != "sound"
+    if validate_owner and len(entry_classes) != 1:
+        raise OperationContractError("INVALID_METADATA", "Dialogue owner admission requires the live MultiSwitchEntry class.")
+    if validate_owner:
         info = _read_property_info(read, name="AudioNode", class_id=entry_classes[0].class_id)
         _require_object_reference_metadata(info)
         planned_owner = ResolvedObject(identity=ObjectIdentity(path=target["canonical_target_path"]),
-            object=target["canonical_target_path"], resolution="planned-import-owner", row={"type":"Sound"})
+            object=target["canonical_target_path"], resolution="planned-import-owner",
+            row={"type":target["metadata_object_type"]})
         _require_reference_target_allowed(info, planned_owner)
         entry_field_metadata.append(info.as_dict())
     for key, native in (("probability", "Probability"), ("weight", "Weight")):
@@ -15345,7 +15345,7 @@ def _prepare_import_dialogue_association(target: dict[str, Any], *, index: int,
         "numeric_properties": {native:declaration[key] for key,native in (("probability","Probability"),("weight","Weight")) if key in declaration},
         "entry_field_metadata": entry_field_metadata, "directive": directive, "before": before_referrers}
     target["class_metadata"].append(event_class.as_dict())
-    if conditions: target["class_metadata"].append(entry_classes[0].as_dict())
+    if validate_owner: target["class_metadata"].append(entry_classes[0].as_dict())
     roles[f"import_dialogue[{index}].parent"] = parent
     path_snapshots.append({"path": event_path, "fields": fields, "rows": existing})
 
