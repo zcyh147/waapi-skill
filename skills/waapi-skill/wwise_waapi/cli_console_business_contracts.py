@@ -5,6 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from .console_platform_copy import PROJECT_COPY_EXCLUSIONS
+
 from .console_project_operations import (
     CLI_PROJECT_FILE_URIS, MAX_MODEL_FILES, MAX_MODEL_DIRECTORIES, MAX_MODEL_DEPTH, MAX_MODEL_ENTRIES, MAX_MODEL_BYTES, MAX_MODEL_SNAPSHOT_BYTES, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
     MAX_PROJECT_XML_DEPTH, MAX_PROJECT_DECLARATION_ROWS, MAX_MISSING_PROJECT_DIRECTORIES,
@@ -731,7 +733,13 @@ def cli_console_business_contract_data(
         }} if operation == 'ak.wwise.cli.createNewProject' else {}),
         **({'effect_verification': {
             'saved_project_and_work_units': 'bounded_UTF8_XML_exact_name_base_and_preserved_model',
-            'copy_settings': 'compare_explicit_platform_values_in_all_observed_WPROJ_and_WWU_files',
+            'copy_settings': 'compare_exact_owned_platform_settings_in_all_observed_WPROJ_and_WWU_files',
+            'project_copy_exclusions': sorted(PROJECT_COPY_EXCLUSIONS),
+            'project_copy_exclusion_scope': 'direct_Project_string_Property_ValueList_Value_only; observe_target_settings_separately',
+            'copied_codec_identity': 'fresh_unique_Conversion_owned_object_ID_only',
+            'copy_source_evidence': f'references/semantic/{version}/platform-copy-sources.json',
+            'cross_base_copy': 'native_may_adjust_unsupported_format_or_sample_rate; '
+                'fallback_differences_remain_unverified_and_are_never_normalized_or_retried',
             'inherited_or_elided_copy_values': 'unresolved_no_business_acceptance_without_native_evidence',
             'preexisting_unregistered_platform_values': 'unresolved_no_business_acceptance',
             'prewrite_inputs': 'all_observed_files_and_root_identity_must_match_Preview',

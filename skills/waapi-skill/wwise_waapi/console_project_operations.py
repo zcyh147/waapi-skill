@@ -601,20 +601,28 @@ def inspect_cli_project_effect(effect):
                  == {key: row['preserved_model_sha256'] for key, row in old_model['files'].items()}}]
         unresolved = (['preexisting_unregistered_platform_values']
             if old_model['platform_settings'][name] else [])
+        copy_settings = None
         if source is not None:
-            expected = old_model['platform_settings'][source]
-            actual = model['platform_settings'][name]
-            if expected and expected == actual:
+            from .console_platform_copy import compare_platform_copy
+            source_base = next(row['ReferencePlatform'] for row in before['platforms'] if row['Name'] == source)
+            copy_settings = compare_platform_copy(old_model['platform_copy'], model['platform_copy'], source, name,
+                cross_base=source_base != args['new-platform-base'])
+            required = copy_settings['required_entries']
+            conflicts = (copy_settings['conflicting_entries'] or copy_settings['unexpected_entries']
+                or not copy_settings['codec_identities_valid'])
+            fallback = copy_settings['native_fallback_uncertain_entries']
+            if required and not conflicts and not copy_settings['missing_entries'] and not fallback:
                 checks.append({'name': 'Explicit source platform settings were copied throughout the saved model', 'passed': True})
             else:
                 # Native may elide inherited values. That representation needs
                 # matching native evidence; absence alone is not failure proof.
-                conflicts = any(key in actual and actual[key] != rows for key, rows in expected.items())
                 checks.append({'name': 'Copied settings contain no observed conflicting explicit values', 'passed': not conflicts})
-                unresolved.append('copy_settings_inherited_or_elided_native_representation' if expected
-                    else 'copy_settings_no_explicit_source_values')
+                unresolved.append('copy_settings_cross_base_native_fallback_unestablished' if fallback else
+                    'copy_settings_inherited_or_elided_native_representation' if required else
+                    'copy_settings_no_explicit_source_values')
         return {'observations': [{'kind': 'cli-added-platform-artifact', 'project': after,
             'saved_model_files': len(model['files']), 'copy_settings_source': source,
+            **({'copy_settings': copy_settings} if copy_settings is not None else {}),
             'unresolved': unresolved}], 'checks': checks, 'unresolved': unresolved}
     raise ValueError('Unknown Console project/file effect')
 
@@ -845,6 +853,8 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
     def digest(value):
         return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     identity = _project_io_root_identity(root)
+    from .console_platform_copy import PlatformCopyObservation
+    platform_copy = PlatformCopyObservation(selected_platforms, str(Path(project_path).relative_to(root)))
     files = _project_model_paths(project_path, root)
     summary = {'files': {}, 'platform_settings': {name: {} for name in selected_platforms}, 'anchors': {}, 'media_ids': {}}
     media_rows, media_sources, media_unresolved, media_mode = [], [], set(), None
@@ -875,23 +885,26 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
         summary['files'][relative] = {'proof': proof,
             'preserved_model_sha256': digest(_xml_value(document, excluded_platform=excluded_platform, document_root=True, exclude_media_storage=exclude_media_storage)),
             'wwise_version': document.get('WwiseVersion')}
-        def visit(node, context, owner):
+        def visit(node, context, owner, ancestors):
             label = (node.tag, node.get('ID', ''), node.get('Name', ''))
             current = [*context, label]
             if node.get('ID', '').startswith('{') and node.tag not in {'ObjectRef', 'MediaID', 'Platform'}:
                 owner = node.get('ID').upper()
                 summary['anchors'].setdefault(relative, []).append([node.tag, owner, node.get('Name')])
             platform = node.get('Platform')
+            key, value = None, None
             if platform in selected_platforms:
                 key = digest([relative, context, node.tag, sorted((k, v) for k, v in node.attrib.items() if k != 'Platform')])
                 value = _xml_value(node)
                 value[1] = [(k, v) for k, v in value[1] if k != 'Platform']
                 summary['platform_settings'][platform].setdefault(key, []).append(digest(value))
+            if selected_platforms:
+                platform_copy.visit(node, ancestors, relative, key, value, digest)
             if node.tag == 'MediaID':
                 summary['media_ids'].setdefault(relative, []).append([owner, [[key, value] for key, value in sorted(node.attrib.items())]])
             for child in node:
-                visit(child, current, owner)
-        visit(document, [], None)
+                visit(child, current, owner, [*ancestors, node])
+        visit(document, [], None, [])
     # Equality guards need the complete multiset, not thousands of repeated
     # names in every immutable Preview. Hash every row (including duplicates)
     # in deterministic order; keep counts for the media observation. The file,
@@ -923,6 +936,8 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
     for values in summary['platform_settings'].values():
         for rows in values.values():
             rows.sort()
+    if selected_platforms:
+        summary['platform_copy'] = platform_copy.finish()
     if files != _project_model_paths(project_path, root):
         raise SoundBankContractError('FILE_CHANGED', 'Project model file membership changed during observation')
     from .operation_soundbank import capture_file_proof
