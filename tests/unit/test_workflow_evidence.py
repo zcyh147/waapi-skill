@@ -351,9 +351,8 @@ def test_owner_only_tsv_fields_native_witness_reaches_persisted_final_writer(tmp
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="owner-fields-tsv")
 
 
-@pytest.mark.parametrize("fault", (None, "ignored-media", "indeterminate"))
-def test_combined_owner_media_tsv_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
-    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="owner-fields-media-tsv")
+def test_combined_owner_media_tsv_native_witness_stops_at_observed_source_boundary(tmp_path, monkeypatch):
+    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault="source-identity-boundary", witness_kind="owner-fields-media-tsv")
 
 
 @pytest.mark.parametrize("fault", (None, "missing-assignment", "indeterminate"))
@@ -813,6 +812,14 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
     assert final["invocation"]["outcome"] == ("PASS" if fault is None else "FAIL")
     assert report["business_effect_verified"] is (fault is None)
     assert report["transaction_budget"] == {"setup": 2, "witness": 1, "maximum_total": 3}
+    if fault == "source-identity-boundary":
+        assert len(final["transactions"]) == client.import_count == 2 and client.tab_count == 0
+        assert all(phase["verify"]["state"] == "verified" for phase in report["setup"])
+        assert report["calls"][-1]["argv"][0] == "draft-check"
+        assert report["calls"][-1]["payload"]["error_code"] == "TSV_COMBINED_SOURCE_IDENTITY_UNSAFE_ON_HOST"
+        assert not report["witness"] and "after" not in report["observations"]
+        assert final["residual_state"]["sandbox"] == "quarantined"
+        return
     if witness_kind == "ordinary-owner-source":
         assert all("Master-Mixer Hierarchy" not in json.dumps(call) and "Master Audio Bus" not in json.dumps(call)
             for call in report["calls"])
