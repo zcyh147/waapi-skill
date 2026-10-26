@@ -383,7 +383,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
             self.bus_work_unit = {"id": "{A74EEB4A-0805-4AFA-969C-53DCB862B550}", "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
                 "path": r"\Busses\Default Work Unit", "notes": "", "parent": None}
             self.objects[self.bus_work_unit["id"]] = self.bus_work_unit
-            self.bus = {"id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}", "name": "Main Audio Bus", "type": "Bus", "classId": 524304,
+            self.bus = {"id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}", "name": "Main Audio Bus", "type": "Bus", "classId": 1376272,
                 "path": r"\Busses\Default Work Unit\Main Audio Bus", "notes": "keep bus", "parent": {"id": self.bus_work_unit["id"]}}
             # The retained r2 public children reply and committed baseline
             # contain all four Buses. Put the selected Main Bus last so taking
@@ -426,7 +426,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 kind = row.get("objectType", "")
                 sound = "sound" in kind.casefold()
                 owner = {"id": "{" + str(uuid.uuid4()).upper() + "}", "name": name,
-                    "type": "Sound" if sound else "PropertyContainer", "classId": 65552 if sound else 1,
+                    "type": "Sound" if sound else "PropertyContainer", "classId": 65552 if sound else 524304,
                     "path": path, "parent": {"id": parent["id"]}, "notes": ""}
                 if sound: owner["@IsVoice"] = "voice" in kind.casefold()
                 self.objects[owner["id"]] = owner
@@ -474,7 +474,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 return info
             if uri.endswith("getTypes"):
                 return {"return": [{"classId": n, "name": name, "type": "WObject"} for n, name in (
-                    (1, "PropertyContainer"), (65552, "Sound"), (16, "AudioFileSource"), (1638416, "WorkUnit"), (524304, "Bus"))]}
+                    (524304, "PropertyContainer"), (65552, "Sound"), (16, "AudioFileSource"), (1638416, "WorkUnit"), (1376272, "Bus"))]}
             if uri.endswith("getPropertyAndReferenceNames"): return {"return": ["IsVoice", "Volume", "OutputBus", "OverrideOutput"]}
             if uri.endswith("getPropertyInfo"):
                 if args["property"] == "Volume":
