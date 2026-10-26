@@ -197,6 +197,6 @@ def test_unresolved_field_guidance_preserves_each_requested_value_mode(tmp_path,
 def test_native_enum_names_do_not_become_arbitrary_public_outputs():
     from tests.unit.test_object_query_result_pages import gateway
 
-    for native in ('blendTracks', 'states', 'suppportsRandomizer'):
+    for native in ('blendTracks', 'suppportsRandomizer', 'sound:arbitraryFilePath'):
         with pytest.raises(SystemExit):
             gateway.build_parser().parse_args(['query-object', '--exact-id', PROJECT_GUID, '--include', native])

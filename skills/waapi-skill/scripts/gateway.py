@@ -129,6 +129,7 @@ from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[report
     query_return_scope_options,
 )
 from wwise_waapi.object_query_outputs import (  # noqa: E402
+    DECLARED_QUERY_RETURN_SPELLINGS,
     QUERY_BUSINESS_OUTPUTS,
     QUERY_FIELD_MODES,
     QUERY_FIELD_OUTPUT_GROUPS,
@@ -6007,7 +6008,9 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
             raise GatewayInputError(f"query-object --include {name} is available in Wwise {', '.join(supported)}; selected version is {version}"
                                     + (f"; {alternative}" if alternative else ""))
         native, output = available_query_outputs(version)[name]
-        bindings.append(("derived" if native is None else "business", native or output, output))
+        kind = ("declared_return" if name in DECLARED_QUERY_RETURN_SPELLINGS
+                else "derived" if native is None else "business")
+        bindings.append((kind, native or output, output))
 
     try:
         requests = [parse_related_request(version, list(values), "--include-related") for values in related]
@@ -25570,6 +25573,11 @@ def _project_query_business_rows(
         grouped: dict[str, dict[str, Any]] = {}
         related_groups: dict[str, dict[str, Any]] = {}
         for kind, native, output in bindings:
+            if kind == "declared_return":
+                # These finite spellings have no proven per-choice result key
+                # or shape. Preserve one actual response, without attributing a
+                # canonical key to an alias or overwriting colliding choices.
+                continue
             if kind == "related_scope":
                 continue
             if kind in {"related", "related_identity", "related_unavailable"}:
@@ -25647,6 +25655,13 @@ def _project_query_business_rows(
                         code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
                         raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
                 item[output] = row[native]
+        declared = [native for kind, native, _ in bindings if kind == "declared_return"]
+        if declared:
+            item["declared_return_observation"] = {
+                "selected_spellings": declared,
+                "returned_values": {key: value for key, value in row.items()
+                                    if key not in SELECTED_REQUIRED_RETURN_FIELDS},
+            }
         for group in QUERY_FIELD_OUTPUT_GROUPS.values():
             if group in grouped:
                 item[group] = grouped[group]
