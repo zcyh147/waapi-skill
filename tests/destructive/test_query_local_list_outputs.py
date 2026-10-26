@@ -434,24 +434,24 @@ def collect_query_function_contexts(runtime, monkeypatch):
     assert not output.exists() and not output.is_symlink()
     evidence_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
     observation = {'candidate': runtime.candidate, 'version': runtime.version, 'read_only': True,
-        'transaction_count': 0, 'groups': [], 'context_transport_verified': False, 'business_effect_verified': False,
-        'boundary': 'documented advanced SELECT context transport only; no raw RETURN, invented GUID or ownership, setup writes, or scalar proof'}
+        'transaction_count': 0, 'groups': [], 'context_transport_verified': False, 'scalar_transport_verified': False, 'business_effect_verified': False,
+        'boundary': 'documented advanced SELECT contexts and closed scalar terminals; no raw RETURN, invented GUID/ownership/status values, or setup writes'}
     category = {'category': 'query-function-contexts', 'status': 'FAIL', 'observation_path': str(output),
-        'verifier_strength': 'source_pinned_positive_context_native_packet_and_exact_identity_readback'}
+        'verifier_strength': 'source_pinned_context_transport_and_actual_native_scalar_to_public_value_association'}
     runtime.category_results.append(category)
     dispatch_count = 0; packet_bytes = 0; invocation_count = 0
     original = waapi_gateway.WwiseDispatcher.dispatch
 
     def read(group, argv):
         nonlocal dispatch_count, packet_bytes, invocation_count
-        assert invocation_count < 20
+        assert invocation_count < 14
         invocation_count += 1
         record = {'argv': list(argv), 'dispatch_calls': [], 'native_packets': []}
         group['invocations'].append(record)
         before = set(evidence_root.glob('*.json'))
         def capture(dispatcher, api, **kwargs):
             nonlocal dispatch_count
-            assert dispatch_count < 64
+            assert dispatch_count < 96
             dispatch_count += 1
             assert api in READ_APIS
             call = {'api': api, **copy.deepcopy({key: kwargs.get(key) for key in ('version', 'args', 'options')})}
@@ -479,15 +479,46 @@ def collect_query_function_contexts(runtime, monkeypatch):
         rows = payload['agent_result']
         assert isinstance(rows, list) and len(rows) == 1, payload
         row, = rows
-        assert all(isinstance(row[key], str) for key in IDENTITY) and row['id'] and row['type'] and row['path']
+        assert all(isinstance(row.get(key), str) for key in IDENTITY) and row['id'] and row['type'] and row['path'], row
         native = [packet for packet in packets.values() if packet['api'] == 'ak.wwise.core.object.get']
-        assert native and any(packet.get('result', {}).get('return') == [row] for packet in native)
+        assert native and any(any(all(raw.get(key) == row[key] for key in IDENTITY)
+            for raw in packet.get('result', {}).get('return', []) if isinstance(raw, dict)) for packet in native)
         return row
 
     def exact(group, expected):
         row = read(group, ['query-object', '--exact-id', expected['id'], '--max-results', '1', '--detail'])
         assert all(row[key] == expected[key] for key in ('id', 'name', 'type')), (row, expected)
         return row
+
+    def scalar_group(label, expected, choices):
+        group = {'label': label, 'status': 'FAIL', 'invocations': [], 'source_owner': expected}
+        observation['groups'].append(group)
+        try:
+            argv = ['query-object', '--exact-id', expected['id'], '--max-results', '1', '--detail']
+            for tokens, _native, _path in choices:
+                argv.extend(['--include-related', *tokens])
+            row = read(group, argv)
+            assert all(row[key] == expected[key] for key in ('id', 'name', 'type'))
+            proofs = []
+            for descriptor in group['invocations'][0]['native_packets']:
+                packet = json.loads(read_file(Path(descriptor['path']), 2 * 1024 * 1024))
+                if packet['api'] != 'ak.wwise.core.object.get': continue
+                for native_row in packet.get('result', {}).get('return', []):
+                    if native_row.get('id') != expected['id']: continue
+                    for _tokens, native, path in choices:
+                        if native not in native_row: continue
+                        value = native_row[native]
+                        public = row
+                        for key in path: public = public[key]
+                        assert value is None or type(value) is (str if path[-1] == 'source' else bool)
+                        assert type(value) is type(public) and public == value
+                        proofs.append({'packet': descriptor['path'], 'native_field': native,
+                            'public_path': list(path), 'value': value})
+            group['actual_scalar_proofs'] = proofs
+            assert {proof['native_field'] for proof in proofs} == {choice[1] for choice in choices}, 'Required native scalar evidence missing; public omissions retained'
+            group['status'] = 'PASS'
+        except (AssertionError, KeyError) as exc:
+            group['failure'] = str(exc)
 
     try:
         facts = query_function_context_source_frame(runtime)
@@ -501,16 +532,29 @@ def collect_query_function_contexts(runtime, monkeypatch):
                 selected = read(group, ['query-object', '--advanced-waql', expression, '--max-results', '1', '--detail'])
                 assert all(selected[key] == fact['selected'][key] for key in ('id', 'name', 'type')), selected
                 assert exact(group, fact['selected']) == selected
-                assert exact(group, fact['owner']) == owner
                 group.update(status='PASS', selected=selected)
             except AssertionError as exc:
                 group['failure'] = str(exc)
                 # No GUID coercion, raw projection, retry, or dependent read after
                 # an adapter/native rejection. Other fixed contexts remain independent.
+        # Source anchors independently authorize these read-only exact-ID roots;
+        # neither scalar group depends on successful transport of another context.
+        scalar_group('field-status', facts['contexts'][2]['owner'], [
+            (['field-status', 'Pitch', 'linked'], 'isLinked("Pitch")', ('related', 'field_status', 'Pitch', 'linked')),
+            (['field-status', 'RTPC', 'overridable'], 'isOverridable("RTPC")', ('related', 'field_status', 'RTPC', 'overridable')),
+            (['field-status', 'OutputBus', 'override-source'], 'isSourceOfOverride("OutputBus")', ('related', 'field_status', 'OutputBus', 'override-source')),
+            (['field-status', 'RTPC', 'present'], 'hasProperty("RTPC")', ('related', 'field_status', 'RTPC', 'present')),
+        ])
+        scalar_group('curve-selection', facts['contexts'][3]['selected'], [
+            (['curve-selection', 'volume-dry'], 'curveToUse("VolumeDryUsage")', ('related', 'curve_selections', 'volume-dry', 'source')),
+            (['curve-selection', 'volume-wet-game'], 'curveToUse("VolumeWetGameUsage")', ('related', 'curve_selections', 'volume-wet-game', 'source')),
+        ])
         observation['source_after'] = query_function_context_source_frame(runtime)
         assert observation['source_before'] == observation['source_after']
-        assert all(group['status'] == 'PASS' for group in observation['groups']), 'Context transport incomplete; see retained per-group packets'
-        observation.update(context_transport_verified=True, business_effect_verified=True)
+        observation['context_transport_verified'] = all(group['status'] == 'PASS' for group in observation['groups'][:4])
+        observation['scalar_transport_verified'] = all(group['status'] == 'PASS' for group in observation['groups'][4:])
+        assert all(group['status'] == 'PASS' for group in observation['groups']), 'Query function collection incomplete; see retained per-group packets'
+        observation['business_effect_verified'] = True
         category['status'] = 'PASS'
     except BaseException as exc:
         observation['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
@@ -521,7 +565,7 @@ def collect_query_function_contexts(runtime, monkeypatch):
         bounded = len(body) <= 20 * 1024 * 1024
         if not bounded:
             category['status'] = 'FAIL'
-            observation.update(context_transport_verified=False, business_effect_verified=False,
+            observation.update(context_transport_verified=False, scalar_transport_verified=False, business_effect_verified=False,
                 finalization_error='Observation exceeds20MiB; retained without truncation')
             body = json.dumps(observation, ensure_ascii=False, indent=2).encode()
         with output.open('xb') as stream: stream.write(body)

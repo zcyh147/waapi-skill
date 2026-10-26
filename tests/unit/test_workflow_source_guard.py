@@ -5881,7 +5881,7 @@ def test_owned_to_new_owned_collector_reaches_current_final_writer(tmp_path, wor
     assert events.index('shutdown') < events.index('release')
 
 
-@pytest.mark.parametrize('fault', [None, 'identity-rejected', 'adapter-rejected', 'empty-context'])
+@pytest.mark.parametrize('fault', [None, 'identity-rejected', 'adapter-rejected', 'empty-context', 'missing-scalar', 'null-scalar', 'missing-identity'])
 def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, workflow, monkeypatch, fault):
     """Substitute native execution, retaining the public producer and v3 writer."""
     import shutil
@@ -5908,8 +5908,18 @@ def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, 
     for index, fact in enumerate(facts['contexts']):
         owner = fact['owner']; member = fact['selected']
         for row in (owner, member):
-            objects[row['id']] = {**row, 'path': '\\fixture-only-context\\' + row['id'], 'classId': index + 1}
+            objects[row['id']] = {**row, 'path': '\\fixture-only-context\\' + row['id'], 'classId': 65552 if row['type'] == 'Sound' else 2686992 if row['type'] == 'Attenuation' else index + 1}
         selected[f'from object "{owner["id"]}" select {fact["expression"]} take 1'] = member['id']
+    task.metadata.update({'Pitch': {'name': 'Pitch', 'type': 'Real64'},
+        'OutputBus': {'name': 'OutputBus', 'type': '', 'restriction': {'type': 'reference'}}})
+    scalar_sound = objects['{0030BF58-90C3-428B-B940-44CC1C5A51B5}']
+    scalar_sound.update({'isLinked("Pitch")': False, 'isOverridable("RTPC")': True,
+        'isSourceOfOverride("OutputBus")': False, 'hasProperty("RTPC")': True})
+    objects['{CB2B7556-B4AB-46B1-A0C9-20D4880B6DED}'].update({
+        'curveToUse("VolumeWetGameUsage")': 'UseVolumeDry', 'curveToUse("VolumeDryUsage")': 'UseCustom'})
+    if fault == 'missing-scalar': scalar_sound.pop('isLinked("Pitch")')
+    if fault == 'null-scalar': scalar_sound['isLinked("Pitch")'] = None
+    failed_run = fault not in {None, 'null-scalar'}
     original = task.call
     def call(uri, args=None, options=None):
         if uri.endswith('object.get') and args.get('waql') != 'from type Project take 1':
@@ -5923,6 +5933,7 @@ def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, 
                 if fault == 'identity-rejected': row['id'] = {'native_context': 'opaque-identity'}
                 if fault == 'adapter-rejected': return {'return': ['opaque-native-context-identity']}
                 if fault == 'empty-context': return {'return': []}
+                if fault == 'missing-identity': row.pop('path')
             return {'return': task.project_rows([row], options)}
         return original(uri, args, options)
     task.call = call
@@ -5932,20 +5943,32 @@ def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, 
         return workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *argv],
             env=runtime.env, client_factory=lambda _: task)
     runtime.raw_gateway = raw
-    if fault:
-        with pytest.raises(AssertionError, match='Context transport incomplete'):
+    if failed_run:
+        with pytest.raises(AssertionError, match='Query function collection incomplete'):
             collector.collect_query_function_contexts(runtime, monkeypatch)
         category, = runtime.category_results
     else:
         category = collector.collect_query_function_contexts(runtime, monkeypatch)
     receipt = json.loads(Path(category['observation_path']).read_text())
-    assert category['status'] == ('FAIL' if fault else 'PASS')
-    assert receipt['context_transport_verified'] is (fault is None)
-    assert [group['status'] for group in receipt['groups']] == (['FAIL', 'PASS', 'PASS', 'PASS'] if fault else ['PASS'] * 4)
-    assert len(commands) == (14 if fault else 16) and all(command[0] == 'query-object' for command in commands)
+    assert category['status'] == ('FAIL' if failed_run else 'PASS')
+    assert receipt['context_transport_verified'] is (fault in {None, 'null-scalar', 'missing-scalar'})
+    assert receipt['scalar_transport_verified'] is (fault != 'missing-scalar')
+    expected = ['PASS'] * 6
+    if failed_run: expected[4 if fault == 'missing-scalar' else 0] = 'FAIL'
+    assert [group['status'] for group in receipt['groups']] == expected
+    assert len(commands) == (13 if fault in {'identity-rejected', 'adapter-rejected', 'empty-context', 'missing-identity'} else 14) and all(command[0] == 'query-object' for command in commands)
     assert receipt['transaction_count'] == 0 and receipt['source_before'] == receipt['source_after']
-    assert all(group['invocations'][1]['native_packets'] for group in receipt['groups'])
-    if fault:
+    assert all(group['invocations'][-1]['native_packets'] for group in receipt['groups'])
+    if fault == 'null-scalar':
+        row = receipt['groups'][4]['invocations'][0]['payload']['agent_result'][0]
+        assert row['related']['field_status']['Pitch'] == {'linked': None}
+        assert any(proof['native_field'] == 'isLinked("Pitch")' and proof['value'] is None
+            for proof in receipt['groups'][4]['actual_scalar_proofs'])
+    if fault == 'missing-scalar':
+        row = receipt['groups'][4]['invocations'][0]['payload']['agent_result'][0]
+        assert row['related']['field_status']['Pitch'] == {'unavailable_fields': ['linked']}
+        assert receipt['groups'][5]['status'] == 'PASS'
+    if failed_run and fault != 'missing-scalar':
         failed = receipt['groups'][0]
         assert len(failed['invocations']) == 2 and failed['failure']
         native = [json.loads(Path(packet['path']).read_text())
@@ -5958,6 +5981,9 @@ def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, 
         elif fault == 'adapter-rejected':
             assert selected_packet['result']['return'] == ['opaque-native-context-identity']
             assert failed['invocations'][1]['exit_code'] == 2
+        elif fault == 'missing-identity':
+            assert 'path' not in selected_packet['result']['return'][0]
+            assert 'path' in failed['invocations'][1]['payload']['agent_result'][0]['unavailable_fields']
         else: assert selected_packet['result']['return'] == []
     (tmp_path / 'lifecycle').mkdir()
     fixture, events, _ = _fixture_run(tmp_path / 'lifecycle', workflow, monkeypatch)
@@ -5966,15 +5992,15 @@ def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, 
     monkeypatch.setattr(exact_real_evidence, 'append_category_evidence', category_evidence.append_category_evidence)
     fixture_runtime = next(fixture)
     fixture_runtime.category_results.extend(runtime.category_results)
-    if fault:
+    if failed_run:
         with pytest.raises(AssertionError, match='collector failed'):
             fixture.throw(AssertionError('collector failed'))
     else:
         with pytest.raises(StopIteration): next(fixture)
     final = json.loads(output.read_text().splitlines()[-1])
     assert final['invocation']['phase'] == 'final'
-    assert final['invocation']['outcome'] == ('FAIL' if fault else 'PASS')
+    assert final['invocation']['outcome'] == ('FAIL' if failed_run else 'PASS')
     retained = next(row for row in final['categories'] if row['category'] == category['category'])
-    assert retained['status'] == ('FAIL' if fault else 'PASS') and retained['observation_sha256'] == category['observation_sha256']
+    assert retained['status'] == ('FAIL' if failed_run else 'PASS') and retained['observation_sha256'] == category['observation_sha256']
     assert json.loads(Path(retained['observation_path']).read_text()) == receipt
     assert events.index('shutdown') < events.index('release')
