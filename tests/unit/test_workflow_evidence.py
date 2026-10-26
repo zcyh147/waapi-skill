@@ -973,3 +973,81 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
             assert actual["owner"]["notes"] == ""
             assert next(item["object"]["notes"] for item in actual["sources"] if item["object"]["source_language"]["name"] == "English(US)") == "TSV requested object Notes"
             assert witness["verify_exit_code"] == 2
+
+
+@pytest.mark.parametrize("fault", (None, "incomplete", "transport-error"))
+def test_dialogue_read_probe_reaches_persisted_final_writer_without_association_claim(tmp_path, monkeypatch, fault):
+    """Synthetic public packets test collection honesty, never native member shape."""
+    import hashlib
+    import json
+    import shutil
+    from pathlib import Path
+    from tests.unit.test_profiler_input_native_fixture import _runtime, _finish
+    context = _runtime(tmp_path, monkeypatch)
+    workflow, runtime, client, lock, proof = context
+    for relative in ("Dynamic Dialogue/Dialogue.wwu", "Containers/Dialogues.wwu"):
+        destination = runtime.sandbox.sandbox_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(workflow.REPO_ROOT / "tests/_org/2025.1" / relative, destination)
+    endpoint = {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}
+    catalog = json.loads((workflow.REPO_ROOT / "skills/waapi-skill/resources/metadata/2025.1/object-types.json").read_text())["types"]
+    sent = []
+    def raw(argv):
+        sent.append(list(argv))
+        packet = {"ok": True, "detected_version": "2025.1", "endpoint": endpoint}
+        if argv[0] == "status":
+            packet["agent_result"] = {"project": {"path": str(runtime.sandbox.sandbox_project)}}
+        elif argv[:2] == ["metadata", "types"]:
+            if fault == "transport-error": raise RuntimeError("synthetic Gateway transport failure")
+            packet["agent_result"] = {"types": [{**row, "selection": "synthetic-type-" + row["name"]}
+                for row in catalog if row["name"] in ("DialogueEvent", "MultiSwitchEntry")], "complete": True}
+        elif argv[0] == "metadata":
+            # These minimal metadata transport packets are synthetic and based
+            # only on documented field kinds, never a claimed live response.
+            # Do not fabricate any native Entry object/member projection.
+            if argv[1] == "list":
+                fields = ("Entries", "Arguments") if any("DialogueEvent" in word for word in argv) else ("AudioNode",)
+                packet["agent_result"] = {"fields": [{"name": field, "selection": "synthetic-field-" + field} for field in fields], "complete": True}
+            else:
+                name = argv[argv.index("--selection") + 1].removeprefix("synthetic-field-")
+                packet["agent_result"] = {"metadata": {"name": name, "type": "Reference" if name == "AudioNode" else "List"}, "complete": True}
+        elif argv[0] == "query-object":
+            if "--include-field" in argv or argv[argv.index("--exact-id") + 1] == "{A1AEBDF2-1B8E-4E92-9CE8-336DB7CB44CA}":
+                packet.update(ok=False, error_code="SYNTHETIC_UNSUPPORTED_READ", message="Test does not invent native Entry shape")
+                return 2, packet
+            scope = json.loads((runtime.state_dir / "dialogue-read-probe.json").read_text())["source_scope"]
+            identity = argv[argv.index("--exact-id") + 1]
+            row = dict(next(item for item in (scope["event"], scope["sound"]) if item["id"] == identity))
+            packet.update(objects=[row], count=1, projection_complete=(fault != "incomplete"), status="partial" if fault == "incomplete" else "complete")
+            packet["agent_result"] = [row]
+        else: raise AssertionError(argv)
+        return 0, packet
+    monkeypatch.setattr(workflow._WorkflowSandboxRuntime, "raw_gateway", lambda _runtime, argv: raw(argv))
+    node = "test_read_only_dialogue_association_metadata_observation"
+    error = None
+    try: getattr(workflow, node)(runtime)
+    except (AssertionError, RuntimeError) as exc: error = exc
+    category, = runtime.category_results
+    body = Path(category["observation_path"]).read_bytes(); report = json.loads(body)
+    final = _finish(context, tmp_path, monkeypatch, [(node, error)])[-1]
+    assert (error is None) == (fault is None), error
+    assert final["invocation"]["outcome"] == ("PASS" if fault is None else "FAIL")
+    assert final["transactions"] == [] and category["transaction_ids"] == []
+    assert final["categories"][0]["observation_sha256"] == hashlib.sha256(body).hexdigest()
+    assert report["collection_complete"] is (fault is None)
+    assert report["business_effect_verified"] is False and report["coverage_credit"] is False
+    assert report["mutation_allowed"] is False
+    assert all(argv[0] in ("status", "metadata", "query-object") for argv in sent)
+    assert report["source_scope"]["entry_path_slot_count"] == 3
+    assert report["source_scope"]["event_entry_count"] == 24
+    assert final["residual_state"]["sandbox"] == ("deleted" if fault is None else "quarantined")
+    if fault is None:
+        assert report["boundaries"] and any(row.get("error_code") == "SYNTHETIC_UNSUPPORTED_READ" for row in report["boundaries"])
+        assert report["association_status"] == "observed_requires_review"
+        assert not report["default_association_proven"]
+        assert any("--include-field" in argv and argv[-1] == "AudioNode" for argv in sent)
+        assert any(row["reason"] == "requested_field_not_uniquely_listed" and row["field"] == "EntryPath" for row in report["boundaries"])
+        assert report["metadata"][0]["details"], "Returned metadata selections reach detail consumer"
+    else:
+        assert report["failure"] and report["calls"]
+        assert report["calls"][-1].get("exception") or report["calls"][-1].get("payload")

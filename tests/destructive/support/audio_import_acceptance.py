@@ -932,3 +932,205 @@ def collect_switch_import_acceptance(runtime, *, tab_delimited=False):
         raise
     finally:
         persist()
+
+
+def collect_dialogue_read_probe(runtime):
+    """Observe an existing nonempty decision graph; never infer default import effects."""
+    import xml.etree.ElementTree as ET
+    assert runtime.version == "2025.1"
+    owned = runtime.sandbox.sandbox_path.resolve(strict=True)
+    assert owned != runtime.sandbox.source_root.resolve(strict=True)
+    output = runtime.state_dir / "dialogue-read-probe.json"
+    assert not output.exists(), "Never overwrite a Dialogue observation"
+    category = {"category": "dialogue-read-only-observation", "status": "FAIL", "transaction_ids": [],
+        "observation_path": str(output), "verifier_strength": "bounded_read_collection_only_no_business_credit",
+        "business_effect_verified": False, "coverage_credit": False}
+    runtime.category_results.append(category)
+    report = {"contract": "waapi-skill.dialogue-read-probe/v1", "candidate": runtime.candidate,
+        "version": runtime.version, "calls": [], "boundaries": [], "metadata": [], "objects": [],
+        "collection_complete": False, "business_effect_verified": False, "coverage_credit": False,
+        "default_association_proven": False, "association_status": "unresolved", "mutation_allowed": False,
+        "transaction_budget": 0, "limits": {"calls": 48, "reply_bytes": 524288, "receipt_bytes": 4194304,
+            "metadata_pages": 2, "detail_pages": 4, "referrers": 8}, "failure": None}
+    endpoint = {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}
+
+    def persist():
+        body = json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= report["limits"]["receipt_bytes"], "Dialogue observation byte limit exceeded"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix(".tmp"); temporary.write_bytes(body); temporary.replace(output)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+
+    def boundary(stage, reason, **facts):
+        report["boundaries"].append({"stage": stage, "reason": reason, **facts})
+
+    def read(stage, argv):
+        assert argv[0] in {"status", "metadata", "query-object"}, "Dialogue probe is read-only"
+        assert len(report["calls"]) < report["limits"]["calls"]
+        call = {"stage": stage, "argv": list(argv)}; report["calls"].append(call)
+        try:
+            code, packet = runtime.raw_gateway(argv)
+            call.update(exit_code=code, payload=packet)
+            assert len(json.dumps(packet, ensure_ascii=False).encode("utf-8")) <= report["limits"]["reply_bytes"]
+            if code != 0 or packet.get("ok") is not True:
+                boundary(stage, "structured_read_rejected", error_code=packet.get("error_code"))
+                return None
+            assert packet.get("detected_version") == runtime.version and packet.get("endpoint") == endpoint, packet
+            return packet
+        except Exception as exc:
+            call["exception"] = {"type": type(exc).__name__, "message": str(exc)[:1024]}
+            raise
+        finally:
+            persist()
+
+    def pages(stage, argv, key=None, *, maximum_pages=2):
+        rows, command = [], list(argv)
+        for _ in range(maximum_pages):
+            packet = read(stage, command)
+            if packet is None:
+                return rows
+            page = packet["agent_result"]
+            if key:
+                assert isinstance(page.get(key), list) and len(page[key]) <= 64, page
+                rows.extend(page[key])
+            else:
+                rows.append(page)
+            if page.get("complete") is True:
+                return rows
+            command = page.get("next_command", {}).get("gateway_argv")
+            assert isinstance(command, list) and command[:1] == ["metadata"], "Incomplete metadata page lacks public continuation"
+        raise AssertionError("Dialogue metadata did not complete within its page bound")
+
+    def query(stage, identity, *, related=False, field=None, expected=None):
+        argv = ["query-object", "--exact-id", identity, "--max-results", "2", "--include", "class-id",
+            "--include", "parent", "--include", "owner", "--detail"]
+        if related:
+            argv += ["--include-related", "references-to", "parent", "--include-related", "references-to", "owner"]
+        if field:
+            argv += ["--include-field", field]
+        packet = read(stage, argv)
+        if packet is None:
+            return None
+        assert packet.get("projection_complete") is not False and packet.get("limit_reached") is not True and packet.get("status") != "partial", packet
+        rows = packet["objects"]
+        assert isinstance(rows, list) and packet["count"] == len(rows) <= 1, packet
+        if not rows:
+            boundary(stage, "exact_identity_not_returned_not_native_absence", object_id=identity)
+            return None
+        row, = rows
+        assert row["id"].upper() == identity.upper(), row
+        if expected:
+            assert all(row.get(key) == value for key, value in expected.items()), {"expected": expected, "actual": row}
+        for relationship in ("parent", "owner"):
+            if relationship not in row:
+                boundary(stage, "requested_relationship_omitted", relationship=relationship)
+        report["objects"].append({"stage": stage, "row": row})
+        return row
+
+    def metadata(stage, scope, wanted):
+        fields = pages(stage + "-list", ["metadata", "list", *scope, "--page-size", "64"], "fields")
+        result = {"stage": stage, "scope": scope, "fields": fields, "details": []}; report["metadata"].append(result)
+        for name in wanted:
+            selected = [field for field in fields if field.get("name") == name]
+            if len(selected) != 1:
+                boundary(stage, "requested_field_not_uniquely_listed", field=name, count=len(selected))
+                continue
+            detail = pages(stage + "-" + name, ["metadata", "detail", *scope, "--selection", selected[0]["selection"]],
+                maximum_pages=report["limits"]["detail_pages"])
+            result["details"].append({"field": selected[0], "pages": detail})
+        return result
+
+    try:
+        # Parse only the private copy. XML list membership does not specify a
+        # queryable member path or native parent/owner response.
+        from tests.destructive.test_gateway_workflow_transaction_matrix import REPO_ROOT
+        catalog_path = REPO_ROOT / "skills/waapi-skill/resources/metadata/2025.1/object-types.json"
+        classes = {row["name"]: row["classId"] for row in json.loads(catalog_path.read_text())["types"]}
+        documents = {}
+        for relative in ("Dynamic Dialogue/Dialogue.wwu", "Containers/Dialogues.wwu"):
+            path = (owned / relative).resolve(strict=True); assert path.is_relative_to(owned)
+            documents[relative] = ET.parse(path)
+        dialogue = documents["Dynamic Dialogue/Dialogue.wwu"]
+        event = dialogue.find('.//DialogueEvent[@ID="{3C874205-5335-4290-830F-A8BFF3AE8A6B}"]')
+        entry = event.find('./ObjectLists/ObjectList[@Name="Entries"]/MultiSwitchEntry[@ID="{A1AEBDF2-1B8E-4E92-9CE8-336DB7CB44CA}"]')
+        audio_node = entry.find('./ReferenceList/Reference[@Name="AudioNode"]/ObjectRef').attrib["ID"]
+        sound_doc = documents["Containers/Dialogues.wwu"]
+        sound = sound_doc.find('.//Sound[@ID="' + audio_node + '"]')
+        assert sound is not None and audio_node == "{CFA81CFE-9D22-4078-9738-83471EF92418}"
+        def identity(document, node, hierarchy):
+            parents = {child: parent for parent in document.iter() for child in parent}
+            ancestry, current = [], node
+            while current is not None:
+                if current.attrib.get("Name") and current.attrib.get("ID"):
+                    ancestry.append(current)
+                current = parents.get(current)
+            chain = list(reversed(ancestry))
+            return {"id": node.attrib["ID"], "name": node.attrib["Name"], "type": node.tag,
+                "class_id": classes[node.tag], "path": "\\" + "\\".join([hierarchy, *(item.attrib["Name"] for item in chain)])}
+        report["source_scope"] = {"event": identity(dialogue, event, "Dynamic Dialogue"),
+            "sound": identity(sound_doc, sound, "Containers"), "entry": {"id": entry.attrib["ID"], "type": entry.tag,
+                "class_id": classes[entry.tag], "xml_name": entry.attrib["Name"], "xml_list_owner": event.attrib["ID"]},
+            "entry_path_slot_count": len(entry.findall('./ObjectLists/ObjectList[@Name="EntryPath"]/*')),
+            "event_entry_count": len(event.findall('./ObjectLists/ObjectList[@Name="Entries"]/MultiSwitchEntry')),
+            "argument_count": len(event.findall('./ObjectLists/ObjectList[@Name="Arguments"]/*')),
+            "entry_path_slots": [{"xml_id": slot.attrib["ID"], "reference": slot.find('./ReferenceList/Reference[@Name="EntryPathObject"]/ObjectRef').attrib}
+                for slot in entry.findall('./ObjectLists/ObjectList[@Name="EntryPath"]/*')],
+            "event_entry_ids": [member.attrib["ID"] for member in event.findall('./ObjectLists/ObjectList[@Name="Entries"]/MultiSwitchEntry')],
+            "other_events": [{"id": other.attrib["ID"], "name": other.attrib["Name"],
+                "entry_count": len(other.findall('./ObjectLists/ObjectList[@Name="Entries"]/MultiSwitchEntry'))}
+                for other in dialogue.findall('.//DialogueEvent') if other is not event],
+            "source_files": [{"relative_path": relative, "sha256": hashlib.sha256((owned / relative).read_bytes()).hexdigest()}
+                for relative in documents], "catalog_sha256": hashlib.sha256(catalog_path.read_bytes()).hexdigest(),
+            "warning": "Existing conditional path is NONEMPTY; XML membership is not a native parent/owner/default-association observation"}
+        assert report["source_scope"]["entry_path_slot_count"] == report["source_scope"]["argument_count"] == 3
+        persist()
+        status = read("owned-project", ["status", "--detail"])
+        assert status is not None
+        project_path = Path(localize_waapi_host_path(status["agent_result"]["project"]["path"])).resolve(strict=True)
+        assert project_path == runtime.sandbox.sandbox_project.resolve(strict=True) != runtime.sandbox.source_project.resolve(strict=True)
+        types = pages("types", ["metadata", "types", "--meaning", "DialogueEvent", "--meaning", "MultiSwitchEntry", "--page-size", "64"], "types")
+        for name, wanted in (("DialogueEvent", ("Entries", "Arguments")), ("MultiSwitchEntry", ("AudioNode", "EntryPath"))):
+            selections = [row for row in types if row.get("name") == name and row.get("classId") == classes[name]]
+            if len(selections) == 1:
+                metadata(name, ["--type-selection", selections[0]["selection"]], wanted)
+            else:
+                boundary("types", "class_selection_unavailable", name=name, class_id=classes[name])
+        scope = report["source_scope"]
+        query("event", event.attrib["ID"], expected=scope["event"])
+        query("entry", entry.attrib["ID"], expected={key: scope["entry"][key] for key in ("id", "type", "class_id")})
+        observed_sound = query("sound-referrers", audio_node, related=True, expected=scope["sound"])
+        referrers = []
+        if observed_sound:
+            sequence = observed_sound.get("related", {}).get("references-to")
+            if not isinstance(sequence, Mapping) or not isinstance(sequence.get("items"), list):
+                boundary("sound-referrers", "reference_list_omitted_not_native_absence")
+            else:
+                assert len(sequence["items"]) <= report["limits"]["referrers"]
+                for member in sequence["items"]:
+                    actual = member.get("object")
+                    if isinstance(actual, Mapping) and actual.get("id"):
+                        canonical = "{" + str(uuid.UUID(actual["id"])).upper() + "}"
+                        assert canonical == actual["id"].upper()
+                        referrers.append(canonical)
+                    else:
+                        boundary("sound-referrers", "reference_member_identity_unavailable", member=member)
+        for referrer in dict.fromkeys(referrers):
+            query("exact-referrer", referrer)
+        entry_fields = metadata("actual-entry", ["--exact-id", entry.attrib["ID"]], ("AudioNode", "EntryPath"))
+        for detail in entry_fields["details"]:
+            if detail["field"]["name"] != "AudioNode":
+                continue
+            info = detail["pages"][0].get("metadata", {}) if detail["pages"] else {}
+            restriction = info.get("restriction")
+            if str(info.get("type", "")).casefold() == "reference" or (isinstance(restriction, Mapping) and restriction.get("type") == "reference"):
+                query("actual-entry-audio-node", entry.attrib["ID"], field=detail["field"]["name"])
+            else:
+                boundary("actual-entry", "audio_node_reference_metadata_unavailable")
+        report.update(collection_complete=True, association_status="observed_requires_review")
+        category["status"] = "PASS"
+        return category
+    except Exception as exc:
+        report["failure"] = {"type": type(exc).__name__, "message": str(exc)[:2048]}
+        raise
+    finally:
+        persist()
