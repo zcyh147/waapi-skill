@@ -17,7 +17,9 @@ from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask
     for version in ('2021.1', '2022.1', '2023.1') for fault in (None, 'native-not-found', 'missing-detail')]
     + [('2021.1', 'missing-owner'), ('2021.1', 'retained-wrapper'),
        ('2022.1', 'retained-wrapper'), ('2021.1', 'wrong-owner'),
-       ('2022.1', 'malformed-class'), ('2021.1', 'empty-fields')])
+       ('2022.1', 'malformed-class'), ('2021.1', 'empty-fields'),
+       ('2021.1', 'scalar'), ('2022.1', 'scalar'), ('2023.1', 'scalar'),
+       ('2021.1', 'scalar-no-effect'), ('2021.1', 'scalar-owner-drift')])
 def test_older_codec_read_reaches_exact_final_writer(tmp_path, monkeypatch, version, fault):
     monkeypatch.setenv('WWISE_LIVE', '1')
     monkeypatch.setenv('WWISE_DESTRUCTIVE', '1')
@@ -25,7 +27,8 @@ def test_older_codec_read_reaches_exact_final_writer(tmp_path, monkeypatch, vers
     workflow = importlib.import_module('tests.destructive.test_gateway_workflow_transaction_matrix')
     committed = workflow.REPO_ROOT / 'tests/_org' / version
     pin = collector.source_identity(committed, version)
-    task = OwnedGraphTask(tmp_path, version, 'object.create')
+    scalar = isinstance(fault, str) and fault.startswith('scalar')
+    task = OwnedGraphTask(tmp_path, version, 'object.setProperty' if scalar else 'object.create')
     project = {'id': pin['project_id'], 'name': 'SampleProject', 'type': 'Project',
         'path': '\\', 'filePath': str(task.project_file)}
     task.objects = {
@@ -35,7 +38,7 @@ def test_older_codec_read_reaches_exact_final_writer(tmp_path, monkeypatch, vers
             'classId': 262145, 'pluginName': 'Vorbis', 'path': pin['owner_path'] + '\\[Vorbis:Mac]',
             'owner': {'id': pin['owner_id'], 'name': 'Voice'}},
     }
-    wrapper = fault in {'retained-wrapper', 'wrong-owner', 'malformed-class', 'empty-fields'}
+    wrapper = fault in {'retained-wrapper', 'wrong-owner', 'malformed-class', 'empty-fields'} or (scalar and version != '2023.1')
     if wrapper:
         # Exact result row retained in both original older native observations.
         task.objects[pin['codec_id']] = {
@@ -51,6 +54,18 @@ def test_older_codec_read_reaches_exact_final_writer(tmp_path, monkeypatch, vers
     task.types = [{'name': 'Vorbis', 'type': 'Conversion', 'classId': 262145}]
     task.metadata = {'QualityFactor': {'name': 'QualityFactor', 'type': 'Real32', 'default': 3.0,
         'restriction': {'type': 'range', 'min': -2.0, 'max': 10.0}}}
+    if scalar:
+        # Retained 2021 metadata-r2 getPropertyInfo result; native record SHA-256:
+        # d75d1fbc18c176a501a0535e9733dde6cef33b4d90d6da879685b243bcfc58aa.
+        task.metadata['QualityFactor'] = {
+            'audioEngineId': 4294967295, 'default': 4.0, 'dependencies': [],
+            'display': {'group': '', 'index': 1305, 'name': ''}, 'name': 'QualityFactor',
+            'restriction': {'max': 10.0, 'min': -2.0, 'type': 'range'},
+            'supports': {'randomizer': False, 'rtpc': 'None', 'unlink': False}, 'type': 'Real32',
+            'ui': {'autoUpdate': False, 'dataMeaning': 'None',
+                'displayAs': {'bitfield': False, 'lrMix': False, 'musicNote': False},
+                'value': {'decimals': 1, 'fine': 0.1, 'infinity': 0.0, 'max': 10.0, 'min': -2.0, 'step': 0.0}}}
+        task.objects[pin['codec_id']]['@QualityFactor'] = 3.0
     if fault == 'empty-fields':
         task.metadata = {}
     original = task.call
@@ -80,6 +95,14 @@ def test_older_codec_read_reaches_exact_final_writer(tmp_path, monkeypatch, vers
                 rows = [project if identity == pin['project_id'] else task.objects[identity]
                     for identity in identities if identity == pin['project_id'] or identity in task.objects]
             return {'return': task.project_rows(rows, options)}
+        if uri.endswith('object.setProperty') and scalar:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args == {'object': pin['codec_id'], 'property': 'QualityFactor', 'value': 4.0}, args
+            if fault != 'scalar-no-effect':
+                task.objects[pin['codec_id']]['@QualityFactor'] = args['value']
+            if fault == 'scalar-owner-drift':
+                task.objects[pin['codec_id']]['owner']['id'] = pin['codec_id']
+            return {}
         if uri.endswith('getPropertyInfo') and fault == 'missing-detail':
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             return {'name': 'QualityFactor', 'type': 42}
@@ -107,57 +130,73 @@ def test_older_codec_read_reaches_exact_final_writer(tmp_path, monkeypatch, vers
         sandbox=sandbox, state_dir=tmp_path / 'state', category_results=[], raw_gateway=lambda argv: task.run(*argv))
     error = None
     try:
-        collector.collect_older_codec_read(runtime)
-    except pytest.skip.Exception as exc:
+        if scalar:
+            collector.collect_existing_codec_field(runtime)
+        else:
+            collector.collect_older_codec_read(runtime)
+    except (pytest.skip.Exception, AssertionError) as exc:
         error = exc
-    success = fault in (None, 'retained-wrapper')
+    success = fault in (None, 'retained-wrapper', 'scalar')
     assert (error is None) is success
-    category, = runtime.category_results
+    category = runtime.category_results[-1]
     body = Path(category['observation_path']).read_bytes()
     receipt = json.loads(body)
-    assert receipt['read_metadata_complete'] is success
-    assert receipt['project_mutation_count'] == 0 and receipt['transactions'] == []
-    assert receipt['business_effect_verified'] is False and receipt['platform_association_proven'] is False
-    assert category['observation_sha256'] == hashlib.sha256(body).hexdigest()
-    assert receipt['source']['codec_id'] == '{6DBA16C0-4F5A-4268-8760-61425C95747B}'
-    assert len(receipt['calls']) <= receipt['limits']['public_calls']
-    assert not any('--advanced-waql' in row['argv'] for row in receipt['calls'])
-    if fault == 'native-not-found':
-        assert receipt['access_outcome'] == 'native_read_unresolved' and 'field_list' not in receipt
-        assert receipt['codec_result']['call']['waapi_error_uri'] == 'ak.wwise.query.invalid_query'
-    elif fault in ('missing-owner', 'wrong-owner', 'malformed-class'):
-        assert receipt['access_outcome'] == 'identity_facts_unresolved' and 'field_list' not in receipt
-        if fault == 'missing-owner':
-            assert receipt['native_record']['result']['return'][0]['owner'] is None
-    elif fault == 'empty-fields':
-        assert receipt['access_outcome'] == 'quality_field_not_disclosed_within_bound'
-        assert receipt['field_list']['fields'] == [] and 'detail_result' not in receipt
-    elif fault == 'missing-detail':
-        assert receipt['access_outcome'] == 'metadata_unresolved'
-        assert receipt['field_list']['fields'][0]['name'] == 'QualityFactor'
-        assert 'detail_result' in receipt
+    if scalar:
+        assert receipt['business_effect_verified'] is success
+        assert receipt['project_mutation_count'] == 1 and len(receipt['transactions']) == 1
+        assert receipt['execute_attempt_count'] == 1
+        assert receipt['platform_association_proven'] is False and receipt['codec_replacement_proven'] is False
+        if success:
+            assert receipt['after']['properties']['QualityFactor'] == 4.0
+        else:
+            assert 'error' in receipt
+        assert sum(uri.endswith('object.setProperty') for uri, _, _ in task.calls) == 1
     else:
-        assert receipt['access_outcome'] == 'read_and_metadata_observed'
-        assert receipt['detail_result']['agent_result']['metadata']['name'] == 'QualityFactor'
-    if wrapper and success:
-        assert receipt['identity_representation'] == 'pinned_older_generic_wrapper'
-        assert receipt['concrete_codec_class_id'] is None
-        assert receipt['native_record']['result']['return'][0] == task.objects[pin['codec_id']]
-        assert receipt['wrapper_source']['native_record_sha256'] in {
-            '3a054be2b3f126ebf71811c7a06fe93015a8e160faaf16795ec7ed603d52a27f',
-            'd91831514fcf3b0c6c9a9ca4402f71a39f7fb10fbe29c65442fd856dec90cee5'}
-    assert all(uri in {'ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo', 'ak.wwise.core.object.get',
-        'ak.wwise.core.object.getTypes', 'ak.wwise.core.object.getPropertyAndReferenceNames',
-        'ak.wwise.core.object.getPropertyInfo'} for uri, _, _ in task.calls)
+        assert receipt['read_metadata_complete'] is success
+    if not scalar:
+        assert receipt['project_mutation_count'] == 0 and receipt['transactions'] == []
+        assert receipt['business_effect_verified'] is False and receipt['platform_association_proven'] is False
+        assert category['observation_sha256'] == hashlib.sha256(body).hexdigest()
+        assert receipt['source']['codec_id'] == '{6DBA16C0-4F5A-4268-8760-61425C95747B}'
+        assert len(receipt['calls']) <= receipt['limits']['public_calls']
+        assert not any('--advanced-waql' in row['argv'] for row in receipt['calls'])
+        if fault == 'native-not-found':
+            assert receipt['access_outcome'] == 'native_read_unresolved' and 'field_list' not in receipt
+            assert receipt['codec_result']['call']['waapi_error_uri'] == 'ak.wwise.query.invalid_query'
+        elif fault in ('missing-owner', 'wrong-owner', 'malformed-class'):
+            assert receipt['access_outcome'] == 'identity_facts_unresolved' and 'field_list' not in receipt
+            if fault == 'missing-owner':
+                assert receipt['native_record']['result']['return'][0]['owner'] is None
+        elif fault == 'empty-fields':
+            assert receipt['access_outcome'] == 'quality_field_not_disclosed_within_bound'
+            assert receipt['field_list']['fields'] == [] and 'detail_result' not in receipt
+        elif fault == 'missing-detail':
+            assert receipt['access_outcome'] == 'metadata_unresolved'
+            assert receipt['field_list']['fields'][0]['name'] == 'QualityFactor'
+            assert 'detail_result' in receipt
+        else:
+            assert receipt['access_outcome'] == 'read_and_metadata_observed'
+            assert receipt['detail_result']['agent_result']['metadata']['name'] == 'QualityFactor'
+        if wrapper and success:
+            assert receipt['identity_representation'] == 'pinned_older_generic_wrapper'
+            assert receipt['concrete_codec_class_id'] is None
+            assert receipt['native_record']['result']['return'][0] == task.objects[pin['codec_id']]
+            assert receipt['wrapper_source']['native_record_sha256'] in {
+                '3a054be2b3f126ebf71811c7a06fe93015a8e160faaf16795ec7ed603d52a27f',
+                'd91831514fcf3b0c6c9a9ca4402f71a39f7fb10fbe29c65442fd856dec90cee5'}
+        assert all(uri in {'ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo', 'ak.wwise.core.object.get',
+            'ak.wwise.core.object.getTypes', 'ak.wwise.core.object.getPropertyAndReferenceNames',
+            'ak.wwise.core.object.getPropertyInfo'} for uri, _, _ in task.calls)
     assert sandbox_fixture.hash_project(source) == proof and (source / 'SampleProject.wproj').stat().st_mtime_ns == mtime
     lock = sandbox_fixture.LiveSandboxLock(tmp_path / 'locks')
     lock.__enter__()
     evidence = tmp_path / 'category.jsonl'
     monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(evidence))
     monkeypatch.setattr(sandbox_fixture, 'KEEP_ON_FAILURE_ROOT', tmp_path / 'retained')
-    node = 'tests/destructive/test_older_codec_read_probe.py::test_' + version[:4] + '_codec_read_metadata'
+    node = 'tests/destructive/test_older_codec_read_probe.py::' + (
+        'test_2021_existing_codec_quality_factor' if scalar else 'test_' + version[:4] + '_codec_read_metadata')
     item = SimpleNamespace(path=collector.__file__, nodeid=node,
-        _waapi_phase_reports={'setup': 'passed', 'call': 'skipped' if error else 'passed'})
+        _waapi_phase_reports={'setup': 'passed', 'call': ('failed' if scalar else 'skipped') if error else 'passed'})
     final_error = exact_real_evidence.finalize_exact_real_evidence(repo_root=workflow.REPO_ROOT,
         candidate=runtime.candidate, version=version, request=SimpleNamespace(session=SimpleNamespace(items=[item])),
         module_file=Path(collector.__file__), started_at_unix_ns=1, active_error=error, deferred_error=None,
@@ -167,14 +206,17 @@ def test_older_codec_read_reaches_exact_final_writer(tmp_path, monkeypatch, vers
     assert final_error is None
     records = [json.loads(line) for line in evidence.read_text().splitlines()]
     final = records[-1]
-    assert final['transactions'] == [] and final['source']['hash_before'] == final['source']['hash_after']
-    assert final['categories'][0]['observation_sha256'] == hashlib.sha256(body).hexdigest()
+    assert len(final['transactions']) == (1 if scalar else 0)
+    if scalar:
+        assert final['transactions'][0]['state'] == ('verification_failed' if fault == 'scalar-no-effect' else 'verified')
+    assert final['source']['hash_before'] == final['source']['hash_after']
+    assert final['categories'][-1]['observation_sha256'] == hashlib.sha256(body).hexdigest()
     assert final['residual_state']['process_cleanup'] == 'cleaned'
     if success:
         assert [row['invocation']['outcome'] for row in records] == ['PENDING', 'PASS']
         assert final['residual_state']['sandbox'] == 'deleted'
     else:
-        assert [row['invocation']['outcome'] for row in records] == ['SKIP']
-        assert final['categories'][0]['status'] == 'blocked'
+        assert [row['invocation']['outcome'] for row in records] == (['FAIL'] if scalar else ['SKIP'])
+        assert final['categories'][-1]['status'] == ('FAIL' if scalar else 'blocked')
         assert final['residual_state']['sandbox'] == 'quarantined'
         assert Path(final['residual_state']['quarantine_path']).is_dir()

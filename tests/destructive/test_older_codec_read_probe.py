@@ -1,4 +1,4 @@
-"""Exact older codec read, using the existing copied-project lifecycle only."""
+"""Exact older codec reads and a separate opt-in existing-codec scalar case."""
 import hashlib
 import json
 import os
@@ -205,3 +205,115 @@ def collect_older_codec_read(runtime):
         output.write_bytes(body)
         category.update(access_outcome=receipt['access_outcome'], read_metadata_complete=receipt['read_metadata_complete'],
             observation_sha256=hashlib.sha256(body).hexdigest())
+
+
+@pytest.mark.skipif(os.environ.get('WWISE_VERSION') != '2021.1', reason='Exact 2021.1.14.8108 existing codec scalar')
+def test_2021_existing_codec_quality_factor(workflow_sandbox_runtime):
+    """Separate opt-in write case; the three read nodes above never call this."""
+    collect_existing_codec_field(workflow_sandbox_runtime)
+
+
+def collect_existing_codec_field(runtime):
+    """One chosen live codec GUID, one disclosed scalar, no factory/platform lookup."""
+    from types import SimpleNamespace
+    from tests.destructive.test_gateway_workflow_transaction_matrix import (
+        _start_business_draft, _bind_business_object, _update_business_draft,
+        discovered_business_field_handle,
+    )
+
+    collect_older_codec_read(runtime)
+    preflight = json.loads((runtime.state_dir / 'older-codec-read-probe.json').read_bytes())
+    # Select the exact GUID returned live, never promote the source XML into mutation authority.
+    chosen, = preflight['codec_result']['agent_result']
+    identity = chosen['id']
+    output = runtime.state_dir / 'older-codec-field-probe.json'
+    assert not output.exists(), 'Never overwrite a prior scalar attempt'
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
+        'project_mutation_count': 0, 'execute_attempt_count': 0, 'business_effect_verified': False,
+        'platform_association_proven': False, 'codec_replacement_proven': False,
+        'chosen_live_identity': chosen, 'preflight_sha256': hashlib.sha256(
+            (runtime.state_dir / 'older-codec-read-probe.json').read_bytes()).hexdigest(),
+        'limits': {'public_calls': 20, 'observation_bytes': 3 * 1024 * 1024}}
+    category = {'category': 'existing-codec-field-scalar', 'status': 'FAIL', 'business_effect_verified': False,
+        'verifier_strength': 'one_live_bound_FieldHandle_scalar_plus_exact_identity_owner_readback',
+        'observation_path': str(output)}
+    runtime.category_results.append(category)
+
+    def call(argv, *, live):
+        assert len(receipt['calls']) < receipt['limits']['public_calls']
+        code, payload = runtime.raw_gateway(['--evidence-dir', str(runtime.state_dir / 'older-codec-field-native'), *argv])
+        receipt['calls'].append({'argv': argv, 'exit_code': code, 'payload': payload})
+        if argv[0] == 'preview-from-draft' and payload.get('transaction_id'):
+            category['transaction_id'] = payload['transaction_id']
+            receipt['transactions'].append({'transaction_id': payload['transaction_id'],
+                'artifact_hash': payload['artifact_hash']})
+        assert code == 0 and payload.get('ok') is True, payload
+        if live:
+            assert payload['endpoint'] == preflight['codec_result']['endpoint']
+            assert payload['detected_version'] == runtime.version
+        return payload
+
+    commands = SimpleNamespace(gateway=call)
+
+    def snapshot():
+        result = call(['query-object', '--exact-id', identity, '--max-results', '2',
+            '--include', 'owner', '--include', 'class-id', '--include', 'plugin-name',
+            '--include-field', 'QualityFactor'], live=True)
+        assert result.get('projection_complete') is not False and result.get('limit_reached') is not True, result
+        row, = result['agent_result']
+        assert {key: row[key] for key in chosen} == chosen, row
+        assert row['owner']['id'] == preflight['source']['owner_id'], row
+        return row
+
+    try:
+        before = receipt['before'] = snapshot()
+        assert before['properties']['QualityFactor'] == 3.0, before
+        draft = _start_business_draft(commands, 'object.setProperty')
+        bound = _bind_business_object(commands, draft, object_id=identity)
+        listed = _update_business_draft(commands, draft, 'draft-discover-fields',
+            ['--object-handle', bound, '--list'], live=True)['agent_result']
+        assert len(listed['fields']) <= 64 and listed.get('complete') is True, listed
+        selected, = [field for field in listed['fields'] if field['name'] == 'QualityFactor']
+        disclosed = _update_business_draft(commands, draft, 'draft-discover-fields',
+            ['--object-handle', bound, '--selection', selected['selection']], live=True)
+        receipt['selected_field'] = disclosed
+        field = discovered_business_field_handle(disclosed, 'QualityFactor')
+        _update_business_draft(commands, draft, 'draft-declare-field-change',
+            ['--object-handle', bound, '--field-handle', field, '--business-value', '4'], live=False)
+        _update_business_draft(commands, draft, 'draft-check', live=True)
+        preview = _update_business_draft(commands, draft, 'preview-from-draft', live=True)
+        transaction = preview['transaction_id']
+        shown = call(['transaction-show', transaction], live=False)
+        assert shown['artifact']['prepared_operation']['dispatch']['uri'] == 'ak.wwise.core.object.setProperty', shown
+        assert shown['artifact']['prepared_operation']['dispatch']['args'] == {
+            'object': identity, 'property': 'QualityFactor', 'value': 4.0}, shown
+        artifact = shown['artifact']
+        call(['confirm', transaction, '--confirmation-token', shown['confirmation']['token']], live=False)
+        receipt['execute_attempt_count'] += 1
+        executed = call(['execute', transaction], live=True)
+        assert executed['state'] == 'executed_unverified' and executed['automatic_retry'] is False, executed
+        receipt['project_mutation_count'] = 1
+        verified = call(['verify', transaction], live=True)
+        assert verified['state'] == 'verified' and verified['verification']['business_state_verified'] is True, verified
+        after = receipt['after'] = snapshot()
+        assert after['properties']['QualityFactor'] == 4.0, after
+        assert {key: value for key, value in after.items() if key != 'properties'} == {
+            key: value for key, value in before.items() if key != 'properties'}, (before, after)
+        owner_result = call(['query-object', '--exact-id', after['owner']['id'], '--include', 'class-id'], live=True)
+        assert owner_result['agent_result'] == preflight['owner_result']['agent_result'], owner_result
+        immutable = call(['transaction-show', transaction], live=False)
+        assert immutable['artifact'] == artifact, immutable
+        current = call(['status'], live=True)
+        baseline = preflight['calls'][0]['payload']
+        assert current['wwise'] == baseline['wwise'] and current['project'] == baseline['project'], current
+        receipt['business_effect_verified'] = True
+        category.update(status='PASS', business_effect_verified=True,
+            reason='One exact chosen existing codec scalar changed 3 to 4; identity/owner retained; no replacement or platform lookup claim')
+    except BaseException as exc:
+        receipt['error'] = f'{type(exc).__name__}: {exc}'
+        raise
+    finally:
+        raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(raw) <= receipt['limits']['observation_bytes']
+        output.write_bytes(raw)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
