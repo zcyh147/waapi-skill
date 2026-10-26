@@ -1107,11 +1107,14 @@ _AUDIO_IMPORT_OBJECT_TYPE_TOKEN_SCHEMA: Mapping[str, Any] = {
     "description": _AUDIO_IMPORT_OBJECT_TYPE_TOKEN_DESCRIPTION,
 }
 _AUDIO_IMPORT_SWITCH_ASSIGNMENT_DESCRIPTION = (
-    "One native Wwise Switch Assignation import directive, not an object "
-    "identity or object-path field. When importing a direct child into an "
-    "existing Switch Container whose Switch/State Group is already bound, "
-    "use the exact Switch/State value name (for example, Snow); do not pass "
-    "the value object's path in that common case."
+    "One exact Switch/State value name for a direct imported child of an "
+    "existing SwitchContainer with its group already bound. Gateway resolves "
+    "that value under the actual group, constructs the native directive, and "
+    "verifies the complete assignment set and unchanged group. This first "
+    "slice supports create/reuse with groups below Default Work Unit, including "
+    "VirtualFolders; replacement, new group/container setup and existing "
+    "localized reuse remain outside this slice. Native directive grammar, "
+    "object paths and GUIDs are not caller inputs."
 )
 _AUDIO_IMPORT_SWITCH_ASSIGNMENT_SCHEMA: Mapping[str, Any] = {
     "type": "string",
@@ -15056,6 +15059,45 @@ def _reconcile_import_media_ownership(targets: Sequence[Mapping[str, Any]]) -> N
             claims[key] = (index, target)
 
 
+def _prepare_import_switch_assignment(target: dict[str, Any], *, index: int,
+                                      roles: dict[str, ResolvedObject], read: ReadCall) -> None:
+    value_name = target["requested_switch_assignment"]
+    if (not isinstance(value_name, str) or not value_name or value_name != value_name.strip()
+            or len(value_name) > 255 or any(c in value_name for c in "\\/<>:\r\n\t|")):
+        raise OperationContractError("INVALID_SWITCH_VALUE", "switch_value must be one exact Switch/State name, never native directive grammar.")
+    parent_path = target["canonical_target_path"].rpartition("\\")[0]
+    container = _resolve_identity({"kind": "path", "value": parent_path}, role=f"import_switch[{index}].container", read=read)
+    if container.row.get("type") != "SwitchContainer":
+        raise OperationContractError("INVALID_TARGET_TYPE", "A Switch import assignment requires an existing direct SwitchContainer parent.")
+    before_owner = target.get("pre_state_rows", [])
+    if before_owner and not _same_identity(_parent_value(before_owner[0].get("parent")), container.object):
+        raise OperationContractError("INVALID_RELATIONSHIP", "The existing imported owner must be a direct child of the SwitchContainer.")
+    group = _switch_assignment_group(container, read=read)
+    value_type = "Switch" if group.row["type"] == "SwitchGroup" else "State"
+    state = _resolve_identity({"kind": "scoped-name", "parent": {"kind": "id", "value": group.object},
+                               "type": value_type, "name": value_name}, role=f"import_switch[{index}].value", read=read)
+    if state.row.get("type") != value_type or state.row.get("name") != value_name:
+        raise OperationContractError("INVALID_TARGET_TYPE", "The exact import Switch value must match its group's value type and requested name.")
+    _require_switch_value_group(state, group)
+    hierarchy = "Switches" if value_type == "Switch" else "States"
+    prefix = f"\\{hierarchy}\\Default Work Unit\\"
+    group_path = group.row.get("path")
+    if not isinstance(group_path, str) or not group_path.startswith(prefix):
+        raise OperationContractError("IMPORT_SWITCH_GROUP_PLACEMENT_UNSUPPORTED", "This first import assignment slice requires a group below its Default Work Unit; other group placements remain unimplemented.")
+    relative_group = group_path[len(prefix):]
+    if not relative_group or any(c in relative_group + value_name for c in "<>:|\r\n\t"):
+        raise OperationContractError("INVALID_SWITCH_VALUE", "The resolved group/value cannot be represented by the documented import directive.")
+    assignments = _assignment_pairs(read(SWITCHCONTAINER_GET_ASSIGNMENTS_URI, {"id": container.object}, {}))
+    before_id = target.get("preexisting_id")
+    if before_id and any(row["child_key"] == _identity_key(before_id) and row["state_key"] != _identity_key(state.object) for row in assignments):
+        raise OperationContractError("RELATIONSHIP_CONFLICT", "The imported owner already has an assignment to a different value.")
+    for name, resolved in (("container", container), ("group", group), ("value", state)):
+        roles[f"import_switch[{index}].{name}"] = resolved
+    target["switch_assignment_binding"] = {"container_id": container.object, "group_id": group.object,
+        "value_id": state.object, "before": _public_assignment_pairs(assignments),
+        "directive": f"<{ 'Switch Group' if value_type == 'Switch' else 'State Group'}:{relative_group}>{state.row['name']}"}
+
+
 def _prepare_closed_import_plan(
     request: OperationRequest,
     *,
@@ -15441,6 +15483,17 @@ def _prepare_closed_import_plan(
             if len(events) == 1:
                 target["event_pre_state_rows"] = event_pre_state[0]["rows"]
         targets[index] = target
+
+    if source_operation == "audio.import":
+        rows_with_directives = [dict(row) for row in dispatch_args["imports"]]
+        for index, target in enumerate(targets):
+            if "requested_switch_assignment" not in target:
+                continue
+            if import_operation == "replaceExisting":
+                raise OperationContractError("IMPORT_SWITCH_REPLACE_UNSUPPORTED", "Replacement assignments require an additional closed lifecycle binding; this first slice supports create/reuse.")
+            _prepare_import_switch_assignment(target, index=index, roles=roles, read=read)
+            rows_with_directives[index]["switchAssignation"] = target["switch_assignment_binding"]["directive"]
+        dispatch_args = {**dict(dispatch_args), "imports": rows_with_directives}
 
     if import_operation == "useExisting":
         unsupported_existing_rows: list[dict[str, Any]] = []
@@ -15999,6 +16052,7 @@ def _prepare_closed_import_plan(
         "class_metadata": [row for target in targets for row in target.get("class_metadata", [])],
         "file_proofs": file_proofs,
         "path_snapshots": path_snapshots,
+        "switch_assignments": [target["switch_assignment_binding"] for target in targets if "switch_assignment_binding" in target],
         "existing_sfx_source_snapshots": [target["existing_sfx_source_snapshot"] for target in targets
                                           if "existing_sfx_source_snapshot" in target],
         "empty_sfx_source_snapshots": [target["empty_sfx_source_snapshot"] for target in targets
@@ -16038,8 +16092,8 @@ def _prepare_closed_import_plan(
                     ),
                     (
                         "switch_assignment_result_and_target_verified_side_effect_not_fully_reconstructed",
-                        "requested_switch_assignment" in target
-                        or bool(target.get("requested_switch_assignments")),
+                        "switch_assignment_binding" not in target and ("requested_switch_assignment" in target
+                        or bool(target.get("requested_switch_assignments"))),
                     ),
                 )
                 if present
@@ -17114,6 +17168,44 @@ def _prepare_soundbank_inclusions(
     return preview, roles, state, verification, cleanup
 
 
+def _switch_assignment_group(container: ResolvedObject, *, read: ReadCall) -> ResolvedObject:
+    reference_result = read(
+        OBJECT_GET_URI,
+        {"from": {"id": [container.object]}},
+        {"return": ["id", "path", SWITCH_GROUP_REFERENCE]},
+    )
+    reference_rows = _rows(reference_result)
+    reference_id = _reference_identity(_field_value(reference_rows[0], SWITCH_GROUP_REFERENCE)) if len(reference_rows) == 1 else None
+    if reference_id is None:
+        raise OperationContractError(
+            "INVALID_RELATIONSHIP",
+            "SwitchContainer must expose one canonical SwitchGroupOrStateGroup reference before assignment mutation.",
+            details={"rows": reference_rows},
+        )
+    group_identity_kind = "path" if isinstance(reference_id, str) and reference_id.startswith("\\") else "id"
+    group = _resolve_identity(
+        {"kind": group_identity_kind, "value": reference_id},
+        role="switch_group_or_state_group",
+        read=read,
+    )
+    if group.row.get("type") not in {"SwitchGroup", "StateGroup"}:
+        raise OperationContractError(
+            "INVALID_TARGET_TYPE",
+            "SwitchGroupOrStateGroup must resolve to a SwitchGroup or StateGroup.",
+            details={"actual_type": group.row.get("type")},
+        )
+    return group
+
+
+def _require_switch_value_group(state: ResolvedObject, group: ResolvedObject) -> None:
+    if not _same_identity(_parent_value(state.row.get("parent")), group.object):
+        raise OperationContractError(
+            "INVALID_RELATIONSHIP",
+            "state_or_switch must be a direct child of the group referenced by the SwitchContainer.",
+            details={"state_parent": _parent_value(state.row.get("parent")), "reference_id": group.object},
+        )
+
+
 def _prepare_switch_assignment(
     request: OperationRequest,
     *,
@@ -17146,38 +17238,9 @@ def _prepare_switch_assignment(
             "state_or_switch must resolve to a Switch or State.",
             details={"actual_type": state.row.get("type")},
         )
-    reference_result = read(
-        OBJECT_GET_URI,
-        {"from": {"id": [container.object]}},
-        {"return": ["id", "path", SWITCH_GROUP_REFERENCE]},
-    )
-    reference_rows = _rows(reference_result)
-    reference_id = _reference_identity(_field_value(reference_rows[0], SWITCH_GROUP_REFERENCE)) if len(reference_rows) == 1 else None
-    if reference_id is None:
-        raise OperationContractError(
-            "INVALID_RELATIONSHIP",
-            "SwitchContainer must expose one canonical SwitchGroupOrStateGroup reference before assignment mutation.",
-            details={"rows": reference_rows},
-        )
-    group_identity_kind = "path" if isinstance(reference_id, str) and reference_id.startswith("\\") else "id"
-    group = _resolve_identity(
-        {"kind": group_identity_kind, "value": reference_id},
-        role="switch_group_or_state_group",
-        read=read,
-    )
-    if group.row.get("type") not in {"SwitchGroup", "StateGroup"}:
-        raise OperationContractError(
-            "INVALID_TARGET_TYPE",
-            "SwitchGroupOrStateGroup must resolve to a SwitchGroup or StateGroup.",
-            details={"actual_type": group.row.get("type")},
-        )
+    group = _switch_assignment_group(container, read=read)
     roles["switch_group_or_state_group"] = group
-    if not _same_identity(_parent_value(state.row.get("parent")), group.object):
-        raise OperationContractError(
-            "INVALID_RELATIONSHIP",
-            "state_or_switch must be a direct child of the group referenced by the SwitchContainer.",
-            details={"state_parent": _parent_value(state.row.get("parent")), "reference_id": group.object},
-        )
+    _require_switch_value_group(state, group)
     assignments_result = read(SWITCHCONTAINER_GET_ASSIGNMENTS_URI, {"id": container.object}, {})
     assignments = _assignment_pairs(assignments_result)
     child_key = _identity_key(child.object)
@@ -18966,6 +19029,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 else:
                     passed, evidence = True, {"path": target["canonical_target_path"], "selected_id": target["preexisting_id"]}
                 assertions.append({"name": "TSV native Source wire path retains one exact identity", "passed": passed, "evidence": evidence})
+        for binding in import_guard.get("switch_assignments", []):
+            reference_result = read_call(OBJECT_GET_URI, {"from": {"id": [binding["container_id"]]}}, {"return": ["id", SWITCH_GROUP_REFERENCE]})
+            reference_rows = _rows(reference_result)
+            actual_group = _reference_identity(_field_value(reference_rows[0], SWITCH_GROUP_REFERENCE)) if len(reference_rows) == 1 else None
+            actual = _public_assignment_pairs(_assignment_pairs(read_call(SWITCHCONTAINER_GET_ASSIGNMENTS_URI, {"id": binding["container_id"]}, {})))
+            assertions.append({"name": "import Switch group and assignments unchanged since Preview",
+                "passed": _same_identity(actual_group, binding["group_id"]) and actual == binding["before"],
+                "evidence": {"expected": binding, "actual_group": actual_group, "actual_assignments": actual}})
         for index, snapshot in enumerate(import_guard.get("path_snapshots", [])):
             if not isinstance(snapshot, Mapping):
                 raise OperationContractError("INVALID_PREVIEW", "Import path snapshot is malformed.")
@@ -24545,6 +24616,35 @@ def verify_prepared_operation(
                         _same_identity(returned_id, live_id),
                         {"result": returned_id, "readback": live_id},
                     )
+                binding = target.get("switch_assignment_binding")
+                if isinstance(binding, Mapping):
+                    container_rows = read_object(object_id=binding["container_id"], fields=["id", SWITCH_GROUP_REFERENCE])
+                    actual_group = _reference_identity(_field_value(container_rows[0], SWITCH_GROUP_REFERENCE)) if len(container_rows) == 1 else None
+                    assignment_args = {"id": binding["container_id"]}
+                    assignment_result = read_call(SWITCHCONTAINER_GET_ASSIGNMENTS_URI, assignment_args, {})
+                    readbacks.append({"uri": SWITCHCONTAINER_GET_ASSIGNMENTS_URI, "args": assignment_args, "options": {}, "result": dict(assignment_result)})
+                    expected = list(binding["before"])
+                    for assigned_target in targets:
+                        other = assigned_target.get("switch_assignment_binding", {})
+                        if not _same_identity(other.get("container_id"), binding["container_id"]):
+                            continue
+                        owner_rows = read_object(path=assigned_target["canonical_target_path"], fields=[*IDENTITY_RETURN_FIELDS, "parent"])
+                        returned_owners = [row for row in object_rows if _same_identity(row.get("path"), assigned_target["canonical_target_path"])]
+                        expected_owner_id = (assigned_target.get("preexisting_id") if import_operation == "useExisting"
+                                             and assigned_target.get("pre_state_rows") else
+                                             returned_owners[0].get("id") if len(returned_owners) == 1 else None)
+                        if (len(owner_rows) != 1 or not _same_identity(owner_rows[0].get("id"), expected_owner_id)
+                                or not _same_identity(_reference_identity(owner_rows[0].get("parent")), binding["container_id"])):
+                            check(f"{label} Switch assignment owner is a direct container child", False, owner_rows)
+                            continue
+                        pair = {"child": _identity_key(owner_rows[0]["id"]), "stateOrSwitch": _identity_key(other["value_id"])}
+                        if pair not in expected:
+                            expected.append(pair)
+                    expected.sort(key=lambda row: (row["child"], row["stateOrSwitch"]))
+                    actual = _public_assignment_pairs(_assignment_pairs(assignment_result))
+                    check(f"{label} Switch assignment effect and unrelated pairs preserved",
+                        _same_identity(actual_group, binding["group_id"]) and actual == expected,
+                        {"expected_group": binding["group_id"], "actual_group": actual_group, "expected_pairs": expected, "actual_pairs": actual})
                 expected_type = target.get("requested_object_type", "Sound")
                 check(
                     f"{label} reflected type matches the request",

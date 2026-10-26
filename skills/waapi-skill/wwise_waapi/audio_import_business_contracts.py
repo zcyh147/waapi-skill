@@ -140,7 +140,12 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
             "reference_value_rule": (
                 "copy_one_bound_object_handle_never_a_path_or_name"
             ),
-            "switch_value_rule": "copy_the_user_requested_switch_value_name",
+            "switch_value_rule": (
+                "exact_value_name_below_the_existing_parent_SwitchContainers_actual_group; "
+                "Gateway_binds_group_and_value_and_owns_native_directive; "
+                "verify_owner_assignment_and_preserve_unrelated_pairs_and_group; "
+                "no_caller_directive_grammar"
+            ),
             "language_rule": (
                 "derive_SFX_from_sound-sfx_else_copy_exact_project_language"
             ),

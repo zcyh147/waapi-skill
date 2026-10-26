@@ -1088,11 +1088,11 @@ def test_audio_import_operation_schema_discloses_native_switch_assignment_usage(
     assert row_assignment == default_assignment
     assert row_assignment["type"] == "string"
     description = row_assignment["description"]
-    assert "native Wwise Switch Assignation import directive" in description
-    assert "not an object identity or object-path field" in description
-    assert "exact Switch/State value name" in description
-    assert "for example, Snow" in description
-    assert "do not pass the value object's path" in description
+    assert "One exact Switch/State value name" in description
+    assert "Gateway resolves" in description
+    assert "complete assignment set and unchanged group" in description
+    assert "Native directive grammar" in description
+    assert "not caller inputs" in description
 
 
 def test_audio_import_schema_discloses_generic_live_dependency_closure() -> None:

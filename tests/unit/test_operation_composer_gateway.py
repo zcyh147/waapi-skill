@@ -332,6 +332,33 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # Closed import Switch value binding changes only the reviewed description.
+    assert canonical_sha256(non_object_set_digests) == "c34ee7bdbb35217f637d58f8bab27564f9127d7ef262b6cb4b3a88dfc5561357"
+    switch_import_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.import", version)
+        properties = contract["argument_contract"]["properties"]
+        for field in (properties["defaults"]["properties"]["switch_assignment"],
+                      properties["imports"]["items"]["properties"]["switch_assignment"]):
+            assert field["description"] == (
+                "One exact Switch/State value name for a direct imported child of an "
+                "existing SwitchContainer with its group already bound. Gateway resolves "
+                "that value under the actual group, constructs the native directive, and "
+                "verifies the complete assignment set and unchanged group. This first "
+                "slice supports create/reuse with groups below Default Work Unit, including "
+                "VirtualFolders; replacement, new group/container setup and existing "
+                "localized reuse remain outside this slice. Native directive grammar, "
+                "object paths and GUIDs are not caller inputs."
+            )
+            field["description"] = (
+                "One native Wwise Switch Assignation import directive, not an object "
+                "identity or object-path field. When importing a direct child into an "
+                "existing Switch Container whose Switch/State Group is already bound, "
+                "use the exact Switch/State value name (for example, Snow); do not pass "
+                "the value object's path in that common case."
+            )
+        switch_import_contracts[version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
     # Combined owner-only field + global Source-wire identity schema.
     assert canonical_sha256(non_object_set_digests) == "27ba4a25e057a70e89d3955e23803cea448054f7d3ff2b0205cf219d3eae59d2"
     # Preserve the independently committed owner-only component seal by
@@ -418,7 +445,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     current_import_digests = dict(non_object_set_digests)
     ordinary_import_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.import", version)
+        contract = switch_import_contracts[version]
         assert contract["constraints"][6] == (
             "ordinary localized useExisting preserves the exact Voice and language-scoped Source identities; Gateway-owned typed owner/Source paths and the 2025.1 exact existing Source GUID binding support metadata-proven owner properties/references and regular or bounded inline WAV media, including an absent language Source; AudioSourceNotes uses an explicit Source row, while Notes, Originals placement and new Events retain independent verification; localized Dialogue/Switch directives and explicit row import_location remain outside the closed preparation path"
         )
