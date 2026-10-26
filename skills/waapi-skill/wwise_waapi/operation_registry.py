@@ -15150,8 +15150,6 @@ def _prepare_import_dialogue_association(target: dict[str, Any], *, index: int,
     before = target.get("pre_state_rows", [])
     owner_id = before[0]["id"] if before else None
     before_referrers = _read_import_dialogue_referrers(owner_id, read=read) if owner_id else []
-    if len(before_referrers) >= 128:
-        raise OperationContractError("DIALOGUE_ASSOCIATION_LIMIT_EXCEEDED", "The complete referrer readback must retain capacity for the new Dialogue association before import.")
     target["dialogue_association_binding"] = {"path": event_path, "parent_id": parent.object,
         "event_class_id": event_class.class_id, "entry_class_id": entry_class.class_id,
         "audio_node_metadata": info.as_dict(), "owner_id": owner_id,
@@ -15634,6 +15632,17 @@ def _prepare_closed_import_plan(
             rows_with_directives[index]["switchAssignation"] = target["switch_assignment_binding"]["directive"]
     if rows_with_directives is not None:
         dispatch_args = {**dict(dispatch_args), "imports": rows_with_directives}
+
+    for target in targets:
+        dialogue = target.get("dialogue_association_binding")
+        if not isinstance(dialogue, Mapping):
+            continue
+        planned_count = 1 + len(target.get("validated_events", []))
+        switch = target.get("switch_assignment_binding")
+        if isinstance(switch, Mapping) and not any(_same_identity(row["id"], switch["container_id"]) for row in dialogue["before"]):
+            planned_count += 1
+        if len(dialogue["before"]) + planned_count > 128:
+            raise OperationContractError("DIALOGUE_ASSOCIATION_LIMIT_EXCEEDED", "The complete referrer readback must retain capacity for the planned Dialogue, Event Actions and bound SwitchContainer before import.")
 
     if import_operation == "useExisting":
         unsupported_existing_rows: list[dict[str, Any]] = []
@@ -24558,6 +24567,7 @@ def verify_prepared_operation(
             target_path = str(target["canonical_target_path"])
             target_number = target.get("index", target.get("row_number", ordinal))
             label = f"import target {target_number}"
+            verified_switch_referrers: set[str] = set()
             source_proof = target.get("source_file")
             media_expected = target.get("media_expected")
             if media_expected is None:
@@ -24772,35 +24782,6 @@ def verify_prepared_operation(
                         _same_identity(returned_id, live_id),
                         {"result": returned_id, "readback": live_id},
                     )
-                dialogue = target.get("dialogue_association_binding")
-                if isinstance(dialogue, Mapping):
-                    def dialogue_read(uri, args, options):
-                        result = read_call(uri, args, options)
-                        readbacks.append({"uri": uri, "args": args, "options": options, "result": dict(result)})
-                        return result
-                    event_rows = read_object(path=dialogue["path"], fields=[*IDENTITY_RETURN_FIELDS, "classId", "parent"])
-                    event_ok = (len(event_rows) == 1 and _valid_object_id(event_rows[0].get("id"))
-                        and event_rows[0].get("type") == "DialogueEvent"
-                        and event_rows[0].get("classId") == dialogue["event_class_id"]
-                        and event_rows[0].get("path") == dialogue["path"]
-                        and _same_identity(_parent_value(event_rows[0].get("parent")), dialogue["parent_id"]))
-                    check(f"{label} exact new DialogueEvent identity and parent", event_ok, event_rows)
-                    referrers = _read_import_dialogue_referrers(live_id, read=dialogue_read)
-                    old = {_identity_key(row["id"]): row for row in dialogue["before"]}
-                    added = [row for row in referrers if _identity_key(row["id"]) not in old]
-                    preserved = all(row in referrers for row in old.values())
-                    event_id = event_rows[0].get("id") if event_ok else None
-                    association_ok = (len(added) == 1 and event_ok and added[0].get("type") == "MultiSwitchEntry"
-                        and added[0].get("classId") == dialogue["entry_class_id"]
-                        and _same_identity(_reference_identity(added[0].get("owner")), event_id)
-                        and _same_identity(_reference_identity(added[0].get("AudioNode")), live_id))
-                    if association_ok:
-                        actual_entry = read_object(object_id=added[0]["id"], fields=[*IDENTITY_RETURN_FIELDS, "classId", "owner", "AudioNode"])
-                        association_ok = actual_entry == added
-                        actual_metadata = _read_property_info(dialogue_read, name="AudioNode", object_id=added[0]["id"]).as_dict()
-                        association_ok = association_ok and _native_snapshot_equal(actual_metadata, dialogue["audio_node_metadata"])
-                    check(f"{label} Dialogue association and unrelated referrers preserved", association_ok and preserved,
-                        {"event": event_rows, "owner_id": live_id, "before": dialogue["before"], "actual": referrers})
                 binding = target.get("switch_assignment_binding")
                 if isinstance(binding, Mapping):
                     container_rows = read_object(object_id=binding["container_id"], fields=["id", SWITCH_GROUP_REFERENCE])
@@ -24828,9 +24809,11 @@ def verify_prepared_operation(
                                 expected.append(pair)
                     expected.sort(key=lambda row: (row["child"], row["stateOrSwitch"]))
                     actual = _public_assignment_pairs(_assignment_pairs(assignment_result))
-                    check(f"{label} Switch assignment effect and unrelated pairs preserved",
-                        _same_identity(actual_group, binding["group_id"]) and actual == expected,
+                    switch_effect_ok = _same_identity(actual_group, binding["group_id"]) and actual == expected
+                    check(f"{label} Switch assignment effect and unrelated pairs preserved", switch_effect_ok,
                         {"expected_group": binding["group_id"], "actual_group": actual_group, "expected_pairs": expected, "actual_pairs": actual})
+                    if switch_effect_ok:
+                        verified_switch_referrers.add(_identity_key(binding["container_id"]))
                 expected_type = target.get("requested_object_type", "Sound")
                 check(
                     f"{label} reflected type matches the request",
@@ -25340,6 +25323,7 @@ def verify_prepared_operation(
                     {"live_id": live_id},
                 )
 
+            verified_event_action_ids: set[str] = set()
             events = target.get("validated_events")
             if not isinstance(events, list):
                 events = (
@@ -25348,6 +25332,7 @@ def verify_prepared_operation(
                     else []
                 )
             for event_index, event in enumerate(events):
+                event_assertion_start = len(assertions)
                 if not isinstance(event, Mapping):
                     raise OperationContractError(
                         "INVALID_PREVIEW",
@@ -25441,6 +25426,44 @@ def verify_prepared_operation(
                                     "actual_target": actual_target,
                                 },
                             )
+                            if all(assertion["passed"] for assertion in assertions[event_assertion_start:]):
+                                verified_event_action_ids.add(_identity_key(action_id))
+            dialogue = target.get("dialogue_association_binding")
+            if live_row is not None and isinstance(dialogue, Mapping):
+                def dialogue_read(uri, args, options):
+                    result = read_call(uri, args, options)
+                    readbacks.append({"uri": uri, "args": args, "options": options, "result": dict(result)})
+                    return result
+                event_rows = read_object(path=dialogue["path"], fields=[*IDENTITY_RETURN_FIELDS, "classId", "parent"])
+                event_ok = (len(event_rows) == 1 and _valid_object_id(event_rows[0].get("id"))
+                    and event_rows[0].get("type") == "DialogueEvent"
+                    and event_rows[0].get("classId") == dialogue["event_class_id"]
+                    and event_rows[0].get("path") == dialogue["path"]
+                    and _same_identity(_parent_value(event_rows[0].get("parent")), dialogue["parent_id"]))
+                check(f"{label} exact new DialogueEvent identity and parent", event_ok, event_rows)
+                referrers = _read_import_dialogue_referrers(live_id, read=dialogue_read)
+                old = {_identity_key(row["id"]): row for row in dialogue["before"]}
+                added = [row for row in referrers if _identity_key(row["id"]) not in old]
+                preserved = all(row in referrers for row in old.values())
+                event_id = event_rows[0].get("id") if event_ok else None
+                planned = [row for row in added if _identity_key(row["id"]) in verified_event_action_ids]
+                switch_members = [row for row in added if _identity_key(row["id"]) in verified_switch_referrers]
+                entries = [row for row in added if row not in planned and row not in switch_members]
+                planned_ok = ({_identity_key(row["id"]) for row in planned} == verified_event_action_ids
+                    and all(row.get("type") == "Action" for row in planned)
+                    and all(row.get("type") == "SwitchContainer" for row in switch_members))
+                association_ok = (planned_ok and len(entries) == 1 and event_ok and entries[0].get("type") == "MultiSwitchEntry"
+                    and entries[0].get("classId") == dialogue["entry_class_id"]
+                    and _same_identity(_reference_identity(entries[0].get("owner")), event_id)
+                    and _same_identity(_reference_identity(entries[0].get("AudioNode")), live_id))
+                if association_ok:
+                    actual_entry = read_object(object_id=entries[0]["id"], fields=[*IDENTITY_RETURN_FIELDS, "classId", "owner", "AudioNode"])
+                    association_ok = actual_entry == entries
+                    actual_metadata = _read_property_info(dialogue_read, name="AudioNode", object_id=entries[0]["id"]).as_dict()
+                    association_ok = association_ok and _native_snapshot_equal(actual_metadata, dialogue["audio_node_metadata"])
+                check(f"{label} Dialogue association and unrelated referrers preserved", association_ok and preserved,
+                    {"event": event_rows, "owner_id": live_id, "before": dialogue["before"], "actual": referrers, "verified_event_actions": sorted(verified_event_action_ids),
+                        "verified_switch_containers": sorted(verified_switch_referrers)})
     # Compatibility for already-persisted legacy previews only. Current public
     # audio.import and audio.importTabDelimited producers emit closed-audio-import.
     elif kind == "audio-import-created-objects":
