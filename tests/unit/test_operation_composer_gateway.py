@@ -333,12 +333,20 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # Invert only the observed combined-source host boundary, preserving the
+    # exact earlier combined disclosure and every component/historical seal.
+    assert canonical_sha256(non_object_set_digests) == "04848d1c5153d3ef35c8dd5f57feb858c3b9bb9e74d3d81a833036b25b5affd3"
+    previous_source_boundary_contract = operation_request_machine_contract("audio.importTabDelimited", "2025.1")
+    assert previous_source_boundary_contract["constraints"].pop(-2) == (
+        "WwiseConsole 2025.1.7 build 9143 blocks a combined localized existing-owner fields/media row when its selected Source path is shared across languages: retained native evidence added an extra Source despite correct fields and copied bytes; preparation and prewrite checks match this observed configuration, not a proven root cause; owner-only, pure-media, unambiguous and other-host forms retain their existing boundaries"
+    )
+    non_object_set_digests["audio.importTabDelimited@2025.1"] = canonical_sha256(previous_source_boundary_contract)
     # Exact TSV combined fields/media adds one reviewed disclosure. Invert
     # only that constraint before retaining both component and older seals.
     assert canonical_sha256(non_object_set_digests) == "3d4da617cf27e38485a15d5f716e97cb6221ebe45a620c96e871868545df9962"
     before_combined_media_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = deepcopy(previous_source_boundary_contract) if version == "2025.1" else operation_request_machine_contract("audio.importTabDelimited", version)
         assert contract["constraints"].pop() == (
             "localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows bind the intended language Source, verify planned media changes and preserve other Source files without rewriting the exact table"
         )

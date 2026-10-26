@@ -3953,6 +3953,7 @@ def operation_request_machine_contract(name: str, version: str) -> dict[str, Any
     constraints = list(spec.constraints)
     if name == "audio.importTabDelimited" and version == "2025.1":
         constraints.append("WwiseConsole 2025.1.7 build 9143 blocks GUID Object Path TSV cells before preview and execution: retained native evidence interpreted them as literal object names and created unintended objects; other host/version GUID semantics remain unproven pending scope decision")
+        constraints.append("WwiseConsole 2025.1.7 build 9143 blocks a combined localized existing-owner fields/media row when its selected Source path is shared across languages: retained native evidence added an extra Source despite correct fields and copied bytes; preparation and prewrite checks match this observed configuration, not a proven root cause; owner-only, pure-media, unambiguous and other-host forms retain their existing boundaries")
     if name == "audio.importTabDelimited":
         constraints.append("localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows bind the intended language Source, verify planned media changes and preserve other Source files without rewriting the exact table")
     return {

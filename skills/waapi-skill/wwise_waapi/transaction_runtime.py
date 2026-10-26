@@ -27,11 +27,13 @@ from .execution_contracts import (
 )
 from .host_paths import HostPathError, parse_absolute_host_path
 from .operation_registry import (
+    OperationContractError,
     OperationRequest,
     PreparedOperation,
     ReadCall,
     parse_operation_request,
     prepare_operation,
+    _require_unique_import_source_wire_path,
 )
 from .platform_paths import (
     WwiseWirePathError,
@@ -270,7 +272,7 @@ def build_runtime_guard(skill_root: Path, version: str) -> dict[str, Any]:
     return {"contract": RUNTIME_GUARD_CONTRACT, **body, "fingerprint": canonical_sha256(body)}
 
 
-def _validate_tab_guid_native_boundary(
+def _validate_tab_native_boundaries(
     request: Mapping[str, Any], verification: Mapping[str, Any], project_guard: Mapping[str, Any],
 ) -> None:
     if request.get("operation") != "audio.importTabDelimited" or request.get("version") != "2025.1":
@@ -297,6 +299,39 @@ def _validate_tab_guid_native_boundary(
                      "native_interpretation": "literal_object_names", "guid_rows": guid_rows,
                      "evidence_case": "import182-tsv-guid-2025-r1",
                      "other_host_version_semantics": "unproven_scope_decision_pending"})
+    if verification.get("import_operation") != "useExisting":
+        return
+    for target in targets:
+        if (not isinstance(target, Mapping) or target.get("localized_owner_fields") is not True
+                or target.get("media_expected") is not True
+                or not (target.get("validated_properties") or target.get("validated_references"))
+                or not target.get("preexisting_id") or not target.get("localized_audio_file_source_id")):
+            continue
+        snapshot = target.get("localized_source_snapshot", {})
+        path = target.get("expected_audio_file_source_result_path")
+        candidates = [source for source in snapshot.get("rows", []) if isinstance(source, Mapping)
+            and source.get("type") == "AudioFileSource" and isinstance(path, str)
+            and str(source.get("path", "")).casefold() == path.casefold()]
+        languages = {source.get("audioSource:language", {}).get("name") for source in candidates}
+        if len(candidates) < 2 or len(languages) < 2:
+            continue
+        try:
+            _require_unique_import_source_wire_path({**target, "canonical_target_path": path,
+                "preexisting_id": target["localized_audio_file_source_id"]}, snapshot)
+        except OperationContractError as exc:
+            # Retained combined r1 changed fields/media but added an English
+            # Source while preserving both old GUIDs. Match only that observed
+            # configuration; cross-language path ambiguity is not proven cause.
+            raise TransactionGuardError("TSV_COMBINED_SOURCE_IDENTITY_UNSAFE_ON_HOST",
+                "WwiseConsole 2025.1.7 build 9143 added an extra language Source for a combined localized owner fields/media row with a cross-language shared Source path. This observed configuration is blocked before preview or writing; the exact table is not rewritten.",
+                details={"observed_version": dict(observed_version), "is_command_line": True,
+                    "row": target.get("row_number"), "owner_id": target["preexisting_id"],
+                    "selected_source_id": target["localized_audio_file_source_id"],
+                    "source_path": path, "candidate_ids": [source.get("id") for source in candidates],
+                    "languages": sorted(languages), "identity_guard": exc.as_dict(),
+                    "evidence_case": "import182-tsv-combined-2025-r1",
+                    "root_cause": "unproven; observed configuration only",
+                    "other_host_version_semantics": "unproven; outside this boundary"}) from exc
 
 
 def _validate_tab_media_path_namespace(prepared: PreparedOperation, project_guard: Mapping[str, Any]) -> None:
@@ -346,7 +381,7 @@ def build_transaction_preview_artifact(
         raise ValueError("ttl_seconds must be greater than zero")
     request = parse_operation_request(request_payload, expected_version=live_version)
     prepared = prepare_operation(request, read_call=read_call, history_resolver=history_resolver, copy_proof_context=copy_proof_context)
-    _validate_tab_guid_native_boundary(request.as_dict(), prepared.verification_plan, project_guard)
+    _validate_tab_native_boundaries(request.as_dict(), prepared.verification_plan, project_guard)
     _validate_tab_media_path_namespace(prepared, project_guard)
     post_execution_project_guard_policy = _prepared_post_execution_project_guard_policy(
         prepared
@@ -628,7 +663,7 @@ def validate_transaction_guards(
         prepared = artifact.get("prepared_operation", {})
         verification = prepared.get("verification_plan", {}) if isinstance(prepared, Mapping) else {}
         if isinstance(verification, Mapping):
-            _validate_tab_guid_native_boundary(request, verification, current_project_guard)
+            _validate_tab_native_boundaries(request, verification, current_project_guard)
     stored_project = artifact.get("project_guard")
     stored_runtime = artifact.get("runtime_guard")
     if not isinstance(stored_project, Mapping) or not isinstance(stored_runtime, Mapping):
