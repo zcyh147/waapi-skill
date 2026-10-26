@@ -5,6 +5,31 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #182 owner-only exact TSV fields milestone
+
+The public Gateway now admits the metadata-proven 2025.1 owner-only localized
+TSV slice with explicit activation prerequisites and complete Source/media
+preservation. The multirow verifier compares each owner's sealed prestate.
+Component evidence is five tracer checks, one multiowner regression and three
+persisted-final-writer controls: separate results, not a Program/Non-live gate.
+
+Console 2025.1.7.9143, macOS, candidate `08e9111a`: **PASS, 6.94s** in
+`import182-tsv-owner-fields-2025-r2`, three verified transactions including two
+setups. The exact table has no Audio File column: Volume changed 0→-6,
+explicit OverrideOutput false→true and OutputBus Main→Secondary. Independent
+checks preserved both-language Source identities/Notes/media, owner facts,
+unrelated/spare objects, both Buses and inputs. Source/process cleanup passed;
+the PASS sandbox was deleted. Receipt SHA-256:
+`3ea67cb126c08b00c2e01bac1e490c4a236fda3e9510e4d0f72a82a700402708`.
+
+Original `import182-tsv-owner-fields-2025-r1` at `4b11301e` remains **FAIL,
+7.44s**: wrong fixture Bus class, two verified setups, witness never executed;
+source/process cleanup passed and its sandbox remains quarantined. Both roots
+retain `main-assessment.json` and final `category.jsonl` under
+`.waapi-skill-state/full-coverage/`. #182 remains OPEN for five-version code
+proof, media-containing TSV/forms and Dialogue/Switch directives. Fresh budget
+remains zero; no broad gates or native-Windows evidence were added.
+
 ## 2026-10-26 #182 GUID TSV failure and immediate safety boundary
 
 GUID parsing and shared typed-class policy have separate component evidence:
