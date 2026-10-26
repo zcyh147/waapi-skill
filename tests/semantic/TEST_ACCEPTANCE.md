@@ -56,6 +56,13 @@ Simple APIs use an ordinary happy path and reusable relevant proof. Structural
 mapping rows, enum values, optional-field permutations and collection sizes are
 not individual execution or evidence-ID quotas.
 
+When matching primary sources establish a version introduction, disclose the
+older-version limit and test the version gate in code. Do not create older
+Wwise samples just to reproduce absence. Unclear documentation is not proof of
+a native limit. The twelve finite declared query return choices approved on
+2026-10-26 need shared transport/preservation checks, not per-spelling native
+samples or invented alias-equivalence proof; see the coverage specification.
+
 Select real Wwise checks for actual business risk, independent behavior and
 host/version differences. Reuse matching valid observations; preserve original
 failed outcomes. CRUD, queries and compound changes retain appropriate identity,

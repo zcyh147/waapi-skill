@@ -223,6 +223,19 @@ source-supported boundaries rather than Wwise repair or QA work. Simple APIs
 use an ordinary happy path and relevant existing proof. Do not expand this into every enum value, optional-field permutation,
 collection cardinality or per-leaf evidence collection.
 
+When matching primary sources establish a capability's introduction, expose the
+version restriction and retain focused code checks of its version gate. Do not
+construct older-version native samples merely to reproduce that absence. A
+missing description or unresolved applicability is not proof of introduction.
+
+For the twelve enum-declared query return spellings discussed on 2026-10-26,
+expose finite version-matched choices through the existing closed query route:
+eleven legacy spellings across the five lanes, and `states` in 2025.1 only.
+Preserve actual returned keys and values without inventing alias equivalence or
+per-choice attribution. Uncertain semantics alone do not justify excluding
+these choices or requiring a separate native sample for each. Ordinary read
+refinement needs no new approval; arbitrary return grammar remains unavailable.
+
 CRUD, queries and compound changes retain appropriate identity, policy,
 execute-once, outcome and cleanup checks. A shared mechanism pass does not
 conceal an unsupported normal-user function. The final checker must accept

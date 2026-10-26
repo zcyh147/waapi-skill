@@ -5,6 +5,52 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #181 query increment
+
+Reviewed integration `74823e56` adds modern `local-markers` and root
+`marker-records`, selected-State/Panner/computed object contexts, 2025 field-status
+and curve-selection outputs, and twelve finite declared return choices. The
+eleven legacy spellings remain selectable across all five lanes; `states` is
+2025-only. Actual native keys/values are retained without alias-equivalence or
+per-choice attribution claims. Source-established 2023 Marker object-model
+introduction supplies the older-version boundary; no older native sample was
+created merely to reproduce absence.
+
+Component program selections overlap and are not a full-gate total: declared
+choices passed **57 in 16.55s**; context/runtime controls **45 in 5.88s** and
+collector/finalizer controls **8 in 4.87s**; public-boundary cleanup **39 passed**;
+final merge intersections **6 in 1.60s**. Marker records used focused tracer,
+version/presence/shape, paging/drift and rejection checks, including a final
+four-check tracer/schema selection passing in **5.05s**. These establish
+Gateway construction/projection, not an exact native Marker-record composition
+receipt or computed/file-cue equivalence. Retained R90 Marker identity and
+Time/Label facts support only those observed primitives. Both incremental review
+axes were clear; no new broad gate or Fresh run occurred.
+
+| Frozen candidate / Console build | Original result | Scoped observation |
+| --- | --- | --- |
+| `36de89a1` / 2021.1.14.8108 | **FAIL, 9.33s** | One value dispatch, one public query, zero transactions. Native `ak.wwise.query.invalid_query`: `Unknown accessor points`. The subsequent precise 2021 accessor boundary replaces the unverified candidate; it does not establish absence of all legacy RTPC reads. |
+| `36de89a1` / 2025.1.7.9143 | **FAIL, 8.30s** | Twelve public invocations, eighteen dispatches, zero transactions. State/Panner selections and exact readbacks, property/reference/List status values and two curve-source values observed. Duration selection returned an accepted empty list; radius selection returned actual Footsteps attenuation, contradicting the collector's XML-derived target expectation. |
+
+The computed-target collector now follows actual zero-or-one results, with
+focused code proof through its finalizer. Original FAILs remain unchanged and
+neither attempt was rerun for this repair. The radius target's later exact-ID
+readback was not reached in the original attempt; an empty duration result is
+not nonempty evidence. Both roots retain source full-hash/tree/mtime proof,
+clean process teardown and quarantined sandboxes:
+`.waapi-skill-state/full-coverage/query181-2021-points-r1` and
+`query181-2025-functions-r1`, including `main-assessment.json` and original
+receipts/categories. Detailed component commands/reviews are retained in
+`.waapi-skill-state/full-coverage/query-181-work/`.
+
+Public Curve/Playlist boundary resources now omit historical developer fixture
+and transaction records. Exact originals remain hash-pinned under
+`tests/fixtures/resource-evidence/native-boundaries/`; source evidence and
+original outcomes were not rewritten. #181 remains open for the residual
+2021 association/applicability work. #194 Fresh budget is zero; #195 retains
+mapping reconciliation and stable combined Program/Non-live gates. No Windows,
+whole-ticket or parent-completion claim follows from this increment.
+
 ## 2026-10-26 #180 graph/lifecycle closeout
 
 Reviewed combined `18defa44` resolves the three audited #180 gaps through the

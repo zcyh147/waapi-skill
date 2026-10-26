@@ -45,3 +45,17 @@ The structured Short-ID type mapping is a shared source-consistency prerequisite
 Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
 
 Use one parameterized five-version code selection for metadata shapes, query projections, pagination and size/error behavior, adding native reads only for missing native facts. Reuse the recorded metadata observations when their exact scope and source dependencies remain valid. Scope helpers and simulated identities to actual native packets rather than XML serialization names. Test evidence-producer and completion-reader corrections locally through their affected chain; do not repeat a live property query solely to repair an old expectation or report. Keep uncovered query semantics and field alternatives explicit.
+
+## Execution detail — 2026-10-26
+
+Expose the eleven enum-declared legacy return spellings in their five matching
+lanes and `states` in 2025.1 through finite closed choices. Preserve actual
+response keys and values without claiming equivalent meanings; the user rejected
+excluding these choices. Permitted read refinement requires no new approval.
+
+Source-established introduction dates become explicit version restrictions, with
+focused code checks rather than older-version native samples. This applies to
+the 2023 Source Marker object model; it does not turn unresolved 2021 static RTPC
+association or active-source applicability into universal native absence.
+Reuse valid observations from the original failed native attempts and preserve
+their verdicts. Final combined gates remain under #195 and Fresh under #194.
