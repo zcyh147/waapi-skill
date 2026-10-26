@@ -1462,8 +1462,8 @@ def workflow_sandbox_runtime(
 
 @pytest.mark.live
 @pytest.mark.destructive
-def test_core_soundbank_temporary_generation_and_default_external_conversion(workflow_sandbox_runtime):
-    """Two Core file effects, each separately previewed and authorized."""
+def test_core_audio_conversion_temporary_bank_and_default_external_conversion(workflow_sandbox_runtime):
+    """Three Core file effects, each separately previewed and authorized."""
     if workflow_sandbox_runtime.version != "2025.1":
         pytest.skip("Representative Core SoundBank file witness is pinned to2025.1")
     from tests.destructive.support.soundbank_acceptance import collect_core_file_acceptance
