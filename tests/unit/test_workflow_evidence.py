@@ -432,9 +432,11 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 media = Path(row["audioFile"]) if "audioFile" in row else Path(relative.replace("\\", "/"))
                 data = media.read_bytes() if "audioFile" in row else base64.b64decode(encoded)
                 source_name = source_name or media.stem
+                # Native r3: an explicit Source path resolves across languages;
+                # importLanguage does not scope the objectPath lookup.
                 source = next((item for item in self.objects.values() if (item.get("parent") or {}).get("id") == owner["id"]
                     and item["type"] == "AudioFileSource" and item["name"] == source_name
-                    and item["audioSource:language"]["name"] == language), None)
+                    and (explicit_source or item["audioSource:language"]["name"] == language)), None)
                 copied = tmp_path / "project/Originals" / ("SFX" if language == "SFX" else "Voices/" + language)
                 copied = (copied / row.get("originalsSubFolder", "") / media.name if "audioFile" in row
                     else tmp_path / "project/Originals" / media)
@@ -445,7 +447,8 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                         "notes": "", "parent": {"id": owner["id"]},
                         "audioSource:language": {"id": ENGLISH if language == "English(US)" else JAPANESE if language == "Japanese" else SFX, "name": language}}
                     self.objects[source["id"]] = source
-                source["originalFilePath"] = str(copied)
+                if not explicit_source or source["audioSource:language"]["name"] == language:
+                    source["originalFilePath"] = str(copied)
                 if explicit_source and "notes" in row: source["notes"] = row["notes"]
                 returned.append(source)
             return returned

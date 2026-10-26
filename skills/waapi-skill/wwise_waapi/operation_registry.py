@@ -14337,10 +14337,35 @@ def _localized_source_snapshot(owner_id: str, *, read: ReadCall) -> dict[str, An
     return {"owner_id": owner_id, "rows": sorted(rows, key=lambda row: row["id"].casefold())}
 
 
-def _bind_localized_import_source(target: dict[str, Any], *, read: ReadCall) -> str | None:
+def _localized_generated_source_path(target: Mapping[str, Any], filename_path: str | None) -> str | None:
+    """Disambiguate only a Gateway-owned ordinary explicit Source child name.
+
+    Native explicit objectPath lookup is not scoped by importLanguage. Keep
+    the filename-derived child when that path is free or already belongs to
+    the selected language; otherwise use a deterministic safe language suffix.
+    The new exact path is still required absent (or bound to its existing
+    selected-language GUID) by the normal snapshot and drift guards.
+    """
+    snapshot = target.get("localized_source_snapshot")
+    language = _localized_import_read_language(target.get("requested_language"))
+    if not isinstance(filename_path, str) or language is None or not isinstance(snapshot, Mapping):
+        return filename_path
+    rows = snapshot.get("rows", [])
+    collisions = [row for row in rows if str(row.get("path", "")).casefold() == filename_path.casefold()]
+    if not collisions or any(_object_type_token(row.get("type")) == "audiofilesource"
+            and _import_language_name(row.get("audioSource:language")) == language for row in collisions):
+        return filename_path
+    return filename_path + "__" + hashlib.sha256(language.encode("utf-8")).hexdigest()[:12]
+
+
+def _bind_localized_import_source(target: dict[str, Any], *, read: ReadCall, derive_source_name: bool = False) -> str | None:
     """Bind exact language/filename identity independently of native import form."""
     language = target.get("requested_language")
     snapshot = _localized_source_snapshot(str(target["preexisting_id"]), read=read)
+    target["localized_source_snapshot"] = snapshot
+    if derive_source_name:
+        target["expected_audio_file_source_result_path"] = _localized_generated_source_path(
+            target, target.get("expected_audio_file_source_result_path"))
     matching_sources = [source for source in snapshot["rows"]
                         if source.get("path") == target.get("expected_audio_file_source_result_path")
                         and _object_type_token(source.get("type")) == "audiofilesource"
@@ -15203,6 +15228,13 @@ def _prepare_closed_import_plan(
                                  "actual_type": rows[0].get("type"), "is_voice": _field_value(rows[0], "@IsVoice")},
                     )
                 _bind_localized_import_source(target, read=read)
+            elif (source_operation == "audio.import" and import_operation == "useExisting"
+                  and _localized_import_read_language(target.get("requested_language")) is not None
+                  and _import_requires_explicit_source(target)):
+                _bind_localized_import_source(target, read=read, derive_source_name=True)
+                if target["expected_audio_file_source_result_path"] != expected_source_path:
+                    allowed_result_paths.discard(str(expected_source_path).casefold())
+                    allowed_result_paths.add(target["expected_audio_file_source_result_path"].casefold())
             roles[f"targets[{index}].existing"] = ResolvedObject(
                 identity=ObjectIdentity(path=target_path),
                 object=existing_id,
@@ -15411,6 +15443,13 @@ def _prepare_closed_import_plan(
             source_fields = _import_audio_source_return_fields(
                 version=request.version
             )
+            source_file = target["source_file"]
+            filename_path = expected_audio_file_source_result_path(target["canonical_target_path"],
+                source_file.get("path", source_file.get("relative_path")))
+            if expected_source_path != filename_path:
+                # A generated collision-avoidance path must be absent across
+                # all languages, or identify the already bound exact Source.
+                read_language = None
             source_rows = _read_object_path_rows(
                 expected_source_path,
                 fields=source_fields,
@@ -15445,6 +15484,12 @@ def _prepare_closed_import_plan(
                             "row": source_row,
                         },
                     )
+            if expected_source_path != filename_path and source_rows and (
+                not _valid_object_id(target.get("localized_audio_file_source_id"))
+                or not _same_identity(source_rows[0].get("id"), target["localized_audio_file_source_id"])
+            ):
+                raise OperationContractError("TARGET_EXISTS", "The generated localized Source child path is already occupied outside the selected language binding.",
+                    details={"path": expected_source_path, "rows": source_rows})
             target["explicit_audio_file_source_pre_state_rows"] = source_rows
             source_snapshot: dict[str, Any] = {
                 "path": expected_source_path,
@@ -15551,7 +15596,8 @@ def _prepare_closed_import_plan(
                         "A localized existing audio.import row lacks its requested objectPath.",
                         details={"index": index, "objectPath": input_object_path},
                     )
-                localized_active_source = _bind_localized_import_source(target, read=read)
+                localized_active_source = (target.get("localized_audio_file_source_id")
+                    if "localized_source_snapshot" in target else _bind_localized_import_source(target, read=read))
                 source_kind = target.get("source_file", {}).get("kind")
                 metadata_fields = []
                 for expected in target.get("localized_owner_field_metadata", []):
@@ -23897,6 +23943,8 @@ def verify_prepared_operation(
                     ) from exc
             else:
                 derived_source_path = None
+            if source_operation == "audio.import" and _import_requires_explicit_source(target):
+                derived_source_path = _localized_generated_source_path(target, derived_source_path)
             if expected_source_path != derived_source_path:
                 raise OperationContractError(
                     "INVALID_PREVIEW",

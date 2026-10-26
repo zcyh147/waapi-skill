@@ -469,7 +469,7 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
             assert owner_row["@Volume"] == -6 and owner_row["@OutputBus"] == bus_id
             assert owner_row["@OverrideOutput"] is True and "@OverrideOutput" not in source_row
             assert "audioFileBase64" not in owner_row and "notes" not in owner_row
-            assert source_row["objectPath"].endswith("\\<Sound Voice>VoiceSource\\<AudioFileSource>LineSource")
+            assert source_row["objectPath"].endswith("\\<Sound Voice>VoiceSource\\<AudioFileSource>LineSource__" + hashlib.sha256(b"Japanese").hexdigest()[:12])
             assert source_row["notes"] == "Japanese explicit Source notes" and source_row["importLanguage"] == "Japanese"
             assert "importLocation" not in source_row and "audioSourceNotes" not in source_row
             assert source_row["audioFileBase64"] == inline.partition("|")[0].replace("/", "\\") + "|" + inline.partition("|")[2]
