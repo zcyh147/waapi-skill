@@ -40,6 +40,11 @@ class PlaylistTask(AttenuationTask):
 
     def call(self, uri, args=None, options=None):
         result = super().call(uri, args, options)
+        if uri.endswith('object.get') and '@PlaylistObject' in (options or {}).get('return', []):
+            for row in result.get('return', []):
+                source = self.objects.get(row.get('id'), {})
+                if 'PlaylistObject' in source:
+                    row['@PlaylistObject'] = deepcopy(source['PlaylistObject'])
         if uri.endswith('setReference') and getattr(self, 'display_path_changes', False):
             owner_path = self.objects[OWNER]['path']
             self.objects[FIRST]['path'] = owner_path + '\\[PlaylistSlot: (' + self.objects[args['value']]['name'] + ')]'
