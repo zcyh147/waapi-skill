@@ -339,7 +339,7 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
         return payload["objects"]
     def exact(identity):
         rows = query(["--exact-id", identity], ("notes", "parent", "class-id"),
-            ("Volume", "OutputBus") if ordinary and identities.get("VoiceSource") == identity else ())
+            ("Volume", "OutputBus", "OverrideOutput") if ordinary and identities.get("VoiceSource") == identity else ())
         assert len(rows) == 1 and rows[0]["id"] == identity and isinstance(rows[0].get("notes"), str), rows
         return rows[0]
     def at(*segments):
@@ -411,14 +411,21 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
             replacement = {"VoiceSource": audio(4, "LineSource")}
             draft = _start_business_draft(gateway, "audio.import")
             voice = _bind_business_object(gateway, draft, object_id=identities["VoiceSource"])
-            # Match the existing version-aware bus fixture collectors. Resolve
-            # the baseline's unique direct Bus instead of assuming its label.
+            # This 2025.1 witness uses the exact Main Audio Bus from the
+            # committed SampleProject and retained public baseline reply.
+            # Other valid direct Buses belong to unrelated workflow fixtures.
             bus_root = "Busses" if runtime.version == "2025.1" else "Master-Mixer Hierarchy"
             bus_work_unit = at(bus_root, "Default Work Unit")
             buses = query(["--exact-id", bus_work_unit, "--relationship", "children"], ("parent",))
-            assert len(buses) == 1 and buses[0]["type"] == "Bus" and buses[0]["parent"]["id"] == bus_work_unit, buses
-            bus_id = buses[0]["id"]
+            bus_id = "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}"
+            selected = [row for row in buses if row["id"] == bus_id]
+            expected_bus = {"id": bus_id, "name": "Main Audio Bus", "type": "Bus",
+                "path": "\\".join(("", bus_root, "Default Work Unit", "Main Audio Bus"))}
+            assert len(selected) == 1 and all(selected[0].get(key) == value for key, value in expected_bus.items()), buses
+            assert selected[0]["parent"]["id"] == bus_work_unit, selected
             report["bus_before"] = exact(bus_id)
+            assert all(report["bus_before"].get(key) == value for key, value in expected_bus.items()), report["bus_before"]
+            assert report["bus_before"]["parent"]["id"] == bus_work_unit
             bus = _bind_business_object(gateway, draft, object_id=bus_id)
             fields = {}
             for meaning in ("Volume", "OutputBus"):
@@ -460,11 +467,13 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
             assert dispatch["uri"] == "ak.wwise.core.audio.import" and dispatch["args"]["importOperation"] == "useExisting"
             owner_row, source_row = dispatch["args"]["imports"]
             assert owner_row["@Volume"] == -6 and owner_row["@OutputBus"] == bus_id
+            assert owner_row["@OverrideOutput"] is True and "@OverrideOutput" not in source_row
             assert "audioFileBase64" not in owner_row and "notes" not in owner_row
             assert source_row["objectPath"].endswith("\\<Sound Voice>VoiceSource\\<AudioFileSource>LineSource")
             assert source_row["notes"] == "Japanese explicit Source notes" and source_row["importLanguage"] == "Japanese"
             assert "importLocation" not in source_row and "audioSourceNotes" not in source_row
             assert source_row["audioFileBase64"] == inline.partition("|")[0].replace("/", "\\") + "|" + inline.partition("|")[2]
+            assert source_row["originalsSubFolder"] == "After"
         else:
             assert dispatch["uri"] == "ak.wwise.core.audio.importTabDelimited"
             assert dispatch["args"] == {"importFile": str(table), "importLocation": container,
@@ -512,10 +521,11 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
             assert selected["object"]["id"] not in {identities["VoiceSource"], old["English(US)"]["object"]["id"]}
             assert selected["object"]["notes"] == "Japanese explicit Source notes"
             assert selected["media"]["sha256"] == report["inputs"][str(replacement["VoiceSource"])]["sha256"]
-            assert Path(selected["media"]["path"]).parent.name == "After"
+            assert Path(selected["media"]["path"]).relative_to(owned) == Path("Originals/Voices/Japanese/After/LineSource.wav")
             assert {key: value for key, value in current["owner"].items() if key not in {"properties", "references"}} == {
                 key: value for key, value in prior["owner"].items() if key not in {"properties", "references"}}
             assert current["owner"]["properties"]["Volume"] == -6
+            assert current["owner"]["properties"]["OverrideOutput"] is True
             assert current["owner"]["references"]["OutputBus"]["id"] == bus_id
         elif witness_kind == "explicit-source-tsv":
             assert after["VoiceSource"] == before["VoiceSource"]
