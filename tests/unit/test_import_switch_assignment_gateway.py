@@ -18,8 +18,9 @@ class SwitchImportClient(ImportFieldsClient):
     OTHER = '{44444444-4444-4444-4444-444444444444}'
     OTHER_VALUE = '{55555555-5555-5555-5555-555555555555}'
 
-    def __init__(self, tmp_path: Path, *, effect=True, media=False):
-        super().__init__(tmp_path, '2025.1')
+    def __init__(self, tmp_path: Path, *, effect=True, media=False, version="2025.1"):
+        super().__init__(tmp_path, version)
+        self.expected_directive = "<Switch Group:Surface>Snow"
         self.effect = effect
         self.media = media
         self.parent.update(type='SwitchContainer', **{'SwitchGroupOrStateGroup': {'id': self.GROUP}})
@@ -33,9 +34,11 @@ class SwitchImportClient(ImportFieldsClient):
         self.created = False
         self.source = {'id': '{66666666-6666-6666-6666-666666666666}', 'name': 'Snow', 'type': 'AudioFileSource', 'classId': 16,
                        'path': self.child['path'] + r'\Snow', 'parent': {'id': self.CHILD},
-                       'audioSource:language': {'name': 'SFX'}, 'originalFilePath': str(tmp_path / 'project/Originals/SFX/Snow.wav')}
+                       'audioSource:language': {'name': 'SFX'}, 'originalFilePath': str(tmp_path / 'project/Originals/SFX/Snow.wav'),
+                       'originalWavFilePath': str(tmp_path / 'project/Originals/SFX/Snow.wav')}
         if media:
-            self.child.update(type='Sound', classId=65552, **{'@IsVoice': False, '@Volume': -6.0, 'activeSource': {'id': self.source['id']}})
+            self.child.update(type='Sound', classId=65552, **{'@IsVoice': False, '@Volume': -6.0, 'activeSource': {'id': self.source['id']},
+                'sound:originalWavFilePath': self.source['originalWavFilePath']})
 
     def call(self, uri, args=None, options=None):
         args, options = args or {}, options or {}
@@ -53,7 +56,7 @@ class SwitchImportClient(ImportFieldsClient):
             if self.media:
                 owner_row, source_row = args['imports']
                 assert owner_row['objectPath'] == self.parent['path'] + r'\<Sound SFX>SnowSounds'
-                assert owner_row['switchAssignation'] == '<Switch Group:Surface>Snow'
+                assert owner_row['switchAssignation'] == self.expected_directive
                 assert owner_row['@Volume'] == -6.0
                 assert 'audioFile' not in owner_row and 'switchAssignation' not in source_row
                 assert source_row['objectPath'].endswith(r'\<Sound SFX>SnowSounds\<AudioFileSource>Snow')
@@ -62,11 +65,14 @@ class SwitchImportClient(ImportFieldsClient):
                 copied.write_bytes(Path(source_row['audioFile']).read_bytes())
             else:
                 assert args['imports'] == [{'objectPath': self.parent['path'] + r'\<Random Container>SnowSounds',
-                                            'objectType': 'RandomSequenceContainer', 'switchAssignation': '<Switch Group:Surface>Snow'}]
+                                            'objectType': 'RandomSequenceContainer', 'switchAssignation': self.expected_directive}]
             self.created = True
             if self.effect:
                 self.assignments.append({'child': self.CHILD, 'stateOrSwitch': self.VALUE})
-            return {'objects': deepcopy([self.child, *([self.source] if self.media else [])]), 'log': [], 'files': [self.source['originalFilePath']] if self.media else []}
+            result = {'objects': deepcopy([self.child, *([self.source] if self.media else [])])}
+            if self.version in {'2023.1', '2024.1', '2025.1'}:
+                result.update(log=[], files=[self.source['originalFilePath']] if self.media else [])
+            return result
         if uri.startswith('ak.wwise.core.undo.'):
             self.calls.append((uri, args, options))
             return {}
@@ -85,9 +91,9 @@ class SwitchImportClient(ImportFieldsClient):
         return super().call(uri, args, options)
 
 
-def _draft(tmp_path, *, effect=True, media=False):
-    client = SwitchImportClient(tmp_path, effect=effect, media=media)
-    command, parent, _ = _import_fields_draft(tmp_path, '2025.1', client)
+def _draft(tmp_path, *, effect=True, media=False, version="2025.1"):
+    client = SwitchImportClient(tmp_path, effect=effect, media=media, version=version)
+    command, parent, _ = _import_fields_draft(tmp_path, version, client)
     if media:
         (tmp_path / 'Snow.wav').write_bytes(WAV_BYTES)
     command('draft-declare-new', '--declaration-id', 'snow', '--parent-handle', parent,
@@ -113,8 +119,9 @@ def test_import_assigns_new_owner_to_bound_switch_and_preserves_unrelated_pairs(
     assert not any(u.endswith('.addAssignment') or u.endswith('.setReference') for u, _, _ in client.calls)
 
 
-def test_import_media_assignment_stays_on_sound_owner_during_source_expansion(tmp_path):
-    command, client = _draft(tmp_path, media=True)
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_import_media_assignment_stays_on_sound_owner_during_source_expansion(tmp_path, version):
+    command, client = _draft(tmp_path, media=True, version=version)
     command('draft-check')
     tx = command('preview-from-draft')['transaction_id']
     shown = command('transaction-show', tx, '--summary-only')
@@ -183,14 +190,16 @@ def test_import_switch_value_does_not_accept_caller_native_directive_grammar(tmp
 class ExistingSfxSwitchImportClient(SwitchImportClient):
     """Existing Sound reuse with no unrelated field to force owner splitting."""
 
-    def __init__(self, tmp_path):
-        super().__init__(tmp_path, media=True)
+    def __init__(self, tmp_path, version="2025.1"):
+        super().__init__(tmp_path, media=True, version=version)
         self.created = True
         self.child.pop('@Volume')
         self.child['notes'] = 'keep owner notes'
         self.source['notes'] = 'keep source notes'
         self.source['audioSource:language']['id'] = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
         self.source['originalFilePath'] = str(tmp_path / 'project/Originals/SFX/Footsteps/Snow.wav')
+        self.source['originalWavFilePath'] = self.source['originalFilePath']
+        self.child['sound:originalWavFilePath'] = self.source['originalFilePath']
         original = Path(self.source['originalFilePath'])
         original.parent.mkdir(parents=True, exist_ok=True)
         original.write_bytes(_tone_wav_bytes(samples=[100] * 8))
@@ -204,22 +213,30 @@ class ExistingSfxSwitchImportClient(SwitchImportClient):
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
             assert args['importOperation'] == 'useExisting'
             owner_row, source_row = args['imports']
-            assert owner_row == {'objectPath': self.child['path'], 'objectType': 'Sound SFX',
-                                 'switchAssignation': '<Switch Group:Surface>Snow'}
-            assert source_row == {'objectPath': '', 'importLocation': self.source['id'],
-                                  'audioFile': str(self.tmp_path / 'Snow.wav'), 'importLanguage': 'SFX',
-                                  'originalsSubFolder': 'Footsteps'}
+            owner_path = self.child['path']
+            assert owner_row == {'objectPath': owner_path, 'objectType': 'Sound SFX',
+                                 'switchAssignation': self.expected_directive}
+            expected_media = {'audioFile': str(self.tmp_path / 'Snow.wav'), 'importLanguage': 'SFX', 'originalsSubFolder': 'Footsteps'}
+            if self.version == '2025.1':
+                expected_media.update(objectPath='', importLocation=self.source['id'])
+            else:
+                expected_media['objectPath'] = owner_path + r'\<AudioFileSource>Snow'
+            assert source_row == expected_media
             Path(self.source['originalFilePath']).write_bytes(Path(source_row['audioFile']).read_bytes())
             self.assignments.append({'child': self.CHILD, 'stateOrSwitch': self.VALUE})
-            return {'objects': deepcopy([self.child, self.source]), 'log': [], 'files': [self.source['originalFilePath']]}
+            result = {'objects': deepcopy([self.child, self.source])}
+            if self.version in {'2023.1', '2024.1', '2025.1'}:
+                result.update(log=[], files=[self.source['originalFilePath']])
+            return result
         return super().call(uri, args, options)
 
 
-def test_existing_sfx_media_and_switch_only_reimport_keeps_directive_on_owner(tmp_path):
-    client = ExistingSfxSwitchImportClient(tmp_path)
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_existing_sfx_media_and_switch_only_reimport_keeps_directive_on_owner(tmp_path, version):
+    client = ExistingSfxSwitchImportClient(tmp_path, version)
     before_owner, before_source = deepcopy(client.child), deepcopy(client.source)
     before_assignments = deepcopy(client.assignments)
-    command, _, _ = _import_fields_draft(tmp_path, '2025.1', client)
+    command, _, _ = _import_fields_draft(tmp_path, version, client)
     (tmp_path / 'Snow.wav').write_bytes(WAV_BYTES)
     bound = command('draft-bind-object', '--object-id', client.CHILD)
     command('draft-declare-existing', '--declaration-id', 'snow', '--object-handle', bound['bound_object']['handle'],
@@ -240,3 +257,68 @@ def test_existing_sfx_media_and_switch_only_reimport_keeps_directive_on_owner(tm
     assert Path(client.source['originalFilePath']).read_bytes() == WAV_BYTES
     assert len([u for u, _, _ in client.calls if u == 'ak.wwise.core.audio.import']) == 1
     assert not any(u.endswith('.addAssignment') or u.endswith('.setReference') for u, _, _ in client.calls)
+
+
+def test_existing_import_adds_value_without_discarding_another_assignment(tmp_path):
+    client = ExistingSfxSwitchImportClient(tmp_path)
+    client.assignments.append({'child': client.CHILD, 'stateOrSwitch': client.OTHER_VALUE})
+    before = deepcopy(client.assignments)
+    command, _, _ = _import_fields_draft(tmp_path, '2025.1', client)
+    (tmp_path / 'Snow.wav').write_bytes(WAV_BYTES)
+    bound = command('draft-bind-object', '--object-id', client.CHILD)
+    command('draft-declare-existing', '--declaration-id', 'snow', '--object-handle', bound['bound_object']['handle'],
+            '--field', 'media_file', str(tmp_path / 'Snow.wav'), '--switch-value', 'Snow')
+    command('draft-check')
+    tx = command('preview-from-draft')['transaction_id']
+    shown = command('transaction-show', tx, '--summary-only')
+    command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    command('execute', tx)
+    result = command('verify', tx)
+    assert result['verified'] is True, result
+    assert client.assignments == [*before, {'child': client.CHILD, 'stateOrSwitch': client.VALUE}]
+    assert Path(client.source['originalFilePath']).read_bytes() == WAV_BYTES
+
+
+class SwitchDirectiveFormsClient(ExistingSfxSwitchImportClient):
+    def __init__(self, tmp_path, form):
+        super().__init__(tmp_path)
+        if form == 'nested-state':
+            self.group.update(type='StateGroup', path=r'\States\Default Work Unit\Biome\Winter\Surface')
+            self.value['type'] = 'State'
+            self.expected_directive = r'<State Group:Biome\Winter\Surface>Snow'
+        else:
+            self.group['path'] = r'\Switches\Default Work Unit\Biome\Winter\Surface'
+            self.expected_directive = r'<Switch Group:Biome\Winter\Surface>Snow'
+        self.group['parent'] = {'id': '{A2222222-2222-2222-2222-222222222222}'}
+        self.value['path'] = self.group['path'] + r'\Snow'
+
+
+@pytest.mark.parametrize('form', ('nested-state', 'nested-switch'))
+def test_switch_import_resolves_state_and_nested_virtual_folder_group_forms(tmp_path, form):
+    client = SwitchDirectiveFormsClient(tmp_path, form)
+    before = deepcopy(client.assignments)
+    command, _, _ = _import_fields_draft(tmp_path, '2025.1', client)
+    (tmp_path / 'Snow.wav').write_bytes(WAV_BYTES)
+    bound = command('draft-bind-object', '--object-id', client.CHILD)
+    command('draft-declare-existing', '--declaration-id', 'snow', '--object-handle', bound['bound_object']['handle'],
+            '--field', 'media_file', str(tmp_path / 'Snow.wav'), '--switch-value', 'Snow')
+    command('draft-check')
+    tx = command('preview-from-draft')['transaction_id']
+    shown = command('transaction-show', tx)
+    assert shown['artifact']['prepared_operation']['dispatch']['args']['imports'][0]['switchAssignation'] == client.expected_directive
+    command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    command('execute', tx)
+    result = command('verify', tx)
+    assert result['verified'] is True, result
+    assert client.assignments == [*before, {'child': client.CHILD, 'stateOrSwitch': client.VALUE}]
+    assert Path(client.source['originalFilePath']).read_bytes() == WAV_BYTES
+
+
+def test_switch_import_rejects_value_type_mismatched_to_actual_state_group(tmp_path):
+    client = SwitchDirectiveFormsClient(tmp_path, 'nested-state')
+    client.value['type'] = 'Switch'
+    command, parent, _ = _import_fields_draft(tmp_path, '2025.1', client)
+    command('draft-declare-new', '--declaration-id', 'snow', '--parent-handle', parent,
+            '--name', 'OtherSnow', '--kind', 'random-container', '--switch-value', 'Snow')
+    command('draft-check', expected_error='IDENTITY_MISMATCH')
+    assert not any(uri == 'ak.wwise.core.audio.import' for uri, _, _ in client.calls)

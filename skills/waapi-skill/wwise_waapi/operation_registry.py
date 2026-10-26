@@ -15143,9 +15143,6 @@ def _prepare_import_switch_assignment(target: dict[str, Any], *, index: int,
     if not relative_group or any(c in relative_group + value_name for c in "<>:|\r\n\t"):
         raise OperationContractError("INVALID_SWITCH_VALUE", "The resolved group/value cannot be represented by the documented import directive.")
     assignments = _assignment_pairs(read(SWITCHCONTAINER_GET_ASSIGNMENTS_URI, {"id": container.object}, {}))
-    before_id = target.get("preexisting_id")
-    if before_id and any(row["child_key"] == _identity_key(before_id) and row["state_key"] != _identity_key(state.object) for row in assignments):
-        raise OperationContractError("RELATIONSHIP_CONFLICT", "The imported owner already has an assignment to a different value.")
     for name, resolved in (("container", container), ("group", group), ("value", state)):
         roles[f"import_switch[{index}].{name}"] = resolved
     target["switch_assignment_binding"] = {"container_id": container.object, "group_id": group.object,
