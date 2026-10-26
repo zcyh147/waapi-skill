@@ -20,6 +20,8 @@ import stat
 from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping, Sequence
 
+from .host_paths import HostPathError, localize_waapi_host_path, parse_absolute_host_path, parse_relative_host_path
+
 
 AUDIO_IMPORT_PLAN_CONTRACT = "waapi-skill.audio-import-plan/v1"
 TAB_IMPORT_PLAN_CONTRACT = "waapi-skill.tab-import-plan/v1"
@@ -244,7 +246,16 @@ def verify_regular_file_proof(proof: Mapping[str, Any], *, field: str) -> dict[s
     expected_path = proof.get("path")
     if not isinstance(expected_path, str):
         raise ImportContractError("INVALID_FILE_PROOF", f"{field} proof requires path.")
-    actual = regular_file_proof(expected_path, field=field)
+    current_path = expected_path
+    if "native_path" in proof:
+        native_path, directory = proof.get("native_path"), proof.get("table_directory")
+        if not isinstance(native_path, str) or not isinstance(directory, str) or not Path(directory).is_absolute():
+            raise ImportContractError("INVALID_FILE_PROOF", "A table media proof lacks its native path or absolute table directory.")
+        try:
+            current_path = _tab_media_host_path(native_path, table_directory=Path(directory))
+        except HostPathError as exc:
+            raise ImportContractError("FILE_CHANGED", f"{field} native path no longer maps to its proven file.", details={"reason": str(exc)}) from exc
+    actual = regular_file_proof(current_path, field=field)
     compared = ("path", "size", "sha256", "mtime_ns", "device", "inode")
     if any(actual.get(key) != proof.get(key) for key in compared):
         raise ImportContractError(
@@ -590,6 +601,20 @@ def build_audio_import_plan(
     }
 
 
+def _tab_media_host_path(value: str, *, table_directory: Path) -> str:
+    """Prove native cell spelling locally; relative cells belong to the table."""
+    if os.name == "posix" and value.startswith("/") and not value.startswith("//"):
+        # Retain the existing native POSIX read contract, including explicit
+        # parent navigation; the live namespace check separately handles Wine.
+        return value
+    try:
+        parse_absolute_host_path(value)
+    except HostPathError:
+        relative = parse_relative_host_path(value, allow_parent_segments=True)
+        return str(table_directory.joinpath(*relative.components))
+    return localize_waapi_host_path(value)
+
+
 def parse_tab_delimited_import_file(
     import_file: str | os.PathLike[str],
     *,
@@ -740,10 +765,13 @@ def parse_tab_delimited_import_file(
             oracle_row["requested_language"] = language
         source_name_path: str | None = None
         if audio_file:
-            proof = regular_file_proof(
-                audio_file,
-                field=f"row[{offset}].Audio File",
-            )
+            try:
+                local_media = _tab_media_host_path(audio_file, table_directory=path.parent)
+            except HostPathError as exc:
+                raise ImportContractError("INVALID_FILE", f"row[{offset}].Audio File has no safe local file mapping.",
+                    details={"path": audio_file, "reason": str(exc)}) from exc
+            proof = {**regular_file_proof(local_media, field=f"row[{offset}].Audio File"),
+                     "native_path": audio_file, "table_directory": str(path.parent)}
             _require_media_extension(
                 proof["path"],
                 field=f"row[{offset}].Audio File",

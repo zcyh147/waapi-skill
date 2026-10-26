@@ -1102,7 +1102,7 @@ def test_tab_parser_rejects_relative_missing_and_symlink_media_before_dispatch(t
     link = tmp_path / "linked.wav"
     create_symlink_or_skip(link, media)
     cases = [
-        ("relative.wav", "INVALID_FILE"),
+        ("relative.wav", "INPUT_FILE_NOT_FOUND"),
         (str(tmp_path / "missing.wav"), "INPUT_FILE_NOT_FOUND"),
         (str(link), "INVALID_FILE"),
     ]

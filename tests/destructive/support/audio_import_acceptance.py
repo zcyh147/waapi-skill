@@ -442,9 +442,20 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
                 {key: audio(index + 4, stem) for index, (key, stem) in enumerate((("VoiceNotes", "LineNotes"), ("VoiceSource", "LineSource")))})
             table = owned / "GatewayTSVWitness/exact-localized.tsv"
             if witness_kind == "explicit-source-tsv":
+                from wwise_waapi.platform_paths import adapt_cli_dispatch_paths
+                shown_setup = gateway.gateway(["transaction-show", report["setup"][0]["transaction_id"]], live=False)
+                media_path = str(replacement["VoiceNotes"].resolve(strict=True))
+                media_uri = "ak.wwise.core.audio.importTabDelimited"
+                adapted = adapt_cli_dispatch_paths(uri=media_uri, args={"importFile": media_path}, options={},
+                    io_audit={"uri": media_uri, "paths": [{"section": "args", "json_path": "$.args.importFile",
+                        "field": "importFile", "role": "read", "raw_path": media_path, "resolved_path": media_path}]},
+                    project_guard=shown_setup["artifact"]["project_guard"])
+                native_media_path = adapted.args["importFile"]
+                assert proof(native_media_path) == report["inputs"][media_path]
+                report["media_cell_path_adaptation"] = adapted.proof
                 table.write_text("Audio File\tObject Path\tNotes\tOriginalsSubFolder\n"
                     + "\t<Sound Voice>VoiceNotes\tTSV requested object Notes\t\n"
-                    + f"{replacement['VoiceNotes']}\t<Sound Voice>VoiceNotes\\<AudioFileSource>LineNotes\tTSV requested source Notes\tAfter\n",
+                    + f"{native_media_path}\t<Sound Voice>VoiceNotes\\<AudioFileSource>LineNotes\tTSV requested source Notes\tAfter\n",
                     encoding="utf-8", newline="\n")
             else:
                 table.write_text("Audio File\tObject Path\tNotes\tAudio Source Notes\tOriginalsSubFolder\n"

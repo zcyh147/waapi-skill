@@ -2290,6 +2290,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "OriginalsSubFolder is a TSV column from Wwise 2023.1 (WG-60834); ordinary audio.import Originals placement remains separate",
             "TSV Notes verifies target-object notes independently from Audio Source Notes; the exact user table is never rewritten",
             "an explicit typed AudioFileSource media row may reimport one existing exact Sound child in the requested language using Notes on the Source; a separate typed owner-only Notes row retains the same exact-table transaction",
+            "Audio File cells retain their native spelling and bind a hashed local file; relative paths resolve from the table directory, including parent navigation; proven Wine hosts require Windows absolute or table-relative media cells",
             "fixed and dynamic native headers are parsed under bounded grammar; importLanguage remains a call argument",
             "the parser hashes the TSV, regular media, and decoded inline base64 before preview",
             "a missing or invalid row rejects the whole request before dispatch",

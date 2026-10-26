@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import os
 from typing import Any
 
 import pytest
@@ -457,6 +458,8 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
             if uri.endswith("getInfo"):
                 info = super().call(uri, args, options)
                 info["version"].update(minor=7, build=9143, displayName="v2025.1.7.9143")
+                if witness_kind == "explicit-source-tsv" and os.name == "posix":
+                    info.update(processPath=r"C:\Wwise\WwiseConsole.exe", platform="x64")
                 return info
             if uri.endswith("getTypes"):
                 return {"return": [{"classId": n, "name": name, "type": "WObject"} for n, name in (
@@ -474,6 +477,9 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 return {"name": "IsVoice", "type": "bool", "default": False, "dependencies": []}
             if uri.endswith("getProjectInfo"):
                 info = super().call(uri, args, options)
+                if witness_kind == "explicit-source-tsv" and os.name == "posix":
+                    from tests.unit.test_transaction_gateway import z_wire_path
+                    info["path"] = z_wire_path(tmp_path / "project/SampleProject.wproj")
                 info["languages"].extend([{"id": ENGLISH, "name": "English(US)", "shortId": 2}, {"id": JAPANESE, "name": "Japanese", "shortId": 3}])
                 return info
             if uri.endswith("object.get") and not args.get("waql", "").startswith("from type Project"):
@@ -518,7 +524,8 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 import csv
                 self.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options))); self.tab_count += 1
                 if fault == "indeterminate": raise RuntimeError("fake native transport lost after dispatch")
-                with Path(args["importFile"]).open(encoding="utf-8", newline="") as source:
+                from wwise_waapi.host_paths import localize_waapi_host_path
+                with Path(localize_waapi_host_path(args["importFile"])).open(encoding="utf-8", newline="") as source:
                     rows = list(csv.DictReader(source, delimiter="\t"))
                 returned = []
                 for row in rows:
@@ -526,7 +533,10 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                     if not object_path.startswith("\\"):
                         object_path = self.objects[args["importLocation"]]["path"] + "\\" + object_path
                     native = {"objectPath": object_path, "notes": row.get("Notes", "")}
-                    if row.get("Audio File"): native["audioFile"] = row["Audio File"]
+                    if row.get("Audio File"):
+                        if witness_kind == "explicit-source-tsv":
+                            assert not row["Audio File"].startswith("/"), "Wine cannot consume a POSIX absolute media cell"
+                        native["audioFile"] = localize_waapi_host_path(row["Audio File"])
                     if row.get("OriginalsSubFolder"): native["originalsSubFolder"] = row["OriginalsSubFolder"]
                     objects = self.ingest(native, "English(US)")
                     owner = objects[0]; source = objects[-1] if len(objects) > 1 else None
