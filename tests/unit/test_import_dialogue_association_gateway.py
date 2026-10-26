@@ -997,24 +997,29 @@ def test_existing_tsv_dialogue_event_with_create_mode_rejects_before_preview(tmp
 
 class StructuralDialogueImportClient(DialogueImportClient):
     """Fake only native structural import/readback; no media Source is created."""
+    owner_type = 'SwitchContainer'
+    owner_class = 655376
+    owner_directive = 'Switch Container'
+
     def __init__(self, tmp_path, version):
         super().__init__(tmp_path, version)
         self.media = False
         self.child = {key: value for key, value in self.child.items()
                       if key in {'id', 'name', 'path', 'parent'}}
-        self.child.update(type='SwitchContainer', classId=655376)
+        self.child.update(type=self.owner_type, classId=self.owner_class)
         self.effect = True
 
     def call(self, uri, args=None, options=None):
         args, options = args or {}, options or {}
         if uri == 'ak.wwise.core.object.getTypes':
             result = super().call(uri, args, options)
-            result['return'].append({'name':'SwitchContainer','type':'WObject','classId':655376})
+            record = {'name':self.owner_type,'type':'WObject','classId':self.owner_class}
+            result['return'] = [row for row in result['return'] if row['name']!=self.owner_type]+[record]
             return result
         if uri == 'ak.wwise.core.audio.import':
             self.calls.append((uri,deepcopy(args),deepcopy(options)))
-            assert args['imports'] == [{'objectPath': self.parent['path']+r'\<Switch Container>SnowSounds',
-                'objectType':'SwitchContainer', 'dialogueEvent':self.expected_dialogue}]
+            assert args['imports'] == [{'objectPath': self.parent['path']+f'\\<{self.owner_directive}>SnowSounds',
+                'objectType':self.owner_type, 'dialogueEvent':self.expected_dialogue}]
             self.created = self.event_created = True
             self.linked = self.effect
             result = {'objects':deepcopy([self.child,self.event])}
@@ -1023,8 +1028,8 @@ class StructuralDialogueImportClient(DialogueImportClient):
         return super().call(uri,args,options)
 
 
-def _structural_dialogue_draft(tmp_path, version='2025.1', *, kind='switch-container', conditions=True):
-    client = StructuralDialogueImportClient(tmp_path, version)
+def _structural_dialogue_draft(tmp_path, version='2025.1', *, kind='switch-container', conditions=True, client=None):
+    client = client if client is not None else StructuralDialogueImportClient(tmp_path, version)
     command,parent,_ = _import_fields_draft(tmp_path, version, client)
     event_parent = command('draft-bind-object','--object-id',client.EVENT_PARENT)['bound_object']['handle']
     condition = ()
@@ -1091,3 +1096,62 @@ def test_structural_name_only_dialogue_creation_uses_metadata_admission_without_
     assert client.event_created and not client.linked
     assert any(u.endswith('getPropertyInfo') and args.get('property')=='AudioNode' for u,args,_ in client.calls)
     assert not Path(client.source['originalFilePath']).exists()
+
+
+class RandomDialogueImportClient(StructuralDialogueImportClient):
+    owner_type = 'RandomSequenceContainer'
+    owner_class = 589840
+    owner_directive = 'Random Container'
+
+
+@pytest.mark.parametrize('version', ('2023.1','2024.1','2025.1'))
+def test_dialogue_audio_node_container_spelling_admits_source_proven_canonical_owner(tmp_path, version):
+    client = RandomDialogueImportClient(tmp_path,version)
+    command,client = _structural_dialogue_draft(tmp_path,version,kind='random-container',client=client)
+    command('draft-check');tx=command('preview-from-draft')['transaction_id']
+    shown=command('transaction-show',tx)
+    command('confirm',tx,'--confirmation-token',shown['confirmation']['token']);command('execute',tx)
+    result=command('verify',tx)
+    assert result['verification']['failed_assertion_count']==0,result
+    assert result['verified'] is False and result['verification']['status']=='result_schema_checked',result
+    assert client.entry['AudioNode']['id']==client.CHILD and client.entry['owner']['id']==client.EVENT
+    assert client.child['type']=='RandomSequenceContainer' and client.child['classId']==589840
+    assert len([u for u,_,_ in client.calls if u=='ak.wwise.core.audio.import'])==1
+    assert not Path(client.source['originalFilePath']).exists()
+
+
+@pytest.mark.parametrize('version', ('2021.1','2022.1'))
+@pytest.mark.parametrize('spelling', ('Container','RandomSequenceContainer'))
+def test_older_dialogue_owner_keeps_canonical_match_and_discloses_unresolved_container_spelling(tmp_path, version, spelling):
+    client = RandomDialogueImportClient(tmp_path,version)
+    client.metadata['restriction']['restrictions'][0]['type'][0] = spelling
+    command,client = _structural_dialogue_draft(tmp_path,version,kind='random-container',client=client)
+    if spelling=='Container':
+        result=command('draft-check',expected_error='IMPORT_DIALOGUE_OWNER_ALIAS_UNRESOLVED')
+        assert result['details']['boundary']=='unresolved_AudioNode_target_spelling'
+        assert result['details']['mutation_dispatched'] is False
+        assert not any(u=='ak.wwise.core.audio.import' for u,_,_ in client.calls)
+        return
+    command('draft-check');tx=command('preview-from-draft')['transaction_id']
+    shown=command('transaction-show',tx)
+    command('confirm',tx,'--confirmation-token',shown['confirmation']['token']);command('execute',tx)
+    result=command('verify',tx)
+    assert result['verification']['failed_assertion_count']==0 and result['verified'] is False,result
+
+
+@pytest.mark.parametrize('fault', ('missing-container','wrong-entry-class','metadata-drift','owner-class-drift'))
+def test_dialogue_container_admission_requires_live_field_class_restriction_and_drift_proof(tmp_path, fault):
+    client = RandomDialogueImportClient(tmp_path,'2025.1')
+    if fault=='missing-container':client.metadata['restriction']['restrictions'][0]['type']=['Sound']
+    if fault=='wrong-entry-class':client.entry_class=5439505
+    command,client = _structural_dialogue_draft(tmp_path,kind='random-container',client=client)
+    if fault in {'missing-container','wrong-entry-class'}:
+        command('draft-check',expected_error='INVALID_REFERENCE_TARGET')
+    else:
+        command('draft-check');tx=command('preview-from-draft')['transaction_id']
+        shown=command('transaction-show',tx)
+        command('confirm',tx,'--confirmation-token',shown['confirmation']['token'])
+        if fault=='metadata-drift':client.metadata['restriction']['restrictions'][0]['type']=['Sound']
+        else:client.owner_class=589841
+        command('execute',tx,expected_error='ROLE_GUARD_MISMATCH')
+    assert not any(u=='ak.wwise.core.audio.import' for u,_,_ in client.calls)

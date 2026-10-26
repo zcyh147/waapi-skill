@@ -15258,7 +15258,7 @@ def _require_import_dialogue_existing_event_mode(import_operation: Any, *, event
 
 
 def _prepare_import_dialogue_association(target: dict[str, Any], *, index: int,
-        roles: dict[str, ResolvedObject], path_snapshots: list[dict[str, Any]], read: ReadCall) -> None:
+        roles: dict[str, ResolvedObject], path_snapshots: list[dict[str, Any]], read: ReadCall, version: str) -> None:
     declaration = target["requested_dialogue_event"]
     event_path = declaration["path"]
     parent = _resolve_identity({"kind": "path", "value": event_path.rpartition("\\")[0]},
@@ -15325,7 +15325,31 @@ def _prepare_import_dialogue_association(target: dict[str, Any], *, index: int,
         planned_owner = ResolvedObject(identity=ObjectIdentity(path=target["canonical_target_path"]),
             object=target["canonical_target_path"], resolution="planned-import-owner",
             row={"type":target["metadata_object_type"]})
-        _require_reference_target_allowed(info, planned_owner)
+        try:
+            _require_reference_target_allowed(info, planned_owner)
+        except OperationContractError as exc:
+            container_spelling = (exc.error_code == "INVALID_REFERENCE_TARGET"
+                and info.name == "AudioNode" and "Container" in exc.details.get("allowed_types", [])
+                and target["metadata_object_type"] == "RandomSequenceContainer"
+                and target["metadata_class_id"] == 589840)
+            if not container_spelling:
+                raise
+            if version in {"2021.1", "2022.1"}:
+                raise OperationContractError("IMPORT_DIALOGUE_OWNER_ALIAS_UNRESOLVED",
+                    "This version's AudioNode metadata spells a target Container; its canonical "
+                    "RandomSequenceContainer mapping is not yet established by reviewed source evidence. "
+                    "No import was dispatched; this is a wrapper metadata-spelling boundary.",
+                    details={"version":version, "entry_class_id":entry_classes[0].class_id,
+                        "target_type":target["metadata_object_type"], "metadata_spelling":"Container",
+                        "boundary":"unresolved_AudioNode_target_spelling", "mutation_dispatched":False}) from exc
+            if version not in {"2023.1", "2024.1", "2025.1"} or entry_classes[0].class_id != 5439504:
+                raise
+            # Matching SDK MultiSwitchEntry.AudioNode possible-types tables
+            # identify RandomSequenceContainer (589840). Live metadata uses
+            # Container for that field; this is not a global reference alias.
+            reflected_owner = ResolvedObject(identity=planned_owner.identity,
+                object=planned_owner.object, resolution=planned_owner.resolution, row={"type":"Container"})
+            _require_reference_target_allowed(info, reflected_owner)
         entry_field_metadata.append(info.as_dict())
     for key, native in (("probability", "Probability"), ("weight", "Weight")):
         if key in declaration:
@@ -15869,7 +15893,7 @@ def _prepare_closed_import_plan(
             event_path = declaration["path"]
             temporary = {**target, "requested_dialogue_event":declaration, "dialogue_from_table":source_operation == "audio.importTabDelimited"}
             _prepare_import_dialogue_association(temporary, index=f"{index}.{position}", roles=roles,
-                path_snapshots=path_snapshots, read=read)
+                path_snapshots=path_snapshots, read=read, version=request.version)
             binding = temporary["dialogue_association_binding"]
             _require_import_dialogue_existing_event_mode(import_operation, event_path=event_path,
                 event_exists=binding.get("event_id") is not None or bool(binding.get("event_before")))
