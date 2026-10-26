@@ -306,10 +306,14 @@ def test_observed_playlist_slot_rename_rejection_is_a_prewrite_boundary(tmp_path
     diagnostic = json.dumps(rejected)
     assert "Can't rename this object." in diagnostic and '2025.1.7.9143' in diagnostic
     assert 'other hosts and builds remain unobserved' in diagnostic
+    for historical in ('original_verdict', 'original_transaction_state', 'tx1-4sftak3s5kwn5bn3gkkz',
+            '.waapi-skill-state', 'tests/', 'quarantined', 'process_cleanup',
+            '7571D6B0-D614-40B5-B02D-0012FE3743A7'):
+        assert historical not in diagnostic
     assert 'transaction_id' not in rejected and writes(task) == [] and task.objects == before
 
 
-def test_playlist_name_boundary_discloses_original_native_rejection_without_regrading_it(tmp_path):
+def test_playlist_name_boundary_discloses_capability_without_historical_task_state(tmp_path):
     task = InnerRenameTask(tmp_path)
     code, schema = task.run('--version', '2025.1', 'operation-schema', 'object.setName')
     assert code == 0, schema
@@ -317,9 +321,18 @@ def test_playlist_name_boundary_discloses_original_native_rejection_without_regr
     assert boundary['class_id'] == 5636096 and boundary['observed_native_build'] == '2025.1.7.9143'
     assert boundary['observed_host'] == 'wwise-console' and boundary['native_message'] == "Can't rename this object."
     assert 'MetadataSlot class 5570560' in boundary['unobserved_contexts']
-    assert boundary['observation']['original_verdict'] == 'FAIL'
-    assert boundary['observation']['original_transaction_state'] == 'indeterminate'
-    assert boundary['observation']['observation_sha256'] == '5e897cd2a0232c5058d0327fa1682a972880145fe4b5c6072c20b4b832fc0f63'
+    import hashlib
+    original = Path(__file__).parents[1] / 'fixtures/resource-evidence/native-boundaries/playlist-slot-name-native-boundary.original.json'
+    assert hashlib.sha256(original.read_bytes()).hexdigest() == '6393d057eda59214e1e540195f0cdd0c279dc8a23e30fa0f0fa1ed2815c3438d'
+    assert boundary['evidence_sha256'] == '6393d057eda59214e1e540195f0cdd0c279dc8a23e30fa0f0fa1ed2815c3438d'
+    assert boundary['native_packet_sha256'] == 'fbbdd1c964ef3fac4d762dd203a9dba09489bc211d356682343e11080e0833a8'
+    packaged = Path(__file__).parents[2] / 'skills/waapi-skill/references/semantic/2025.1/playlist-slot-name-native-boundary.json'
+    for diagnostic in (json.dumps(schema), packaged.read_text()):
+        for historical in ('original_verdict', 'original_transaction_state', 'transaction_id',
+                '.waapi-skill-state', 'tests/', 'quarantined', 'process_cleanup',
+                '7571D6B0-D614-40B5-B02D-0012FE3743A7', '8C0FD1AD-E45D-408D-9BF3-874970CCC123'):
+            assert historical not in diagnostic
+    assert 'observation' not in boundary
     assert boundary['preserved_outcomes'][:2] == ['object.setNotes', 'object.setReference']
     assert task.calls == []
 

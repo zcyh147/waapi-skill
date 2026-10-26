@@ -256,7 +256,7 @@ def query_output_detail(version: str, name: str) -> dict[str, Any]:
         path = Path(__file__).resolve().parents[1] / 'references/semantic/2021.1/query-curve-points-native-boundary.json'
         with path.open('rb') as source:
             raw = source.read(8193)
-        if len(raw) > 8192 or hashlib.sha256(raw).hexdigest() != 'adb9e934824829fa32711882d457312df7d8497d6fc7521f100310a1c81eafc7':
+        if len(raw) > 8192 or hashlib.sha256(raw).hexdigest() != 'd2a9c8b053330c467221f7ea27d17ea9037b06d900f66cd58dba1cfaabbf2f0e':
             raise ValueError('Pinned Curve points native-boundary source changed')
         boundary = json.loads(raw)
         if (boundary['version'], boundary['wwise_build']) != (version, graph.wwise_build):

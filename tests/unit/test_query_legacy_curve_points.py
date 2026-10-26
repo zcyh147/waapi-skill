@@ -33,17 +33,31 @@ def test_2021_fixed_points_rejection_is_disclosed_and_blocks_before_transport(tm
     assert detail['native_accessor_rejection_proven'] is True and detail['native_absence_proven'] is False
     boundary = detail['native_boundary']
     assert boundary['scope'] == 'fixed object.get return accessor points on Curve; not all legacy Curve or RTPC reads'
-    assert boundary['observation']['native_error_uri'] == packet['waapi_error_uri']
-    assert boundary['observation']['native_error_details'] == packet['waapi_error_details']
-    assert boundary['observation']['packet_sha256'] == hashlib.sha256(raw).hexdigest()
-    assert boundary['observation']['original_verdict'] == 'FAIL'
-    assert boundary['observation']['build'] == '2021.1.14.8108'
+    assert boundary['native_error_uri'] == packet['waapi_error_uri']
+    assert boundary['native_error_details'] == packet['waapi_error_details']
+    assert boundary['native_packet_sha256'] == hashlib.sha256(raw).hexdigest()
+    assert boundary['wwise_build'] == '2021.1.14.8108' and boundary['observed_host'] == 'wwise-console'
+    original = Path(__file__).parents[1] / 'fixtures/resource-evidence/native-boundaries/query-curve-points-native-boundary.original.json'
+    assert hashlib.sha256(original.read_bytes()).hexdigest() == 'adb9e934824829fa32711882d457312df7d8497d6fc7521f100310a1c81eafc7'
+    assert boundary['evidence_sha256'] == 'adb9e934824829fa32711882d457312df7d8497d6fc7521f100310a1c81eafc7'
+    assert boundary['class_id'] == 917520 and boundary['class_name'] == 'Curve'
+    assert boundary['source_delta']['2021']['metadata_source_sha256'] == 'c409accff2f6b7ed19f20bc544a822e237ae646928d91154b0bf73070ac82f0a'
+    assert 'they do not supply ordered points' in boundary['alternatives']
+    assert 'observation' not in boundary
+    packaged = Path(__file__).parents[2] / 'skills/waapi-skill/references/semantic/2021.1/query-curve-points-native-boundary.json'
+    for diagnostic in (json.dumps(schema), packaged.read_text()):
+        for historical in ('original_verdict', '.waapi-skill-state', 'tests/', 'quarantined',
+                'process_cleanup', 'candidate', '0B357DC6-5FE7-4E50-9C31-23CDE7F34307'):
+            assert historical not in diagnostic
     assert boundary['source_delta']['2021']['named_points'] is False
     assert boundary['source_delta']['2022']['named_points'] is True
     assert detail['result_schema'] is None
     code, result = task.run('query-object', '--exact-id', CURVE, '--include', 'curve-points')
     assert code == 2 and result['error_code'] == 'GatewayInputError', result
     assert 'Unknown accessor points' in result['message'] and not task.calls
+    for historical in ('original_verdict', '.waapi-skill-state', 'tests/', 'quarantined',
+            'process_cleanup', 'b0c855241618a32daecbec5dba5569eb607e88cbb467b0e488359783ac47e393'):
+        assert historical not in json.dumps(result)
 
 
 @pytest.mark.parametrize('version', VERSIONS[1:])

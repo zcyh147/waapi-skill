@@ -65,13 +65,13 @@ _DECLARATIONS: dict[str, dict[str, Any]] = {
 
 
 def object_name_native_limitations(version: str) -> list[dict[str, Any]]:
-    """Retain the exact observed rejection without classifying other contexts."""
+    """Expose pinned capability facts without historical task or transaction state."""
     if version != "2025.1":
         return []
     path = Path(__file__).resolve().parents[1] / "references" / "semantic" / version / "playlist-slot-name-native-boundary.json"
     with path.open("rb") as source:
         raw = source.read(8193)
-    if len(raw) > 8192 or hashlib.sha256(raw).hexdigest() != "6393d057eda59214e1e540195f0cdd0c279dc8a23e30fa0f0fa1ed2815c3438d":
+    if len(raw) > 8192 or hashlib.sha256(raw).hexdigest() != "8d7e60dd8531958037214c0789c3a3a8302da80d72c499ba6773af9f0f63eb0d":
         raise ValueError("Pinned PlaylistSlot native name-boundary source changed")
     return [json.loads(raw)]
 
