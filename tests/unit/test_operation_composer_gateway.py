@@ -340,12 +340,32 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
-    # Existing Dialogue Event identity is the only new machine field. Revert
-    # that field and its disclosure before all prior component/history seals.
-    assert canonical_sha256(non_object_set_digests) == "4808739b8ef500377baf8bd7eb02caae2366b40ab28bf4eaaa44d5c5876e72b7"
-    before_dialogue_lifecycle = {}
+    # Seal the combined final forms, then invert only the closed Switch
+    # group alternative before preserving both independent lifecycle seals.
+    assert canonical_sha256(non_object_set_digests) == "2b932cf2993e74108be0589ed02f2795718e53d8723b0dbb2f255bf437521fd8"
+    before_switch_final_forms = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
         contract = operation_request_machine_contract("audio.import", version)
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            switch = fields["switch_assignment"]
+            assert set(switch) == {"oneOf", "description"}
+            assert switch["description"] == 'One exact Switch/State value name under the actual container group, or a closed bound group identity with an optional exact value name. Group-only associates that existing group with the imported SwitchContainer; earlier typed container declarations supply the group for their direct children. Gateway owns directive construction, metadata, group and full pair readback. Supports create/reuse/replace and localized owner/media reuse with groups below Default Work Unit, including VirtualFolders. Replacement removes old-owner pairs and verifies the requested new-owner pairs; an explicit whole-container replacement may replace its occupied group. Native directive grammar, object paths and GUIDs are not caller inputs.'
+            assert switch["oneOf"] == [
+                {"type": "string", "minLength": 1, "maxLength": 16 * 1024},
+                {"type": "object", "additionalProperties": False, "required": ["group"],
+                 "properties": {"group": fields["import_location"],
+                    "value": {"type": "string", "minLength": 1, "maxLength": 255}}},
+            ]
+            fields["switch_assignment"] = {'type': 'string', 'minLength': 1, 'maxLength': 16384, 'description': 'One exact Switch/State value name for a direct imported child of an existing SwitchContainer with its group already bound. Gateway resolves that value under the actual group, constructs the native directive, and verifies the complete assignment set and unchanged group. Supports create/reuse/replace and localized owner/media reuse with groups below Default Work Unit, including VirtualFolders. Replacement removes old-owner pairs and verifies the requested new-owner pairs. Native directive grammar, object paths and GUIDs are not caller inputs.'}
+        before_switch_final_forms[version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+    dialogue_component_digests = dict(non_object_set_digests)
+    # Existing Dialogue Event identity is the only new machine field. Revert
+    # that field and its disclosure before all prior component/history seals.
+    before_dialogue_lifecycle = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(before_switch_final_forms[version])
         props = contract["argument_contract"]["properties"]
         for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
             assert fields["dialogue_event"]["properties"].pop("existing_id") == {
@@ -353,6 +373,25 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
             fields["dialogue_event"]["description"] = "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; name/path alone requests Event creation, not a decision-path association. Optional ordered bound group/value or wildcard conditions request an association; Probability/Weight require that path. Entry owner/AudioNode and supplied numeric values are checked; exact decision-path sequence is not read back."
         before_dialogue_lifecycle[version] = contract
         non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+    # Source lifecycle extends one TSV disclosure across all five lanes.
+    # Invert exactly that delta before retaining every prior component seal.
+    assert canonical_sha256(non_object_set_digests) == "0a067c9f0ac14b8c48378170821fbcfdb6d9568d54fd0df39f87f4638a4e3ef4"
+    before_source_lifecycle = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        assert contract["constraints"][3] == (
+            "explicit Sound-owned AudioFileSource media rows support createNew/useExisting/replaceExisting with exact absent-or-selected Source paths across languages; a missing Sound kind is bound by its typed parent or same-table typed owner row; unchanged owners and unplanned Source identities/files are preserved, while an explicitly declared Sound replacement retires the complete sealed child set and rebinds requested Sources; regular or bounded inline WAV media and live metadata-proven Source fields retain independent verification; table bytes are never rewritten"
+        )
+        contract["constraints"][3] = (
+            "an explicit path-spelled AudioFileSource media row requires one exact Sound child path across all languages at Preview and execution, matching the selected GUID, class and parent; Notes targets that Source and a separate owner-only Notes row retains the exact-table transaction"
+        )
+        before_source_lifecycle[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+        dialogue_component_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    # The same Source inversion on the copy independently retains Dialogue's
+    # component seal; the main map retains Source's seal before that inversion.
+    assert canonical_sha256(dialogue_component_digests) == "4808739b8ef500377baf8bd7eb02caae2366b40ab28bf4eaaa44d5c5876e72b7"
+
     # Reconcile the independent Switch extension before the Dialogue component
     # and all earlier seals. Only its two descriptions/one constraint changed.
     assert canonical_sha256(non_object_set_digests) == "c56f61d0fb3a1911e6b32c223bc1b482c3e6219676cc09937e36f5787dddcf40"
@@ -383,7 +422,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
             )
         before_switch_contracts["audio.import", version] = contract
         non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
-        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = deepcopy(before_source_lifecycle[version])
         assert contract["constraints"].pop(1) == (
             "Switch Assignation binds an exact existing group and optional exact values; group-only descriptors associate a typed SwitchContainer without creating a group or adding a child pair; explicitly typed new direct containers use the same single-import path and full group/pair readback"
         )

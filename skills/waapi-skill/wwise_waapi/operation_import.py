@@ -895,6 +895,9 @@ def parse_tab_delimited_import_file(
             if expected_source_path is not None:
                 oracle_row["expected_audio_file_source_result_path"] = expected_source_path
 
+            elif _import_object_type_token(str(oracle_row.get("requested_object_type", ""))) == "audiofilesource":
+                raise ImportContractError("INVALID_TARGET_TYPE", "An explicit AudioFileSource requires reviewed audio media, not MIDI topology.")
+
         originals_subfolder = single_value("OriginalsSubFolder")
         if originals_subfolder:
             if not oracle_row["media_expected"]:
