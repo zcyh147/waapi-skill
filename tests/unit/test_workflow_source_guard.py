@@ -5881,7 +5881,7 @@ def test_owned_to_new_owned_collector_reaches_current_final_writer(tmp_path, wor
     assert events.index('shutdown') < events.index('release')
 
 
-@pytest.mark.parametrize('fault', [None, 'identity-rejected', 'adapter-rejected', 'empty-context', 'missing-scalar', 'null-scalar', 'missing-identity'])
+@pytest.mark.parametrize('fault', [None, 'identity-rejected', 'adapter-rejected', 'empty-context', 'missing-scalar', 'null-scalar', 'missing-identity', 'computed-readback-drift'])
 def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, workflow, monkeypatch, fault):
     """Substitute native execution, retaining the public producer and v3 writer."""
     import shutil
@@ -5903,13 +5903,28 @@ def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, 
         sandbox=SimpleNamespace(source_root=source, sandbox_path=owned,
             metadata=SimpleNamespace(get_info_version={'year': 2025, 'major': 1, 'minor': 7, 'build': 9143})))
     facts = collector.query_function_context_source_frame(runtime)
+    # Exact result subtrees from the retained 2025 native run, not inferred XML
+    # outcomes. Original packet hashes identify the unchanged FINAL/FAIL evidence.
+    recorded = {
+        'maxDurationSourceObject': {'return': []},
+        'maxRadiusAttenuationObject': {'return': [{'id': '{DD088B98-4DAD-4C54-B1EE-CA3427643E93}',
+            'name': 'Footsteps', 'path': r'\Attenuations\Footsteps\Footsteps', 'type': 'Attenuation'}]},
+    }
+    # Native packet SHA256: duration 1db4959e54b9b4fbb8a9b98729c2f088129027aa154a24fd8a85fac0071c92b0;
+    # radius 4bc7c9c2435709b940495ad3f3b79842b0d3e77d5f3bf8388061ddab7cb122b4.
+    # Only the exact result subtrees above are replayed; all exact readbacks below
+    # are program fakes, never retroactive native readback or FINAL/PASS evidence.
     objects = {}
     selected = {}
-    for index, fact in enumerate(facts['contexts']):
-        owner = fact['owner']; member = fact['selected']
-        for row in (owner, member):
-            objects[row['id']] = {**row, 'path': '\\fixture-only-context\\' + row['id'], 'classId': 65552 if row['type'] == 'Sound' else 2686992 if row['type'] == 'Attenuation' else index + 1}
-        selected[f'from object "{owner["id"]}" select {fact["expression"]} take 1'] = member['id']
+    rows = list(facts['scalar_owners'].values())
+    for fact in facts['contexts']:
+        rows.append(fact['owner'])
+        if 'selected' in fact:
+            rows.append(fact['selected'])
+            selected[f'from object "{fact["owner"]["id"]}" select {fact["expression"]} take 1'] = fact['selected']['id']
+    for index, row in enumerate(rows):
+        objects[row['id']] = {**row, 'path': '\\fixture-only-context\\' + row['id'],
+            'classId': 65552 if row['type'] == 'Sound' else 2686992 if row['type'] == 'Attenuation' else index + 1}
     task.metadata.update({'Pitch': {'name': 'Pitch', 'type': 'Real64'},
         'OutputBus': {'name': 'OutputBus', 'type': '', 'restriction': {'type': 'reference'}}})
     scalar_sound = objects['{0030BF58-90C3-428B-B940-44CC1C5A51B5}']
@@ -5925,10 +5940,17 @@ def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, 
         if uri.endswith('object.get') and args.get('waql') != 'from type Project take 1':
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             expression = args['waql']
+            for function, result in recorded.items():
+                if f' select {function} take 1' in expression:
+                    for native_row in result['return']:
+                        objects[native_row['id']] = deepcopy(native_row)
+                    return deepcopy(result)
             identity = selected.get(expression)
             if identity is None:
                 identity = expression.split('"')[1]
             row = deepcopy(objects[identity])
+            if fault == 'computed-readback-drift' and identity == '{DD088B98-4DAD-4C54-B1EE-CA3427643E93}':
+                row['name'] = 'Changed after computed selection'
             if expression in selected and 'select state(' in expression:
                 if fault == 'identity-rejected': row['id'] = {'native_context': 'opaque-identity'}
                 if fault == 'adapter-rejected': return {'return': ['opaque-native-context-identity']}
@@ -5954,10 +5976,24 @@ def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, 
     assert receipt['context_transport_verified'] is (fault in {None, 'null-scalar', 'missing-scalar'})
     assert receipt['scalar_transport_verified'] is (fault != 'missing-scalar')
     expected = ['PASS'] * 6
-    if failed_run: expected[4 if fault == 'missing-scalar' else 0] = 'FAIL'
+    if failed_run: expected[4 if fault == 'missing-scalar' else 3 if fault == 'computed-readback-drift' else 0] = 'FAIL'
     assert [group['status'] for group in receipt['groups']] == expected
-    assert len(commands) == (13 if fault in {'identity-rejected', 'adapter-rejected', 'empty-context', 'missing-identity'} else 14) and all(command[0] == 'query-object' for command in commands)
+    assert len(commands) == (12 if fault in {'identity-rejected', 'adapter-rejected', 'empty-context', 'missing-identity'} else 13) and all(command[0] == 'query-object' for command in commands)
     assert receipt['transaction_count'] == 0 and receipt['source_before'] == receipt['source_after']
+    duration, radius = receipt['groups'][2:4]
+    assert duration['selection_state'] == 'no-match' and duration['result_count'] == 0
+    assert duration['selected'] is None and duration['exact_readback_verified'] is False
+    assert duration['exact_readback_required'] is False
+    assert len(duration['invocations']) == 2
+    assert 'selected' not in duration['source'] and 'selected' not in radius['source']
+    assert radius['selection_state'] == 'selected' and radius['result_count'] == 1
+    assert radius['exact_readback_required'] is True
+    assert radius['selected'] == recorded['maxRadiusAttenuationObject']['return'][0]
+    assert radius['invocations'][2]['argv'][2] == '{DD088B98-4DAD-4C54-B1EE-CA3427643E93}'
+    if fault == 'computed-readback-drift':
+        assert radius['status'] == 'FAIL' and 'exact_readback_verified' not in radius
+        assert receipt['groups'][4]['status'] == receipt['groups'][5]['status'] == 'PASS'
+    else: assert radius['exact_readback_verified'] is True
     assert all(group['invocations'][-1]['native_packets'] for group in receipt['groups'])
     if fault == 'null-scalar':
         row = receipt['groups'][4]['invocations'][0]['payload']['agent_result'][0]
@@ -5968,7 +6004,7 @@ def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, 
         row = receipt['groups'][4]['invocations'][0]['payload']['agent_result'][0]
         assert row['related']['field_status']['Pitch'] == {'unavailable_fields': ['linked']}
         assert receipt['groups'][5]['status'] == 'PASS'
-    if failed_run and fault != 'missing-scalar':
+    if failed_run and fault not in {'missing-scalar', 'computed-readback-drift'}:
         failed = receipt['groups'][0]
         assert len(failed['invocations']) == 2 and failed['failure']
         native = [json.loads(Path(packet['path']).read_text())

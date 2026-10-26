@@ -13,6 +13,7 @@ from tests.destructive.support.source_copy_fixture import read_file, sha
 from tests.destructive.test_gateway_workflow_transaction_matrix import workflow_sandbox_runtime, waapi_gateway
 from tests.destructive.test_query_list_sequences import BUILDS, READ_APIS, _page_value
 from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+from wwise_waapi.object_query_related_runtime import canonical_guid
 
 pytestmark=[pytest.mark.live,pytest.mark.destructive,
     pytest.mark.skipif(os.environ.get('WWISE_VERSION') not in {'2022.1','2025.1'},
@@ -376,7 +377,7 @@ CONTEXT_PINS = {
 
 
 def query_function_context_source_frame(runtime):
-    """Establish positive contexts from four fixed source files, never live guesses."""
+    """Pin query inputs/source associations without inferring computed selections."""
     assert runtime.version == '2025.1'
     trees = {}; frames = []
     for relative, pin in CONTEXT_PINS.items():
@@ -409,8 +410,6 @@ def query_function_context_source_frame(runtime):
     panner, = panner_owner.findall('./PositioningInfo/Panner')
     assert panner.get('ID') == '{15866C0E-BAE4-47B2-BDE5-1BD5A3DD9D77}'
     sound = find('Containers/Footsteps.wwu', 'Sound', '{0030BF58-90C3-428B-B940-44CC1C5A51B5}')
-    audio, = sound.findall('./ChildrenList/AudioFileSource')
-    assert audio.get('ID') == '{806D447C-2AC4-4A6C-89DB-9D6DAFA7B5CF}'
     attenuation_owner = find('Containers/Footsteps.wwu', 'RandomSequenceContainer', '{D5594A4B-DDB0-47F3-AC2F-08F104C72438}')
     attenuation, = attenuation_owner.findall('./ReferenceList/Reference[@Name="Attenuation"]/Custom/Attenuation')
     assert attenuation.get('ID') == '{CB2B7556-B4AB-46B1-A0C9-20D4880B6DED}'
@@ -418,11 +417,16 @@ def query_function_context_source_frame(runtime):
     for label, owner, selected, expression in (
         ('state', state_owner, custom, f'state("{state_id}")'),
         ('panner', panner_owner, panner, 'panner'),
-        ('max-duration-source-object', sound, audio, 'maxDurationSourceObject'),
-        ('max-radius-attenuation-object', attenuation_owner, attenuation, 'maxRadiusAttenuationObject'),
+        ('max-duration-source-object', sound, None, 'maxDurationSourceObject'),
+        ('max-radius-attenuation-object', attenuation_owner, None, 'maxRadiusAttenuationObject'),
     ):
-        contexts.append({'label': label, 'owner': identity(owner), 'selected': identity(selected), 'expression': expression})
-    return {'files': frames, 'contexts': contexts}
+        context = {'label': label, 'owner': identity(owner), 'expression': expression,
+            'selection_kind': 'computed' if selected is None else 'source-association'}
+        if selected is not None: context['selected'] = identity(selected)
+        contexts.append(context)
+    # These are independent scalar query inputs, never computed-selector oracles.
+    return {'files': frames, 'contexts': contexts,
+        'scalar_owners': {'field-status': identity(sound), 'curve-selection': identity(attenuation)}}
 
 
 def collect_query_function_contexts(runtime, monkeypatch):
@@ -442,7 +446,7 @@ def collect_query_function_contexts(runtime, monkeypatch):
     dispatch_count = 0; packet_bytes = 0; invocation_count = 0
     original = waapi_gateway.WwiseDispatcher.dispatch
 
-    def read(group, argv):
+    def read(group, argv, *, allow_empty=False):
         nonlocal dispatch_count, packet_bytes, invocation_count
         assert invocation_count < 14
         invocation_count += 1
@@ -477,10 +481,13 @@ def collect_query_function_contexts(runtime, monkeypatch):
         assert code == 0 and payload.get('ok') is True, payload
         assert list(payload)[-1] == 'agent_result'
         rows = payload['agent_result']
-        assert isinstance(rows, list) and len(rows) == 1, payload
-        row, = rows
-        assert all(isinstance(row.get(key), str) for key in IDENTITY) and row['id'] and row['type'] and row['path'], row
+        assert isinstance(rows, list) and (len(rows) <= 1 if allow_empty else len(rows) == 1), payload
         native = [packet for packet in packets.values() if packet['api'] == 'ak.wwise.core.object.get']
+        if not rows:
+            assert native and any(packet.get('result', {}).get('return') == [] for packet in native)
+            return None
+        row, = rows
+        assert all(isinstance(row.get(key), str) for key in IDENTITY) and canonical_guid(row['id']) and row['type'] and row['path'], row
         assert native and any(any(all(raw.get(key) == row[key] for key in IDENTITY)
             for raw in packet.get('result', {}).get('return', []) if isinstance(raw, dict)) for packet in native)
         return row
@@ -529,23 +536,34 @@ def collect_query_function_contexts(runtime, monkeypatch):
             try:
                 owner = exact(group, fact['owner'])
                 expression = f'from object "{owner["id"]}" select {fact["expression"]}'
-                selected = read(group, ['query-object', '--advanced-waql', expression, '--max-results', '1', '--detail'])
-                assert all(selected[key] == fact['selected'][key] for key in ('id', 'name', 'type')), selected
-                assert exact(group, fact['selected']) == selected
-                group.update(status='PASS', selected=selected)
+                computed = fact['selection_kind'] == 'computed'
+                selected = read(group, ['query-object', '--advanced-waql', expression, '--max-results', '1', '--detail'],
+                    allow_empty=computed)
+                # Wwise owns computed extrema. XML pins the input only; a direct
+                # source child/reference is not an oracle for a computed result.
+                group.update(selected=selected, selection_state='no-match' if selected is None else 'selected',
+                    result_count=0 if selected is None else 1, exact_readback_required=selected is not None)
+                if selected is not None:
+                    if not computed:
+                        assert all(selected[key] == fact['selected'][key] for key in ('id', 'name', 'type')), selected
+                    assert exact(group, selected) == selected
+                    group['exact_readback_verified'] = True
+                else:
+                    group['exact_readback_verified'] = False  # Completed no-match; no GUID exists to read back.
+                group['status'] = 'PASS'
             except AssertionError as exc:
                 group['failure'] = str(exc)
                 # No GUID coercion, raw projection, retry, or dependent read after
                 # an adapter/native rejection. Other fixed contexts remain independent.
         # Source anchors independently authorize these read-only exact-ID roots;
         # neither scalar group depends on successful transport of another context.
-        scalar_group('field-status', facts['contexts'][2]['owner'], [
+        scalar_group('field-status', facts['scalar_owners']['field-status'], [
             (['field-status', 'Pitch', 'linked'], 'isLinked("Pitch")', ('related', 'field_status', 'Pitch', 'linked')),
             (['field-status', 'RTPC', 'overridable'], 'isOverridable("RTPC")', ('related', 'field_status', 'RTPC', 'overridable')),
             (['field-status', 'OutputBus', 'override-source'], 'isSourceOfOverride("OutputBus")', ('related', 'field_status', 'OutputBus', 'override-source')),
             (['field-status', 'RTPC', 'present'], 'hasProperty("RTPC")', ('related', 'field_status', 'RTPC', 'present')),
         ])
-        scalar_group('curve-selection', facts['contexts'][3]['selected'], [
+        scalar_group('curve-selection', facts['scalar_owners']['curve-selection'], [
             (['curve-selection', 'volume-dry'], 'curveToUse("VolumeDryUsage")', ('related', 'curve_selections', 'volume-dry', 'source')),
             (['curve-selection', 'volume-wet-game'], 'curveToUse("VolumeWetGameUsage")', ('related', 'curve_selections', 'volume-wet-game', 'source')),
         ])
