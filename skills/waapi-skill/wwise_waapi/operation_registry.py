@@ -3456,6 +3456,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         ("soundbanks", "platforms", "io_root"),
         (
             "all_user_soundbanks",
+            "all_user_bank_expectations",
             "skip_languages",
             "write_to_disk",
             "languages",
@@ -3481,6 +3482,11 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 },
                 "write_to_disk": {"type": "boolean", "description": "Omitted means the native false default: in-memory generation with result-only verification; no bank data is returned by this call."},
                 "all_user_soundbanks": {"type": "string", "enum": ["nonlocalized", "localized", "mixed"]},
+                "all_user_bank_expectations": {"type": "array", "maxItems": 64, "items": {
+                    "type": "object", "additionalProperties": False,
+                    "required": ["soundbank", "artifact_expectation"], "properties": {
+                        "soundbank": IDENTITY_ARGUMENT_SCHEMA,
+                        "artifact_expectation": {"type": "string", "enum": ["nonlocalized", "localized", "mixed"]}}}},
                 "rebuild_soundbanks": {
                     "type": "boolean",
                     "default": False,
@@ -3502,6 +3508,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             },
             optional=(
                 "all_user_soundbanks",
+                "all_user_bank_expectations",
                 "skip_languages",
                 "write_to_disk",
                 "languages",
@@ -3510,7 +3517,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "rebuild_init_bank",
             ),
         ),
-        identity_arguments=("soundbanks[].events[]", "soundbanks[].aux_busses[]"),
+        identity_arguments=("soundbanks[].events[]", "soundbanks[].aux_busses[]", "all_user_bank_expectations[].soundbank"),
         constraints=(
             "SoundBank scope is selected or explicitly all-user; platforms remain bounded and explicit; omitted languages mean all live project languages; Init is an automatic by-product",
             "language selection is batch-wide; explicit skip_languages=true conflicts with localized artifact expectations; preserve native omission and explicit options",
@@ -17242,8 +17249,22 @@ def _normalize_generate_arguments(
                 raise OperationContractError("INVALID_READBACK", "All-user SoundBank inventory is malformed or ambiguous.")
             seen_ids.add(row["id"].casefold())
             seen_names.add(row["name"].casefold())
+        overrides = {}
+        inventory = {row["id"].casefold(): row for row in rows}
+        for index, override in enumerate(arguments.get("all_user_bank_expectations", [])):
+            role = f"all_user_bank_expectations[{index}].soundbank"
+            resolved = _resolve_identity(override["soundbank"], role=role, read=read)
+            key = str(resolved.object).casefold()
+            captured = inventory.get(key)
+            if captured is None or any(resolved.row.get(field) != captured.get(field) for field in ("name", "type", "path")):
+                raise OperationContractError("INVALID_SCOPE", "Every artifact expectation override must match a SoundBank in the captured all-user inventory.",
+                    details={"role": role, "object": resolved.object})
+            if key in overrides:
+                raise OperationContractError("DUPLICATE_TARGET", "One all-user SoundBank artifact expectation was supplied twice.")
+            overrides[key] = override["artifact_expectation"]
+            roles[role] = resolved
         result["soundbanks"] = [{"name": row["name"],
-            "artifactExpectation": arguments["all_user_soundbanks"]} for row in rows]
+            "artifactExpectation": overrides.get(row["id"].casefold(), arguments["all_user_soundbanks"])} for row in rows]
         result["allUserSoundBanks"] = {"inventory": rows}
     optional_map = {
         "skip_languages": "skipLanguages",
@@ -27417,6 +27438,19 @@ def _validate_nested_request_shape(
                         value,
                         role=f"soundbanks[{bank_index}].{field_name}[{value_index}]",
                     )
+        if "all_user_bank_expectations" in arguments:
+            if "all_user_soundbanks" not in arguments:
+                raise OperationContractError("INVALID_SCOPE", "Bank artifact overrides require all-user scope.")
+            overrides = _mapping_sequence(arguments["all_user_bank_expectations"], field="all_user_bank_expectations")
+            if len(overrides) > 64:
+                raise OperationContractError("LIMIT_EXCEEDED", "All-user artifact overrides exceed the 64-bank bound.")
+            for index, override in enumerate(overrides):
+                _require_exact_keys(override, required=("soundbank", "artifact_expectation"),
+                    context=f"all_user_bank_expectations[{index}]")
+                _validate_identity_payload_shape(override["soundbank"], role=f"all_user_bank_expectations[{index}].soundbank")
+                if override["artifact_expectation"] not in {"nonlocalized", "localized", "mixed"}:
+                    raise OperationContractError("INVALID_ARGUMENT", "Bank artifact override needs a disclosed layout.")
+                artifact_expectations.append(override["artifact_expectation"])
         for field in ("skip_languages", "write_to_disk"):
             if field in arguments and not isinstance(arguments[field], bool):
                 raise OperationContractError("INVALID_ARGUMENT", f"{field} must be a boolean.")

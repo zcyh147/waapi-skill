@@ -199,6 +199,7 @@ def _materialize_generate(
             "write_to_disk",
             "skip_languages",
             "all_user_soundbanks",
+            "all_user_bank_expectations",
             "languages",
             "rebuild_soundbanks",
             "clear_audio_file_cache",
@@ -311,11 +312,32 @@ def _materialize_generate(
         "platforms": platforms,
         "io_root": _text(source["io_root"], field="io_root"),
     }
+    overrides = []
+    if "all_user_bank_expectations" in source:
+        if "all_user_soundbanks" not in source:
+            _error("BUSINESS_VALUE_INVALID", "all_user_bank_expectations",
+                   "select all user SoundBanks before overriding their artifact expectations")
+        for index, raw in enumerate(_bounded_sequence(source["all_user_bank_expectations"],
+            field="all_user_bank_expectations", maximum=64, allow_empty=True)):
+            field = f"all_user_bank_expectations[{index}]"
+            override = _exact_fields(_mapping(raw, field=field),
+                required={"soundbank_handle", "artifact_expectation"}, field=field)
+            bound = _bound(session, override["soundbank_handle"], field=f"{field}.soundbank_handle",
+                object_types={"SoundBank"}, role="soundbank")
+            expectation = _text(override["artifact_expectation"], field=f"{field}.artifact_expectation")
+            if expectation not in {"nonlocalized", "localized", "mixed"}:
+                _error("BUSINESS_VALUE_INVALID", f"{field}.artifact_expectation",
+                       "choose nonlocalized, localized, or mixed")
+            overrides.append({"soundbank": bound_object_identity_for_handle(session.handles,
+                bound.handle, field=f"{field}.soundbank_handle",
+                action="bind the exact live SoundBank and copy its returned handle"),
+                "artifact_expectation": expectation})
+        arguments["all_user_bank_expectations"] = overrides
     # Preserve the established public file-generation workflow. Native omission
     # is an explicit business choice so an old plan cannot become memory-only.
     source.setdefault("write_to_disk", True)
     source.setdefault("skip_languages", not any(
-        row["artifact_expectation"] in {"localized", "mixed"} for row in banks
+        row["artifact_expectation"] in {"localized", "mixed"} for row in banks + overrides
     ) and source.get("all_user_soundbanks") not in {"localized", "mixed"})
     if "languages" in source:
         languages = [

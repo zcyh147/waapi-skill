@@ -27,6 +27,7 @@ _DECLARATIONS: dict[str, dict[str, Any]] = {
         "required_fields": ["soundbanks", "platforms", "io_root"],
         "optional_fields": [
             "all_user_soundbanks",
+            "all_user_bank_expectations",
             "write_to_disk",
             "skip_languages",
             "languages",
@@ -108,7 +109,13 @@ _DECLARATION_SCHEMAS: dict[str, dict[str, Any]] = {
                 },
             },
             "all_user_soundbanks": {"type": "string", "enum": ["nonlocalized", "localized", "mixed"],
-                "description": "Generate all live user SoundBanks using this common expected artifact layout; soundbanks must be empty. Preview binds at most 64 live banks and rejects selection drift. 2023–25 dispatch an empty native list; 2021–22 enumerate that exact bounded live selection because their reflection does not document empty-list meaning."},
+                "description": "Generate all live user SoundBanks using this default artifact layout and optional bound per-bank expectations; soundbanks must be empty. Preview binds at most 64 live banks and rejects selection drift. 2023–25 dispatch an empty native list; 2021–22 enumerate that exact bounded live selection because their reflection does not document empty-list meaning."},
+            "all_user_bank_expectations": {"type": "array", "maxItems": 64,
+                "description": "Optional per-bank artifact layouts within all-user scope. Each live bound SoundBank must belong to the captured inventory. These are verification expectations only; native per-bank events, AuxBusses, inclusions and rebuild choices remain selected-bank inputs and are not reinterpreted here.",
+                "items": {"type": "object", "additionalProperties": False,
+                    "required": ["soundbank_handle", "artifact_expectation"], "properties": {
+                        "soundbank_handle": _HANDLE,
+                        "artifact_expectation": {"type": "string", "enum": ["nonlocalized", "localized", "mixed"]}}}},
             "write_to_disk": {"oneOf": [{"type": "boolean"}, {"const": "native-default"}],
                 "default": True, "description": "Public default true preserves file generation. false explicitly selects memory generation; native-default omits native writeToDisk (documented false). Memory mode checks only the bounded result schema, diagnostics and input/output guards; it never verifies bank data or delivered artifacts. To receive memory data, establish the existing Gateway soundbank.generated Topic workflow before generation."},
             "skip_languages": {"oneOf": [{"type": "boolean"}, {"const": "native-default"}],

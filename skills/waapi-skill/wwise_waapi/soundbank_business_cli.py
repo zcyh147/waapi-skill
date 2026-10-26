@@ -61,6 +61,8 @@ def add_soundbank_plan_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--temporary-soundbank", action="append", nargs=2, default=[],
                         metavar=("NAME", "ARTIFACT_EXPECTATION"))
     parser.add_argument("--all-user-soundbanks", choices=("nonlocalized", "localized", "mixed"))
+    parser.add_argument("--all-user-bank-expectation", action="append", nargs=2, default=[],
+                        metavar=("SOUNDBANK_HANDLE", "ARTIFACT_EXPECTATION"))
     for flag in ("empty-events", "empty-aux-busses", "empty-generation-inclusions"):
         parser.add_argument(f"--{flag}", action="append", default=[], metavar="BANK_SELECTION")
     parser.add_argument("--language", action="append", default=[])
@@ -101,6 +103,7 @@ def soundbank_plan_from_namespace(
         "soundbank",
         "temporary_soundbank",
         "all_user_soundbanks",
+        "all_user_bank_expectation",
         "empty_events",
         "empty_aux_busses",
         "empty_generation_inclusions",
@@ -127,6 +130,7 @@ def soundbank_plan_from_namespace(
             "inclusion",
         },
         "soundbank.generate": {
+            "all_user_bank_expectation",
             "empty_events",
             "empty_aux_busses",
             "empty_generation_inclusions",
@@ -276,6 +280,13 @@ def soundbank_plan_from_namespace(
             if rows:
                 raise SoundBankBusinessCliError("all-user-soundbanks cannot be combined with selected banks")
             plan["all_user_soundbanks"] = args.all_user_soundbanks
+        if args.all_user_bank_expectation:
+            if args.all_user_soundbanks is None:
+                raise SoundBankBusinessCliError("all-user-bank-expectation requires all-user-soundbanks")
+            plan["all_user_bank_expectations"] = [
+                {"soundbank_handle": handle, "artifact_expectation": expectation}
+                for handle, expectation in args.all_user_bank_expectation
+            ]
         for name in (
             "write_to_disk",
             "skip_languages",

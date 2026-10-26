@@ -1222,3 +1222,65 @@ def test_generate_explicit_empty_definition_and_language_choices_remain_selectab
         "artifact_expectation": "nonlocalized", "events": [], "aux_busses": [], "inclusions": []}]
     assert request["arguments"]["languages"] == []
     assert request["arguments"]["write_to_disk"] is True
+
+
+@pytest.mark.parametrize("foreign_bank", [False, True])
+def test_all_user_generation_supports_bound_bank_layout_overrides(tmp_path: Path, foreign_bank: bool) -> None:
+    from tests.unit.test_operation_registry_soundbank import _project as generation_project, GenerateReader, _row
+    from wwise_waapi.operation_registry import verify_prepared_operation, validate_prepared_roles
+    io_root, project = generation_project(tmp_path)
+    root_bank = _row(BANK_ID, "Harbor", "SoundBank", r"\SoundBanks\Default Work Unit\Harbor")
+    voice_bank = _row(OBJECT_ID, "Dialogue", "SoundBank", r"\SoundBanks\Default Work Unit\Dialogue")
+    class Client:
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return _info()
+            if uri == "ak.wwise.core.object.get":
+                if args.get("waql") == "from type SoundBank take 65":
+                    return {"return": [root_bank] if foreign_bank else [root_bank, voice_bank]}
+                if args.get("from", {}).get("id") == [OBJECT_ID]:
+                    return {"return": [voice_bank]}
+            return GenerateReader(project)(uri, args, options)
+        def disconnect(self):
+            pass
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv],
+            env=_env(tmp_path), client_factory=lambda _url: Client())
+    code, started = run("draft-start", "soundbank.generate")
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    code, bound = run("draft-bind-object", draft_id, "--task-authority", authority,
+        "--expected-revision", "1", "--object-id", OBJECT_ID, "--role", "soundbank")
+    assert code == 0, bound
+    code, invalid = run("draft-declare-soundbank-plan", draft_id, "--task-authority", authority,
+        "--expected-revision", "2", "--all-user-soundbanks", "nonlocalized",
+        "--soundbank-rebuild", bound["bound_object"]["handle"], "true",
+        "--platform", "Mac", "--io-root", str(io_root))
+    assert code == 2, invalid
+    code, declared = run("draft-declare-soundbank-plan", draft_id, "--task-authority", authority,
+        "--expected-revision", "2", "--all-user-soundbanks", "nonlocalized",
+        "--all-user-bank-expectation", bound["bound_object"]["handle"], "localized",
+        "--platform", "Mac", "--io-root", str(io_root))
+    assert code == 0, declared
+    code, checked = run("draft-check", draft_id, "--task-authority", authority, "--expected-revision", "3")
+    if foreign_bank:
+        assert code == 2 and checked["error_code"] == "INVALID_SCOPE", checked
+        return
+    assert code == 0, checked
+    code, previewed = run("preview-from-draft", draft_id, "--task-authority", authority,
+        "--expected-revision", str(checked["draft"]["revision"]))
+    assert code == 0, previewed
+    prepared = TransactionStore(tmp_path / "state").load_preview(previewed["transaction_id"]).artifact["prepared_operation"]
+    assert validate_prepared_roles(prepared, read_call=Client().call)["ok"] is True
+    assert prepared["dispatch"]["args"]["soundbanks"] == []
+    assert prepared["dispatch"]["args"]["skipLanguages"] is False
+    assert "all_user_bank_expectations" not in prepared["dispatch"]["args"]
+    assert prepared["verification_plan"]["plan"]["scope"]["artifact_expectations"] == [
+        {"name": "Harbor", "mode": "nonlocalized"}, {"name": "Dialogue", "mode": "localized"}]
+    output = Path(project["platforms"][0]["soundBankPath"])
+    output.mkdir(parents=True)
+    (output / "Harbor.bnk").write_bytes(b"BKHD-Harbor")
+    assert not verify_prepared_operation(prepared, execution_result={"result": {}}, read_call=Client().call).ok
+    (output / "English(US)").mkdir()
+    (output / "English(US)" / "Dialogue.bnk").write_bytes(b"BKHD-Dialogue")
+    assert verify_prepared_operation(prepared, execution_result={"result": {}}, read_call=Client().call).ok
