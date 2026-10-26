@@ -15892,6 +15892,7 @@ def _prepare_closed_import_plan(
                         isinstance(target.get("source_file"), Mapping)
                         and target["source_file"].get("kind") == "inline_base64"
                         and source_operation != "audio.import"
+                        and not target.get("requested_switch_assignments")
                     )),
                     ("import_location", "requested_import_location" in target),
                     ("dialogue_event", (

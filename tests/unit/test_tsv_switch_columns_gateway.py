@@ -409,7 +409,11 @@ class LocalizedTableSwitchClient(LocalizedSwitchImportClient):
             with Path(args['importFile']).open(encoding='utf-8', newline='') as stream:
                 rows = list(csv.reader(stream, delimiter='\t'))
             assert rows[1][0] == '<Sound Voice>Voice' and rows[1][2] == '<Switch Group:Surface>Snow'
-            self.copied.write_bytes(Path(localize_waapi_host_path(rows[1][1])).read_bytes())
+            if rows[0][1] == 'Audio File Base64':
+                import base64
+                self.copied.write_bytes(base64.b64decode(rows[1][1].partition('|')[2]))
+            else:
+                self.copied.write_bytes(Path(localize_waapi_host_path(rows[1][1])).read_bytes())
             if self.assignment_effect:
                 self.assignments.append({'child': self.OWNER, 'stateOrSwitch': self.VALUE})
             if self.change_other_media:
@@ -418,18 +422,31 @@ class LocalizedTableSwitchClient(LocalizedSwitchImportClient):
         return super().call(uri, args, options)
 
 
-def _localized_table_switch_draft(tmp_path, version='2025.1'):
+def _localized_table_switch_draft(tmp_path, version='2025.1', *, inline=False):
     client = LocalizedTableSwitchClient(tmp_path, version)
     command, run, client, table = _draft(tmp_path, version, client=client, language='English(US)')
     media = tmp_path / 'Line.wav'; media.write_bytes(WAV_BYTES)
     table.write_text('Object Path\tAudio File\tSwitch Assignation\n<Sound Voice>Voice\t'
                      + z_wire_path(media) + '\t<Switch Group:Surface>Snow\n', encoding='utf-8')
+    if inline:
+        import base64
+        table.write_text('Object Path\tAudio File Base64\tSwitch Assignation\n<Sound Voice>Voice\tLine.wav|'
+                         + base64.b64encode(WAV_BYTES).decode('ascii') + '\t<Switch Group:Surface>Snow\n', encoding='utf-8')
     return command, run, client, table
 
 
 @pytest.mark.parametrize('version', ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'))
 def test_localized_table_switch_media_binds_selected_source_and_preserves_other_language(tmp_path, version):
-    command, run, client, table = _localized_table_switch_draft(tmp_path, version)
+    _assert_localized_table_switch_media(tmp_path, version)
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'))
+def test_localized_table_inline_switch_media_binds_selected_source_and_preserves_other_language(tmp_path, version):
+    _assert_localized_table_switch_media(tmp_path, version, inline=True)
+
+
+def _assert_localized_table_switch_media(tmp_path, version, *, inline=False):
+    command, run, client, table = _localized_table_switch_draft(tmp_path, version, inline=inline)
     original = table.read_bytes(); before_sources = deepcopy(client.sources); before_pairs = deepcopy(client.assignments)
     other_media = client.other_file.read_bytes()
     command('draft-check'); tx = command('preview-from-draft')['transaction_id']
