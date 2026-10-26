@@ -276,7 +276,8 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
         _complete_business_draft, _write_fixture_wav,
     )
     assert runtime.version == "2025.1", "Representative unchanged-table witness is pinned to 2025.1"
-    assert witness_kind in {"notes-columns", "ordinary-owner-source", "explicit-source-tsv"}
+    assert witness_kind in {"notes-columns", "ordinary-owner-source", "explicit-source-tsv", "guid-source-tsv"}
+    explicit_source_table = witness_kind in {"explicit-source-tsv", "guid-source-tsv"}
     ordinary = witness_kind == "ordinary-owner-source"
     name = "TSV_Witness_" + uuid.uuid4().hex[:10]
     output = runtime.state_dir / ("localized-exact-tsv-notes-witness.json" if witness_kind == "notes-columns" else "localized-" + witness_kind + "-witness.json")
@@ -438,10 +439,10 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
                 "--field", "audio_source_notes", "Japanese explicit Source notes", "--field", "originals_subfolder", "After",
                 "--field-value", fields["Volume"], "-6", "--field-value", fields["OutputBus"], bus], live=False)
         else:
-            replacement = ({"VoiceNotes": audio(4, "DifferentMedia")} if witness_kind == "explicit-source-tsv" else
+            replacement = ({"VoiceNotes": audio(4, "DifferentMedia")} if explicit_source_table else
                 {key: audio(index + 4, stem) for index, (key, stem) in enumerate((("VoiceNotes", "LineNotes"), ("VoiceSource", "LineSource")))})
             table = owned / "GatewayTSVWitness/exact-localized.tsv"
-            if witness_kind == "explicit-source-tsv":
+            if explicit_source_table:
                 from wwise_waapi.platform_paths import adapt_cli_dispatch_paths
                 shown_setup = gateway.gateway(["transaction-show", report["setup"][0]["transaction_id"]], live=False)
                 media_path = str(replacement["VoiceNotes"].resolve(strict=True))
@@ -453,10 +454,23 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
                 native_media_path = adapted.args["importFile"]
                 assert proof(native_media_path) == report["inputs"][media_path]
                 report["media_cell_path_adaptation"] = adapted.proof
-                table.write_text("Audio File\tObject Path\tNotes\tOriginalsSubFolder\n"
-                    + "\t<Sound Voice>VoiceNotes\tTSV requested object Notes\t\n"
-                    + f"{native_media_path}\t<Sound Voice>VoiceNotes\\<AudioFileSource>LineNotes\tTSV requested source Notes\tAfter\n",
-                    encoding="utf-8", newline="\n")
+                if witness_kind == "guid-source-tsv":
+                    source, = [row["object"] for row in before["VoiceNotes"]["sources"]
+                        if row["object"]["source_language"]["name"] == "English(US)"]
+                    assert source["type"] == "AudioFileSource" and source["class_id"] == 16
+                    report["guid_target_bindings"] = {"owner": before["VoiceNotes"]["owner"], "source": source}
+                    # The primary GUID example supplies Object Type explicitly.
+                    # Copy the existing Source's native class name, never infer
+                    # a Sound type from this replacement WAV's different stem.
+                    table.write_text("Audio File\tObject Path\tObject Type\tNotes\tOriginalsSubFolder\n"
+                        + f"\t{identities['VoiceNotes']}\tSound Voice\tTSV requested object Notes\t\n"
+                        + f"{native_media_path}\t{source['id']}\t{source['type']}\tTSV requested source Notes\tAfter\n",
+                        encoding="utf-8", newline="\n")
+                else:
+                    table.write_text("Audio File\tObject Path\tNotes\tOriginalsSubFolder\n"
+                        + "\t<Sound Voice>VoiceNotes\tTSV requested object Notes\t\n"
+                        + f"{native_media_path}\t<Sound Voice>VoiceNotes\\<AudioFileSource>LineNotes\tTSV requested source Notes\tAfter\n",
+                        encoding="utf-8", newline="\n")
             else:
                 table.write_text("Audio File\tObject Path\tNotes\tAudio Source Notes\tOriginalsSubFolder\n"
                     + "".join(f"{replacement[key]}\t<Sound Voice>{key}\t{notes}\t{source_notes}\tAfter\n"
@@ -538,7 +552,7 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
             assert current["owner"]["properties"]["Volume"] == -6
             assert current["owner"]["properties"]["OverrideOutput"] is True
             assert current["owner"]["references"]["OutputBus"]["id"] == bus_id
-        elif witness_kind == "explicit-source-tsv":
+        elif explicit_source_table:
             assert after["VoiceSource"] == before["VoiceSource"]
             prior, current = before["VoiceNotes"], after["VoiceNotes"]
             old = {row["object"]["source_language"]["name"]: row for row in prior["sources"]}
@@ -583,3 +597,7 @@ def collect_localized_owner_source_import_acceptance(runtime):
 
 def collect_localized_explicit_source_tsv_acceptance(runtime):
     return collect_localized_tsv_import_acceptance(runtime, witness_kind="explicit-source-tsv")
+
+
+def collect_localized_guid_source_tsv_acceptance(runtime):
+    return collect_localized_tsv_import_acceptance(runtime, witness_kind="guid-source-tsv")

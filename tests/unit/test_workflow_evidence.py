@@ -341,6 +341,11 @@ def test_owner_source_native_witnesses_reach_persisted_final_writer(tmp_path, mo
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind=witness_kind)
 
 
+@pytest.mark.parametrize("fault", (None, "wrong-identity", "indeterminate"))
+def test_guid_source_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
+    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="guid-source-tsv")
+
+
 @pytest.mark.parametrize("fault", ("missing-bus", "wrong-bus-parent"))
 def test_ordinary_owner_source_native_witness_rejects_invalid_selected_bus(tmp_path, monkeypatch, fault):
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="ordinary-owner-source")
@@ -404,8 +409,9 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 result.append({key: row.get(key, row.get("@" + key)) for key in options["return"] if key in row or "@" + key in row})
             return result
         def ingest(self, row, language):
-            explicit_source = "<AudioFileSource>" in row["objectPath"]
-            path = re.sub(r"<[^>]+>", "", row["objectPath"])
+            guid_target = self.objects.get(row["objectPath"])
+            explicit_source = "<AudioFileSource>" in row["objectPath"] or (guid_target is not None and guid_target["type"] == "AudioFileSource")
+            path = guid_target["path"] if guid_target is not None else re.sub(r"<[^>]+>", "", row["objectPath"])
             source_name = path.rsplit("\\", 1)[-1] if explicit_source else None
             if explicit_source: path = path.rsplit("\\", 1)[0]
             owner = next((item for item in self.objects.values() if item["path"] == path and item["type"] != "AudioFileSource"), None)
@@ -458,7 +464,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
             if uri.endswith("getInfo"):
                 info = super().call(uri, args, options)
                 info["version"].update(minor=7, build=9143, displayName="v2025.1.7.9143")
-                if witness_kind == "explicit-source-tsv" and os.name == "posix":
+                if witness_kind in {"explicit-source-tsv", "guid-source-tsv"} and os.name == "posix":
                     info.update(processPath=r"C:\Wwise\WwiseConsole.exe", platform="x64")
                 return info
             if uri.endswith("getTypes"):
@@ -477,7 +483,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 return {"name": "IsVoice", "type": "bool", "default": False, "dependencies": []}
             if uri.endswith("getProjectInfo"):
                 info = super().call(uri, args, options)
-                if witness_kind == "explicit-source-tsv" and os.name == "posix":
+                if witness_kind in {"explicit-source-tsv", "guid-source-tsv"} and os.name == "posix":
                     from tests.unit.test_transaction_gateway import z_wire_path
                     info["path"] = z_wire_path(tmp_path / "project/SampleProject.wproj")
                 info["languages"].extend([{"id": ENGLISH, "name": "English(US)", "shortId": 2}, {"id": JAPANESE, "name": "Japanese", "shortId": 3}])
@@ -530,17 +536,22 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 returned = []
                 for row in rows:
                     object_path = row["Object Path"]
-                    if not object_path.startswith("\\"):
+                    guid_target = self.objects.get(object_path)
+                    explicit_source = "<AudioFileSource>" in object_path or (guid_target is not None and guid_target["type"] == "AudioFileSource")
+                    if witness_kind == "guid-source-tsv":
+                        assert guid_target is not None, "Native fake must resolve the exact supplied GUID"
+                        assert row["Object Type"] == ("AudioFileSource" if explicit_source else "Sound Voice")
+                    elif not object_path.startswith("\\"):
                         object_path = self.objects[args["importLocation"]]["path"] + "\\" + object_path
                     native = {"objectPath": object_path, "notes": row.get("Notes", "")}
                     if row.get("Audio File"):
-                        if witness_kind == "explicit-source-tsv":
+                        if witness_kind in {"explicit-source-tsv", "guid-source-tsv"}:
                             assert not row["Audio File"].startswith("/"), "Wine cannot consume a POSIX absolute media cell"
                         native["audioFile"] = localize_waapi_host_path(row["Audio File"])
                     if row.get("OriginalsSubFolder"): native["originalsSubFolder"] = row["OriginalsSubFolder"]
                     objects = self.ingest(native, "English(US)")
                     owner = objects[0]; source = objects[-1] if len(objects) > 1 else None
-                    if row.get("Notes") and source is not None and "<AudioFileSource>" not in object_path:
+                    if row.get("Notes") and source is not None and not explicit_source:
                         (source if fault == "notes-on-source" else owner)["notes"] = row["Notes"]
                     if row.get("Audio Source Notes") and source is not None: source["notes"] = row["Audio Source Notes"]
                     if fault == "wrong-identity" and source is not None:
@@ -575,7 +586,8 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
     lock = sandbox_fixture.LiveSandboxLock(tmp_path / "locks"); lock.__enter__()
     node = {"notes-columns": "test_audio_import_localized_exact_tsv_independent_notes",
         "ordinary-owner-source": "test_audio_import_new_localized_source_owner_fields",
-        "explicit-source-tsv": "test_audio_import_exact_tsv_owner_notes_existing_source_media"}[witness_kind]
+        "explicit-source-tsv": "test_audio_import_exact_tsv_owner_notes_existing_source_media",
+        "guid-source-tsv": "test_audio_import_exact_tsv_guid_owner_and_source_media"}[witness_kind]
     error = None
     try: getattr(workflow, node)(runtime)
     except AssertionError as exc: error = exc
@@ -622,8 +634,16 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
             assert client.import_count == 2 and client.tab_count == 1
             assert "Audio Source Notes" not in report["table"]["utf8"]
             cells = [line.split("\t") for line in report["table"]["utf8"].splitlines()]
-            assert cells[1][0] == "" and cells[1][2] == "TSV requested object Notes"
-            assert cells[2][1].endswith("<AudioFileSource>LineNotes") and cells[2][2] == "TSV requested source Notes"
+            if witness_kind == "guid-source-tsv":
+                assert cells[0] == ["Audio File", "Object Path", "Object Type", "Notes", "OriginalsSubFolder"]
+                assert cells[1] == ["", report["guid_target_bindings"]["owner"]["id"], "Sound Voice", "TSV requested object Notes", ""]
+                assert cells[2][1:] == [report["guid_target_bindings"]["source"]["id"], "AudioFileSource", "TSV requested source Notes", "After"]
+                from wwise_waapi.host_paths import localize_waapi_host_path
+                assert Path(localize_waapi_host_path(cells[2][0])).name == "DifferentMedia.wav"
+                assert report["guid_target_bindings"]["source"]["name"] == "LineNotes"
+            else:
+                assert cells[1][0] == "" and cells[1][2] == "TSV requested object Notes"
+                assert cells[2][1].endswith("<AudioFileSource>LineNotes") and cells[2][2] == "TSV requested source Notes"
             if fault != "indeterminate": assert report["table_after"]["sha256"] == report["table"]["sha256"]
         return
     table_bytes = report["table"]["utf8"].encode("utf-8")

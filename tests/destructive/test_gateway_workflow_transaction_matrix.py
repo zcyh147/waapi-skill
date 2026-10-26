@@ -1008,6 +1008,17 @@ def test_audio_import_exact_tsv_owner_notes_existing_source_media(workflow_sandb
 
 @pytest.mark.live
 @pytest.mark.destructive
+@pytest.mark.parametrize("workflow_sandbox_runtime", [pytest.param(("Japanese",), id="japanese")], indirect=True)
+def test_audio_import_exact_tsv_guid_owner_and_source_media(workflow_sandbox_runtime):
+    """Exact GUID owner/Source table, one media import in a three-transaction lifecycle."""
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("Representative GUID Source table witness is pinned to 2025.1")
+    from tests.destructive.support.audio_import_acceptance import collect_localized_guid_source_tsv_acceptance
+    collect_localized_guid_source_tsv_acceptance(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_music_playlist_canonical_query_create_and_import_parent(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
