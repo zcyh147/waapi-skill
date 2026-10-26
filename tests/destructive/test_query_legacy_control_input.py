@@ -235,3 +235,113 @@ def test_legacy_control_input_typed_reads_keep_exact_rtpc_and_lfo_scope(workflow
         with output.open('xb') as stream:stream.write(body)
         category.update(status=status,observation_sha256=sha(body),business_effect_verified=observation['business_effect_verified'])
         assert bounded,'Finalized observation exceeded16MiB; no native PASS'
+
+
+def test_legacy_plugin_active_source_uses_documented_select(workflow_sandbox_runtime, monkeypatch):
+    """One existing linked plugin choice, through SELECT rather than RETURN."""
+    runtime = workflow_sandbox_runtime
+    assert runtime.version == '2021.1'
+    assert tuple(runtime.sandbox.metadata.get_info_version[key] for key in ('year','major','minor','build')) == BUILDS[runtime.version]
+    output = runtime.state_dir / 'query-legacy-plugin-active-source.json'
+    output.parent.mkdir(parents=True, exist_ok=True)
+    _reject_symlink_chain(output.parent, owned_input=runtime.state_dir, label='active-source observation')
+    assert not output.exists() and not output.is_symlink()
+    observation = {'candidate':runtime.candidate,'version':runtime.version,'read_only':True,'transaction_count':0,
+        'invocation_count':0,'dispatch_count':0,'packet_bytes':0,'invocations':[],'native_packets':[],
+        'active_source_identity_verified':False,'business_effect_verified':False,'native_absence_proven':False,
+        'scope':'one existing linked Wwise Synth One Sound choice; no generic unlinked, empty-selection or other Source-class claim',
+        'view':{'platform':'Mac','language':'SFX'},
+        'limits':{'value_reads':2,'packet_bytes':4*1024*1024,'receipt_bytes':8*1024*1024}}
+    category = {'category':'query-legacy-plugin-active-source','status':'FAIL','observation_path':str(output),
+        'verifier_strength':'documented_select_exact_source_readback_independent_existing_active_choice_and_preservation'}
+    runtime.category_results.append(category)
+    evidence_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
+    original = waapi_gateway.WwiseDispatcher.dispatch
+    status = 'FAIL'
+
+    def read(argv):
+        assert observation['invocation_count'] < 2
+        invocation = {'argv':argv,'dispatch_calls':[]}; observation['invocations'].append(invocation)
+        observation['invocation_count'] += 1
+        packets_before = set(evidence_root.glob('*.json'))
+        def capture(dispatcher, api, **kwargs):
+            assert observation['dispatch_count'] < 2 and api == 'ak.wwise.core.object.get'
+            observation['dispatch_count'] += 1
+            call = {'api':api,**copy.deepcopy({key:kwargs.get(key) for key in ('version','args','options')})}
+            invocation['dispatch_calls'].append(call)
+            result = original(dispatcher,api,**kwargs)
+            call.update(ok=result['ok'],evidence_path=result.get('evidence_path'),result_sha256=canonical_sha256(result.get('result')))
+            return result
+        with monkeypatch.context() as patch:
+            patch.setattr(waapi_gateway.WwiseDispatcher,'dispatch',capture)
+            code,payload = runtime.raw_gateway(argv)
+        invocation.update(exit_code=code,payload=payload)
+        packets = {}
+        for path in sorted(set(evidence_root.glob('*.json')) - packets_before):
+            raw = read_file(path,1024*1024)
+            observation['packet_bytes'] += len(raw)
+            assert observation['packet_bytes'] <= observation['limits']['packet_bytes']
+            observation['native_packets'].append({'path':str(path),'bytes':len(raw),'sha256':sha(raw)})
+            packets[str(path)] = json.loads(raw)
+        calls = invocation['dispatch_calls']
+        assert len(calls) == len(packets) == 1, 'One value read per invocation; no alternate accessor or retry'
+        call, = calls; packet = packets[call['evidence_path']]
+        assert call['api'] == packet['api'] == 'ak.wwise.core.object.get' and call['version'] == runtime.version
+        assert call['ok'] is packet['ok'] and call['result_sha256'] == canonical_sha256(packet.get('result'))
+        assert call['options'] == {'return':[*IDENTITY,'classId'],'platform':'Mac','language':'SFX'}
+        assert code == 0 and payload.get('ok') is True, payload
+        assert list(payload)[-1] == 'agent_result' and isinstance(payload['agent_result'],list)
+        rows = payload['agent_result']
+        assert len(rows) == 1, 'Expected one source; empty/multiple results do not establish this active choice'
+        row, = rows; native, = packet['result']['return']
+        assert {key:row[key] for key in IDENTITY} == {key:native[key] for key in IDENTITY}
+        assert row['class_id'] == native['classId'] == 9699330 and type(row['class_id']) is int
+        assert row['id'] == SOURCE and row['type'] == 'SourcePlugin' and row['name'] == 'Wwise Synth One'
+        return row
+
+    try:
+        before = source_frame(runtime); observation['source_before'] = before
+        # Developer-only independent saved-model oracle. Runtime Gateway never
+        # reads project XML, derives a filename, or assumes a sole child wins.
+        tree = xml(read_file(runtime.sandbox.sandbox_path / RELATIVE,4*1024*1024))
+        sound, = [node for node in tree.iter('Sound') if node.get('ID') == SOUND]
+        source, = [node for node in sound.findall('ChildrenList/SourcePlugin') if node.get('ID') == SOURCE]
+        active, = sound.findall('ActiveSourceList/ActiveSource')
+        assert active.attrib == {'Name':'Wwise Synth One','ID':SOURCE,'Platform':'Linked'}
+        assert source.get('Name') == active.get('Name') and source.findtext('Language') == 'SFX'
+        assert not list(source.iter('AudioFile'))
+        observation['source_oracle'] = {'sound_id':SOUND,'source_id':SOURCE,'active_entry':dict(active.attrib),
+            'source_tag':source.tag,'no_audio_file_element':True,'language':'SFX',
+            'authority':'existing immutable MIDI ActiveSourceList GUID; not child order or path inference'}
+        selected = read(['query-object','--advanced-waql',f'from object "{SOUND}" select activeSource',
+            '--max-results','2','--include','class-id','--platform','Mac','--language','SFX','--detail'])
+        observation['selected_source'] = selected
+        assert observation['invocations'][0]['dispatch_calls'][0]['args'] == {'waql':f'from object "{SOUND}" select activeSource take 2'}
+        readback = read(['query-object','--exact-id',selected['id'],'--max-results','1',
+            '--include','class-id','--platform','Mac','--language','SFX','--detail'])
+        observation['readback_source'] = readback
+        assert observation['invocations'][1]['dispatch_calls'][0]['args'] == {'waql':f'from object "{SOURCE}" take 1'}
+        assert readback == selected, 'Exact selected Source identity changed'
+        observation.update(active_source_identity_verified=True,business_effect_verified=True)
+        status = 'PASS'
+    except BaseException as exc:
+        observation['error'] = f'{type(exc).__name__}: {exc}'
+        raise
+    finally:
+        try:
+            observation['source_after'] = source_frame(runtime)
+            assert observation['source_after'] == observation.get('source_before')
+        except BaseException as exc:
+            status = 'FAIL'
+            observation.update(active_source_identity_verified=False,business_effect_verified=False,
+                preservation_error=f'{type(exc).__name__}: {exc}')
+            raise
+        finally:
+            body = json.dumps(observation,ensure_ascii=False,indent=2).encode()
+            if len(body) > observation['limits']['receipt_bytes']:
+                status = 'FAIL'; observation.update(active_source_identity_verified=False,business_effect_verified=False,
+                    finalization_error='Observation exceeded 8MiB; retained without truncation')
+                body = json.dumps(observation,ensure_ascii=False,indent=2).encode()
+            with output.open('xb') as stream: stream.write(body)
+            category.update(status=status,observation_sha256=sha(body),business_effect_verified=observation['business_effect_verified'])
+            assert len(body) <= observation['limits']['receipt_bytes'], 'Observation ceiling exceeded; no native PASS'
