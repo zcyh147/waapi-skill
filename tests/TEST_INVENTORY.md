@@ -5,6 +5,57 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #182 import progress and scoped native outcomes
+
+Implementation through `f4445eba` preserves independent default Field Handle
+assignments, row precedence and explicit empty Notes. Mixed replace/create
+binds destructive intent to exact existing targets and requires declared-new
+targets to be absent. Ordinary localized fields and exact TSV retain separate
+Notes/AudioSourceNotes expectations, source/language snapshots and media/drift
+checks. TSV `OriginalsSubFolder` is gated to 2023.1+ by WG-60834; four incompatible
+current 2022 V3 definitions block before producers without changing historical
+campaigns. Source-bound 2025 Events use a controlled owner/Event row plus exact
+Source/media row in one call; older wire behavior remains unchanged.
+
+Focused component tests and small integration selections are recorded separately
+in `.waapi-skill-state/full-coverage/import-182-work/`. Counts overlap; they are
+not a combined Program/Non-live pass. Original REDs, the mixed 73-pass/2-fail run
+and its two repaired synthetic fixtures remain attributed to their actual runs.
+No new Fresh, native-Windows or full gate is claimed.
+
+Five separate owned macOS Console 2025.1.7.9143 roots retain these original results:
+
+- `import182-mixed-2025-r1` at `eb3b0e29`: **PASS, 12.65s**, two verified
+  transactions including setup. Distinct replacement/old-GUID absence, new
+  target, Source ownership/language/media bytes and unrelated/input preservation
+  passed; setup grants no extra API credit.
+- `import182-localized-2025-r1` at `eb3b0e29`: **FAIL, 6.96s** during Japanese
+  setup. Requested AudioSourceNotes read back empty; English witness never ran.
+- `import182-localized-2025-r2` at `a256767b`: **FAIL, 6.78s**. The English
+  witness reached verification, failing its Event Action's zero-GUID Target.
+  Other verifier facts remain scoped observations; independent after-reads
+  were not reached.
+- `import182-localized-2025-r3` at `b3b7a644`: **PASS, 7.19s**, three verified
+  transactions after the owner/Event partition repair. Literal English Notes,
+  exact Source identity/media/moved folder, Event target, owner notes and
+  other-language/unrelated preservation passed. This does not prove r1's
+  new-language AudioSourceNotes effect.
+- `import182-tsv-2025-r1` at `f4445eba`: **FAIL, 10.24s**. Two setup transactions
+  verified; TSV execution was indeterminate after native rejection of Audio
+  Source Notes. No Verify or follow-up reads/writes ran; final target effects
+  remain unknown, without a native-absence conclusion.
+
+Evidence roots are below `.waapi-skill-state/full-coverage/`; each retains its
+`main-assessment.json` beside original receipts/category rows. All five confirm
+source preservation and clean process cleanup. Passing sandboxes were deleted;
+all three failed sandboxes remain quarantined. No original FAIL was replayed or
+regraded. These are separate scoped results, not one green campaign.
+
+#182 remains OPEN: new-language AudioSourceNotes and actual localized TSV effects
+remain unresolved; localized owner properties/references/inline media and
+Dialogue/Switch assignments remain implementation/proof work. #194 Fresh budget
+stays zero; #195 owns final mapping reconciliation and combined gates.
+
 ## 2026-10-26 #181 functional closeout
 
 Reviewed `cc545ad2` completes the remaining disclosure after the query increment
