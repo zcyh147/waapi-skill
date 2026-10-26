@@ -15149,10 +15149,13 @@ def _prepare_import_dialogue_association(target: dict[str, Any], *, index: int,
     _require_reference_target_allowed(info, planned_owner)
     before = target.get("pre_state_rows", [])
     owner_id = before[0]["id"] if before else None
+    before_referrers = _read_import_dialogue_referrers(owner_id, read=read) if owner_id else []
+    if len(before_referrers) >= 128:
+        raise OperationContractError("DIALOGUE_ASSOCIATION_LIMIT_EXCEEDED", "The complete referrer readback must retain capacity for the new Dialogue association before import.")
     target["dialogue_association_binding"] = {"path": event_path, "parent_id": parent.object,
         "event_class_id": event_class.class_id, "entry_class_id": entry_class.class_id,
         "audio_node_metadata": info.as_dict(), "owner_id": owner_id,
-        "before": _read_import_dialogue_referrers(owner_id, read=read) if owner_id else []}
+        "before": before_referrers}
     target["class_metadata"].extend([event_class.as_dict(), entry_class.as_dict()])
     roles[f"import_dialogue[{index}].parent"] = parent
     path_snapshots.append({"path": event_path, "fields": list(IDENTITY_RETURN_FIELDS), "rows": []})

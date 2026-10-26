@@ -186,3 +186,11 @@ def test_ordinary_import_does_not_accept_legacy_caller_native_dialogue_directive
     command,client = _draft(tmp_path)
     command('draft-revise-declaration','--declaration-id','snow','--field','dialogue_event_directive','Greeting@Path:State.Value',expected_error='GatewayInputError')
     assert not any(u=='ak.wwise.core.audio.import' for u,_,_ in client.calls)
+
+
+def test_dialogue_import_reserves_readback_capacity_before_any_write(tmp_path):
+    command,client = _draft(tmp_path,existing=True)
+    template=client.before_links[0]
+    client.before_links=[{**deepcopy(template),'id':f'{{BBBBBBBB-1111-1111-1111-{index:012d}}}'} for index in range(128)]
+    command('draft-check',expected_error='DIALOGUE_ASSOCIATION_LIMIT_EXCEEDED')
+    assert not any(u=='ak.wwise.core.audio.import' for u,_,_ in client.calls)
