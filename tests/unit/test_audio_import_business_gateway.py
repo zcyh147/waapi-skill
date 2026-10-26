@@ -3093,8 +3093,8 @@ class LocalizedOwnerOnlyTabClient(LocalizedOwnerFieldsClient):
         return result
 
 
-def _localized_owner_only_tab_draft(tmp_path):
-    client = LocalizedOwnerOnlyTabClient(tmp_path)
+def _localized_owner_only_tab_draft(tmp_path, *, client=None):
+    client = client or LocalizedOwnerOnlyTabClient(tmp_path)
     command, run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1", client=client)
     table.write_text("Object Path\tProperty[Volume]\tProperty[OverrideOutput]\tReference[OutputBus]\n"
         "<Sound Voice>Voice\t-6\ttrue\t" + client.bus["path"] + "\n", encoding="utf-8")
@@ -3120,6 +3120,83 @@ def test_localized_owner_only_exact_table_fields_preserve_sources_and_media(tmp_
     assert client.owner["@OutputBus"] == {"id": client.BUS} and client.owner["@IsVoice"] is True
     assert client.owner["notes"] == "keep owner notes" and client.sources == sources
     assert (client.copied.read_bytes(), client.other_file.read_bytes()) == media and table.read_bytes() == original
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
+
+
+class MultiOwnerOnlyTabClient(LocalizedOwnerOnlyTabClient):
+    """Two same-class owners retain different original Source/media states."""
+
+    SECOND_OWNER = "{C1234567-1234-1234-1234-123456789ABC}"
+    SECOND_AUDIO_SOURCE = "{D1234567-1234-1234-1234-123456789ABC}"
+
+    def __init__(self, tmp_path):
+        super().__init__(tmp_path)
+        self.second_file = self.copied.parent / "OtherOwner/OtherLine.wav"
+        self.second_file.parent.mkdir(parents=True)
+        self.second_file.write_bytes(b"preserve second owner media")
+        self.second_owner = {"id": self.SECOND_OWNER, "name": "OtherVoice", "type": "Sound", "classId": 65552,
+            "path": self.parent["path"] + r"\OtherVoice", "parent": {"id": PARENT_ID},
+            "notes": "keep second owner notes", "@IsVoice": True, "activeSource": {"id": self.SECOND_AUDIO_SOURCE},
+            "originalFilePath": str(self.second_file), "@Volume": 2.0,
+            "@OutputBus": {"id": self.INITIAL_BUS}, "@OverrideOutput": False}
+        self.second_source = {"id": self.SECOND_AUDIO_SOURCE, "name": "OtherLine", "type": "AudioFileSource", "classId": 16,
+            "path": self.second_owner["path"] + r"\OtherLine", "parent": {"id": self.SECOND_OWNER},
+            "notes": "keep second Source notes", "audioSource:language": {"id": self.LANGUAGE, "name": "English(US)"},
+            "originalFilePath": str(self.second_file), "originalWavFilePath": str(self.second_file)}
+
+    def call(self, uri, args=None, options=None):
+        from copy import deepcopy
+        args, options = args or {}, options or {}
+        if uri == "ak.wwise.core.audio.importTabDelimited":
+            import csv
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            with Path(args["importFile"]).open(encoding="utf-8", newline="") as stream:
+                rows = list(csv.DictReader(stream, delimiter="\t"))
+            assert [row["Object Path"] for row in rows] == ["<Sound Voice>Voice", "<Sound Voice>OtherVoice"]
+            for row, owner in zip(rows, [self.owner, self.second_owner], strict=True):
+                assert "Audio File" not in row and row["Reference[OutputBus]"] == self.bus["path"]
+                assert row["Property[OverrideOutput]"] == "true"
+                owner.update({"@Volume": float(row["Property[Volume]"]), "@OverrideOutput": True, "@OutputBus": {"id": self.BUS}})
+            return {"objects": [{key: deepcopy(value) for key, value in owner.items() if key in options["return"]}
+                for owner in [self.owner, self.second_owner]]}
+        if uri == "ak.wwise.core.object.get" and args.get("waql") == f'from object "{self.SECOND_OWNER}" select children take 129':
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {"return": [{key: deepcopy(value) for key, value in self.second_source.items() if key in options["return"]}]}
+        result = super().call(uri, args, options)
+        if uri == "ak.wwise.core.object.get":
+            identity = args.get("from", {})
+            for row in [self.second_owner, self.second_source]:
+                if row["id"] in identity.get("id", []) or row["path"] in identity.get("path", []):
+                    result["return"].append({key: deepcopy(value) for key, value in row.items() if key in options["return"]})
+        return result
+
+
+def test_localized_owner_only_exact_table_compares_each_rows_own_media_baseline(tmp_path):
+    from copy import deepcopy
+    client = MultiOwnerOnlyTabClient(tmp_path)
+    command, run, client, table = _localized_owner_only_tab_draft(tmp_path, client=client)
+    table.write_text(table.read_text() + "<Sound Voice>OtherVoice\t-3\ttrue\t" + client.bus["path"] + "\n", encoding="utf-8")
+    original = table.read_bytes(); sources = deepcopy([*client.sources, client.second_source])
+    media = [path.read_bytes() for path in [client.copied, client.other_file, client.second_file]]
+    selections = [deepcopy(owner["activeSource"]) for owner in [client.owner, client.second_owner]]
+    assert selections[0] != selections[1]
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    targets = shown["artifact"]["prepared_operation"]["verification_plan"]["targets"]
+    assert [target["pre_state_rows"][0]["activeSource"] for target in targets] == selections
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction)
+    failures = [row for row in verified.get("verification", {}).get("assertions", []) if not row["passed"]]
+    assert code == 0 and verified["verified"] is True, failures
+    assert [owner["@Volume"] for owner in [client.owner, client.second_owner]] == [-6, -3]
+    assert all(owner["@OverrideOutput"] is True and owner["@OutputBus"] == {"id": client.BUS}
+        for owner in [client.owner, client.second_owner])
+    assert [owner["activeSource"] for owner in [client.owner, client.second_owner]] == selections
+    assert [*client.sources, client.second_source] == sources
+    assert [path.read_bytes() for path in [client.copied, client.other_file, client.second_file]] == media
+    assert client.owner["notes"] == "keep owner notes" and client.second_owner["notes"] == "keep second owner notes"
+    assert table.read_bytes() == original
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
 
 

@@ -24555,7 +24555,7 @@ def verify_prepared_operation(
                 )
                 if target.get("localized_owner_only") is True:
                     preserved_fields = ["activeSource", "originalFilePath", "sound:originalWavFilePath", "audioSource:language"]
-                    before_owner = pre_state_rows[0]
+                    before_owner = target["pre_state_rows"][0]
                     check(f"{label} owner-only TSV preserves the owner media selection and placement",
                           all(_native_snapshot_equal(_field_value(live_row, field), _field_value(before_owner, field))
                               for field in preserved_fields),
