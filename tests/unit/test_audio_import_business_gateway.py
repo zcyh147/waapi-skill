@@ -3057,8 +3057,8 @@ class LocalizedOwnerOnlyTabClient(LocalizedOwnerFieldsClient):
 
     INITIAL_BUS = "{A0A0A0A0-A0A0-A0A0-A0A0-A0A0A0A0A0A0}"
 
-    def __init__(self, tmp_path):
-        super().__init__(tmp_path, "2025.1", fault="activation")
+    def __init__(self, tmp_path, version="2025.1"):
+        super().__init__(tmp_path, version, fault="activation")
         self.owner["@OutputBus"] = {"id": self.INITIAL_BUS}
         self.initial_bus = {"id": self.INITIAL_BUS, "name": "Initial", "type": "Bus", "classId": 524304,
             "path": r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus\Initial"}
@@ -3077,11 +3077,15 @@ class LocalizedOwnerOnlyTabClient(LocalizedOwnerFieldsClient):
             with Path(args["importFile"]).open(encoding="utf-8", newline="") as stream:
                 row, = list(csv.DictReader(stream, delimiter="\t"))
             assert row["Object Path"] == "<Sound Voice>Voice" and "Audio File" not in row
-            assert row["Reference[OutputBus]"] == self.bus["path"]
-            assert row["Property[OverrideOutput]"] in {"true", "false"}
-            self.owner["@Volume"] = float(row["Property[Volume]"])
-            self.owner["@OverrideOutput"] = row["Property[OverrideOutput]"] == "true"
-            self.owner["@OutputBus"] = {"id": self.BUS}
+            if row.get("Reference[OutputBus]"):
+                assert row["Reference[OutputBus]"] == self.bus["path"]
+            if row.get("Property[OverrideOutput]"):
+                assert row["Property[OverrideOutput]"] in {"true", "false"}
+                self.owner["@OverrideOutput"] = row["Property[OverrideOutput]"] == "true"
+            if row.get("Property[Volume]"):
+                self.owner["@Volume"] = float(row["Property[Volume]"])
+            if row.get("Reference[OutputBus]"):
+                self.owner["@OutputBus"] = {"id": self.BUS}
             return {"objects": [{key: deepcopy(value) for key, value in self.owner.items() if key in options["return"]}]}
         result = super().call(uri, args, options)
         if uri == "ak.wwise.core.object.get":
@@ -3093,17 +3097,18 @@ class LocalizedOwnerOnlyTabClient(LocalizedOwnerFieldsClient):
         return result
 
 
-def _localized_owner_only_tab_draft(tmp_path, *, client=None):
-    client = client or LocalizedOwnerOnlyTabClient(tmp_path)
-    command, run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1", client=client)
+def _localized_owner_only_tab_draft(tmp_path, version="2025.1", *, client=None):
+    client = client or LocalizedOwnerOnlyTabClient(tmp_path, version)
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, version, client=client)
     table.write_text("Object Path\tProperty[Volume]\tProperty[OverrideOutput]\tReference[OutputBus]\n"
         "<Sound Voice>Voice\t-6\ttrue\t" + client.bus["path"] + "\n", encoding="utf-8")
     return command, run, client, table
 
 
-def test_localized_owner_only_exact_table_fields_preserve_sources_and_media(tmp_path):
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_localized_owner_only_exact_table_fields_preserve_sources_and_media(tmp_path, version):
     from copy import deepcopy
-    command, run, client, table = _localized_owner_only_tab_draft(tmp_path)
+    command, run, client, table = _localized_owner_only_tab_draft(tmp_path, version)
     original = table.read_bytes(); sources = deepcopy(client.sources)
     before_bus_id = client.owner["@OutputBus"]["id"]
     assert before_bus_id == client.INITIAL_BUS and before_bus_id != client.BUS
@@ -3113,6 +3118,11 @@ def test_localized_owner_only_exact_table_fields_preserve_sources_and_media(tmp_
     prepared = shown["artifact"]["prepared_operation"]
     assert prepared["dispatch"]["args"]["importFile"] == str(table.resolve())
     assert "imports" not in prepared["dispatch"]["args"]
+    source_rows = prepared["verification_plan"]["targets"][0]["localized_source_snapshot"]["rows"]
+    file_field = "originalWavFilePath" if version == "2021.1" else "originalFilePath"
+    assert all(file_field in source for source in source_rows)
+    if version == "2021.1":
+        assert all("originalFilePath" not in source for source in source_rows)
     assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
     code, executed = run("execute", transaction); assert code == 0, executed
     code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
@@ -3121,6 +3131,53 @@ def test_localized_owner_only_exact_table_fields_preserve_sources_and_media(tmp_
     assert client.owner["notes"] == "keep owner notes" and client.sources == sources
     assert (client.copied.read_bytes(), client.other_file.read_bytes()) == media and table.read_bytes() == original
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
+
+
+def test_localized_owner_only_table_reuses_satisfied_prerequisite_without_adding_column(tmp_path):
+    from copy import deepcopy
+    command, run, client, table = _localized_owner_only_tab_draft(tmp_path)
+    client.owner["@OverrideOutput"] = True
+    table.write_text(table.read_text().replace("\tProperty[OverrideOutput]", "").replace("\ttrue\t", "\t"), encoding="utf-8")
+    original = table.read_bytes(); sources = deepcopy(client.sources)
+    media = (client.copied.read_bytes(), client.other_file.read_bytes())
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
+    assert client.owner["@OverrideOutput"] is True and client.owner["@OutputBus"] == {"id": client.BUS}
+    assert client.owner["@Volume"] == -6 and client.sources == sources
+    assert (client.copied.read_bytes(), client.other_file.read_bytes()) == media and table.read_bytes() == original
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
+
+
+def test_localized_owner_only_table_blank_fields_preserve_unrequested_reference_and_activation(tmp_path):
+    command, run, client, table = _localized_owner_only_tab_draft(tmp_path)
+    table.write_text(table.read_text().replace("\ttrue\t" + client.bus["path"], "\t\t"), encoding="utf-8")
+    original = table.read_bytes()
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
+    assert client.owner["@Volume"] == -6 and client.owner["@OverrideOutput"] is False
+    assert client.owner["@OutputBus"] == {"id": client.INITIAL_BUS} and table.read_bytes() == original
+
+
+def test_localized_owner_only_table_rejects_satisfied_prerequisite_drift_before_write(tmp_path):
+    command, run, client, table = _localized_owner_only_tab_draft(tmp_path)
+    client.owner["@OverrideOutput"] = True
+    table.write_text(table.read_text().replace("\tProperty[OverrideOutput]", "").replace("\ttrue\t", "\t"), encoding="utf-8")
+    original = table.read_bytes()
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    client.owner["@OverrideOutput"] = False
+    code, executed = run("execute", transaction)
+    assert code == 2 and executed["executed"] is False and executed["status"] == "repreview_required", executed
+    assert client.owner["@Volume"] == 0 and client.owner["@OutputBus"] == {"id": client.INITIAL_BUS}
+    assert table.read_bytes() == original
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
 
 
 class MultiOwnerOnlyTabClient(LocalizedOwnerOnlyTabClient):
@@ -3202,12 +3259,15 @@ def test_localized_owner_only_exact_table_compares_each_rows_own_media_baseline(
 
 @pytest.mark.parametrize("fault,error", (
     ("missing-activation", "TAB_REFERENCE_DEPENDENCY_REQUIRES_COLUMN"),
+    ("conflicting-activation", "REFERENCE_DEPENDENCY_CONFLICT"),
     ("wrong-reference", "INVALID_REFERENCE_TARGET"),
 ))
 def test_localized_owner_only_exact_table_rejects_undeclared_prerequisite_and_wrong_bus(tmp_path, fault, error):
     command, _run, client, table = _localized_owner_only_tab_draft(tmp_path)
     if fault == "missing-activation":
         table.write_text(table.read_text().replace("\tProperty[OverrideOutput]", "").replace("\ttrue\t", "\t"), encoding="utf-8")
+    elif fault == "conflicting-activation":
+        table.write_text(table.read_text().replace("\ttrue\t", "\tfalse\t"), encoding="utf-8")
     else:
         table.write_text(table.read_text().replace(client.bus["path"], client.owner["path"]), encoding="utf-8")
     original = table.read_bytes()
