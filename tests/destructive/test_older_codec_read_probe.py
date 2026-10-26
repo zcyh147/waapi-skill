@@ -25,6 +25,16 @@ SOURCES = {
         '6936b9719114606e3e9883afa970979b5d5105246506a14b6d939033ac0f54ce'),
 }
 
+# Original read-r1 packets establish only this exact old wrapper representation.
+OLDER_WRAPPER_SOURCES = {
+    '2021.1': {'observation': 'older-codec179-2021-read-r1/pytest/gateway-workflows-2021-10/state/older-codec-read-probe.json',
+        'observation_sha256': 'da12a3c7d5570eb27a0da464fe708a2fc13d1865bb1061fe9055b497e5079f4b',
+        'native_record_sha256': '3a054be2b3f126ebf71811c7a06fe93015a8e160faaf16795ec7ed603d52a27f'},
+    '2022.1': {'observation': 'older-codec179-2022-read-r1/pytest/gateway-workflows-2022-10/state/older-codec-read-probe.json',
+        'observation_sha256': '645822436713273baf10da840727216b604a4fb043ee19d5d085ba196be2c046',
+        'native_record_sha256': 'd91831514fcf3b0c6c9a9ca4402f71a39f7fb10fbe29c65442fd856dec90cee5'},
+}
+
 
 @pytest.mark.skipif(os.environ.get('WWISE_VERSION') != '2021.1', reason='Exact 2021.1.14.8108 codec read')
 def test_2021_codec_read_metadata(workflow_sandbox_runtime):
@@ -72,6 +82,7 @@ def collect_older_codec_read(runtime):
     receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
         'project_mutation_count': 0, 'business_effect_verified': False, 'platform_association_proven': False,
         'read_metadata_complete': False, 'access_outcome': 'not_attempted',
+        'identity_representation': 'unresolved', 'concrete_codec_class_id': None,
         'limits': {'public_calls': 9, 'identity_rows': 2, 'field_list_pages': 1, 'listed_fields': 64,
             'detail_pages': 1, 'observation_bytes': 2 * 1024 * 1024}}
     category = {'category': 'older-codec-read-metadata', 'status': 'FAIL', 'business_effect_verified': False,
@@ -146,10 +157,20 @@ def collect_older_codec_read(runtime):
             unresolved('identity_facts_unresolved')
         row = rows[0]
         owner_reference = row.get('owner')
-        if (row.get('id') != pin['codec_id'] or row.get('class_id') != 262145
-                or row.get('plugin_name') != 'Vorbis' or not isinstance(owner_reference, dict)
-                or owner_reference.get('id') != pin['owner_id']
+        if (row.get('id') != pin['codec_id'] or row.get('type') != 'ConversionPlugin'
+                or not isinstance(owner_reference, dict) or owner_reference.get('id') != pin['owner_id']
                 or row.get('identity_completeness', {}).get('complete') is False):
+            unresolved('identity_facts_unresolved')
+        if (type(row.get('class_id')) is int and row['class_id'] == 262145
+                and row.get('plugin_name') == 'Vorbis'):
+            receipt.update(identity_representation='concrete_codec', concrete_codec_class_id=262145)
+        elif (runtime.version in OLDER_WRAPPER_SOURCES and type(row.get('class_id')) is int
+                and row['class_id'] == 2818064 and row.get('plugin_name') == ''
+                and row.get('name') == '' and row.get('path') == '<Unnamed Conversion plugin>'):
+            # Identity is readable; concrete codec class and platform association remain unresolved.
+            receipt.update(identity_representation='pinned_older_generic_wrapper',
+                wrapper_source=OLDER_WRAPPER_SOURCES[runtime.version])
+        else:
             unresolved('identity_facts_unresolved')
         code, listed = read(['metadata', 'list', '--exact-id', pin['codec_id'], '--page-size', '64'])
         receipt['field_list_result'] = listed
@@ -173,7 +194,7 @@ def collect_older_codec_read(runtime):
         current = successful(['status'])
         assert current['wwise'] == baseline['wwise'] and current['project'] == baseline['project'], current
         receipt.update(read_metadata_complete=True, access_outcome='read_and_metadata_observed')
-        category.update(status='PASS', reason='Exact codec identity and one disclosed field observed; no write or platform-association acceptance')
+        category.update(status='PASS', reason='Exact object identity and one disclosed field observed; concrete codec facts retained separately; no write or platform-association acceptance')
     except BaseException as exc:
         receipt['error'] = f'{type(exc).__name__}: {exc}'
         raise
