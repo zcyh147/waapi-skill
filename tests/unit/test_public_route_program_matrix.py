@@ -710,13 +710,34 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert verification.readbacks[0]["file_proof"] == prepared_payload["verification_plan"]["file_proof"]
     elif entry.uri in CLI_PROJECT_FILE_URIS:
         observed = verification.readbacks[0]
-        # Process success remains a separate fact from the unchanged/missing
-        # project artifacts. No fake native response can grant business credit.
+        # Process success remains separate from independently observed effects.
+        # The missing-central-file refresh has a documented preserving no-op;
+        # the process reply still proves no mutation.
         assert observed["business_effect_proven"] is False
         assert observed["outcome"] == ("not_reported" if earlier_void else "success")
         assert ("exit_code" not in observed) if earlier_void else observed["exit_code"] == 0
-        assert verification.business_state_verified is False
-        if entry.uri == "ak.wwise.cli.verify":
+        preserving_refresh = entry.uri == "ak.wwise.cli.updateMediaIdsInSingleFile"
+        assert verification.business_state_verified is preserving_refresh
+        if preserving_refresh:
+            assert verification.status == "verified"
+            assert verification.verification_strength == "independent_console_project_file_artifact"
+            before = prepared_payload["pre_state"]["cli_project_effect"]["mapping_before"]
+            assert before["exists"] is False
+            effects = [row for row in verification.readbacks if row.get("kind") == "cli-media-id-artifacts"]
+            assert len(effects) == 1
+            effect = effects[0]
+            assert effect["mapping_file"]["exists"] is False
+            assert effect["work_unit_media_id_count_before"] == effect["work_unit_media_id_count_after"] == 0
+            assert effect["unresolved"] == []
+            checks = {row["name"]: row["passed"] for row in verification.assertions}
+            for name in (
+                "Project identity, platforms and languages were preserved during media ID maintenance",
+                "Model content outside the requested media ID storage fields was preserved",
+                "Refreshing the central file preserves Work Unit media IDs and project storage mode",
+                "Refresh leaves an absent central media ID file absent",
+            ):
+                assert checks[name] is True
+        elif entry.uri == "ak.wwise.cli.verify":
             assert verification.status == "result_schema_checked"
             assert verification.verification_strength == "documented_cli_process_outcome"
             assert verification.readbacks == (observed,)
