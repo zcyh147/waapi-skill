@@ -975,6 +975,17 @@ def test_audio_import_localized_notes_placement_event(workflow_sandbox_runtime):
 
 @pytest.mark.live
 @pytest.mark.destructive
+@pytest.mark.parametrize("workflow_sandbox_runtime", [pytest.param(("Japanese",), id="japanese")], indirect=True)
+def test_audio_import_localized_exact_tsv_independent_notes(workflow_sandbox_runtime):
+    """One unchanged two-row table; independent owner/source Notes observations."""
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("Representative unchanged-table localized witness is pinned to2025.1")
+    from tests.destructive.support.audio_import_acceptance import collect_localized_tsv_import_acceptance
+    collect_localized_tsv_import_acceptance(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_music_playlist_canonical_query_create_and_import_parent(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:

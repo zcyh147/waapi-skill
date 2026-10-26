@@ -327,3 +327,197 @@ def test_switch_assignment_business_evidence_rejects_relationship_tampering() ->
             state_or_switch_id=SWITCH_ID,
             should_exist=True,
         )
+
+
+@pytest.mark.parametrize("fault", (None, "notes-on-source", "partial-post-read", "indeterminate"))
+def test_localized_tsv_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
+    """Real public Gateway/collector/finalizer; only native Wwise is substituted."""
+    import importlib
+    import hashlib
+    import json
+    import re
+    import uuid
+    from pathlib import Path
+    from types import SimpleNamespace
+    from tests.unit.test_audio_import_business_gateway import ImportFieldsClient, _env, waapi_gateway
+    from tests.unit.test_profiler_input_native_fixture import _finish
+    from tests.destructive.support import sandbox_fixture
+
+    monkeypatch.setenv("WWISE_LIVE", "1"); monkeypatch.setenv("WWISE_DESTRUCTIVE", "1")
+    workflow = importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
+    collector = importlib.import_module("tests.destructive.support.audio_import_acceptance")
+
+    class Client(ImportFieldsClient):
+        def __init__(self):
+            super().__init__(tmp_path, "2025.1")
+            self.parent = {"id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+                "path": r"\Containers\Default Work Unit", "notes": "keep placement", "parent": None}
+            self.objects = {PARENT_ID: self.parent}
+            self.tab_count = 0
+        def projected(self, rows, options):
+            result = []
+            for raw in rows:
+                row = copy.deepcopy(raw)
+                if row["type"] == "Sound":
+                    children = [source for source in self.objects.values() if (source.get("parent") or {}).get("id") == row["id"]
+                        and source.get("audioSource:language", {}).get("name") == options.get("language", "English(US)" if row.get("@IsVoice") else "SFX")]
+                    if children:
+                        row.update(activeSource={"id": children[0]["id"]}, originalFilePath=children[0]["originalFilePath"],
+                            **{"sound:originalWavFilePath": children[0]["originalFilePath"], "audioSource:language": children[0]["audioSource:language"]})
+                result.append({key: row.get(key, row.get("@" + key)) for key in options["return"] if key in row or "@" + key in row})
+            return result
+        def ingest(self, row, language):
+            path = re.sub(r"<[^>]+>", "", row["objectPath"])
+            owner = next((item for item in self.objects.values() if item["path"] == path and item["type"] != "AudioFileSource"), None)
+            if owner is None:
+                parent_path, _, name = path.rpartition("\\")
+                parent = next(item for item in self.objects.values() if item["path"] == parent_path)
+                kind = row.get("objectType", "")
+                sound = "sound" in kind.casefold()
+                owner = {"id": "{" + str(uuid.uuid4()).upper() + "}", "name": name,
+                    "type": "Sound" if sound else "PropertyContainer", "classId": 65552 if sound else 1,
+                    "path": path, "parent": {"id": parent["id"]}, "notes": ""}
+                if sound: owner["@IsVoice"] = "voice" in kind.casefold()
+                self.objects[owner["id"]] = owner
+            returned = [owner]
+            if "audioFile" in row:
+                media = Path(row["audioFile"])
+                source = next((item for item in self.objects.values() if (item.get("parent") or {}).get("id") == owner["id"]
+                    and item["type"] == "AudioFileSource" and item["name"] == media.stem
+                    and item["audioSource:language"]["name"] == language), None)
+                copied = tmp_path / "project/Originals" / ("SFX" if language == "SFX" else "Voices/" + language)
+                copied = copied / row.get("originalsSubFolder", "") / media.name
+                copied.parent.mkdir(parents=True, exist_ok=True); copied.write_bytes(media.read_bytes())
+                if source is None:
+                    source = {"id": "{" + str(uuid.uuid4()).upper() + "}", "name": media.stem,
+                        "type": "AudioFileSource", "classId": 16, "path": path + "\\" + media.stem,
+                        "notes": "", "parent": {"id": owner["id"]},
+                        "audioSource:language": {"id": ENGLISH if language == "English(US)" else JAPANESE if language == "Japanese" else SFX, "name": language}}
+                    self.objects[source["id"]] = source
+                source["originalFilePath"] = str(copied)
+                returned.append(source)
+            return returned
+        def call(self, uri, args=None, options=None):
+            args, options = args or {}, options or {}
+            if uri.endswith("getInfo"):
+                info = super().call(uri, args, options)
+                info["version"].update(minor=7, build=9143, displayName="v2025.1.7.9143")
+                return info
+            if uri.endswith("getTypes"):
+                return {"return": [{"classId": n, "name": name, "type": "WObject"} for n, name in (
+                    (1, "PropertyContainer"), (65552, "Sound"), (16, "AudioFileSource"), (1638416, "WorkUnit"))]}
+            if uri.endswith("getPropertyAndReferenceNames"): return {"return": ["IsVoice"]}
+            if uri.endswith("getPropertyInfo"): return {"name": "IsVoice", "type": "bool", "default": False, "dependencies": []}
+            if uri.endswith("getProjectInfo"):
+                info = super().call(uri, args, options)
+                info["languages"].extend([{"id": ENGLISH, "name": "English(US)", "shortId": 2}, {"id": JAPANESE, "name": "Japanese", "shortId": 3}])
+                return info
+            if uri.endswith("object.get") and not args.get("waql", "").startswith("from type Project"):
+                rows = []
+                if "waql" in args:
+                    match = re.match(r'from object ("(?:[^"\\]|\\.)*")(.*)', args["waql"])
+                    assert match, args
+                    identity, tail = match[1][1:-1], match[2]
+                    rows = [item for item in self.objects.values() if item["id"] == identity or item["path"] == identity]
+                    if "select children" in tail:
+                        owners = {item["id"] for item in rows}
+                        rows = [item for item in self.objects.values() if isinstance(item.get("parent"), dict) and item["parent"].get("id") in owners]
+                    if fault == "partial-post-read" and self.tab_count and rows and rows[0]["name"] == "VoiceSource" and "select children" not in tail:
+                        rows = []
+                elif "from" in args:
+                    identities = args["from"]
+                    rows = [item for item in self.objects.values() if item["id"] in identities.get("id", []) or item["path"] in identities.get("path", [])]
+                    if args.get("transform"):
+                        owners = {item["id"] for item in rows}
+                        rows = [item for item in self.objects.values() if isinstance(item.get("parent"), dict) and item["parent"].get("id") in owners]
+                self.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options)))
+                return {"return": self.projected(rows, options)}
+            if uri == "ak.wwise.core.audio.import":
+                self.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options)))
+                returned = []
+                for row in args["imports"]: returned.extend(self.ingest(row, row.get("importLanguage", "SFX")))
+                return {"objects": self.projected(returned, options), "log": [],
+                    "files": [item["originalFilePath"] for item in returned if item["type"] == "AudioFileSource"]}
+            if uri == "ak.wwise.core.audio.importTabDelimited":
+                import csv
+                self.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options))); self.tab_count += 1
+                if fault == "indeterminate": raise RuntimeError("fake native transport lost after dispatch")
+                with Path(args["importFile"]).open(encoding="utf-8", newline="") as source:
+                    rows = list(csv.DictReader(source, delimiter="\t"))
+                returned = []
+                for row in rows:
+                    object_path = row["Object Path"]
+                    if not object_path.startswith("\\"):
+                        object_path = self.objects[args["importLocation"]]["path"] + "\\" + object_path
+                    owner, source = self.ingest({"objectPath": object_path, "audioFile": row["Audio File"],
+                        "originalsSubFolder": row["OriginalsSubFolder"]}, "English(US)")
+                    if row["Notes"]: (source if fault == "notes-on-source" else owner)["notes"] = row["Notes"]
+                    if row["Audio Source Notes"]: source["notes"] = row["Audio Source Notes"]
+                    returned.extend([owner, source])
+                return {"objects": self.projected(returned, options)}
+            if uri.startswith("ak.wwise.core.undo."): return {}
+            return super().call(uri, args, options)
+
+    PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
+    ENGLISH = "{88888888-8888-8888-8888-888888888888}"
+    JAPANESE = "{99999999-9999-9999-9999-999999999999}"
+    SFX = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+    client = Client()
+    state = tmp_path / "state"
+    env = {**_env(tmp_path)}
+    config = Path(env["WAAPI_SKILL_CONFIG_PATH"])
+    settings = json.loads(config.read_text()); settings["wwise_version"] = "2025.1"; config.write_text(json.dumps(settings))
+    raw = lambda argv: waapi_gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client)
+    source_root = tmp_path / "immutable-source"; source_root.mkdir()
+    source_file = source_root / "SampleProject.wproj"; source_file.write_text("immutable source")
+    proof = sandbox_fixture.hash_project(source_root)
+    metadata = sandbox_fixture.SandboxMetadata(str(source_file), str(source_root), str(tmp_path / "project"),
+        str(tmp_path / "project/SampleProject.wproj"), "2025.1", 0, proof, sandbox_fixture.hash_project(tmp_path / "project"),
+        source_file.stat().st_mtime, process_cleanup_result="cleaned", process_cleanup_details={"residual_processes": []})
+    metadata.get_info_version = {"year": 2025, "major": 1, "minor": 7, "build": 9143}
+    sandbox = sandbox_fixture.SandboxProject(source_file, source_root, tmp_path, tmp_path / "project", tmp_path / "project/SampleProject.wproj", metadata)
+    runtime = SimpleNamespace(version="2025.1", candidate=workflow.exact_git_candidate(workflow.REPO_ROOT), sandbox=sandbox,
+        state_dir=state, env=env, category_results=[], raw_gateway=raw,
+        lifecycle=SimpleNamespace(host="127.0.0.1", waapi_url="ws://127.0.0.1:31337/waapi"), port=31337)
+    lock = sandbox_fixture.LiveSandboxLock(tmp_path / "locks"); lock.__enter__()
+    node = "test_audio_import_localized_exact_tsv_independent_notes"
+    error = None
+    try: collector.collect_localized_tsv_import_acceptance(runtime)
+    except AssertionError as exc: error = exc
+    assert (error is None) == (fault is None), error
+    category, = runtime.category_results
+    body = Path(category["observation_path"]).read_bytes(); report = json.loads(body)
+    final = _finish((workflow, runtime, client, lock, proof), tmp_path, monkeypatch, [(node, error)])[-1]
+    assert final["categories"][0]["observation_sha256"] == hashlib.sha256(body).hexdigest()
+    assert final["invocation"]["outcome"] == ("PASS" if fault is None else "FAIL")
+    assert report["business_effect_verified"] is (fault is None)
+    assert report["transaction_budget"] == {"setup": 2, "witness": 1, "maximum_total": 3}
+    table_bytes = report["table"]["utf8"].encode("utf-8")
+    assert hashlib.sha256(table_bytes).hexdigest() == report["table"]["sha256"]
+    cells = [line.split("\t") for line in report["table"]["utf8"].splitlines()]
+    assert cells[1][2:4] == ["TSV requested object Notes", ""]
+    assert cells[2][2:4] == ["", "TSV requested source Notes"]
+    assert client.tab_count == 1
+    assert len(final["transactions"]) == 3
+    witness = report["witness"]
+    if fault == "indeterminate":
+        assert witness["execute"]["state"] == "indeterminate"
+        assert not report["observations"].get("after")
+        index = next(i for i, row in enumerate(report["calls"]) if row["argv"] == ["execute", witness["transaction_id"]])
+        assert index == len(report["calls"]) - 1
+    else:
+        assert {row["name"] for row in report["rows"]} == {"VoiceNotes", "VoiceSource"}
+        after = report["observations"]["after"]
+        assert report["table_after"]["sha256"] == report["table"]["sha256"]
+        if fault == "partial-post-read":
+            assert report["observation_errors"] and "owner" not in after["VoiceSource"]
+            assert after["VoiceSource"]["sources"]
+            assert after["VoiceNotes"]["owner"] and after["VoiceNotes"]["sources"]
+        else:
+            assert all("owner" in row and "sources" in row for row in after.values())
+        assert len(witness["actual_verifications"]) == 1 and witness["actual_verifications"][0]["readbacks"]
+        if fault == "notes-on-source":
+            actual = report["observations"]["after"]["VoiceNotes"]
+            assert actual["owner"]["notes"] == ""
+            assert next(item["object"]["notes"] for item in actual["sources"] if item["object"]["source_language"]["name"] == "English(US)") == "TSV requested object Notes"
+            assert witness["verify_exit_code"] == 2
