@@ -1426,11 +1426,10 @@ def build_external_sources_operation_plan(
         if "output" in raw:
             output_path = _require_text(raw["output"], field=f"sources[{index}].output")
         else:
-            # getProjectInfo owns the configured cache and filesystem platform
-            # spelling; never assume project/.cache or use the display name.
-            cache = _require_text(project_info["directories"].get("cache"), field="project_info.directories.cache")
-            platform_segment = _safe_artifact_segment(platform["baseName"], field=f"sources[{index}].platform.baseName")
-            output_path = str(Path(cache) / "ExternalSources" / platform_segment)
+            binding = _require_mapping(project_info.get("externalSourcesOutputPaths"),
+                field="project_info.externalSourcesOutputPaths").get(platform["id"])
+            binding = _require_mapping(binding, field="Project.ExternalSourcesOutputPath")
+            output_path = _require_text(binding.get("effective_path"), field="Project.ExternalSourcesOutputPath.effective_path")
         output_proof = prove_artifact_path(
             output_path,
             io_root=io_root,
@@ -1502,6 +1501,7 @@ def build_external_sources_operation_plan(
                 "index": index,
                 "platform": {key: platform[key] for key in ("id", "name", "baseName")},
                 "output_root": output_root,
+                **({"output_setting": dict(binding)} if "output" not in raw else {}),
                 "output_path_proof": output_proof,
                 "source_list": parsed,
                 "expected_outputs": expected_outputs,

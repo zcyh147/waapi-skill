@@ -1293,8 +1293,8 @@ def test_all_user_generation_supports_bound_bank_layout_overrides(tmp_path: Path
     (output / "English(US)" / "Dialogue.bnk").write_bytes(b"BKHD-Dialogue")
     assert verify_prepared_operation(prepared, execution_result={"result": {}}, read_call=Client().call).ok
 @pytest.mark.parametrize("version,fault", [(v, None) for v in ("2022.1", "2023.1", "2024.1", "2025.1")] +
-    [("2025.1", f) for f in ("outside-cache", "missing-cache", "unsafe-base", "cache-drift", "platform-drift", "source-drift", "missing-output", "extra-output")])
-def test_external_source_omitted_output_uses_live_custom_cache_and_base_platform(tmp_path, version, fault):
+    [("2025.1", f) for f in ("outside-setting", "empty-setting", "missing-setting", "wrong-project", "missing-field", "malformed-field", "live-setting-drift", "unsafe-setting", "setting-drift", "platform-drift", "source-drift", "missing-output", "extra-output", "explicit-output")])
+def test_external_source_omitted_output_binds_live_project_platform_setting(tmp_path, version, fault):
     from tests.unit.test_operation_registry_soundbank import _project as project_fixture
     io_root, project = project_fixture(tmp_path)
     project_root = Path(project["directories"]["root"])
@@ -1304,13 +1304,35 @@ def test_external_source_omitted_output_uses_live_custom_cache_and_base_platform
     source.write_bytes(b"RIFF" + b"0" * 64)
     source_list = project_root / "external.wsources"
     source_list.write_text('<ExternalSourcesList SchemaVersion="1"><Source Path="external.wav" /></ExternalSourcesList>', encoding="utf-8")
-    output = io_root / "custom-cache" / "ExternalSources" / "Mac" / "external.wem"
-    if fault == "outside-cache":
-        project["directories"]["cache"] = str(tmp_path / "unowned-cache")
-    elif fault == "missing-cache":
-        del project["directories"]["cache"]
-    elif fault == "unsafe-base":
-        project["platforms"][0]["baseName"] = "../escape"
+    import xml.etree.ElementTree as ET
+    document = ET.Element("WwiseDocument", {"Type": "Project", "SchemaVersion":
+        {"2022.1": "110", "2023.1": "119", "2024.1": "123", "2025.1": "133"}[version],
+        "WwiseVersion": f"v{version}.0", "WwiseBuild": "1"})
+    owning_project = ET.SubElement(ET.SubElement(document, "ProjectInfo"), "Project", {"Name": project["name"], "ID": project["id"]})
+    platforms = ET.SubElement(owning_project, "Platforms")
+    ET.SubElement(platforms, "Platform", {"Name": "StudioMac", "ReferencePlatform": "Mac", "ID": project["platforms"][0]["id"]})
+    properties = ET.SubElement(owning_project, "PropertyList")
+    setting = ET.SubElement(properties, "Property", {"Name": "ExternalSourcesOutputPath", "Type": "string"})
+    value = ET.SubElement(ET.SubElement(setting, "ValueList"), "Value", {"Platform": "StudioMac"})
+    value.text = "../external-output/StudioMac"
+    # The same token exists in shared/override class metadata. It is not the
+    # owning Project setting and must never supply this operation's output.
+    decoy = ET.SubElement(ET.SubElement(document, "SharedPropertyList"), "Property", {"Name": "ExternalSourcesOutputPath", "Type": "string"})
+    ET.SubElement(ET.SubElement(decoy, "ValueList"), "Value").text = "wrong-scope"
+    output = io_root / "external-output" / "StudioMac" / "external.wem"
+    if fault == "outside-setting":
+        value.text = "../../unowned-output"
+    elif fault == "empty-setting":
+        value.text = ""
+    elif fault == "missing-setting":
+        properties.remove(setting)
+    elif fault == "unsafe-setting":
+        value.text = "$(Unbound)/external"
+    project_file = Path(project["path"])
+    project_file.write_bytes(ET.tostring(document, encoding="utf-8", xml_declaration=True))
+    if fault in {"empty-setting", "missing-setting"}:
+        output = project_root / ".cache" / "ExternalSources" / "StudioMac" / "external.wem"
+    live_value = None
     calls = []
     class Client:
         def call(self, uri, args=None, options=None):
@@ -1321,8 +1343,19 @@ def test_external_source_omitted_output_uses_live_custom_cache_and_base_platform
                 return info
             if uri == "ak.wwise.core.getProjectInfo":
                 return project
+            if uri == "ak.wwise.core.object.get":
+                assert args == {"from": {"id": [project["id"]]}}
+                assert options == {"return": ["id", "@ExternalSourcesOutputPath"], "platform": project["platforms"][0]["id"]}
+                row = {"id": BANK_ID if fault == "wrong-project" else project["id"]}
+                if fault != "missing-field":
+                    actual = live_value if live_value is not None else (value.text or "") if fault != "missing-setting" else ""
+                    row["@ExternalSourcesOutputPath"] = 123 if fault == "malformed-field" else actual
+                return {"return": [row]}
             if uri == "ak.wwise.core.soundbank.convertExternalSources":
-                assert args == {"sources": [{"input": str(source_list), "platform": project["platforms"][0]["id"]}]}
+                expected_row = {"input": str(source_list), "platform": project["platforms"][0]["id"]}
+                if fault == "explicit-output":
+                    expected_row["output"] = str(output.parent)
+                assert args == {"sources": [expected_row]}
                 output.parent.mkdir(parents=True, exist_ok=True)
                 if fault != "missing-output":
                     output.write_bytes(b"WEM!" + b"1" * 32)
@@ -1338,11 +1371,12 @@ def test_external_source_omitted_output_uses_live_custom_cache_and_base_platform
     code, started = run("draft-start", "soundbank.convertExternalSources")
     assert code == 0, started
     draft, authority = started["draft"]["draft_id"], started["task_authority"]
+    explicit_output = [str(output.parent)] if fault == "explicit-output" else []
     code, declared = run("draft-declare-soundbank-plan", draft, "--task-authority", authority,
-        "--expected-revision", "1", "--source", str(source_list), "StudioMac", "--io-root", str(io_root))
+        "--expected-revision", "1", "--source", str(source_list), "StudioMac", *explicit_output, "--io-root", str(io_root))
     assert code == 0, declared
     code, checked = run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(declared["draft"]["revision"]))
-    if fault in {"outside-cache", "missing-cache", "unsafe-base"}:
+    if fault in {"outside-setting", "wrong-project", "missing-field", "malformed-field", "unsafe-setting"}:
         assert code == 2, checked
         assert not any(uri.endswith("convertExternalSources") for uri, _, _ in calls)
         return
@@ -1356,14 +1390,17 @@ def test_external_source_omitted_output_uses_live_custom_cache_and_base_platform
     assert code == 0, shown
     code, confirmed = run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
     assert code == 0, confirmed
-    if fault == "cache-drift":
-        project["directories"]["cache"] = str(io_root / "changed-cache")
+    if fault == "live-setting-drift":
+        live_value = "../different-live-output/StudioMac"
+    elif fault == "setting-drift":
+        value.text = "../different-output/StudioMac"
+        project_file.write_bytes(ET.tostring(document, encoding="utf-8", xml_declaration=True))
     elif fault == "platform-drift":
         project["platforms"][0]["baseName"] = "ChangedMac"
     elif fault == "source-drift":
         source.write_bytes(b"changed-source")
     code, executed = run("execute", tx)
-    if fault in {"cache-drift", "platform-drift", "source-drift"}:
+    if fault in {"setting-drift", "live-setting-drift", "platform-drift", "source-drift"}:
         assert code == 2 and executed["error_code"] == "ROLE_GUARD_MISMATCH", executed
         assert not any(uri.endswith("convertExternalSources") for uri, _, _ in calls)
         return

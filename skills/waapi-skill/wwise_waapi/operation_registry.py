@@ -16800,6 +16800,7 @@ def _prepare_closed_soundbank_operation(
             project_info=project_info,
             io_root=io_root,
             project_context_authority=project_authority,
+            read=read,
         )
         _resolve_external_source_conversions(plan, roles=roles, read=read)
     else:
@@ -17289,6 +17290,50 @@ def _normalize_generate_arguments(
     return result
 
 
+def _external_source_output_settings(project_info: Mapping[str, Any], arguments: Mapping[str, Any], *,
+        io_root: str, read: ReadCall) -> dict[str, Any]:
+    """Bind the Project's platform-specific live property, including omission."""
+    settings = {}
+    for raw in arguments["sources"]:
+        if "output" in raw:
+            continue
+        matches = [row for row in project_info["platforms"]
+            if any(row.get(alias) == raw["platform"] for alias in ("id", "name", "baseName"))]
+        if len(matches) != 1:
+            continue  # The planner retains its exact platform-uniqueness error.
+        platform = matches[0]
+        if platform["id"] in settings:
+            continue
+        rows = _read_object_id_rows(project_info["id"],
+            fields=["id", "@ExternalSourcesOutputPath"], platform=platform["id"], read=read)
+        if (len(rows) != 1 or not _same_identity(rows[0].get("id"), project_info["id"])
+                or not isinstance(rows[0].get("@ExternalSourcesOutputPath"), str)):
+            raise OperationContractError("INVALID_READBACK", "Project ExternalSourcesOutputPath requires one exact platform-specific string readback.")
+        value = rows[0]["@ExternalSourcesOutputPath"]
+        if value:
+            if any(token in value for token in ("$", "%")) or value.startswith("~"):
+                raise OperationContractError("INVALID_PROJECT_CONTEXT", "External Sources output requires a literal owned project path.")
+            effective = _localize_soundbank_project_directory(value,
+                field="Project.ExternalSourcesOutputPath", project_root=Path(project_info["directories"]["root"]),
+                io_root=Path(io_root))
+            source = "live_Project_ExternalSourcesOutputPath"
+        else:
+            # The Core conversion definition documents this literal fallback;
+            # it is independent of the configurable converted-media cache.
+            name = platform["name"]
+            try:
+                segment = parse_relative_host_path(name)
+            except HostPathError as exc:
+                raise OperationContractError("INVALID_PROJECT_CONTEXT", "Default External Sources output needs one safe platform name.") from exc
+            if len(segment.components) != 1 or name in {".", ".."}:
+                raise OperationContractError("INVALID_PROJECT_CONTEXT", "Default External Sources output needs one safe platform name.")
+            effective = Path(project_info["directories"]["root"]) / ".cache" / "ExternalSources" / name
+            source = "documented_Core_project_cache_default"
+        settings[platform["id"]] = {"raw_value": value, "effective_path": str(effective),
+            "platform_id": platform["id"], "source": source}
+    return {**project_info, "externalSourcesOutputPaths": settings}
+
+
 def _build_soundbank_plan(
     operation: str,
     arguments: Mapping[str, Any],
@@ -17297,6 +17342,7 @@ def _build_soundbank_plan(
     project_info: Mapping[str, Any],
     io_root: str,
     project_context_authority: str,
+    read: ReadCall | None = None,
 ) -> dict[str, Any]:
     try:
         if operation == "soundbank.generate":
@@ -17308,6 +17354,10 @@ def _build_soundbank_plan(
                 project_context_authority=project_context_authority,
             )
         if operation == "soundbank.convertExternalSources":
+            if any("output" not in row for row in arguments["sources"]):
+                if read is None:
+                    raise OperationContractError("INVALID_PREVIEW", "Omitted External Sources output requires its live Project property binding.")
+                project_info = _external_source_output_settings(project_info, arguments, io_root=io_root, read=read)
             return build_external_sources_operation_plan(
                 arguments,
                 version=version,
@@ -19744,6 +19794,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 project_info=project_info,
                 io_root=io_root,
                 project_context_authority=fresh_authority,
+                read=soundbank_read,
             )
         except OperationContractError as exc:
             assertions.append(

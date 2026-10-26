@@ -78,6 +78,10 @@ def _exercise_core_file_collector(tmp_path, monkeypatch, missing_artifact, *, ex
             if uri == 'ak.wwise.core.getProjectInfo': return deepcopy(project)
             if uri == 'ak.wwise.core.object.get':
                 ids = args.get('from', {}).get('id', [])
+                if ids == [project['id']] and options.get('return') == ['id', '@ExternalSourcesOutputPath']:
+                    assert options['platform'] == platform['id']
+                    setting = ET.parse(project['path']).find("./ProjectInfo/Project/PropertyList/Property[@Name='ExternalSourcesOutputPath']/ValueList/Value[@Platform='Windows']")
+                    return {'return': [{'id': project['id'], '@ExternalSourcesOutputPath': setting.text or ''}]}
                 if ids == [event_row['id']] or event_row['id'].casefold() in json.dumps(args).casefold(): return {'return': [deepcopy(event_row)]}
                 for row in (sound_row, source_row):
                     if row['id'].casefold() in json.dumps(args).casefold(): return {'return': [deepcopy(row)]}
@@ -96,7 +100,7 @@ def _exercise_core_file_collector(tmp_path, monkeypatch, missing_artifact, *, ex
             if uri == 'ak.wwise.core.soundbank.convertExternalSources':
                 self.writes.append((uri, deepcopy(args)))
                 assert 'output' not in args['sources'][0]
-                output = Path(project['directories']['cache']) / 'ExternalSources/Windows/CoreWitness/external.wem'
+                output = prelaunch_io / 'external/Windows/CoreWitness/external.wem'
                 if external_only and missing_artifact:
                     output = io_root / 'alternate-owned-output' / 'external.wem'
                 output.parent.mkdir(parents=True, exist_ok=True); output.write_bytes(b'RIFF-native-wem')
