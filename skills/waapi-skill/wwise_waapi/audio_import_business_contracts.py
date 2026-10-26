@@ -25,6 +25,7 @@ AUDIO_IMPORT_BUSINESS_VALUE_TYPES = {
     "media_file": "string",
     "originals_subfolder": "string",
     "source_name": "string",
+    "switch_group": "reference",
     "switch_value": "string",
 }
 AUDIO_IMPORT_BUSINESS_DECLARATION_FIELDS = (
@@ -141,7 +142,7 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
                 for name, value_type in AUDIO_IMPORT_BUSINESS_VALUE_TYPES.items()
                 if value_type != "reference"
             ),
-            "bound_object_handle_fields": ["output_bus"],
+            "bound_object_handle_fields": ["output_bus", "switch_group"],
             "bound_field_handle_container": "field_values",
             "dedicated_declaration_parameters": {
                 "switch_value": "--switch-value",
@@ -153,11 +154,14 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
             ),
             "dialogue_event_rule": "new_DialogueEvent_from_bound_parent_and_exact_name; Gateway_owns_path_syntax; verify_Event_creation_only; association_requires_an_explicit_decision_path; explicit_ordered_group_value_or_wildcard_conditions_with_path_only_Probability_Weight_0_to_100; verify_association_and_supplied_numeric_values; decision_path_sequence_not_read_back",
             "switch_value_rule": (
-                "exact_value_name_below_the_existing_parent_SwitchContainers_actual_group; "
+                "optional_exact_value_name_below_switch_group_bound_handle_or_existing_parent_SwitchContainers_actual_group; "
+                "group_only_on_a_SwitchContainer_associates_that_exact_existing_group; "
+                "planned_direct_container_inherits_its_earlier_declarations_bound_group; "
                 "Gateway_binds_group_and_value_and_owns_native_directive; "
                 "verify_owner_assignment_and_preserve_unrelated_pairs_and_group; "
                 "no_caller_directive_grammar"
             ),
+            "switch_group_rule": "copy_one_bound_SwitchGroup_or_StateGroup_handle; omit_switch_value_for_group_only; preserve_existing_pairs_unless_the_exact_existing_container_is_explicitly_replaced",
             "language_rule": (
                 "derive_SFX_from_sound-sfx_else_copy_exact_project_language"
             ),

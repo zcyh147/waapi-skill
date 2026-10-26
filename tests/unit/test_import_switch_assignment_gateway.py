@@ -439,6 +439,164 @@ def test_localized_media_cannot_hide_ignored_switch_assignment(tmp_path):
                for row in verified['verification']['assertions'])
 
 
+class ExplicitGroupImportClient(SwitchImportClient):
+    CONTAINER = '{99999999-1111-1111-1111-111111111111}'
+    WORK_UNIT = '{99999999-2222-2222-2222-222222222222}'
+    REPLACED_PARENT = '{99999999-3333-3333-3333-333333333333}'
+    NEW_GROUP = '{99999999-4444-4444-4444-444444444444}'
+
+    def __init__(self, tmp_path, version):
+        super().__init__(tmp_path, version=version)
+        self.container_created = False
+        self.container = {'id': self.CONTAINER, 'name': 'Cases', 'type': 'SwitchContainer', 'classId': 1,
+            'path': self.parent['path'] + r'\Cases', 'parent': {'id': PARENT_ID},
+            'SwitchGroupOrStateGroup': {'id': self.GROUP}}
+        self.work_unit = {'id': self.WORK_UNIT, 'name': 'Default Work Unit', 'type': 'WorkUnit',
+            'path': self.parent['path'].rpartition('\\')[0]}
+        self.new_pairs = []
+        self.group_types = ['SwitchGroup', 'StateGroup']
+
+    def call(self, uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri == 'ak.wwise.core.object.getPropertyInfo' and args['property'] == 'SwitchGroupOrStateGroup':
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'name': 'SwitchGroupOrStateGroup', 'type': 'Reference',
+                    'restriction': {'type': 'reference', 'restrictions': [{'type': list(self.group_types)}]}}
+        if uri == 'ak.wwise.core.switchContainer.getAssignments' and args['id'] == self.CONTAINER:
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert self.container_created
+            return {'return': deepcopy(self.new_pairs)}
+        if uri == 'ak.wwise.core.object.get':
+            identity = args.get('from', {})
+            if identity.get('id') == [PARENT_ID] and self.parent['id'] != PARENT_ID:
+                self.calls.append((uri, deepcopy(args), deepcopy(options)))
+                return {'return': []}
+            extra = [self.work_unit, *([self.container] if self.container_created else [])]
+            selected = [row for row in extra if row['id'] in identity.get('id', []) or row['path'] in identity.get('path', [])]
+            if selected:
+                result = super().call(uri, args, options)
+                result['return'].extend({key: deepcopy(row[key]) for key in options['return'] if key in row} for row in selected)
+                return result
+        if uri == 'ak.wwise.core.audio.import':
+            rows = args['imports']
+            if len(rows) == 1 and rows[0]['objectPath'] == self.parent['path'] + r'\<Random Container>SnowSounds':
+                return super().call(uri, args, options)
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert rows[0]['switchAssignation'] == '<Switch Group:Surface>'
+            if rows[0]['objectPath'] == self.parent['path']:
+                assert len(rows) == 1
+                self.parent['SwitchGroupOrStateGroup'] = {'id': self.group['id']}
+                if args['importOperation'] == 'replaceExisting':
+                    self.parent['id'] = self.REPLACED_PARENT
+                    self.assignments = []
+                returned = [self.parent]
+            else:
+                assert rows[0]['objectPath'] == self.parent['path'] + r'\<Switch Container>Cases'
+                assert rows[1]['objectPath'] == rows[0]['objectPath'] + r'\<Random Container>SnowSounds'
+                assert rows[1]['switchAssignation'] == '<Switch Group:Surface>Snow'
+                self.container_created = self.created = True
+                self.child.update(path=self.container['path'] + r'\SnowSounds', parent={'id': self.CONTAINER})
+                self.new_pairs = [{'child': self.CHILD, 'stateOrSwitch': self.VALUE}]
+                returned = [self.container, self.child]
+            return {'objects': deepcopy(returned), **({'log': [], 'files': []}
+                if self.version in {'2023.1', '2024.1', '2025.1'} else {})}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'))
+def test_ordinary_bound_group_only_associates_empty_existing_switch_container(tmp_path, version):
+    client = ExplicitGroupImportClient(tmp_path, version)
+    client.parent['SwitchGroupOrStateGroup'] = None; client.assignments = []
+    command, parent, _ = _import_fields_draft(tmp_path, version, client)
+    group = command('draft-bind-object', '--object-id', client.GROUP)['bound_object']['handle']
+    command('draft-declare-existing', '--declaration-id', 'group', '--object-handle', parent,
+            '--field', 'switch_group', group)
+    command('draft-check'); tx = command('preview-from-draft')['transaction_id']
+    shown = command('transaction-show', tx)
+    command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    command('execute', tx); verified = command('verify', tx)
+    assert verified['verified'] is True, verified
+    assert client.parent['SwitchGroupOrStateGroup'] == {'id': client.GROUP} and client.assignments == []
+    assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.core.audio.import']) == 1
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'))
+def test_ordinary_new_container_group_and_direct_child_share_one_import(tmp_path, version):
+    client = ExplicitGroupImportClient(tmp_path, version)
+    command, parent, _ = _import_fields_draft(tmp_path, version, client)
+    group = command('draft-bind-object', '--object-id', client.GROUP)['bound_object']['handle']
+    command('draft-declare-import-batch', '--row-order', 'cases', 'snow',
+            '--new-row', 'cases', parent, 'Cases', 'switch-container', '--field', 'cases', 'switch_group', group,
+            '--new-row', 'snow', 'cases', 'SnowSounds', 'random-container', '--switch-value', 'snow', 'Snow')
+    command('draft-check'); tx = command('preview-from-draft')['transaction_id']
+    shown = command('transaction-show', tx)
+    command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    command('execute', tx); verified = command('verify', tx)
+    assert verified['verified'] is True, verified
+    assert client.new_pairs == [{'child': client.CHILD, 'stateOrSwitch': client.VALUE}]
+    assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.core.audio.import']) == 1
+    assert not any(uri.endswith(('.setReference', '.addAssignment')) for uri, _, _ in client.calls)
+
+
+def test_ordinary_explicit_group_value_reuses_exact_group_without_discarding_pairs(tmp_path):
+    client = ExplicitGroupImportClient(tmp_path, '2025.1')
+    command, parent, _ = _import_fields_draft(tmp_path, '2025.1', client)
+    group = command('draft-bind-object', '--object-id', client.GROUP)['bound_object']['handle']
+    command('draft-declare-new', '--declaration-id', 'snow', '--parent-handle', parent,
+            '--name', 'SnowSounds', '--kind', 'random-container', '--field', 'switch_group', group, '--switch-value', 'Snow')
+    before = deepcopy(client.assignments)
+    command('draft-check'); tx = command('preview-from-draft')['transaction_id']
+    shown = command('transaction-show', tx)
+    command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    command('execute', tx); verified = command('verify', tx)
+    assert verified['verified'] is True, verified
+    assert client.assignments == [*before, {'child': client.CHILD, 'stateOrSwitch': client.VALUE}]
+
+
+@pytest.mark.parametrize('fault', ('wrong-handle-type', 'metadata-drift', 'occupied-group'))
+def test_ordinary_group_input_keeps_exact_type_metadata_and_occupied_pair_guards(tmp_path, fault):
+    client = ExplicitGroupImportClient(tmp_path, '2025.1')
+    command, parent, _ = _import_fields_draft(tmp_path, '2025.1', client)
+    if fault == 'occupied-group':
+        client.group['id'] = client.NEW_GROUP
+    group = (parent if fault == 'wrong-handle-type' else
+             command('draft-bind-object', '--object-id', client.group['id'])['bound_object']['handle'])
+    command('draft-declare-existing', '--declaration-id', 'group', '--object-handle', parent,
+            '--field', 'switch_group', group)
+    if fault == 'wrong-handle-type':
+        command('draft-check', expected_error='OPERATION_DRAFT_ACTION_INVALID')
+    elif fault == 'occupied-group':
+        command('draft-check', expected_error='IMPORT_SWITCH_GROUP_CHANGE_WITH_ASSIGNMENTS_UNSUPPORTED')
+    elif fault == 'metadata-drift':
+        command('draft-check'); tx = command('preview-from-draft')['transaction_id']
+        shown = command('transaction-show', tx)
+        command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        client.group_types = ['StateGroup']
+        command('execute', tx, expected_error='ROLE_GUARD_MISMATCH')
+    assert not any(uri == 'ak.wwise.core.audio.import' for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'))
+def test_explicit_whole_container_replacement_can_bind_a_different_group(tmp_path, version):
+    client = ExplicitGroupImportClient(tmp_path, version)
+    client.group['id'] = client.NEW_GROUP
+    command, parent, _ = _import_fields_draft(tmp_path, version, client)
+    group = command('draft-bind-object', '--object-id', client.group['id'])['bound_object']['handle']
+    command('draft-business-configure', '--mode', 'replace')
+    command('draft-declare-existing', '--declaration-id', 'replace', '--object-handle', parent,
+            '--field', 'switch_group', group)
+    command('draft-check'); tx = command('preview-from-draft')['transaction_id']
+    shown = command('transaction-show', tx)
+    command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    command('execute', tx)
+    code, verified = waapi_gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'), 'verify', tx],
+        env=set_gateway_config(_env(tmp_path), wwise_version=version), client_factory=lambda _url: client)
+    assert code == 0 and verified['verified'] is True, [row for row in verified['verification']['assertions'] if not row['passed']]
+    assert client.parent['id'] == client.REPLACED_PARENT and client.assignments == []
+    assert client.parent['SwitchGroupOrStateGroup'] == {'id': client.group['id']}
+    assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.core.audio.import']) == 1
+
+
 class SwitchDirectiveFormsClient(ExistingSfxSwitchImportClient):
     def __init__(self, tmp_path, form):
         super().__init__(tmp_path)

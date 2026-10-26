@@ -5,7 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 import pytest
 
-from tests.unit.test_import_switch_assignment_gateway import SwitchImportClient, WAV_BYTES
+from tests.unit.test_import_switch_assignment_gateway import SwitchImportClient, LocalizedSwitchImportClient, WAV_BYTES
 from tests.unit.test_audio_import_business_gateway import PARENT_ID, waapi_gateway, _env
 from tests.support.gateway_config import set_gateway_config
 from tests.unit.test_transaction_gateway import z_wire_path
@@ -52,7 +52,7 @@ class TabSwitchClient(SwitchImportClient):
         return super().call(uri, args, options)
 
 
-def _draft(tmp_path, version='2025.1', *, client=None):
+def _draft(tmp_path, version='2025.1', *, client=None, language='SFX'):
     client = client or TabSwitchClient(tmp_path, version)
     media = tmp_path / 'Snow.wav'; media.write_bytes(WAV_BYTES)
     table = tmp_path / 'switch.tsv'
@@ -74,7 +74,7 @@ def _draft(tmp_path, version='2025.1', *, client=None):
         return result
     bound = command('draft-bind-object', '--role', 'import_location', '--object-id', PARENT_ID)
     command('draft-declare-artifact-plan', '--table-file', str(table), '--location-handle',
-            bound['bound_object']['handle'], '--language', 'SFX', '--mode', 'reimport')
+            bound['bound_object']['handle'], '--language', language, '--mode', 'reimport')
     return command, run, client, table
 
 
@@ -389,3 +389,94 @@ def test_planned_container_is_read_back_even_when_import_result_omits_ancestor(t
     code, verified = run('verify', tx)
     assert code == 0 and verified['verified'] is True, verified
     assert client.planned_pairs == [{'child': client.CHILD, 'stateOrSwitch': client.VALUE}]
+
+
+class LocalizedTableSwitchClient(LocalizedSwitchImportClient):
+    def __init__(self, tmp_path, version):
+        super().__init__(tmp_path, version)
+        self.change_other_media = False
+
+    def call(self, uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri == 'ak.wwise.core.getInfo':
+            result = super().call(uri, args, options)
+            if self.version == '2025.1':
+                result['version'].update(minor=7, build=9143, displayName='v2025.1.7.9143')
+            return result
+        if uri == 'ak.wwise.core.audio.importTabDelimited':
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args['importOperation'] == 'useExisting' and args['importLanguage'] == 'English(US)'
+            with Path(args['importFile']).open(encoding='utf-8', newline='') as stream:
+                rows = list(csv.reader(stream, delimiter='\t'))
+            assert rows[1][0] == '<Sound Voice>Voice' and rows[1][2] == '<Switch Group:Surface>Snow'
+            self.copied.write_bytes(Path(localize_waapi_host_path(rows[1][1])).read_bytes())
+            if self.assignment_effect:
+                self.assignments.append({'child': self.OWNER, 'stateOrSwitch': self.VALUE})
+            if self.change_other_media:
+                self.other_file.write_bytes(b'wrong unrelated media')
+            return {'objects': deepcopy([self.owner, self.sources[0]])}
+        return super().call(uri, args, options)
+
+
+def _localized_table_switch_draft(tmp_path, version='2025.1'):
+    client = LocalizedTableSwitchClient(tmp_path, version)
+    command, run, client, table = _draft(tmp_path, version, client=client, language='English(US)')
+    media = tmp_path / 'Line.wav'; media.write_bytes(WAV_BYTES)
+    table.write_text('Object Path\tAudio File\tSwitch Assignation\n<Sound Voice>Voice\t'
+                     + z_wire_path(media) + '\t<Switch Group:Surface>Snow\n', encoding='utf-8')
+    return command, run, client, table
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'))
+def test_localized_table_switch_media_binds_selected_source_and_preserves_other_language(tmp_path, version):
+    command, run, client, table = _localized_table_switch_draft(tmp_path, version)
+    original = table.read_bytes(); before_sources = deepcopy(client.sources); before_pairs = deepcopy(client.assignments)
+    other_media = client.other_file.read_bytes()
+    command('draft-check'); tx = command('preview-from-draft')['transaction_id']
+    code, shown = run('transaction-show', tx); assert code == 0, shown
+    target = shown['artifact']['prepared_operation']['verification_plan']['targets'][0]
+    assert target['localized_audio_file_source_id'] == client.SOURCE
+    assert target['localized_source_snapshot']['preserve_media_version'] == version
+    assert shown['artifact']['prepared_operation']['dispatch']['args']['importFile'] == str(table.resolve())
+    assert run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, executed = run('execute', tx); assert code == 0, executed
+    code, verified = run('verify', tx); assert code == 0 and verified['verified'] is True, verified
+    assert client.sources == before_sources and client.other_file.read_bytes() == other_media
+    assert client.copied.read_bytes() == WAV_BYTES and table.read_bytes() == original
+    assert client.assignments == [*before_pairs, {'child': client.OWNER, 'stateOrSwitch': client.VALUE}]
+    assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.core.audio.importTabDelimited']) == 1
+    assert not any(uri.endswith(('.setReference', '.addAssignment')) for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize('fault', ('missing-assignment', 'other-media'))
+def test_localized_table_switch_media_success_cannot_hide_missing_effect_or_unrelated_changes(tmp_path, fault):
+    command, run, client, _ = _localized_table_switch_draft(tmp_path)
+    client.assignment_effect = fault != 'missing-assignment'; client.change_other_media = fault == 'other-media'
+    command('draft-check'); tx = command('preview-from-draft')['transaction_id']
+    code, shown = run('transaction-show', tx); assert code == 0, shown
+    assert run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    assert run('execute', tx)[0] == 0
+    code, verified = run('verify', tx)
+    assert code == 2 and verified['verified'] is False, verified
+    assert client.copied.read_bytes() == WAV_BYTES
+
+
+def test_localized_table_switch_revalidates_other_language_file_before_import(tmp_path):
+    command, run, client, _ = _localized_table_switch_draft(tmp_path)
+    command('draft-check'); tx = command('preview-from-draft')['transaction_id']
+    code, shown = run('transaction-show', tx); assert code == 0, shown
+    assert run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    client.other_file.write_bytes(b'changed since Preview')
+    code, result = run('execute', tx)
+    assert code == 2 and result['executed'] is False and result['status'] == 'repreview_required', result
+    assert not any(uri == 'ak.wwise.core.audio.importTabDelimited' for uri, _, _ in client.calls)
+
+
+def test_localized_table_switch_does_not_unblock_observed_owner_fields_media_shape(tmp_path):
+    command, _, client, table = _localized_table_switch_draft(tmp_path)
+    rows = table.read_text().splitlines()
+    table.write_text(rows[0] + '\t@Volume\n' + rows[1] + '\t-6\n', encoding='utf-8')
+    original = table.read_bytes(); before = deepcopy(client.sources)
+    command('draft-check', expected_error='TSV_COMBINED_SOURCE_IDENTITY_UNSAFE_ON_HOST')
+    assert table.read_bytes() == original and client.sources == before
+    assert not any(uri == 'ak.wwise.core.audio.importTabDelimited' for uri, _, _ in client.calls)

@@ -521,6 +521,13 @@ def _compile_declaration(
                     session, business_name, "string" if allows_empty else "non-empty string"
                 )
             row[native_name] = value
+    if "switch_group" in fields:
+        group = _resolve_object(session, fields["switch_group"])
+        if _type_token(group.object_type) not in {"switchgroup", "stategroup"}:
+            raise _repair(session, "REFERENCE_TARGET_TYPE_MISMATCH", field="switch_group",
+                allowed_target_types=("SwitchGroup", "StateGroup"), action="choose one exact bound Switch or State group")
+        row["switch_assignment"] = {"group": {"kind": "id", "value": group.object_id},
+            **({"value": fields["switch_value"]} if "switch_value" in fields else {})}
     if "originals_subfolder" in fields:
         try:
             row["originals_subfolder"] = normalize_originals_subfolder(

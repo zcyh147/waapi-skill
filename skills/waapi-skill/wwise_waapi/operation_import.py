@@ -560,11 +560,17 @@ def build_audio_import_plan(
             dispatch["dialogueEvent"] = dialogue_event["path"]
             oracle_row["requested_dialogue_event"] = dialogue_event
         if "switch_assignment" in effective:
-            switch_assignment = _require_native_import_directive(
-                effective.get("switch_assignment"),
-                field=f"imports[{index}].switch_assignment",
-            )
-            dispatch["switchAssignation"] = switch_assignment
+            switch_assignment = effective["switch_assignment"]
+            if isinstance(switch_assignment, Mapping):
+                if (set(switch_assignment) - {"group", "value"} or "group" not in switch_assignment
+                        or not isinstance(switch_assignment["group"], Mapping)
+                        or "value" in switch_assignment and not isinstance(switch_assignment["value"], str)):
+                    raise ImportContractError("INVALID_ARGUMENT", "Switch assignment requires one closed group identity and an optional exact value name.")
+                switch_assignment = dict(switch_assignment)
+                dispatch["switchAssignation"] = switch_assignment.get("value", "")
+            else:
+                switch_assignment = _require_native_import_directive(switch_assignment, field=f"imports[{index}].switch_assignment")
+                dispatch["switchAssignation"] = switch_assignment
             oracle_row["requested_switch_assignment"] = switch_assignment
 
         properties = _normalize_named_value_rows(
