@@ -1,10 +1,10 @@
-"""First closed import-driven Switch assignment, through the public Gateway."""
+"""Closed import-driven Switch assignment, through the public Gateway."""
 import json
 import pytest
 from copy import deepcopy
 from pathlib import Path
 
-from tests.unit.test_audio_import_business_gateway import ImportFieldsClient, _import_fields_draft, PARENT_ID, waapi_gateway, _env
+from tests.unit.test_audio_import_business_gateway import ImportFieldsClient, LocalizedOwnerFieldsClient, _import_fields_draft, PARENT_ID, waapi_gateway, _env
 from tests.support.gateway_config import set_gateway_config
 from tests.support.riff_wave import _tone_wav_bytes
 
@@ -23,7 +23,7 @@ class SwitchImportClient(ImportFieldsClient):
         self.expected_directive = "<Switch Group:Surface>Snow"
         self.effect = effect
         self.media = media
-        self.parent.update(type='SwitchContainer', **{'SwitchGroupOrStateGroup': {'id': self.GROUP}})
+        self.parent.update(type='SwitchContainer', classId=1, **{'SwitchGroupOrStateGroup': {'id': self.GROUP}})
         self.group = {'id': self.GROUP, 'name': 'Surface', 'type': 'SwitchGroup',
                       'path': r'\Switches\Default Work Unit\Surface'}
         self.value = {'id': self.VALUE, 'name': 'Snow', 'type': 'Switch',
@@ -277,6 +277,166 @@ def test_existing_import_adds_value_without_discarding_another_assignment(tmp_pa
     assert result['verified'] is True, result
     assert client.assignments == [*before, {'child': client.CHILD, 'stateOrSwitch': client.VALUE}]
     assert Path(client.source['originalFilePath']).read_bytes() == WAV_BYTES
+
+
+class ReplacingSwitchImportClient(SwitchImportClient):
+    REPLACEMENT = '{99999999-9999-9999-9999-999999999999}'
+
+    def __init__(self, tmp_path, version):
+        super().__init__(tmp_path, version=version)
+        self.created = True
+        self.child['@RandomOrSequence'] = 0
+        self.assignments.extend([{'child': self.CHILD, 'stateOrSwitch': self.VALUE},
+                                 {'child': self.CHILD, 'stateOrSwitch': self.OTHER_VALUE}])
+        self.leave_old_pair = False
+
+    def call(self, uri, args=None, options=None):
+        if uri == 'ak.wwise.core.audio.import':
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args['importOperation'] == 'replaceExisting'
+            assert args['imports'] == [{'objectPath': self.child['path'],
+                'objectType': 'RandomSequenceContainer', 'switchAssignation': self.expected_directive}]
+            if not self.leave_old_pair:
+                self.assignments = [pair for pair in self.assignments if pair['child'] != self.CHILD]
+            self.child['id'] = self.REPLACEMENT
+            self.assignments.append({'child': self.REPLACEMENT, 'stateOrSwitch': self.VALUE})
+            return {'objects': deepcopy([self.child]), **({'log': [], 'files': []}
+                if self.version in {'2023.1', '2024.1', '2025.1'} else {})}
+        return super().call(uri, args, options)
+
+
+def _replace_draft(tmp_path, version):
+    client = ReplacingSwitchImportClient(tmp_path, version)
+    command, _, _ = _import_fields_draft(tmp_path, version, client)
+    bound = command('draft-bind-object', '--object-id', client.CHILD)
+    command('draft-business-configure', '--mode', 'replace')
+    command('draft-declare-existing', '--declaration-id', 'snow',
+            '--object-handle', bound['bound_object']['handle'], '--switch-value', 'Snow')
+    return command, client
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'))
+def test_switch_replacement_rebinds_new_owner_and_removes_only_old_owner_pairs(tmp_path, version):
+    command, client = _replace_draft(tmp_path, version)
+    command('draft-check')
+    tx = command('preview-from-draft')['transaction_id']
+    shown = command('transaction-show', tx)
+    command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    command('execute', tx)
+    verified = command('verify', tx)
+    assert verified['verified'] is True, verified
+    assert client.assignments == [{'child': client.OTHER, 'stateOrSwitch': client.OTHER_VALUE},
+                                  {'child': client.REPLACEMENT, 'stateOrSwitch': client.VALUE}]
+    assert len([u for u, _, _ in client.calls if u == 'ak.wwise.core.audio.import']) == 1
+
+
+def test_switch_replacement_cannot_hide_stale_old_owner_assignment(tmp_path):
+    command, client = _replace_draft(tmp_path, '2025.1')
+    client.leave_old_pair = True
+    command('draft-check')
+    tx = command('preview-from-draft')['transaction_id']
+    shown = command('transaction-show', tx)
+    command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    command('execute', tx)
+    code, verified = waapi_gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'), 'verify', tx],
+        env=set_gateway_config(_env(tmp_path), wwise_version='2025.1'), client_factory=lambda _url: client)
+    assert code == 2 and verified['verified'] is False, verified
+    assert any(not row['passed'] and 'Switch assignment effect' in row['name']
+               for row in verified['verification']['assertions'])
+
+
+class LocalizedSwitchImportClient(LocalizedOwnerFieldsClient):
+    GROUP = SwitchImportClient.GROUP
+    VALUE = SwitchImportClient.VALUE
+
+    def __init__(self, tmp_path, version):
+        super().__init__(tmp_path, version)
+        self.parent.update(type='SwitchContainer', classId=1, SwitchGroupOrStateGroup={'id': self.GROUP})
+        self.group = {'id': self.GROUP, 'name': 'Surface', 'type': 'SwitchGroup',
+                      'path': r'\Switches\Default Work Unit\Surface'}
+        self.value = {'id': self.VALUE, 'name': 'Snow', 'type': 'Switch',
+                      'path': self.group['path'] + r'\Snow', 'parent': {'id': self.GROUP}}
+        self.assignments = [{'child': '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}', 'stateOrSwitch': self.VALUE}]
+        self.assignment_effect = True
+
+    def call(self, uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri == 'ak.wwise.core.switchContainer.getAssignments':
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': deepcopy(self.assignments)}
+        if uri == 'ak.wwise.core.audio.import':
+            owner, source = args['imports']
+            assert owner['switchAssignation'] == '<Switch Group:Surface>Snow'
+            assert 'audioFile' not in owner and 'switchAssignation' not in source
+            assert source['importLanguage'] == 'English(US)'
+            result = super().call(uri, args, options)
+            if self.assignment_effect:
+                self.assignments.append({'child': self.OWNER, 'stateOrSwitch': self.VALUE})
+            return result
+        if uri == 'ak.wwise.core.object.get':
+            source = args.get('from', {})
+            rows = [r for r in (self.group, self.value)
+                    if r['id'] in source.get('id', []) or r['path'] in source.get('path', [])]
+            scoped_value = self.GROUP in args.get('waql', '') and 'Snow' in args['waql']
+            if scoped_value:
+                rows = [self.value]
+            if rows:
+                result = {'return': []} if scoped_value else super().call(uri, args, options)
+                self.calls.append((uri, deepcopy(args), deepcopy(options)))
+                result['return'].extend({k: deepcopy(r[k]) for k in options['return'] if k in r} for r in rows)
+                return result
+        return super().call(uri, args, options)
+
+
+def _localized_switch_draft(tmp_path, version):
+    client = LocalizedSwitchImportClient(tmp_path, version)
+    command, _, _ = _import_fields_draft(tmp_path, version, client)
+    media = tmp_path / 'Line.wav'; media.write_bytes(WAV_BYTES)
+    bound = command('draft-bind-object', '--object-id', client.OWNER)
+    command('draft-declare-existing', '--declaration-id', 'voice', '--object-handle', bound['bound_object']['handle'],
+            '--field', 'media_file', str(media), '--field', 'language', 'English(US)', '--switch-value', 'Snow')
+    return command, client
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'))
+def test_localized_switch_reimport_assigns_owner_and_preserves_other_language_source(tmp_path, version):
+    command, client = _localized_switch_draft(tmp_path, version)
+    before_sources, before_owner = deepcopy(client.sources), deepcopy(client.owner)
+    other_bytes = client.other_file.read_bytes()
+    before_pairs = deepcopy(client.assignments)
+    command('draft-check')
+    tx = command('preview-from-draft')['transaction_id']
+    shown = command('transaction-show', tx)
+    owner, source = shown['artifact']['prepared_operation']['dispatch']['args']['imports']
+    if version == '2025.1':
+        assert owner['objectPath'] == client.owner['path']
+    else:
+        assert owner['objectPath'].endswith(r'\<Sound Voice>Voice')
+    assert owner['switchAssignation'] == '<Switch Group:Surface>Snow'
+    assert 'switchAssignation' not in source
+    command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    command('execute', tx)
+    verified = command('verify', tx)
+    assert verified['verified'] is True, verified
+    assert client.assignments == [*before_pairs, {'child': client.OWNER, 'stateOrSwitch': client.VALUE}]
+    assert client.sources == before_sources and client.owner == before_owner
+    assert client.copied.read_bytes() == WAV_BYTES and client.other_file.read_bytes() == other_bytes
+    assert len([u for u, _, _ in client.calls if u == 'ak.wwise.core.audio.import']) == 1
+
+
+def test_localized_media_cannot_hide_ignored_switch_assignment(tmp_path):
+    command, client = _localized_switch_draft(tmp_path, '2025.1')
+    client.assignment_effect = False
+    command('draft-check'); tx = command('preview-from-draft')['transaction_id']
+    shown = command('transaction-show', tx)
+    command('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    command('execute', tx)
+    code, verified = waapi_gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'), 'verify', tx],
+        env=set_gateway_config(_env(tmp_path), wwise_version='2025.1'), client_factory=lambda _url: client)
+    assert code == 2 and verified['verified'] is False, verified
+    assert client.copied.read_bytes() == WAV_BYTES
+    assert any(not row['passed'] and 'Switch assignment effect' in row['name']
+               for row in verified['verification']['assertions'])
 
 
 class SwitchDirectiveFormsClient(ExistingSfxSwitchImportClient):
