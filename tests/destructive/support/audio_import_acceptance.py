@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from typing import Mapping
 import uuid
 
 from wwise_waapi.host_paths import localize_waapi_host_path
@@ -12,7 +13,7 @@ from wwise_waapi.host_paths import localize_waapi_host_path
 def _collect(runtime, *, localized):
     from tests.destructive.test_gateway_workflow_transaction_matrix import (
         _start_business_draft, _update_business_draft, _bind_business_object,
-        _complete_business_draft, _write_fixture_wav, _save_sandbox_project,
+        _complete_business_draft, _write_fixture_wav, _save_sandbox_project, waapi_gateway,
     )
     if localized:
         assert runtime.version == "2025.1", "The source-GUID localized witness is pinned to 2025.1"
@@ -37,7 +38,7 @@ def _collect(runtime, *, localized):
         category["observation_sha256"] = hashlib.sha256(data).hexdigest()
 
     class Gateway:
-        def gateway(self, argv, *, live):
+        def raw_gateway(self, argv):
             assert len(receipt["calls"]) < receipt["limits"]["calls"]
             if argv[0] == "execute":
                 assert argv[1] not in attempted, "Import execution is never retried"
@@ -47,13 +48,17 @@ def _collect(runtime, *, localized):
                 code, payload = runtime.raw_gateway(argv)
                 row.update(exit_code=code, payload=payload)
                 assert len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) <= receipt["limits"]["reply_bytes"]
-                assert code == 0 and payload.get("ok") is True, payload
-                if live:
-                    assert payload["detected_version"] == runtime.version
-                    assert payload["endpoint"] == {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}
-                return payload
+                return code, payload
             finally:
                 persist()
+
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get("ok") is True, payload
+            if live:
+                assert payload["detected_version"] == runtime.version
+                assert payload["endpoint"] == {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}
+            return payload
     gateway = Gateway()
     root = "Containers" if runtime.version == "2025.1" else "Actor-Mixer Hierarchy"
 
@@ -68,6 +73,33 @@ def _collect(runtime, *, localized):
         rows = query(["--exact-id", identity], includes=includes, maximum=2)
         assert len(rows) == 1, rows
         return rows[0]
+
+    def destroyed_old_id_rows(identity):
+        # Reuse the owned-ControlInput collector's exact public failure binding;
+        # no other query or failure in these witnesses receives normalization.
+        code, payload = gateway.raw_gateway(["query-object", "--exact-id", identity, "--max-results", "2", "--detail"])
+        assert payload.get("detected_version") == runtime.version, payload
+        assert payload.get("endpoint") == {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}, payload
+        if code == 0:
+            assert payload.get("ok") is True, payload
+            rows = payload.get("objects")
+            assert isinstance(rows, list) and len(rows) <= 1 and payload.get("count") == len(rows), payload
+            assert payload.get("projection_complete") is not False and payload.get("limit_reached") is not True and payload.get("status") != "partial", payload
+            return rows
+        assert code == 2 and payload.get("ok") is False and payload.get("status") == "error", payload
+        preview = payload["semantic_preview"]; call = payload["call"]
+        args = {"waql": f'from object "{identity}" take 2'}
+        assert preview["version"] == runtime.version and preview["envelope"]["uri"] == "ak.wwise.core.object.get", payload
+        assert preview["envelope"]["args"] == args and payload["query_bound"] == {"mode": "take", "value": 2}, payload
+        assert preview["envelope"]["options"] == {"return": ["id", "name", "type", "path"]}, payload
+        assert call["api"] == "ak.wwise.core.object.get" and call["version"] == runtime.version, payload
+        if call.get("waapi_error_uri") == "ak.wwise.query.invalid_query":
+            details = call.get("waapi_error_details")
+            assert isinstance(details, Mapping) and details.get("details") == {"procedureUri": call["api"]}, payload
+        normalized = waapi_gateway.normalize_exact_object_absence(api=call["api"], args=args, result=call, exact_object_lookup=True)
+        assert normalized.get("ok") is True and normalized.get("result") == {"return": []}, payload
+        receipt["absence_normalization"] = normalized["normalization"]
+        return []
 
     def path_id(*segments):
         rows = query([value for segment in segments for value in ("--path-segment", segment)], maximum=2)
@@ -202,7 +234,7 @@ def _collect(runtime, *, localized):
             created_id = path_id(root, "Default Work Unit", name, "New")
             after = {"replacement": exact(replacement_id, includes=("parent", "class-id")),
                 "created": exact(created_id, includes=("parent", "class-id")),
-                "old_id_rows": query(["--exact-id", existing], maximum=2),
+                "old_id_rows": destroyed_old_id_rows(existing),
                 "replacement_sources": sources(replacement_id), "created_sources": sources(created_id)}
             receipt["observations"]["after"] = after; persist()
             assert replacement_id != existing and created_id not in {existing, replacement_id} and after["old_id_rows"] == []

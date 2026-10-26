@@ -2269,6 +2269,17 @@ class ImportWitnessClient(ImportFieldsClient):
 @pytest.mark.parametrize("fault", (None, "corrupt-media", "after-verify"))
 @pytest.mark.parametrize("localized", (False, True))
 def test_import_collectors_reach_actual_final_writer_with_partial_failure(tmp_path, workflow, monkeypatch, fault, localized):
+    _assert_import_collector_final_writer(tmp_path, workflow, monkeypatch, fault=fault, localized=localized)
+
+
+@pytest.mark.parametrize("packet_case", (
+    "structured-missing", "wrong-guid", "wrong-version", "wrong-endpoint", "wrong-projection", "nonabsence-error",
+))
+def test_mixed_import_absence_packet_reaches_actual_final_writer(tmp_path, workflow, monkeypatch, packet_case):
+    _assert_import_collector_final_writer(tmp_path, workflow, monkeypatch, fault=None, localized=False, packet_case=packet_case)
+
+
+def _assert_import_collector_final_writer(tmp_path, workflow, monkeypatch, *, fault, localized, packet_case=None):
     from types import SimpleNamespace
     from tests.unit.test_workflow_source_guard import _fixture_run
     from tests.destructive.support import category_evidence, exact_real_evidence
@@ -2289,6 +2300,26 @@ def test_import_collectors_reach_actual_final_writer_with_partial_failure(tmp_pa
             else:
                 selected = next(row for row in client.objects.values() if row["type"] == "AudioFileSource" and row["name"] == "Replacement")
                 Path(selected["originalFilePath"]).write_bytes(b"changed after verification")
+        if packet_case and client.write_count == 2 and argv[:2] == ["query-object", "--exact-id"] and payload.get("objects") == []:
+            from copy import deepcopy
+            payload = deepcopy(payload)
+            payload.update(ok=False, status="error")
+            payload.pop("objects"); payload.pop("count")
+            payload["call"] = {"api": "ak.wwise.core.object.get", "version": "2025.1", "ok": False,
+                "error_code": "WaapiRequestFailed", "message": "Structured fixture missing object",
+                "waapi_error_uri": "ak.wwise.query.invalid_query",
+                "waapi_error_details": {"message": "Object not found (13)", "details": {"procedureUri": "ak.wwise.core.object.get"}}}
+            if packet_case == "wrong-guid":
+                payload["semantic_preview"]["envelope"]["args"]["waql"] = f'from object "{PARENT_ID}" take 2'
+            elif packet_case == "wrong-version":
+                payload["detected_version"] = "2022.1"
+            elif packet_case == "wrong-endpoint":
+                payload["endpoint"]["port"] += 1
+            elif packet_case == "wrong-projection":
+                payload["semantic_preview"]["envelope"]["options"]["return"].append("notes")
+            elif packet_case == "nonabsence-error":
+                payload["call"]["waapi_error_details"]["message"] = "Unsupported projection"
+            code = 2
         return code, payload
     runtime.raw_gateway = raw_gateway
     failure = None
@@ -2299,8 +2330,23 @@ def test_import_collectors_reach_actual_final_writer_with_partial_failure(tmp_pa
         failure = exc
     category, = runtime.category_results
     receipt = json.loads(Path(category["observation_path"]).read_text())
-    assert (failure is None) is (fault is None), receipt.get("failure")
-    assert category["status"] == ("PASS" if fault is None else "FAIL")
+    failed = fault is not None or packet_case not in {None, "structured-missing"}
+    if packet_case:
+        packet, = [row for row in receipt["calls"] if row.get("exit_code") == 2]
+        assert packet["payload"]["call"]["waapi_error_details"]["message"] == (
+            "Unsupported projection" if packet_case == "nonabsence-error" else "Object not found (13)")
+        assert packet["argv"] == ["query-object", "--exact-id", receipt["observations"]["before"]["existing"]["id"],
+            "--max-results", "2", "--detail"]
+        assert receipt["phases"][-1]["verify"]["verified"] is True
+        if failed:
+            assert "absence_normalization" not in receipt and receipt["failure"]["type"] == "AssertionError"
+            assert receipt["business_effect_verified"] is False
+        if packet_case == "structured-missing":
+            assert receipt.get("absence_normalization", {}).get("original") == {
+                key: packet["payload"]["call"].get(key) for key in
+                ("error_code", "waapi_error_uri", "waapi_error_details", "message", "evidence_path")}
+    assert (failure is not None) is failed, receipt.get("failure")
+    assert category["status"] == ("FAIL" if failed else "PASS")
     assert receipt["observations"]["before"] and receipt["phases"][-1]["name"] == "witness"
     if fault == "after-verify":
         assert receipt["phases"][-1]["verify"]["verified"] is True
@@ -2322,6 +2368,6 @@ def test_import_collectors_reach_actual_final_writer_with_partial_failure(tmp_pa
         with pytest.raises(AssertionError): fixture.throw(failure)
     final = json.loads(target.read_text().splitlines()[-1])
     assert final["invocation"]["phase"] == "final" and final["invocation"]["outcome"] == category["status"]
-    assert final["residual_state"]["sandbox"] == ("deleted" if fault is None else "quarantined")
+    assert final["residual_state"]["sandbox"] == ("quarantined" if failed else "deleted")
     assert len(final["transactions"]) == (3 if localized else 2) and client.write_count == (3 if localized else 2)
     assert final["categories"][0] == category
