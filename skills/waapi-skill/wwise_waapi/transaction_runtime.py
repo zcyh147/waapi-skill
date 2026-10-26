@@ -35,6 +35,7 @@ from .operation_registry import (
 )
 from .platform_paths import (
     WwiseWirePathError,
+    adapt_cli_dispatch_paths,
     localize_live_wwise_project_path,
 )
 
@@ -269,6 +270,38 @@ def build_runtime_guard(skill_root: Path, version: str) -> dict[str, Any]:
     return {"contract": RUNTIME_GUARD_CONTRACT, **body, "fingerprint": canonical_sha256(body)}
 
 
+def _validate_tab_media_path_namespace(prepared: PreparedOperation, project_guard: Mapping[str, Any]) -> None:
+    if prepared.request.operation != "audio.importTabDelimited":
+        return
+    guard = prepared.pre_state.get("import_guard", {})
+    proofs = [item["proof"] for item in guard.get("file_proofs", [])
+              if isinstance(item, Mapping) and isinstance(item.get("proof"), Mapping)
+              and "native_path" in item["proof"]]
+    if not proofs:
+        return
+    dispatch = prepared.semantic_preview.dispatch_payload()
+    try:
+        observed = adapt_cli_dispatch_paths(uri=dispatch["uri"], args=dispatch["args"], options=dispatch["options"],
+            io_audit=guard["wire_path_input_audit"], project_guard=project_guard)
+    except WwiseWirePathError as exc:
+        raise TransactionGuardError(exc.error_code, str(exc), details=exc.details) from exc
+    mode = observed.proof["mode"]
+    for proof in proofs:
+        if mode == "local_posix_wine" and proof["native_path"].startswith("/"):
+            raise TransactionGuardError("NATIVE_MEDIA_PATH_REQUIRED",
+                "An exact TSV for the proven Wine host requires a native Windows media path or a path relative to the table directory; its bytes cannot be rewritten.",
+                details={"native_path": proof["native_path"], "host_path": proof["path"]})
+        try:
+            parsed = parse_absolute_host_path(proof["native_path"])
+        except HostPathError:
+            # The closed parser already proved a table-relative path and base.
+            continue
+        if mode == "native_posix_identity" and parsed.flavor != "posix":
+            raise TransactionGuardError("NATIVE_MEDIA_PATH_NAMESPACE_UNAVAILABLE",
+                "A Windows TSV media path cannot be certified for the proven native POSIX host.",
+                details={"native_path": proof["native_path"]})
+
+
 def build_transaction_preview_artifact(
     request_payload: Mapping[str, Any],
     *,
@@ -293,6 +326,7 @@ def build_transaction_preview_artifact(
         raise ValueError("ttl_seconds must be greater than zero")
     request = parse_operation_request(request_payload, expected_version=live_version)
     prepared = prepare_operation(request, read_call=read_call, history_resolver=history_resolver, copy_proof_context=copy_proof_context)
+    _validate_tab_media_path_namespace(prepared, project_guard)
     post_execution_project_guard_policy = _prepared_post_execution_project_guard_policy(
         prepared
     )

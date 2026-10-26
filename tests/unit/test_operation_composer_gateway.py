@@ -332,6 +332,17 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # Native media cells add one reviewed TSV constraint; invert that exact
+    # disclosure while retaining the complete earlier combined schema seal.
+    assert canonical_sha256(non_object_set_digests) == "073025d7216355087c4fe62331316385f54da4a100aeeec0df7c5c4b53655a46"
+    native_path_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        assert contract["constraints"].pop(3) == (
+            "Audio File cells retain their native spelling and bind a hashed local file; relative paths resolve from the table directory, including parent navigation; proven Wine hosts require Windows absolute or table-relative media cells"
+        )
+        native_path_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
     # The next #182 slice admits localized owner fields/inline media and
     # explicit Source creation. Seal only this disclosure delta, then invert
     # it so the earlier import and all pre-import seals remain unchanged.
@@ -353,7 +364,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     assert canonical_sha256(non_object_set_digests) == "499c116a84384ac1ba3eb981911ad472b7f255e23f3e696ad3ca8dfb84490eeb"
     reviewed_tsv_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = native_path_contracts[version]
         assert contract["constraints"].pop(2) == (
             "an explicit typed AudioFileSource media row may reimport one existing exact Sound child in the requested language using Notes on the Source; a separate typed owner-only Notes row retains the same exact-table transaction"
         )

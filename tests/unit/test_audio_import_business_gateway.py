@@ -3015,8 +3015,8 @@ class ExplicitSourceTabClient(LocalizedFieldsClient):
         return result
 
 
-def _explicit_source_tab_draft(tmp_path, version, *, outcome="normal"):
-    client = ExplicitSourceTabClient(tmp_path, version, outcome=outcome)
+def _explicit_source_tab_draft(tmp_path, version, *, outcome="normal", client=None):
+    client = client or ExplicitSourceTabClient(tmp_path, version, outcome=outcome)
     media = tmp_path / "Different.wav"
     media.write_bytes(b"requested explicit Source media")
     table = tmp_path / "explicit.tsv"
@@ -3170,4 +3170,118 @@ def test_exact_table_media_ownership_keeps_disjoint_sources_under_one_sound(tmp_
     assert {target["localized_audio_file_source_id"] for target in prepared["verification_plan"]["targets"]
         if target["media_expected"]} == {client.SOURCE, client.ACTION}
     assert table.read_bytes() == original and other_original.read_bytes() == b"old other English media"
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+
+
+class WineExactTableClient(ExplicitSourceTabClient):
+    """Native boundary requires Windows absolute cells or table-relative cells."""
+
+    def call(self, uri, args=None, options=None):
+        from copy import deepcopy
+        from wwise_waapi.host_paths import localize_waapi_host_path, parse_relative_host_path
+        from tests.unit.test_transaction_gateway import z_wire_path
+        args, options = args or {}, options or {}
+        if uri == "ak.wwise.core.audio.importTabDelimited":
+            import csv
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            table = Path(localize_waapi_host_path(args["importFile"]))
+            with table.open(encoding="utf-8", newline="") as stream:
+                owner, source = list(csv.DictReader(stream, delimiter="\t"))
+            cell = source["Audio File"]
+            assert not cell.startswith("/"), "Wine must never receive an absolute POSIX media cell"
+            if len(cell) > 1 and cell[1] == ":":
+                media = Path(localize_waapi_host_path(cell))
+            else:
+                media = table.parent.joinpath(*parse_relative_host_path(cell, allow_parent_segments=True).components)
+            self.owner["notes"] = owner["Notes"]
+            self.sources[0]["notes"] = source["Notes"]
+            self.copied.write_bytes(media.read_bytes())
+            self.imported = True
+            return {"objects": deepcopy([self.owner, self.sources[0]])}
+        result = super().call(uri, args, options)
+        if uri == "ak.wwise.core.getInfo":
+            result.update(processPath=r"C:\Wwise\WwiseConsole.exe", platform="x64")
+        if uri == "ak.wwise.core.getProjectInfo":
+            result["path"] = z_wire_path(_project_path(self.tmp_path))
+        return result
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX/Wine namespace boundary")
+@pytest.mark.parametrize("cell_form", ("native", "relative", "relative-parent"))
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+def test_exact_table_native_media_path_is_hashed_locally_and_dispatched_unchanged(tmp_path, cell_form, version):
+    import hashlib
+    from tests.unit.test_transaction_gateway import z_wire_path
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, version, client=WineExactTableClient(tmp_path, version))
+    media = tmp_path / "Different.wav"
+    if cell_form in {"relative", "relative-parent"}:
+        folder = tmp_path / "Relative 音" if cell_form == "relative" else tmp_path.parent / (tmp_path.name + "-external")
+        destination = folder / "Different.wav"
+        folder.mkdir(); destination.write_bytes(media.read_bytes())
+        native = r"Relative 音\Different.wav" if cell_form == "relative" else "..\\" + folder.name + r"\Different.wav"
+    else:
+        destination = media
+        native = z_wire_path(media)
+    table.write_text(table.read_text().replace(str(media), native), encoding="utf-8")
+    media = destination
+    original = table.read_bytes()
+    command("draft-check")
+    transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    prepared = shown["artifact"]["prepared_operation"]
+    proof = prepared["verification_plan"]["targets"][1]["source_file"]
+    assert proof["path"] == str(media.resolve()) and proof["sha256"] == hashlib.sha256(media.read_bytes()).hexdigest()
+    assert proof["native_path"] == native and proof["table_directory"] == str(table.parent.resolve())
+    table_proof, = [row["proof"] for row in prepared["pre_state"]["import_guard"]["file_proofs"] if row["field"] == "import_file"]
+    assert table_proof["path"] == str(table.resolve()) and table_proof["sha256"] == hashlib.sha256(original).hexdigest()
+    assert table.read_bytes() == original and native in table.read_text()
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
+    assert table.read_bytes() == original and client.copied.read_bytes() == media.read_bytes()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX/Wine namespace boundary")
+def test_exact_table_rejects_absolute_posix_media_cell_for_proven_wine_before_preview(tmp_path):
+    command, _run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1", client=WineExactTableClient(tmp_path, "2025.1"))
+    original = table.read_bytes()
+    command("draft-check", expected_error="NATIVE_MEDIA_PATH_REQUIRED")
+    assert table.read_bytes() == original
+    assert not list((tmp_path / "state/transactions").glob("tx1-*"))
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX/Wine namespace boundary")
+@pytest.mark.parametrize("cell", (r"Z:Different.wav", r"Q:\Different.wav", r"\\server\share\Different.wav", "Linked.wav"))
+def test_exact_table_rejects_ambiguous_or_escaped_native_media_paths(tmp_path, cell):
+    command, _run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1", client=WineExactTableClient(tmp_path, "2025.1"))
+    if cell == "Linked.wav": (tmp_path / cell).symlink_to(tmp_path / "Different.wav")
+    table.write_text(table.read_text().replace(str(tmp_path / "Different.wav"), cell), encoding="utf-8")
+    command("draft-check", expected_error="INVALID_FILE")
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX/Wine namespace boundary")
+@pytest.mark.parametrize("drift", ("table", "media", "relative-link"))
+def test_exact_table_native_media_and_table_proofs_reject_drift(tmp_path, drift):
+    from tests.unit.test_transaction_gateway import z_wire_path
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1", client=WineExactTableClient(tmp_path, "2025.1"))
+    media = tmp_path / "Different.wav"
+    if drift == "relative-link":
+        folder = tmp_path / "Media"; folder.mkdir(); (folder / "Different.wav").write_bytes(media.read_bytes())
+        link = tmp_path / "Alias"; link.symlink_to(folder, target_is_directory=True)
+        cell = r"Alias\Different.wav"
+    else: cell = z_wire_path(media)
+    table.write_text(table.read_text().replace(str(media), cell), encoding="utf-8")
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    if drift == "table": table.write_bytes(table.read_bytes() + b"\n")
+    elif drift == "media": media.write_bytes(b"changed native media")
+    else:
+        outside = tmp_path.parent / (tmp_path.name + "-outside"); outside.mkdir()
+        (outside / "Different.wav").write_bytes(b"unowned relative escape")
+        link.unlink(); link.symlink_to(outside, target_is_directory=True)
+    code, rejected = run("execute", transaction)
+    assert code == 2 and rejected["executed"] is False, rejected
     assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
