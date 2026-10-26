@@ -157,7 +157,7 @@ def test_generate_plan_closes_scope_resolves_project_rows_and_proves_outputs(tmp
                 "inclusions": ["event", "structure", "media"],
                 "rebuild": True,
             },
-            {"name": "Music_Main", "rebuild": False},
+            {"name": "Music_Main"},
         ],
         "platforms": [MAC_ID],
         "languages": [ENGLISH_ID, FRENCH_ID],
@@ -187,9 +187,7 @@ def test_generate_plan_closes_scope_resolves_project_rows_and_proves_outputs(tmp
         (lambda value: value.update(soundbanks=[]), "INVALID_SCOPE"),
         (lambda value: value.pop("platforms"), "INVALID_ARGUMENT"),
         (lambda value: value.update(platforms=[]), "INVALID_SCOPE"),
-        (lambda value: value.pop("languages"), "INVALID_ARGUMENT"),
         (lambda value: value.update(skipLanguages=True), "INVALID_SCOPE"),
-        (lambda value: value.update(writeToDisk=False), "UNSUPPORTED_BOUNDARY"),
         (lambda value: value["soundbanks"].append({"name": "Init", "artifactExpectation": "nonlocalized"}), "INVALID_SCOPE"),
         (lambda value: value["soundbanks"].append({"name": "Bad Bank", "artifactExpectation": "nonlocalized"}), "INVALID_SOUNDBANK_NAME"),
     ],
@@ -217,16 +215,6 @@ def test_generate_plan_rejects_implicit_or_ambiguous_scope(
 @pytest.mark.parametrize(
     "soundbanks,skip_languages,languages",
     [
-        (
-            [{"name": "Gameplay_Main", "artifactExpectation": "nonlocalized"}],
-            False,
-            ["English(US)"],
-        ),
-        (
-            [{"name": "Gameplay_Main", "artifactExpectation": "nonlocalized"}],
-            True,
-            ["English(US)"],
-        ),
         (
             [{"name": "Dialogue_Main", "artifactExpectation": "localized"}],
             True,

@@ -1402,6 +1402,7 @@ _SOUNDBANK_GENERATE_ITEM_SCHEMA: Mapping[str, Any] = {
     "additionalProperties": False,
     "properties": {
         "name": {"type": "string", "minLength": 1},
+        "temporary": {"type": "boolean"},
         "artifact_expectation": {
             "type": "string",
             "enum": ["nonlocalized", "localized", "mixed"],
@@ -1409,15 +1410,14 @@ _SOUNDBANK_GENERATE_ITEM_SCHEMA: Mapping[str, Any] = {
                 "Expected artifact layout for this SoundBank. nonlocalized means "
                 "only the root non-localized/SFX Bank artifact; localized means "
                 "per-language artifacts; mixed means both root and per-language "
-                "artifacts. Language selection is a batch-level rule derived from "
-                "all soundbanks[] rows."
+                "artifacts. Language selection is a batch-level explicit or native-default choice."
             ),
         },
-        "events": {"type": "array", "minItems": 1, "maxItems": 256, "items": IDENTITY_ARGUMENT_SCHEMA},
-        "aux_busses": {"type": "array", "minItems": 1, "maxItems": 256, "items": IDENTITY_ARGUMENT_SCHEMA},
+        "events": {"type": "array", "minItems": 0, "maxItems": 256, "items": IDENTITY_ARGUMENT_SCHEMA},
+        "aux_busses": {"type": "array", "minItems": 0, "maxItems": 256, "items": IDENTITY_ARGUMENT_SCHEMA},
         "inclusions": {
             "type": "array",
-            "minItems": 1,
+            "minItems": 0,
             "maxItems": 3,
             "uniqueItems": True,
             "items": {"type": "string", "enum": ["event", "structure", "media"]},
@@ -3452,42 +3452,41 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "soundbank.generate",
         "ak.wwise.core.soundbank.generate",
         "soundbank",
-        "Generate an explicit bounded SoundBank/platform/language scope and verify requested non-empty artifacts inside one isolated I/O root.",
-        ("soundbanks", "platforms", "skip_languages", "write_to_disk", "io_root"),
+        "Generate selected, temporary, or all user SoundBanks inside an owned I/O root; verify files independently or disclose the in-memory result-only boundary.",
+        ("soundbanks", "platforms", "io_root"),
         (
+            "all_user_soundbanks",
+            "all_user_bank_expectations",
+            "skip_languages",
+            "write_to_disk",
             "languages",
             "rebuild_soundbanks",
             "clear_audio_file_cache",
             "rebuild_init_bank",
         ),
         argument_contract=_object_contract(
-            ("soundbanks", "platforms", "skip_languages", "write_to_disk", "io_root"),
+            ("soundbanks", "platforms", "io_root"),
             {
-                "soundbanks": {"type": "array", "minItems": 1, "maxItems": 64, "items": _SOUNDBANK_GENERATE_ITEM_SCHEMA},
+                "soundbanks": {"type": "array", "minItems": 0, "maxItems": 64, "items": _SOUNDBANK_GENERATE_ITEM_SCHEMA},
                 "platforms": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "string", "minLength": 1}},
                 "languages": {
                     "type": "array",
-                    "minItems": 1,
+                    "minItems": 0,
                     "maxItems": 64,
                     "items": {"type": "string", "minLength": 1},
-                    "description": (
-                        "Batch language selection. Omit when every SoundBank has "
-                        "artifact_expectation=nonlocalized. When any SoundBank is "
-                        "localized or mixed, supply one or more real localized "
-                        "project language names; SFX is not a localized language "
-                        "and is forbidden here."
-                    ),
+                    "description": "Explicit project language selection; empty or omitted means all project languages. Omission is preserved in native dispatch; SFX is not a localized language.",
                 },
                 "skip_languages": {
                     "type": "boolean",
-                    "x-discloseDescription": True,
-                    "description": (
-                        "Batch switch derived from the complete soundbanks[] list: "
-                        "true exactly when every SoundBank is nonlocalized, and "
-                        "false when any SoundBank is localized or mixed."
-                    ),
+                    "description": "Explicit suppression of localized banks; omitted native control retains its native default. The public business declaration discloses its compatible artifact-derived default separately.",
                 },
-                "write_to_disk": {"const": True},
+                "write_to_disk": {"type": "boolean", "description": "Omitted means the native false default: in-memory generation with result-only verification; no bank data is returned by this call."},
+                "all_user_soundbanks": {"type": "string", "enum": ["nonlocalized", "localized", "mixed"]},
+                "all_user_bank_expectations": {"type": "array", "maxItems": 64, "items": {
+                    "type": "object", "additionalProperties": False,
+                    "required": ["soundbank", "artifact_expectation"], "properties": {
+                        "soundbank": IDENTITY_ARGUMENT_SCHEMA,
+                        "artifact_expectation": {"type": "string", "enum": ["nonlocalized", "localized", "mixed"]}}}},
                 "rebuild_soundbanks": {
                     "type": "boolean",
                     "default": False,
@@ -3508,20 +3507,24 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "io_root": {"type": "string", "minLength": 1},
             },
             optional=(
+                "all_user_soundbanks",
+                "all_user_bank_expectations",
+                "skip_languages",
+                "write_to_disk",
                 "languages",
                 "rebuild_soundbanks",
                 "clear_audio_file_cache",
                 "rebuild_init_bank",
             ),
         ),
-        identity_arguments=("soundbanks[].events[]", "soundbanks[].aux_busses[]"),
+        identity_arguments=("soundbanks[].events[]", "soundbanks[].aux_busses[]", "all_user_bank_expectations[].soundbank"),
         constraints=(
-            "the user SoundBank, platform, and language scope is explicit; Init is an automatic by-product and cannot be requested",
-            "language selection is batch-wide: all-nonlocalized soundbanks require skip_languages=true and languages omitted; any localized or mixed soundbank requires skip_languages=false plus non-empty live project languages, never SFX; one batch may combine nonlocalized with localized or mixed rows",
+            "SoundBank scope is selected or explicitly all-user; platforms remain bounded and explicit; omitted languages mean all live project languages; Init is an automatic by-product",
+            "language selection is batch-wide; explicit skip_languages=true conflicts with localized artifact expectations; preserve native omission and explicit options",
             "batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent; preserve every explicitly supplied value at its original level",
             "Event and AuxBus descriptors resolve live to one GUID before preview",
             "Wwise 2021.1 derives project paths from the live Project filePath plus a hashed strict WPROJ parse; later versions use live core.getProjectInfo",
-            "execution replays project/file/artifact guards; verification requires each requested Bank artifact to be created or changed and non-empty",
+            "execution replays project/file/artifact and selection guards; file output requires every requested artifact to be created or changed and non-empty; memory output proves only result schema and diagnostics, not bank delivery",
         ),
         selection_guidance=_selection_guidance(
             use_when=(
@@ -16863,6 +16866,19 @@ def _prepare_closed_soundbank_operation(
         "plan_sha256": plan.get("plan_sha256"),
         "artifact_snapshots": snapshots,
     }
+    if request.operation == "soundbank.generate":
+        selection_reads = []
+        if "all_user_soundbanks" in arguments:
+            selection_reads.append({"query": "from type SoundBank take 65",
+                "rows": plan_arguments["allUserSoundBanks"]["inventory"]})
+        for bank in arguments["soundbanks"]:
+            if bank.get("temporary"):
+                query, rows = _read_named_type_rows("SoundBank", bank["name"], read=read, take=2)
+                if rows:
+                    raise OperationContractError("NAME_COLLISION", "A temporary SoundBank name already exists.",
+                        details={"name": bank["name"], "rows": rows})
+                selection_reads.append({"query": query, "rows": []})
+        guard["generation_selection_reads"] = selection_reads
     if wire_path_io_audit is not None:
         guard["io_audit"] = _json_mapping(wire_path_io_audit)
     if definition_oracle is not None:
@@ -16879,6 +16895,18 @@ def _prepare_closed_soundbank_operation(
         "plan": _json_mapping(plan),
         "artifact_snapshots": snapshots,
     }
+    if request.operation == "soundbank.generate":
+        # The ordinary compact transaction projection preserves this field.
+        # Keep the weaker memory boundary visible before authorization.
+        files_requested = plan["artifact_plan"]["bank_files_requested"]
+        verification["verification_scope"] = {
+            "output": "files" if files_requested else "memory",
+            "business_state_requires_artifacts": plan["oracle"]["business_state_requires_artifacts"],
+            "boundary": plan["oracle"]["verification_boundary"],
+            "transaction_captures_topic_data": False,
+            "memory_data_topic": "ak.wwise.core.soundbank.generated",
+            "memory_data_subscription_required_before_generation": not files_requested,
+        }
     if definition_oracle is not None:
         verification["definition_oracle"] = _json_mapping(definition_oracle)
     cleanup = {
@@ -17206,10 +17234,41 @@ def _normalize_generate_arguments(
     result: dict[str, Any] = {
         "soundbanks": normalized_banks,
         "platforms": list(arguments.get("platforms", [])),
-        "skipLanguages": arguments.get("skip_languages"),
-        "writeToDisk": arguments.get("write_to_disk"),
     }
+    if "all_user_soundbanks" in arguments:
+        query = "from type SoundBank take 65"
+        rows = _rows(read(OBJECT_GET_URI, {"waql": query}, {"return": list(IDENTITY_RETURN_FIELDS)}))
+        if len(rows) > 64:
+            raise OperationContractError("RESULT_LIMIT_EXCEEDED", "All-user SoundBank scope exceeds the 64-bank preview bound.")
+        seen_ids, seen_names = set(), set()
+        for row in rows:
+            if (not _valid_object_id(row.get("id")) or row.get("type") != "SoundBank"
+                or not isinstance(row.get("name"), str) or not row["name"]
+                or not isinstance(row.get("path"), str) or not row["path"]
+                or row["id"].casefold() in seen_ids or row["name"].casefold() in seen_names):
+                raise OperationContractError("INVALID_READBACK", "All-user SoundBank inventory is malformed or ambiguous.")
+            seen_ids.add(row["id"].casefold())
+            seen_names.add(row["name"].casefold())
+        overrides = {}
+        inventory = {row["id"].casefold(): row for row in rows}
+        for index, override in enumerate(arguments.get("all_user_bank_expectations", [])):
+            role = f"all_user_bank_expectations[{index}].soundbank"
+            resolved = _resolve_identity(override["soundbank"], role=role, read=read)
+            key = str(resolved.object).casefold()
+            captured = inventory.get(key)
+            if captured is None or any(resolved.row.get(field) != captured.get(field) for field in ("name", "type", "path")):
+                raise OperationContractError("INVALID_SCOPE", "Every artifact expectation override must match a SoundBank in the captured all-user inventory.",
+                    details={"role": role, "object": resolved.object})
+            if key in overrides:
+                raise OperationContractError("DUPLICATE_TARGET", "One all-user SoundBank artifact expectation was supplied twice.")
+            overrides[key] = override["artifact_expectation"]
+            roles[role] = resolved
+        result["soundbanks"] = [{"name": row["name"],
+            "artifactExpectation": overrides.get(row["id"].casefold(), arguments["all_user_soundbanks"])} for row in rows]
+        result["allUserSoundBanks"] = {"inventory": rows}
     optional_map = {
+        "skip_languages": "skipLanguages",
+        "write_to_disk": "writeToDisk",
         "languages": "languages",
         "rebuild_soundbanks": "rebuildSoundBanks",
         "clear_audio_file_cache": "clearAudioFileCache",
@@ -19636,6 +19695,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             readbacks.append({"role": "soundbank-guard", "uri": uri, "args": dict(args), "options": dict(options), "result": normalized})
             return normalized
 
+        for selection in soundbank_guard.get("generation_selection_reads", []):
+            actual = _rows(soundbank_read(OBJECT_GET_URI, {"waql": selection["query"]},
+                {"return": list(IDENTITY_RETURN_FIELDS)}))
+            expected = selection["rows"]
+            assertions.append({"name": "SoundBank generation selection is unchanged since preview",
+                "passed": sorted(actual, key=lambda row: str(row.get("id"))) == sorted(expected, key=lambda row: str(row.get("id"))),
+                "evidence": {"query": selection["query"], "expected": expected, "actual": actual}})
+
         try:
             project_info, fresh_authority, project_validation = _soundbank_project_info(
                 version,
@@ -21672,7 +21739,13 @@ def verify_prepared_operation(
             },
         )
 
-        if source_operation == "soundbank.generate":
+        if source_operation == "soundbank.generate" and not closed_plan.get("oracle", {}).get("business_state_requires_artifacts"):
+            success_status = "result_schema_checked"
+            verification_strength = "result_schema_and_diagnostics_only"
+            business_state_verified = False
+            check("generation has a result-only boundary without verified artifact or bank-data delivery", True,
+                {"boundary": closed_plan.get("oracle", {}).get("verification_boundary")})
+        elif source_operation == "soundbank.generate":
             artifact_plan = closed_plan.get("artifact_plan")
             platforms = artifact_plan.get("platforms") if isinstance(artifact_plan, Mapping) else None
             if not isinstance(platforms, list):
@@ -27333,7 +27406,7 @@ def _validate_nested_request_shape(
             _require_exact_keys(
                 bank,
                 required=("name", "artifact_expectation"),
-                optional=("events", "aux_busses", "inclusions", "rebuild"),
+                optional=("events", "aux_busses", "inclusions", "rebuild", "temporary"),
                 context=f"soundbank.generate soundbanks[{bank_index}]",
             )
             artifact_expectation = bank.get("artifact_expectation")
@@ -27351,66 +27424,50 @@ def _validate_nested_request_shape(
                         "actual": artifact_expectation,
                     },
                 )
+            if "temporary" in bank and not isinstance(bank["temporary"], bool):
+                raise OperationContractError("INVALID_ARGUMENT", "temporary must be boolean.")
             artifact_expectations.append(str(artifact_expectation))
             for field_name in ("events", "aux_busses"):
                 if field_name not in bank:
                     continue
                 values = bank.get(field_name)
-                if not isinstance(values, list) or not values:
-                    raise OperationContractError(
-                        "INVALID_ARGUMENT",
-                        f"soundbanks[{bank_index}].{field_name} must be a non-empty JSON array.",
-                    )
+                if not isinstance(values, list):
+                    raise OperationContractError("INVALID_ARGUMENT", f"soundbanks[{bank_index}].{field_name} must be an array.")
                 for value_index, value in enumerate(values):
                     _validate_identity_payload_shape(
                         value,
                         role=f"soundbanks[{bank_index}].{field_name}[{value_index}]",
                     )
-        skip_languages = arguments.get("skip_languages")
-        if not isinstance(skip_languages, bool):
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                "soundbank.generate skip_languages must be a boolean.",
-            )
-        language_dependent = any(
-            expectation in {"localized", "mixed"}
-            for expectation in artifact_expectations
-        )
-        if not language_dependent:
-            if skip_languages is not True or "languages" in arguments:
-                raise OperationContractError(
-                    "INVALID_SCOPE",
-                    "An all-nonlocalized SoundBank batch requires "
-                    "skip_languages=true and languages omitted.",
-                )
-            return
-        if skip_languages is not False:
-            raise OperationContractError(
-                "INVALID_SCOPE",
-                "A SoundBank batch containing any localized or mixed row "
-                "requires skip_languages=false.",
-            )
-        languages = arguments.get("languages")
-        if (
-            not isinstance(languages, list)
-            or not languages
-            or not all(
-                isinstance(language, str) and bool(language.strip())
-                for language in languages
-            )
+        if "all_user_bank_expectations" in arguments:
+            if "all_user_soundbanks" not in arguments:
+                raise OperationContractError("INVALID_SCOPE", "Bank artifact overrides require all-user scope.")
+            overrides = _mapping_sequence(arguments["all_user_bank_expectations"], field="all_user_bank_expectations")
+            if len(overrides) > 64:
+                raise OperationContractError("LIMIT_EXCEEDED", "All-user artifact overrides exceed the 64-bank bound.")
+            for index, override in enumerate(overrides):
+                _require_exact_keys(override, required=("soundbank", "artifact_expectation"),
+                    context=f"all_user_bank_expectations[{index}]")
+                _validate_identity_payload_shape(override["soundbank"], role=f"all_user_bank_expectations[{index}].soundbank")
+                if override["artifact_expectation"] not in {"nonlocalized", "localized", "mixed"}:
+                    raise OperationContractError("INVALID_ARGUMENT", "Bank artifact override needs a disclosed layout.")
+                artifact_expectations.append(override["artifact_expectation"])
+        for field in ("skip_languages", "write_to_disk"):
+            if field in arguments and not isinstance(arguments[field], bool):
+                raise OperationContractError("INVALID_ARGUMENT", f"{field} must be a boolean.")
+        if arguments.get("skip_languages") is True and any(
+            mode in {"localized", "mixed"} for mode in artifact_expectations
         ):
-            raise OperationContractError(
-                "INVALID_SCOPE",
-                "A SoundBank batch containing any localized or mixed row "
-                "requires a non-empty languages array of localized project "
-                "language names.",
-            )
-        if any(language.strip().casefold() == "sfx" for language in languages):
-            raise OperationContractError(
-                "INVALID_SCOPE",
-                "SFX is not a localized project language and cannot appear in "
-                "soundbank.generate languages.",
-            )
+            raise OperationContractError("INVALID_SCOPE", "Localized artifact expectations conflict with skip_languages=true.")
+        languages = arguments.get("languages", [])
+        if not isinstance(languages, list) or not all(isinstance(language, str) and language.strip() for language in languages):
+            raise OperationContractError("INVALID_ARGUMENT", "languages must be a bounded list of nonempty project language names or IDs.")
+        if any(language.casefold() == "sfx" for language in languages):
+            raise OperationContractError("INVALID_SCOPE", "SFX is not a localized project language.")
+        all_mode = arguments.get("all_user_soundbanks")
+        if not soundbanks and all_mode not in {"nonlocalized", "localized", "mixed"}:
+            raise OperationContractError("INVALID_SCOPE", "An empty bank list requires explicit all_user_soundbanks scope.")
+        if soundbanks and all_mode is not None:
+            raise OperationContractError("INVALID_SCOPE", "All-user scope cannot be combined with selected banks.")
         return
     if operation == "soundbank.convertExternalSources":
         for index, row in enumerate(_mapping_sequence(arguments.get("sources"), field="sources")):

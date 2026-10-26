@@ -26,6 +26,10 @@ _DECLARATIONS: dict[str, dict[str, Any]] = {
     "soundbank.generate": {
         "required_fields": ["soundbanks", "platforms", "io_root"],
         "optional_fields": [
+            "all_user_soundbanks",
+            "all_user_bank_expectations",
+            "write_to_disk",
+            "skip_languages",
             "languages",
             "rebuild_soundbanks",
             "clear_audio_file_cache",
@@ -73,17 +77,16 @@ _DECLARATION_SCHEMAS: dict[str, dict[str, Any]] = {
         "properties": {
             "soundbanks": {
                 "type": "array",
-                "minItems": 1,
+                "minItems": 0,
                 "maxItems": 64,
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
-                    "required": [
-                        "soundbank_handle",
-                        "artifact_expectation",
-                    ],
+                    "required": ["artifact_expectation"],
+                    "oneOf": [{"required": ["soundbank_handle"]}, {"required": ["name"]}],
                     "properties": {
                         "soundbank_handle": _HANDLE,
+                        "name": {"type": "string", "pattern": r"^[A-Za-z_][A-Za-z0-9_]*$", "description": "Temporary bank name; must not collide with a live SoundBank. Use this name as the bank selection key for nested Event/AuxBus/inclusion choices."},
                         "artifact_expectation": {
                             "type": "string",
                             "enum": ["nonlocalized", "localized", "mixed"],
@@ -91,20 +94,32 @@ _DECLARATION_SCHEMAS: dict[str, dict[str, Any]] = {
                         "rebuild": {"type": "boolean"},
                         "event_handles": {
                             "type": "array",
-                            "minItems": 1,
+                            "minItems": 0,
                             "maxItems": 256,
                             "items": _HANDLE,
                         },
                         "aux_bus_handles": {
                             "type": "array",
-                            "minItems": 1,
+                            "minItems": 0,
                             "maxItems": 256,
                             "items": _HANDLE,
                         },
-                        "inclusions": _FILTERS,
+                        "inclusions": {**_FILTERS, "minItems": 0},
                     },
                 },
             },
+            "all_user_soundbanks": {"type": "string", "enum": ["nonlocalized", "localized", "mixed"],
+                "description": "Generate all live user SoundBanks using this default artifact layout and optional bound per-bank expectations; soundbanks must be empty. Preview binds at most 64 live banks and rejects selection drift. 2023–25 dispatch an empty native list; 2021–22 enumerate that exact bounded live selection because their reflection does not document empty-list meaning."},
+            "all_user_bank_expectations": {"type": "array", "maxItems": 64,
+                "description": "Optional per-bank artifact layouts within all-user scope. Each live bound SoundBank must belong to the captured inventory. These are verification expectations only; native per-bank events, AuxBusses, inclusions and rebuild choices remain selected-bank inputs and are not reinterpreted here.",
+                "items": {"type": "object", "additionalProperties": False,
+                    "required": ["soundbank_handle", "artifact_expectation"], "properties": {
+                        "soundbank_handle": _HANDLE,
+                        "artifact_expectation": {"type": "string", "enum": ["nonlocalized", "localized", "mixed"]}}}},
+            "write_to_disk": {"oneOf": [{"type": "boolean"}, {"const": "native-default"}],
+                "default": True, "description": "Public default true preserves file generation. false explicitly selects memory generation; native-default omits native writeToDisk (documented false). Memory mode checks only the bounded result schema, diagnostics and input/output guards; it never verifies bank data or delivered artifacts. To receive memory data, establish the existing Gateway soundbank.generated Topic workflow before generation."},
+            "skip_languages": {"oneOf": [{"type": "boolean"}, {"const": "native-default"}],
+                "description": "Public default derives from artifact layout for compatibility. Explicit true suppresses localized banks; false enables selected/all project languages; native-default omits native skipLanguages. Omitted languages select all live project languages without synthesizing a native languages array."},
             "platforms": {
                 "type": "array",
                 "minItems": 1,
@@ -113,7 +128,7 @@ _DECLARATION_SCHEMAS: dict[str, dict[str, Any]] = {
             },
             "languages": {
                 "type": "array",
-                "minItems": 1,
+                "minItems": 0,
                 "maxItems": 64,
                 "items": {"type": "string", "minLength": 1},
             },
@@ -202,7 +217,7 @@ def soundbank_business_contract_data(
     ):
         raise ValueError("unsupported Wwise version for SoundBank operation")
     declaration = _DECLARATIONS[operation]
-    return {
+    result = {
         "contract": SOUNDBANK_BUSINESS_CONTRACT,
         "operation": operation,
         "version": version,
@@ -245,6 +260,16 @@ def soundbank_business_contract_data(
             "artifact_verification": "operation_specific",
         },
     }
+
+    if operation == "soundbank.generate":
+        result["verification_modes"] = {
+            "files": "Each declared bank/platform/language artifact must be independently nonempty and changed; source and owned-I/O guards remain mandatory.",
+            "memory": "Only the bounded reflected call result and diagnostics are checked; business_state_verified=false. No bank data is returned or captured by this transaction.",
+            "memory_data_observation": {"before_generation": "Use the existing Gateway topic-schema and stream-topic workflow for ak.wwise.core.soundbank.generated before generation; the generation call cannot reconstruct missed events.",
+                "topic_schema_argv": ["topic-schema", "ak.wwise.core.soundbank.generated"],
+                "transaction_captures_topic_data": False},
+        }
+    return result
 
 
 __all__ = [
