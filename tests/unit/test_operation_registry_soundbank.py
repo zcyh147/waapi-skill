@@ -950,82 +950,29 @@ def test_process_definition_files_resolves_every_identity_and_checks_exact_inclu
     assert mismatch.ok is False
 
 
-def test_process_definition_files_preserves_preexisting_inclusions_additively(
-    tmp_path: Path,
-) -> None:
+def test_process_definition_files_nonempty_prestate_discloses_unverified_import_effects(tmp_path: Path) -> None:
     io_root, project = _project(tmp_path)
     definition = Path(project["directories"]["root"]) / "banks.tsv"
-    definition.write_text(
-        f"Gameplay_Main\t{EVENT_ID}\tEvent\tStructure\tMedia\n",
-        encoding="utf-8",
-    )
+    definition.write_text(f"Gameplay_Main\t{EVENT_ID}\tEvent\tStructure\tMedia\n", encoding="utf-8")
     reader = DefinitionReader(project)
     reader.target_exists = True
-    debug_inclusion = {
-        "object": {"id": DEBUG_EVENT_ID},
-        "filter": ["events", "structures", "media"],
-    }
-    requested_inclusion = {
-        "object": {"id": EVENT_ID},
-        "filter": ["events", "structures", "media"],
-    }
-    reader.target_inclusions = [debug_inclusion]
-
-    prepared = prepare_operation(
-        parse_operation_request(
-            _request(
-                "soundbank.processDefinitionFiles",
-                {"files": [str(definition)], "io_root": str(io_root)},
-            )
-        ),
-        read_call=reader,
-    ).as_dict()
-
-    bank_oracle = prepared["verification_plan"]["definition_oracle"]["banks"][0]
-    assert bank_oracle["before_inclusions"] == [
-        {
-            "object": DEBUG_EVENT_ID.casefold(),
-            "filters": ["events", "media", "structures"],
-        }
-    ]
-    assert bank_oracle["definition_inclusions"] == [
-        {
-            "object": EVENT_ID.casefold(),
-            "filters": ["events", "media", "structures"],
-        }
-    ]
-    assert len(bank_oracle["expected_inclusions"]) == 2
-
-    reader.target_inclusions = [debug_inclusion, requested_inclusion]
-    verified = verify_prepared_operation(
-        prepared,
-        execution_result={"result": {}},
-        read_call=reader,
-    )
-    assert verified.ok is True
-
-    reader.target_inclusions = [requested_inclusion]
-    lost_preexisting = verify_prepared_operation(
-        prepared,
-        execution_result={"result": {}},
-        read_call=reader,
-    )
-    assert lost_preexisting.ok is False
-
-    reader.target_inclusions = [
-        debug_inclusion,
-        requested_inclusion,
-        {
-            "object": {"id": CONTROL_BANK_ID},
-            "filter": ["events", "structures", "media"],
-        },
-    ]
-    unexpected_extra = verify_prepared_operation(
-        prepared,
-        execution_result={"result": {}},
-        read_call=reader,
-    )
-    assert unexpected_extra.ok is False
+    old = {"object": {"id": DEBUG_EVENT_ID}, "filter": ["events", "structures", "media"]}
+    requested = {"object": {"id": EVENT_ID}, "filter": ["events", "structures", "media"]}
+    reader.target_inclusions = [old]
+    prepared = prepare_operation(parse_operation_request(_request("soundbank.processDefinitionFiles",
+        {"files": [str(definition)], "io_root": str(io_root)})), read_call=reader).as_dict()
+    bank = prepared["verification_plan"]["definition_oracle"]["banks"][0]
+    assert bank["before_inclusions"] == [{"object": DEBUG_EVENT_ID.casefold(), "filters": ["events", "media", "structures"]}]
+    assert bank["expected_inclusions"] is None
+    assert bank["verification_boundary_reasons"] == ["nonempty_preexisting_inclusions"]
+    assert prepared["verification_plan"]["verification_scope"]["mode"] == "result_schema_only"
+    # Neither preservation nor removal is inferred from an empty native result.
+    for actual in ([old, requested], [requested], []):
+        reader.target_inclusions = actual
+        result = verify_prepared_operation(prepared, execution_result={"result": {}}, read_call=reader)
+        assert result.ok and result.status == "result_schema_checked"
+        assert result.business_state_verified is False
+        assert result.verification_scope["mode"] == "result_schema_only"
 
 
 def test_process_definition_files_resolves_short_id_through_reflected_uint32_id(

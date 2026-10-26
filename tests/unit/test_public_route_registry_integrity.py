@@ -298,7 +298,7 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
     assert summary["rules"] == 45
     assert summary["scopes"] == 254
     assert summary["schema_selectors"] == 870
-    assert summary["semantic_boundaries"] == 63
+    assert summary["semantic_boundaries"] == 64
     assert sum(summary["selectors_by_status"].values()) == 870
     assert summary["selectors_by_status"]["intentionally_blocked"] > 0
     assert summary["selectors_by_status"]["missing"] == 0
@@ -395,12 +395,29 @@ def test_native_surface_policy_records_closed_switch_assignment_boundaries() -> 
 def test_native_surface_policy_records_closed_soundbank_file_and_inclusion_boundaries() -> None:
     payload = load_native_surface_policy()
     rules = {rule["uri"]: rule for rule in payload["rules"]}
+    generation = {row["selector"]: row for row in rules["ak.wwise.core.soundbank.generate"]["semantic_boundaries"]}
+    assert set(generation) == {
+        "args.writeToDisk::false", "args.soundbanks::all-user-scope",
+        "args.platforms::omitted-or-empty-all-platforms",
+    }
+    assert all(row["status"] == "normalized_equivalent" for row in generation.values())
+    assert "business_state_verified=false" in generation["args.writeToDisk::false"]["reason"]
+    assert "2021.1/2022.1" in generation["args.soundbanks::all-user-scope"]["reason"]
+    assert "complete explicit selection" in generation["args.platforms::omitted-or-empty-all-platforms"]["reason"]
+    conversion = payload["route_audit"]["reviewed_generic_restrictions"]["ak.wwise.core.audio.convert"]
+    assert "unresolved array item" not in conversion
+    assert "not an independent conversion-artifact effect" in conversion
     definitions = rules["ak.wwise.core.soundbank.processDefinitionFiles"]
     assert definitions["versions"] == ["2022.1", "2023.1", "2024.1", "2025.1"]
     assert definitions["scopes"][0]["classifications"]["normalized_equivalent"] == ["files"]
     assert definitions["semantic_boundaries"][0]["selector"] == (
         "gateway.io_root::required-confinement"
     )
+
+    definition_reason = definitions["semantic_boundaries"][0]["reason"]
+    assert "GameSyncExclusion" in definition_reason
+    assert "business_state_verified=false" in definition_reason
+    assert "old-state preservation/removal are not inferred" in definition_reason
 
     inclusions = rules["ak.wwise.core.soundbank.setInclusions"]
     assert inclusions["versions"] == [
