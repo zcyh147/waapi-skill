@@ -3554,12 +3554,13 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "minItems": 1,
                     "maxItems": 32,
                     "items": _object_contract(
-                        ("input", "platform", "output"),
+                        ("input", "platform"),
                         {
                             "input": {"type": "string", "absoluteRegularFile": True},
                             "platform": {"type": "string", "minLength": 1},
                             "output": {"type": "string", "minLength": 1},
                         },
+                        optional=("output",),
                     ),
                 },
                 "io_root": {"type": "string", "minLength": 1},
@@ -27416,7 +27417,8 @@ def _validate_nested_request_shape(
         for index, row in enumerate(_mapping_sequence(arguments.get("sources"), field="sources")):
             _require_exact_keys(
                 row,
-                required=("input", "platform", "output"),
+                required=("input", "platform"),
+                optional=("output",),
                 context=f"soundbank.convertExternalSources sources[{index}]",
             )
         return

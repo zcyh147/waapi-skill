@@ -161,7 +161,7 @@ _DECLARATION_SCHEMAS: dict[str, dict[str, Any]] = {
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
-                    "required": ["input", "platform", "output"],
+                    "required": ["input", "platform"],
                     "properties": {
                         "input": {"type": "string", "minLength": 1},
                         "platform": {"type": "string", "minLength": 1},

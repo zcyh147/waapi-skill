@@ -426,13 +426,14 @@ def _materialize_external_sources(plan: Mapping[str, Any]) -> dict[str, Any]:
     ):
         row = _exact_fields(
             _mapping(raw, field=f"sources[{index}]"),
-            required={"input", "platform", "output"},
+            required={"input", "platform"},
+            optional={"output"},
             field=f"sources[{index}]",
         )
         rows.append(
             {
                 name: _text(row[name], field=f"sources[{index}].{name}")
-                for name in ("input", "platform", "output")
+                for name in ("input", "platform", "output") if name in row
             }
         )
     return {
