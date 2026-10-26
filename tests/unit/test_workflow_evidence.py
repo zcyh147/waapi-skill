@@ -1113,3 +1113,120 @@ def _assert_dialogue_probe_final_writer(tmp_path, monkeypatch, *, fault, members
     else:
         assert report["failure"] and report["calls"]
         assert report["calls"][-1].get("exception") or report["calls"][-1].get("payload")
+
+
+@pytest.mark.parametrize("fault", (None, "ignored-association", "indeterminate"))
+def test_dialogue_import_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
+    """Real collector/Gateway/verifier/writer; only native execution is fake."""
+    import importlib
+    import json
+    import hashlib
+    import re
+    import shutil
+    from pathlib import Path
+    from types import SimpleNamespace
+    import xml.etree.ElementTree as ET
+    from tests.unit.test_import_dialogue_association_gateway import DialogueImportClient
+    from tests.unit.test_audio_import_business_gateway import _env, waapi_gateway
+    from tests.support.gateway_config import set_gateway_config
+    from tests.unit.test_profiler_input_native_fixture import _finish
+    from tests.destructive.support import sandbox_fixture
+    monkeypatch.setenv("WWISE_LIVE", "1"); monkeypatch.setenv("WWISE_DESTRUCTIVE", "1")
+    workflow = importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
+    source = workflow.REPO_ROOT / "tests/_org/2025.1"
+    catalog = json.loads((workflow.REPO_ROOT / "skills/waapi-skill/resources/metadata/2025.1/object-types.json").read_text())["types"]
+    classes = {row["name"]: row["classId"] for row in catalog}
+    def source_row(relative, tag, name, hierarchy):
+        doc = ET.parse(source / relative); node = doc.find(f'.//{tag}[@Name="{name}"]')
+        parents = {child: parent for parent in doc.iter() for child in parent}; chain=[]; current=node
+        while current is not None:
+            if current.attrib.get("ID") and current.attrib.get("Name"): chain.append(current)
+            current=parents.get(current)
+        chain.reverse()
+        return {"id":node.attrib["ID"],"name":name,"type":tag,"classId":classes[tag],
+            "path":"\\"+"\\".join([hierarchy,*(item.attrib["Name"] for item in chain)]),"notes":"",
+            **({"parent":{"id":chain[-2].attrib["ID"]}} if len(chain)>1 else {})}
+    class Client(DialogueImportClient):
+        def __init__(self):
+            super().__init__(tmp_path)
+            self.parent=source_row("Containers/Default Work Unit.wwu","WorkUnit","Default Work Unit","Containers")
+            self.event_parent=source_row("Dynamic Dialogue/Dialogue.wwu","WorkUnit","Dialogue","Dynamic Dialogue")
+            self.regular_parent=source_row("Events/Default Work Unit.wwu","WorkUnit","Default Work Unit","Events")
+            self.EVENT_PARENT=self.event_parent["id"]; self.REGULAR_PARENT=self.regular_parent["id"]
+            self.baseline_event=source_row("Dynamic Dialogue/Dialogue.wwu","DialogueEvent","Objective_Status","Dynamic Dialogue")
+            self.baseline_sound=source_row("Containers/Dialogues.wwu","Sound","UNA-DB-OS_01","Containers")
+            self.baseline_entry={"id":"{A1AEBDF2-1B8E-4E92-9CE8-336DB7CB44CA}","name":"","type":"MultiSwitchEntry","classId":classes["MultiSwitchEntry"],
+                "path":"opaque fixture Entry path","owner":{"id":self.baseline_event["id"]},"AudioNode":{"id":self.baseline_sound["id"]},"notes":""}
+            self.regular_requested=True; self.effect=fault!="ignored-association"; self.import_count=0
+        def call(self,uri,args=None,options=None):
+            args,options=args or {},options or {}
+            if uri.endswith("getTypes"): self.calls.append((uri,copy.deepcopy(args),copy.deepcopy(options))); return {"return":catalog}
+            if uri.endswith("getPropertyAndReferenceNames"):
+                self.calls.append((uri,copy.deepcopy(args),copy.deepcopy(options)))
+                return {"return":["AudioNode"] if args.get("classId")==classes["MultiSwitchEntry"] or args.get("object") in (self.ENTRY,self.baseline_entry["id"]) else ["IsVoice"]}
+            if uri.endswith("object.get") and args.get("waql")!="from type Project take 1":
+                self.calls.append((uri,copy.deepcopy(args),copy.deepcopy(options)))
+                known=[self.parent,self.event_parent,self.regular_parent,self.baseline_event,self.baseline_entry,self.baseline_sound,
+                    *([self.child,self.source,self.event,self.regular_event,self.action] if self.created else []),*([self.entry] if self.linked else [])]
+                if "waql" in args:
+                    match=re.match(r'from object ("(?:[^"\\]|\\.)*")(.*)',args["waql"]); assert match,args
+                    selected=match[1][1:-1]; tail=match[2]  # Closed fixture Wwise paths keep their domain separators.
+                    rows=[row for row in known if row["id"]==selected or row["path"]==selected]
+                    if "select referencesTo" in tail:
+                        rows=([*([self.entry] if self.linked else []),*([self.action] if self.created else [])] if selected==self.CHILD
+                            else [self.baseline_entry] if selected==self.baseline_sound["id"] else [])
+                    elif "select children" in tail:
+                        rows=[row for row in known if (row.get("parent") or {}).get("id")==selected]
+                else:
+                    selected=args["from"]; rows=[row for row in known if row["id"] in selected.get("id",[]) or row["path"] in selected.get("path",[])]
+                    if args.get("transform")==[{"select":["children"]}]:
+                        ids={row["id"] for row in rows}; rows=[row for row in known if (row.get("parent") or {}).get("id") in ids]
+                return {"return":[{key:copy.deepcopy(row[key]) for key in options["return"] if key in row} for row in rows]}
+            if uri=="ak.wwise.core.audio.import":
+                self.calls.append((uri,copy.deepcopy(args),copy.deepcopy(options))); self.import_count+=1
+                if fault=="indeterminate": raise RuntimeError("fake native transport lost after Dialogue import dispatch")
+                owner,media=args["imports"]
+                assert "dialogueEvent" in owner and "event" in owner and "audioFile" not in owner
+                assert "dialogueEvent" not in media and "event" not in media
+                owner_path=re.sub(r'<[^>]+>','',owner["objectPath"])
+                self.child.update(name=owner_path.rpartition('\\')[2],path=owner_path,parent={"id":self.parent["id"]},notes="")
+                wav=Path(media["audioFile"])
+                self.source.update(name=wav.stem,path=owner_path+'\\'+wav.stem,parent={"id":self.CHILD},notes="",originalFilePath=str(tmp_path/'project/Originals/SFX'/wav.name),**{"audioSource:language":{"id":"{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}","name":"SFX"}})
+                self.child.update(activeSource={"id":self.source["id"]},**{"sound:originalWavFilePath":self.source["originalFilePath"]})
+                self.event.update(name=owner["dialogueEvent"].rpartition('\\')[2],path=owner["dialogueEvent"],parent={"id":self.EVENT_PARENT},notes="")
+                event_path=owner["event"].removesuffix('@Play')
+                self.regular_event.update(name=event_path.rpartition('\\')[2],path=event_path,parent={"id":self.REGULAR_PARENT},notes="",classId=classes["Event"])
+                self.action.update(path=event_path+'\\Play',parent={"id":self.REGULAR_EVENT},Target={"id":self.CHILD},notes="")
+                self.entry.update(path=self.event["path"]+'\\opaque fixture association',owner={"id":self.EVENT},AudioNode={"id":self.CHILD},notes="")
+                copied=Path(self.source["originalFilePath"]); copied.parent.mkdir(parents=True,exist_ok=True); copied.write_bytes(wav.read_bytes())
+                self.created=self.event_created=True; self.linked=self.effect
+                return {"objects":copy.deepcopy([self.child,self.source,self.event]),"log":[],"files":[str(copied)]}
+            return super().call(uri,args,options)
+    client=Client(); state=tmp_path/'state'; env=set_gateway_config(_env(tmp_path),wwise_version='2025.1')
+    immutable=tmp_path/'immutable-source'; immutable.mkdir(); project=immutable/'SampleProject.wproj'; project.write_text('immutable Dialogue source')
+    source_proof=sandbox_fixture.hash_project(immutable)
+    metadata=sandbox_fixture.SandboxMetadata(str(project),str(immutable),str(tmp_path/'project'),str(tmp_path/'project/SampleProject.wproj'),'2025.1',0,source_proof,sandbox_fixture.hash_project(tmp_path/'project'),project.stat().st_mtime,process_cleanup_result='cleaned',process_cleanup_details={'residual_processes':[]})
+    sandbox=sandbox_fixture.SandboxProject(project,immutable,tmp_path,tmp_path/'project',tmp_path/'project/SampleProject.wproj',metadata)
+    for relative in ('Containers/Default Work Unit.wwu','Events/Default Work Unit.wwu','Dynamic Dialogue/Dialogue.wwu'):
+        destination=sandbox.sandbox_path/relative; destination.parent.mkdir(parents=True,exist_ok=True); shutil.copyfile(source/relative,destination)
+    runtime=workflow._WorkflowSandboxRuntime('2025.1',sandbox,SimpleNamespace(host='127.0.0.1',port=31337,waapi_url='ws://127.0.0.1:31337/waapi'),state,env,workflow.exact_git_candidate(workflow.REPO_ROOT),[])
+    monkeypatch.setattr(workflow._WorkflowSandboxRuntime,'raw_gateway',lambda _runtime,argv:waapi_gateway.execute_gateway(['--state-dir',str(state),*argv],env=env,client_factory=lambda _:client))
+    lock=sandbox_fixture.LiveSandboxLock(tmp_path/'locks'); lock.__enter__(); node='test_audio_import_creates_play_event_and_dialogue_link'; error=None
+    try: getattr(workflow,node)(runtime)
+    except AssertionError as exc:error=exc
+    category,=runtime.category_results; body=Path(category['observation_path']).read_bytes(); report=json.loads(body)
+    final=_finish((workflow,runtime,client,lock,source_proof),tmp_path,monkeypatch,[(node,error)])[-1]
+    assert (error is None)==(fault is None),error
+    assert final['invocation']['outcome']==('PASS' if fault is None else 'FAIL')
+    assert final['categories'][0]['observation_sha256']==hashlib.sha256(body).hexdigest()
+    assert len(final['transactions'])==client.import_count==1
+    assert report['transaction_budget']==1 and report['business_effect_verified'] is (fault is None)
+    assert final['residual_state']['sandbox']==('deleted' if fault is None else 'quarantined')
+    assert not any(uri.endswith(('.setReference','.create','.set')) for uri,_,_ in client.calls)
+    if fault=='indeterminate':
+        assert report['calls'][-1]['argv']==['execute',report['witness']['transaction_id']]
+        assert 'after' not in report['observations']
+    elif fault:
+        assert report['witness']['verify']['state']=='verification_failed'
+        assert report['observations']['after']['source_media'] and report['observations']['after']['actions']
+        assert report['observations']['after']['entries']==[], 'Media/Event success cannot hide absent Dialogue link'

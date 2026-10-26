@@ -1094,6 +1094,16 @@ def test_read_only_dialogue_list_membership_observation(workflow_sandbox_runtime
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_audio_import_creates_play_event_and_dialogue_link(workflow_sandbox_runtime):
+    """One new SFX Sound/media, Play Event and Dialogue association in one import."""
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("Representative basic Dialogue import is pinned to 2025.1")
+    from tests.destructive.support.audio_import_acceptance import collect_dialogue_import_acceptance
+    collect_dialogue_import_acceptance(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_music_playlist_canonical_query_create_and_import_parent(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:

@@ -1194,3 +1194,160 @@ def collect_dialogue_read_probe(runtime, *, memberships=False):
         raise
     finally:
         persist()
+
+
+def collect_dialogue_import_acceptance(runtime):
+    """One basic import creates media, a Play Event and a Dialogue association."""
+    import xml.etree.ElementTree as ET
+    from tests.destructive.test_gateway_workflow_transaction_matrix import (
+        REPO_ROOT, _start_business_draft, _update_business_draft, _bind_business_object, _write_fixture_wav,
+    )
+    assert runtime.version == "2025.1"
+    output = runtime.state_dir / "dialogue-import-witness.json"
+    assert not output.exists(), "Never overwrite an original Dialogue witness"
+    category = {"category": "audio-import-dialogue-and-play-event", "status": "FAIL", "transaction_ids": [],
+        "observation_path": str(output), "verifier_strength": "public_verifier_plus_exact_owner_audionode_event_target_media_and_preservation"}
+    runtime.category_results.append(category)
+    report = {"contract": "waapi-skill.dialogue-import-witness/v1", "candidate": runtime.candidate,
+        "version": runtime.version, "transaction_budget": 1, "business_effect_verified": False, "stage": "baseline",
+        "calls": [], "witness": {}, "observations": {}, "inputs": {}, "failure": None,
+        "scope": "Basic creation/link only; no conditional path, weight, ordering or internal default claim",
+        "limits": {"calls": 64, "reply_bytes": 524288, "receipt_bytes": 4194304}}
+    attempted = set()
+    def persist():
+        body = json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= report["limits"]["receipt_bytes"]
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix(".tmp"); temporary.write_bytes(body); temporary.replace(output)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+    class Gateway:
+        version, lifecycle, port = runtime.version, runtime.lifecycle, runtime.port
+        def raw_gateway(self, argv):
+            assert len(report["calls"]) < report["limits"]["calls"]
+            if argv[0] == "execute":
+                assert argv[1] not in attempted, "Never retry Dialogue import execution"
+                attempted.add(argv[1])
+            call = {"argv": list(argv)}; report["calls"].append(call)
+            try:
+                code, payload = runtime.raw_gateway(argv); call.update(exit_code=code, payload=payload)
+                assert len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) <= report["limits"]["reply_bytes"]
+                return code, payload
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get("ok") is True, payload
+            if live:
+                assert payload.get("detected_version") == runtime.version
+                assert payload.get("endpoint") == {"host":runtime.lifecycle.host,"port":runtime.port,"url":runtime.lifecycle.waapi_url}
+            return payload
+    gateway = Gateway()
+    owned = runtime.sandbox.sandbox_path.resolve(strict=True)
+    def proof(raw):
+        lexical = Path(localize_waapi_host_path(raw)); assert not lexical.is_symlink()
+        path = lexical.resolve(strict=True); assert path.is_relative_to(owned) and path.is_file()
+        body = path.read_bytes(); assert 0 < len(body) <= 65536
+        return {"path":str(path),"size":len(body),"sha256":hashlib.sha256(body).hexdigest()}
+    def query(argv, *, includes=(), fields=(), maximum=8):
+        payload = gateway.gateway(["query-object", *argv, "--max-results", str(maximum),
+            *(word for include in includes for word in ("--include",include)),
+            *(word for field in fields for word in ("--include-field",field))], live=True)
+        assert payload.get("projection_complete") is not False and payload.get("limit_reached") is not True and payload.get("status") != "partial", payload
+        rows = payload["objects"]; assert payload["count"] == len(rows) <= maximum, payload
+        return rows
+    def exact(identity, *, fields=()):
+        rows = query(["--exact-id",identity], includes=("class-id","notes","parent","owner"), fields=fields, maximum=2)
+        assert len(rows) == 1 and rows[0]["id"] == identity, rows
+        return rows[0]
+    def at(segments):
+        rows = query([word for segment in segments for word in ("--path-segment",segment)], includes=("class-id","parent"), maximum=2)
+        assert len(rows) == 1, rows
+        return rows[0]
+    try:
+        classes = {row["name"]:row["classId"] for row in json.loads((REPO_ROOT/"skills/waapi-skill/resources/metadata/2025.1/object-types.json").read_text())["types"]}
+        parents = {}; before = report["observations"]["before"] = {"parents":{},"borrowed":{}}
+        for key, hierarchy, relative in (("sound","Containers","Containers/Default Work Unit.wwu"),
+            ("play","Events","Events/Default Work Unit.wwu"),("dialogue","Dynamic Dialogue","Dynamic Dialogue/Dialogue.wwu")):
+            source_path = (owned/relative).resolve(strict=True); assert source_path.is_relative_to(owned)
+            document = ET.parse(source_path); work_unit = document.find("./" + ("DynamicDialogue" if key=="dialogue" else hierarchy) + "/WorkUnit")
+            assert work_unit is not None
+            segments = (hierarchy,work_unit.attrib["Name"])
+            row = at(segments)
+            assert row["id"] == work_unit.attrib["ID"] and row["type"] == "WorkUnit" and row["class_id"] == classes["WorkUnit"], row
+            assert row["path"] == "\\" + "\\".join(segments), row
+            parents[key] = row
+            before["parents"][key] = exact(row["id"])
+        for key, identity, fields in (("event","{3C874205-5335-4290-830F-A8BFF3AE8A6B}",()),
+            ("entry","{A1AEBDF2-1B8E-4E92-9CE8-336DB7CB44CA}",("AudioNode",)),
+            ("sound","{CFA81CFE-9D22-4078-9738-83471EF92418}",())):
+            before["borrowed"][key] = exact(identity, fields=fields)
+        assert before["borrowed"]["entry"]["owner"]["id"] == before["borrowed"]["event"]["id"]
+        assert before["borrowed"]["entry"]["references"]["AudioNode"]["id"] == before["borrowed"]["sound"]["id"]
+        suffix = uuid.uuid4().hex[:10]; name = "ImportDialogue_" + suffix
+        media = _write_fixture_wav(owned/"GatewayDialogueWitness",name,frequency=660)
+        report["inputs"][str(media)] = proof(str(media))
+        draft = _start_business_draft(gateway,"audio.import")
+        # The pinned import contract documents useExisting creation for absent
+        # names. New declarations still retain exact absence/prewrite guards.
+        handles = {key:_bind_business_object(gateway,draft,object_id=row["id"]) for key,row in parents.items()}
+        _update_business_draft(gateway,draft,"draft-business-configure",["--mode","reimport"],live=False)
+        play_name, dialogue_name = "Play_"+name, "Dialogue_"+name
+        _update_business_draft(gateway,draft,"draft-declare-new",["--declaration-id","sound","--parent-handle",handles["sound"],
+            "--name",name,"--kind","sound-sfx","--field","media_file",str(media),
+            "--event-parent-handle",handles["play"],"--event-name",play_name,"--event-action","Play",
+            "--dialogue-event-parent-handle",handles["dialogue"],"--dialogue-event-name",dialogue_name],live=False)
+        report["stage"] = "witness"
+        _update_business_draft(gateway,draft,"draft-check",live=True)
+        preview = _update_business_draft(gateway,draft,"preview-from-draft",live=True)
+        witness=report["witness"]; tx=preview["transaction_id"]; category["transaction_ids"].append(tx)
+        witness.update(transaction_id=tx,preview=preview)
+        shown = gateway.gateway(["transaction-show",tx],live=False)
+        dispatch = witness["compiled_native_request"] = shown["artifact"]["prepared_operation"]["dispatch"]
+        assert dispatch["uri"] == "ak.wwise.core.audio.import" and dispatch["args"]["importOperation"] == "useExisting", dispatch
+        owner, source = dispatch["args"]["imports"]
+        assert owner["dialogueEvent"] == parents["dialogue"]["path"]+"\\"+dialogue_name
+        assert owner["event"] == parents["play"]["path"]+"\\"+play_name+"@Play" and "audioFile" not in owner
+        assert source["audioFile"] == str(media) and "event" not in source and "dialogueEvent" not in source
+        gateway.gateway(["confirm",tx,"--confirmation-token",shown["confirmation"]["token"]],live=False)
+        code, executed = gateway.raw_gateway(["execute",tx]); witness.update(execute_exit_code=code,execute=executed); persist()
+        if code != 0 or executed.get("state") != "executed_unverified":
+            category["status"]="blocked"; raise AssertionError("Dialogue import execution unknown; no follow-up calls")
+        code, verified = gateway.raw_gateway(["verify",tx]); witness.update(verify_exit_code=code,verify=verified); persist()
+        if verified.get("state") == "indeterminate" or verified.get("status") == "indeterminate":
+            category["status"]="blocked"; raise AssertionError("Dialogue verification unknown; no follow-up calls")
+        after = report["observations"]["after"] = {}
+        after["sound"] = at(("Containers",parents["sound"]["name"],name))
+        after["play_event"] = at(("Events",parents["play"]["name"],play_name))
+        after["dialogue_event"] = at(("Dynamic Dialogue",parents["dialogue"]["name"],dialogue_name))
+        sound, play, dialogue = (after[key] for key in ("sound","play_event","dialogue_event"))
+        after["sources"] = query(["--exact-id",sound["id"],"--relationship","children"],includes=("class-id","parent","source-language","original-file-path","notes"))
+        new_source, = after["sources"]; after["source_media"] = proof(new_source["original_file_path"])
+        after["actions"] = query(["--exact-id",play["id"],"--relationship","event-actions"], maximum=100)
+        referrers = query(["--exact-id",sound["id"],"--relationship","references-to"],includes=("class-id","owner"))
+        after["referrers"] = referrers
+        after["entries"] = [exact(row["id"],fields=("AudioNode",)) for row in referrers if row["type"] == "MultiSwitchEntry"]
+        after["parents"] = {key:exact(row["id"]) for key,row in parents.items()}
+        after["borrowed"] = {key:exact(row["id"],fields=("AudioNode",) if key=="entry" else ()) for key,row in before["borrowed"].items()}
+        persist()
+        assert after["parents"] == before["parents"] and after["borrowed"] == before["borrowed"]
+        assert len({sound["id"],play["id"],dialogue["id"],new_source["id"]}) == 4
+        for row, kind, parent in ((sound,"Sound",parents["sound"]),(play,"Event",parents["play"]),(dialogue,"DialogueEvent",parents["dialogue"])):
+            assert row["type"] == kind and row["class_id"] == classes[kind] and row["parent"]["id"] == parent["id"], row
+        assert new_source["class_id"] == classes["AudioFileSource"] and new_source["parent"]["id"] == sound["id"]
+        assert new_source["source_language"]["name"] == "SFX" and after["source_media"]["sha256"] == report["inputs"][str(media)]["sha256"]
+        action, = after["actions"]
+        assert action["type"] == "Action" and action["action_type"] == 1 and action["target"]["id"] == sound["id"], action
+        assert len(after["entries"]) == 1, "Exactly one requested Dialogue association must be observed"
+        linked_entry, = after["entries"]
+        assert linked_entry["class_id"] == classes["MultiSwitchEntry"] and linked_entry["owner"]["id"] == dialogue["id"]
+        assert linked_entry["references"]["AudioNode"]["id"] == sound["id"]
+        assert {row["id"] for row in referrers} == {action["id"],linked_entry["id"]}
+        assert proof(str(media)) == report["inputs"][str(media)]
+        assert code == 0 and verified.get("verified") is True, verified
+        report.update(stage="complete",business_effect_verified=True); category["status"]="PASS"
+        return category
+    except Exception as exc:
+        report["failure"]={"type":type(exc).__name__,"message":str(exc)[:2048]}
+        raise
+    finally:
+        persist()
