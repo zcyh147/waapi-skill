@@ -55,6 +55,8 @@ def test_exact_legacy_curve_points_capability(workflow_sandbox_runtime, monkeypa
         oracle = {'curve_id':CURVE,'owner_id':RTPC,
             'xy':[[float(row.findtext('XPos')),float(row.findtext('YPos'))] for row in stored],
             'stored_flags':[row.findtext('Flags') for row in stored],
+            'numeric_comparison':{'relative_tolerance':2**-23,'absolute_tolerance':0,
+                'scope':'serialized source XY versus native float32 representation only; count/order and native-public values stay exact'},
             'flags_interpretation':'uninterpreted; no interpolation decoder or mathematical claim'}
         assert oracle['xy'] == [[0.0,-5.67053],[1.0,0.0]] and oracle['stored_flags'] == ['21','53']
         observation['source_oracle'] = oracle
@@ -89,7 +91,11 @@ def test_exact_legacy_curve_points_capability(workflow_sandbox_runtime, monkeypa
         assert native_row['id'] == CURVE and native_row['classId'] == 917520 and native_row['owner']['id'] == RTPC
         assert 'points' in native_row and native_row['points'] is not None, 'Required points were omitted or null; no absence conclusion'
         assert row.get('curve_points') == native_row['points']
-        assert [[point['x'],point['y']] for point in row['curve_points']] == oracle['xy']
+        # One float32 relative epsilon admits representation rounding of the
+        # decimal fixture. Zero stays exact; this does not round native output.
+        assert len(row['curve_points']) == len(oracle['xy'])
+        for point, expected in zip(row['curve_points'], oracle['xy']):
+            assert [point['x'],point['y']] == pytest.approx(expected, rel=2**-23, abs=0)
         observation.update(ordered_source_xy_verified=True,business_effect_verified=True)
         status = 'PASS'
     except BaseException as exc:
