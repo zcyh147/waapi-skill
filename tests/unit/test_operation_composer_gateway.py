@@ -332,10 +332,18 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # The first owner-only localized field slice changes only the 2025 contract.
+    # Invert that exact disclosure and retain the native GUID boundary seal.
+    assert canonical_sha256(non_object_set_digests) == "6bf96594342dac95d9c41ce5cbdaca2ad4c3c79aed0f02ee1c23fcc76fb7d6c5"
+    owner_only_contract = operation_request_machine_contract("audio.importTabDelimited", "2025.1")
+    assert owner_only_contract["constraints"].pop() == (
+        "the first localized owner-field TSV slice admits an existing typed Sound Voice owner-only row in useExisting on 2025.1; live class metadata validates property/reference fields, required activation columns stay explicit, and Source Notes, identities, languages, placement and file bytes remain preserved; broader localized field/media combinations remain outside this slice"
+    )
+    non_object_set_digests["audio.importTabDelimited@2025.1"] = canonical_sha256(owner_only_contract)
     # One observed Console/build boundary changes only the 2025 TSV contract.
     # Remove exactly that disclosure and retain the complete prior schema seal.
     assert canonical_sha256(non_object_set_digests) == "f33f339b6f3ce93d866a2d1a42e0f5277f81ee7631ee0ccbb89f6f42f79d5b0a"
-    native_boundary_contract = operation_request_machine_contract("audio.importTabDelimited", "2025.1")
+    native_boundary_contract = owner_only_contract
     assert native_boundary_contract["constraints"].pop() == (
         "WwiseConsole 2025.1.7 build 9143 blocks GUID Object Path TSV cells before preview and execution: retained native evidence interpreted them as literal object names and created unintended objects; other host/version GUID semantics remain unproven pending scope decision"
     )
