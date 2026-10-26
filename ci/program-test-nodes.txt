@@ -66,6 +66,7 @@ tests/unit/test_audio_import_business_adapter.py
 tests/unit/test_audio_import_business_gateway.py
 tests/unit/test_import_switch_assignment_gateway.py
 tests/unit/test_tsv_combined_fields_media_gateway.py
+tests/unit/test_tsv_switch_columns_gateway.py
 tests/unit/test_existing_sfx_import.py
 tests/unit/test_audio_import_business_migration.py
 tests/unit/test_business_declarations.py
