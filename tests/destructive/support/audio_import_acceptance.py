@@ -1,4 +1,4 @@
-"""Two bounded import witnesses using the existing owned workflow lifecycle."""
+"""Bounded import witnesses using the existing owned workflow lifecycle."""
 from __future__ import annotations
 
 import hashlib
@@ -267,3 +267,202 @@ def collect_mixed_import_acceptance(runtime):
 
 def collect_localized_import_acceptance(runtime):
     return _collect(runtime, localized=True)
+
+
+def collect_localized_tsv_import_acceptance(runtime):
+    """One unchanged table, two independent Notes columns; preserve failed facts."""
+    from tests.destructive.test_gateway_workflow_transaction_matrix import (
+        _start_business_draft, _update_business_draft, _bind_business_object,
+        _complete_business_draft, _write_fixture_wav,
+    )
+    assert runtime.version == "2025.1", "Representative unchanged-table witness is pinned to 2025.1"
+    name = "TSV_Witness_" + uuid.uuid4().hex[:10]
+    output = runtime.state_dir / "localized-exact-tsv-notes-witness.json"
+    assert not output.exists(), "Never overwrite original native observations"
+    category = {"category": "audio-import-localized-exact-tsv-notes", "status": "FAIL",
+        "verifier_strength": "gateway_verifier_plus_independent_owner_source_notes_identity_media_and_preservation",
+        "observation_path": str(output), "transaction_ids": []}
+    runtime.category_results.append(category)
+    report = {"contract": "waapi-skill.localized-tsv-witness/v1", "candidate": runtime.candidate,
+        "version": runtime.version, "setup_coverage_credit": False, "business_effect_verified": False,
+        "transaction_budget": {"setup": 2, "witness": 1, "maximum_total": 3},
+        "stage": "setup", "calls": [], "setup": [], "witness": {}, "rows": [],
+        "observations": {}, "observation_errors": [], "inputs": {}, "failure": None,
+        "limits": {"calls": 128, "reply_bytes": 262144, "receipt_bytes": 2097152},
+        "lifecycle_acceptance": "Requires existing final host-category-evidence/v3 source-integrity and cleanup record"}
+    attempted = set()
+    def persist():
+        body = json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= report["limits"]["receipt_bytes"], "TSV witness receipt bound exceeded"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix(".tmp"); temporary.write_bytes(body); temporary.replace(output)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+    class Gateway:
+        version, lifecycle, port = runtime.version, runtime.lifecycle, runtime.port
+        def raw_gateway(self, argv):
+            assert len(report["calls"]) < report["limits"]["calls"]
+            if argv[0] == "execute":
+                assert argv[1] not in attempted, "Never retry native witness execution"
+                attempted.add(argv[1])
+            call = {"argv": list(argv)}; report["calls"].append(call)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                call.update(exit_code=code, payload=payload)
+                assert len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) <= report["limits"]["reply_bytes"]
+                return code, payload
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get("ok") is True, payload
+            if live:
+                assert payload["detected_version"] == runtime.version
+                assert payload["endpoint"] == {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}
+            return payload
+    gateway = Gateway()
+    owned = runtime.sandbox.sandbox_path.resolve(strict=True)
+    def proof(raw):
+        lexical = Path(localize_waapi_host_path(raw))
+        assert not lexical.is_symlink(), lexical
+        path = lexical.resolve(strict=True)
+        assert path.is_relative_to(owned) and path.is_file(), path
+        body = path.read_bytes(); assert 0 < len(body) <= 65536
+        return {"path": str(path), "size": len(body), "sha256": hashlib.sha256(body).hexdigest()}
+    def query(argv, includes=()):
+        payload = gateway.gateway(["query-object", *argv,
+            *(word for field in includes for word in ("--include", field)), "--max-results", "8"], live=True)
+        assert payload.get("projection_complete") is not False and payload.get("limit_reached") is not True and payload.get("status") != "partial", payload
+        assert payload["count"] == len(payload["objects"]), payload
+        return payload["objects"]
+    def exact(identity):
+        rows = query(["--exact-id", identity], ("notes", "parent", "class-id"))
+        assert len(rows) == 1 and rows[0]["id"] == identity and isinstance(rows[0].get("notes"), str), rows
+        return rows[0]
+    def at(*segments):
+        rows = query([word for segment in segments for word in ("--path-segment", segment)])
+        assert len(rows) == 1, rows
+        return rows[0]["id"]
+    def sources(identity):
+        rows = query(["--exact-id", identity, "--relationship", "children"],
+            ("class-id", "parent", "source-language", "original-file-path", "notes"))
+        assert rows and all(row["type"] == "AudioFileSource" and row["class_id"] == 16
+            and row["parent"]["id"] == identity and isinstance(row.get("notes"), str) for row in rows), rows
+        return [{"object": row, "media": proof(row["original_file_path"])} for row in rows]
+    def observe(identity, bucket):
+        # Capture both independent facts even if one read is incomplete. Raw
+        # bounded replies and actual failed verifier readbacks remain durable.
+        for key, read in (("owner", lambda: exact(identity)), ("sources", lambda: sources(identity))):
+            try: bucket[key] = read()
+            except Exception as exc:
+                report["observation_errors"].append({"identity": identity, "part": key, "type": type(exc).__name__, "message": str(exc)[:2048]})
+            persist()
+    def audio(index, stem):
+        path = _write_fixture_wav(owned / "GatewayTSVWitness" / str(index), stem, frequency=330 + index * 110)
+        report["inputs"][str(path)] = proof(str(path))
+        return path
+    def setup(draft, phase_name):
+        phase = {"name": phase_name}; report["setup"].append(phase)
+        def inspect(preview):
+            category["transaction_ids"].append(preview["transaction_id"])
+            phase["transaction_id"] = preview["transaction_id"]
+        result = _complete_business_draft(gateway, draft, inspect_preview=inspect, phase_receipt=phase)
+        phase.update(execute=result["execute"], verify=result["verify"]); persist()
+    try:
+        initial = {key: audio(index, stem) for index, (key, stem) in enumerate((
+            ("VoiceNotes", "LineNotes"), ("VoiceSource", "LineSource"), ("Spare", "Spare")))}
+        draft = _start_business_draft(gateway, "audio.import")
+        parent = _bind_business_object(gateway, draft, path_segments=("Containers", "Default Work Unit"))
+        args = ["--row-order", "root", "notes", "source", "spare", "--new-row", "root", parent, name, "actor-mixer"]
+        for key, row, kind in (("VoiceNotes", "notes", "sound-voice"), ("VoiceSource", "source", "sound-voice"), ("Spare", "spare", "sound-sfx")):
+            args.extend(["--new-row", row, "root", key, kind, "--field", row, "media_file", str(initial[key])])
+            if kind == "sound-voice": args.extend(["--field", row, "language", "English(US)"])
+        _update_business_draft(gateway, draft, "draft-declare-import-batch", args, live=False)
+        setup(draft, "basic_english_and_spare")
+        container = at("Containers", "Default Work Unit", name)
+        identities = {key: at("Containers", "Default Work Unit", name, key) for key in initial}
+        japanese = audio(3, "LineNotes")
+        draft = _start_business_draft(gateway, "audio.import")
+        voice = _bind_business_object(gateway, draft, object_id=identities["VoiceNotes"])
+        _update_business_draft(gateway, draft, "draft-declare-existing", ["--declaration-id", "japanese", "--object-handle", voice,
+            "--field", "media_file", str(japanese), "--field", "language", "Japanese"], live=False)
+        setup(draft, "basic_japanese_media_only")
+        before = report["observations"]["before"] = {}
+        for key, identity in identities.items():
+            before[key] = {}; observe(identity, before[key])
+        assert not report["observation_errors"], report["observation_errors"]
+        for key, languages in (("VoiceNotes", {"English(US)", "Japanese"}), ("VoiceSource", {"English(US)"})):
+            by_language = {row["object"]["source_language"]["name"]: row for row in before[key]["sources"]}
+            assert len(by_language) == len(before[key]["sources"]) and set(by_language) == languages, before[key]
+            assert by_language["English(US)"]["media"]["sha256"] == report["inputs"][str(initial[key])]["sha256"]
+            if "Japanese" in languages:
+                assert by_language["Japanese"]["media"]["sha256"] == report["inputs"][str(japanese)]["sha256"]
+            report["rows"].append({"name": key, "owner_id": identities[key],
+                "baseline_owner_notes": before[key]["owner"]["notes"],
+                "baseline_source_notes": {row["object"]["source_language"]["name"]: row["object"]["notes"] for row in before[key]["sources"]}})
+        replacement = {key: audio(index + 4, stem) for index, (key, stem) in enumerate((("VoiceNotes", "LineNotes"), ("VoiceSource", "LineSource")))}
+        table = owned / "GatewayTSVWitness/exact-localized.tsv"
+        table.write_text("Audio File\tObject Path\tNotes\tAudio Source Notes\tOriginalsSubFolder\n"
+            + "".join(f"{replacement[key]}\t<Sound Voice>{key}\t{notes}\t{source_notes}\tAfter\n"
+                for key, notes, source_notes in (("VoiceNotes", "TSV requested object Notes", ""), ("VoiceSource", "", "TSV requested source Notes"))),
+            encoding="utf-8", newline="\n")
+        table_proof = proof(str(table)); report["table"] = {**table_proof, "utf8": table.read_text(encoding="utf-8")}
+        report["stage"] = "witness"
+        draft = _start_business_draft(gateway, "audio.importTabDelimited")
+        location = _bind_business_object(gateway, draft, role="import_location", object_id=container)
+        _update_business_draft(gateway, draft, "draft-declare-artifact-plan", ["--table-file", str(table), "--location-handle", location,
+            "--language", "English(US)", "--mode", "reimport"], live=False)
+        _update_business_draft(gateway, draft, "draft-check", live=True)
+        preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
+        witness = report["witness"]; transaction = preview["transaction_id"]
+        category["transaction_ids"].append(transaction)
+        witness.update(transaction_id=transaction, preview=preview)
+        shown = gateway.gateway(["transaction-show", transaction], live=False)
+        dispatch = shown["artifact"]["prepared_operation"]["dispatch"]; witness["compiled_native_request"] = dispatch
+        assert dispatch["uri"] == "ak.wwise.core.audio.importTabDelimited"
+        assert dispatch["args"] == {"importFile": str(table), "importLocation": container,
+            "importLanguage": "English(US)", "importOperation": "useExisting", "autoAddToSourceControl": False, "autoCheckOutToSourceControl": False}
+        assert proof(str(table)) == table_proof
+        gateway.gateway(["confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]], live=False)
+        code, executed = gateway.raw_gateway(["execute", transaction]); witness.update(execute_exit_code=code, execute=executed); persist()
+        if code != 0 or executed.get("state") != "executed_unverified":
+            category["status"] = "blocked"
+            raise AssertionError("Native TSV outcome is not determinate; no follow-up writes or reads")
+        code, verified = gateway.raw_gateway(["verify", transaction]); witness.update(verify_exit_code=code, verify=verified); persist()
+        # Successful Verify stdout is compact; one public journal read retains
+        # the original verifier's readbacks without repeating native Verify.
+        saved_code, saved = gateway.raw_gateway(["transaction-show", transaction])
+        witness["journal_exit_code"] = saved_code
+        actual = [event["details"]["verification"] for event in saved.get("events", []) if event.get("event_type") == "verification_recorded"]
+        if saved_code != 0:
+            report["observation_errors"].append({"part": "verifier_journal", "message": "Public transaction evidence unavailable"})
+        witness["actual_verifications"] = actual
+        after = report["observations"]["after"] = {}
+        for key, identity in identities.items():
+            after[key] = {}; observe(identity, after[key])
+        report["table_after"] = proof(str(table)); persist()
+        assert not report["observation_errors"], report["observation_errors"]
+        assert len(actual) == 1 and isinstance(actual[0].get("readbacks"), list), "Actual verifier readbacks missing"
+        assert report["table_after"] == table_proof
+        assert all(proof(path) == original for path, original in report["inputs"].items())
+        assert after["Spare"] == before["Spare"]
+        for key in ("VoiceNotes", "VoiceSource"):
+            prior, current = before[key], after[key]
+            old = {row["object"]["source_language"]["name"]: row for row in prior["sources"]}
+            new = {row["object"]["source_language"]["name"]: row for row in current["sources"]}
+            assert len(new) == len(current["sources"]) == len(old) == len(prior["sources"])
+            assert set(new) == set(old)
+            assert current["owner"] == {**prior["owner"], "notes": "TSV requested object Notes" if key == "VoiceNotes" else prior["owner"]["notes"]}
+            assert new["English(US)"]["object"]["id"] == old["English(US)"]["object"]["id"]
+            assert new["English(US)"]["object"]["notes"] == (old["English(US)"]["object"]["notes"] if key == "VoiceNotes" else "TSV requested source Notes")
+            assert new["English(US)"]["media"]["sha256"] == report["inputs"][str(replacement[key])]["sha256"]
+            assert Path(new["English(US)"]["media"]["path"]).parent.name == "After"
+            assert new["English(US)"]["media"]["path"] != old["English(US)"]["media"]["path"]
+            if "Japanese" in old: assert new["Japanese"] == old["Japanese"]
+        assert code == 0 and verified.get("verified") is True, verified
+        report.update(stage="complete", business_effect_verified=True); category["status"] = "PASS"
+        return category
+    except Exception as exc:
+        report["failure"] = {"type": type(exc).__name__, "message": str(exc)[:2048]}
+        raise
+    finally:
+        persist()
