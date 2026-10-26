@@ -355,6 +355,11 @@ def test_combined_owner_media_tsv_native_witness_stops_at_observed_source_bounda
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault="source-identity-boundary", witness_kind="owner-fields-media-tsv")
 
 
+@pytest.mark.parametrize("fault", (None, "ignored-media"))
+def test_distinct_source_combined_tsv_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
+    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="distinct-owner-fields-media-tsv")
+
+
 @pytest.mark.parametrize("fault", (None, "missing-assignment", "indeterminate"))
 def test_switch_import_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
     """Actual producer/Gateway/verifier/final writer, source-backed external graph."""
@@ -632,7 +637,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 if "@" + name in row:
                     owner["@" + name] = {"id": row["@" + name]} if name == "OutputBus" else row["@" + name]
             if owner["type"] == "Sound":
-                owner.setdefault("@Volume", 0.0); owner.setdefault("@OutputBus", {"id": self.bus["id"]} if witness_kind in {"owner-fields-tsv", "owner-fields-media-tsv"} else None); owner.setdefault("@OverrideOutput", False)
+                owner.setdefault("@Volume", 0.0); owner.setdefault("@OutputBus", {"id": self.bus["id"]} if witness_kind in {"owner-fields-tsv", "owner-fields-media-tsv", "distinct-owner-fields-media-tsv"} else None); owner.setdefault("@OverrideOutput", False)
             if "notes" in row and not explicit_source and "audioFile" not in row and "audioFileBase64" not in row:
                 owner["notes"] = row["notes"]
             returned = [owner]
@@ -651,7 +656,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 copied = (copied / row.get("originalsSubFolder", "") / media.name if "audioFile" in row
                     else tmp_path / "project/Originals" / media)
                 copied.parent.mkdir(parents=True, exist_ok=True)
-                if not (witness_kind == "owner-fields-media-tsv" and fault == "ignored-media" and self.tab_count):
+                if not (witness_kind in {"owner-fields-media-tsv", "distinct-owner-fields-media-tsv"} and fault == "ignored-media" and self.tab_count):
                     copied.write_bytes(data)
                 if source is None:
                     source = {"id": "{" + str(uuid.uuid4()).upper() + "}", "name": source_name,
@@ -669,7 +674,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
             if uri.endswith("getInfo"):
                 info = super().call(uri, args, options)
                 info["version"].update(minor=7, build=9143, displayName="v2025.1.7.9143")
-                if witness_kind in {"explicit-source-tsv", "guid-source-tsv", "owner-fields-media-tsv"} and os.name == "posix":
+                if witness_kind in {"explicit-source-tsv", "guid-source-tsv", "owner-fields-media-tsv", "distinct-owner-fields-media-tsv"} and os.name == "posix":
                     info.update(processPath=r"C:\Wwise\WwiseConsole.exe", platform="x64")
                 return info
             if uri.endswith("getTypes"):
@@ -688,7 +693,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 return {"name": "IsVoice", "type": "bool", "default": False, "dependencies": []}
             if uri.endswith("getProjectInfo"):
                 info = super().call(uri, args, options)
-                if witness_kind in {"explicit-source-tsv", "guid-source-tsv", "owner-fields-media-tsv"} and os.name == "posix":
+                if witness_kind in {"explicit-source-tsv", "guid-source-tsv", "owner-fields-media-tsv", "distinct-owner-fields-media-tsv"} and os.name == "posix":
                     from tests.unit.test_transaction_gateway import z_wire_path
                     info["path"] = z_wire_path(tmp_path / "project/SampleProject.wproj")
                 info["languages"].extend([{"id": ENGLISH, "name": "English(US)", "shortId": 2}, {"id": JAPANESE, "name": "Japanese", "shortId": 3}])
@@ -750,13 +755,13 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                         object_path = self.objects[args["importLocation"]]["path"] + "\\" + object_path
                     native = {"objectPath": object_path}
                     if "Notes" in row: native["notes"] = row["Notes"]
-                    if witness_kind in {"owner-fields-tsv", "owner-fields-media-tsv"}:
+                    if witness_kind in {"owner-fields-tsv", "owner-fields-media-tsv", "distinct-owner-fields-media-tsv"}:
                         native["@Volume"] = float(row["Property[Volume]"])
                         assert row["Property[OverrideOutput]"] in {"true", "false"}
                         native["@OverrideOutput"] = row["Property[OverrideOutput]"] == "true"
                         if fault != "ignored-reference": native["@OutputBus"] = row["Reference[OutputBus]"]
                     if row.get("Audio File"):
-                        if witness_kind in {"explicit-source-tsv", "guid-source-tsv", "owner-fields-media-tsv"}:
+                        if witness_kind in {"explicit-source-tsv", "guid-source-tsv", "owner-fields-media-tsv", "distinct-owner-fields-media-tsv"}:
                             assert not row["Audio File"].startswith("/"), "Wine cannot consume a POSIX absolute media cell"
                         native["audioFile"] = localize_waapi_host_path(row["Audio File"])
                     if row.get("OriginalsSubFolder"): native["originalsSubFolder"] = row["OriginalsSubFolder"]
@@ -800,7 +805,8 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
         "explicit-source-tsv": "test_audio_import_exact_tsv_owner_notes_existing_source_media",
         "guid-source-tsv": "test_audio_import_exact_tsv_guid_owner_and_source_media",
         "owner-fields-tsv": "test_audio_import_exact_tsv_owner_only_fields_preserve_sources",
-        "owner-fields-media-tsv": "test_audio_import_exact_tsv_combined_owner_fields_existing_media"}[witness_kind]
+        "owner-fields-media-tsv": "test_audio_import_exact_tsv_combined_owner_fields_existing_media",
+        "distinct-owner-fields-media-tsv": "test_audio_import_exact_tsv_combined_fields_distinct_language_sources"}[witness_kind]
     error = None
     try: getattr(workflow, node)(runtime)
     except AssertionError as exc: error = exc
@@ -855,15 +861,22 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
             assert client.import_count == 2 and client.tab_count == 1
             assert "Audio Source Notes" not in report["table"]["utf8"]
             cells = [line.split("\t") for line in report["table"]["utf8"].splitlines()]
-            if witness_kind in {"owner-fields-tsv", "owner-fields-media-tsv"}:
+            if witness_kind in {"owner-fields-tsv", "owner-fields-media-tsv", "distinct-owner-fields-media-tsv"}:
                 expected_cells = [["Object Path", "Property[Volume]", "Property[OverrideOutput]", "Reference[OutputBus]"],
                     ["<Sound Voice>VoiceNotes", "-6", "true", "{D2E0BC7E-7B3F-4FFE-A670-FAE02761B631}"]]
-                if witness_kind == "owner-fields-media-tsv":
+                if witness_kind in {"owner-fields-media-tsv", "distinct-owner-fields-media-tsv"}:
                     from wwise_waapi.host_paths import localize_waapi_host_path
                     assert len(cells) == 2 and cells[0] == ["Audio File", *expected_cells[0]] and cells[1][1:] == expected_cells[1]
                     assert Path(localize_waapi_host_path(cells[1][0])).name == "LineNotes.wav"
                     assert cells[1][0].startswith("Z:\\") if os.name == "posix" else Path(cells[1][0]).is_absolute()
                     assert not any("<AudioFileSource>" in cell for cell in cells[1])
+                    if witness_kind == "distinct-owner-fields-media-tsv":
+                        assert report["selected_console_host"]["isCommandLine"] is True
+                        assert report["selected_console_host"]["version"]["build"] == 9143
+                        english = report["distinct_source_configuration"]["English(US)"]
+                        japanese = report["distinct_source_configuration"]["Japanese"]
+                        assert english["name"] == "LineNotes" and japanese["name"] == "OtherLineNotes"
+                        assert english["path"] != japanese["path"]
                 else:
                     assert cells == expected_cells
                     assert "Audio File" not in report["table"]["utf8"]

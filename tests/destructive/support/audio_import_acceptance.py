@@ -276,9 +276,10 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
         _complete_business_draft, _write_fixture_wav,
     )
     assert runtime.version == "2025.1", "Representative unchanged-table witness is pinned to 2025.1"
-    assert witness_kind in {"notes-columns", "ordinary-owner-source", "explicit-source-tsv", "guid-source-tsv", "owner-fields-tsv", "owner-fields-media-tsv"}
-    combined_owner_media = witness_kind == "owner-fields-media-tsv"
-    owner_fields = witness_kind in {"owner-fields-tsv", "owner-fields-media-tsv"}
+    assert witness_kind in {"notes-columns", "ordinary-owner-source", "explicit-source-tsv", "guid-source-tsv", "owner-fields-tsv", "owner-fields-media-tsv", "distinct-owner-fields-media-tsv"}
+    distinct_sources = witness_kind == "distinct-owner-fields-media-tsv"
+    combined_owner_media = witness_kind in {"owner-fields-media-tsv", "distinct-owner-fields-media-tsv"}
+    owner_fields = witness_kind in {"owner-fields-tsv", "owner-fields-media-tsv", "distinct-owner-fields-media-tsv"}
     explicit_source_table = witness_kind in {"explicit-source-tsv", "guid-source-tsv"}
     ordinary = witness_kind == "ordinary-owner-source"
     name = "TSV_Witness_" + uuid.uuid4().hex[:10]
@@ -390,7 +391,7 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
         # A valid typed Source wire path must be unique across languages.
         # Preserve the old failed roots; only this future path-based fixture
         # gives the unrelated Japanese Source a distinct filename/name.
-        japanese = audio(3, "OtherLineNotes" if witness_kind == "explicit-source-tsv" else "LineNotes")
+        japanese = audio(3, "OtherLineNotes" if witness_kind == "explicit-source-tsv" or distinct_sources else "LineNotes")
         draft = _start_business_draft(gateway, "audio.import")
         voice = _bind_business_object(gateway, draft, object_id=identities["VoiceNotes"])
         _update_business_draft(gateway, draft, "draft-declare-existing", ["--declaration-id", "japanese", "--object-handle", voice,
@@ -406,6 +407,11 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
             assert by_language["English(US)"]["media"]["sha256"] == report["inputs"][str(initial[key])]["sha256"]
             if "Japanese" in languages:
                 assert by_language["Japanese"]["media"]["sha256"] == report["inputs"][str(japanese)]["sha256"]
+                if distinct_sources:
+                    english, other = by_language["English(US)"]["object"], by_language["Japanese"]["object"]
+                    assert english["name"] == "LineNotes" and other["name"] == "OtherLineNotes"
+                    assert english["path"] != other["path"] and english["id"] != other["id"]
+                    report["distinct_source_configuration"] = {"English(US)": english, "Japanese": other}
             report["rows"].append({"name": key, "owner_id": identities[key],
                 "baseline_owner_notes": before[key]["owner"]["notes"],
                 "baseline_source_notes": {row["object"]["source_language"]["name"]: row["object"]["notes"] for row in before[key]["sources"]}})
@@ -515,6 +521,11 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
         category["transaction_ids"].append(transaction)
         witness.update(transaction_id=transaction, preview=preview)
         shown = gateway.gateway(["transaction-show", transaction], live=False)
+        if distinct_sources:
+            host = shown["artifact"]["project_guard"]["wwise"]
+            assert host["isCommandLine"] is True and all(host["version"].get(key) == value
+                for key, value in (("year", 2025), ("major", 1), ("minor", 7), ("build", 9143))), host
+            report["selected_console_host"] = host
         dispatch = shown["artifact"]["prepared_operation"]["dispatch"]; witness["compiled_native_request"] = dispatch
         if ordinary:
             assert dispatch["uri"] == "ak.wwise.core.audio.import" and dispatch["args"]["importOperation"] == "useExisting"
@@ -658,6 +669,10 @@ def collect_localized_owner_fields_tsv_acceptance(runtime):
 
 def collect_localized_combined_owner_media_tsv_acceptance(runtime):
     return collect_localized_tsv_import_acceptance(runtime, witness_kind="owner-fields-media-tsv")
+
+
+def collect_localized_distinct_source_tsv_acceptance(runtime):
+    return collect_localized_tsv_import_acceptance(runtime, witness_kind="distinct-owner-fields-media-tsv")
 
 
 def collect_switch_import_acceptance(runtime):
