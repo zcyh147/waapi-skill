@@ -7086,6 +7086,197 @@ def test_rtpc_graph_acceptance_across_selected_version(workflow_sandbox_runtime:
     assert category['status'] == 'PASS', category
 
 
+def _collect_owned_control_input_disposition(runtime: _WorkflowSandboxRuntime, *, name: str) -> dict[str, Any]:
+    """Observe old-custom lifetime after a shared-reference change; no custom→custom claim."""
+    output = runtime.state_dir / 'owned-control-input-disposition-diagnostic.json'
+    category = {'category': 'owned-control-input-disposition-diagnostic', 'status': 'FAIL',
+        'observation_path': str(output), 'verifier_strength': 'bounded_disposition_observation_only_no_owned_replacement_acceptance'}
+    runtime.category_results.append(category)
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
+        'complete': False, 'owned_to_owned_acceptance': False, 'business_effect_verified': False,
+        'observational_scope': 'owned_ControlInput_displaced_by_verified_shared_target_only',
+        'old_input_disposition': {'state': 'unobserved'},
+        'lifecycle_acceptance': 'Existing host-category-evidence/v3 finalizer owns source, host and cleanup proof'}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 16 * 1024 * 1024, 'Disposition receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+    class Gateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 128, 'Disposition public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            return payload
+    gateway = Gateway()
+    projection = ['--include', 'class-id', '--include', 'owner', '--include', 'parent', '--include', 'notes']
+    def query(selector, fields=(), *, curve=False):
+        payload = gateway.gateway(['query-object', *selector, '--max-results', '2', *projection,
+            *(arg for field in fields for arg in ('--include-field', field)),
+            *(['--include', 'curve-points'] if curve else [])], live=True)
+        rows = payload.get('objects')
+        assert isinstance(rows, list) and len(rows) < 2 and payload.get('count') == len(rows), payload
+        assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', payload
+        assert len({row['id'] for row in rows}) == len(rows), payload
+        return rows
+    def exact(identity, fields=(), *, curve=False):
+        rows = query(['--exact-id', identity], fields, curve=curve)
+        assert len(rows) == 1 and rows[0]['id'] == identity and type(rows[0].get('class_id')) is int, rows
+        return rows[0]
+    def complete(draft, label, operation, uri):
+        phase = {'phase': label, 'public_operation': operation, 'native_outcome': 'not_executed'}
+        receipt['transactions'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        tx = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', tx], live=False)
+        phase.update(transaction_id=tx, artifact_hash=preview['artifact_hash'],
+            compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
+        assert shown['artifact']['request']['operation'] == operation and phase['compiled_native_request']['uri'] == uri, shown
+        gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        assert code == 0 and executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('verified') is True and verified.get('verification', {}).get('business_state_verified') is True, verified
+        final = gateway.gateway(['transaction-show', tx], live=False)
+        assert final['artifact'] == shown['artifact'], 'Stored immutable Preview changed'
+        phase['artifact_unchanged'] = True
+        return phase
+    def ref(row, token):
+        value = row.get('references', {}).get(token)
+        identity = value.get('id') if isinstance(value, Mapping) else value
+        assert isinstance(identity, str) and uuid.UUID(identity).int != 0, (token, row)
+        return identity
+    try:
+        assert runtime.version == '2022.1', 'Bounded lifetime source observation is pinned to2022.1'
+        source = _collect_rtpc_graph_acceptance(runtime, name=name, owned_time_first=True)
+        assert source['status'] == 'PASS', source
+        source_path = Path(source['observation_path'])
+        raw = source_path.read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == source['observation_sha256'], source
+        source_receipt = json.loads(raw)
+        receipt['source_witness'] = {'observation_path': str(source_path), 'observation_sha256': source['observation_sha256'],
+            'witness_build': source_receipt['witness_build'], 'endpoint': source_receipt['host_and_project']['endpoint']}
+        before = source_receipt['effects'][0]['independent_effect']
+        member, = before['members']
+        owner, rtpc, old = before['owner']['id'], member['object']['id'], member['control_input']['id']
+        curve = member['curve']['id']
+        receipt['before'] = before
+        assert len({owner, rtpc, old, curve}) == 4
+        setup = _start_business_draft(gateway, 'object.set')
+        parent = _bind_business_object(gateway, setup, path_segments=('Game Parameters', 'Default Work Unit'))
+        kind = _discover_business_type(gateway, setup, meaning='GameParameter', role='object', expected_label='GameParameter')
+        duration = member['control_input']['properties']['TimeModDuration']
+        assert type(duration) in (int, float) and math.isfinite(duration) and duration > 0, member
+        field_values = []
+        for token, value in (('Min', 0), ('Max', duration)):
+            found = _update_business_draft(gateway, setup, 'draft-discover-fields',
+                ['--type-handle', kind, '--meaning', token], live=True)
+            field_values.extend(('--field-value', discovered_business_field_handle(found, token), json.dumps(value)))
+        receipt['shared_target_domain'] = {'minimum': 0, 'maximum': duration,
+            'source': 'observed_custom_TimeModDuration_seconds', 'curve_points': member['curve']['curve_points']}
+        _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', 'shared',
+            '--parent-handle', parent, '--kind', kind, '--name', name + '_Shared', '--field', 'notes', 'Keep shared target',
+            *field_values], live=False)
+        complete(setup, 'shared_target_setup_no_credit', 'object.set', 'ak.wwise.core.object.set')
+        shared, = query([*(arg for segment in ('Game Parameters', 'Default Work Unit', name + '_Shared')
+            for arg in ('--path-segment', segment))])
+        identity = exact(shared['id'])
+        assert identity == shared and shared['type'] == 'GameParameter' and shared['class_id'] == 1507344, shared
+        shared = exact(shared['id'], ('Min', 'Max'))
+        assert shared.get('owner') is None and isinstance(shared.get('parent'), Mapping), shared
+        assert shared['properties'] == {'Min': 0, 'Max': duration}, shared
+        receipt['shared_target_before'] = shared
+        draft = _start_business_draft(gateway, 'object.setReference')
+        target = _bind_business_object(gateway, draft, object_id=rtpc)
+        control = _bind_business_object(gateway, draft, object_id=shared['id'])
+        found = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target, '--meaning', 'ControlInput'], live=True)
+        field = discovered_business_field_handle(found, 'ControlInput')
+        _update_business_draft(gateway, draft, 'draft-declare-field-change', ['--object-handle', target,
+            '--field-handle', field, '--target-handle', control], live=False)
+        complete(draft, 'displace_owned_with_shared', 'object.setReference', 'ak.wwise.core.object.setReference')
+        after = exact(rtpc, ('PropertyName', 'ControlInput', 'Curve'))
+        assert ref(after, 'ControlInput') == shared['id'] and ref(after, 'Curve') == curve, after
+        preserved_before, preserved_after = deepcopy(member['object']), deepcopy(after)
+        for row in (preserved_before, preserved_after):
+            row['references'].pop('ControlInput')
+        # Display paths may derive from the changed reference. Retain both
+        # observations, while testing the identity/ownership/field preservation
+        # needed for this lifetime question rather than inventing path stability.
+        preserved_before.pop('path'); preserved_after.pop('path')
+        assert preserved_after == preserved_before, (preserved_before, preserved_after)
+        observed = {'rtpc': after, 'curve': exact(curve, curve=True), 'owner': exact(owner, ('Volume',)),
+            'members': query(['--advanced-waql', f'from object "{owner}" select @RTPC']), 'shared_target': exact(shared['id'], ('Min', 'Max'))}
+        receipt['after'] = observed
+        curve_before, curve_after = deepcopy(member['curve']), deepcopy(observed['curve'])
+        curve_before.pop('path'); curve_after.pop('path')
+        assert curve_after == curve_before and observed['owner'] == before['owner'], observed
+        assert [row['id'] for row in observed['members']] == [rtpc] and observed['shared_target'] == shared, observed
+        # The existing normalizer is used only after binding the complete public
+        # failure to this exact GUID, version, endpoint and bounded query frame.
+        code, payload = gateway.raw_gateway(['query-object', '--exact-id', old, '--max-results', '2', '--detail', *projection])
+        if code == 0:
+            assert payload.get('ok') is True, payload
+            rows = payload.get('objects')
+            assert isinstance(rows, list) and len(rows) <= 1 and payload.get('count') == len(rows), payload
+            assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', payload
+        else:
+            assert code == 2 and payload.get('ok') is False and payload.get('status') == 'error', payload
+            assert payload.get('detected_version') == runtime.version and payload.get('endpoint') == receipt['source_witness']['endpoint'], payload
+            preview = payload['semantic_preview']; call = payload['call']
+            args = {'waql': f'from object "{old}" take 2'}
+            assert preview['version'] == runtime.version and preview['envelope']['uri'] == 'ak.wwise.core.object.get', payload
+            assert preview['envelope']['args'] == args and payload['query_bound'] == {'mode': 'take', 'value': 2}, payload
+            assert preview['envelope']['options'] == {'return': ['id', 'name', 'type', 'path', 'classId', 'owner', 'parent', 'notes']}, payload
+            assert call['api'] == 'ak.wwise.core.object.get' and call['version'] == runtime.version, payload
+            if call.get('waapi_error_uri') == 'ak.wwise.query.invalid_query':
+                assert call.get('waapi_error_details') == {'details': {'procedureUri': call['api']},
+                    'message': args['waql'] + ' - Object not found'}, payload
+            normalized = waapi_gateway.normalize_exact_object_absence(api=call['api'], args=args, result=call, exact_object_lookup=True)
+            assert normalized.get('ok') is True and normalized.get('result') == {'return': []}, payload
+            receipt['absence_normalization'] = normalized['normalization']
+            rows = []
+        if rows:
+            row, = rows
+            assert row['id'] == old and row['type'] == 'ModulatorTime' and row['class_id'] == 5111824, row
+            assert 'owner' in row or 'owner' in row.get('unavailable_fields', []), row
+            receipt['old_input_disposition'] = {'state': 'retained', 'object': row,
+                'owner_observed': row.get('owner'), 'owner_unavailable': 'owner' in row.get('unavailable_fields', [])}
+        else:
+            receipt['old_input_disposition'] = {'state': 'absent', 'id': old}
+        receipt['complete'] = True
+        category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+@pytest.mark.skipif(os.environ.get('WWISE_VERSION') != '2022.1', reason='Disposition source observation is pinned to2022.1')
+def test_owned_control_input_disposition_diagnostic_2022(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    category = _collect_owned_control_input_disposition(workflow_sandbox_runtime,
+        name='WAAPI_INPUT_LIFETIME_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
 def _collect_compound_render_rename_history(gateway, receipt, *, version, owner_id, selected_id,
         field, renamed, snapshot, metadata_scopes):
     """One owned compound change and receipt-bound history, using the caller's oracle."""
