@@ -3954,7 +3954,7 @@ def operation_request_machine_contract(name: str, version: str) -> dict[str, Any
     if name == "audio.importTabDelimited" and version == "2025.1":
         constraints.append("WwiseConsole 2025.1.7 build 9143 blocks GUID Object Path TSV cells before preview and execution: retained native evidence interpreted them as literal object names and created unintended objects; other host/version GUID semantics remain unproven pending scope decision")
     if name == "audio.importTabDelimited":
-        constraints.append("localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows remain outside the closed preparation path")
+        constraints.append("localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows bind the intended language Source, verify planned media changes and preserve other Source files without rewriting the exact table")
     return {
         "additional_properties": False,
         "argument_contract": _operation_argument_contract(
@@ -14311,7 +14311,7 @@ def _prepare_import_dynamic_fields(
                     },
                 )
 
-        if ((source_operation == "audio.import" or target.get("localized_owner_only") is True)
+        if ((source_operation == "audio.import" or target.get("localized_owner_fields") is True)
                 and _localized_import_read_language(target.get("requested_language")) is not None
                 and (property_specs or reference_specs)):
             target["localized_owner_field_metadata"] = [
@@ -14385,6 +14385,51 @@ def _localized_source_snapshot(owner_id: str, *, read: ReadCall,
     return snapshot
 
 
+def _localized_import_source_preservation(before: Mapping[str, Any], after: Mapping[str, Any],
+                                          targets: Sequence[Mapping[str, Any]]) -> tuple[bool, dict[str, Any]]:
+    """Preserve the complete owner collection around exact table-owned writes.
+
+    Media/hash and requested Source Notes/placement outcomes are independently
+    checked by each media target's verifier. All other Source fields and files
+    retain their sealed prestate, including when another row owns that write.
+    """
+    owner_id = before["owner_id"]
+    before_rows = {row["id"].casefold(): row for row in before["rows"]}
+    after_rows = {row["id"].casefold(): row for row in after["rows"]}
+    planned: dict[str, set[str]] = {}
+    for target in targets:
+        if target.get("media_expected") is not True:
+            continue
+        snapshot = target.get("localized_source_snapshot", {})
+        if not _same_identity(snapshot.get("owner_id"), owner_id):
+            continue
+        source_id = target.get("localized_audio_file_source_id")
+        for key, row in {**before_rows, **after_rows}.items():
+            if source_id is not None:
+                matches = _same_identity(row["id"], source_id)
+            else:
+                matches = (row.get("path") == target.get("expected_audio_file_source_result_path")
+                    and _import_language_name(row.get("audioSource:language")) == target.get("requested_language"))
+            if not matches:
+                continue
+            fields = planned.setdefault(key, set())
+            fields.update(("originalFilePath", "originalWavFilePath"))
+            if ("requested_audio_source_notes" in target
+                    or target.get("requested_notes_destination") == "audio_file_source" and "requested_notes" in target
+                    or "explicit_source_owner" in target and "requested_notes" in target):
+                fields.add("notes")
+    rows_ok = set(after_rows) == (set(before_rows) | set(planned))
+    for key, row in before_rows.items():
+        ignored = planned.get(key, set())
+        expected = {field: value for field, value in row.items() if field not in ignored}
+        actual = {field: value for field, value in after_rows.get(key, {}).items() if field not in ignored}
+        rows_ok = rows_ok and actual == expected
+    before_proofs = {row["source_id"].casefold(): row for row in before.get("media_proofs", []) if row["source_id"].casefold() not in planned}
+    after_proofs = {row["source_id"].casefold(): row for row in after.get("media_proofs", []) if row["source_id"].casefold() not in planned}
+    return rows_ok and before_proofs == after_proofs, {"planned_source_ids": sorted(planned),
+        "before": before, "after": after}
+
+
 def _seal_tab_owner_field_metadata(target: dict[str, Any], *, read: ReadCall) -> None:
     metadata_fields = []
     for expected in target.get("localized_owner_field_metadata", []):
@@ -14433,10 +14478,10 @@ def _localized_generated_source_path(target: Mapping[str, Any], filename_path: s
     return generated_path
 
 
-def _bind_localized_import_source(target: dict[str, Any], *, read: ReadCall, derive_source_name: bool = False) -> str | None:
+def _bind_localized_import_source(target: dict[str, Any], *, read: ReadCall, derive_source_name: bool = False, preserve_media_version: str | None = None) -> str | None:
     """Bind exact language/filename identity independently of native import form."""
     language = target.get("requested_language")
-    snapshot = _localized_source_snapshot(str(target["preexisting_id"]), read=read)
+    snapshot = _localized_source_snapshot(str(target["preexisting_id"]), read=read, preserve_media_version=preserve_media_version)
     target["localized_source_snapshot"] = snapshot
     if derive_source_name:
         target["expected_audio_file_source_result_path"] = _localized_generated_source_path(
@@ -15163,10 +15208,6 @@ def _prepare_closed_import_plan(
         )
     import_operation = policy.get("import_operation")
     roles: dict[str, ResolvedObject] = {}
-    if (any(target.get("localized_owner_only") is True for target in raw_targets)
-            and any(target.get("media_expected") is True for target in raw_targets)):
-        raise OperationContractError("LOCALIZED_EXISTING_IMPORT_FIELDS",
-            "The first localized owner-only TSV field slice cannot combine Source/media edits; no native limitation is established.")
     targets, dispatch_args, dynamic_roles = _prepare_import_dynamic_fields(
         request,
         source_operation=source_operation,
@@ -15396,7 +15437,10 @@ def _prepare_closed_import_plan(
                     target["localized_source_snapshot"] = snapshot
                     _seal_tab_owner_field_metadata(target, read=read)
                 else:
-                    _bind_localized_import_source(target, read=read)
+                    _bind_localized_import_source(target, read=read,
+                        preserve_media_version=request.version if target.get("localized_owner_fields") else None)
+                    if target.get("localized_owner_fields"):
+                        _seal_tab_owner_field_metadata(target, read=read)
             elif (source_operation == "audio.import" and import_operation == "useExisting"
                   and _localized_import_read_language(target.get("requested_language")) is not None
                   and _import_requires_explicit_source(target)):
@@ -15540,9 +15584,9 @@ def _prepare_closed_import_plan(
                         "requested_switch_assignment" in target
                         or bool(target.get("requested_switch_assignments"))
                     )),
-                    ("properties", source_operation != "audio.import" and target.get("localized_owner_only") is not True and bool(target.get("validated_properties"))),
-                    ("references", source_operation != "audio.import" and target.get("localized_owner_only") is not True and bool(target.get("validated_references"))),
-                    ("dynamic_fields", target.get("localized_owner_only") is not True and bool(target.get("requested_dynamic_fields"))),
+                    ("properties", source_operation != "audio.import" and target.get("localized_owner_fields") is not True and bool(target.get("validated_properties"))),
+                    ("references", source_operation != "audio.import" and target.get("localized_owner_fields") is not True and bool(target.get("validated_references"))),
+                    ("dynamic_fields", target.get("localized_owner_fields") is not True and bool(target.get("requested_dynamic_fields"))),
                 )
                 if present
             ]
@@ -16093,7 +16137,7 @@ def _prepare_closed_import_plan(
         "import_operation": import_operation,
         "targets": targets,
         **({"owner_only_language_inventory": _json_mapping(language_inventory)}
-           if any(target.get("localized_owner_only") is True for target in targets) else {}),
+           if any(target.get("localized_owner_fields") is True for target in targets) else {}),
         "allowed_result_paths": sorted(allowed_result_paths),
         "result_contract": oracle.get("result_contract"),
         "error_log_is_failure": True,
@@ -19016,12 +19060,12 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             actual = _existing_sfx_source_snapshot(snapshot["owner_id"], version=snapshot["version"], read=read_call)
             assertions.append({"name": "existing SFX source identities and placement unchanged since preview",
                                "passed": actual == snapshot, "evidence": {"expected": snapshot, "actual": actual}})
-        actual_source_snapshots: dict[str, dict[str, Any]] = {}
+        actual_source_snapshots: dict[tuple[str, str | None], dict[str, Any]] = {}
         for snapshot in import_guard.get("localized_source_snapshots", []):
             if not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("rows"), list):
                 raise OperationContractError("INVALID_PREVIEW", "Localized source guard is malformed.")
             owner_id = str(snapshot.get("owner_id"))
-            cache_key = owner_id.casefold()
+            cache_key = (owner_id.casefold(), snapshot.get("preserve_media_version"))
             if cache_key not in actual_source_snapshots:
                 actual_source_snapshots[cache_key] = _localized_source_snapshot(owner_id, read=read_call,
                     preserve_media_version=snapshot.get("preserve_media_version"))
@@ -19036,7 +19080,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 if not _is_tab_audio_file_source_target(target, "audio.importTabDelimited") or target.get("requested_target_id") is not None:
                     continue
                 owner_id = target.get("explicit_source_owner", {}).get("id")
-                actual = actual_source_snapshots.get(str(owner_id).casefold())
+                actual = actual_source_snapshots.get((str(owner_id).casefold(), None))
                 if actual is None:
                     raise OperationContractError("INVALID_PREVIEW", "A path-spelled TSV Source requires its complete owner-child snapshot.")
                 try:
@@ -24910,18 +24954,19 @@ def verify_prepared_operation(
                                     if row.get("path") == expected_source_path
                                     and _object_type_token(row.get("type")) == "audiofilesource"
                                     and row["audioSource:language"]["name"] == target.get("requested_language")]
-                        if target.get("localized_owner_only") is True:
-                            check(f"{label} owner-only TSV preserves all Source Notes, identities, languages, paths and media bytes",
-                                  after_sources == localized_snapshot, {"expected": localized_snapshot, "actual": after_sources})
-                        else:
+                        if "preserve_media_version" in localized_snapshot:
+                            preserved, preservation_evidence = _localized_import_source_preservation(localized_snapshot, after_sources, targets)
+                            check(f"{label} TSV preserves Sources and media outside planned table changes", preserved, preservation_evidence)
+                        if target.get("localized_owner_only") is not True:
                             check(f"{label} localized source is unique after import", len(selected) == 1, selected)
                         before_by_id = {row["id"].casefold(): row for row in localized_snapshot["rows"]}
                         after_by_id = {row["id"].casefold(): row for row in after_rows}
                         expected_ids = set(before_by_id) | {row["id"].casefold() for row in selected}
                         check(
                             f"{label} localized import preserves existing source identities and other languages",
-                            set(after_by_id) == expected_ids
-                            and all(after_by_id.get(key) == row for key, row in before_by_id.items()),
+                            preserved if "preserve_media_version" in localized_snapshot else (
+                                set(after_by_id) == expected_ids
+                                and all(after_by_id.get(key) == row for key, row in before_by_id.items())),
                             {"before": localized_snapshot["rows"], "after": after_rows},
                         )
 

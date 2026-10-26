@@ -333,6 +333,20 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # Exact TSV combined fields/media adds one reviewed disclosure. Invert
+    # only that constraint before retaining both component and older seals.
+    assert canonical_sha256(non_object_set_digests) == "3d4da617cf27e38485a15d5f716e97cb6221ebe45a620c96e871868545df9962"
+    before_combined_media_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        assert contract["constraints"].pop() == (
+            "localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows bind the intended language Source, verify planned media changes and preserve other Source files without rewriting the exact table"
+        )
+        contract["constraints"].append(
+            "localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows remain outside the closed preparation path"
+        )
+        before_combined_media_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
     # Combined five-version owner fields + closed Switch binding schema.
     assert canonical_sha256(non_object_set_digests) == "d3b68dd3cd376da66b1e5926b931feaaee985fc6fb0eb5afc1ec9cd73c7213d0"
     # Invert only Switch wording on a copy to preserve the independently
@@ -368,7 +382,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # independently reviewed Switch component before all historical seals.
     previous_owner_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = deepcopy(before_combined_media_contracts[version])
         assert contract["constraints"].pop() == (
             "localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows remain outside the closed preparation path"
         )
