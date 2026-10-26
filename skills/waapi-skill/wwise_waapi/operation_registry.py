@@ -2196,7 +2196,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "dynamic @ fields are produced only after live object-type and getPropertyInfo validation",
             "each row accepts one regular audio_file, one bounded RIFF/WAVE audio_file_base64, or a typed structure-only import",
             "useExisting preserves an existing target GUID; replaceExisting requires the old GUID to disappear",
-            "an ordinary audio.import live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight; Originals placement, one source notes field and a new Event retain ordinary import verification; metadata-proven owner properties/references and bounded inline WAV reuse require an exact existing language Source; other requested row fields are rejected",
+            "ordinary localized useExisting preserves the exact Voice and language-scoped Source identities; Gateway-owned typed owner/Source paths and the 2025.1 exact existing Source GUID binding support metadata-proven owner properties/references and regular or bounded inline WAV media, including an absent language Source; AudioSourceNotes uses an explicit Source row, while Notes, Originals placement and new Events retain independent verification; localized Dialogue/Switch directives and explicit row import_location remain outside the closed preparation path",
             "replaceExisting is irreversible; replaced objects and media have no automatic restoration",
             "auto_add_to_source_control is explicit and defaults to false",
             "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
@@ -15475,13 +15475,6 @@ def _prepare_closed_import_plan(
                     )
                 localized_active_source = _bind_localized_import_source(target, read=read)
                 source_kind = target.get("source_file", {}).get("kind")
-                owner_fields = bool(target.get("validated_properties") or target.get("validated_references"))
-                if (owner_fields or source_kind == "inline_base64") and not _valid_object_id(localized_active_source):
-                    raise OperationContractError(
-                        "LOCALIZED_EXISTING_SOURCE_REQUIRED",
-                        "Localized owner fields and inline WAV reimport require one exact existing language Source; adding a new localization remains outside this preparation path.",
-                        details={"index": index, "target_path": target_path, "language": language},
-                    )
                 metadata_fields = []
                 for expected in target.get("localized_owner_field_metadata", []):
                     observed = _read_property_info(read, object_id=target["preexisting_id"], name=expected["name"]).as_dict()

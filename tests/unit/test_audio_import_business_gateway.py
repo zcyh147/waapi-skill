@@ -2780,9 +2780,16 @@ class LocalizedOwnerFieldsClient(LocalizedFieldsClient):
         return super().call(uri, args, options)
 
 
-def _localized_owner_fields_draft(tmp_path, version, *, fault=None, inline=False):
+def _localized_owner_fields_draft(tmp_path, version, *, fault=None, inline=False, language="English(US)"):
     import base64, io, wave
     client = LocalizedOwnerFieldsClient(tmp_path, version, fault=fault)
+    folder = "Dialogue"
+    if language == "Japanese":
+        client.sources = client.sources[:1]
+        folder = "Other"
+        project = _project_path(tmp_path)
+        project.write_text(project.read_text().replace("</LanguageList>",
+            '<Language Name="Japanese" ID="{99999999-9999-9999-9999-999999999999}"/></LanguageList>'))
     stream = io.BytesIO()
     with wave.open(stream, "wb") as wav:
         wav.setparams((1, 2, 8000, 0, "NONE", "not compressed")); wav.writeframes(b"\x01\x00" * 16)
@@ -2798,10 +2805,10 @@ def _localized_owner_fields_draft(tmp_path, version, *, fault=None, inline=False
     if fault == "activation-conflict":
         found = command("draft-discover-fields", "--object-handle", voice, "--meaning", "OverrideOutput")
         activation = ["--field-value", found["meaning_results"][0]["candidates"][0]["handle"], "false"]
-    artifact = "Voices/English(US)/Dialogue/Line.wav|" + base64.b64encode(media.read_bytes()).decode() if inline else str(media)
+    artifact = f"Voices/{language}/{folder}/Line.wav|" + base64.b64encode(media.read_bytes()).decode() if inline else str(media)
     command("draft-declare-existing", "--declaration-id", "voice", "--object-handle", voice,
-        "--field", "language", "English(US)", "--field", "inline_wav" if inline else "media_file", artifact,
-        "--field", "notes", "updated source notes", "--field", "originals_subfolder", "Dialogue",
+        "--field", "language", language, "--field", "inline_wav" if inline else "media_file", artifact,
+        "--field", "notes", "updated source notes", "--field", "originals_subfolder", folder,
         "--field-value", fields["Volume"], "-6", "--field-value", fields["OutputBus"], bus, *activation)
     env = set_gateway_config(_env(tmp_path), wwise_version=version)
     def run(*argv):
@@ -2870,12 +2877,9 @@ def test_localized_owner_fields_reject_changed_authority_before_execution(tmp_pa
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
-@pytest.mark.parametrize("fault,error", (("constrained-reference", "CONSTRAINED_REFERENCE_BOUNDARY"),
-    ("missing-language-source", "LOCALIZED_EXISTING_SOURCE_REQUIRED")))
+@pytest.mark.parametrize("fault,error", (("constrained-reference", "CONSTRAINED_REFERENCE_BOUNDARY"),))
 def test_localized_owner_fields_keep_reference_and_exact_source_boundaries(tmp_path, version, fault, error):
     command, _run, client = _localized_owner_fields_draft(tmp_path, version, fault=fault)
-    if fault == "missing-language-source":
-        client.sources.pop(0)
     record, = (tmp_path / "state/operation-drafts-v1/records").glob("*.json"); before = record.read_bytes()
     command("draft-check", expected_error=error)
     assert record.read_bytes() == before
@@ -2930,3 +2934,48 @@ def test_localized_owner_reference_reuses_declared_activation_prerequisite(tmp_p
     code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
     assert client.owner["@OverrideOutput"] is True and client.owner["@OutputBus"] == {"id": client.BUS}
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("inline", (False, True))
+def test_new_language_owner_fields_and_media_use_absent_source_scope(tmp_path, version, inline):
+    from copy import deepcopy
+    command, run, client = _localized_owner_fields_draft(tmp_path, version, inline=inline, language="Japanese")
+    before = deepcopy(client.sources); english_bytes = client.copied.read_bytes(); other_bytes = client.other_file.read_bytes()
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    owner, media = shown["artifact"]["prepared_operation"]["dispatch"]["args"]["imports"]
+    assert owner["@Volume"] == -6 and owner["@OutputBus"] == client.BUS
+    assert "audioFile" not in owner and "audioFileBase64" not in owner and "notes" not in owner
+    assert media["objectPath"].endswith(r"\<Sound Voice>Voice\<AudioFileSource>Line")
+    assert "importLocation" not in media and media["importLanguage"] == "Japanese"
+    assert ("audioFileBase64" in media) is inline and ("audioFile" in media) is not inline
+    assert media["notes"] == "updated source notes" and not any(key.startswith("@") for key in media)
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]); assert code == 0, confirmed
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
+    assert client.owner["@Volume"] == -6 and client.owner["@OutputBus"] == {"id": client.BUS}
+    assert client.owner["@IsVoice"] is True and client.owner["notes"] == "keep owner notes"
+    japanese, = [source for source in client.sources if source["audioSource:language"]["name"] == "Japanese"]
+    assert japanese["id"] not in {client.OWNER, before[0]["id"]} and japanese["parent"] == {"id": client.OWNER}
+    assert japanese["notes"] == "updated source notes" and Path(japanese["originalFilePath"]).read_bytes() == (tmp_path / "Line.wav").read_bytes()
+    assert [source for source in client.sources if source["audioSource:language"]["name"] == "English(US)"] == before
+    assert client.copied.read_bytes() == english_bytes and client.other_file.read_bytes() == other_bytes
+    code, repeated = run("execute", transaction); assert code == 2, repeated
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_new_language_source_collision_after_preview_blocks_owner_and_media_write(tmp_path, version):
+    command, run, client = _localized_owner_fields_draft(tmp_path, version, inline=True, language="Japanese")
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]); assert code == 0, confirmed
+    client.sources.append({"id": client.OTHER_SOURCE, "name": "Line", "type": "AudioFileSource", "classId": 16,
+        "path": client.owner["path"] + r"\Line", "parent": {"id": client.OWNER}, "notes": "Unexpected live collision",
+        "audioSource:language": {"id": "{99999999-9999-9999-9999-999999999999}", "name": "Japanese"},
+        "originalFilePath": str(client.other_file), "originalWavFilePath": str(client.other_file)})
+    code, executed = run("execute", transaction)
+    assert code == 2 and executed["executed"] is False and executed["status"] == "repreview_required", executed
+    assert client.owner["@Volume"] == 0 and client.owner["@OutputBus"] is None
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
