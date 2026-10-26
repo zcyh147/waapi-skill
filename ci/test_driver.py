@@ -647,6 +647,17 @@ def main(
     arguments = tuple(sys.argv[1:] if argv is None else argv)
     try:
         request = parse_request(arguments)
+        if request is not None and request.mode in {"matrix", "focused", "all"}:
+            selectors, _ = pytest_token_roles(request.pytest_args)
+            unit_root = (repo_root / "tests" / "unit").resolve(strict=False)
+            for selector in selectors:
+                path = Path(selector.split("::", 1)[0]).expanduser()
+                selected_path = path if path.is_absolute() else repo_root / path
+                if selected_path.resolve(strict=False).is_relative_to(unit_root):
+                    raise TestDriverError(
+                        "Unit selectors cannot run in matrix/focused/all mode; "
+                        "use --mode nonlive -- with the same pytest selection."
+                    )
     except TestDriverError as exc:
         print(str(exc), file=sys.stderr)
         print(usage(windows=windows), file=sys.stderr, end="")

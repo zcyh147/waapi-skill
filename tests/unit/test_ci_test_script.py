@@ -144,6 +144,32 @@ def test_real_driver_matrix_preserves_exact_selection_and_sequential_lane_bindin
                for _, options in calls)
 
 
+@pytest.mark.parametrize("mode,absolute", [("matrix", False), ("focused", True), ("all", False)])
+def test_matrix_unit_selection_rejects_before_readiness_or_dispatch(tmp_path, monkeypatch, capsys, mode, absolute):
+    from ci import test_driver
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Unit matrix selection must stop before readiness or dispatch")
+
+    monkeypatch.setattr(test_driver, "validate_test_environment", forbidden)
+    monkeypatch.setattr(test_driver, "TestDriver", forbidden)
+    selector = "tests/unit/test_fake.py::test_one"
+    if absolute:
+        selector = str(tmp_path / selector)
+    code = developer_launch(("--mode", mode, "--", selector), repo_root=tmp_path)
+    assert code == 1
+    assert "--mode nonlive" in capsys.readouterr().err
+
+
+def test_focused_matrix_keeps_native_selector_and_unit_like_option_operand(tmp_path, monkeypatch):
+    args = ("-k", "tests/unit/test_fake.py::operand", "tests/live/test_exact.py::test_one", "-q")
+    code, calls = _record_driver_selection(tmp_path, monkeypatch, mode="focused", version="all", pytest_args=args)
+    assert code == 0 and len(calls) == 10
+    assert all(command == (sys.executable, "-m", "pytest", *args) for command, _ in calls)
+    assert [(options["env"]["WWISE_VERSION"], options["env"]["WWISE_DESTRUCTIVE"])
+            for _, options in calls] == [(version, flag) for version in SUPPORTED_VERSIONS for flag in ("0", "1")]
+
+
 def test_real_driver_matrix_selection_stops_on_first_child_failure(tmp_path, monkeypatch):
     code, calls = _record_driver_selection(tmp_path, monkeypatch, mode="matrix", version="all",
         pytest_args=("tests/live/test_exact.py::test_one",), status=9)
