@@ -3132,3 +3132,42 @@ def test_exact_table_source_verification_requires_notes_media_owner_and_source_p
     assert code == 2 and verified["verified"] is False, verified
     assert any(not row["passed"] for row in verified["verification"]["assertions"]), verified
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
+
+
+def test_exact_table_rejects_owner_and_explicit_source_media_writers_before_preview(tmp_path):
+    command, _run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1")
+    owner_media = tmp_path / "Line.wav"
+    owner_media.write_bytes(b"different owner-row media")
+    table.write_text(table.read_text().replace("\n\t<Sound Voice>Voice\t", "\n" + str(owner_media) + "\t<Sound Voice>Voice\t"), encoding="utf-8")
+    original = table.read_bytes()
+    rejected = command("draft-check", expected_error="DUPLICATE_TARGET")
+    assert rejected["details"]["source_path"] == client.owner["path"] + r"\Line"
+    assert table.read_bytes() == original and client.copied.read_bytes() == b"old English media"
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+    assert not list((tmp_path / "state/transactions").glob("tx1-*"))
+
+
+def test_exact_table_media_ownership_keeps_disjoint_sources_under_one_sound(tmp_path):
+    from copy import deepcopy
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1")
+    other_source = deepcopy(client.sources[0])
+    other_original = client.copied.with_name("Other.wav")
+    other_original.write_bytes(b"old other English media")
+    other_source.update(id=client.ACTION, name="Other", path=client.owner["path"] + r"\Other",
+        originalFilePath=str(other_original), originalWavFilePath=str(other_original))
+    client.sources.append(other_source)
+    media = tmp_path / "OtherNew.wav"
+    media.write_bytes(b"new disjoint English media")
+    table.write_text(table.read_text() + str(media)
+        + "\t<Sound Voice>Voice\\<AudioFileSource>Other\tother Source notes\n", encoding="utf-8")
+    original = table.read_bytes()
+    command("draft-check")
+    transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction)
+    assert code == 0, shown
+    prepared = shown["artifact"]["prepared_operation"]
+    assert prepared["dispatch"]["args"]["importFile"] == str(table.resolve())
+    assert {target["localized_audio_file_source_id"] for target in prepared["verification_plan"]["targets"]
+        if target["media_expected"]} == {client.SOURCE, client.ACTION}
+    assert table.read_bytes() == original and other_original.read_bytes() == b"old other English media"
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
