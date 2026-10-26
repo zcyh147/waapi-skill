@@ -236,6 +236,13 @@ per-choice attribution. Uncertain semantics alone do not justify excluding
 these choices or requiring a separate native sample for each. Ordinary read
 refinement needs no new approval; arbitrary return grammar remains unavailable.
 
+The user also accepted one precise 2021.1 Skill limitation on 2026-10-26:
+reading the stored property-to-RTPC association (for example, whether an RTPC
+controls Volume or Pitch) is not supported. Retain existing RTPC, Game Parameter
+and typed ControlInput reads, disclose the restriction, and stop searching for
+undocumented methods. This is not a claim of universal native impossibility and
+does not exclude other versions or other RTPC functionality.
+
 CRUD, queries and compound changes retain appropriate identity, policy,
 execute-once, outcome and cleanup checks. A shared mechanism pass does not
 conceal an unsupported normal-user function. The final checker must accept

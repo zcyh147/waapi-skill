@@ -39,6 +39,13 @@ def local_marker_boundary_message(version):
         f"unavailable in Wwise {version}; not all file/effective marker information is excluded")
 
 
+def local_rtpc_boundary_message(version):
+    if version != '2021.1': return None
+    return ('Wwise 2021.1 stored property-to-RTPC association is not exposed by this Skill; '
+        'exact RTPC/Game Parameter and typed ControlInput reads remain available. '
+        'This is a Skill limitation, not a claim of native absence.')
+
+
 def descriptor(native):
     return next((value for value in LOCAL_LISTS.values() if value['native'] == native), None)
 
@@ -97,6 +104,12 @@ def validate_local_member(row, owner_id, source, error):
 def local_list_contract(version):
     catalog = load_catalog(version)
     contexts = {name: {**value, 'available': version >= value['first']} for name, value in LOCAL_LISTS.items()}
+    if version == '2021.1':
+        contexts['local-rtpcs'].update(limitation_kind='skill-interface', native_absence_proven=False,
+            availability_reason=local_rtpc_boundary_message(version),
+            alternatives={'query':'query-object --exact-id','metadata':'metadata list/detail --exact-id',
+                'available_reads':['RTPC identity and owner','Game Parameter metadata-bound values',
+                    'typed RTPC ControlInput reference and related target reads']})
     marker_boundary = local_marker_version_boundary(version)
     if marker_boundary is not None:
         contexts['local-markers'].update(native_boundary=marker_boundary, availability_reason=local_marker_boundary_message(version))
@@ -108,9 +121,11 @@ def local_list_contract(version):
         'unresolved': 'missing class/source is not empty membership or native absence',
         'explicit_class_bridges': ([{'actual_class_id': 9699330, 'actual_object_type': 'SourcePlugin',
             'source_class_id': 1048592, 'native_list': '@RTPC'}] if plugin_bridge(version) else []),
-        'remaining': ['2021 RTPC inspection semantics', '2021/2022 fixed Effect0-3 inspection uses existing scalar/reference paths',
-            'imported/effective marker projection',
-            'other precise source-proven plugin-to-base bridges']}
+        'available_paths': {
+            'rtpc_association':'Wwise 2022–2025 local-rtpcs exposes stored property associations; the 2021 Skill limitation preserves ordinary exact RTPC/Game Parameter and typed ControlInput reads',
+            'fixed_effects':'Wwise 2021/2022 Effect0-3 properties and references use existing --include-field and --include-local-reference reads',
+            'marker_records':'Wwise 2023–2025 --include marker-records returns actual ordered records on an exact AudioFileSource or advanced SELECT Source roots; computed file/effective-marker equivalence is not established',
+            'plugin_lists':'Other plugin classes require their exact documented List source or an explicit class bridge; base-class inheritance is not inferred'}}
 
 
 def validate_curve_points(version, value, error):

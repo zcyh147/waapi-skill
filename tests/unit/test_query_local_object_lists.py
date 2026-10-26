@@ -87,12 +87,26 @@ def test_closed_local_lists_disclose_and_enforce_version_specific_source(tmp_pat
     available = version >= ('2022.1' if source == 'local-rtpcs' else '2023.1')
     assert contract['contexts'][source]['available'] is available
     assert 'directly stored' in contract['membership']
+    if source == 'local-rtpcs' and version == '2021.1':
+        boundary = contract['contexts'][source]
+        assert boundary['limitation_kind'] == 'skill-interface'
+        assert boundary['native_absence_proven'] is False
+        assert 'stored property-to-RTPC association' in boundary['availability_reason']
+        assert 'exact RTPC/Game Parameter' in boundary['availability_reason']
+        assert 'typed ControlInput' in boundary['availability_reason']
+        assert boundary['alternatives']['query'] == 'query-object --exact-id'
+        assert boundary['alternatives']['metadata'] == 'metadata list/detail --exact-id'
+    elif source == 'local-rtpcs':
+        assert 'limitation_kind' not in contract['contexts'][source]
     code,result = task.run('query-object','--exact-id',SOUND,'--include-related',source,'count')
     if available:
         assert code == 0,result
         assert result['agent_result'][0]['related']['projections'][0]['value'] == 2
     else:
         assert code == 2 and not any(uri.endswith('object.get') for uri,_,_ in task.calls),result
+        if source == 'local-rtpcs':
+            assert result['message'] == contract['contexts'][source]['availability_reason']
+            assert 'Skill limitation' in result['message'] and 'not a claim of native absence' in result['message']
 
 
 @pytest.mark.parametrize('version', ['2023.1','2024.1','2025.1'])
@@ -367,8 +381,14 @@ def test_local_marker_contract_keeps_modern_stored_list_and_legacy_inner_boundar
     assert context['native'] == '@Markers' and context['field'] == 'Markers'
     assert context['available'] is (version >= '2023.1')
     assert 'no imported/effective marker computation claim' in context['scope']
-    assert 'imported/effective marker projection' in contract['remaining']
-    assert '2021 RTPC inspection semantics' in contract['remaining']
+    assert 'remaining' not in contract
+    paths = contract['available_paths']
+    assert '2021 Skill limitation' in paths['rtpc_association']
+    assert 'Effect0-3' in paths['fixed_effects'] and '--include-field' in paths['fixed_effects']
+    assert '--include marker-records' in paths['marker_records'] and 'actual ordered' in paths['marker_records']
+    assert 'equivalence is not established' in paths['marker_records']
+    for backlog in ('inspection semantics', 'imported/effective marker projection', 'remaining', '#181'):
+        assert backlog not in json.dumps(paths)
     if version < '2023.1':
         boundary = context['native_boundary']
         assert boundary['version'] == version and boundary['introduced_in'] == '2023.1'

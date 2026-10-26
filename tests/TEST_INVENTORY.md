@@ -5,6 +5,36 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #181 functional closeout
+
+Reviewed `cc545ad2` completes the remaining disclosure after the query increment
+below. The user accepted the precise 2021 stored-property-to-RTPC association
+Skill limitation, retaining RTPC/Game Parameter/typed ControlInput reads. Public
+schema and early rejection distinguish that limitation from native absence;
+stale developer backlog text now points to available query paths. The two new
+disclosure checks passed **2 in 0.45s**, and adjacent schema/version controls
+passed **6 in 0.81s**. Both review axes were clear.
+
+At frozen `ceb9a58c`, one existing plugin/no-file Sound was queried through the
+already supported advanced `SELECT activeSource` route on Console
+2021.1.14.8108. Original result: **FAIL, 9.48s**, native
+`ak.wwise.query.invalid_query`, `Unknown accessor activeSource (61)`; one public
+invocation/value dispatch, 990 packet bytes, zero transactions. No source
+selection or exact-ID readback was reached. Source full hash/tree/mtime and
+prepared MIDI bytes were unchanged; processes were cleaned and the sandbox
+quarantined. Root `query181-2021-active-source-r1` under the durable full-coverage
+state retains the original category, receipt, packet and `main-assessment.json`.
+
+The precise observed-host/build restriction is now disclosed; the existing
+file-backed algorithm, modern choices and advanced grammar remain unchanged.
+The positive capability probe is explicitly skipped, with its body and original
+FAIL preserved and no native PASS credit. Four focused collector/finalizer
+controls passed before that attempt; only the affected disclosure/retirement
+checks ran afterwards. No native retry, new fixture, unlinked permutation sweep,
+Fresh or full gate followed. The closeout audit found no further functional
+blocker; #195 retains global mapping reconciliation and stable combined gates,
+and #194 retains Fresh budget zero. This is not parent or Windows acceptance.
+
 ## 2026-10-26 #181 query increment
 
 Reviewed integration `74823e56` adds modern `local-markers` and root
