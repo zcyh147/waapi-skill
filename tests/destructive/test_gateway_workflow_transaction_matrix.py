@@ -122,6 +122,7 @@ class _WorkflowSandboxRuntime:
     category_results: list[dict[str, Any]]
     source_copy_prelaunch: dict[str, Any] | None = None
     namespaced_query_prelaunch: dict[str, Any] | None = None
+    soundbank_prelaunch: dict[str, Any] | None = None
 
     @property
     def port(self) -> int:
@@ -1226,6 +1227,7 @@ def workflow_sandbox_runtime(
         pytest.skip('Namespaced query fixture is initially selected for2025.1.7.9143')
     source_copy_prelaunch = None
     namespaced_query_prelaunch = None
+    soundbank_prelaunch = None
     lock = LiveSandboxLock(_safe_lock_root(env))
     sandbox: SandboxProject | None = None
     lifecycle: HeadlessLifecycle | None = None
@@ -1295,6 +1297,7 @@ def workflow_sandbox_runtime(
                 )
             else:
                 assert prelaunch.auro_soundbank_isolation is not None
+                soundbank_prelaunch = prelaunch.as_dict()
         if source_profile == REPEATED_PROFILE:
             from tests.destructive.support.source_copy_fixture import prepare_repeated_source_fixture
             source_fixture_io = case_sandbox_root / 'source-copy-prelaunch-io'
@@ -1357,6 +1360,7 @@ def workflow_sandbox_runtime(
             category_results=category_results,
             source_copy_prelaunch=source_copy_prelaunch,
             namespaced_query_prelaunch=namespaced_query_prelaunch,
+            soundbank_prelaunch=soundbank_prelaunch,
         )
         yield runtime
     finally:
@@ -1454,6 +1458,16 @@ def workflow_sandbox_runtime(
 
         if deferred_error is not None:
             raise deferred_error
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_core_soundbank_temporary_generation_and_default_external_conversion(workflow_sandbox_runtime):
+    """Two Core file effects, each separately previewed and authorized."""
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("Representative Core SoundBank file witness is pinned to2025.1")
+    from tests.destructive.support.soundbank_acceptance import collect_core_file_acceptance
+    collect_core_file_acceptance(workflow_sandbox_runtime)
 
 
 @pytest.mark.live
