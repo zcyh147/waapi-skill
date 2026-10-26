@@ -25549,7 +25549,7 @@ def verify_prepared_operation(
                     )
 
                 source_state = audio_source_row if audio_source_row is not None else live_row
-                if "requested_language" in target and target.get("localized_owner_only") is not True:
+                if media_expected and "requested_language" in target and target.get("localized_owner_only") is not True:
                     language_value = _field_value(source_state, "audioSource:language")
                     if language_value is None and source_state is not live_row:
                         language_value = _field_value(live_row, "audioSource:language")

@@ -962,7 +962,8 @@ def parse_tab_delimited_import_file(
             if (not oracle_row["media_expected"] and language_requires_live_project_validation(language)
                     and _import_object_type_token(str(oracle_row.get("requested_object_type", ""))) == "soundvoice"):
                 oracle_row["requested_language"] = language
-                oracle_row["localized_owner_only"] = True
+                if policy["import_operation"] == "useExisting":
+                    oracle_row["localized_owner_only"] = True
 
         switch_assignments = [
             _require_native_import_directive(

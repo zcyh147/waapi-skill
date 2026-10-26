@@ -844,3 +844,27 @@ def test_two_table_owners_can_share_new_dialogue_event_but_not_one_decision_path
     run('confirm',tx,'--confirmation-token',shown['confirmation']['token']);assert run('execute',tx)[0]==0
     code,result=run('verify',tx);assert code==0 and result['verification']['failed_assertion_count']==0,result
     assert not result['verified'] and table.read_bytes()==before
+
+
+def test_localized_owner_only_tsv_dialogue_replacement_retires_voice_owner_without_preserving_deleted_sources(tmp_path):
+    class ReplacingVoiceClient(LocalizedDialogueClient):
+        NEW_OWNER='{F6666666-6666-6666-6666-666666666666}'
+        def call(self,uri,args=None,options=None):
+            args,options=args or {},options or {}
+            if uri=='ak.wwise.core.audio.importTabDelimited':
+                self.calls.append((uri,deepcopy(args),deepcopy(options)))
+                assert args['importOperation']=='replaceExisting'
+                self.owner['id']=self.NEW_OWNER;self.owner.pop('activeSource',None);self.owner.pop('sound:originalWavFilePath',None)
+                self.sources=[];self.associated=True;self.entry['AudioNode']={'id':self.NEW_OWNER}
+                return {'objects':[deepcopy(self.owner)]}
+            if uri=='ak.wwise.core.object.get' and self.associated and args.get('waql')==f'from object "{self.NEW_OWNER}" select referencesTo take 129':
+                self.calls.append((uri,deepcopy(args),deepcopy(options)));return {'return':[deepcopy(self.entry)]}
+            return super().call(uri,args,options)
+    client=ReplacingVoiceClient(tmp_path,'2025.1')
+    table=tmp_path/'voice-replace.tsv';table.write_text('Object Path\tDialogue Event\n<Sound Voice>Voice\t'+client.dialogue['path']+'@Path:<Switch Group:Surface>Snow\n')
+    command,run=_table_lifecycle_draft(tmp_path,'2025.1',client,table,language='English(US)',mode='replace')
+    before=table.read_bytes()
+    command('draft-check');tx=command('preview-from-draft')['transaction_id'];_,shown=run('transaction-show',tx)
+    run('confirm',tx,'--confirmation-token',shown['confirmation']['token']);assert run('execute',tx)[0]==0
+    code,result=run('verify',tx);assert code==0 and result['verification']['failed_assertion_count']==0,result
+    assert not result['verified'] and table.read_bytes()==before and client.owner['id']==client.NEW_OWNER
