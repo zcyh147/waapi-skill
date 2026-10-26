@@ -334,6 +334,7 @@ def _prepared(
     return {
         "contract": PREPARED_OPERATION_CONTRACT,
         "operation": source_operation,
+        "pre_state": {},
         "verification_plan": verification_plan,
     }
 
