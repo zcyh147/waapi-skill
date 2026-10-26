@@ -351,6 +351,194 @@ def test_owner_only_tsv_fields_native_witness_reaches_persisted_final_writer(tmp
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="owner-fields-tsv")
 
 
+@pytest.mark.parametrize("fault", (None, "missing-assignment", "indeterminate"))
+def test_switch_import_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
+    """Actual producer/Gateway/verifier/final writer, source-backed external graph."""
+    import importlib
+    import hashlib
+    import json
+    import re
+    import shutil
+    import uuid
+    from pathlib import Path
+    from types import SimpleNamespace
+    import xml.etree.ElementTree as ET
+    from tests.unit.test_audio_import_business_gateway import ImportFieldsClient, _env, waapi_gateway
+    from tests.support.gateway_config import set_gateway_config
+    from tests.unit.test_profiler_input_native_fixture import _finish
+    from tests.destructive.support import sandbox_fixture
+
+    monkeypatch.setenv("WWISE_LIVE", "1"); monkeypatch.setenv("WWISE_DESTRUCTIVE", "1")
+    workflow = importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
+    source = workflow.REPO_ROOT / "tests/_org/2025.1"
+    catalog = json.loads((workflow.REPO_ROOT / "skills/waapi-skill/resources/metadata/2025.1/object-types.json").read_text())["types"]
+    classes = {row["name"]: row["classId"] for row in catalog}
+
+    class Client(ImportFieldsClient):
+        def __init__(self):
+            super().__init__(tmp_path, "2025.1")
+            self.objects, self.import_count, self.assignments = {}, 0, []
+            document = ET.parse(source / "Containers/Default Work Unit.wwu")
+            work = document.find(".//WorkUnit"); parent = document.find('.//PropertyContainer[@Name="PlayerFootstepsMaintenance"]')
+            self.objects[work.attrib["ID"]] = self.object(work, r"\Containers", None)
+            self.objects[parent.attrib["ID"]] = self.object(parent, r"\Containers\Default Work Unit", work.attrib["ID"])
+            container = parent.find("./ChildrenList/SwitchContainer")
+            self.container = self.object(container, self.objects[parent.attrib["ID"]]["path"], parent.attrib["ID"])
+            self.objects[self.container["id"]] = self.container
+            def children(node, owner):
+                for child in node.findall("./ChildrenList/*"):
+                    row = self.object(child, owner["path"], owner["id"])
+                    self.objects[row["id"]] = row
+                    if child.tag == "AudioFileSource":
+                        relative = Path(child.findtext("AudioFile").replace("\\", "/"))
+                        destination = tmp_path / "project/Originals/SFX" / relative
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(source / "Originals/SFX" / relative, destination)
+                        row.update(originalFilePath=str(destination), **{"audioSource:language": {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "SFX"}})
+                    children(child, row)
+            children(container, self.container)
+            group_doc = ET.parse(source / "Switches/Default Work Unit.wwu")
+            group_work = group_doc.find(".//WorkUnit")
+            group = group_doc.find('.//SwitchGroup[@Name="WAAPI_V2_Surface"]')
+            self.group = self.object(group, r"\Switches\Default Work Unit", group_work.attrib["ID"])
+            self.objects[self.group["id"]] = self.group
+            for value in group.findall("./ChildrenList/Switch"):
+                row = self.object(value, self.group["path"], self.group["id"]); self.objects[row["id"]] = row
+            self.container["SwitchGroupOrStateGroup"] = {"id": self.group["id"]}
+            for grouping in container.findall("./GroupingInfo/GroupingList/Grouping"):
+                value = grouping.find("SwitchRef").attrib["ID"]
+                self.assignments.extend({"child": child.attrib["ID"], "stateOrSwitch": value} for child in grouping.findall("./ItemList/ItemRef"))
+        def object(self, node, parent_path, parent_id):
+            return {"id": node.attrib["ID"], "name": node.attrib["Name"], "type": node.tag,
+                "classId": classes[node.tag], "path": parent_path + "\\" + node.attrib["Name"],
+                "parent": {"id": parent_id} if parent_id else None, "notes": node.findtext("Comment", ""),
+                **({"@IsVoice": False} if node.tag == "Sound" else {})}
+        def projected(self, rows, options):
+            result = []
+            for raw in rows:
+                row = copy.deepcopy(raw)
+                if row["type"] == "Sound":
+                    sources = [item for item in self.objects.values() if item["type"] == "AudioFileSource" and (item.get("parent") or {}).get("id") == row["id"]]
+                    if sources:
+                        row.update(activeSource={"id": sources[0]["id"]}, originalFilePath=sources[0]["originalFilePath"],
+                            **{"sound:originalWavFilePath": sources[0]["originalFilePath"], "audioSource:language": sources[0]["audioSource:language"]})
+                result.append({key: row.get(key, row.get("@" + key)) for key in options["return"] if key in row or "@" + key in row})
+            return result
+        def ingest(self, row):
+            target = self.objects.get(row.get("importLocation")) if row["objectPath"] == "" else None
+            path = target["path"] if target else re.sub(r"<[^>]+>", "", row["objectPath"])
+            explicit = (target and target["type"] == "AudioFileSource") or "<AudioFileSource>" in row["objectPath"]
+            owner_path = path.rpartition("\\")[0] if explicit else path
+            owner = next((item for item in self.objects.values() if item["path"] == owner_path), None)
+            if owner is None:
+                parent_path, _, name = owner_path.rpartition("\\")
+                parent = next(item for item in self.objects.values() if item["path"] == parent_path)
+                owner = {"id": "{" + str(uuid.uuid4()).upper() + "}", "name": name, "type": "Sound", "classId": classes["Sound"],
+                    "path": owner_path, "parent": {"id": parent["id"]}, "notes": "", "@IsVoice": False}
+                self.objects[owner["id"]] = owner
+            if row.get("switchAssignation"):
+                assert not explicit, "Native assignment must target the owner, not its Source"
+                assert row["switchAssignation"] == "<Switch Group:WAAPI_V2_Surface>Snow"
+                if fault != "missing-assignment":
+                    value = next(item for item in self.objects.values() if item["type"] == "Switch" and item["name"] == "Snow")
+                    pair = {"child": owner["id"], "stateOrSwitch": value["id"]}
+                    if pair not in self.assignments: self.assignments.append(pair)
+            returned = [owner]
+            if "audioFile" in row:
+                media = Path(row["audioFile"])
+                source_name = path.rpartition("\\")[2] if explicit else media.stem
+                selected = target or next((item for item in self.objects.values() if item["type"] == "AudioFileSource"
+                    and (item.get("parent") or {}).get("id") == owner["id"] and item["name"] == source_name), None)
+                copied = tmp_path / "project/Originals/SFX" / row.get("originalsSubFolder", "") / media.name
+                copied.parent.mkdir(parents=True, exist_ok=True); copied.write_bytes(media.read_bytes())
+                if selected is None:
+                    selected = {"id": "{" + str(uuid.uuid4()).upper() + "}", "name": source_name, "type": "AudioFileSource", "classId": classes["AudioFileSource"],
+                        "path": owner_path + "\\" + source_name, "parent": {"id": owner["id"]}, "notes": "",
+                        "audioSource:language": {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "SFX"}}
+                    self.objects[selected["id"]] = selected
+                selected["originalFilePath"] = str(copied); returned.append(selected)
+            return returned
+        def call(self, uri, args=None, options=None):
+            args, options = args or {}, options or {}
+            self.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options)))
+            if uri.endswith("getInfo"):
+                result = super().call(uri, args, options); result["version"].update(minor=7, build=9143, displayName="v2025.1.7.9143"); return result
+            if uri.endswith("getTypes"): return {"return": catalog}
+            if uri.endswith("getPropertyAndReferenceNames"): return {"return": ["IsVoice", "SwitchGroupOrStateGroup"]}
+            if uri.endswith("getPropertyInfo"):
+                if args["property"] == "IsVoice": return {"name": "IsVoice", "type": "bool", "default": False, "dependencies": []}
+                assert args["property"] == "SwitchGroupOrStateGroup", args
+                return {"name": "SwitchGroupOrStateGroup", "type": "Reference", "restriction": {"type": "reference", "restrictions": [{"type": ["SwitchGroup", "StateGroup"]}]}}
+            if uri.endswith("switchContainer.getAssignments"): return {"return": copy.deepcopy(self.assignments)}
+            if uri.endswith("object.get") and not args.get("waql", "").startswith("from type Project"):
+                if "waql" in args:
+                    match = re.match(r'from object ("(?:[^"\\]|\\.)*")(.*)', args["waql"])
+                    assert match, args
+                    identity, tail = json.loads(match[1]), match[2]
+                    rows = [item for item in self.objects.values() if item["id"] == identity or item["path"] == identity]
+                    if "select descendants" in tail:
+                        rows = [item for item in self.objects.values() if any(item["path"].startswith(owner["path"] + "\\") for owner in rows)]
+                    elif "select children" in tail:
+                        owners = {item["id"] for item in rows}
+                        rows = [item for item in self.objects.values() if (item.get("parent") or {}).get("id") in owners]
+                    name = re.search(r'name\s*=\s*"([^"]+)"', tail)
+                    if name: rows = [item for item in rows if item["name"] == name[1]]
+                else:
+                    identities = args["from"]
+                    rows = [item for item in self.objects.values() if item["id"] in identities.get("id", []) or item["path"] in identities.get("path", [])]
+                return {"return": self.projected(rows, options)}
+            if uri == "ak.wwise.core.audio.import":
+                self.import_count += 1
+                if self.import_count == 2 and fault == "indeterminate": raise RuntimeError("fake native transport lost after Switch import dispatch")
+                rows = [item for row in args["imports"] for item in self.ingest(row)]
+                rows = list({item["id"]: item for item in rows}.values())
+                return {"objects": self.projected(rows, options), "log": [], "files": [item["originalFilePath"] for item in rows if item["type"] == "AudioFileSource"]}
+            if uri.startswith("ak.wwise.core.undo."): return {}
+            return super().call(uri, args, options)
+
+    client = Client()
+    state = tmp_path / "state"
+    env = set_gateway_config(_env(tmp_path), wwise_version="2025.1")
+    immutable = tmp_path / "immutable-source"; immutable.mkdir()
+    project = immutable / "SampleProject.wproj"; project.write_text("immutable Switch witness source")
+    proof = sandbox_fixture.hash_project(immutable)
+    metadata = sandbox_fixture.SandboxMetadata(str(project), str(immutable), str(tmp_path / "project"),
+        str(tmp_path / "project/SampleProject.wproj"), "2025.1", 0, proof, sandbox_fixture.hash_project(tmp_path / "project"),
+        project.stat().st_mtime, process_cleanup_result="cleaned", process_cleanup_details={"residual_processes": []})
+    sandbox = sandbox_fixture.SandboxProject(project, immutable, tmp_path, tmp_path / "project", tmp_path / "project/SampleProject.wproj", metadata)
+    endpoint = SimpleNamespace(host="127.0.0.1", port=31337, waapi_url="ws://127.0.0.1:31337/waapi")
+    runtime = workflow._WorkflowSandboxRuntime("2025.1", sandbox, endpoint, state, env, workflow.exact_git_candidate(workflow.REPO_ROOT), [])
+    runtime_raw = lambda argv: waapi_gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client)
+    monkeypatch.setattr(workflow._WorkflowSandboxRuntime, "raw_gateway", lambda _runtime, argv: runtime_raw(argv))
+    lock = sandbox_fixture.LiveSandboxLock(tmp_path / "locks"); lock.__enter__()
+    node = "test_audio_import_switch_assignment_media_and_preservation"
+    error = None
+    try: getattr(workflow, node)(runtime)
+    except AssertionError as exc: error = exc
+    category, = runtime.category_results
+    body = Path(category["observation_path"]).read_bytes(); report = json.loads(body)
+    final = _finish((workflow, runtime, client, lock, proof), tmp_path, monkeypatch, [(node, error)])[-1]
+    assert (error is None) == (fault is None), error
+    assert final["invocation"]["outcome"] == ("PASS" if fault is None else "FAIL")
+    assert final["categories"][0]["observation_sha256"] == hashlib.sha256(body).hexdigest()
+    assert report["transaction_budget"] == {"setup": 1, "witness": 1, "maximum_total": 2}
+    assert report["business_effect_verified"] is (fault is None)
+    assert len(final["transactions"]) == client.import_count == 2
+    assert final["residual_state"]["sandbox"] == ("deleted" if fault is None else "quarantined")
+    assert not any(uri.endswith(".addAssignment") or uri.endswith(".setReference") for uri, _, _ in client.calls)
+    if fault == "indeterminate":
+        assert report["witness"]["execute"]["state"] == "indeterminate"
+        assert report["calls"][-1]["argv"] == ["execute", report["witness"]["transaction_id"]]
+        assert "after" not in report["observations"]
+    else:
+        assert report["witness"]["actual_verifications"][0]["readbacks"]
+        assert report["observations"]["after"]["group"] == report["observations"]["baseline"]["group"]
+        if fault:
+            assert report["witness"]["verify_exit_code"] == 2
+            assert report["observations"]["after"]["pairs"] == report["observations"]["baseline"]["pairs"]
+            assert report["observations"]["after"]["subtree"], "Retain observed media/state despite failed assignment"
+
+
 @pytest.mark.parametrize("fault", ("missing-bus", "wrong-bus-parent"))
 def test_ordinary_owner_source_native_witness_rejects_invalid_selected_bus(tmp_path, monkeypatch, fault):
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="ordinary-owner-source")

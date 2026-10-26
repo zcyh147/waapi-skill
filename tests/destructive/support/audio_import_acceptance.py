@@ -640,3 +640,214 @@ def collect_localized_guid_source_tsv_acceptance(runtime):
 
 def collect_localized_owner_fields_tsv_acceptance(runtime):
     return collect_localized_tsv_import_acceptance(runtime, witness_kind="owner-fields-tsv")
+
+
+def collect_switch_import_acceptance(runtime):
+    """Two imports under the sandbox's source-backed nonempty Switch graph."""
+    from tests.destructive.test_gateway_workflow_transaction_matrix import (
+        _start_business_draft, _update_business_draft, _bind_business_object,
+        _complete_business_draft, _write_fixture_wav,
+    )
+    assert runtime.version == "2025.1", "This representative Switch witness is pinned to 2025.1"
+    output = runtime.state_dir / "switch-import-witness.json"
+    assert not output.exists(), "Never overwrite original Switch observations"
+    category = {"category": "audio-import-switch-owner-media", "status": "FAIL", "transaction_ids": [],
+        "verifier_strength": "public_verifier_plus_exact_group_pairs_source_media_and_subtree_preservation",
+        "observation_path": str(output)}
+    runtime.category_results.append(category)
+    report = {"contract": "waapi-skill.switch-import-witness/v1", "candidate": runtime.candidate,
+        "version": runtime.version, "setup_coverage_credit": False, "business_effect_verified": False,
+        "transaction_budget": {"setup": 1, "witness": 1, "maximum_total": 2}, "stage": "baseline",
+        "calls": [], "setup": {}, "witness": {}, "observations": {}, "inputs": {}, "failure": None,
+        "limits": {"calls": 96, "reply_bytes": 262144, "receipt_bytes": 2097152},
+        "lifecycle_acceptance": "Requires existing final host-category-evidence/v3 source-integrity and cleanup record"}
+    attempted = set()
+
+    def persist():
+        body = json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= report["limits"]["receipt_bytes"], "Switch witness receipt bound exceeded"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix(".tmp"); temporary.write_bytes(body); temporary.replace(output)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+
+    class Gateway:
+        version, lifecycle, port = runtime.version, runtime.lifecycle, runtime.port
+        def raw_gateway(self, argv):
+            assert len(report["calls"]) < report["limits"]["calls"]
+            if argv[0] == "execute":
+                assert argv[1] not in attempted, "Never retry Switch import execution"
+                attempted.add(argv[1])
+            call = {"argv": list(argv)}; report["calls"].append(call)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                call.update(exit_code=code, payload=payload)
+                assert len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) <= report["limits"]["reply_bytes"]
+                return code, payload
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get("ok") is True, payload
+            if live:
+                assert payload["detected_version"] == runtime.version, payload
+                assert payload["endpoint"] == {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}, payload
+            return payload
+    gateway = Gateway()
+    owned = runtime.sandbox.sandbox_path.resolve(strict=True)
+
+    def proof(raw):
+        lexical = Path(localize_waapi_host_path(raw)); assert not lexical.is_symlink(), lexical
+        path = lexical.resolve(strict=True)
+        assert path.is_relative_to(owned) and path.is_file(), path
+        body = path.read_bytes(); assert 0 < len(body) <= 65536
+        return {"path": str(path), "size": len(body), "sha256": hashlib.sha256(body).hexdigest()}
+
+    def query(argv, *, fields=(), maximum=64):
+        payload = gateway.gateway(["query-object", *argv, "--include", "notes", "--include", "parent", "--include", "class-id",
+            *(word for field in fields for word in ("--include-field", field)), "--max-results", str(maximum)], live=True)
+        assert payload.get("projection_complete") is not False and payload.get("limit_reached") is not True and payload.get("status") != "partial", payload
+        rows = payload["objects"]; assert payload["count"] == len(rows) and len(rows) <= maximum, payload
+        return rows
+
+    def exact(identity, *, fields=()):
+        rows = query(["--exact-id", identity], fields=fields, maximum=2)
+        assert len(rows) == 1 and rows[0]["id"] == identity and isinstance(rows[0].get("notes"), str), rows
+        return rows[0]
+
+    def pairs(identity):
+        payload = gateway.gateway(["core-call", "ak.wwise.core.switchContainer.getAssignments", "--object-id", identity], live=True)
+        rows = payload["agent_result"]["return"]
+        assert isinstance(rows, list) and len(rows) <= 64, payload
+        result = []
+        for row in rows:
+            child, value = row["child"], row["stateOrSwitch"]
+            child = child["id"] if isinstance(child, Mapping) else child
+            value = value["id"] if isinstance(value, Mapping) else value
+            assert uuid.UUID(child).int and uuid.UUID(value).int, row
+            result.append({"child": child.upper(), "stateOrSwitch": value.upper()})
+        assert len({(row["child"], row["stateOrSwitch"]) for row in result}) == len(result), result
+        return sorted(result, key=lambda row: (row["child"], row["stateOrSwitch"]))
+
+    def subtree(identity):
+        payload = gateway.gateway(["query-object", "--exact-id", identity, "--relationship", "descendants",
+            "--include", "notes", "--include", "parent", "--include", "class-id", "--include", "source-language",
+            "--include", "original-file-path", "--max-results", "64"], live=True)
+        assert payload.get("projection_complete") is not False and payload.get("limit_reached") is not True and payload.get("status") != "partial", payload
+        rows = payload["objects"]; assert payload["count"] == len(rows) <= 64, payload
+        result = {}
+        for row in rows:
+            assert row["id"] not in result, row
+            result[row["id"]] = {"object": row}
+            if row["type"] == "AudioFileSource":
+                assert row["class_id"] == 16 and row["source_language"]["name"] == "SFX", row
+                result[row["id"]]["media"] = proof(row["original_file_path"])
+        return result
+
+    def audio(index, stem):
+        path = _write_fixture_wav(owned / "GatewaySwitchWitness" / str(index), stem, frequency=330 + index * 110)
+        report["inputs"][str(path)] = proof(str(path))
+        return path
+
+    try:
+        # Exact identities/classes from the pinned SampleProject and catalog.
+        container_id = "{72A207A3-DA06-4467-8E18-3FDAB77DC66B}"
+        group_id = "{4F5CED25-BA00-4C46-88AB-CE2CFBEFDD2D}"
+        value_id = "{8E435F66-9998-4396-8BBC-1BEAF62FD304}"
+        container = exact(container_id, fields=("SwitchGroupOrStateGroup",))
+        assert (container["name"], container["type"], container["class_id"], container["path"], container["parent"]["id"]) == (
+            "Player_Footsteps", "SwitchContainer", 655376, r"\Containers\Default Work Unit\PlayerFootstepsMaintenance\Player_Footsteps", "{8570736F-FDCF-4C43-AF64-C99A25B16722}"), container
+        assert container["references"]["SwitchGroupOrStateGroup"]["id"] == group_id, container
+        group = exact(group_id)
+        assert (group["name"], group["type"], group["class_id"], group["path"], group["parent"]["id"]) == (
+            "WAAPI_V2_Surface", "SwitchGroup", 1245200, r"\Switches\Default Work Unit\WAAPI_V2_Surface", "{943EAFED-3A2C-4325-9F3C-E4CD8AEE33DC}"), group
+        value = exact(value_id)
+        assert (value["name"], value["type"], value["class_id"], value["path"], value["parent"]["id"]) == (
+            "Snow", "Switch", 1310736, group["path"] + r"\Snow", group_id), value
+        values = sorted(query(["--exact-id", group_id, "--relationship", "children"]), key=lambda row: row["id"])
+        baseline = report["observations"]["baseline"] = {"container": container, "group": group, "values": values,
+            "pairs": pairs(container_id), "subtree": subtree(container_id)}
+        assert baseline["pairs"] and all(row["stateOrSwitch"] != value_id for row in baseline["pairs"]), baseline["pairs"]
+        assert all(row["child"] in baseline["subtree"] for row in baseline["pairs"]), baseline["pairs"]
+        assert any("media" in row for row in baseline["subtree"].values()), "Nonempty original media baseline required"
+        suffix = uuid.uuid4().hex[:10]
+        existing_name, spare_name, new_name = ("ImportSwitch_" + suffix + tail for tail in ("Existing", "Spare", "New"))
+        first, spare = audio(0, existing_name), audio(1, spare_name)
+        draft = _start_business_draft(gateway, "audio.import")
+        parent = _bind_business_object(gateway, draft, object_id=container_id)
+        _update_business_draft(gateway, draft, "draft-declare-import-batch", ["--row-order", "existing", "spare",
+            "--new-row", "existing", parent, existing_name, "sound-sfx", "--field", "existing", "media_file", str(first),
+            "--new-row", "spare", parent, spare_name, "sound-sfx", "--field", "spare", "media_file", str(spare)], live=False)
+        def inspect_setup(preview):
+            category["transaction_ids"].append(preview["transaction_id"])
+        _complete_business_draft(gateway, draft, inspect_preview=inspect_setup, phase_receipt=report["setup"])
+        before = report["observations"]["before"] = subtree(container_id)
+        assert all(before[identity] == row for identity, row in baseline["subtree"].items())
+        existing, = [row["object"] for row in before.values() if row["object"]["name"] == existing_name and row["object"]["parent"]["id"] == container_id]
+        spare_owner, = [row["object"] for row in before.values() if row["object"]["name"] == spare_name and row["object"]["parent"]["id"] == container_id]
+        old_source, = [row for row in before.values() if row["object"]["type"] == "AudioFileSource" and row["object"]["parent"]["id"] == existing["id"]]
+        spare_ids = {spare_owner["id"], *(identity for identity, row in before.items() if row["object"]["parent"]["id"] == spare_owner["id"])}
+        assert len(before) == len(baseline["subtree"]) + 4 and len(spare_ids) == 2, before
+        assert old_source["media"]["sha256"] == report["inputs"][str(first)]["sha256"]
+        assert pairs(container_id) == baseline["pairs"]
+        replacement, created = audio(2, existing_name), audio(3, new_name)
+        draft = _start_business_draft(gateway, "audio.import")
+        owner = _bind_business_object(gateway, draft, object_id=existing["id"])
+        parent = _bind_business_object(gateway, draft, object_id=container_id)
+        _update_business_draft(gateway, draft, "draft-declare-import-batch", ["--row-order", "existing", "new",
+            "--existing-row", "existing", owner, "--field", "existing", "media_file", str(replacement), "--switch-value", "existing", "Snow",
+            "--new-row", "new", parent, new_name, "sound-sfx", "--field", "new", "media_file", str(created), "--switch-value", "new", "Snow"], live=False)
+        report["stage"] = "witness"
+        _update_business_draft(gateway, draft, "draft-check", live=True)
+        preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
+        witness = report["witness"]; transaction = preview["transaction_id"]
+        witness.update(transaction_id=transaction, preview=preview); category["transaction_ids"].append(transaction)
+        shown = gateway.gateway(["transaction-show", transaction], live=False)
+        dispatch = witness["compiled_native_request"] = shown["artifact"]["prepared_operation"]["dispatch"]
+        assert dispatch["uri"] == "ak.wwise.core.audio.import" and dispatch["args"]["importOperation"] == "useExisting", dispatch
+        rows = dispatch["args"]["imports"]
+        owner_row, = [row for row in rows if row.get("switchAssignation") and existing_name in row["objectPath"]]
+        assert owner_row == {"objectPath": existing["path"], "objectType": "Sound SFX",
+            "switchAssignation": "<Switch Group:WAAPI_V2_Surface>Snow"}, owner_row
+        assert owner_row["switchAssignation"] == "<Switch Group:WAAPI_V2_Surface>Snow"
+        media_row, = [row for row in rows if row.get("importLocation") == old_source["object"]["id"]]
+        assert media_row["objectPath"] == "" and "switchAssignation" not in media_row and media_row["audioFile"] == str(replacement), media_row
+        assert sum("switchAssignation" in row for row in rows) == 2 and len(rows) <= 4, rows
+        gateway.gateway(["confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]], live=False)
+        code, executed = gateway.raw_gateway(["execute", transaction]); witness.update(execute_exit_code=code, execute=executed); persist()
+        if code != 0 or executed.get("state") != "executed_unverified":
+            category["status"] = "blocked"
+            raise AssertionError("Switch import outcome is indeterminate; no follow-up calls")
+        code, verified = gateway.raw_gateway(["verify", transaction]); witness.update(verify_exit_code=code, verify=verified); persist()
+        if verified.get("state") == "indeterminate" or verified.get("status") == "indeterminate":
+            category["status"] = "blocked"
+            raise AssertionError("Switch import verification is indeterminate; no follow-up calls")
+        saved = gateway.gateway(["transaction-show", transaction], live=False)
+        witness["actual_verifications"] = [event["details"]["verification"] for event in saved.get("events", []) if event.get("event_type") == "verification_recorded"]
+        after = report["observations"]["after"] = {"subtree": subtree(container_id), "pairs": pairs(container_id),
+            "container": exact(container_id, fields=("SwitchGroupOrStateGroup",)), "group": exact(group_id),
+            "values": sorted(query(["--exact-id", group_id, "--relationship", "children"]), key=lambda row: row["id"])}
+        persist()
+        assert all(after[key] == baseline[key] for key in ("container", "group", "values")), after
+        assert all(after["subtree"][identity] == row for identity, row in baseline["subtree"].items())
+        assert all(after["subtree"][identity] == before[identity] for identity in spare_ids)
+        assert after["subtree"][existing["id"]]["object"] == existing
+        current_source = after["subtree"][old_source["object"]["id"]]
+        assert current_source["object"] == old_source["object"]
+        assert current_source["media"]["sha256"] == report["inputs"][str(replacement)]["sha256"] != old_source["media"]["sha256"]
+        new_owner, = [row["object"] for row in after["subtree"].values() if row["object"]["name"] == new_name and row["object"]["parent"]["id"] == container_id]
+        new_source, = [row for row in after["subtree"].values() if row["object"]["type"] == "AudioFileSource" and row["object"]["parent"]["id"] == new_owner["id"]]
+        assert new_owner["type"] == "Sound" and new_owner["class_id"] == 65552 and new_source["media"]["sha256"] == report["inputs"][str(created)]["sha256"]
+        assert set(after["subtree"]) == set(before) | {new_owner["id"], new_source["object"]["id"]}
+        expected = sorted([*baseline["pairs"], *({"child": identity.upper(), "stateOrSwitch": value_id} for identity in (existing["id"], new_owner["id"]))],
+            key=lambda row: (row["child"], row["stateOrSwitch"]))
+        assert after["pairs"] == expected, {"expected": expected, "actual": after["pairs"]}
+        assert all(proof(path) == original for path, original in report["inputs"].items())
+        assert len(witness["actual_verifications"]) == 1 and witness["actual_verifications"][0]["readbacks"]
+        assert code == 0 and verified.get("verified") is True, verified
+        report.update(stage="complete", business_effect_verified=True); category["status"] = "PASS"
+        return category
+    except Exception as exc:
+        report["failure"] = {"type": type(exc).__name__, "message": str(exc)[:2048]}
+        raise
+    finally:
+        persist()

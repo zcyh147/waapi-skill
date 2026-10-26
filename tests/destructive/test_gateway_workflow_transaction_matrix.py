@@ -1030,6 +1030,16 @@ def test_audio_import_exact_tsv_owner_only_fields_preserve_sources(workflow_sand
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_audio_import_switch_assignment_media_and_preservation(workflow_sandbox_runtime):
+    """Existing SFX reuse plus one new Sound, under a nonempty Switch baseline."""
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("Representative Switch media witness is pinned to 2025.1")
+    from tests.destructive.support.audio_import_acceptance import collect_switch_import_acceptance
+    collect_switch_import_acceptance(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_music_playlist_canonical_query_create_and_import_parent(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
