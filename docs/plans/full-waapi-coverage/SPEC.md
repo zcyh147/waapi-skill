@@ -324,3 +324,25 @@ Source creation or closing #182/#174. It applies only to the observed Console
 host/build, not all 2025.1 builds, all five versions or Wwise Authoring.
 Owner-only and pure-media forms retain their existing boundaries. The separate
 all-five-version GUID TSV scope question is not approved by this decision.
+
+## User-approved proportional Dialogue acceptance — 2026-10-27
+
+For #182, the user accepted a closed Dialogue wrapper, program tests and one
+representative successful owned native basic flow as sufficient functional
+acceptance. Dialogue is rarely used; do not expand acceptance into native
+per-condition, ordering or default-association matrices, or comprehensive proof
+of Wwise's internal default structure. Matching primary sources and program
+tests may establish explicit condition-input construction.
+
+Legitimate documented inputs, five-version mapping, Gateway-owned construction,
+configuration binding, the three modification policies, immutable Preview,
+execute-once behavior, drift checks, honest outcomes and cleanup remain
+required. Fix the known Event-plus-Dialogue false-verification failure; the
+lighter evidence method does not excuse that concrete wrapper defect.
+
+Preserve all raw receipts, verdicts and unresolved native observations. A
+read-only collection PASS is not the representative import success. State the
+actual observed result without claiming unproved internal order or default
+association. This changes acceptance depth, not supported feature scope; it
+proves no native absence, grants no blanket Dialogue exclusion and does not
+close #182/#174. No comprehensive native Dialogue QA is a completion condition.
