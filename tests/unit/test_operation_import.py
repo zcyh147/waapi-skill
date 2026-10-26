@@ -26,7 +26,6 @@ from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImpor
     import_operation_policy,
     parse_tab_delimited_import_file,
     regular_file_proof,
-    unsupported_localized_existing_fields,
     verify_regular_file_proof,
 )
 
@@ -1196,40 +1195,27 @@ def test_import_policies_retain_project_without_claiming_in_place_restore() -> N
     )
 
 
-@pytest.mark.parametrize(
-    ("language", "subfolder", "notes", "source_notes", "event", "expected"),
-    [
-        ("Japanese", True, False, False, False, ("originals_subfolder",)),
-        ("English(US)", False, True, False, False, ("notes",)),
-        ("Japanese", False, False, True, False, ("audio_source_notes",)),
-        ("English(US)", False, False, False, True, ("event",)),
-        (
-            "Chinese(PRC)",
-            True,
-            True,
-            True,
-            True,
-            ("originals_subfolder", "notes", "audio_source_notes", "event"),
-        ),
-        ("SFX", True, True, True, True, ()),
-        (None, True, True, True, True, ()),
-    ],
-)
-def test_localized_existing_boundary_rejects_every_unproven_wire_field(
-    language: object,
-    subfolder: bool,
-    notes: bool,
-    source_notes: bool,
-    event: bool,
-    expected: tuple[str, ...],
-) -> None:
-    assert unsupported_localized_existing_fields(
-        import_language=language,
-        originals_subfolder_supplied=subfolder,
-        notes_supplied=notes,
-        audio_source_notes_supplied=source_notes,
-        event_supplied=event,
-    ) == expected
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_localized_import_fields_remain_mapped_in_each_native_contract(version: str, tmp_path: Path) -> None:
+    root = NEW_ROOT if version == "2025.1" else OLD_ROOT
+    media = _write_media(tmp_path)
+    plan = build_audio_import_plan([{
+        "object_path": root + r"\Voice", "audio_file": str(media), "import_language": "English(US)",
+        "originals_subfolder": "Dialogue", "notes": "source notes",
+        "event": {"path": r"\Events\Default Work Unit\Play_Voice", "action": "Play"},
+    }], version=version, import_operation="useExisting")
+    schemas = json.loads((Path(__file__).resolve().parents[2] / "skills/waapi-skill/resources/manifest"
+        / version / "schemas.json").read_text(encoding="utf-8"))["schemas"]
+    native = next(row["schema"]["argsSchema"] for row in schemas if row["uri"] == "ak.wwise.core.audio.import")
+    for field in ("originalsSubFolder", "notes", "audioSourceNotes", "event"):
+        assert native["properties"]["imports"]["items"]["properties"][field] == {
+            "$ref": f"#/properties/default/properties/{field}"}
+        assert native["properties"]["default"]["properties"][field]["type"] == "string"
+    assert plan["dispatch_args"]["imports"] == [{
+        "objectPath": root + r"\Voice", "audioFile": str(media.resolve()), "importLanguage": "English(US)",
+        "originalsSubFolder": "Dialogue", "notes": "source notes",
+        "event": r"\Events\Default Work Unit\Play_Voice@Play",
+    }]
 
 
 def test_tab_file_proof_detects_file_replacement(tmp_path: Path) -> None:

@@ -1006,7 +1006,7 @@ def test_import_object_get_projection_never_uses_unproven_relative_accessor(
     )
 
 
-def test_use_existing_rejects_only_live_localized_rows_with_non_audio_fields(
+def test_use_existing_localized_directive_boundary_still_rejects_unowned_semantics(
     tmp_path: Path,
 ) -> None:
     existing_source = _media(tmp_path, "existing-localized.wav")
@@ -1042,7 +1042,8 @@ def test_use_existing_rejects_only_live_localized_rows_with_non_audio_fields(
                         "audio_file": str(existing_source),
                         "import_language": "Japanese",
                         "originals_subfolder": "Dialogue/Japanese",
-                        "notes": "must be a separate object mutation",
+                        "notes": "requested source notes",
+                        "dialogue_event": r"\Dialogue Events\Unowned",
                     },
                     {
                         "object_path": absent_path,
@@ -1075,9 +1076,34 @@ def test_use_existing_rejects_only_live_localized_rows_with_non_audio_fields(
             "index": 0,
             "target_path": existing_path,
             "import_language": "Japanese",
-            "unsupported_fields": ["originals_subfolder", "notes"],
+            "unsupported_fields": ["dialogue_event"],
         }
     ]
+
+
+def test_localized_tab_existing_field_boundary_remains_an_implementation_limit(tmp_path: Path) -> None:
+    """TSV source normalization is still unresolved #182 work, not native absence."""
+    source = _media(tmp_path, "localized-tab.wav")
+    table = tmp_path / "localized.tsv"
+    table.write_text(f"Audio File\tObject Path\tOriginalsSubFolder\tNotes\tEvent\n"
+        f"{source}\tVoice\tDialogue\trequested source notes\t"
+        r"\Events\Default Work Unit\Play_Voice@Play" + "\n", encoding="utf-8")
+    anchor = {"id": PARENT_GUID, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+        "path": OLD_ROOT, "parent": {"id": SECOND_GUID}, "notes": ""}
+    existing = {"id": OLD_GUID, "name": "Voice", "type": "Sound", "classId": 65552,
+        "path": OLD_ROOT + r"\Voice", "parent": {"id": PARENT_GUID}, "notes": "preserved"}
+    request = parse_operation_request({
+        "contract": OPERATION_REQUEST_CONTRACT, "version": "2022.1", "operation": "audio.importTabDelimited",
+        "arguments": {"import_file": str(table), "import_location": {"kind": "path", "value": OLD_ROOT},
+            "import_language": "English(US)", "import_operation": "useExisting"},
+    })
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(request, read_call=ScriptedReader([
+            {"return": [anchor]}, {"return": [anchor]}, {"return": [existing]}, {"return": []},
+        ], version="2022.1"))
+    assert rejected.value.error_code == "LOCALIZED_EXISTING_IMPORT_FIELDS"
+    assert rejected.value.details["rows"][0]["unsupported_fields"] == ["originals_subfolder", "notes", "event"]
+    assert "implementation boundary" in str(rejected.value)
 
 
 def test_use_existing_live_sfx_preserves_inline_base64_and_native_directives(
@@ -2300,11 +2326,13 @@ def test_replace_existing_requires_distinct_new_guid_and_absent_old_guid(
     old_rows = [live] if old_readback else []
 
     verified = verify_prepared_operation(
-        _prepared(
+        # This legacy verifier fixture has no preparation conditions. Real
+        # Preview producers always include a pre_state mapping.
+        {**_prepared(
             version="2022.1",
             targets=[target],
             import_operation="replaceExisting",
-        ),
+        ), "pre_state": {}},
         execution_result=_result("2022.1", [live], [copied]),
         read_call=ScriptedReader([{"return": [live]}, {"return": old_rows}], version='2022.1'),
     )
