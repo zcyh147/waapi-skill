@@ -1,0 +1,47 @@
+{
+  "contract": "waapi-skill.source-marker-object-model-boundary/v1",
+  "version": "2022.1",
+  "wwise_build": "2022.1.19.8584",
+  "status": "native_object_model_unavailable",
+  "introduced_in": "2023.1",
+  "scope": "direct source Marker object/List read and edit through WAAPI/WAQL; not all file/effective marker information",
+  "owner_class_id": 16,
+  "owner_class_name": "AudioFileSource",
+  "legacy_marker": {
+    "class_id": 65077248,
+    "registration_kind": "Inner"
+  },
+  "modern_marker": {
+    "class_id": 5373968,
+    "registration_kind": "WObject",
+    "list": "Markers"
+  },
+  "basis": "explicit introduction history and matching versioned representation declarations; no new native fixture",
+  "source": {
+    "build": "2023.1.19.8928",
+    "archive": "SDK/Help/WwiseSDK-Windows.chm",
+    "archive_sha256": "fa5e37e8adacc33cf9189be46a4bdbb7f780ebf776429154fddc0ae2df303415",
+    "member": "whatsnew_2023_1_new_features.html",
+    "member_sha256": "ab295251f12c58809e78a24691f4a0603034b8f7519f63f8aa52904295771c39",
+    "section": "WAAPI / Object Model",
+    "html_lines": [
+      423,
+      426
+    ],
+    "feature_statement": "The following elements have been refactored and are now accessible in WAAPI and WAQL:",
+    "feature": "Markers in Audio File Source",
+    "write_example_member": "ak_wwise_core_object_set_example_adding_a_marker_to_an_audio_source.html",
+    "write_example_sha256": "61603a220685745fb161422fa1d9f196e9bbea9168be7c35501d547305bf43ad"
+  },
+  "registered_type_discovery_available": true,
+  "registered_class_metadata_discovery_available": true,
+  "all_marker_information_absence_proven": false,
+  "not_excluded": [
+    "file/imported/effective marker information through independently defined mechanisms",
+    "registered Inner type and class metadata discovery"
+  ],
+  "remaining": [
+    "imported/effective marker projection",
+    "2021 RTPC property association remains a separate unresolved question"
+  ]
+}

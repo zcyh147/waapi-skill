@@ -13,6 +13,30 @@ LOCAL_LISTS = {
     'local-markers': {'native': '@Markers', 'field': 'Markers', 'first': '2023.1',
         'scope': 'directly stored AudioFileSource Marker objects; no imported/effective marker computation claim'},
 }
+MARKER_BOUNDARY_SHA256 = {
+    '2021.1':'cbf38d10d47a74703bd56da8b98ed5821420d64ab30f9da6922312e717033c93',
+    '2022.1':'f88030959957037a8d087fc4bab6df8bcbac5b59e71a9c7eeaa04771e844cb99',
+}
+
+
+def local_marker_version_boundary(version):
+    if version not in MARKER_BOUNDARY_SHA256: return None
+    path = Path(__file__).resolve().parents[1] / 'references/semantic' / version / 'source-marker-object-model-boundary.json'
+    with path.open('rb') as source:
+        raw = source.read(8193)
+    if len(raw) > 8192 or hashlib.sha256(raw).hexdigest() != MARKER_BOUNDARY_SHA256[version]:
+        raise ValueError('Pinned source Marker object-model boundary changed')
+    boundary = json.loads(raw)
+    if (boundary['version'], boundary['wwise_build']) != (version, load_definition_graph(version).wwise_build):
+        raise ValueError('Source Marker object-model boundary differs from selected version/build')
+    return boundary
+
+
+def local_marker_boundary_message(version):
+    boundary = local_marker_version_boundary(version)
+    if boundary is None: return None
+    return (f"Direct source Marker object/List read and edit was introduced in Wwise {boundary['introduced_in']}; "
+        f"unavailable in Wwise {version}; not all file/effective marker information is excluded")
 
 
 def descriptor(native):
@@ -72,7 +96,11 @@ def validate_local_member(row, owner_id, source, error):
 
 def local_list_contract(version):
     catalog = load_catalog(version)
-    return {'contexts': {name: {**value, 'available': version >= value['first']} for name, value in LOCAL_LISTS.items()},
+    contexts = {name: {**value, 'available': version >= value['first']} for name, value in LOCAL_LISTS.items()}
+    marker_boundary = local_marker_version_boundary(version)
+    if marker_boundary is not None:
+        contexts['local-markers'].update(native_boundary=marker_boundary, availability_reason=local_marker_boundary_message(version))
+    return {'contexts': contexts,
         'membership': 'directly stored local List only; no ordinary/override equivalence claim',
         'scope': 'fresh exact owner classId certified by matching per-class documented List source; unknown class never borrows a base by type name',
         'source': {'version': version, 'catalog_sha256': catalog['catalog_sha256'], **catalog['source']},
@@ -81,7 +109,7 @@ def local_list_contract(version):
         'explicit_class_bridges': ([{'actual_class_id': 9699330, 'actual_object_type': 'SourcePlugin',
             'source_class_id': 1048592, 'native_list': '@RTPC'}] if plugin_bridge(version) else []),
         'remaining': ['2021 RTPC inspection semantics', '2021/2022 fixed Effect0-3 inspection uses existing scalar/reference paths',
-            'imported/effective marker projection and 2021/2022 Inner Marker representation',
+            'imported/effective marker projection',
             'other precise source-proven plugin-to-base bridges']}
 
 

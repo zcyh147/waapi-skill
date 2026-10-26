@@ -367,13 +367,42 @@ def test_local_marker_contract_keeps_modern_stored_list_and_legacy_inner_boundar
     assert context['native'] == '@Markers' and context['field'] == 'Markers'
     assert context['available'] is (version >= '2023.1')
     assert 'no imported/effective marker computation claim' in context['scope']
-    assert 'imported/effective marker projection and 2021/2022 Inner Marker representation' in contract['remaining']
+    assert 'imported/effective marker projection' in contract['remaining']
+    assert '2021 RTPC inspection semantics' in contract['remaining']
+    if version < '2023.1':
+        boundary = context['native_boundary']
+        assert boundary['version'] == version and boundary['introduced_in'] == '2023.1'
+        assert boundary['scope'] == 'direct source Marker object/List read and edit through WAAPI/WAQL; not all file/effective marker information'
+        assert boundary['source']['feature'] == 'Markers in Audio File Source'
+        assert boundary['source']['feature_statement'] == 'The following elements have been refactored and are now accessible in WAAPI and WAQL:'
+        assert boundary['source']['member_sha256'] == 'ab295251f12c58809e78a24691f4a0603034b8f7519f63f8aa52904295771c39'
+        assert boundary['registered_type_discovery_available'] is True
+        assert boundary['all_marker_information_absence_proven'] is False
+    else:
+        assert 'native_boundary' not in context
     code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include-related','local-markers','count')
     if version >= '2023.1':
         assert code == 0,result
         assert result['agent_result'][0]['related']['projections'][0]['value'] == 1
     else:
         assert code == 2 and not task.calls,result
+        assert 'introduced in Wwise 2023.1' in result['message'] and 'not all file/effective marker information' in result['message']
+        assert 'native absence is not established' not in result['message']
+        original = task.call
+        def native(uri, args=None, options=None):
+            if uri.endswith('object.getTypes'):
+                task.calls.append((uri,args,options))
+                return {'return':[{'name':'Marker','classId':65077248,'type':'Inner'}]}
+            return original(uri,args,options)
+        task.call = native
+        task.metadata[65077248] = {'Time':{'name':'Time','type':'Real64'},'Label':{'name':'Label','type':'string'}}
+        code,types = task.run('metadata','types')
+        assert code == 0,types
+        inner, = types['agent_result']['types']
+        assert {key:inner[key] for key in ('name','classId','type')} == {'name':'Marker','classId':65077248,'type':'Inner'}
+        code,fields = task.run('metadata','list','--custom-kind','Marker')
+        assert code == 0 and [field['name'] for field in fields['agent_result']['fields']] == ['Label','Time'],fields
+        assert not any('@Markers' in (args or {}).get('waql','') for uri,args,_ in task.calls if uri.endswith('object.get'))
 
 
 @pytest.mark.parametrize('version', ['2023.1','2025.1'])
