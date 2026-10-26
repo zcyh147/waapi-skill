@@ -7,11 +7,11 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## 2026-10-26 #182 owner-only exact TSV fields milestone
 
-The public Gateway now admits the metadata-proven 2025.1 owner-only localized
-TSV slice with explicit activation prerequisites and complete Source/media
-preservation. The multirow verifier compares each owner's sealed prestate.
-Component evidence is five tracer checks, one multiowner regression and three
-persisted-final-writer controls: separate results, not a Program/Non-live gate.
+The public Gateway admits metadata-proven owner-only localized TSV fields on
+all five pinned versions, preserving Source/media and each row's sealed
+prestate. Activation may be explicit or already satisfied on the exact owner.
+`6548a1c0` has 14 distinct passing program nodes across separate components;
+prior tracer/multiowner/final-writer proofs remain separate, not a broad gate.
 
 Console 2025.1.7.9143, macOS, candidate `08e9111a`: **PASS, 6.94s** in
 `import182-tsv-owner-fields-2025-r2`, three verified transactions including two
@@ -26,9 +26,10 @@ Original `import182-tsv-owner-fields-2025-r1` at `4b11301e` remains **FAIL,
 7.44s**: wrong fixture Bus class, two verified setups, witness never executed;
 source/process cleanup passed and its sandbox remains quarantined. Both roots
 retain `main-assessment.json` and final `category.jsonl` under
-`.waapi-skill-state/full-coverage/`. #182 remains OPEN for five-version code
-proof, media-containing TSV/forms and Dialogue/Switch directives. Fresh budget
-remains zero; no broad gates or native-Windows evidence were added.
+`.waapi-skill-state/full-coverage/`. #182 remains OPEN for combined localized
+owner-field/media TSV rows, broader media forms and Dialogue/Switch directives.
+Older lanes and omitted activation have program-only proof. Fresh budget stays
+zero; no broad gates or native-Windows evidence were added.
 
 ## 2026-10-26 #182 GUID TSV failure and immediate safety boundary
 
