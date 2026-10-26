@@ -5,6 +5,56 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #180 graph/lifecycle closeout
+
+Reviewed combined `18defa44` resolves the three audited #180 gaps through the
+existing public Gateway. Pair-aware nested RTPC preparation admits non-fail
+parent merges with a new owned ControlInput while preserving existing pairs,
+Curves and actual occurrence handles. Old-owned replacement now previews the
+old GUID's removal and verifies a fresh new input, old absence and retained
+RTPC/Curve/list/peer state. Five-version contracts and program boundaries remain:
+the source-certified constructor is supported in 2022–2025; 2021 retains its
+constructor-introduction boundary, without excluding all other RTPC workflows.
+Mixed platform intent uses the existing separately previewed property path.
+
+Selected program results remain component-attributed and overlapping: the
+2022/2025 parent/shared-input merge group passed **7 in 4.64s**; the final
+PlaylistSlot boundary/MetadataSlot/preservation/schema group passed **27 in
+9.31s**; replacement controls passed **24 in 14.79s**, with its existing finalizer
+group separately **12 in 14.68s**. Shared replacement tests cover 2022–2025.
+These are representative mechanisms, not a per-class/value/conflict receipt
+quota or a summed full-gate result. Detailed commands and reviews are retained
+under `.waapi-skill-state/full-coverage/graph-180-closeout/`.
+
+| Candidate / exact Console build | Original result | Scoped native outcome |
+| --- | --- | --- |
+| `18defa44` / 2022.1.19.8584 | **PASS, 9.18s** | Three VERIFIED transactions: two setup, one owned Time→fresh `TimeModFresh` replacement. Fresh GUID/class/RTPC owner/values, old GUID absence, unchanged RTPC/Curve GUID/class/owner/points and complete owning List independently proven. |
+| `549ef3f9` / 2022.1.19.8584 | **FAIL, 11.92s** | Four VERIFIED transactions and retained `Object not found (13)` response support only old-input absence after owned→shared displacement. Consumer repair `935f121c` preserves this scoped assessment; it does not regrade the root or establish owned→owned replacement. |
+| `549ef3f9` / 2025.1.7.9143 | **FAIL, 10.73s** | PlaylistSlot class 5636096 `setName` returned `ak.wwise.invalid_arguments`, `Can't rename this object.` Transaction remains indeterminate; no post-error query, verification or retry. |
+
+The approved exact-class/2025-lane rename boundary pins that representative
+Console rejection in `references/semantic/2025.1/playlist-slot-name-native-boundary.json`;
+other hosts/builds remain unobserved. The historical capability probe is explicitly
+skipped without PASS credit. MetadataSlot class 5570560 retains its scoped rename
+path and fake coverage only; no native name claim follows. Existing reference,
+notes and Playlist List outcomes remain available through their own contracts.
+
+The three native roots under `.waapi-skill-state/full-coverage/` are
+`owned-input180-2022-replacement-r1`, `owned-input180-2022-disposition-r1` and
+`inner-rename180-2025-native-r1`; each retains `main-assessment.json`, category
+records and logs. Replacement observation SHA-256 is
+`10d05ddca24eb954fb5479bdbcf29903300616abe2f245b76c812f2115799bde`.
+All three preserve source full hash/tree/project mtime and clean process teardown;
+the PASS sandbox was deleted, both failed sandboxes remain quarantined. Original
+FAILs and the indeterminate transaction are unchanged. Both incremental reviews
+were CLEAR before the final replacement run.
+
+R59 already delivered the Source evidence adapter and attached the 26 exact
+Source branches; no Source capture or adapter rerun was needed here. #195 retains
+mapping/source reconciliation and stable combined Program/Non-live gates; #194
+Fresh budget remains zero. This #180 closeout grants no parent completion,
+Windows evidence, broad native matrix or #179 scope exception.
+
 ## 2026-10-26 #179 Sink guard and Conversion evidence checkpoint
 
 Sink guard `e0cbf3be` uses five matching DefaultSink/WObjects/catalog sources:

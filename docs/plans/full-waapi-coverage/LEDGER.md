@@ -1,22 +1,28 @@
 # Branch completion ledger
 
+Current #180 closeout and selected native results are recorded in
+[the test inventory](../../../tests/TEST_INVENTORY.md). The checkpoints below
+retain their original counts and outcomes; #195 owns current generated
+mapping/source reconciliation and final combined gates, with #194 Fresh at zero.
+
 ## R57/R58 exact Source copy observations
 
 Accepted `411e8173` adds version-matched saved-copy continuation support and the
 modern collector. [The Source fact ledger](SOURCE_COPY.md) records separate
 2021 repeated-fixture and 2022–2025 existing-Synth copy/Save observations, original
 candidate/receipt hashes, raw diagnostic flags and Root's scoped effect assessment.
-The Source collector-to-exact-branch adapter remains required #180 implementation;
-these observations add no generated native credit and close no functional ticket.
+R59 subsequently delivered the Source collector-to-exact-branch adapter and
+attached the 26 exact Source branches. The original observations and their raw
+flags remain unchanged; the dated R59 inventory records that separate admission.
 
-## Latest integration: R58
+## Historical integration: R58
 
 Reviewed source `35410b7e` passed 49 affected controls and one 60-case capture.
 Artifact candidate `f5a6487e` passed both portable-product checks after one
 additive import and branch generation/check. All 2,683 earlier archive files,
 625 selected bindings and native obligation identities/shapes/owners were
-preserved. The counts below remain unchanged; the five Source observations
-above remain scoped business facts until their required #180 reader is finished.
+preserved. The historical counts below remain unchanged; R59 later completed the
+Source reader/attachment without repeating those five native observations.
 This is focused integration evidence, not final full-gate or Fresh acceptance.
 Exact results are in [the test inventory](../../../tests/TEST_INVENTORY.md).
 

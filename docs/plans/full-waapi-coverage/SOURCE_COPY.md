@@ -1,7 +1,8 @@
 # Exact Synth Source copy and Save observations
 
-These are scoped #180 business observations, separate from generated branch
-credit. The public Gateway copied an existing Wwise Synth One Source graph,
+These are original scoped #180 business observations; R59 subsequently attached
+their retained evidence to exact Source branches as recorded below. The public
+Gateway copied an existing Wwise Synth One Source graph,
 using separately authorized destination creation, baseline Save, copy and final
 Save transactions. Original native receipts and diagnostic flags remain unchanged.
 
@@ -58,20 +59,21 @@ to those originals.
 | 2024.1 | `e6d1c439477bf0f84f3dc0ab2fec4d92de6fbbfe271c783eaedf20edfac1a8b1` |
 | 2025.1 | `e2b448af5ca6156f5aafed8a48130c8f5d057128b173011147ea4c00dff3966d` |
 
-## Required remaining integration and variants
+## R59 attachment and current scope
 
-The existing Topic/metadata import does not map these Source collector contracts
-to exact generated branch assertions. #180 still requires a reviewed adapter in
-the existing audit/finalizer lane: original collector/native/category locators,
-exact per-branch input/observation pointers and native shapes/reference chains,
-source/candidate bridges, and portable evidence descriptors. Candidate seams are
-`tests/destructive/test_gateway_workflow_transaction_matrix.py` (producer),
-`tests/support/exact_evidence_finalization.py` (finalizer), and
-`tests/maintenance/branch_audit_completion.py` plus
-`tests/maintenance/branch_coverage_audit.py` (admission/index). Extend the existing
-contract; never reinterpret diagnostic flags or count a whole URI as covered.
+R59 delivered the reviewed adapter in the existing audit/finalizer lane and
+attached the five original version-specific Source records without rerunning
+Wwise. At `4e3c2800`, the actual completion evaluator accepted the 26 exact Source
+branches alongside 65 metadata branches. Original collector/native/category
+locators, exact branch shapes/reference chains, source/candidate bridges and
+portable evidence remain separately attributable; raw diagnostic flags and
+original verdicts were not rewritten. See the dated R59 entry in
+[the test inventory](../../../tests/TEST_INVENTORY.md).
 
-This is required same-parent implementation, not a documentation exception or
-completion of #180. No generated Source native-PASS count follows yet. Other
-Source classes, sharedObjectRef arrangements, arbitrary repeated topology,
-constructors, Voice/media/audio effects, history, Windows and Fresh remain open.
+R59 fulfilled the former missing-adapter requirement; reuse the original Source
+captures within their accepted scope. These records establish only their exact
+Synth Source copy/Save scope; they do not themselves prove every Source class,
+sharedObjectRef arrangement, topology, constructor, media/history effect,
+Windows host or Fresh workflow. #195 owns current mapping/source reconciliation
+and final combined gates; #194 Fresh budget remains zero. No per-class or
+topology execution-receipt quota follows from this ledger.
