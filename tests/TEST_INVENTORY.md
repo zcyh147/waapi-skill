@@ -5,6 +5,24 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #182 repeated TSV Switch native milestone
+
+Console 2025.1.7/build 9143, `ee13e472`, root `import182-tsv-switch-2025-r1`:
+**PASS, 7.22s**, two verified transactions including setup. The exact table's
+two Switch columns assigned Snow and Metal to one new SFX Sound with one Source
+and requested bytes; assignment pairs grew 3→5. Old group/values, subtree/media,
+spare, inputs and table stayed exact. Source hash/tree/mtime were unchanged;
+process cleanup passed and the PASS sandbox was deleted. Main assessment/final
+category remain in the full-coverage root; receipt SHA-256:
+`0af062ccc22be4c59d689981562d3dc28e1a80d2859d2860bd845cc216520944`.
+
+Five-lane repeated-column program proof is **13 distinct component checks**,
+separate from this native result; localized/reuse/replacement TSV and Dialogue
+remain unproven. CI `40344306708` retains its admission FAIL before tests.
+Three new fake-only Gateway files are now registered in Program: **370 parsed
+roster selectors**, not passing tests; only focused admission checks ran.
+No Fresh, full gates or all-coverage claim is added; #182 remains OPEN.
+
 ## 2026-10-26 #182 distinct-Source failure and current host boundary
 
 Console 2025.1.7/build 9143, `784e1bfe`, root
