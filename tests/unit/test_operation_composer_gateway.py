@@ -332,6 +332,21 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # The next #182 slice admits localized owner fields/inline media and
+    # explicit Source creation. Seal only this disclosure delta, then invert
+    # it so the earlier import and all pre-import seals remain unchanged.
+    assert canonical_sha256(non_object_set_digests) == "f7e8659d742bce3fa0de9b380ce392287a5692268e163f680004ad38bab53c80"
+    ordinary_import_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.import", version)
+        assert contract["constraints"][6] == (
+            "ordinary localized useExisting preserves the exact Voice and language-scoped Source identities; Gateway-owned typed owner/Source paths and the 2025.1 exact existing Source GUID binding support metadata-proven owner properties/references and regular or bounded inline WAV media, including an absent language Source; AudioSourceNotes uses an explicit Source row, while Notes, Originals placement and new Events retain independent verification; localized Dialogue/Switch directives and explicit row import_location remain outside the closed preparation path"
+        )
+        contract["constraints"][6] = (
+            "an ordinary audio.import live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight; Originals placement, one source notes field and a new Event retain ordinary import verification; other requested row fields are rejected"
+        )
+        ordinary_import_contracts[version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
     # #182 changes only import constraints: ordinary localized field admission
     # and exact TSV version/Notes disclosure. Verify and invert those reviewed
     # deltas before retaining every earlier schema seal below.
@@ -344,7 +359,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         ]
         del contract["constraints"][:2]
         non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
-        contract = operation_request_machine_contract("audio.import", version)
+        contract = ordinary_import_contracts[version]
         assert contract["constraints"][6] == (
             "an ordinary audio.import live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight; Originals placement, one source notes field and a new Event retain ordinary import verification; other requested row fields are rejected"
         )
