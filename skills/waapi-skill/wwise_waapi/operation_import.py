@@ -960,9 +960,9 @@ def parse_tab_delimited_import_file(
         )
         if dynamic_fields:
             oracle_row["requested_dynamic_fields"] = dynamic_fields
-            # First owner-only localized TSV slice: typed existing Voice fields.
-            # Media rows and other lanes retain their existing boundaries.
-            if (lane == "2025.1" and not oracle_row["media_expected"]
+            # Typed existing Voice owner fields preserve every language Source.
+            # Media rows retain their separate admission and identity guards.
+            if (not oracle_row["media_expected"]
                     and language_requires_live_project_validation(language)
                     and _import_object_type_token(str(oracle_row.get("requested_object_type", ""))) == "soundvoice"):
                 oracle_row["requested_language"] = language
