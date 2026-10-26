@@ -333,6 +333,13 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # This inventory owns the exact seals for both import routes in all lanes;
+    # the Registry unit test separately checks version/prose/hash semantics.
+    assert {
+        f"{operation}@{version}"
+        for operation in ("audio.import", "audio.importTabDelimited")
+        for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+    } <= non_object_set_digests.keys()
     # Explicit path choices add only the ordinary row/default Dialogue fields.
     # Invert that exact extension before all historical schema seals below.
     assert canonical_sha256(non_object_set_digests) == "4fabdc0d5496d180c8f0adf680d812204692dd157c26dc85e4e3965890ec9de8"
