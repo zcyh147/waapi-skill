@@ -185,13 +185,17 @@ def validate_audio_import_replacement_scope(
     compiled: CompiledBusinessPlan,
     prepared: Mapping[str, Any],
 ) -> None:
-    """Bind replace permission to declared existing targets, never new collisions.
+    """Bind named-Source absence and replacement permission to declarations.
 
     The successful Draft check seals this exact prepared snapshot; Preview and
     execution retain their existing digest and prewrite drift checks.
     """
 
-    if compiled.request["arguments"].get("import_operation") != "replaceExisting":
+    replace_existing = compiled.request["arguments"].get("import_operation") == "replaceExisting"
+    if not replace_existing and not any(
+        "source_name" in expectation["business_fields"]
+        for expectation in compiled.verifier_expectations
+    ):
         return
     targets = prepared.get("verification_plan", {}).get("targets", [])
     by_path = {row["canonical_target_path"].casefold(): row for row in targets}
@@ -206,6 +210,13 @@ def validate_audio_import_replacement_scope(
         if target is None:
             raise _repair(session, "AUDIO_IMPORT_SCOPE_INVALID", field="targets",
                 action="prepare the exact declared import targets")
+        if "source_name" in expectation["business_fields"]:
+            if target.get("pre_state_rows") or target.get("preexisting_id") is not None:
+                raise _repair(session, "NEW_IMPORT_TARGET_EXISTS", field="source_name", path=path,
+                    action="keep this new Source absent or bind its exact Source handle for reimport or replacement")
+            continue
+        if not replace_existing:
+            continue
         if isinstance(declaration.target, NewDescendantTarget):
             if target.get("pre_state_rows") or target.get("preexisting_id") is not None:
                 raise _repair(session, "NEW_IMPORT_TARGET_EXISTS", field="target", path=path,

@@ -185,3 +185,66 @@ def test_named_sources_reject_drift_before_the_only_execution(tmp_path, drift):
     result = command("execute", preview["transaction_id"], expected_error="ROLE_GUARD_MISMATCH")
     assert result["state"] == "repreview_required"
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize("form", ("new_explicit_reimport", "existing_sound", "mixed_default"))
+def test_owner_named_source_requires_absence_even_when_batch_reimports(tmp_path, form):
+    client = NamedSourcesClient(tmp_path, "2025.1", existing=True)
+    old_id = "{22222222-2222-2222-2222-222222222222}"
+    old_file = _project_path(tmp_path).parent / "Originals/SFX/old.wav"
+    old_file.write_bytes(b"existing named Source media")
+    client.objects[old_id] = client.source(old_id, "_MyActiveSource", old_file)
+    before = deepcopy(client.objects)
+    command, parent, _ = _import_fields_draft(tmp_path, "2025.1", client)
+    if form == "new_explicit_reimport":
+        command("draft-business-configure", "--mode", "reimport")
+    elif form == "mixed_default":
+        bound = command("draft-bind-object", "--object-id", client.UNRELATED)
+        command("draft-declare-existing", "--declaration-id", "bound-source",
+            "--object-handle", bound["bound_object"]["handle"],
+            "--field", "media_file", str(client.unrelated_file), "--field", "language", "SFX")
+    media = tmp_path / "replacement.wav"
+    media.write_bytes(b"requested media")
+    if form == "existing_sound":
+        bound = command("draft-bind-object", "--object-id", client.OWNER)
+        command("draft-declare-existing", "--declaration-id", "named-source",
+            "--object-handle", bound["bound_object"]["handle"],
+            "--field", "source_name", "_MyActiveSource", "--field", "media_file", str(media),
+            "--field", "language", "SFX")
+    else:
+        command("draft-declare-new", "--declaration-id", "named-source", "--parent-handle", parent,
+            "--name", "MySound", "--kind", "sound-sfx", "--field", "source_name", "_MyActiveSource",
+            "--field", "media_file", str(media))
+    record = next((tmp_path / "state/operation-drafts-v1/records").glob("*.json"))
+    original_record = record.read_bytes()
+    command("draft-check", expected_error="NEW_IMPORT_TARGET_EXISTS")
+    assert record.read_bytes() == original_record
+    assert client.objects == before and old_file.read_bytes() == b"existing named Source media"
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
+    assert not list((tmp_path / "state/transactions").glob("tx1-*"))
+
+
+def test_new_named_source_reimport_keeps_absence_bound_through_prewrite(tmp_path):
+    command, client = draft(tmp_path, "2025.1", existing=True)
+    command("draft-business-configure", "--mode", "reimport")
+    command("draft-check")
+    preview = command("preview-from-draft")
+    shown = command(*preview["next_command"]["gateway_argv"])
+    command(*shown["next_command"]["gateway_argv"])
+    collision_id = "{22222222-2222-2222-2222-222222222222}"
+    client.objects[collision_id] = client.source(collision_id, "_MyActiveSource", client.unrelated_file)
+    before = deepcopy(client.objects)
+    rejected = command("execute", preview["transaction_id"], expected_error="ROLE_GUARD_MISMATCH")
+    assert rejected["state"] == "repreview_required" and client.objects == before
+    assert client.unrelated_file.read_bytes() == b"unrelated bytes"
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
+
+
+def test_absent_named_sources_can_be_created_in_reimport_batch(tmp_path):
+    command, client = draft(tmp_path, "2025.1", existing=True)
+    command("draft-business-configure", "--mode", "reimport")
+    command("draft-check")
+    assert execute(command, command("preview-from-draft"), client)["state"] == "verified"
+    assert {row["name"] for row in client.objects.values() if row["type"] == "AudioFileSource"} == {
+        "Keep", "_MyActiveSource", "OtherSource"}
+    assert client.unrelated_file.read_bytes() == b"unrelated bytes"
