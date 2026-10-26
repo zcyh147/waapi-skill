@@ -993,3 +993,101 @@ def test_existing_tsv_dialogue_event_with_create_mode_rejects_before_preview(tmp
     result=command('draft-check',expected_error='IMPORT_DIALOGUE_EXISTING_EVENT_MODE_UNSAFE')
     assert result['details']['safe_workflow'][0]['mode']=='create'
     assert not any(u=='ak.wwise.core.audio.importTabDelimited' for u,_,_ in client.calls)
+
+
+class StructuralDialogueImportClient(DialogueImportClient):
+    """Fake only native structural import/readback; no media Source is created."""
+    def __init__(self, tmp_path, version):
+        super().__init__(tmp_path, version)
+        self.media = False
+        self.child = {key: value for key, value in self.child.items()
+                      if key in {'id', 'name', 'path', 'parent'}}
+        self.child.update(type='SwitchContainer', classId=655376)
+        self.effect = True
+
+    def call(self, uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri == 'ak.wwise.core.object.getTypes':
+            result = super().call(uri, args, options)
+            result['return'].append({'name':'SwitchContainer','type':'WObject','classId':655376})
+            return result
+        if uri == 'ak.wwise.core.audio.import':
+            self.calls.append((uri,deepcopy(args),deepcopy(options)))
+            assert args['imports'] == [{'objectPath': self.parent['path']+r'\<Switch Container>SnowSounds',
+                'objectType':'SwitchContainer', 'dialogueEvent':self.expected_dialogue}]
+            self.created = self.event_created = True
+            self.linked = self.effect
+            result = {'objects':deepcopy([self.child,self.event])}
+            if self.version in {'2023.1','2024.1','2025.1'}:result.update(log=[],files=[])
+            return result
+        return super().call(uri,args,options)
+
+
+def _structural_dialogue_draft(tmp_path, version='2025.1', *, kind='switch-container', conditions=True):
+    client = StructuralDialogueImportClient(tmp_path, version)
+    command,parent,_ = _import_fields_draft(tmp_path, version, client)
+    event_parent = command('draft-bind-object','--object-id',client.EVENT_PARENT)['bound_object']['handle']
+    condition = ()
+    if conditions:
+        group = command('draft-bind-object','--object-id',client.GROUP)['bound_object']['handle']
+        value = command('draft-bind-object','--object-id',client.VALUE)['bound_object']['handle']
+        condition = ('--dialogue-condition',group,value)
+    command('draft-declare-new','--declaration-id','snow','--parent-handle',parent,
+        '--name','SnowSounds','--kind',kind,
+        '--dialogue-event-parent-handle',event_parent,'--dialogue-event-name','Greeting',*condition)
+    client.expected_dialogue=client.event['path']+('@Path:<Switch Group:Surface>Snow' if conditions else '')
+    return command,client
+
+
+@pytest.mark.parametrize('version', ('2021.1','2022.1','2023.1','2024.1','2025.1'))
+def test_structural_dialogue_import_admits_owner_from_matching_live_audio_node_metadata(tmp_path, version):
+    command,client = _structural_dialogue_draft(tmp_path, version)
+    command('draft-check');tx=command('preview-from-draft')['transaction_id']
+    shown=command('transaction-show',tx)
+    command('confirm',tx,'--confirmation-token',shown['confirmation']['token']);command('execute',tx)
+    result=command('verify',tx)
+    # Observable association succeeds; exact decision sequence remains disclosed.
+    assert result['verified'] is False and result['verification']['status']=='result_schema_checked',result
+    assert result['verification']['failed_assertion_count']==0,result
+    assert client.entry['owner']['id']==client.EVENT and client.entry['AudioNode']['id']==client.CHILD
+    assert client.child['type']=='SwitchContainer'
+    assert len([u for u,_,_ in client.calls if u=='ak.wwise.core.audio.import'])==1
+    assert not any(u.endswith(('.setReference','.create','.set')) for u,_,_ in client.calls)
+    assert not Path(client.source['originalFilePath']).exists()
+
+
+def test_structural_dialogue_import_rejects_metadata_disallowed_actor_mixer_even_without_conditions(tmp_path):
+    command,client = _structural_dialogue_draft(tmp_path,kind='actor-mixer',conditions=False)
+    command('draft-check',expected_error='INVALID_REFERENCE_TARGET')
+    assert not any(u=='ak.wwise.core.audio.import' for u,_,_ in client.calls)
+
+
+@pytest.mark.parametrize('fault', ('metadata-drift','missing-association'))
+def test_structural_dialogue_import_preserves_metadata_drift_and_requested_effect_guards(tmp_path, fault):
+    command,client = _structural_dialogue_draft(tmp_path)
+    command('draft-check');tx=command('preview-from-draft')['transaction_id']
+    shown=command('transaction-show',tx)
+    command('confirm',tx,'--confirmation-token',shown['confirmation']['token'])
+    if fault=='metadata-drift':
+        client.metadata['restriction']={'type':'reference','restrictions':[{'type':['Sound']}]}
+        command('execute',tx,expected_error='ROLE_GUARD_MISMATCH')
+        assert not any(u=='ak.wwise.core.audio.import' for u,_,_ in client.calls)
+        return
+    client.effect=False
+    command('execute',tx)
+    code,result=waapi_gateway.execute_gateway(['--state-dir',str(tmp_path/'state'),'verify',tx],
+        env=set_gateway_config(_env(tmp_path),wwise_version='2025.1'),client_factory=lambda _url:client)
+    assert code==2 and result['verification']['status']=='verification_failed',result
+    assert any(not row['passed'] and 'Dialogue creation' in row['name'] for row in result['verification']['assertions'])
+
+
+def test_structural_name_only_dialogue_creation_uses_metadata_admission_without_implied_entry(tmp_path):
+    command,client = _structural_dialogue_draft(tmp_path,conditions=False)
+    client.effect=False
+    command('draft-check');tx=command('preview-from-draft')['transaction_id']
+    shown=command('transaction-show',tx)
+    command('confirm',tx,'--confirmation-token',shown['confirmation']['token']);command('execute',tx)
+    assert command('verify',tx)['verified'] is True
+    assert client.event_created and not client.linked
+    assert any(u.endswith('getPropertyInfo') and args.get('property')=='AudioNode' for u,args,_ in client.calls)
+    assert not Path(client.source['originalFilePath']).exists()
