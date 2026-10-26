@@ -360,7 +360,7 @@ def test_switch_import_native_witness_reaches_persisted_final_writer(tmp_path, m
     import re
     import shutil
     import uuid
-    from pathlib import Path
+    from pathlib import Path, PureWindowsPath
     from types import SimpleNamespace
     import xml.etree.ElementTree as ET
     from tests.unit.test_audio_import_business_gateway import ImportFieldsClient, _env, waapi_gateway
@@ -390,10 +390,11 @@ def test_switch_import_native_witness_reaches_persisted_final_writer(tmp_path, m
                     row = self.object(child, owner["path"], owner["id"])
                     self.objects[row["id"]] = row
                     if child.tag == "AudioFileSource":
-                        relative = Path(child.findtext("AudioFile").replace("\\", "/"))
-                        destination = tmp_path / "project/Originals/SFX" / relative
+                        relative = PureWindowsPath(child.findtext("AudioFile"))
+                        assert not relative.anchor and ".." not in relative.parts
+                        destination = (tmp_path / "project/Originals/SFX").joinpath(*relative.parts)
                         destination.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copyfile(source / "Originals/SFX" / relative, destination)
+                        shutil.copyfile((source / "Originals/SFX").joinpath(*relative.parts), destination)
                         row.update(originalFilePath=str(destination), **{"audioSource:language": {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "SFX"}})
                     children(child, row)
             children(container, self.container)
