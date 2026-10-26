@@ -70,8 +70,8 @@ class OwnedControlTask(OwnedGraphTask):
             owner_id = CHILD if planned else FIRST
             if planned:
                 assert item['object'] == SECOND and item['children'][0]['name'] == 'PlannedSound'
-                self.objects[CHILD] = {'id': CHILD, 'name': 'PlannedSound', 'type': 'Sound', 'classId': 65552,
-                    'path': self.objects[SECOND]['path'] + r'\PlannedSound', 'parent': {'id': SECOND}, 'notes': '', '@RTPC': []}
+                self.objects.setdefault(CHILD, {'id': CHILD, 'name': 'PlannedSound', 'type': 'Sound', 'classId': 65552,
+                    'path': self.objects[SECOND]['path'] + r'\PlannedSound', 'parent': {'id': SECOND}, 'notes': '', '@RTPC': []})
             node = (item['children'][0] if planned else item)['@RTPC'][0]
             assert node['@ControlInput'] == {'type': self.input_type, 'name': 'TimeMod',
                 'notes': 'New time control', **({'platform': self.input_platform} if self.input_platform else {}),
@@ -360,10 +360,6 @@ def test_owned_time_input_below_a_planned_owner_has_no_invented_rtpc_path(tmp_pa
     if conflict != 'fail':
         code, configured = task.step('draft-business-configure', '--name-conflict', conflict)
         assert code == 0, configured
-        code, rejected = task.step('draft-check')
-        assert code == 2 and 'OWNED_CONTROL_INPUT_CONFLICT_UNPROVEN' in json.dumps(rejected), rejected
-        assert task.writes == []
-        return
     tx, shown = task.preview()
     facts = shown['artifact']['prepared_operation']['pre_state']['planned_reference_context']['facts']
     assert len([fact for fact in facts.values() if fact['path'] is None]) == 2
@@ -520,6 +516,8 @@ def test_public_schema_discloses_closed_existing_rtpc_owned_reference_route(tmp_
     assert 'replace_owned_control_input' in encoded and 'draft-declare-field-change' in encoded
     assert '"unit": "seconds"' in encoded and '"native_domain_complete": false' in encoded
     assert 'partial_duration_endpoints' in encoded and 'native_field_order' in encoded
+    assert 'non_fail_conflicts' not in encoded and 'nested_RTPCs' not in encoded
+    assert 'mixed_platform_workflow' in encoded and 'new_object.setProperty_Draft' in encoded
     code, named = task.run('operation-schema', 'object.setRTPC')
     assert code == 0 and '"unit": "seconds"' in json.dumps(named), named
     assert '"native_domain_complete": false' in json.dumps(named)
@@ -687,6 +685,9 @@ def test_new_owned_input_preserves_additive_existing_pair_and_curve(tmp_path, op
     seed_old_pair(task)
     before = deepcopy(task.objects[CHILD])
     declare_time(task)
+    if operation == 'object.set':
+        code, configured = task.step('draft-business-configure', '--name-conflict', 'merge')
+        assert code == 0, configured
     tx, shown = task.preview()
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified.get('verified') is True, verified
@@ -853,3 +854,139 @@ def test_two_new_owned_inputs_obey_combined_exclusive_final_count(tmp_path, repl
     code, rejected = task.step('draft-check')
     assert code == 2 and 'RTPC_EXCLUSIVE_CONFLICT' in json.dumps(rejected), rejected
     assert task.writes == []
+
+
+@pytest.mark.parametrize('version,fault', [('2022.1', None), ('2025.1', None),
+    ('2022.1', 'stale-curve'), ('2022.1', 'missing-result'), ('2022.1', 'changed-old-curve'),
+    ('2022.1', 'exclusive')])
+def test_parent_merge_adds_owned_control_and_preserves_existing_rtpc_pair(tmp_path, version, fault):
+    task = OwnedControlTask(tmp_path, version=version, operation='object.set')
+    task.types.extend([{'name': 'WorkUnit', 'classId': 1638416, 'type': 'WObject'},
+        {'name': 'GameParameter', 'classId': 1507344, 'type': 'WObject'}])
+    task.objects[SECOND] = {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit',
+        'classId': 1638416, 'path': r'\Actor-Mixer Hierarchy\Default Work Unit', 'parent': None, 'notes': 'Keep work unit'}
+    old_rtpc = '{88888888-8888-8888-8888-888888888888}'
+    old_curve = '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'
+    task.objects[CHILD] = {'id': CHILD, 'name': 'PlannedSound', 'type': 'Sound', 'classId': 65552,
+        'path': task.objects[SECOND]['path'] + r'\PlannedSound', 'parent': {'id': SECOND},
+        'notes': 'Keep merged owner', '@RTPC': [{'id': old_rtpc}]}
+    task.objects[OLD_CONTROL] = {'id': OLD_CONTROL, 'name': 'Intensity', 'type': 'GameParameter',
+        'classId': 1507344, 'path': r'\Game Parameters\Default Work Unit\Intensity',
+        'parent': {'id': SECOND}, 'owner': None, 'notes': 'Keep shared'}
+    task.objects[old_curve] = {'id': old_curve, 'name': '', 'type': 'Curve', 'classId': 917520,
+        'path': r'\old-curve', 'owner': {'id': old_rtpc}, 'notes': 'Keep Curve'}
+    task.objects[old_rtpc] = {'id': old_rtpc, 'name': '', 'type': 'RTPC', 'classId': 1441808,
+        'path': r'\old-rtpc', 'owner': {'id': CHILD}, 'notes': 'Keep existing RTPC',
+        '@PropertyName': 'Volume', '@ControlInput': {'id': OLD_CONTROL},
+        '@Curve': {'id': old_curve, 'points': [{'x': 0, 'y': 2, 'shape': 'Linear'}]}}
+    before = deepcopy(task.objects)
+    if fault == 'exclusive':
+        task.metadata['Volume']['supports']['rtpc'] = 'Exclusive'
+    parent = task.bind(SECOND)
+    code, types = task.step('draft-discover-types', '--role', 'object', '--meaning', 'Sound')
+    assert code == 0, types
+    field = task.class_field(types['type_candidates'][0]['handle'], 'Volume')
+    code, declared = task.step('draft-declare-new', '--declaration-id', 'sound', '--parent-handle', parent,
+        '--kind', 'sound-sfx', '--name', 'PlannedSound')
+    assert code == 0, declared
+    declare_time(task, declared['draft']['declared_object']['result_handle'], field)
+    code, configured = task.step('draft-business-configure', '--name-conflict', 'merge')
+    assert code == 0, configured
+    if fault == 'exclusive':
+        code, rejected = task.step('draft-check')
+        assert code == 2 and rejected['error_code'] == 'RTPC_EXCLUSIVE_CONFLICT', rejected
+        assert task.writes == [] and task.objects == before
+        return
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.set') and fault == 'changed-old-curve':
+            task.objects[old_rtpc]['@Curve']['points'][0]['y'] = 3
+        return result
+    task.call = call
+    task.fault = fault
+    tx, shown = task.preview()
+    if fault == 'stale-curve':
+        task.objects[old_rtpc]['@Curve']['points'][0]['y'] = 3
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and task.writes == [], rejected
+        assert 'graph complete RTPC list pre-state unchanged' in json.dumps(rejected)
+        return
+    code, verified = task.finish(tx, shown)
+    if fault is not None:
+        assert code == 2 and verified.get('verified') is False, json.dumps(verified)
+        assert len(task.writes) == 1
+        expected_failure = ('MISSING_RESULT_NODES' if fault == 'missing-result' else
+            'unrequested RTPC complete state and curve remain unchanged')
+        assert expected_failure in json.dumps(verified), verified
+        return
+    assert code == 0 and verified.get('verified') is True, json.dumps(verified)
+    assert len(task.writes) == 1 and task.writes[0]['onNameConflict'] == 'merge'
+    assert task.objects[CHILD]['@RTPC'] == [{'id': old_rtpc}, {'id': RTPC}]
+    assert task.objects[CHILD]['notes'] == before[CHILD]['notes']
+    assert all(task.objects[key] == before[key] for key in (SECOND, old_rtpc, old_curve, OLD_CONTROL))
+    assert task.objects[RTPC]['owner'] == {'id': CHILD}
+    assert task.objects[CONTROL]['owner'] == {'id': RTPC}
+    code, recorded = task.run('transaction-show', tx)
+    assert code == 0, recorded
+    verification, = [event['details']['verification'] for event in recorded['events']
+        if event['event_type'] == 'verification_recorded']
+    identities = [check for check in verification['assertions']
+        if check.get('kind') == 'verified_owned_control_input_identity']
+    assert len(identities) == 1 and identities[0]['passed'] is True, identities
+    assert identities[0]['evidence']['object']['id'] == CONTROL
+    facts = shown['artifact']['prepared_operation']['pre_state']['planned_reference_context']['facts']
+    fact = next(fact for fact in facts.values() if fact['type'] == 'ModulatorTime')
+    assert identities[0]['evidence']['result_handle'] == fact['result_handle']
+
+
+def test_verified_input_accepts_separately_previewed_platform_field_assignment(tmp_path):
+    task = declare_time(OwnedControlTask(tmp_path, operation='object.set'))
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+    before = deepcopy(task.objects)
+    original, platform_duration = task.call, None
+    def call(uri, args=None, options=None):
+        nonlocal platform_duration
+        if uri.endswith('object.setProperty'):
+            assert args == {'object': CONTROL, 'platform': 'Windows', 'property': 'TimeModDuration', 'value': 6.0}
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.writes.append(deepcopy(args))
+            platform_duration = 6.0
+            return {'objects': [{'id': CONTROL, 'name': 'TimeMod'}]}
+        result = original(uri, args, options)
+        if (uri.endswith('object.get') and CONTROL in args.get('from', {}).get('id', [])
+                and options.get('platform') == 'Windows' and platform_duration is not None):
+            for row in result['return']:
+                for token in ('TimeModDuration', '@TimeModDuration'):
+                    if token in row:
+                        row[token] = platform_duration
+        return result
+    task.call = call
+    code, started = task.run('draft-start', 'object.setProperty')
+    assert code == 0, started
+    task.draft, task.authority = started['draft']['draft_id'], started['task_authority']
+    task.revision = started['draft']['revision']
+    target = task.bind(CONTROL)
+    code, found = task.step('draft-discover-fields', '--object-handle', target,
+        '--meaning', 'TimeModDuration', '--platform', 'Windows')
+    assert code == 0, found
+    field = found['meaning_results'][0]['candidates'][0]['handle']
+    code, declared = task.step('draft-declare-field-change', '--object-handle', target,
+        '--field-handle', field, '--business-value', '6')
+    assert code == 0, json.dumps(declared)
+    followup, shown = task.preview()
+    assert followup != tx and len(task.writes) == 1 and platform_duration is None
+    code, rejected = task.run('execute', followup)
+    assert code == 2 and len(task.writes) == 1, rejected
+    code, confirmed = task.run('confirm', followup, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, executed = task.run('execute', followup)
+    assert code == 0, executed
+    code, verified = task.run('verify', followup)
+    assert code == 0 and verified.get('verified') is True, verified
+    assert len(task.writes) == 2 and platform_duration == 6.0
+    assert task.objects == before  # Generic values, RTPC/Curve and identity stay fixed.

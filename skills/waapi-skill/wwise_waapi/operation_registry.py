@@ -6167,11 +6167,6 @@ def _prepare_object_set(
             allow_language=True,
             allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS,
         )
-        if row_conflict != "fail" and any(node.rtpc is not None
-                and isinstance(node.rtpc.control_input, OwnedControlInputDescriptor)
-                for node in (*children.nodes, *(node for descriptor in lists for node in descriptor.nodes))):
-            raise OperationContractError("OWNED_CONTROL_INPUT_CONFLICT_UNPROVEN",
-                "Non-fail owned ControlInput conflicts remain unfinished under issue #180.", details={"tracking_issue": 180})
         live_source_parent = (target.row.get("type") == "Sound" and bool(children.roots)
             and all(root.plugin is not None and root.plugin.kind == "source" for root in children.roots))
         if children.roots:
@@ -6835,8 +6830,6 @@ def _prepare_object_set(
                 list_spec["on_name_conflict"] = row_conflict
                 if is_root:
                     list_spec["parent_request_path"] = target_spec["request_path"]
-            if row_conflict != "fail" and any(spec.get("owned_control_input") for spec in prepared_specs):
-                raise OperationContractError("OWNED_CONTROL_INPUT_CONFLICT_UNPROVEN", "Non-fail owned ControlInput conflicts remain unfinished under issue #180.", details={"tracking_issue": 180})
             rtpc_pairs = [_rtpc_pair_key(spec) for spec in root_specs if spec.get("rtpc_binding")]
             if len(rtpc_pairs) != len(set(rtpc_pairs)):
                 raise OperationContractError("DUPLICATE_RTPC_PAIR", "An owner may request each exact RTPC pair once.")
@@ -7036,6 +7029,11 @@ def _prepare_object_set(
                     spec = nested_specs[member.request_path]
                     spec.update({"collection": descriptor.name, "list_name": descriptor.name,
                                  "list_mode": row_list_mode, "on_name_conflict": row_conflict})
+                    if spec.get("rtpc_binding"):
+                        # Unnamed RTPCs are selected by their property/input
+                        # pair, never by their shared empty display name. The
+                        # RTPC preparation already bound or admitted this row.
+                        continue
                     if member.anonymous:
                         if row_conflict != "fail":
                             raise OperationContractError("ANONYMOUS_LIST_CONFLICT_UNRESOLVED", "Anonymous nondefault name conflict semantics remain pending exact source/native proof")
@@ -7594,7 +7592,7 @@ def _prepare_owned_control_input(descriptor, *, version, read, inherited_platfor
         raise OperationContractError("CONTROL_INPUT_CONSTRUCTION_VERSION_BOUNDARY", "This property-bound owned ControlInput constructor was introduced in 2022.1.")
     if descriptor.platform is None and descriptor.properties and inherited_platform is not None:
         raise OperationContractError("OWNED_CONTROL_INPUT_PLATFORM_ASSIGNMENTS_UNRESOLVED",
-            "Generic new-input Field Handles cannot inherit an explicit graph platform; separate assignment authority remains issue #180 work.",
+            "Generic new-input Field Handles cannot inherit an explicit graph platform. Create and verify the input with one scope, then bind its exact GUID in a new object.setProperty Draft for separately previewed platform assignments.",
             details={"tracking_issue": 180, "inherited_platform": inherited_platform})
     from .owned_control_inputs import constructor_authority
     try:

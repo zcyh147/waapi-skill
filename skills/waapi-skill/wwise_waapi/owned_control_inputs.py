@@ -4,8 +4,8 @@ Authority: matching 2022.1--2025.1 WObjects.xml RTPC.ControlInput custom
 restrictions and the matching SDK object.set custom ModulatorTime example.
 Exact fragments, matching schema/class/example digests and introduction facts
 are packaged per version in resources/metadata/*/owned-control-input-construction.json.
-This property-bound constructor was introduced in 2022.1. Nested RTPCs,
-old-custom replacement disposition and non-fail conflicts remain unfinished
+This property-bound constructor was introduced in 2022.1. The previous
+custom input replacement disposition remains unfinished
 under issue #180; the 2021.1 boundary does not classify other creation routes.
 """
 from __future__ import annotations
@@ -161,7 +161,7 @@ def compile_owned_control_input(session, payload):
         properties.append({"name": field.token, "value": session.handles.validate_field_value(field, value)})
     if len(platforms) > 1:
         reject("OWNED_CONTROL_INPUT_PLATFORM_ASSIGNMENTS_UNRESOLVED", "new_control_input.field_values",
-            "mixed generic and explicit or distinct platform assignments need a separately proved construction under issue #180")
+            "create and verify the input with one field scope, then bind its verified exact GUID in a new object.setProperty Draft for separately previewed platform assignments")
     platform = next(iter(platforms), None)
     return {"new_control_input": {"type": kind.name, "name": name, "properties": properties,
         **({"platform": platform} if platform is not None else {}),
