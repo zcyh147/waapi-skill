@@ -31,6 +31,7 @@ def exercise_collector(tmp_path, workflow, monkeypatch, fault=None):
     elif fault == 'null': task.row['points'] = None
     elif fault == 'wrong-shape': task.row['points'][0]['shape'] = 'unrecognized'
     elif fault == 'wrong-value': task.row['points'][0]['y'] = 123
+    elif fault == 'float32': task.row['points'][0]['y'] = -5.670529842376709
     native = task.call
     def call(uri, args=None, options=None):
         if fault == 'rejection' and uri.endswith('object.get') and 'points' in (options or {}).get('return', []):
@@ -70,13 +71,15 @@ def exercise_collector(tmp_path, workflow, monkeypatch, fault=None):
 
 
 def test_legacy_curve_collector_reaches_final_writer_with_independent_source_xy(tmp_path, workflow, monkeypatch):
-    task, receipt, final, error = exercise_collector(tmp_path, workflow, monkeypatch)
+    task, receipt, final, error = exercise_collector(tmp_path, workflow, monkeypatch, 'float32')
     assert error is None and final['invocation']['outcome'] == 'PASS'
     assert final['residual_state']['sandbox'] == 'deleted'
     assert receipt['ordered_source_xy_verified'] is True and receipt['transaction_count'] == 0
     assert receipt['source_oracle']['xy'] == [[0.0,-5.67053],[1.0,0.0]]
     assert receipt['source_oracle']['stored_flags'] == ['21','53']
-    assert receipt['public_curve']['curve_points'] == POINTS
+    native_points = copy.deepcopy(POINTS); native_points[0]['y'] = -5.670529842376709
+    assert receipt['public_curve']['curve_points'] == native_points
+    assert receipt['public_curve']['curve_points'][0]['y'] != receipt['source_oracle']['xy'][0][1]
     assert receipt['source_before'] == receipt['source_after']
     assert receipt['invocation_count'] == 1 and receipt['dispatch_count'] == 1
     assert len([call for call in task.calls if call[0].endswith('object.get')]) == 1
