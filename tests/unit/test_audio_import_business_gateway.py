@@ -2023,6 +2023,9 @@ class LocalizedFieldsClient(ImportFieldsClient):
                 return {"return": [deepcopy(self.action)]}
             selected = [row for row in known if row["id"] in identity.get("id", [])
                 or row["path"] in identity.get("path", [])]
+            if options.get("language"):
+                selected = [row for row in selected if row["type"] != "AudioFileSource"
+                    or row["audioSource:language"]["name"] == options["language"]]
             if selected or self.event_path in identity.get("path", []):
                 self.calls.append((uri, args, options))
                 return {"return": deepcopy(selected)}
@@ -2086,10 +2089,14 @@ def test_localized_existing_fields_reach_public_execute_and_independent_verifica
     row, = [row for row in writes[0]["imports"] if "audioFile" in row]
     event_row, = [row for row in writes[0]["imports"] if "event" in row]
     assert row["originalsSubFolder"] == "Dialogue"
-    if version == "2025.1":
+    if version == "2025.1" or note_field == "audio_source_notes":
         assert len(writes[0]["imports"]) == 2
-        assert event_row == {"objectPath": client.owner["path"], "event": client.event_path + "@Play"}
-        assert row["objectPath"] == "" and row["importLocation"] == client.SOURCE
+        assert event_row == {"objectPath": client.owner["path"] if version == "2025.1"
+            else client.owner["path"].rsplit("\\", 1)[0] + r"\<Sound Voice>Voice", "event": client.event_path + "@Play"}
+        if version == "2025.1":
+            assert row["objectPath"] == "" and row["importLocation"] == client.SOURCE
+        else:
+            assert row["objectPath"].endswith(r"\<Sound Voice>Voice\<AudioFileSource>Line")
         assert row["notes"] == "requested source notes" and "event" not in row
     else:
         assert len(writes[0]["imports"]) == 1
@@ -2682,3 +2689,244 @@ def test_localized_exact_table_new_language_source_is_independent_of_default_act
     assert client.owner["activeSource"]["id"] == client.OTHER_SOURCE
     assert client.sources[1]["notes"] == "keep Japanese notes"
     assert client.other_file.read_bytes() == b"keep Japanese media"
+
+
+class LocalizedOwnerFieldsClient(LocalizedFieldsClient):
+    """External Wwise model for owner fields separate from localized media."""
+    BUS = "{B0B0B0B0-B0B0-B0B0-B0B0-B0B0B0B0B0B0}"
+
+    def __init__(self, tmp_path, version, *, fault=None):
+        super().__init__(tmp_path, version)
+        self.fault = fault
+        self.range_max = 200
+        self.owner.update({"@Volume": 0.0, "@OutputBus": None, "@OverrideOutput": False})
+        self.bus = {"id": self.BUS, "name": "Dialogue", "type": "Bus", "classId": 524304,
+            "path": r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus\Dialogue"}
+
+    def call(self, uri, args=None, options=None):
+        import base64
+        from copy import deepcopy
+        args, options = args or {}, options or {}
+        if uri == "ak.wwise.core.getProjectInfo":
+            result = super().call(uri, args, options)
+            result["languages"].append({"id": "{99999999-9999-9999-9999-999999999999}", "name": "Japanese", "shortId": 3})
+            return result
+        if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+            self.calls.append((uri, args, options))
+            return {"return": ["IsVoice", "Volume", "OutputBus", "OverrideOutput"]}
+        if uri == "ak.wwise.core.object.getPropertyInfo" and args["property"] != "IsVoice":
+            self.calls.append((uri, args, options))
+            if args["property"] == "OverrideOutput":
+                return {"name": "OverrideOutput", "type": "bool", "default": False}
+            if args["property"] == "Volume":
+                return {"name": "Volume", "type": "Real32", "restriction": {"type": "range", "min": -200, "max": self.range_max}}
+            restriction = {"type": "reference", "restrictions": [{"type": ["Bus"]}]}
+            if self.fault == "constrained-reference":
+                restriction["restrictions"].append({"childOfReference": "OutputBus"})
+            return {"name": "OutputBus", "type": "Reference", "restriction": restriction,
+                **({"dependencies": [{"type": "override", "action": "Enable", "context": "Self", "property": "OverrideOutput"}]}
+                   if self.fault in {"activation", "activation-conflict"} else {})}
+        if uri == "ak.wwise.core.object.getTypes":
+            result = super().call(uri, args, options)
+            result["return"].append({"name": "Bus", "classId": 524304, "type": "WObject"})
+            return result
+        if uri == "ak.wwise.core.object.get" and (args.get("from", {}).get("id") == [self.BUS]
+                or args.get("from", {}).get("path") == [self.bus["path"]]):
+            self.calls.append((uri, args, options))
+            return {"return": [deepcopy(self.bus)]}
+        if uri == "ak.wwise.core.object.get":
+            result = super().call(uri, args, options)
+            if self.BUS in args.get("from", {}).get("id", []):
+                result["return"].append(deepcopy(self.bus))
+            if options.get("language"):
+                result["return"] = [row for row in result.get("return", []) if row.get("type") != "AudioFileSource"
+                    or row["audioSource:language"]["name"] == options["language"]]
+            return result
+        if uri == "ak.wwise.core.audio.import":
+            self.calls.append((uri, deepcopy(args), deepcopy(options))); self.imported = True
+            selected = self.sources[0]
+            for row in args["imports"]:
+                has_media = "audioFile" in row or "audioFileBase64" in row
+                if has_media:
+                    language = row.get("importLanguage", "SFX")
+                    selected = next((source for source in self.sources if source["audioSource:language"]["name"] == language), None)
+                    if selected is None:
+                        copied = self.other_file.parent / "Other/Line.wav"
+                        copied.parent.mkdir(parents=True, exist_ok=True)
+                        selected = {"id": self.OTHER_SOURCE, "name": "Line", "type": "AudioFileSource", "classId": 16,
+                            "path": self.owner["path"] + r"\Line", "parent": {"id": self.OWNER}, "notes": "",
+                            "audioSource:language": {"id": "{99999999-9999-9999-9999-999999999999}", "name": language},
+                            "originalFilePath": str(copied), "originalWavFilePath": str(copied)}
+                        self.sources.append(selected)
+                    self.owner["activeSource"] = {"id": selected["id"]}
+                destination = selected if has_media else self.owner
+                if self.fault != "ignored-owner-fields":
+                    for name in ("Volume", "OutputBus", "OverrideOutput"):
+                        if "@" + name in row:
+                            destination["@" + name] = ({"id": row["@" + name]} if name == "OutputBus" else row["@" + name])
+                if "audioFile" in row:
+                    Path(destination["originalFilePath"]).write_bytes(Path(row["audioFile"]).read_bytes())
+                elif "audioFileBase64" in row:
+                    Path(destination["originalFilePath"]).write_bytes(base64.b64decode(row["audioFileBase64"].partition("|")[2]))
+                if "audioFile" in row or "audioFileBase64" in row:
+                    # r1 proved audioSourceNotes on the owner localization-addition row ineffective.
+                    destination["notes"] = row.get("notes", destination["notes"])
+            if self.fault == "lost-other-language":
+                self.sources.pop()
+            result = {"objects": deepcopy([self.owner, selected])}
+            if self.version in {"2023.1", "2024.1", "2025.1"}:
+                result.update(log=[], files=[selected["originalFilePath"]])
+            return result
+        return super().call(uri, args, options)
+
+
+def _localized_owner_fields_draft(tmp_path, version, *, fault=None, inline=False):
+    import base64, io, wave
+    client = LocalizedOwnerFieldsClient(tmp_path, version, fault=fault)
+    stream = io.BytesIO()
+    with wave.open(stream, "wb") as wav:
+        wav.setparams((1, 2, 8000, 0, "NONE", "not compressed")); wav.writeframes(b"\x01\x00" * 16)
+    media = tmp_path / "Line.wav"; media.write_bytes(stream.getvalue())
+    command, _parent, _ = _import_fields_draft(tmp_path, version, client)
+    voice = command("draft-bind-object", "--object-id", client.OWNER)["bound_object"]["handle"]
+    bus = command("draft-bind-object", "--object-id", client.BUS)["bound_object"]["handle"]
+    fields = {}
+    for name in ("Volume", "OutputBus"):
+        found = command("draft-discover-fields", "--object-handle", voice, "--meaning", name)
+        fields[name] = found["meaning_results"][0]["candidates"][0]["handle"]
+    activation = []
+    if fault == "activation-conflict":
+        found = command("draft-discover-fields", "--object-handle", voice, "--meaning", "OverrideOutput")
+        activation = ["--field-value", found["meaning_results"][0]["candidates"][0]["handle"], "false"]
+    artifact = "Voices/English(US)/Dialogue/Line.wav|" + base64.b64encode(media.read_bytes()).decode() if inline else str(media)
+    command("draft-declare-existing", "--declaration-id", "voice", "--object-handle", voice,
+        "--field", "language", "English(US)", "--field", "inline_wav" if inline else "media_file", artifact,
+        "--field", "notes", "updated source notes", "--field", "originals_subfolder", "Dialogue",
+        "--field-value", fields["Volume"], "-6", "--field-value", fields["OutputBus"], bus, *activation)
+    env = set_gateway_config(_env(tmp_path), wwise_version=version)
+    def run(*argv):
+        return waapi_gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv], env=env,
+            client_factory=lambda _url: client)
+    return command, run, client
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("inline", (False, True))
+def test_localized_owner_fields_and_source_media_verify_through_public_gateway(tmp_path, version, inline):
+    command, run, client = _localized_owner_fields_draft(tmp_path, version, inline=inline)
+    command("draft-check")
+    preview = command("preview-from-draft"); transaction = preview["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    owner, media = shown["artifact"]["prepared_operation"]["dispatch"]["args"]["imports"]
+    assert owner["@Volume"] == -6 and owner["@OutputBus"] == client.BUS
+    assert "audioFile" not in owner and "importLanguage" not in owner and "notes" not in owner
+    assert media["notes"] == "updated source notes" and not any(name.startswith("@") for name in media)
+    if version == "2025.1":
+        assert owner["objectPath"] == client.owner["path"] and "importLocation" not in owner
+        assert media["objectPath"] == "" and media["importLocation"] == client.SOURCE
+    before_other = dict(client.sources[1]); other_bytes = client.other_file.read_bytes()
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]); assert code == 0, confirmed
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
+    assert client.owner["@Volume"] == -6 and client.owner["@OutputBus"] == {"id": client.BUS}
+    assert client.owner["notes"] == "keep owner notes" and client.owner["@IsVoice"] is True
+    assert client.sources[0]["id"] == client.SOURCE and client.sources[0]["notes"] == "updated source notes"
+    assert client.sources[1] == before_other and client.other_file.read_bytes() == other_bytes
+    assert client.copied.read_bytes() == (tmp_path / "Line.wav").read_bytes()
+    code, repeated = run("execute", transaction); assert code == 2, repeated
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("fault", ("ignored-owner-fields", "lost-other-language"))
+def test_localized_owner_fields_require_requested_effects_and_language_preservation(tmp_path, version, fault):
+    command, run, client = _localized_owner_fields_draft(tmp_path, version, fault=fault)
+    command("draft-check"); preview = command("preview-from-draft"); transaction = preview["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]); assert code == 0, confirmed
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction)
+    assert code == 2 and verified["verified"] is False, verified
+    failed = [row for row in verified["verification"]["assertions"] if not row["passed"]]
+    assert any(("Volume" in row["name"] or "OutputBus" in row["name"]) if fault == "ignored-owner-fields"
+        else "preserves existing source identities and other languages" in row["name"] for row in failed), failed
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("drift", ("metadata", "source"))
+def test_localized_owner_fields_reject_changed_authority_before_execution(tmp_path, version, drift):
+    command, run, client = _localized_owner_fields_draft(tmp_path, version)
+    command("draft-check"); preview = command("preview-from-draft"); transaction = preview["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]); assert code == 0, confirmed
+    if drift == "metadata":
+        client.range_max = 100
+    else:
+        client.sources[0]["id"] = "{D1D1D1D1-D1D1-D1D1-D1D1-D1D1D1D1D1D1}"
+    code, executed = run("execute", transaction)
+    assert code == 2 and executed["executed"] is False and executed["status"] == "repreview_required", executed
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("fault,error", (("constrained-reference", "CONSTRAINED_REFERENCE_BOUNDARY"),
+    ("missing-language-source", "LOCALIZED_EXISTING_SOURCE_REQUIRED")))
+def test_localized_owner_fields_keep_reference_and_exact_source_boundaries(tmp_path, version, fault, error):
+    command, _run, client = _localized_owner_fields_draft(tmp_path, version, fault=fault)
+    if fault == "missing-language-source":
+        client.sources.pop(0)
+    record, = (tmp_path / "state/operation-drafts-v1/records").glob("*.json"); before = record.read_bytes()
+    command("draft-check", expected_error=error)
+    assert record.read_bytes() == before
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
+
+
+def test_new_localization_source_notes_use_explicit_source_row_without_owner_edit(tmp_path):
+    from copy import deepcopy
+    client = LocalizedOwnerFieldsClient(tmp_path, "2025.1")
+    client.sources = client.sources[:1]
+    before = deepcopy(client.sources[0]); before_bytes = client.copied.read_bytes()
+    media = tmp_path / "Line.wav"; media.write_bytes(b"requested new Japanese media")
+    command, _parent, _ = _import_fields_draft(tmp_path, "2025.1", client)
+    voice = command("draft-bind-object", "--object-id", client.OWNER)["bound_object"]["handle"]
+    command("draft-declare-existing", "--declaration-id", "japanese", "--object-handle", voice,
+        "--field", "language", "Japanese", "--field", "media_file", str(media),
+        "--field", "audio_source_notes", "Requested Japanese Source notes", "--field", "originals_subfolder", "Other")
+    command("draft-check"); preview = command("preview-from-draft"); transaction = preview["transaction_id"]
+    env = set_gateway_config(_env(tmp_path), wwise_version="2025.1")
+    def run(*argv):
+        return waapi_gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv], env=env,
+            client_factory=lambda _url: client)
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]); assert code == 0, confirmed
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
+    owner, source = shown["artifact"]["prepared_operation"]["dispatch"]["args"]["imports"]
+    assert owner == {"objectPath": client.owner["path"].rsplit("\\", 1)[0] + r"\<Sound Voice>Voice"}
+    assert source["objectPath"].endswith(r"\<Sound Voice>Voice\<AudioFileSource>Line")
+    assert source["notes"] == "Requested Japanese Source notes" and "audioSourceNotes" not in source
+    assert "importLocation" not in source and source["importLanguage"] == "Japanese"
+    assert client.sources[0] == before and client.copied.read_bytes() == before_bytes
+    assert client.sources[1]["notes"] == "Requested Japanese Source notes" and client.sources[1]["parent"] == {"id": client.OWNER}
+    assert Path(client.sources[1]["originalFilePath"]).read_bytes() == media.read_bytes()
+    assert client.owner["notes"] == "keep owner notes"
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
+
+
+@pytest.mark.parametrize("fault", ("activation", "activation-conflict"))
+def test_localized_owner_reference_reuses_declared_activation_prerequisite(tmp_path, fault):
+    command, run, client = _localized_owner_fields_draft(tmp_path, "2025.1", fault=fault)
+    if fault == "activation-conflict":
+        command("draft-check", expected_error="REFERENCE_DEPENDENCY_CONFLICT")
+        assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
+        return
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    owner, media = shown["artifact"]["prepared_operation"]["dispatch"]["args"]["imports"]
+    assert owner["@OverrideOutput"] is True and "@OverrideOutput" not in media
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]); assert code == 0, confirmed
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
+    assert client.owner["@OverrideOutput"] is True and client.owner["@OutputBus"] == {"id": client.BUS}
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1

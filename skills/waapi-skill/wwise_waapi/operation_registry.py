@@ -2196,7 +2196,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "dynamic @ fields are produced only after live object-type and getPropertyInfo validation",
             "each row accepts one regular audio_file, one bounded RIFF/WAVE audio_file_base64, or a typed structure-only import",
             "useExisting preserves an existing target GUID; replaceExisting requires the old GUID to disappear",
-            "an ordinary audio.import live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight; Originals placement, one source notes field and a new Event retain ordinary import verification; other requested row fields are rejected",
+            "an ordinary audio.import live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight; Originals placement, one source notes field and a new Event retain ordinary import verification; metadata-proven owner properties/references and bounded inline WAV reuse require an exact existing language Source; other requested row fields are rejected",
             "replaceExisting is irreversible; replaced objects and media have no automatic restoration",
             "auto_add_to_source_control is explicit and defaults to false",
             "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
@@ -14284,6 +14284,13 @@ def _prepare_import_dynamic_fields(
                     },
                 )
 
+        if (source_operation == "audio.import"
+                and _localized_import_read_language(target.get("requested_language")) is not None
+                and (property_specs or reference_specs)):
+            target["localized_owner_field_metadata"] = [
+                property_info(type_info.class_id, name).as_dict()
+                for name in sorted({spec["name"] for spec in [*property_specs, *reference_specs]})
+            ]
         if property_specs:
             target["validated_properties"] = property_specs
         if reference_specs:
@@ -14481,6 +14488,9 @@ def _normalize_existing_sfx_imports(
 def _import_requires_explicit_source(target: Mapping[str, Any]) -> bool:
     return target.get("media_expected") is True and (
         bool(target.get("validated_properties") or target.get("validated_references"))
+        or (bool(target.get("pre_state_rows"))
+            and _localized_import_read_language(target.get("requested_language")) is not None
+            and "requested_audio_source_notes" in target)
         or (
             _object_type_token(target.get("metadata_object_type")) == "musictrack"
             and isinstance(target.get("expected_audio_file_source_result_path"), str)
@@ -14506,6 +14516,8 @@ def _materialize_audio_import_dynamic_rows(
     onto an already-created Track path alone can silently create no media.
     Events on an exact existing source binding likewise require a separate
     owner row: an AudioFileSource cannot be the Event Action's Sound target.
+    Localized Audio Source notes also use the explicit Source row so their
+    native notes field is bound to the requested Source rather than its owner.
     """
 
     raw_rows = dispatch_args.get("imports")
@@ -14589,8 +14601,10 @@ def _materialize_audio_import_dynamic_rows(
         bound_source_id = target.get("localized_audio_file_source_id")
         if not (_valid_object_id(bound_source_id) and row.get("importLocation") == bound_source_id):
             bound_source_id = target.get("existing_sfx_source_id") if version == "2025.1" else None
-        source_targeted_event = bool(media_expected and row.get("event") and _valid_object_id(bound_source_id))
-        if not _import_requires_explicit_source(target) and not source_targeted_event:
+        source_targeted_owner_fields = bool(
+            media_expected and (row.get("event") or _import_requires_explicit_source(target)) and _valid_object_id(bound_source_id)
+        )
+        if not _import_requires_explicit_source(target) and not source_targeted_owner_fields:
             row.update(dynamic_fields)
             native_index = len(native_rows)
             native_rows.append(row)
@@ -14636,7 +14650,7 @@ def _materialize_audio_import_dynamic_rows(
             )
         claimed_source_paths.add(source_key)
 
-        object_path = target.get("canonical_target_path") if source_targeted_event else row.get("objectPath")
+        object_path = target.get("canonical_target_path") if source_targeted_owner_fields else row.get("objectPath")
         source_name = expected_source_path.rpartition("\\")[2]
         if (
             not isinstance(object_path, str)
@@ -14688,7 +14702,7 @@ def _materialize_audio_import_dynamic_rows(
             )
             if key in row
         }
-        if source_targeted_event:
+        if source_targeted_owner_fields:
             structure_row["objectPath"] = object_path
             structure_row.pop("importLocation", None)
         if target.get("requested_notes_destination") == "target_object" and "notes" in row:
@@ -14707,7 +14721,7 @@ def _materialize_audio_import_dynamic_rows(
         ):
             if key in row:
                 media_row[key] = row[key]
-        if source_targeted_event:
+        if source_targeted_owner_fields:
             media_row["objectPath"] = ""
             media_row["importLocation"] = bound_source_id
         if "audioSourceNotes" in row:
@@ -15225,6 +15239,7 @@ def _prepare_closed_import_plan(
                     ("audio_file_base64", (
                         isinstance(target.get("source_file"), Mapping)
                         and target["source_file"].get("kind") == "inline_base64"
+                        and source_operation != "audio.import"
                     )),
                     ("import_location", "requested_import_location" in target),
                     ("dialogue_event", (
@@ -15235,8 +15250,8 @@ def _prepare_closed_import_plan(
                         "requested_switch_assignment" in target
                         or bool(target.get("requested_switch_assignments"))
                     )),
-                    ("properties", bool(target.get("validated_properties"))),
-                    ("references", bool(target.get("validated_references"))),
+                    ("properties", source_operation != "audio.import" and bool(target.get("validated_properties"))),
+                    ("references", source_operation != "audio.import" and bool(target.get("validated_references"))),
                     ("dynamic_fields", bool(target.get("requested_dynamic_fields"))),
                 )
                 if present
@@ -15459,6 +15474,25 @@ def _prepare_closed_import_plan(
                         details={"index": index, "objectPath": input_object_path},
                     )
                 localized_active_source = _bind_localized_import_source(target, read=read)
+                source_kind = target.get("source_file", {}).get("kind")
+                owner_fields = bool(target.get("validated_properties") or target.get("validated_references"))
+                if (owner_fields or source_kind == "inline_base64") and not _valid_object_id(localized_active_source):
+                    raise OperationContractError(
+                        "LOCALIZED_EXISTING_SOURCE_REQUIRED",
+                        "Localized owner fields and inline WAV reimport require one exact existing language Source; adding a new localization remains outside this preparation path.",
+                        details={"index": index, "target_path": target_path, "language": language},
+                    )
+                metadata_fields = []
+                for expected in target.get("localized_owner_field_metadata", []):
+                    observed = _read_property_info(read, object_id=target["preexisting_id"], name=expected["name"]).as_dict()
+                    if not _native_snapshot_equal(observed, expected):
+                        raise OperationContractError(
+                            "INVALID_METADATA", "Localized owner field metadata differs from its validated class metadata.",
+                            details={"index": index, "field": expected["name"], "expected": expected, "actual": observed},
+                        )
+                    metadata_fields.append(observed)
+                if metadata_fields:
+                    target["condition_metadata_guard"] = {"object_id": target["preexisting_id"], "fields": metadata_fields}
                 # Console 2021/2022 reuse the language source through the typed
                 # Sound Voice path; source-GUID importLocation silently imports
                 # nothing there. Console 2025 instead needs that exact source
@@ -15478,7 +15512,9 @@ def _prepare_closed_import_plan(
                 if "objectType" in row:
                     row.pop("objectType")
                     consumed.append("object_type")
-                expected_wire_fields = {"audioFile", "objectPath", "importLanguage"}
+                expected_wire_fields = {
+                    "audioFileBase64" if source_kind == "inline_base64" else "audioFile", "objectPath", "importLanguage",
+                }
                 # Preserve ordinary import fields through the localized source
                 # binding. Their existing oracles verify placement, source notes,
                 # and the new Event/Action independently after dispatch.
@@ -15788,6 +15824,9 @@ def _prepare_closed_import_plan(
         "created_guid_source": "execution_result.result.objects",
     }
     state = {"closed_import_plan": _json_mapping(plan), "import_guard": guard, **render_state}
+    localized_metadata_guards = [target["condition_metadata_guard"] for target in targets if "condition_metadata_guard" in target]
+    if localized_metadata_guards:
+        state["condition_metadata_guards"] = [*state.get("condition_metadata_guards", []), *localized_metadata_guards]
     return preview, roles, state, verification, cleanup
 
 
