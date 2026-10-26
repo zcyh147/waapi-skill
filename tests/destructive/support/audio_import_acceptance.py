@@ -276,8 +276,9 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
         _complete_business_draft, _write_fixture_wav,
     )
     assert runtime.version == "2025.1", "Representative unchanged-table witness is pinned to 2025.1"
-    assert witness_kind in {"notes-columns", "ordinary-owner-source", "explicit-source-tsv", "guid-source-tsv", "owner-fields-tsv"}
-    owner_fields = witness_kind == "owner-fields-tsv"
+    assert witness_kind in {"notes-columns", "ordinary-owner-source", "explicit-source-tsv", "guid-source-tsv", "owner-fields-tsv", "owner-fields-media-tsv"}
+    combined_owner_media = witness_kind == "owner-fields-media-tsv"
+    owner_fields = witness_kind in {"owner-fields-tsv", "owner-fields-media-tsv"}
     explicit_source_table = witness_kind in {"explicit-source-tsv", "guid-source-tsv"}
     ordinary = witness_kind == "ordinary-owner-source"
     name = "TSV_Witness_" + uuid.uuid4().hex[:10]
@@ -443,9 +444,21 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
                 "--field", "audio_source_notes", "Japanese explicit Source notes", "--field", "originals_subfolder", "After",
                 "--field-value", fields["Volume"], "-6", "--field-value", fields["OutputBus"], bus], live=False)
         else:
-            replacement = ({} if owner_fields else {"VoiceNotes": audio(4, "DifferentMedia")} if explicit_source_table else
+            replacement = ({"VoiceNotes": audio(4, "LineNotes")} if combined_owner_media else {} if owner_fields else {"VoiceNotes": audio(4, "DifferentMedia")} if explicit_source_table else
                 {key: audio(index + 4, stem) for index, (key, stem) in enumerate((("VoiceNotes", "LineNotes"), ("VoiceSource", "LineSource")))})
             table = owned / "GatewayTSVWitness/exact-localized.tsv"
+            if explicit_source_table or combined_owner_media:
+                from wwise_waapi.platform_paths import adapt_cli_dispatch_paths
+                shown_setup = gateway.gateway(["transaction-show", report["setup"][0]["transaction_id"]], live=False)
+                media_path = str(replacement["VoiceNotes"].resolve(strict=True))
+                media_uri = "ak.wwise.core.audio.importTabDelimited"
+                adapted = adapt_cli_dispatch_paths(uri=media_uri, args={"importFile": media_path}, options={},
+                    io_audit={"uri": media_uri, "paths": [{"section": "args", "json_path": "$.args.importFile",
+                        "field": "importFile", "role": "read", "raw_path": media_path, "resolved_path": media_path}]},
+                    project_guard=shown_setup["artifact"]["project_guard"])
+                native_media_path = adapted.args["importFile"]
+                assert proof(native_media_path) == report["inputs"][media_path]
+                report["media_cell_path_adaptation"] = adapted.proof
             if owner_fields:
                 bus_work_unit = at("Busses", "Default Work Unit")
                 report["buses_before"] = {}
@@ -464,20 +477,11 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
                 secondary_id = report["buses_before"]["Secondary"]["id"]
                 assert before["VoiceNotes"]["owner"]["references"]["OutputBus"]["id"] == report["buses_before"]["Main"]["id"] != secondary_id
                 assert before["VoiceNotes"]["owner"]["properties"] == {"Volume": 0.0, "OverrideOutput": False}
-                table.write_text("Object Path\tProperty[Volume]\tProperty[OverrideOutput]\tReference[OutputBus]\n"
-                    + f"<Sound Voice>VoiceNotes\t-6\ttrue\t{secondary_id}\n", encoding="utf-8", newline="\n")
+                header = "Object Path\tProperty[Volume]\tProperty[OverrideOutput]\tReference[OutputBus]\n"
+                cells = f"<Sound Voice>VoiceNotes\t-6\ttrue\t{secondary_id}\n"
+                table.write_text(("Audio File\t" + header + native_media_path + "\t" + cells if combined_owner_media else header + cells),
+                    encoding="utf-8", newline="\n")
             elif explicit_source_table:
-                from wwise_waapi.platform_paths import adapt_cli_dispatch_paths
-                shown_setup = gateway.gateway(["transaction-show", report["setup"][0]["transaction_id"]], live=False)
-                media_path = str(replacement["VoiceNotes"].resolve(strict=True))
-                media_uri = "ak.wwise.core.audio.importTabDelimited"
-                adapted = adapt_cli_dispatch_paths(uri=media_uri, args={"importFile": media_path}, options={},
-                    io_audit={"uri": media_uri, "paths": [{"section": "args", "json_path": "$.args.importFile",
-                        "field": "importFile", "role": "read", "raw_path": media_path, "resolved_path": media_path}]},
-                    project_guard=shown_setup["artifact"]["project_guard"])
-                native_media_path = adapted.args["importFile"]
-                assert proof(native_media_path) == report["inputs"][media_path]
-                report["media_cell_path_adaptation"] = adapted.proof
                 if witness_kind == "guid-source-tsv":
                     source, = [row["object"] for row in before["VoiceNotes"]["sources"]
                         if row["object"]["source_language"]["name"] == "English(US)"]
@@ -580,7 +584,17 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
             assert current["owner"]["references"]["OutputBus"]["id"] == bus_id
         elif owner_fields:
             assert after["VoiceSource"] == before["VoiceSource"]
-            assert after["VoiceNotes"]["sources"] == before["VoiceNotes"]["sources"]
+            if combined_owner_media:
+                old = {row["object"]["source_language"]["name"]: row for row in before["VoiceNotes"]["sources"]}
+                new = {row["object"]["source_language"]["name"]: row for row in after["VoiceNotes"]["sources"]}
+                assert len(new) == len(after["VoiceNotes"]["sources"]) == len(old) == 2 and set(new) == set(old) == {"English(US)", "Japanese"}
+                assert new["Japanese"] == old["Japanese"]
+                assert new["English(US)"]["object"] == old["English(US)"]["object"]
+                assert new["English(US)"]["media"]["path"] == old["English(US)"]["media"]["path"]
+                assert new["English(US)"]["object"]["name"] == Path(new["English(US)"]["media"]["path"]).stem == "LineNotes"
+                assert new["English(US)"]["media"]["sha256"] == report["inputs"][str(replacement["VoiceNotes"])]["sha256"] != old["English(US)"]["media"]["sha256"]
+            else:
+                assert after["VoiceNotes"]["sources"] == before["VoiceNotes"]["sources"]
             assert report["buses_after"] == report["buses_before"]
             prior, current = before["VoiceNotes"]["owner"], after["VoiceNotes"]["owner"]
             assert {key: value for key, value in current.items() if key not in {"properties", "references"}} == {
@@ -640,6 +654,10 @@ def collect_localized_guid_source_tsv_acceptance(runtime):
 
 def collect_localized_owner_fields_tsv_acceptance(runtime):
     return collect_localized_tsv_import_acceptance(runtime, witness_kind="owner-fields-tsv")
+
+
+def collect_localized_combined_owner_media_tsv_acceptance(runtime):
+    return collect_localized_tsv_import_acceptance(runtime, witness_kind="owner-fields-media-tsv")
 
 
 def collect_switch_import_acceptance(runtime):

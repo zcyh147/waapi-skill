@@ -1030,6 +1030,17 @@ def test_audio_import_exact_tsv_owner_only_fields_preserve_sources(workflow_sand
 
 @pytest.mark.live
 @pytest.mark.destructive
+@pytest.mark.parametrize("workflow_sandbox_runtime", [pytest.param(("Japanese",), id="japanese")], indirect=True)
+def test_audio_import_exact_tsv_combined_owner_fields_existing_media(workflow_sandbox_runtime):
+    """One ordinary Voice row reuses English media and changes owner fields."""
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("Representative combined owner/media table witness is pinned to 2025.1")
+    from tests.destructive.support.audio_import_acceptance import collect_localized_combined_owner_media_tsv_acceptance
+    collect_localized_combined_owner_media_tsv_acceptance(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_audio_import_switch_assignment_media_and_preservation(workflow_sandbox_runtime):
     """Existing SFX reuse plus one new Sound, under a nonempty Switch baseline."""
     if workflow_sandbox_runtime.version != "2025.1":
