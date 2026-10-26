@@ -5,6 +5,22 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #182 GUID TSV failure and immediate safety boundary
+
+GUID parsing and shared typed-class policy have separate component evidence:
+20 focused passes and eight unique parity controls across overlapping runs,
+not an aggregate gate. One native attempt at `0b350f8b`, Console 2025.1.7/build
+9143, root `import182-tsv-guid-2025-r1`: **FAIL, 7.90s**. Correct Z: media and
+explicit Object Type were present, but native created unexpected GUID-named
+objects and left intended targets unchanged. Strict verification failed;
+source/process cleanup passed and the unchanged failed sandbox is quarantined.
+Reviewed `945cc6f5` blocks that observed host/build before Preview and again
+before execution; **10 focused checks passed in 2.19s**. Older lanes remain
+program-only; a user decision on an all-five-version exception is pending.
+This proves no all-five native absence or #182 closure. Ordinary r4 PASS remains
+reusable; the GUID attempt was not replayed. Original assessment/receipts remain
+under the named full-coverage root; the remaining obligations below stay open.
+
 ## 2026-10-26 #182 owner/Source progress and retained native failures
 
 Reviewed implementation through `d6c63639` separates metadata-proven owner
