@@ -5,6 +5,42 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-27 #183 configured external-output correction
+
+The failed-only diagnostic at `46ec36ed`, root
+`soundbank183-external-default-2025-r1`, remained **FAIL, 6.44s** but retained
+complete owned-output evidence: Wwise created a 1,696-byte WEM under the
+Project's configured `ExternalSourcesOutputPath`. The wrapper had incorrectly
+predicted a converted-media-cache subdirectory. Its original observation SHA
+is `bd69b89781a48065e3cceefd15860b6dba14f0ba9d74c7d3af205cfcf1e877b8`.
+
+Fix `11b10c19`, integrated in `451647cd`, reads the exact live Project property
+for the selected platform, seals the effective path and rereads it before
+execution. Native output omission remains omission. **22 focused code checks
+passed in 4.50s**; both review axes are clear. Literal blank-property fallback
+and custom platform naming are program-tested, not newly native-proven.
+
+The same external-only node on `451647cd` passed on macOS WwiseConsole
+**2025.1.7/build 9143: 1 PASS, 4.78s**, root
+`.waapi-skill-state/full-coverage/soundbank183-external-fixed-2025-r1`.
+One transaction was verified; the exact configured output contained the
+independently proved 1,696-byte WEM. Input/source hash, tree and project mtime
+were preserved; owned processes were cleaned and the successful sandbox deleted.
+Observation SHA: `8ccd32a36183f03b4859cbf30d82dac4292f7eb9f7bdc70977301c5bcb473047`.
+The two earlier successful mechanisms were not rerun. Both older native FAILs
+remain unchanged; these are scoped cumulative effects, not a new single-run
+three-effect PASS or a Windows/five-version native/Fresh gate.
+
+## 2026-10-27 #184 media-ID effect checks
+
+Implementation `a370b5cd`, tested merge `6edf5981`, adds exact central-to-Work-Unit
+transfer checks and existing central-file refresh/preserving absent-file no-op
+checks. Closed public inputs, native XML parser and optional None-state rules
+remain unchanged. **87 selected public-Gateway program checks passed in 39.63s**
+across the five applicable lanes. Both reviews accepted the scoped change;
+optional baseline-selector duplication is nonblocking. No #184 native result
+or whole-ticket completion is added by this entry.
+
 ## 2026-10-27 #183 Core file workflows and Definition coverage
 
 Integrated candidate `e6bb933f` includes the reviewed Core option mappings,

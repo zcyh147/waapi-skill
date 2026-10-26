@@ -1345,3 +1345,25 @@ blocking edge. The existing global branch generator also encountered a retained
 Source successor-context mismatch once; #195 owns its final reconciliation.
 Neither problem is hidden by the local public contract checks or treated as
 native absence. #183 and #174 remain open.
+
+## #183 output-path correction and #184 media checks — 2026-10-27
+
+At `451647cd`, omitted external output follows the exact live Project's
+platform-specific `ExternalSourcesOutputPath`, bound into Preview and checked
+again before execution. A bounded failed-only diagnostic established that Wwise
+had created the file in this configured folder; the former media-cache
+prediction was the wrapper defect. The corrected one-transaction 2025.1.7
+native follow-up passed in 4.78s. Earlier failures stay frozen and the two
+previously successful Core effects were reused without another execution.
+See Test Inventory for source/cleanup and receipt attribution. The #179 setter
+decision still blocks whole-#183 completion; it is not a new external-conversion
+failure or a reason to rerun these effects.
+
+The same integration contains #184's two missing media-ID effect oracles:
+exact inverse transfer from the sealed central mapping to Work Units, and
+refresh of an existing file with a preserving no-op when none existed.
+Five-lane public checks passed (87 affected cases), with scoped reviews accepted.
+Representative remaining Console effects are being planned from the complete
+11-URI ownership list and retained evidence. No #184 native, Fresh or final
+combined Program/Nonlive gate is claimed. Global Source-context reconciliation
+remains #195 work; no original native record is rewritten.
