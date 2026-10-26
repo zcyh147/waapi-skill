@@ -3947,6 +3947,9 @@ def operation_request_machine_contract(name: str, version: str) -> dict[str, Any
             f"{name} does not yet have a closed executable verifier.",
             details={"operation": name, "boundary": spec.boundary},
         )
+    constraints = list(spec.constraints)
+    if name == "audio.importTabDelimited" and version == "2025.1":
+        constraints.append("WwiseConsole 2025.1.7 build 9143 blocks GUID Object Path TSV cells before preview and execution: retained native evidence interpreted them as literal object names and created unintended objects; other host/version GUID semantics remain unproven pending scope decision")
     return {
         "additional_properties": False,
         "argument_contract": _operation_argument_contract(
@@ -3954,7 +3957,7 @@ def operation_request_machine_contract(name: str, version: str) -> dict[str, Any
             spec.argument_contract,
             version=version,
         ),
-        "constraints": list(spec.constraints),
+        "constraints": constraints,
         "contract": "waapi-skill.operation-request-schema/v1",
         "file_read_policy": spec.file_read_policy,
         "identity_arguments": list(spec.identity_arguments),

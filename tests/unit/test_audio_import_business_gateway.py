@@ -3152,6 +3152,8 @@ class GuidSourceTabClient(ExplicitSourceTabClient):
     def call(self, uri, args=None, options=None):
         if uri != "ak.wwise.core.audio.importTabDelimited":
             result = super().call(uri, args, options)
+            if uri == "ak.wwise.core.getInfo" and self.version == "2025.1":
+                result["version"].update(minor=7, build=getattr(self, "guid_host_build", 9143), displayName="v2025.1.7")
             if uri == "ak.wwise.core.object.getTypes" and hasattr(self, "extra_type"):
                 result["return"].append(self.extra_type)
             return result
@@ -3205,6 +3207,12 @@ def test_exact_table_guid_container_notes_reuses_shared_class_policy(tmp_path, v
     command, run, client, table = _explicit_source_tab_draft(tmp_path, version, client=client, language="SFX")
     table.write_text("Object Path\tNotes\n" + client.container["id"].lower() + "\tupdated container notes\n", encoding="utf-8")
     original = table.read_bytes(); sources_before = json.loads(json.dumps(client.sources))
+    # Fake-host compiler coverage in other lanes is not native GUID evidence.
+    if version == "2025.1":
+        command("draft-check", expected_error="TSV_GUID_OBJECT_PATH_UNSAFE_ON_HOST")
+        assert table.read_bytes() == original and client.copied.read_bytes() == b"old English media"
+        assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+        return
     command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
     code, shown = run("transaction-show", transaction); assert code == 0, shown
     prepared = shown["artifact"]["prepared_operation"]
@@ -3220,8 +3228,8 @@ def test_exact_table_guid_container_notes_reuses_shared_class_policy(tmp_path, v
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
 
 
-def _guid_source_tab_draft(tmp_path, version):
-    client = GuidSourceTabClient(tmp_path, version)
+def _guid_source_tab_draft(tmp_path, version, *, client=None):
+    client = client or GuidSourceTabClient(tmp_path, version)
     command, run, client, table = _explicit_source_tab_draft(tmp_path, version, client=client)
     table.write_text(table.read_text().replace(
         r"<Sound Voice>Voice\<AudioFileSource>Line", client.SOURCE.lower()).replace(
@@ -3233,6 +3241,12 @@ def _guid_source_tab_draft(tmp_path, version):
 def test_exact_table_guid_owner_and_source_keep_table_and_prove_media(tmp_path, version):
     command, run, client, table = _guid_source_tab_draft(tmp_path, version)
     original = table.read_bytes()
+    # Fake-host compiler coverage in other lanes is not native GUID evidence.
+    if version == "2025.1":
+        command("draft-check", expected_error="TSV_GUID_OBJECT_PATH_UNSAFE_ON_HOST")
+        assert table.read_bytes() == original and client.copied.read_bytes() == b"old English media"
+        assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+        return
     command("draft-check")
     transaction = command("preview-from-draft")["transaction_id"]
     code, shown = run("transaction-show", transaction); assert code == 0, shown
@@ -3248,6 +3262,33 @@ def test_exact_table_guid_owner_and_source_keep_table_and_prove_media(tmp_path, 
     assert client.sources[0]["id"] == client.SOURCE and client.sources[1]["notes"] == "keep Japanese notes"
     assert table.read_bytes() == original
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
+
+
+def test_exact_table_guid_cells_are_blocked_on_observed_2025_console_before_preview(tmp_path):
+    command, _run, client, table = _guid_source_tab_draft(tmp_path, "2025.1")
+    original = table.read_bytes()
+    rejected = command("draft-check", expected_error="TSV_GUID_OBJECT_PATH_UNSAFE_ON_HOST")
+    assert rejected["details"]["native_interpretation"] == "literal_object_names"
+    assert rejected["details"]["observed_version"]["build"] == 9143
+    assert table.read_bytes() == original and client.owner["notes"] == "keep owner notes"
+    assert client.copied.read_bytes() == b"old English media"
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+    assert not list((tmp_path / "state/transactions").glob("tx1-*"))
+
+
+def test_exact_table_guid_dispatch_stops_if_host_becomes_observed_unsafe_build(tmp_path):
+    client = GuidSourceTabClient(tmp_path, "2025.1")
+    client.guid_host_build = 9142  # Fake unobserved host; no native support claim.
+    command, run, client, table = _guid_source_tab_draft(tmp_path, "2025.1", client=client)
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    client.guid_host_build = 9143
+    code, executed = run("execute", transaction)
+    assert code == 2 and executed["executed"] is False and executed["status"] == "repreview_required", executed
+    assert executed["error_code"] == "TSV_GUID_OBJECT_PATH_UNSAFE_ON_HOST", executed
+    assert client.copied.read_bytes() == b"old English media" and client.owner["notes"] == "keep owner notes"
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
 
 
 @pytest.mark.parametrize("fault,error", (
@@ -3295,7 +3336,7 @@ def test_exact_table_guid_targets_reject_missing_wrong_class_and_language(tmp_pa
 
 @pytest.mark.parametrize("drift", ("class", "guid-path", "table"))
 def test_exact_table_guid_targets_revalidate_before_dispatch(tmp_path, drift):
-    command, run, client, table = _guid_source_tab_draft(tmp_path, "2025.1")
+    command, run, client, table = _guid_source_tab_draft(tmp_path, "2022.1")
     command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
     code, shown = run("transaction-show", transaction); assert code == 0, shown
     assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0

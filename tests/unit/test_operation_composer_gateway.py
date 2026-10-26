@@ -332,12 +332,20 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # One observed Console/build boundary changes only the 2025 TSV contract.
+    # Remove exactly that disclosure and retain the complete prior schema seal.
+    assert canonical_sha256(non_object_set_digests) == "f33f339b6f3ce93d866a2d1a42e0f5277f81ee7631ee0ccbb89f6f42f79d5b0a"
+    native_boundary_contract = operation_request_machine_contract("audio.importTabDelimited", "2025.1")
+    assert native_boundary_contract["constraints"].pop() == (
+        "WwiseConsole 2025.1.7 build 9143 blocks GUID Object Path TSV cells before preview and execution: retained native evidence interpreted them as literal object names and created unintended objects; other host/version GUID semantics remain unproven pending scope decision"
+    )
+    non_object_set_digests["audio.importTabDelimited@2025.1"] = canonical_sha256(native_boundary_contract)
     # GUID identities reuse the complete existing typed-TSV target policy.
     # Invert this wording delta before all historical schema seals.
     assert canonical_sha256(non_object_set_digests) == "3fd1e7e36d961a8ea781046a8527ba81ede47c090d0529428136dc1b262cce97"
     class_parity_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = native_boundary_contract if version == "2025.1" else operation_request_machine_contract("audio.importTabDelimited", version)
         assert contract["constraints"][4] == (
             "canonical GUID Object Path cells resolve exact existing identities under the shared typed-TSV target class and root policy before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries"
         )

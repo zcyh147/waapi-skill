@@ -270,6 +270,35 @@ def build_runtime_guard(skill_root: Path, version: str) -> dict[str, Any]:
     return {"contract": RUNTIME_GUARD_CONTRACT, **body, "fingerprint": canonical_sha256(body)}
 
 
+def _validate_tab_guid_native_boundary(
+    request: Mapping[str, Any], verification: Mapping[str, Any], project_guard: Mapping[str, Any],
+) -> None:
+    if request.get("operation") != "audio.importTabDelimited" or request.get("version") != "2025.1":
+        return
+    host = project_guard.get("wwise", {})
+    if not isinstance(host, Mapping):
+        return
+    observed_version = host.get("version", {})
+    if (not isinstance(observed_version, Mapping) or host.get("isCommandLine") is not True
+            or any(observed_version.get(key) != value for key, value in
+                   (("year", 2025), ("major", 1), ("minor", 7), ("build", 9143)))):
+        return
+    targets = verification.get("targets", [])
+    if not isinstance(targets, list):
+        raise TransactionGuardError("INVALID_PREVIEW", "The TSV verification target list is malformed.")
+    guid_rows = [{"row": target.get("row_number"), "object_path": target["requested_target_id"]}
+                 for target in targets if isinstance(target, Mapping) and "requested_target_id" in target]
+    if guid_rows:
+        # Retained import182-tsv-guid-2025-r1: both supplied canonical GUIDs
+        # produced new literal-name Sound/Source nodes, leaving targets unchanged.
+        raise TransactionGuardError("TSV_GUID_OBJECT_PATH_UNSAFE_ON_HOST",
+            "WwiseConsole 2025.1.7 build 9143 was observed treating TSV Object Path GUID cells as literal object names and creating unintended objects. GUID TSV targets are blocked on this host before preview or writing; the table is not rewritten.",
+            details={"observed_version": dict(observed_version), "is_command_line": True,
+                     "native_interpretation": "literal_object_names", "guid_rows": guid_rows,
+                     "evidence_case": "import182-tsv-guid-2025-r1",
+                     "other_host_version_semantics": "unproven_scope_decision_pending"})
+
+
 def _validate_tab_media_path_namespace(prepared: PreparedOperation, project_guard: Mapping[str, Any]) -> None:
     if prepared.request.operation != "audio.importTabDelimited":
         return
@@ -317,6 +346,7 @@ def build_transaction_preview_artifact(
         raise ValueError("ttl_seconds must be greater than zero")
     request = parse_operation_request(request_payload, expected_version=live_version)
     prepared = prepare_operation(request, read_call=read_call, history_resolver=history_resolver, copy_proof_context=copy_proof_context)
+    _validate_tab_guid_native_boundary(request.as_dict(), prepared.verification_plan, project_guard)
     _validate_tab_media_path_namespace(prepared, project_guard)
     post_execution_project_guard_policy = _prepared_post_execution_project_guard_policy(
         prepared
@@ -594,6 +624,11 @@ def validate_transaction_guards(
     request = artifact.get("request")
     if not isinstance(request, Mapping) or not isinstance(request.get("version"), str):
         raise TransactionGuardError("INVALID_PREVIEW", "Transaction preview lacks a versioned request.")
+    if project_phase == PROJECT_GUARD_PHASE_PRE_EXECUTION:
+        prepared = artifact.get("prepared_operation", {})
+        verification = prepared.get("verification_plan", {}) if isinstance(prepared, Mapping) else {}
+        if isinstance(verification, Mapping):
+            _validate_tab_guid_native_boundary(request, verification, current_project_guard)
     stored_project = artifact.get("project_guard")
     stored_runtime = artifact.get("runtime_guard")
     if not isinstance(stored_project, Mapping) or not isinstance(stored_runtime, Mapping):
