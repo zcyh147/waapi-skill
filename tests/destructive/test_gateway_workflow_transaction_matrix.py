@@ -1083,6 +1083,17 @@ def test_read_only_dialogue_association_metadata_observation(workflow_sandbox_ru
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_read_only_dialogue_list_membership_observation(workflow_sandbox_runtime):
+    """Source-scoped advanced owner queries; native list ordering remains unknown."""
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("Dialogue list membership observation is pinned to 2025.1")
+    from tests.destructive.support.audio_import_acceptance import collect_dialogue_read_probe
+    category = collect_dialogue_read_probe(workflow_sandbox_runtime, memberships=True)
+    assert category["status"] == "PASS", category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_music_playlist_canonical_query_create_and_import_parent(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:

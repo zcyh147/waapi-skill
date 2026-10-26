@@ -934,22 +934,23 @@ def collect_switch_import_acceptance(runtime, *, tab_delimited=False):
         persist()
 
 
-def collect_dialogue_read_probe(runtime):
+def collect_dialogue_read_probe(runtime, *, memberships=False):
     """Observe an existing nonempty decision graph; never infer default import effects."""
     import xml.etree.ElementTree as ET
     assert runtime.version == "2025.1"
     owned = runtime.sandbox.sandbox_path.resolve(strict=True)
     assert owned != runtime.sandbox.source_root.resolve(strict=True)
-    output = runtime.state_dir / "dialogue-read-probe.json"
+    output = runtime.state_dir / ("dialogue-list-read-probe.json" if memberships else "dialogue-read-probe.json")
     assert not output.exists(), "Never overwrite a Dialogue observation"
-    category = {"category": "dialogue-read-only-observation", "status": "FAIL", "transaction_ids": [],
+    category = {"category": "dialogue-list-read-only-observation" if memberships else "dialogue-read-only-observation", "status": "FAIL", "transaction_ids": [],
         "observation_path": str(output), "verifier_strength": "bounded_read_collection_only_no_business_credit",
         "business_effect_verified": False, "coverage_credit": False}
     runtime.category_results.append(category)
     report = {"contract": "waapi-skill.dialogue-read-probe/v1", "candidate": runtime.candidate,
         "version": runtime.version, "calls": [], "boundaries": [], "metadata": [], "objects": [],
         "collection_complete": False, "business_effect_verified": False, "coverage_credit": False,
-        "default_association_proven": False, "association_status": "unresolved", "mutation_allowed": False,
+        "default_association_proven": False, "ordering_proven": False, "membership_reads": [],
+        "association_status": "unresolved", "mutation_allowed": False,
         "transaction_budget": 0, "limits": {"calls": 48, "reply_bytes": 524288, "receipt_bytes": 4194304,
             "metadata_pages": 2, "detail_pages": 4, "referrers": 8}, "failure": None}
     endpoint = {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}
@@ -965,7 +966,7 @@ def collect_dialogue_read_probe(runtime):
         report["boundaries"].append({"stage": stage, "reason": reason, **facts})
 
     def read(stage, argv):
-        assert argv[0] in {"status", "metadata", "query-object"}, "Dialogue probe is read-only"
+        assert argv[0] in {"status", "metadata", "query-object", "query-schema"}, "Dialogue probe is read-only"
         assert len(report["calls"]) < report["limits"]["calls"]
         call = {"stage": stage, "argv": list(argv)}; report["calls"].append(call)
         try:
@@ -975,7 +976,8 @@ def collect_dialogue_read_probe(runtime):
             if code != 0 or packet.get("ok") is not True:
                 boundary(stage, "structured_read_rejected", error_code=packet.get("error_code"))
                 return None
-            assert packet.get("detected_version") == runtime.version and packet.get("endpoint") == endpoint, packet
+            if argv[0] != "query-schema":
+                assert packet.get("detected_version") == runtime.version and packet.get("endpoint") == endpoint, packet
             return packet
         except Exception as exc:
             call["exception"] = {"type": type(exc).__name__, "message": str(exc)[:1024]}
@@ -1073,6 +1075,8 @@ def collect_dialogue_read_probe(runtime):
             "entry_path_slot_count": len(entry.findall('./ObjectLists/ObjectList[@Name="EntryPath"]/*')),
             "event_entry_count": len(event.findall('./ObjectLists/ObjectList[@Name="Entries"]/MultiSwitchEntry')),
             "argument_count": len(event.findall('./ObjectLists/ObjectList[@Name="Arguments"]/*')),
+            "argument_slots": [{"xml_id": slot.attrib["ID"], "reference": slot.find('./ReferenceList/Reference[@Name="Argument"]/ObjectRef').attrib}
+                for slot in event.findall('./ObjectLists/ObjectList[@Name="Arguments"]/*')],
             "entry_path_slots": [{"xml_id": slot.attrib["ID"], "reference": slot.find('./ReferenceList/Reference[@Name="EntryPathObject"]/ObjectRef').attrib}
                 for slot in entry.findall('./ObjectLists/ObjectList[@Name="EntryPath"]/*')],
             "event_entry_ids": [member.attrib["ID"] for member in event.findall('./ObjectLists/ObjectList[@Name="Entries"]/MultiSwitchEntry')],
@@ -1088,6 +1092,62 @@ def collect_dialogue_read_probe(runtime):
         assert status is not None
         project_path = Path(localize_waapi_host_path(status["agent_result"]["project"]["path"])).resolve(strict=True)
         assert project_path == runtime.sandbox.sandbox_project.resolve(strict=True) != runtime.sandbox.source_project.resolve(strict=True)
+        if memberships:
+            # SDK WAQL documents from-type, owner chaining and GUID equality;
+            # this uses the existing disclosed advanced read lane. It does not
+            # assume a SELECT @List spelling or native queryability of Inner types.
+            schema = read("advanced-contract", ["query-schema", "--advanced"])
+            assert schema is not None and schema.get("query_contract") == "waapi-skill.advanced-object-query/v1", schema
+            types = pages("membership-types", ["metadata", "types", "--meaning", "MultiSwitchEntry",
+                "--meaning", "ArgumentsSlot", "--meaning", "EntryPathSlot", "--page-size", "64"], "types")
+            scope = report["source_scope"]
+            for kind, owner, expected_ids, slots, reference in (
+                ("MultiSwitchEntry", event.attrib["ID"], scope["event_entry_ids"], (), None),
+                ("ArgumentsSlot", event.attrib["ID"], [row["xml_id"] for row in scope["argument_slots"]], scope["argument_slots"], "Argument"),
+                ("EntryPathSlot", entry.attrib["ID"], [row["xml_id"] for row in scope["entry_path_slots"]], scope["entry_path_slots"], "EntryPathObject"),
+            ):
+                if len([row for row in types if row.get("name") == kind and row.get("classId") == classes[kind]]) != 1:
+                    boundary(kind, "actual_type_not_uniquely_listed", class_id=classes[kind])
+                    continue
+                canonical_owner = "{" + str(uuid.UUID(owner)).upper() + "}"
+                expression = f'from type {kind} where owner.id = "{canonical_owner}"'
+                observation = {"kind": kind, "owner_id": canonical_owner, "expected_source_ids": expected_ids,
+                    "waql": expression, "rows": None, "order_status": "not_established_by_owner_filter"}
+                report["membership_reads"].append(observation)
+                packet = read(kind + "-members", ["query-object", "--advanced-waql", expression,
+                    "--max-results", str(len(expected_ids) + 1), "--include", "class-id", "--include", "owner", "--detail"])
+                if packet is None:
+                    continue
+                assert packet.get("projection_complete") is not False and packet.get("limit_reached") is not True and packet.get("status") != "partial", packet
+                rows = packet["objects"]; observation["rows"] = rows
+                assert packet["count"] == len(rows) == len(expected_ids), packet
+                assert len({row["id"].upper() for row in rows}) == len(rows), rows
+                assert {row["id"].upper() for row in rows} == {identity.upper() for identity in expected_ids}, rows
+                assert all(row.get("type") == kind and row.get("class_id") == classes[kind]
+                    and row.get("owner", {}).get("id", "").upper() == canonical_owner for row in rows), rows
+                # Exact actual members, never a parsed bracketed display path.
+                for slot in slots:
+                    identity = next(row["id"] for row in rows if row["id"].upper() == slot["xml_id"].upper())
+                    result = metadata(kind + "-" + identity, ["--exact-id", identity], (reference,))
+                    for detail in result["details"]:
+                        info = detail["pages"][0].get("metadata", {}) if detail["pages"] else {}
+                        restriction = info.get("restriction")
+                        if str(info.get("type", "")).casefold() == "reference" or (isinstance(restriction, Mapping) and restriction.get("type") == "reference"):
+                            actual = query(kind + "-reference", identity, field=detail["field"]["name"],
+                                expected={"id": identity, "type": kind, "class_id": classes[kind]})
+                            if actual:
+                                returned = actual.get("references", {}).get(detail["field"]["name"])
+                                observation.setdefault("reference_reads", []).append({"id": identity,
+                                    "expected_source_reference": slot["reference"], "actual": returned})
+                                if returned is None:
+                                    boundary(kind, "reference_projection_omitted", object_id=identity, field=reference)
+                                else:
+                                    assert returned.get("id", "").upper() == slot["reference"]["ID"].upper(), returned
+                        else:
+                            boundary(kind, "reference_kind_not_proven", field=reference, object_id=identity)
+            report.update(collection_complete=True, association_status="observed_requires_review")
+            category["status"] = "PASS"
+            return category
         types = pages("types", ["metadata", "types", "--meaning", "DialogueEvent", "--meaning", "MultiSwitchEntry", "--page-size", "64"], "types")
         for name, wanted in (("DialogueEvent", ("Entries", "Arguments")), ("MultiSwitchEntry", ("AudioNode", "EntryPath"))):
             selections = [row for row in types if row.get("name") == name and row.get("classId") == classes[name]]
