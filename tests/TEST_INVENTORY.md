@@ -5,6 +5,53 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #182 owner/Source progress and retained native failures
+
+Reviewed implementation through `d6c63639` separates metadata-proven owner
+properties/references from Source Notes/media, including inline media and a new
+language. The media-ownership P2 repair retains exact selected-Source binding
+and preservation. Exact TSV media proofs bind native spelling, canonical local
+bytes and table-relative bases; namespace checks use proven Wine facts. Ordinary
+Gateway-generated Source names avoid cross-language collisions, and the reuse
+P2 repair retains an existing generated Source after its original collider is
+renamed. Explicit TSV targets keep their declared identities.
+
+Source-backed fixture repairs bind the actual 2025 Busses hierarchy and exact
+Main Audio Bus among valid siblings. The launcher now rejects explicit unit
+selectors in matrix/focused/all modes before readiness, directing them to
+Non-live. Schema-seal inversions retain reviewed contracts and historical seals.
+CI `40296335746` at `a077f112` recorded **837 passed, 1 failed in 96.68s**;
+its sole failure was the digest inventory, repaired at `7edae952` with the exact
+failed node **1 passed in 0.39s**. Subsequent CI has not run yet. Component and
+merge-intersection counts overlap; none is an aggregate Program/Non-live gate.
+
+Six separate Console 2025.1.7.9143 roots under the durable full-coverage state
+retain original receipts and authoritative `main-assessment.json` files:
+
+- `import182-owner-source-2025-r1`: **FAIL, 8.45s**. Old Bus hierarchy path
+  resolved nothing; two setup transactions verified, witness never executed.
+- `import182-tsv-source-2025-r1`: **FAIL, 6.45s**. Owner/Source Notes changed,
+  but media/path stayed old with the POSIX media cell; strict verification failed.
+- `import182-owner-source-2025-r2`: **FAIL, 6.27s**. Singleton-Bus fixture
+  assumption failed among four valid Bus children; witness never executed.
+- `import182-owner-source-2025-r3`: **FAIL, 7.62s**. Explicit Source lookup
+  reused English identity and changed its Notes; no Japanese Source was created.
+- `import182-tsv-source-2025-r2` at `9548a89c92ce47181aa7de363b843392a3c91b39`:
+  **FAIL, 7.56s**. Correct native Z: cell retained; Notes and identities passed,
+  but old media/path remained. Namespace proof alone did not prove replacement.
+- `import182-owner-source-2025-r4` at `d6c63639b7b48bbc4b629f374953b8d49408c496`:
+  **PASS, 7.27s**, three verified transactions including setup. Distinct Japanese
+  Source/Notes/exact inline media/After placement and owner Volume/OutputBus/
+  OverrideOutput passed; English GUID/Notes/media and unrelated/input state
+  were preserved. This ordinary result grants no TSV media-effect credit.
+
+All six confirm source preservation and clean process cleanup. The PASS sandbox
+was deleted; all five FAIL sandboxes remain quarantined, unchanged and unregraded.
+No universal native-absence conclusion follows. #182 remains OPEN: GUID targets
+are being implemented; localized TSV dynamic fields, Dialogue/Switch directives
+and TSV media outcome remain work. No new Fresh or native-Windows evidence is
+claimed. #194 Fresh budget stays zero; #195 owns combined gates/reconciliation.
+
 ## 2026-10-26 #182 import progress and scoped native outcomes
 
 Implementation through `f4445eba` preserves independent default Field Handle
