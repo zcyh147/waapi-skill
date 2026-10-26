@@ -2999,6 +2999,14 @@ def test_new_language_source_collision_after_preview_blocks_owner_and_media_writ
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 def test_generated_language_source_reimport_preserves_its_existing_identity(tmp_path, version):
+    _assert_generated_language_source_reimport(tmp_path, version)
+
+
+def test_generated_language_source_reimport_survives_removed_filename_collision(tmp_path):
+    _assert_generated_language_source_reimport(tmp_path, "2025.1", rename_collider=True)
+
+
+def _assert_generated_language_source_reimport(tmp_path, version, *, rename_collider=False):
     from copy import deepcopy
     command, run, client = _localized_owner_fields_draft(tmp_path, version, language="Japanese")
     generated_name = "Line__" + hashlib.sha256(b"Japanese").hexdigest()[:12]
@@ -3009,7 +3017,12 @@ def test_generated_language_source_reimport_preserves_its_existing_identity(tmp_
         "audioSource:language": {"id": "{99999999-9999-9999-9999-999999999999}", "name": "Japanese"},
         "originalFilePath": str(existing_media), "originalWavFilePath": str(existing_media)}
     client.sources.append(japanese)
+    if rename_collider:
+        # An unrelated, earlier user rename removed the filename-path
+        # collision; useExisting must still reuse the generated Japanese GUID.
+        client.sources[0].update(name="RenamedEnglish", path=client.owner["path"] + r"\RenamedEnglish")
     english = deepcopy(client.sources[0]); english_bytes = client.copied.read_bytes()
+    source_ids = {source["id"] for source in client.sources}
     identity = {key: japanese[key] for key in ("id", "name", "path", "parent")}
     command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
     code, shown = run("transaction-show", transaction); assert code == 0, shown
@@ -3022,6 +3035,7 @@ def test_generated_language_source_reimport_preserves_its_existing_identity(tmp_
     code, executed = run("execute", transaction); assert code == 0, executed
     code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
     assert {key: japanese[key] for key in identity} == identity
+    assert {source["id"] for source in client.sources} == source_ids and len(client.sources) == 2
     assert japanese["notes"] == "updated source notes" and Path(japanese["originalFilePath"]).read_bytes() == (tmp_path / "Line.wav").read_bytes()
     assert client.sources[0] == english and client.copied.read_bytes() == english_bytes
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1

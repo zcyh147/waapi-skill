@@ -14341,9 +14341,10 @@ def _localized_source_snapshot(owner_id: str, *, read: ReadCall) -> dict[str, An
 def _localized_generated_source_path(target: Mapping[str, Any], filename_path: str | None) -> str | None:
     """Disambiguate only a Gateway-owned ordinary explicit Source child name.
 
-    Native explicit objectPath lookup is not scoped by importLanguage. Keep
-    the filename-derived child when that path is free or already belongs to
-    the selected language; otherwise use a deterministic safe language suffix.
+    Native explicit objectPath lookup is not scoped by importLanguage. Reuse
+    an existing deterministic language child first, even if an earlier filename
+    collision has disappeared. Otherwise keep the filename child when free or
+    already selected-language, or use the safe deterministic language suffix.
     The new exact path is still required absent (or bound to its existing
     selected-language GUID) by the normal snapshot and drift guards.
     """
@@ -14352,11 +14353,25 @@ def _localized_generated_source_path(target: Mapping[str, Any], filename_path: s
     if not isinstance(filename_path, str) or language is None or not isinstance(snapshot, Mapping):
         return filename_path
     rows = snapshot.get("rows", [])
+    generated_path = filename_path + "__" + hashlib.sha256(language.encode("utf-8")).hexdigest()[:12]
+    existing = [row for row in rows if row.get("path") == generated_path
+        and _object_type_token(row.get("type")) == "audiofilesource"
+        and _import_language_name(row.get("audioSource:language")) == language]
+    if len(existing) > 1:
+        raise OperationContractError("AMBIGUOUS_LOCALIZED_SOURCE", "The generated language Source binding is ambiguous.",
+            details={"path": generated_path, "language": language, "candidate_count": len(existing)})
+    if existing:
+        source = existing[0]
+        if (not _same_identity(_reference_identity(source.get("parent")), target.get("preexisting_id"))
+                or not _object_class_matches(source.get("classId"), target.get("audio_source_class_id"))
+                or source.get("name") != generated_path.rpartition("\\")[2]):
+            raise OperationContractError("INVALID_READBACK", "The generated language Source must retain its exact owner, class, path and name.")
+        return generated_path
     collisions = [row for row in rows if str(row.get("path", "")).casefold() == filename_path.casefold()]
     if not collisions or any(_object_type_token(row.get("type")) == "audiofilesource"
             and _import_language_name(row.get("audioSource:language")) == language for row in collisions):
         return filename_path
-    return filename_path + "__" + hashlib.sha256(language.encode("utf-8")).hexdigest()[:12]
+    return generated_path
 
 
 def _bind_localized_import_source(target: dict[str, Any], *, read: ReadCall, derive_source_name: bool = False) -> str | None:
