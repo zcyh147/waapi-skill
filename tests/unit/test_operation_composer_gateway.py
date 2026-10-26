@@ -332,12 +332,23 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # Explicit Source TSV admission adds one constraint and no request field.
+    # Verify and invert only that reviewed delta, retaining the prior full seal.
+    assert canonical_sha256(non_object_set_digests) == "499c116a84384ac1ba3eb981911ad472b7f255e23f3e696ad3ca8dfb84490eeb"
+    reviewed_tsv_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        assert contract["constraints"].pop(2) == (
+            "an explicit typed AudioFileSource media row may reimport one existing exact Sound child in the requested language using Notes on the Source; a separate typed owner-only Notes row retains the same exact-table transaction"
+        )
+        reviewed_tsv_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
     # #182 changes only import constraints: ordinary localized field admission
     # and exact TSV version/Notes disclosure. Verify and invert those reviewed
     # deltas before retaining every earlier schema seal below.
     assert canonical_sha256(non_object_set_digests) == "05fa0904d8607b769b6614a2fa4d989763c0d31a2d87b5adf18d98d878ead741"
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = reviewed_tsv_contracts[version]
         assert contract["constraints"][:2] == [
             "OriginalsSubFolder is a TSV column from Wwise 2023.1 (WG-60834); ordinary audio.import Originals placement remains separate",
             "TSV Notes verifies target-object notes independently from Audio Source Notes; the exact user table is never rewritten",
