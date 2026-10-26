@@ -67,9 +67,9 @@ MAX_TREE_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
 MAX_TREE_FILE_BYTES = 512 * 1024 * 1024
 MAX_TREE_DEPTH = 32
 
-_GENERATE_REQUIRED_KEYS = frozenset({"soundbanks", "platforms", "skipLanguages", "writeToDisk"})
+_GENERATE_REQUIRED_KEYS = frozenset({"soundbanks", "platforms"})
 _GENERATE_OPTIONAL_KEYS = frozenset(
-    {"languages", "rebuildSoundBanks", "clearAudioFileCache", "rebuildInitBank"}
+    {"languages", "skipLanguages", "writeToDisk", "rebuildSoundBanks", "clearAudioFileCache", "rebuildInitBank", "allUserSoundBanks"}
 )
 _GENERATE_BANK_REQUIRED_KEYS = frozenset({"name", "artifactExpectation"})
 _GENERATE_BANK_OPTIONAL_KEYS = frozenset({"events", "auxBusses", "inclusions", "rebuild"})
@@ -929,7 +929,7 @@ def build_generate_operation_plan(
     )
 
     soundbanks = _require_sequence(arguments.get("soundbanks"), field="soundbanks")
-    if not soundbanks or len(soundbanks) > MAX_GENERATE_BANKS:
+    if (not soundbanks and "allUserSoundBanks" not in arguments) or len(soundbanks) > MAX_GENERATE_BANKS:
         raise SoundBankContractError(
             "INVALID_SCOPE",
             "soundbank.generate requires an explicit non-empty bounded SoundBank list.",
@@ -985,27 +985,14 @@ def build_generate_operation_plan(
                     raw.get(public_name),
                     field=f"soundbanks[{index}].{public_name}",
                 )
-                if not identities:
-                    raise SoundBankContractError(
-                        "INVALID_ARGUMENT",
-                        f"soundbanks[{index}].{public_name} must not be an empty explicit list.",
-                    )
                 bank[public_name] = identities
-        definitions_present = "events" in bank or "auxBusses" in bank
         if "inclusions" in raw:
-            if not definitions_present:
-                raise SoundBankContractError(
-                    "INVALID_ARGUMENT",
-                    "SoundBank inclusions are accepted only with explicit Event or AuxBus definitions.",
-                    details={"index": index},
-                )
             bank["inclusions"] = _normalize_generate_inclusions(
                 raw.get("inclusions"),
                 field=f"soundbanks[{index}].inclusions",
             )
-        elif definitions_present:
-            bank["inclusions"] = list(_GENERATE_INCLUSIONS)
-        bank["rebuild"] = _optional_bool(raw, "rebuild", default=False, field=f"soundbanks[{index}].rebuild")
+        if "rebuild" in raw:
+            bank["rebuild"] = _require_bool(raw["rebuild"], field=f"soundbanks[{index}].rebuild")
         normalized_banks.append(bank)
 
     requested_platforms = _require_nonempty_strings(
@@ -1025,58 +1012,24 @@ def build_generate_operation_plan(
         for bank in normalized_banks
         if bank["artifactExpectation"] in {"localized", "mixed"}
     ]
-    skip_languages = _require_bool(arguments.get("skipLanguages"), field="skipLanguages")
-    if not language_dependent_banks:
-        if skip_languages is not True or "languages" in arguments:
-            raise SoundBankContractError(
-                "INVALID_SCOPE",
-                "An all-nonlocalized SoundBank batch requires "
-                "skipLanguages=true and languages omitted.",
-            )
-        selected_languages: list[dict[str, Any]] = []
+    skip_languages = _optional_bool(arguments, "skipLanguages", default=False)
+    write_to_disk = _optional_bool(arguments, "writeToDisk", default=False)
+    if skip_languages and language_dependent_banks:
+        raise SoundBankContractError("INVALID_SCOPE", "Localized artifact expectations conflict with skipLanguages=true.")
+    if skip_languages and "languages" not in arguments:
+        selected_languages = []
     else:
-        if skip_languages is not False:
-            raise SoundBankContractError(
-                "INVALID_SCOPE",
-                "A SoundBank batch containing any localized or mixed row "
-                "requires skipLanguages=false.",
-                details={"soundbanks": language_dependent_banks},
-            )
-        requested_languages = _require_nonempty_strings(
-            arguments.get("languages"),
-            field="languages",
-            limit=MAX_LANGUAGES,
-        )
+        requested_languages = arguments.get("languages")
+        if requested_languages is None or requested_languages == []:
+            requested_languages = [row["id"] for row in project_info.get("languages", [])
+                if isinstance(row, Mapping) and str(row.get("name", "")).casefold() != "sfx"]
+        requested_languages = _require_nonempty_strings(requested_languages, field="languages", limit=MAX_LANGUAGES) if requested_languages else []
         if any(language.strip().casefold() == "sfx" for language in requested_languages):
-            raise SoundBankContractError(
-                "INVALID_SCOPE",
-                "SFX is not a localized project language and cannot appear in "
-                "soundbank.generate languages.",
-            )
-        selected_languages = _resolve_project_rows(
-            requested_languages,
-            project_info.get("languages"),
-            field="languages",
-            aliases=("id", "name"),
-            required_fields=("id", "name"),
-        )
-    if skip_languages:
-        if "languages" in arguments:
-            raise SoundBankContractError(
-                "INVALID_SCOPE",
-                "languages must be omitted when skipLanguages is true.",
-            )
+            raise SoundBankContractError("INVALID_SCOPE", "SFX is not a localized project language.")
+        selected_languages = _resolve_project_rows(requested_languages, project_info.get("languages"),
+            field="languages", aliases=("id", "name"), required_fields=("id", "name")) if requested_languages else []
     if language_dependent_banks and not selected_languages:
-        raise SoundBankContractError(
-            "INVALID_SCOPE",
-            "Localized or mixed SoundBank artifact expectations require explicit languages and skipLanguages=false.",
-            details={"soundbanks": language_dependent_banks, "skipLanguages": skip_languages},
-        )
-    if _require_bool(arguments.get("writeToDisk"), field="writeToDisk") is not True:
-        raise SoundBankContractError(
-            "UNSUPPORTED_BOUNDARY",
-            "The closed generation route currently requires writeToDisk=true for artifact verification.",
-        )
+        raise SoundBankContractError("INVALID_SCOPE", "Localized artifact expectations require live project languages.")
 
     directories = _require_mapping(project_info.get("directories"), field="project_info.directories")
     cache_path = _require_text(directories.get("cache"), field="project_info.directories.cache")
@@ -1158,14 +1111,16 @@ def build_generate_operation_plan(
             for bank in normalized_banks
         ],
         "platforms": [platform["id"] for platform in selected_platforms],
-        "skipLanguages": skip_languages,
-        "rebuildSoundBanks": _optional_bool(arguments, "rebuildSoundBanks", default=False),
-        "clearAudioFileCache": _optional_bool(arguments, "clearAudioFileCache", default=False),
-        "writeToDisk": True,
-        "rebuildInitBank": _optional_bool(arguments, "rebuildInitBank", default=False),
     }
-    if selected_languages:
-        dispatch_args["languages"] = [language["id"] for language in selected_languages]
+    if "allUserSoundBanks" in arguments and lane in {"2023.1", "2024.1", "2025.1"}:
+        dispatch_args["soundbanks"] = []
+    elif "allUserSoundBanks" in arguments and not normalized_banks:
+        raise SoundBankContractError("INVALID_SCOPE", "No live user SoundBanks were found; older reflected schemas do not establish empty-list generation semantics.")
+    for name in ("skipLanguages", "writeToDisk", "rebuildSoundBanks", "clearAudioFileCache", "rebuildInitBank"):
+        if name in arguments:
+            dispatch_args[name] = _require_bool(arguments[name], field=name)
+    if "languages" in arguments:
+        dispatch_args["languages"] = [language["id"] for language in selected_languages] if arguments["languages"] else []
 
     body = {
         "contract": GENERATE_PLAN_CONTRACT,
@@ -1187,9 +1142,11 @@ def build_generate_operation_plan(
                 for language in selected_languages
             ],
             "skip_languages": skip_languages,
-            "empty_soundbank_list_allowed": False,
+            "empty_soundbank_list_allowed": "allUserSoundBanks" in arguments and lane in {"2023.1", "2024.1", "2025.1"},
+            "all_user_soundbanks": "allUserSoundBanks" in arguments,
+            "all_user_scope_strategy": ("native_empty_list" if lane in {"2023.1", "2024.1", "2025.1"} else "bounded_live_enumeration") if "allUserSoundBanks" in arguments else None,
             "implicit_all_platforms_allowed": False,
-            "implicit_all_languages_allowed": False,
+            "implicit_all_languages_allowed": "languages" not in arguments,
             "auto_defined_soundbanks": (
                 "generated_by_wwise_if_project_feature_enabled_and_not_selectable_by_this_api"
                 if lane in {"2023.1", "2024.1", "2025.1"}
@@ -1205,13 +1162,17 @@ def build_generate_operation_plan(
             "metadata_root": str(Path(metadata_root).resolve(strict=False)),
             "cache_root": str(Path(cache_path).resolve(strict=False)),
             "automatic_byproducts": ["Init.bnk"],
-            "required_verification": "bounded_pre_post_tree_delta_plus_nonempty_requested_bank_artifacts",
+            "required_verification": ("bounded_pre_post_tree_delta_plus_nonempty_requested_bank_artifacts"
+                if write_to_disk and normalized_banks else "result_schema_diagnostics_and_bounded_io_guards_only"),
+            "bank_files_requested": write_to_disk,
         },
         "oracle": {
             "result_schema_required": True,
             "logs_are_diagnostic_only": lane != "2021.1",
             "error_field_must_be_empty": lane == "2025.1",
-            "business_state_requires_artifacts": True,
+            "business_state_requires_artifacts": write_to_disk and bool(normalized_banks),
+            "verification_boundary": ("nonempty_requested_artifacts" if write_to_disk and normalized_banks else
+                "result_schema_and_diagnostics_only; no bank data or artifact delivery is verified; in-memory bank data requires a soundbank.generated subscription before generation"),
             "no_retry_after_dispatch": True,
         },
     }
@@ -2076,8 +2037,6 @@ def _normalize_identities(value: Any, *, field: str) -> list[str | int]:
 
 def _normalize_generate_inclusions(value: Any, *, field: str) -> list[str]:
     rows = _require_sequence(value, field=field)
-    if not rows:
-        raise SoundBankContractError("INVALID_ARGUMENT", f"{field} must not be empty.")
     result: list[str] = []
     for index, inclusion in enumerate(rows):
         if not isinstance(inclusion, str) or inclusion not in _GENERATE_INCLUSIONS:

@@ -21,11 +21,9 @@ _NATIVE_FIELDS = frozenset(
         "native_rows",
         "object_path",
         "request_fragment",
-        "skip_languages",
         "waapi_args",
         "waapi_options",
         "wire_type",
-        "write_to_disk",
     }
 )
 _FILTERS = ("events", "structures", "media")
@@ -173,12 +171,12 @@ def _bound(
     return bound
 
 
-def _filters(value: Any, *, field: str) -> list[str]:
+def _filters(value: Any, *, field: str, allow_empty: bool = False) -> list[str]:
     rows = [
         _text(item, field=field)
-        for item in _bounded_sequence(value, field=field, maximum=3)
+        for item in _bounded_sequence(value, field=field, maximum=3, allow_empty=allow_empty)
     ]
-    if not rows or len(rows) != len(set(rows)) or any(
+    if (not rows and not allow_empty) or len(rows) != len(set(rows)) or any(
         item not in _FILTERS for item in rows
     ):
         _error(
@@ -198,6 +196,9 @@ def _materialize_generate(
         plan,
         required={"soundbanks", "platforms", "io_root"},
         optional={
+            "write_to_disk",
+            "skip_languages",
+            "all_user_soundbanks",
             "languages",
             "rebuild_soundbanks",
             "clear_audio_file_cache",
@@ -211,12 +212,15 @@ def _materialize_generate(
             source["soundbanks"],
             field="soundbanks",
             maximum=64,
+            allow_empty="all_user_soundbanks" in source,
         )
     ):
         bank = _exact_fields(
             _mapping(raw, field=f"soundbanks[{index}]"),
-            required={"soundbank_handle", "artifact_expectation"},
+            required={"artifact_expectation"},
             optional={
+                "soundbank_handle",
+                "name",
                 "rebuild",
                 "event_handles",
                 "aux_bus_handles",
@@ -224,13 +228,15 @@ def _materialize_generate(
             },
             field=f"soundbanks[{index}]",
         )
-        bound_bank = _bound(
-            session,
-            bank["soundbank_handle"],
-            field=f"soundbanks[{index}].soundbank_handle",
-            object_types={"SoundBank"},
-            role="soundbank",
-        )
+        if ("soundbank_handle" in bank) == ("name" in bank):
+            _error("BUSINESS_VALUE_INVALID", f"soundbanks[{index}]",
+                   "select one bound SoundBank or a temporary SoundBank name")
+        if "soundbank_handle" in bank:
+            bound_bank = _bound(session, bank["soundbank_handle"],
+                field=f"soundbanks[{index}].soundbank_handle", object_types={"SoundBank"}, role="soundbank")
+            name = bound_bank.name
+        else:
+            name = _text(bank["name"], field=f"soundbanks[{index}].name")
         expectation = _text(
             bank["artifact_expectation"],
             field=f"soundbanks[{index}].artifact_expectation",
@@ -242,9 +248,11 @@ def _materialize_generate(
                 "choose nonlocalized, localized, or mixed",
             )
         row: dict[str, Any] = {
-            "name": bound_bank.name,
+            "name": name,
             "artifact_expectation": expectation,
         }
+        if "name" in bank:
+            row["temporary"] = True
         if "rebuild" in bank:
             if not isinstance(bank["rebuild"], bool):
                 _error(
@@ -263,6 +271,7 @@ def _materialize_generate(
                 bank[public],
                 field=f"soundbanks[{index}].{public}",
                 maximum=256,
+                allow_empty=True,
             )
             row[output] = [
                 bound_object_identity_for_handle(
@@ -285,6 +294,7 @@ def _materialize_generate(
                 for item in _filters(
                     bank["inclusions"],
                     field=f"soundbanks[{index}].inclusions",
+                    allow_empty=True,
                 )
             ]
         banks.append(row)
@@ -296,39 +306,43 @@ def _materialize_generate(
             maximum=16,
         )
     ]
-    language_dependent = any(
-        row["artifact_expectation"] in {"localized", "mixed"}
-        for row in banks
-    )
     arguments: dict[str, Any] = {
         "soundbanks": banks,
         "platforms": platforms,
-        "skip_languages": not language_dependent,
-        "write_to_disk": True,
         "io_root": _text(source["io_root"], field="io_root"),
     }
-    if language_dependent:
+    # Preserve the established public file-generation workflow. Native omission
+    # is an explicit business choice so an old plan cannot become memory-only.
+    source.setdefault("write_to_disk", True)
+    source.setdefault("skip_languages", not any(
+        row["artifact_expectation"] in {"localized", "mixed"} for row in banks
+    ) and source.get("all_user_soundbanks") not in {"localized", "mixed"})
+    if "languages" in source:
         languages = [
             _text(value, field="languages")
             for value in _bounded_sequence(
-                source.get("languages"),
+                source["languages"],
                 field="languages",
                 maximum=64,
+                allow_empty=True,
             )
         ]
         arguments["languages"] = languages
-    elif "languages" in source:
-        _error(
-            "BUSINESS_FIELD_UNAVAILABLE",
-            "languages",
-            "omit languages when every requested SoundBank is nonlocalized",
-        )
+    if "all_user_soundbanks" in source:
+        if banks or source["all_user_soundbanks"] not in {"nonlocalized", "localized", "mixed"}:
+            _error("BUSINESS_VALUE_INVALID", "all_user_soundbanks",
+                   "select all user SoundBanks with one artifact expectation and no selected banks")
+        arguments["all_user_soundbanks"] = source["all_user_soundbanks"]
     for name in (
+        "write_to_disk",
+        "skip_languages",
         "rebuild_soundbanks",
         "clear_audio_file_cache",
         "rebuild_init_bank",
     ):
         if name in source:
+            if name in {"write_to_disk", "skip_languages"} and source[name] == "native-default":
+                continue
             if not isinstance(source[name], bool):
                 _error(
                     "BUSINESS_VALUE_INVALID",

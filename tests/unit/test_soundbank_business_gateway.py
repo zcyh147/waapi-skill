@@ -1134,3 +1134,91 @@ def test_definition_dialogue_short_id_decimal_boundary_and_counterexamples(tmp_p
     number: int, readback: str, error: str | None) -> None:
     test_definition_short_id_draft_checks_and_seals_unique_guid(tmp_path, version, "DialogueEvent", "-DialogueEvent\t", None,
         readback, error, number=number)
+
+
+def test_generate_temporary_bank_preserves_memory_and_language_choices(tmp_path: Path) -> None:
+    code, started = _offline(tmp_path, "draft-start", "soundbank.generate")
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    event = _bind(tmp_path, draft_id=draft_id, authority=authority, revision=1,
+        object_id=OBJECT_ID, name="Play_Harbor", object_type="Event",
+        path=r"\Events\Default Work Unit\Play_Harbor", role="event")
+    code, declared = _declare_plan(tmp_path, "draft-declare-soundbank-plan", draft_id,
+        "--task-authority", authority, "--expected-revision", "2",
+        "--temporary-soundbank", "Harbor_Temporary", "nonlocalized",
+        "--event", "Harbor_Temporary", event["bound_object"]["handle"],
+        "--platform", "Windows", "--write-to-disk", "false",
+        "--skip-languages", "false", "--language", "English(US)",
+        "--io-root", str(tmp_path))
+    assert code == 0, declared
+    request = OperationDraftStore(tmp_path / "state").materialize_request(draft_id,
+        task_authority=authority, expected_revision=3,
+        schema_digest=gateway.operation_draft_schema_digest("soundbank.generate", "2025.1"),
+        composer_digest=operation_composer_digest("soundbank.generate", "2025.1")).request
+    assert request["arguments"] == {"soundbanks": [{"name": "Harbor_Temporary",
+        "artifact_expectation": "nonlocalized", "temporary": True, "events": [{"kind": "id", "value": OBJECT_ID}]}],
+        "platforms": ["Windows"], "write_to_disk": False, "skip_languages": False,
+        "languages": ["English(US)"], "io_root": str(tmp_path)}
+
+
+@pytest.mark.parametrize("selection", ["all", "temporary"])
+def test_generation_business_choice_reaches_immutable_preview_and_truthful_verifier(tmp_path: Path, selection: str) -> None:
+    from tests.unit.test_operation_registry_soundbank import _project as generation_project, GenerateReader, _row
+    from wwise_waapi.operation_registry import verify_prepared_operation
+    io_root, project = generation_project(tmp_path)
+    bank = _row(BANK_ID, "Harbor", "SoundBank", r"\SoundBanks\Default Work Unit\Harbor")
+    class Client:
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return _info()
+            if uri == "ak.wwise.core.object.get" and args.get("waql") == "from type SoundBank take 65":
+                return {"return": [bank]}
+            return GenerateReader(project)(uri, args, options)
+        def disconnect(self):
+            pass
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv],
+            env=_env(tmp_path), client_factory=lambda _url: Client())
+    code, started = run("draft-start", "soundbank.generate")
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    choice = ["--all-user-soundbanks", "nonlocalized"] if selection == "all" else ["--temporary-soundbank", "New_Bank", "nonlocalized"]
+    code, declared = run("draft-declare-soundbank-plan", draft_id, "--task-authority", authority,
+        "--expected-revision", "1", *choice, "--platform", "Mac", "--io-root", str(io_root),
+        "--write-to-disk", "native-default", "--skip-languages", "native-default")
+    assert code == 0, declared
+    code, checked = run("draft-check", draft_id, "--task-authority", authority, "--expected-revision", "2")
+    assert code == 0, checked
+    code, previewed = run("preview-from-draft", draft_id, "--task-authority", authority,
+        "--expected-revision", str(checked["draft"]["revision"]))
+    assert code == 0, previewed
+    stored = TransactionStore(tmp_path / "state").load_preview(previewed["transaction_id"])
+    prepared = stored.artifact["prepared_operation"]
+    assert "business_state_requires_artifacts" in json.dumps(previewed)
+    assert "writeToDisk" not in prepared["dispatch"]["args"]
+    assert "skipLanguages" not in prepared["dispatch"]["args"]
+    assert prepared["dispatch"]["args"]["soundbanks"] == ([] if selection == "all" else [{"name": "New_Bank"}])
+    verified = verify_prepared_operation(prepared, execution_result={"result": {}}, read_call=Client().call)
+    assert verified.ok and verified.business_state_verified is False
+    assert verified.status == "result_schema_checked"
+
+
+def test_generate_explicit_empty_definition_and_language_choices_remain_selectable(tmp_path: Path) -> None:
+    code, started = _offline(tmp_path, "draft-start", "soundbank.generate")
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    code, declared = _declare_plan(tmp_path, "draft-declare-soundbank-plan", draft_id,
+        "--task-authority", authority, "--expected-revision", "1",
+        "--temporary-soundbank", "Empty_Bank", "nonlocalized",
+        "--empty-events", "Empty_Bank", "--empty-aux-busses", "Empty_Bank",
+        "--empty-generation-inclusions", "Empty_Bank", "--all-languages",
+        "--skip-languages", "false", "--platform", "Windows", "--io-root", str(tmp_path))
+    assert code == 0, declared
+    request = OperationDraftStore(tmp_path / "state").materialize_request(draft_id,
+        task_authority=authority, expected_revision=2,
+        schema_digest=gateway.operation_draft_schema_digest("soundbank.generate", "2025.1"),
+        composer_digest=operation_composer_digest("soundbank.generate", "2025.1")).request
+    assert request["arguments"]["soundbanks"] == [{"name": "Empty_Bank", "temporary": True,
+        "artifact_expectation": "nonlocalized", "events": [], "aux_busses": [], "inclusions": []}]
+    assert request["arguments"]["languages"] == []
+    assert request["arguments"]["write_to_disk"] is True

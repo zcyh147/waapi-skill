@@ -58,7 +58,13 @@ def add_soundbank_plan_arguments(parser: argparse.ArgumentParser) -> None:
         metavar=("SOUNDBANK_HANDLE", "TRUE_OR_FALSE"),
     )
     parser.add_argument("--platform", action="append", default=[])
+    parser.add_argument("--temporary-soundbank", action="append", nargs=2, default=[],
+                        metavar=("NAME", "ARTIFACT_EXPECTATION"))
+    parser.add_argument("--all-user-soundbanks", choices=("nonlocalized", "localized", "mixed"))
+    for flag in ("empty-events", "empty-aux-busses", "empty-generation-inclusions"):
+        parser.add_argument(f"--{flag}", action="append", default=[], metavar="BANK_SELECTION")
     parser.add_argument("--language", action="append", default=[])
+    parser.add_argument("--all-languages", action="store_true", default=None)
     for flag in (
         "rebuild-soundbanks",
         "clear-audio-file-cache",
@@ -68,6 +74,8 @@ def add_soundbank_plan_arguments(parser: argparse.ArgumentParser) -> None:
             f"--{flag}",
             choices=("true", "false"),
         )
+    for flag in ("write-to-disk", "skip-languages"):
+        parser.add_argument(f"--{flag}", choices=("true", "false", "native-default"))
     parser.add_argument(
         "--source",
         action="append",
@@ -91,6 +99,14 @@ def soundbank_plan_from_namespace(
         "soundbank_handle",
         "inclusion",
         "soundbank",
+        "temporary_soundbank",
+        "all_user_soundbanks",
+        "empty_events",
+        "empty_aux_busses",
+        "empty_generation_inclusions",
+        "all_languages",
+        "write_to_disk",
+        "skip_languages",
         "event",
         "aux_bus",
         "generation_inclusion",
@@ -111,6 +127,14 @@ def soundbank_plan_from_namespace(
             "inclusion",
         },
         "soundbank.generate": {
+            "empty_events",
+            "empty_aux_busses",
+            "empty_generation_inclusions",
+            "all_languages",
+            "temporary_soundbank",
+            "all_user_soundbanks",
+            "write_to_disk",
+            "skip_languages",
             "soundbank",
             "event",
             "aux_bus",
@@ -179,6 +203,11 @@ def soundbank_plan_from_namespace(
                 "artifact_expectation": expectation,
             }
             order.append(handle)
+        for name, expectation in args.temporary_soundbank:
+            if name in rows:
+                raise SoundBankBusinessCliError("one generated SoundBank selection was supplied twice")
+            rows[name] = {"name": name, "artifact_expectation": expectation}
+            order.append(name)
 
         def append_for_bank(
             pairs: Sequence[Sequence[str]],
@@ -210,6 +239,12 @@ def soundbank_plan_from_namespace(
                         "one generated SoundBank inclusion filter was supplied twice"
                     )
                 inclusions.append(filter_name)
+        for source, field in ((args.empty_events, "event_handles"),
+            (args.empty_aux_busses, "aux_bus_handles"), (args.empty_generation_inclusions, "inclusions")):
+            for key in source:
+                if key not in rows or field in rows[key]:
+                    raise SoundBankBusinessCliError("an explicit empty list needs one declared bank and cannot replace supplied values")
+                rows[key][field] = []
         if len(args.soundbank_rebuild) != len(
             {handle for handle, _value in args.soundbank_rebuild}
         ):
@@ -233,14 +268,24 @@ def soundbank_plan_from_namespace(
         }
         if args.language:
             plan["languages"] = list(args.language)
+        if args.all_languages:
+            if args.language:
+                raise SoundBankBusinessCliError("all-languages cannot be combined with selected languages")
+            plan["languages"] = []
+        if args.all_user_soundbanks is not None:
+            if rows:
+                raise SoundBankBusinessCliError("all-user-soundbanks cannot be combined with selected banks")
+            plan["all_user_soundbanks"] = args.all_user_soundbanks
         for name in (
+            "write_to_disk",
+            "skip_languages",
             "rebuild_soundbanks",
             "clear_audio_file_cache",
             "rebuild_init_bank",
         ):
             value = getattr(args, name)
             if value is not None:
-                plan[name] = value == "true"
+                plan[name] = value if value == "native-default" else value == "true"
         return plan
     if operation == "soundbank.convertExternalSources":
         return {
