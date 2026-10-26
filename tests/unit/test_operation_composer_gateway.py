@@ -332,6 +332,19 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # #180 changes only the five setName constraint lists for exact Inner name
+    # attempts. Invert this reviewed delta before retaining the prior chain.
+    assert canonical_sha256(non_object_set_digests) == "78b7e8a32277e0fea03977c82f4ea0a99e8f0cd4926eafab568c1c832e9c9e3f"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("object.setName", version)
+        assert contract["constraints"] == [
+            "object types with source-proven non-mutable derived or embedded-value names fail before preview instead of dispatching setName",
+            "exact 2025 PlaylistSlot and MetadataSlot attempts retain class, owner, ordered List, references and display path; native acknowledgment alone never verifies a rename",
+        ]
+        contract["constraints"] = [
+            "object types without a mutable intrinsic name, including derived, embedded-value, and owned-collection objects, fail before preview instead of dispatching setName",
+        ]
+        non_object_set_digests[f"object.setName@{version}"] = canonical_sha256(contract)
     # R74 adds only the generated structural Switch-child property target proof
     # to the five setProperty machine contracts. Invert exactly that addition
     # before retaining every reviewed prior aggregate below.

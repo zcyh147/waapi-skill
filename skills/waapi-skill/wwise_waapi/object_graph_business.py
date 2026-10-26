@@ -1226,6 +1226,22 @@ def _compile_existing_set_fields(
             )
         compiled["on_name_conflict"] = conflict
     if "new_name" in fields:
+        if (session.context.wwise_version == "2025.1" and source.object_type == "PluginInnerObject"
+                and source.class_id in {5636096, 5570560}):
+            raise _repair(
+                session,
+                "INNER_GRAPH_RENAME_REQUIRES_SCOPED_OPERATION",
+                field="new_name",
+                object_handle=source.handle,
+                class_id=source.class_id,
+                required_operation="object.setName",
+                action=(
+                    "Remove new_name from this object.set declaration and request the rename through "
+                    "object.setName as a separately previewed and authorized operation, which retains "
+                    "the exact owner, ordered List, peers and references. Other non-name fields retain "
+                    "their existing contracts. This graph boundary does not establish native absence."
+                ),
+            )
         semantics = object_identity_semantics(source.object_type)
         if not semantics.mutable_intrinsic_name:
             raise _repair(

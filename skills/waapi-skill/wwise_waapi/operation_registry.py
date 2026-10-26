@@ -6200,6 +6200,14 @@ def _prepare_object_set(
         if any(type_matches(row) for row in type_catalog) and not type_matches(class_types[0]):
             raise OperationContractError("INVALID_TARGET_TYPE", "Existing ordinary native type contradicts its live class metadata.")
         if (request.version == "2025.1" and target.row.get("type") == "PluginInnerObject"
+                and target_class in {5636096, 5570560} and "name" in item):
+            raise OperationContractError(
+                "INNER_GRAPH_RENAME_REQUIRES_SCOPED_OPERATION",
+                "Remove new_name from this object.set declaration and use object.setName as a separately previewed and authorized operation, retaining exact owner, ordered List, peers and references. Other non-name fields retain their existing contracts. This graph boundary does not establish native absence.",
+                details={"field": "new_name", "object_id": target.object, "class_id": target_class,
+                    "required_operation": "object.setName"},
+            )
+        if (request.version == "2025.1" and target.row.get("type") == "PluginInnerObject"
                 and target_class == 5636096):
             raise OperationContractError(
                 "PLAYLIST_SLOT_OBJECT_SET_UNPROVEN",

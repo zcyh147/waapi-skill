@@ -265,8 +265,8 @@ def test_playlist_reference_retains_each_modification_policy(tmp_path, policy):
 class InnerRenameTask(PlaylistTask):
     """A controlled native name outcome, not evidence that Wwise supports it."""
 
-    def __init__(self, path, *, fault=None, kind='PlaylistSlot'):
-        super().__init__(path, operation='object.setName')
+    def __init__(self, path, *, fault=None, kind='PlaylistSlot', operation='object.setName'):
+        super().__init__(path, operation=operation)
         self.fault = fault
         if kind == 'MetadataSlot':
             self.types.extend([{'classId': 5570560, 'name': 'MetadataSlot', 'type': 'Inner'},
@@ -346,15 +346,30 @@ def test_inner_rename_retains_exact_identity_owner_peers_and_references(tmp_path
     assert len(writes(task)) == (0 if stage == 'before-execute' else 1)
 
 
-def test_direct_playlist_object_set_rename_keeps_its_observed_native_boundary(tmp_path):
-    task = PlaylistTask(tmp_path, operation='object.set')
+@pytest.mark.parametrize('kind', ['PlaylistSlot', 'MetadataSlot'])
+@pytest.mark.parametrize('initial_name', ['', 'PreviouslyNamed'])
+def test_inner_graph_rename_requires_the_separately_scoped_public_name_workflow(tmp_path, kind, initial_name):
+    task = InnerRenameTask(tmp_path, kind=kind, operation='object.set')
+    task.objects[FIRST]['name'] = initial_name
+    before = deepcopy(task.objects)
     source = task.bind(FIRST)
-    code, declared = task.step('draft-declare-existing', '--declaration-id', 'rename',
-        '--object-handle', source, '--field', 'new_name', 'Renamed')
-    assert code == 0, declared
-    code, rejected = task.step('draft-check')
-    assert code == 2 and 'PLAYLIST_SLOT_OBJECT_SET_UNPROVEN' in json.dumps(rejected), rejected
-    assert writes(task) == []
+    code, rejected = task.step('draft-declare-existing', '--declaration-id', 'rename',
+        '--object-handle', source, '--field', 'new_name', 'Renamed', '--field', 'notes', 'Requested notes')
+    if code == 0:
+        code, rejected = task.step('draft-check')
+    assert code == 2 and 'INNER_GRAPH_RENAME_REQUIRES_SCOPED_OPERATION' in json.dumps(rejected), rejected
+    diagnostic = json.dumps(rejected)
+    assert 'object.setName' in diagnostic and 'separately previewed and authorized' in diagnostic
+    assert 'native absence' in diagnostic and 'new_name' in diagnostic
+    assert 'transaction_id' not in rejected
+    assert writes(task) == [] and task.objects == before
+    if kind == 'MetadataSlot' and initial_name == '':
+        code, declared = task.step('draft-declare-existing', '--declaration-id', 'notes',
+            '--object-handle', source, '--field', 'notes', 'Requested notes')
+        assert code == 0, declared
+        code, checked = task.step('draft-check')
+        assert code == 0, checked
+        assert writes(task) == [] and task.objects == before
 
 
 @pytest.mark.parametrize('operation,identity,argv', [
