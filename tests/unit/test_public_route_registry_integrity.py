@@ -414,6 +414,11 @@ def test_native_surface_policy_records_closed_soundbank_file_and_inclusion_bound
         "gateway.io_root::required-confinement"
     )
 
+    definition_reason = definitions["semantic_boundaries"][0]["reason"]
+    assert "GameSyncExclusion" in definition_reason
+    assert "business_state_verified=false" in definition_reason
+    assert "old-state preservation/removal are not inferred" in definition_reason
+
     inclusions = rules["ak.wwise.core.soundbank.setInclusions"]
     assert inclusions["versions"] == [
         "2021.1", "2022.1", "2023.1", "2024.1", "2025.1"

@@ -2268,7 +2268,7 @@
         {
           "selector": "gateway.io_root::required-confinement",
           "status": "normalized_equivalent",
-          "reason": "The public typed operation adds a sealed I/O root, proves every caller-owned Definition file without rewriting it, derives exact object and inclusion expectations from its hashed TSV bytes, and verifies the resulting SoundBank state."
+          "reason": "The closed business operation confines and hashes caller-owned ordered Definition files without rewriting their bytes. Repeated files/banks/object rows and documented GameSyncExclusion forms bind exact typed identities with prewrite drift checks. Single-file unique inclusions on empty-before banks retain exact GUID/inclusion verification. Repeated bank/object input, exclusions and nonempty preexisting inclusions disclose result_schema_only before authorization and finish result_schema_checked with business_state_verified=false; merge/filter precedence, exclusion effects and old-state preservation/removal are not inferred."
         }
       ]
     },
