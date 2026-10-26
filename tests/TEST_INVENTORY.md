@@ -5,6 +5,48 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #179 Sink guard and Conversion evidence checkpoint
+
+Sink guard `e0cbf3be` uses five matching DefaultSink/WObjects/catalog sources:
+No Output has CanBeMasterSink=false; absent System capability stays unspecified.
+Existing reference/SET routes reject that incompatible class before Preview,
+retain live class binding and preserve unrelated references. Affected checks
+passed **46 in 68.17s**; renamed-instance correction passed **9 overlapping
+checks in 2.00s**, not 55 distinct tests. Packaged
+reference-master-sink-capabilities.json retains source digests.
+
+Conversion `144acba7` adds Type Handle/platform mapping, independent observations
+and a typed verified-codec outcome retained through compaction. Affected checks
+passed **12 in 28.01s**, compaction controls **3 in 13.95s** (program evidence).
+The original Console 2025.1.7.9143 getter preflight remains **FAIL, 14.60s**,
+zero writes/transactions: explicit Mac context returned two owner codec GUIDs.
+The metadata diagnostic was **PASS, 5.58s**, business category **blocked**:
+both PCM inventories exposed scalar MaxBitDepth, no platform/reference field.
+Current wrapper refuses ambiguity; neither setter impossibility nor placement
+effect is proven. Original category rows/packets/main-assessment.json remain in
+conversion-179-2025-native-r1 and conversion-179-2025-metadata-r1.
+
+Older exact-build read-r1 at `bc1dd284` retains **SKIP, 9.26s** (2021) and
+**SKIP, 4.31s** (2022): codec/owner identities had generic class 2818064 and empty
+pluginName; the original collector stopped before metadata. Console 2023.1.19.8928
+read-r1 passed **4.39s**, concrete Vorbis 262145/QualityFactor metadata observed.
+Pinned-wrapper `302ed287` metadata-r2 passed **5.94s** on 2021.1.14.8108 and
+**4.07s** on 2022.1.19.8584. All reads had zero writes/transactions; old concrete
+codec class remains unresolved. Roots: older-codec179-{2021,2022,2023}-read-r1
+and older-codec179-{2021,2022}-metadata-r2.
+
+At `a47152b7`, Console 2021 existing object.setProperty FieldHandle passed
+**6.35s**: transaction `tx1-y5an0z8y2dkgeh4nw7vh` VERIFIED QualityFactor 3.0→4.0,
+with GUID/name/type/opaque path/owner/raw class 2818064/empty pluginName unchanged.
+No production change was needed. Root older-codec179-2021-field-r1 retains
+independent readback/artifact/final category. Every native source tree/full
+hash/project mtime was preserved and processes cleaned; PASS sandboxes were
+deleted, original SKIPs/FAIL quarantined. This proves exact chosen-GUID scalar
+configuration, not replacement/platform lookup. Both user decisions (2021
+Sink/Metadata direct-factory boundary and modern verification depth) remain
+pending: no scope exception or #179 closure. #195 owns mapping/gates; #194 Fresh
+budget remains zero.
+
 ## 2026-10-26 #178 planned Playlist arrays and older native boundary
 
 Combined `04bf7f8f` adds one immutable SET Preview for a new 2023/2024
