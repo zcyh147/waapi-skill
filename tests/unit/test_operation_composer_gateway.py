@@ -333,12 +333,28 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # Explicit path choices add only the ordinary row/default Dialogue fields.
+    # Invert that exact extension before all historical schema seals below.
+    assert canonical_sha256(non_object_set_digests) == "4fabdc0d5496d180c8f0adf680d812204692dd157c26dc85e4e3965890ec9de8"
+    dialogue_input_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.import", version)
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            dialogue = fields["dialogue_event"]
+            assert set(dialogue["properties"]) == {"path", "conditions", "probability", "weight"}
+            assert dialogue["properties"]["conditions"]["maxItems"] == 32
+            for field in ("conditions", "probability", "weight"):
+                dialogue["properties"].pop(field)
+            dialogue["description"] = "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; name/path alone requests Event creation, not a decision-path association. Explicit decision paths remain separate closed support work."
+        dialogue_input_contracts[version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
     # Exact Help and the retained native result establish creation for name
     # alone. Invert only the corrected promise, retaining the previous seal.
     assert canonical_sha256(non_object_set_digests) == "5da8cc04ba3f0f1596ec4dd13cfa95c7333d3115df8e20360a6a47403e4450c2"
     association_promise_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.import", version)
+        contract = deepcopy(dialogue_input_contracts[version])
         props = contract["argument_contract"]["properties"]
         for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
             assert fields["dialogue_event"]["description"] == "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; name/path alone requests Event creation, not a decision-path association. Explicit decision paths remain separate closed support work."
