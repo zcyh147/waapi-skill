@@ -1472,6 +1472,16 @@ def test_core_audio_conversion_temporary_bank_and_default_external_conversion(wo
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_core_external_default_output_diagnostic(workflow_sandbox_runtime):
+    """Retry only external conversion, retaining owned output-location evidence."""
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("External conversion diagnostic is pinned to 2025.1")
+    from tests.destructive.support.soundbank_acceptance import collect_core_file_acceptance
+    collect_core_file_acceptance(workflow_sandbox_runtime, external_only=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_closed_gateway_workflows_across_selected_version(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:

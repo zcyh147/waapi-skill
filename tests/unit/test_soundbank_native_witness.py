@@ -1,5 +1,6 @@
 """Core file witnesses reach the existing persisted category writer without Wwise."""
 from copy import deepcopy
+import hashlib
 import importlib
 import json
 from pathlib import Path
@@ -17,12 +18,23 @@ from tests.unit.test_operation_registry_soundbank import _project, _row, CONVERS
 from tests.unit.test_soundbank_business_gateway import _env, _info
 
 NODE = 'test_core_audio_conversion_temporary_bank_and_default_external_conversion'
+EXTERNAL_NODE = 'test_core_external_default_output_diagnostic'
 
 
 @pytest.mark.parametrize('missing_artifact', [False, True])
 def test_core_soundbank_collector_reaches_persisted_final_writer(tmp_path, monkeypatch, missing_artifact):
+    _exercise_core_file_collector(tmp_path, monkeypatch, missing_artifact)
+
+
+@pytest.mark.parametrize('missing_artifact', [False, True])
+def test_external_only_collector_retains_owned_output_diagnostics_in_final_writer(tmp_path, monkeypatch, missing_artifact):
+    _exercise_core_file_collector(tmp_path, monkeypatch, missing_artifact, external_only=True)
+
+
+def _exercise_core_file_collector(tmp_path, monkeypatch, missing_artifact, *, external_only=False):
     monkeypatch.setenv('WWISE_LIVE', '1'); monkeypatch.setenv('WWISE_DESTRUCTIVE', '1')
     workflow = importlib.import_module('tests.destructive.test_gateway_workflow_transaction_matrix')
+    node = EXTERNAL_NODE if external_only else NODE
     source = tmp_path / 'source'
     shutil.copytree(Path(__file__).resolve().parents[1] / '_org/2025.1', source)
     proof = sandbox_fixture.hash_project(source)
@@ -85,6 +97,8 @@ def test_core_soundbank_collector_reaches_persisted_final_writer(tmp_path, monke
                 self.writes.append((uri, deepcopy(args)))
                 assert 'output' not in args['sources'][0]
                 output = Path(project['directories']['cache']) / 'ExternalSources/Windows/CoreWitness/external.wem'
+                if external_only and missing_artifact:
+                    output = io_root / 'alternate-owned-output' / 'external.wem'
                 output.parent.mkdir(parents=True, exist_ok=True); output.write_bytes(b'RIFF-native-wem')
                 return {}
             raise AssertionError((uri, args, options))
@@ -92,7 +106,7 @@ def test_core_soundbank_collector_reaches_persisted_final_writer(tmp_path, monke
     execute = workflow.waapi_gateway.execute_gateway
     def gateway(argv, **kwargs):
         code, payload = execute(argv, **kwargs, client_factory=lambda _: client)
-        if missing_artifact and 'verify' in argv and len(client.writes) == 1 and code == 0:
+        if not external_only and missing_artifact and 'verify' in argv and len(client.writes) == 1 and code == 0:
             # External file loss after a genuine successful Gateway verification
             # must still fail the collector's independent artifact observation.
             converted.unlink()
@@ -109,17 +123,22 @@ def test_core_soundbank_collector_reaches_persisted_final_writer(tmp_path, monke
         SimpleNamespace(host='127.0.0.1', port=31337, waapi_url='ws://127.0.0.1:31337/waapi'),
         tmp_path / 'state', env, workflow.exact_git_candidate(workflow.REPO_ROOT), [])
     runtime.soundbank_prelaunch = prelaunch
+    if external_only:
+        runtime.lifecycle.process = SimpleNamespace(pid=123, poll=lambda: None)
+        runtime.lifecycle.output = SimpleNamespace(tail=lambda stream, max_lines: 'native external conversion ' + stream)
     failure = None
     try:
-        getattr(workflow, NODE)(runtime)
+        getattr(workflow, node)(runtime)
     except Exception as exc:
         failure = exc
     assert (failure is not None) is missing_artifact, failure
-    assert len(client.writes) == (1 if missing_artifact else 3)
+    assert len(client.writes) == (1 if external_only or missing_artifact else 3)
+    if external_only:
+        assert [uri for uri, _ in client.writes] == ['ak.wwise.core.soundbank.convertExternalSources']
     category_path = tmp_path / 'category.jsonl'
     monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(category_path))
     monkeypatch.setattr(sandbox_fixture, 'KEEP_ON_FAILURE_ROOT', tmp_path / 'retained')
-    nodeid = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + NODE
+    nodeid = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + node
     item = SimpleNamespace(path=workflow.__file__, nodeid=nodeid,
         _waapi_phase_reports={'setup': 'passed', 'call': 'failed' if failure else 'passed'})
     assert sandbox_fixture.hash_project(source) == proof
@@ -136,13 +155,38 @@ def test_core_soundbank_collector_reaches_persisted_final_writer(tmp_path, monke
     final = rows[-1]
     assert final['invocation']['phase'] == 'final'
     assert final['invocation']['outcome'] == ('FAIL' if missing_artifact else 'PASS')
-    assert len(final['transactions']) == (1 if missing_artifact else 3)
+    assert len(final['transactions']) == (1 if external_only or missing_artifact else 3)
     statuses = [item['status'] for item in final['categories']]
-    assert statuses == (['FAIL', 'blocked', 'blocked'] if missing_artifact else ['PASS', 'PASS', 'PASS'])
+    assert statuses == ((['FAIL'] if missing_artifact else ['PASS']) if external_only else
+        (['FAIL', 'blocked', 'blocked'] if missing_artifact else ['PASS', 'PASS', 'PASS']))
     assert final['residual_state']['sandbox'] == ('quarantined' if missing_artifact else 'deleted')
     receipt = json.loads(Path(final['categories'][0]['observation_path']).read_text())
     assert receipt['complete'] is (not missing_artifact)
     assert receipt['input_preservation_verified'] is True
+    if external_only:
+        assert len(receipt['phases']) == 1
+        phase, = receipt['phases']
+        assert phase['verify']['state'] == ('verification_failed' if missing_artifact else 'verified')
+        assert phase['effect_verified'] is (not missing_artifact)
+        diagnostic = receipt['external_output_diagnostics']
+        assert diagnostic['complete'] is True and diagnostic['diagnostic_only'] is True
+        assert diagnostic['business_effect_verified'] is False
+        assert diagnostic['tree_delta']['expectations_satisfied'] is (not missing_artifact)
+        expected = diagnostic['expected_relative_path']
+        after = {row['path']: row for row in diagnostic['owned_parent_after']['files']}
+        assert (expected in after) is (not missing_artifact)
+        wem, = diagnostic['changed_wem_files']
+        assert wem['file_proof']['sha256'] == hashlib.sha256(b'RIFF-native-wem').hexdigest()
+        if missing_artifact:
+            assert wem['relative_path'] == 'alternate-owned-output/external.wem'
+            assert wem['relative_path'] != expected
+        else:
+            assert wem['relative_path'] == expected
+        assert diagnostic['process']['capture_status'] == 'complete'
+        assert diagnostic['process']['stderr_tail'] == 'native external conversion stderr'
+        assert final['categories'][0]['status'] == ('FAIL' if missing_artifact else 'PASS')
+        assert receipt['prelaunch']['auro_soundbank_isolation']['profile'] == WWISE_2025_SOUNDBANK_AURO_PROFILE
+        return
     assert receipt['audio_conversion']['diagnostic_result'] == {'errors': []}
     assert receipt['audio_conversion']['sound_after']['converted_file_path'] == receipt['audio_conversion']['source_after']['converted_file_path']
     assert receipt['phases'][0]['verify']['verification']['business_state_verified'] is False
