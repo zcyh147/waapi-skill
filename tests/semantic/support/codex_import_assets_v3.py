@@ -17,6 +17,7 @@ from typing import Any, Mapping, Sequence
 
 from wwise_waapi.operation_import import (
     ImportContractError,
+    TAB_HEADERS_BY_VERSION,
     normalize_originals_subfolder,
 )
 
@@ -116,6 +117,21 @@ class BoundImportMetadata:
         }
 
 
+def validate_import_case_version(scenario: OnlineScenario, *, version: str) -> None:
+    """Reject the known TSV column boundary before project or asset producers."""
+    if scenario.api != _TAB_IMPORT_API:
+        return
+    spec = getattr(scenario, "fixture", {}).get("asset_spec")
+    if not isinstance(spec, Mapping):
+        return
+    for table in _mapping_rows(spec["tsv"], field="tsv"):
+        if "OriginalsSubFolder" in table["headers"] and "OriginalsSubFolder" not in TAB_HEADERS_BY_VERSION[version]:
+            raise ImportAssetMaterializationError(
+                f"VERSION_BEHAVIOR_BOUNDARY: {scenario.id}: OriginalsSubFolder TSV column "
+                f"requires Wwise 2023.1 or newer (WG-60834); requested {version}"
+            )
+
+
 def materialize_import_case(
     scenario: OnlineScenario,
     *,
@@ -137,6 +153,7 @@ def materialize_import_case(
         raise ImportAssetMaterializationError(
             f"{scenario.id} lacks the reviewed import asset contract"
         )
+    validate_import_case_version(scenario, version=version)
     root = Path(asset_root).expanduser().resolve(strict=False)
     if root.exists():
         raise ImportAssetMaterializationError(
@@ -2166,4 +2183,5 @@ __all__ = [
     "bound_import_metadata_tokens",
     "canonical_wwise_language",
     "materialize_import_case",
+    "validate_import_case_version",
 ]

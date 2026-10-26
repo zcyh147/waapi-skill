@@ -2149,3 +2149,250 @@ def test_localized_existing_fields_keep_event_ownership_and_notes_unambiguous(
     command("draft-check", expected_error=error)
     assert record.read_bytes() == before
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
+
+
+class LocalizedTabClient(LocalizedFieldsClient):
+    """Separate object/Source column effects; native reuse remains unproven."""
+
+    def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        if uri != "ak.wwise.core.audio.importTabDelimited":
+            result = super().call(uri, args, options)
+            if uri == "ak.wwise.core.object.get" and options and "return" in options:
+                result = {**result, "return": [{key: value for key, value in row.items() if key in options["return"] or key.lstrip("@") in options["return"]}
+                    for row in result.get("return", [])]}
+            return result
+        import csv
+        from copy import deepcopy
+        args, options = args or {}, options or {}
+        self.calls.append((uri, deepcopy(args), deepcopy(options)))
+        self.imported = True
+        with Path(args["importFile"]).open(encoding="utf-8", newline="") as table:
+            row, = list(csv.DictReader(table, delimiter="\t"))
+        if self.outcome != "ignored-notes":
+            self.owner["notes"] = row["Notes"]
+        if self.outcome != "ignored-source-notes":
+            self.sources[0]["notes"] = row["Audio Source Notes"]
+        if "OriginalsSubFolder" in row and self.outcome != "ignored-placement":
+            self.copied = self.copied.parent.parent / row["OriginalsSubFolder"] / "Line.wav"
+            self.copied.parent.mkdir(parents=True, exist_ok=True)
+            self.sources[0]["originalFilePath"] = str(self.copied)
+            self.sources[0]["originalWavFilePath"] = str(self.copied)
+        if self.outcome != "ignored-media":
+            self.copied.write_bytes(Path(row["Audio File"]).read_bytes())
+        else:
+            self.copied.write_bytes(b"old English media")
+        if self.outcome == "wrong-event-target":
+            self.action["@Target"] = {"id": PARENT_ID}
+        if self.outcome == "lost-other-language":
+            self.sources.pop()
+        if self.outcome == "reset-voice":
+            self.owner["@IsVoice"] = False
+        return {"objects": deepcopy([self.owner, self.sources[0]])}
+
+
+def _localized_tab_draft(tmp_path: Path, version: str, *, outcome: str = "normal"):
+    client = LocalizedTabClient(tmp_path, version, outcome=outcome)
+    media = tmp_path / "Line.wav"
+    media.write_bytes(b"requested English media")
+    table = tmp_path / "localized.tsv"
+    placement = "\tOriginalsSubFolder" if version not in {"2021.1", "2022.1"} else ""
+    table.write_text("Audio File\tObject Path\tNotes\tAudio Source Notes\tEvent" + placement + "\n"
+        + str(media) + "\t<Sound Voice>Voice\trequested owner notes\trequested Source notes\t"
+        + client.event_path + "@Play" + ("\tMoved" if placement else "") + "\n", encoding="utf-8")
+    env = set_gateway_config(_env(tmp_path), wwise_version=version)
+
+    def run(*argv):
+        return waapi_gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv],
+            env=env, client_factory=lambda _url: client)
+
+    code, started = run("draft-start", "audio.importTabDelimited")
+    assert code == 0, started
+    draft, authority, revision = started["draft"]["draft_id"], started["task_authority"], 1
+
+    def command(name, *argv, expected_error=None):
+        nonlocal revision
+        code, result = run(name, draft, "--task-authority", authority, "--expected-revision", str(revision), *argv)
+        if expected_error is not None:
+            assert code == 2 and result["error_code"] == expected_error, result
+        else:
+            assert code == 0, json.dumps(result, indent=2)
+        if "draft" in result:
+            revision = result["draft"]["revision"]
+        return result
+
+    bound = command("draft-bind-object", "--role", "import_location", "--object-id", PARENT_ID)
+    command("draft-declare-artifact-plan", "--table-file", str(table),
+        "--location-handle", bound["bound_object"]["handle"], "--language", "English(US)", "--mode", "reimport")
+    return command, run, client, table
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_localized_exact_table_preserves_distinct_notes_and_owned_media_event(tmp_path: Path, version: str) -> None:
+    command, run, client, table = _localized_tab_draft(tmp_path, version)
+    original = table.read_bytes()
+    command("draft-check")
+    preview = command("preview-from-draft")
+    transaction = preview["transaction_id"]
+    code, shown = run("transaction-show", transaction)
+    assert code == 0, shown
+    dispatch = shown["artifact"]["prepared_operation"]["dispatch"]
+    assert dispatch["args"]["importFile"] == str(table.resolve())
+    assert dispatch["args"]["importLocation"] == PARENT_ID
+    assert "imports" not in dispatch["args"]
+    target = shown["artifact"]["prepared_operation"]["verification_plan"]["targets"][0]
+    assert target["localized_audio_file_source_id"] == client.SOURCE
+    assert target["requested_notes_destination"] == "target_object"
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = run("execute", transaction)
+    assert code == 0, json.dumps(executed, indent=2)
+    code, verified = run("verify", transaction)
+    assert code == 0 and verified["verified"] is True, json.dumps(verified, indent=2)
+    assert client.owner["notes"] == "requested owner notes"
+    assert client.sources[0]["notes"] == "requested Source notes"
+    assert client.other_file.read_bytes() == b"keep Japanese media"
+    assert table.read_bytes() == original
+    code, repeated = run("execute", transaction)
+    assert code == 2, repeated
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+@pytest.mark.parametrize("fault,failed_check", (
+    ("ignored-notes", "notes match exactly"),
+    ("ignored-source-notes", "Audio Source notes match exactly"),
+    ("ignored-media", "copied original WAV hash matches"),
+    ("wrong-event-target", "Action target is the imported object"),
+    ("lost-other-language", "preserves existing source identities and other languages"),
+    ("reset-voice", "localized TSV owner remains a Sound Voice"),
+))
+def test_localized_exact_table_verifier_rejects_ignored_fields_and_scope_loss(
+    tmp_path: Path, version: str, fault: str, failed_check: str,
+) -> None:
+    command, run, client, table = _localized_tab_draft(tmp_path, version, outcome=fault)
+    original = table.read_bytes()
+    command("draft-check")
+    transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction, "--summary-only")
+    assert code == 0, shown
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = run("execute", transaction)
+    assert code == 0, executed
+    code, verified = run("verify", transaction)
+    assert code == 2 and verified["verified"] is False, verified
+    assert any(failed_check in row["name"] and not row["passed"]
+        for row in verified["verification"]["assertions"]), verified
+    assert table.read_bytes() == original
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+@pytest.mark.parametrize("drift", ("table", "media", "source-language"))
+def test_localized_exact_table_guard_rejects_input_and_language_drift(
+    tmp_path: Path, version: str, drift: str,
+) -> None:
+    command, run, client, table = _localized_tab_draft(tmp_path, version)
+    command("draft-check")
+    transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction, "--summary-only")
+    assert code == 0, shown
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if drift == "table":
+        table.write_bytes(table.read_bytes() + b"\n")
+    elif drift == "media":
+        (tmp_path / "Line.wav").write_bytes(b"changed after Preview")
+    else:
+        client.sources[1]["audioSource:language"]["name"] = "changed language"
+    code, rejected = run("execute", transaction)
+    assert code == 2 and rejected["executed"] is False, rejected
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize("fault,error", (
+    ("typed-sfx", "INVALID_TARGET_TYPE"),
+    ("live-sfx", "INVALID_TARGET_TYPE"),
+    ("duplicate-source", "AMBIGUOUS_LOCALIZED_SOURCE"),
+    ("foreign-source", "INVALID_READBACK"),
+    ("missing-language", "IMPORT_LANGUAGE_UNAVAILABLE"),
+))
+def test_localized_exact_table_checks_live_owner_source_and_language_before_preview(
+    tmp_path: Path, fault: str, error: str,
+) -> None:
+    from copy import deepcopy
+    command, _run, client, table = _localized_tab_draft(tmp_path, "2025.1")
+    if fault == "typed-sfx":
+        table.write_text(table.read_text().replace("<Sound Voice>", "<Sound SFX>"), encoding="utf-8")
+    elif fault == "live-sfx":
+        client.owner["@IsVoice"] = False
+    elif fault == "duplicate-source":
+        duplicate = deepcopy(client.sources[0]); duplicate["id"] = client.ACTION
+        client.sources.append(duplicate)
+    elif fault == "foreign-source":
+        client.sources[0]["parent"]["id"] = PARENT_ID
+    else:
+        command("draft-declare-artifact-plan", "--table-file", str(table), "--location-handle",
+            # Rebind the same exact placement to obtain a current public handle.
+            command("draft-bind-object", "--role", "import_location", "--object-id", PARENT_ID)["bound_object"]["handle"],
+            "--language", "Unknown", "--mode", "reimport")
+    record = next((tmp_path / "state/operation-drafts-v1/records").glob("*.json"))
+    before = record.read_bytes()
+    command("draft-check", expected_error=error)
+    assert record.read_bytes() == before
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1"))
+def test_localized_exact_table_reports_originals_column_introduction_before_preview(tmp_path: Path, version: str) -> None:
+    command, _run, client, table = _localized_tab_draft(tmp_path, version)
+    lines = table.read_text().splitlines()
+    table.write_text(lines[0] + "\tOriginalsSubFolder\n" + lines[1] + "\tMoved\n", encoding="utf-8")
+    original = table.read_bytes()
+    rejected = command("draft-check", expected_error="VERSION_BEHAVIOR_BOUNDARY")
+    assert rejected["details"]["introduced_version"] == "2023.1"
+    assert rejected["details"]["source_change"] == "WG-60834"
+    assert table.read_bytes() == original
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+
+
+def test_localized_exact_table_verifier_rejects_ignored_originals_placement(tmp_path: Path) -> None:
+    command, run, client, table = _localized_tab_draft(tmp_path, "2025.1", outcome="ignored-placement")
+    command("draft-check")
+    transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction, "--summary-only")
+    assert code == 0, shown
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = run("execute", transaction)
+    assert code == 0, executed
+    code, verified = run("verify", transaction)
+    assert code == 2 and verified["verified"] is False, verified
+    assert any("Originals subfolder matches" in row["name"] and not row["passed"]
+        for row in verified["verification"]["assertions"]), verified
+
+
+def test_localized_exact_table_new_language_source_is_independent_of_default_active_source(tmp_path: Path) -> None:
+    command, run, client, table = _localized_tab_draft(tmp_path, "2025.1")
+    pending_source = client.sources.pop(0)
+    client.owner["activeSource"] = {"id": client.OTHER_SOURCE}
+    prior = client.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.audio.importTabDelimited":
+            client.sources.insert(0, pending_source)
+        return prior(uri, args, options)
+    client.call = call
+    command("draft-check")
+    transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction)
+    assert code == 0, shown
+    assert shown["artifact"]["prepared_operation"]["verification_plan"]["targets"][0]["localized_audio_file_source_id"] is None
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = run("execute", transaction)
+    assert code == 0, executed
+    code, verified = run("verify", transaction)
+    assert code == 0 and verified["verified"] is True, verified
+    assert client.owner["activeSource"]["id"] == client.OTHER_SOURCE
+    assert client.sources[1]["notes"] == "keep Japanese notes"
+    assert client.other_file.read_bytes() == b"keep Japanese media"

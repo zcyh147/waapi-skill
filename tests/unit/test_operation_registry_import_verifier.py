@@ -847,7 +847,8 @@ def test_tab_delimited_prepare_and_verify_share_the_closed_oracle(
     copied = _media(tmp_path, "Originals/SFX/Batch/tab-e2e.wav")
     import_file = tmp_path / "batch.tsv"
     import_file.write_text(
-        f"Audio File\tObject Path\tOriginalsSubFolder\n{source}\tBatch\\TabE2E\tBatch\n",
+        f"Audio File\tObject Path" + ("\tOriginalsSubFolder" if version != "2022.1" else "")
+        + f"\n{source}\tBatch\\TabE2E" + ("\tBatch" if version != "2022.1" else "") + "\n",
         encoding="utf-8",
     )
     location = {
@@ -1081,8 +1082,8 @@ def test_use_existing_localized_directive_boundary_still_rejects_unowned_semanti
     ]
 
 
-def test_localized_tab_existing_field_boundary_remains_an_implementation_limit(tmp_path: Path) -> None:
-    """TSV source normalization is still unresolved #182 work, not native absence."""
+@pytest.mark.parametrize("version", ["2021.1", "2022.1"])
+def test_tab_originals_column_has_source_proven_2023_introduction(tmp_path: Path, version: str) -> None:
     source = _media(tmp_path, "localized-tab.wav")
     table = tmp_path / "localized.tsv"
     table.write_text(f"Audio File\tObject Path\tOriginalsSubFolder\tNotes\tEvent\n"
@@ -1093,17 +1094,17 @@ def test_localized_tab_existing_field_boundary_remains_an_implementation_limit(t
     existing = {"id": OLD_GUID, "name": "Voice", "type": "Sound", "classId": 65552,
         "path": OLD_ROOT + r"\Voice", "parent": {"id": PARENT_GUID}, "notes": "preserved"}
     request = parse_operation_request({
-        "contract": OPERATION_REQUEST_CONTRACT, "version": "2022.1", "operation": "audio.importTabDelimited",
+        "contract": OPERATION_REQUEST_CONTRACT, "version": version, "operation": "audio.importTabDelimited",
         "arguments": {"import_file": str(table), "import_location": {"kind": "path", "value": OLD_ROOT},
             "import_language": "English(US)", "import_operation": "useExisting"},
     })
     with pytest.raises(OperationContractError) as rejected:
         prepare_operation(request, read_call=ScriptedReader([
             {"return": [anchor]}, {"return": [anchor]}, {"return": [existing]}, {"return": []},
-        ], version="2022.1"))
-    assert rejected.value.error_code == "LOCALIZED_EXISTING_IMPORT_FIELDS"
-    assert rejected.value.details["rows"][0]["unsupported_fields"] == ["originals_subfolder", "notes", "event"]
-    assert "implementation boundary" in str(rejected.value)
+        ], version=version))
+    assert rejected.value.error_code == "VERSION_BEHAVIOR_BOUNDARY"
+    assert rejected.value.details == {"version": version, "column": "OriginalsSubFolder",
+        "introduced_version": "2023.1", "source_change": "WG-60834"}
 
 
 def test_use_existing_live_sfx_preserves_inline_base64_and_native_directives(

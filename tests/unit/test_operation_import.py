@@ -786,7 +786,7 @@ def test_tab_parser_derives_unicode_oracle_from_file_bytes(tmp_path: Path) -> No
 
     plan = parse_tab_delimited_import_file(
         tsv,
-        version="2022.1",
+        version="2023.1",
         import_location=OLD_ROOT + r"\Ambience",
         import_language="SFX",
         import_operation="useExisting",
@@ -799,6 +799,7 @@ def test_tab_parser_derives_unicode_oracle_from_file_bytes(tmp_path: Path) -> No
         "importLanguage": "SFX",
         "importOperation": "useExisting",
         "autoAddToSourceControl": False,
+        "autoCheckOutToSourceControl": False,
     }
     assert plan["rows"][0]["canonical_target_path"] == OLD_ROOT + r"\Ambience\Forest\Night\Owl"
     assert plan["rows"][0]["notes"] == "夜间·远景"

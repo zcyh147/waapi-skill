@@ -105,8 +105,11 @@ _TAB_HEADERS = frozenset(
         "Switch Assignation",
     }
 )
+# Wwise 2023.1 release note WG-60834 introduced this TSV column.
+# Ordinary audio.import originalsSubFolder is a separate, five-version field.
 TAB_HEADERS_BY_VERSION: Mapping[str, frozenset[str]] = {
-    version: _TAB_HEADERS for version in SUPPORTED_WWISE_VERSIONS
+    version: (_TAB_HEADERS - {"OriginalsSubFolder"} if version in {"2021.1", "2022.1"} else _TAB_HEADERS)
+    for version in SUPPORTED_WWISE_VERSIONS
 }
 REQUIRED_TAB_HEADERS = frozenset({"Object Path"})
 
@@ -601,6 +604,12 @@ def parse_tab_delimited_import_file(
 
     lane = _require_version(version)
     policy = import_operation_policy(import_operation)
+    if import_operation == "useExisting":
+        policy = {**policy, "notes_destination_policy": (
+            "tsv_Notes_routes_to_target_object;"
+            "tsv_Audio_Source_Notes_routes_to_audio_file_source"
+        )}
+
     auto_add = _require_boolean(
         auto_add_to_source_control,
         field="auto_add_to_source_control",
@@ -1422,6 +1431,13 @@ def _validate_tab_headers(headers: Sequence[str], *, version: str) -> None:
             details={"duplicate_headers": duplicate_singletons},
         )
     allowed = TAB_HEADERS_BY_VERSION[version]
+    if "OriginalsSubFolder" in headers and "OriginalsSubFolder" not in allowed:
+        raise ImportContractError(
+            "VERSION_BEHAVIOR_BOUNDARY",
+            "The OriginalsSubFolder TSV column requires Wwise 2023.1 or newer (WG-60834).",
+            details={"version": version, "column": "OriginalsSubFolder",
+                     "introduced_version": "2023.1", "source_change": "WG-60834"},
+        )
     unsupported = sorted(
         {
             header

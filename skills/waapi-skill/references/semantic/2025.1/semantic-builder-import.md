@@ -57,7 +57,9 @@ importOperation controls name collisions: createNew makes unique names, useExist
 
 ## Unsupported cases
 
-Do not use import builders for profiler, transport, soundengine, UI, CLI, remote, or debug APIs. Do not set constrained Switch Container assignments through import when ordering cannot be proven. Tab-delimited voice import ignores concurrent operations such as volume adjustments.
+Do not use import builders for profiler, transport, soundengine, UI, CLI, remote, or debug APIs. Do not set constrained Switch Container assignments through import when ordering cannot be proven.
+
+The official [tab-delimited import Help](https://www.audiokinetic.com/en/public-library/2025.1.12_9287/?source=Help&id=importing_media_files_from_tab_delimited_text_file) documents Sound Voice rows with Dialogue Event assignments and distinguishes GUI import mixing restrictions from WAAPI/CLI import. The earlier blanket statement that voice import ignores concurrent operations is not established by that source. Exact existing-localized Notes, Source notes, Event and media-reuse effects still require outcome verification. The requested 2025.1.7 Help URL redirected to 2025.1.12 when checked on 2026-10-26; this observation is not exact-patch native evidence.
 
 ## Cited required fields
 
