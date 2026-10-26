@@ -29,3 +29,13 @@ Users can import, update and replace media and object structures with all in-sco
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## User-approved acceptance boundary — 2026-10-27
+
+- [x] Retain the strict no-additional-Source requirement and the exact observed
+  Console 2025.1.7/build 9143 combined localized existing-Source TSV fields/media
+  boundary specified in [the approved spec section](../SPEC.md#user-approved-localized-tsv-source-identity-boundary--2026-10-27).
+  Stop further native tests of that configuration; preserve both original FAILs.
+
+This resolves only that acceptance decision. Other #182 obligations remain
+open; the separate all-five-version GUID TSV question remains unapproved.

@@ -297,3 +297,30 @@ file contents or audio quality. Retained WAVs and matching native creation
 receipts may be reused; no new Wwise or Fresh run is required merely to refresh
 that proof. Existing nonnegative marker-position and embedded-NUL guards remain
 disclosed Gateway input constraints, not claims that Wwise rejects these values.
+
+## User-approved localized TSV Source-identity boundary — 2026-10-27
+
+For #182, the user approved preserving the existing requirement that combined
+localized TSV reimport must not add a Source. Retain the reviewed `35432c76`
+boundary for `audio.importTabDelimited` on WwiseConsole 2025.1.7/build 9143:
+`useExisting`, an existing typed Sound Voice owner with validated property or
+reference assignments plus localized media, and a bound existing selected-language
+Source. Refuse this configuration before Preview and again at prewrite,
+regardless of whether language Source paths are shared or distinct. Twenty
+focused passing checks establish the guard's program behavior; they are not a
+native success or a full gate. Stop further native tests of this configuration.
+
+The immutable native roots `import182-tsv-combined-2025-r1` at `b997fbd6`
+(FAIL, 8.77s) and `import182-tsv-distinct-source-2025-r1` at `784e1bfe`
+(FAIL, 8.31s) remain failures. Each verified two setups, then the witness ended
+`verification_failed`: owner fields and English bytes changed, original Source
+GUIDs and Japanese bytes remained, but an additional English Source appeared.
+Retain original receipts, assessments and quarantines; partial effects grant
+no success credit. Distinct paths did not prevent the observed failure; its
+cause remains unproven. Source projects and process cleanup were preserved.
+
+This specific acceptance boundary is approved, without approving additional
+Source creation or closing #182/#174. It applies only to the observed Console
+host/build, not all 2025.1 builds, all five versions or Wwise Authoring.
+Owner-only and pure-media forms retain their existing boundaries. The separate
+all-five-version GUID TSV scope question is not approved by this decision.

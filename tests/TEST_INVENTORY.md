@@ -5,6 +5,19 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-27 #182 Source-identity boundary approved
+
+The user approved the precise [localized TSV Source-identity boundary](../docs/plans/full-waapi-coverage/SPEC.md#user-approved-localized-tsv-source-identity-boundary--2026-10-27):
+retain the no-additional-Source requirement and stop further native tests of
+the guarded combined localized existing-Source fields/media configuration on
+Console 2025.1.7/build 9143. The existing before-Preview/prewrite guard has 20
+focused passing checks; no new run occurred for this decision. Both retained
+shared/distinct-path native FAILs and their partial effects remain unchanged.
+This supersedes the pending decision in dated entries below, without approving
+additional-Source behavior, other host/build/version exclusions or the separate
+all-five GUID TSV question. Owner-only/pure-media boundaries remain unchanged;
+this acceptance decision is resolved, while #182 and overall coverage stay open.
+
 ## 2026-10-26 #182 repeated TSV Switch native milestone
 
 Console 2025.1.7/build 9143, `ee13e472`, root `import182-tsv-switch-2025-r1`:
