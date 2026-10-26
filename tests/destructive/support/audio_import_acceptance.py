@@ -385,7 +385,10 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
         setup(draft, "basic_english_and_spare")
         container = at("Containers", "Default Work Unit", name)
         identities = {key: at("Containers", "Default Work Unit", name, key) for key in initial}
-        japanese = audio(3, "LineNotes")
+        # A valid typed Source wire path must be unique across languages.
+        # Preserve the old failed roots; only this future path-based fixture
+        # gives the unrelated Japanese Source a distinct filename/name.
+        japanese = audio(3, "OtherLineNotes" if witness_kind == "explicit-source-tsv" else "LineNotes")
         draft = _start_business_draft(gateway, "audio.import")
         voice = _bind_business_object(gateway, draft, object_id=identities["VoiceNotes"])
         _update_business_draft(gateway, draft, "draft-declare-existing", ["--declaration-id", "japanese", "--object-handle", voice,
