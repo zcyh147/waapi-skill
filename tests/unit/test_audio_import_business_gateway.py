@@ -1572,3 +1572,198 @@ def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
     assert archived.state is OperationDraftState.SEALED
     assert archived.seal is not None
     assert archived.seal["request"] == previewed["agent_result"]["request"]
+
+
+class ImportFieldsClient(BusinessCheckClient):
+    """External read boundary for the versioned public import Draft tests."""
+
+    def __init__(self, tmp_path: Path, version: str) -> None:
+        super().__init__(tmp_path)
+        self.version = version
+        root = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
+        self.parent = {
+            "id": PARENT_ID, "name": "Weather", "type": "ActorMixer" if version != "2025.1" else "PropertyContainer",
+            "path": rf"\{root}\Default Work Unit\Weather",
+        }
+        self.field_ranges = {"Volume": (-200, 200), "Pitch": (-2400, 2400), "Lowpass": (0, 100)}
+        project_file = _project_path(tmp_path)
+        (project_file.parent / "Originals").mkdir(parents=True)
+        project_file.write_text(
+            '<WwiseDocument Type="Project" SchemaVersion="103" WwiseVersion="v2021.1.0" WwiseBuild="7485">'
+            f'<ProjectInfo><Project Name="SampleProject" ID="{PROJECT_ID}">'
+            '<LanguageList><Language Name="SFX" ID="{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"/></LanguageList>'
+            '<MiscSettings><MiscSettingEntry Name="Originals">Originals</MiscSettingEntry></MiscSettings>'
+            '</Project></ProjectInfo></WwiseDocument>', encoding="utf-8")
+
+    def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.getInfo":
+            info = _info()
+            info["version"].update(year=int(self.version[:4]), displayName=f"v{self.version}.0.1")
+            return info
+        if uri == "ak.wwise.core.getProjectInfo":
+            project_root = _project_path(self.tmp_path).parent
+            language_id = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+            platform_id = "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}"
+            return {
+                "id": PROJECT_ID, "name": "SampleProject", "displayTitle": "SampleProject",
+                "path": str(_project_path(self.tmp_path)), "isDirty": False,
+                "currentLanguageId": language_id, "referenceLanguageId": language_id,
+                "currentPlatformId": platform_id,
+                "languages": [{"id": language_id, "name": "SFX", "shortId": 1}],
+                "platforms": [{"id": platform_id, "name": "Mac", "baseName": "Mac", "baseDisplayName": "Mac",
+                    "soundBankPath": str(project_root / "GeneratedSoundBanks/Mac"),
+                    "copiedMediaPath": str(project_root / "GeneratedSoundBanks/Mac/Media")}],
+                "defaultConversion": {"id": "{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}", "name": "Default"},
+                "directories": {name: str(project_root / suffix) for name, suffix in (
+                    ("root", ""), ("originals", "Originals"), ("cache", ".cache"),
+                    ("soundBankOutputRoot", "GeneratedSoundBanks"), ("commands", "Commands"), ("properties", "Properties"))},
+            }
+        if uri == "ak.wwise.core.object.getTypes":
+            return {"return": [{"classId": 2, "name": "RandomSequenceContainer", "type": "RandomSequenceContainer"},
+                {"classId": 65552, "name": "Sound", "type": "Sound"},
+                {"classId": 16, "name": "AudioSource" if self.version == "2021.1" else "AudioFileSource", "type": "WObject"},
+                {"classId": 1, "name": self.parent["type"], "type": self.parent["type"]}]}
+        if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+            return {"return": list(self.field_ranges)}
+        if uri == "ak.wwise.core.object.getPropertyInfo":
+            name = args["property"]
+            low, high = self.field_ranges[name]
+            return {"name": name, "type": "Real32", "restriction": {"type": "range", "min": low, "max": high}}
+        if uri == "ak.wwise.core.object.get":
+            if args.get("waql") in {"from type Project take 1", "from type Project take 2"}:
+                return {"return": [{"id": PROJECT_ID, "name": "SampleProject", "type": "Project",
+                    "path": "\\", "filePath": str(_project_path(self.tmp_path)), "workunitIsDirty": False}]}
+            source = args.get("from", {})
+            if source.get("id") == [PARENT_ID] or source.get("path") == [self.parent["path"]]:
+                return {"return": [dict(self.parent)]}
+            return {"return": []}
+        raise AssertionError(f"Unexpected WAAPI call: {uri} {args!r} {options!r}")
+
+
+def _import_fields_draft(tmp_path: Path, version: str):
+    env = set_gateway_config(_env(tmp_path), wwise_version=version)
+    client = ImportFieldsClient(tmp_path, version)
+
+    def gateway(*argv: str):
+        return waapi_gateway.execute_gateway(
+            ["--state-dir", str(tmp_path / "state"), *argv], env=env,
+            client_factory=lambda _url: client,
+        )
+
+    code, started = gateway("draft-start", "audio.import")
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    revision = started["draft"]["revision"]
+
+    def command(name: str, *argv: str, expected_error: str | None = None):
+        nonlocal revision
+        code, result = gateway(name, draft_id, "--task-authority", authority,
+            "--expected-revision", str(revision), *argv)
+        if expected_error is not None:
+            assert code == 2, result
+            assert result["error_code"] == expected_error, result
+        else:
+            assert code == 0, json.dumps(result, indent=2)
+            if "draft" in result:
+                revision = result["draft"]["revision"]
+        return result
+
+    bound = command("draft-bind-object", "--object-id", PARENT_ID)
+    return command, bound["bound_object"]["handle"], client
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_import_preview_preserves_independent_default_fields_and_row_overrides(tmp_path: Path, version: str) -> None:
+    command, parent, _client = _import_fields_draft(tmp_path, version)
+    handles = {}
+    for meaning in ("Volume", "Pitch", "Lowpass"):
+        discovered = command("draft-discover-fields", "--semantic-kind", "random-container", "--meaning", meaning)
+        handles[meaning] = discovered["meaning_results"][0]["candidates"][0]["handle"]
+    command("draft-business-configure", "--default-field-value", handles["Volume"], "-4",
+        "--default-field-value", handles["Pitch"], "-100")
+    rediscovered = command("draft-discover-fields", "--semantic-kind", "random-container", "--meaning", "Pitch")
+    row_pitch = rediscovered["meaning_results"][0]["candidates"][0]["handle"]
+    assert row_pitch != handles["Pitch"]
+    command("draft-declare-new", "--declaration-id", "baseline", "--parent-handle", parent,
+        "--name", "Baseline", "--kind", "random-container")
+    command("draft-declare-new", "--declaration-id", "overridden", "--parent-handle", parent,
+        "--name", "Overridden", "--kind", "random-container",
+        "--field-value", row_pitch, "-200", "--field-value", handles["Lowpass"], "10")
+    command("draft-check")
+    preview = command("preview-from-draft")
+    assert preview["state"] == "awaiting_confirmation"
+    rows = preview["agent_result"]["request"]["arguments"]["imports"]
+    assert [row["object_path"].rsplit("\\", 1)[-1] for row in rows] == [
+        "<Random Container>Baseline", "<Random Container>Overridden"]
+    assert [sorted(row["properties"], key=lambda field: field["name"]) for row in rows] == [
+        [{"name": "Pitch", "value": -100.0}, {"name": "Volume", "value": -4.0}],
+        [{"name": "Lowpass", "value": 10.0}, {"name": "Pitch", "value": -200.0}, {"name": "Volume", "value": -4.0}],
+    ]
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("empty_at", ("default", "row"))
+def test_import_preview_transports_empty_notes_without_conflating_omission(
+    tmp_path: Path, version: str, empty_at: str,
+) -> None:
+    command, parent, client = _import_fields_draft(tmp_path, version)
+    media = tmp_path / "small.wav"
+    media.write_bytes(b"RIFF-test-media")
+    if empty_at == "default":
+        command("draft-business-configure", "--default", "notes", "", "--default", "audio_source_notes", "")
+    command("draft-declare-new", "--declaration-id", "inherited", "--parent-handle", parent,
+        "--name", "Inherited", "--kind", "sound-sfx", "--field", "media_file", str(media))
+    row_note = "explicit row note" if empty_at == "default" else ""
+    command("draft-declare-new", "--declaration-id", "explicit", "--parent-handle", parent,
+        "--name", "Explicit", "--kind", "sound-sfx", "--field", "media_file", str(media),
+        "--field", "notes", row_note, "--field", "audio_source_notes", row_note)
+    command("draft-check")
+    preview = command("preview-from-draft")
+    assert preview["state"] == "awaiting_confirmation"
+    rows = preview["agent_result"]["request"]["arguments"]["imports"]
+    for field in ("notes", "audio_source_notes"):
+        if empty_at == "default":
+            assert rows[0][field] == ""
+        else:
+            assert field not in rows[0]
+        assert rows[1][field] == row_note
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_import_inherited_field_conflict_rejects_check_without_changing_draft(tmp_path: Path, version: str) -> None:
+    command, parent, client = _import_fields_draft(tmp_path, version)
+    handles = {}
+    for meaning in ("Volume", "Pitch"):
+        discovered = command("draft-discover-fields", "--semantic-kind", "random-container", "--meaning", meaning)
+        handles[meaning] = discovered["meaning_results"][0]["candidates"][0]["handle"]
+    command("draft-business-configure", "--default-field-value", handles["Volume"], "-4")
+    command("draft-declare-new", "--declaration-id", "conflict", "--parent-handle", parent,
+        "--name", "Conflict", "--kind", "random-container", "--field", "volume_db", "-6",
+        "--field-value", handles["Pitch"], "-100")
+    record = next((tmp_path / "state/operation-drafts-v1/records").glob("*.json"))
+    before = record.read_bytes()
+    command("draft-check", expected_error="OPERATION_DRAFT_ACTION_INVALID")
+    assert record.read_bytes() == before
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("field,value,error", (
+    ("dialogue_event_directive", "", "OPERATION_DRAFT_ACTION_INVALID"),
+    ("switch_value", "", "OPERATION_DRAFT_ACTION_INVALID"),
+    ("notes", "bad\x00note", "LIMIT_EXCEEDED"),
+))
+def test_import_empty_notes_change_preserves_other_string_guards(
+    tmp_path: Path, version: str, field: str, value: str, error: str,
+) -> None:
+    command, parent, client = _import_fields_draft(tmp_path, version)
+    field_args = ("--switch-value", value) if field == "switch_value" else ("--field", field, value)
+    command("draft-declare-new", "--declaration-id", "invalid", "--parent-handle", parent,
+        "--name", "Invalid", "--kind", "random-container", *field_args)
+    record = next((tmp_path / "state/operation-drafts-v1/records").glob("*.json"))
+    before = record.read_bytes()
+    command("draft-check", expected_error=error)
+    assert record.read_bytes() == before
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)

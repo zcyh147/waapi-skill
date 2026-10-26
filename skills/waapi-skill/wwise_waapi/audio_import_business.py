@@ -289,6 +289,21 @@ def _compile_declaration(
     collect_file_evidence: bool,
 ) -> tuple[BusinessEffect, BusinessFileEvidence | None]:
     fields = {**dict(default_fields), **dict(declaration.fields)}
+    default_values = default_fields.get("field_values")
+    row_values = declaration.fields.get("field_values")
+    if isinstance(default_values, Mapping) and isinstance(row_values, Mapping):
+        # Rediscovery can issue another handle for the exact same bound field.
+        # Only identical scope/metadata bindings share native-default precedence.
+        row_bindings = {
+            session.handles.bound_field(handle).binding_digest for handle in row_values
+        }
+        fields["field_values"] = {
+            **{
+                handle: value for handle, value in default_values.items()
+                if session.handles.bound_field(handle).binding_digest not in row_bindings
+            },
+            **row_values,
+        }
     unknown = sorted(set(fields) - _DECLARATION_FIELDS)
     if unknown:
         raise _repair(
@@ -449,8 +464,11 @@ def _compile_declaration(
     ):
         value = fields.get(business_name)
         if value is not None:
-            if not isinstance(value, str) or not value:
-                raise _field_type_repair(session, business_name, "non-empty string")
+            allows_empty = business_name in {"notes", "audio_source_notes"}
+            if not isinstance(value, str) or (not value and not allows_empty):
+                raise _field_type_repair(
+                    session, business_name, "string" if allows_empty else "non-empty string"
+                )
             row[native_name] = value
     if "originals_subfolder" in fields:
         try:
