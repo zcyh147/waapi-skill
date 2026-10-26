@@ -762,14 +762,6 @@ def parse_tab_delimited_import_file(
             oracle_row["source_file"] = source_proof
             source_name_path = str(source_proof["relative_path"])
 
-        if source_name_path is not None:
-            expected_source_path = expected_audio_file_source_result_path(
-                target["canonical_target_path"],
-                source_name_path,
-            )
-            if expected_source_path is not None:
-                oracle_row["expected_audio_file_source_result_path"] = expected_source_path
-
         object_type_value = single_value("Object Type")
         inferred_type = _typed_leaf_object_type(object_path)
         if object_type_value:
@@ -801,6 +793,22 @@ def parse_tab_delimited_import_file(
                 "A structure-only tab row requires Object Type or a typed final Object Path segment.",
                 details={"row": offset},
             )
+
+        if _import_object_type_token(str(oracle_row.get("requested_object_type", ""))) == "audiofilesource":
+            owner_path = object_path.rpartition("\\")[0]
+            owner_type = _typed_leaf_object_type(owner_path)
+            if owner_type is not None:
+                oracle_row["requested_source_owner_type"] = _require_object_type(owner_type, field=f"row[{offset}].Object Path parent")
+
+        if source_name_path is not None:
+            expected_source_path = expected_audio_file_source_result_path(
+                target["canonical_target_path"], source_name_path,
+                target_is_audio_file_source=(
+                    _import_object_type_token(str(oracle_row.get("requested_object_type", ""))) == "audiofilesource"
+                ),
+            )
+            if expected_source_path is not None:
+                oracle_row["expected_audio_file_source_result_path"] = expected_source_path
 
         originals_subfolder = single_value("OriginalsSubFolder")
         if originals_subfolder:
@@ -971,11 +979,14 @@ def canonical_import_target(object_path: str, *, version: str) -> dict[str, str]
 def expected_audio_file_source_result_path(
     canonical_target_path: str,
     source_file_path: str,
+    *,
+    target_is_audio_file_source: bool = False,
 ) -> str | None:
     """Seal the exact AudioFileSource result path for reviewed audio media.
 
-    Wwise names the AudioFileSource child from the imported audio filename,
-    without its extension.  MIDI imports have a different object topology and
+    An explicitly typed AudioFileSource TSV target names the Source itself.
+    Otherwise Wwise names the AudioFileSource child from the imported audio
+    filename, without its extension.  MIDI imports have a different object topology and
     therefore deliberately do not claim this AudioFileSource result contract.
     """
 
@@ -997,6 +1008,8 @@ def expected_audio_file_source_result_path(
             "source_file_path does not use a reviewed AudioFileSource extension.",
             details={"path": source_file_path, "supported_extensions": [".amb", ".wav"]},
         )
+    if target_is_audio_file_source:
+        return "\\" + "\\".join(target_segments)
     source_name = source_path.stem
     if (
         not source_name

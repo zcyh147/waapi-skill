@@ -2979,3 +2979,156 @@ def test_new_language_source_collision_after_preview_blocks_owner_and_media_writ
     assert code == 2 and executed["executed"] is False and executed["status"] == "repreview_required", executed
     assert client.owner["@Volume"] == 0 and client.owner["@OutputBus"] is None
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
+
+
+class ExplicitSourceTabClient(LocalizedFieldsClient):
+    """External boundary: exact Source path names the media target itself."""
+
+    def call(self, uri, args=None, options=None):
+        from copy import deepcopy
+        args, options = args or {}, options or {}
+        if uri == "ak.wwise.core.audio.importTabDelimited":
+            import csv
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            self.imported = True
+            with Path(args["importFile"]).open(encoding="utf-8", newline="") as stream:
+                rows = list(csv.DictReader(stream, delimiter="\t"))
+            assert [row["Object Path"] for row in rows] == [
+                "<Sound Voice>Voice", r"<Sound Voice>Voice\<AudioFileSource>Line"]
+            self.owner["notes"] = rows[0]["Notes"]
+            if self.outcome != "ignored-source-notes":
+                self.sources[0]["notes"] = rows[1]["Notes"]
+            if self.outcome != "ignored-media":
+                self.copied.write_bytes(Path(rows[1]["Audio File"]).read_bytes())
+            if self.outcome == "changed-owner": self.owner["@IsVoice"] = False
+            if self.outcome == "wrong-source-parent": self.sources[0]["parent"] = {"id": PARENT_ID}
+            if self.outcome == "lost-other-language": self.sources.pop()
+            return {"objects": deepcopy([self.owner] if self.outcome == "omitted-source" else [self.owner, self.sources[0]])}
+        result = super().call(uri, args, options)
+        if uri == "ak.wwise.core.object.get":
+            rows = result.get("return", [])
+            if options.get("language"):
+                rows = [row for row in rows if row.get("type") != "AudioFileSource"
+                    or row.get("audioSource:language", {}).get("name") == options["language"]]
+            result = {**result, "return": [{key: value for key, value in row.items() if key in options["return"]}
+                for row in rows]}
+        return result
+
+
+def _explicit_source_tab_draft(tmp_path, version, *, outcome="normal"):
+    client = ExplicitSourceTabClient(tmp_path, version, outcome=outcome)
+    media = tmp_path / "Different.wav"
+    media.write_bytes(b"requested explicit Source media")
+    table = tmp_path / "explicit.tsv"
+    table.write_text("Audio File\tObject Path\tNotes\n"
+        "\t<Sound Voice>Voice\trequested owner notes\n"
+        + str(media) + "\t<Sound Voice>Voice\\<AudioFileSource>Line\trequested Source notes\n", encoding="utf-8")
+    env = set_gateway_config(_env(tmp_path), wwise_version=version)
+    def run(*argv):
+        return waapi_gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv],
+            env=env, client_factory=lambda _url: client)
+    code, started = run("draft-start", "audio.importTabDelimited")
+    assert code == 0, started
+    draft, authority, revision = started["draft"]["draft_id"], started["task_authority"], 1
+    def command(name, *argv, expected_error=None):
+        nonlocal revision
+        code, result = run(name, draft, "--task-authority", authority, "--expected-revision", str(revision), *argv)
+        assert code == (2 if expected_error else 0), json.dumps(result, indent=2)
+        if expected_error: assert result["error_code"] == expected_error, result
+        if "draft" in result: revision = result["draft"]["revision"]
+        return result
+    bound = command("draft-bind-object", "--role", "import_location", "--object-id", PARENT_ID)
+    command("draft-declare-artifact-plan", "--table-file", str(table),
+        "--location-handle", bound["bound_object"]["handle"], "--language", "English(US)", "--mode", "reimport")
+    return command, run, client, table
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_exact_table_can_update_existing_source_media_and_notes_with_separate_owner_notes(tmp_path, version):
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, version)
+    original = table.read_bytes()
+    command("draft-check")
+    transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction)
+    assert code == 0, shown
+    dispatch = shown["artifact"]["prepared_operation"]["dispatch"]
+    assert dispatch["args"] == {"importFile": str(table.resolve()), "importLocation": PARENT_ID,
+        "importLanguage": "English(US)", "importOperation": "useExisting", "autoAddToSourceControl": False,
+        **({"autoCheckOutToSourceControl": False} if version in {"2023.1", "2024.1", "2025.1"} else {})}
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = run("execute", transaction)
+    assert code == 0, executed
+    code, verified = run("verify", transaction)
+    assert code == 0 and verified["verified"] is True, json.dumps(verified, indent=2)
+    assert client.owner["notes"] == "requested owner notes"
+    assert client.sources[0]["id"] == client.SOURCE and client.sources[0]["path"] == client.owner["path"] + r"\Line"
+    assert client.sources[0]["notes"] == "requested Source notes"
+    assert client.copied.read_bytes() == b"requested explicit Source media"
+    assert client.sources[1]["notes"] == "keep Japanese notes" and client.other_file.read_bytes() == b"keep Japanese media"
+    assert table.read_bytes() == original
+    code, repeated = run("execute", transaction)
+    assert code == 2, repeated
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
+
+
+def test_exact_table_existing_source_can_be_proven_when_native_omits_its_result(tmp_path):
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1", outcome="omitted-source")
+    command("draft-check")
+    transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction)
+    assert code == 0, shown
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    code, executed = run("execute", transaction)
+    assert code == 0, executed
+    code, verified = run("verify", transaction)
+    assert code == 0 and verified["verified"] is True, json.dumps(verified, indent=2)
+    assert client.sources[0]["notes"] == "requested Source notes" and client.copied.read_bytes() == b"requested explicit Source media"
+
+
+@pytest.mark.parametrize("fault", ("foreign-parent", "wrong-type", "wrong-language", "nested-sound", "typed-sfx-owner"))
+def test_exact_table_source_admission_rejects_wrong_relationship_type_and_language(tmp_path, fault):
+    command, _run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1")
+    if fault == "foreign-parent": client.sources[0]["parent"] = {"id": PARENT_ID}
+    elif fault == "wrong-type": client.sources[0].update(type="Sound", classId=65552)
+    elif fault == "wrong-language": client.sources[0]["audioSource:language"]["name"] = "Japanese"
+    elif fault == "typed-sfx-owner":
+        table.write_text(table.read_text().replace(r"<Sound Voice>Voice\<AudioFileSource>", r"<Sound SFX>Voice\<AudioFileSource>"), encoding="utf-8")
+    else:
+        table.write_text(table.read_text().replace("<AudioFileSource>Line", "<Sound Voice>NewVoice"), encoding="utf-8")
+    command("draft-check", expected_error="INVALID_TARGET_TYPE")
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize("drift", ("source-guid", "source-notes", "owner-notes", "table", "media"))
+def test_exact_table_source_reimport_rejects_stale_source_owner_and_inputs(tmp_path, drift):
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1")
+    command("draft-check")
+    transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction)
+    assert code == 0, shown
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    if drift == "source-guid": client.sources[0]["id"] = client.ACTION
+    elif drift == "source-notes": client.sources[0]["notes"] = "changed after Preview"
+    elif drift == "owner-notes": client.owner["notes"] = "changed after Preview"
+    elif drift == "table": table.write_bytes(table.read_bytes() + b"\n")
+    else: (tmp_path / "Different.wav").write_bytes(b"changed after Preview")
+    code, rejected = run("execute", transaction)
+    assert code == 2 and rejected["executed"] is False, rejected
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize("fault", ("ignored-source-notes", "ignored-media", "changed-owner", "wrong-source-parent", "lost-other-language"))
+def test_exact_table_source_verification_requires_notes_media_owner_and_source_preservation(tmp_path, fault):
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1", outcome=fault)
+    command("draft-check")
+    transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction)
+    assert code == 0, shown
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    code, executed = run("execute", transaction)
+    assert code == 0, executed
+    code, verified = run("verify", transaction)
+    assert code == 2 and verified["verified"] is False, verified
+    assert any(not row["passed"] for row in verified["verification"]["assertions"]), verified
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1

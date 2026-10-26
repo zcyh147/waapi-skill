@@ -2289,6 +2289,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "OriginalsSubFolder is a TSV column from Wwise 2023.1 (WG-60834); ordinary audio.import Originals placement remains separate",
             "TSV Notes verifies target-object notes independently from Audio Source Notes; the exact user table is never rewritten",
+            "an explicit typed AudioFileSource media row may reimport one existing exact Sound child in the requested language using Notes on the Source; a separate typed owner-only Notes row retains the same exact-table transaction",
             "fixed and dynamic native headers are parsed under bounded grammar; importLanguage remains a call argument",
             "the parser hashes the TSV, regular media, and decoded inline base64 before preview",
             "a missing or invalid row rejects the whole request before dispatch",
@@ -14787,6 +14788,8 @@ def _metadata_is_reference(info: PropertyInfoMetadataRecord) -> bool:
 
 def _import_metadata_object_type(value: str, *, version: str) -> str:
     token = _object_type_token(value)
+    if token == "audiofilesource" and version == "2021.1":
+        return "AudioSource"
     if token in {"actormixer", "propertycontainer"}:
         # Wwise 2025.1 reflects Actor Mixers as PropertyContainer metadata,
         # while audio.import still accepts the stable native ActorMixer token.
@@ -14900,6 +14903,12 @@ def _coerce_tab_import_property_value(
     return result
 
 
+def _is_tab_audio_file_source_target(target: Mapping[str, Any], source_operation: Any) -> bool:
+    return (source_operation == "audio.importTabDelimited"
+            and target.get("media_expected") is True
+            and _object_type_token(target.get("requested_object_type")) == "audiofilesource")
+
+
 def _prepare_closed_import_plan(
     request: OperationRequest,
     *,
@@ -14976,12 +14985,13 @@ def _prepare_closed_import_plan(
             role=f"targets[{index}].anchor",
             read=read,
             version=request.version,
+            audio_file_source_parent=_is_tab_audio_file_source_target(target, source_operation),
         )
         roles[f"targets[{index}].anchor"] = anchor
         fields = _import_target_return_fields(target, version=request.version)
         localized_tab = (source_operation == "audio.importTabDelimited"
                          and _localized_import_read_language(target.get("requested_language")) is not None)
-        if localized_tab:
+        if localized_tab and not _is_tab_audio_file_source_target(target, source_operation):
             fields = _dedupe_fields([*fields, "@IsVoice"])
         read_language = _localized_import_read_language(
             target.get("requested_language")
@@ -15070,6 +15080,7 @@ def _prepare_closed_import_plan(
                 derived_source_path = expected_audio_file_source_result_path(
                     target_path,
                     source_name_path,
+                    target_is_audio_file_source=_is_tab_audio_file_source_target(target, source_operation),
                 )
             except ImportContractError as exc:
                 raise OperationContractError(
@@ -15115,7 +15126,36 @@ def _prepare_closed_import_plan(
                     },
                 )
             target["preexisting_id"] = existing_id
-            if localized_tab and import_operation == "useExisting":
+            if _is_tab_audio_file_source_target(target, source_operation):
+                if import_operation != "useExisting":
+                    raise OperationContractError("INVALID_TARGET_TYPE", "An explicit TSV AudioFileSource media target requires existing-source reimport.")
+                owner_fields = [*IDENTITY_RETURN_FIELDS, "classId", "@IsVoice"]
+                owner_rows = _read_object_path_rows(target["canonical_parent_path"], fields=owner_fields, read=read)
+                if (len(owner_rows) != 1 or _object_type_token(owner_rows[0].get("type")) != "sound"
+                        or not _same_identity(_reference_identity(rows[0].get("parent")), owner_rows[0].get("id"))
+                        or _field_value(owner_rows[0], "@IsVoice") is not (target.get("requested_language") != "SFX")):
+                    raise OperationContractError("INVALID_TARGET_TYPE", "An explicit TSV AudioFileSource requires its exact Sound parent and matching Voice state.")
+                owner = owner_rows[0]
+                owner_type = _object_type_token(target.get("requested_source_owner_type", "Sound"))
+                if (owner_type not in {"sound", "soundvoice", "soundsfx"}
+                        or owner_type == "soundvoice" and _field_value(owner, "@IsVoice") is not True
+                        or owner_type == "soundsfx" and _field_value(owner, "@IsVoice") is not False):
+                    raise OperationContractError("INVALID_TARGET_TYPE", "The typed TSV Source parent conflicts with the existing Sound kind.")
+                snapshot = _localized_source_snapshot(owner["id"], read=read)
+                matches = [source for source in snapshot["rows"]
+                           if source.get("path") == target_path
+                           and _object_type_token(source.get("type")) == "audiofilesource"
+                           and _import_language_name(source.get("audioSource:language")) == target.get("requested_language")]
+                if (len(matches) != 1 or not _same_identity(matches[0].get("id"), existing_id)
+                        or not _object_class_matches(matches[0].get("classId"), target.get("audio_source_class_id"))):
+                    raise OperationContractError("INVALID_TARGET_TYPE", "An explicit TSV AudioFileSource must match one existing Source GUID, class and language.")
+                target["explicit_source_owner"] = owner
+                target["localized_source_snapshot"] = snapshot
+                target["localized_audio_file_source_id"] = existing_id
+                roles[f"targets[{index}].source_owner"] = ResolvedObject(
+                    identity=ObjectIdentity(path=target["canonical_parent_path"]), object=owner["id"], resolution="live-path", row=owner)
+                path_snapshots.append({"path": target["canonical_parent_path"], "fields": owner_fields, "rows": owner_rows})
+            elif localized_tab and import_operation == "useExisting":
                 if (_object_type_token(rows[0].get("type")) != "sound"
                         or _field_value(rows[0], "@IsVoice") is not True
                         or isinstance(requested_type, str)
@@ -15133,6 +15173,8 @@ def _prepare_closed_import_plan(
                 resolution="live-path",
                 row=rows[0],
             )
+        if _is_tab_audio_file_source_target(target, source_operation) and not rows:
+            raise OperationContractError("INVALID_TARGET_TYPE", "An explicit TSV AudioFileSource media target must already exist in the selected language.")
         notes_destination = (
             "audio_file_source"
             if source_operation == "audio.import" and import_operation == "useExisting" and bool(rows)
@@ -15829,6 +15871,7 @@ def _resolve_import_anchor(
     role: str,
     read: ReadCall,
     version: str,
+    audio_file_source_parent: bool = False,
 ) -> tuple[ResolvedObject, list[dict[str, Any]]]:
     segments = target_path[1:].split("\\") if target_path.startswith("\\") else []
     if len(segments) < 3:
@@ -15864,11 +15907,9 @@ def _resolve_import_anchor(
             resolution="live-path",
             row=row,
         )
-        _require_import_parent(
-            resolved,
-            index=0,
-            version=version,
-        )
+        if not (audio_file_source_parent and end == len(segments) - 1
+                and _object_type_token(row.get("type")) == "sound"):
+            _require_import_parent(resolved, index=0, version=version)
         return resolved, empty_snapshots
     raise OperationContractError(
         "IMPORT_ANCHOR_NOT_FOUND",
@@ -15919,22 +15960,18 @@ def _import_target_return_fields(
     version: str,
 ) -> list[str]:
     fields = [*IDENTITY_RETURN_FIELDS, "classId"]
+    if _object_type_token(target.get("requested_object_type")) == "audiofilesource":
+        fields.extend(["audioSource:language", "originalWavFilePath" if version == "2021.1" else "originalFilePath"])
     # Wwise 2021.1 rejects the otherwise useful ``activeSource`` and
     # ``originalFilePath`` accessors on the imported Sound object.  Its import
     # result still returns the created AudioFileSource, so the verifier binds
     # that child directly and uses the older Sound accessors for language/path.
-    fields.extend(
-        (
+    if _object_type_token(target.get("requested_object_type")) != "audiofilesource":
+        fields.extend(
             ("sound:originalWavFilePath", "audioSource:language")
             if version == "2021.1"
-            else (
-                "activeSource",
-                "originalFilePath",
-                "sound:originalWavFilePath",
-                "audioSource:language",
-            )
+            else ("activeSource", "originalFilePath", "sound:originalWavFilePath", "audioSource:language")
         )
-    )
     if (
         _object_type_token(target.get("requested_object_type")) == "musictrack"
         and target.get("media_expected") is True
@@ -23812,6 +23849,7 @@ def verify_prepared_operation(
                     derived_source_path = expected_audio_file_source_result_path(
                         target_path,
                         source_name_path,
+                        target_is_audio_file_source=_is_tab_audio_file_source_target(target, source_operation),
                     )
                 except ImportContractError as exc:
                     raise OperationContractError(
@@ -24194,8 +24232,8 @@ def verify_prepared_operation(
                 and isinstance(expected_source_path, str)
                 and not returned_source_matches
                 and (_valid_object_id(target.get("localized_audio_file_source_id")) or bound_sfx_source)
-                and _object_type_token(target.get("requested_object_type", "Sound"))
-                in {"sound", "soundsfx", "soundvoice"}
+                and (_object_type_token(target.get("requested_object_type", "Sound")) in {"sound", "soundsfx", "soundvoice"}
+                     or _is_tab_audio_file_source_target(target, source_operation))
             )
             if isinstance(expected_source_path, str):
                 check(
@@ -24242,7 +24280,8 @@ def verify_prepared_operation(
                 )
 
             target_fields = _import_target_return_fields(target, version=version)
-            localized_tab_owner = (source_operation == "audio.importTabDelimited"
+            explicit_tab_source = _is_tab_audio_file_source_target(target, source_operation)
+            localized_tab_owner = (source_operation == "audio.importTabDelimited" and not explicit_tab_source
                                    and isinstance(target.get("localized_source_snapshot"), Mapping))
             if localized_tab_owner:
                 target_fields = _dedupe_fields([*target_fields, "@IsVoice"])
@@ -24257,6 +24296,15 @@ def verify_prepared_operation(
             audio_source_row: Mapping[str, Any] | None = None
             if live_row is not None:
                 live_id = live_row.get("id")
+                source_owner_id = target["explicit_source_owner"]["id"] if explicit_tab_source else live_id
+                if explicit_tab_source:
+                    owner_before = target["explicit_source_owner"]
+                    owner_rows = read_object(object_id=source_owner_id, fields=[*IDENTITY_RETURN_FIELDS, "classId", "@IsVoice"])
+                    expected_owner = dict(owner_before)
+                    for owner_target in targets:
+                        if owner_target["canonical_target_path"] == owner_before["path"] and "requested_notes" in owner_target:
+                            expected_owner["notes"] = owner_target["requested_notes"]
+                    check(f"{label} exact Source owner is preserved", owner_rows == [expected_owner], {"expected": expected_owner, "actual": owner_rows})
                 check(f"{label} live GUID is canonical", _valid_object_id(live_id), live_row)
                 check(
                     f"{label} exact live path matches",
@@ -24339,7 +24387,9 @@ def verify_prepared_operation(
                 active_source_id = _reference_identity(
                     _field_value(live_row, "activeSource")
                 )
-                if localized_tab_owner:
+                if explicit_tab_source:
+                    active_source_id = live_id
+                elif localized_tab_owner:
                     # TSV rows bind the imported filename/language, even when
                     # Wwise keeps another Source active. An absent pre-source
                     # must instead be established by the unique native result.
@@ -24378,9 +24428,9 @@ def verify_prepared_operation(
                     )
                     check(
                         f"{label} returned AudioFileSource parent is the live target",
-                        _same_identity(returned_parent_id, live_id),
+                        _same_identity(returned_parent_id, source_owner_id),
                         {
-                            "expected": live_id,
+                            "expected": source_owner_id,
                             "actual": returned_parent_id,
                             "parent": returned_source.get("parent"),
                         },
@@ -24396,7 +24446,7 @@ def verify_prepared_operation(
                         )
                 if active_source_id is not None:
                     source_fields = _dedupe_fields([*_import_audio_source_return_fields(version=version), "parent"])
-                    if music_media or omitted_sound_source or legacy_bound_sfx or localized_tab_owner:
+                    if music_media or omitted_sound_source or legacy_bound_sfx or localized_tab_owner or explicit_tab_source:
                         if version == "2021.1":
                             source_fields.append("originalWavFilePath")
                     source_rows = read_object(
@@ -24413,7 +24463,7 @@ def verify_prepared_operation(
                                 {"expected": target.get("audio_source_class_id"), "actual": audio_source_row.get("classId")})
                             check(f"{label} actual AudioFileSource belongs to the verified target",
                                   _object_type_token(audio_source_row.get("type")) == "audiofilesource"
-                                  and _same_identity(_reference_identity(audio_source_row.get("parent")), live_id),
+                                  and _same_identity(_reference_identity(audio_source_row.get("parent")), source_owner_id),
                                   {"target_id": live_id, "source": audio_source_row})
                         if target.get("existing_sfx_source_id") is not None:
                             check(f"{label} reimport preserves the bound SFX source GUID",
@@ -24435,14 +24485,14 @@ def verify_prepared_operation(
                             check(
                                 f"{label} omitted source result is proven by exact live ownership",
                                 _object_type_token(audio_source_row.get("type")) == "audiofilesource"
-                                and _same_identity(_reference_identity(audio_source_row.get("parent")), live_id),
+                                and _same_identity(_reference_identity(audio_source_row.get("parent")), source_owner_id),
                                 audio_source_row,
                             )
                         if music_media:
                             check(
                                 f"{label} live music source belongs to the Track",
                                 _object_type_token(audio_source_row.get("type")) == "audiofilesource"
-                                and _same_identity(_reference_identity(audio_source_row.get("parent")), live_id),
+                                and _same_identity(_reference_identity(audio_source_row.get("parent")), source_owner_id),
                                 audio_source_row,
                             )
                         check(
@@ -24496,7 +24546,7 @@ def verify_prepared_operation(
                         return result
 
                     try:
-                        after_sources = _localized_source_snapshot(str(live_id), read=read_localized_sources)
+                        after_sources = _localized_source_snapshot(str(source_owner_id), read=read_localized_sources)
                     except OperationContractError as exc:
                         check(f"{label} localized source collection remains valid", False, exc.as_dict())
                     else:
@@ -24608,7 +24658,7 @@ def verify_prepared_operation(
 
                 if media_expected:
                     copied_path = _field_value(source_state, "originalFilePath")
-                    if (music_media or legacy_bound_sfx or localized_tab_owner) and version == "2021.1":
+                    if (music_media or legacy_bound_sfx or localized_tab_owner or explicit_tab_source) and version == "2021.1":
                         copied_path = _field_value(source_state, "originalWavFilePath")
                     if music_media:
                         try:
