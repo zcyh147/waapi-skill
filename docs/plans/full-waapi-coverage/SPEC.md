@@ -349,15 +349,15 @@ close #182/#174. No comprehensive native Dialogue QA is a completion condition.
 
 ## User-approved lightweight table-audio acceptance — 2026-10-27
 
-Table-based audio import, including multilingual forms and
-`audio.importTabDelimited`, is an optional secondary workflow to ordinary
-AI-directed import. Across Wwise 2021.1–2025.1, a closed wrapper and passing
-code tests suffice for its acceptance. Retain complete documented inputs,
+All table-based imports use lightweight acceptance, including multilingual
+audio, `audio.importTabDelimited`, and SoundBank Definition files. Across
+Wwise 2021.1–2025.1 where the native operation exists, a closed wrapper and
+passing code tests suffice for acceptance. Retain complete documented inputs,
 version mapping and public routing, configuration binding, the three policies,
 immutable Preview, execute-once, identity/drift, source-preservation and cleanup
 safety. This changes evidence requirements, not supported input scope.
 
-Do not spend further native validation on table audio imports: no per-combination
+Do not spend further native validation on table imports: no per-combination
 native cases, probes or native functional gate is required. This supersedes
 earlier table-specific native evidence obligations. Preserve all original raw
 FAILs, receipts and quarantines, and the exact Console 2025.1.7/build 9143
@@ -365,6 +365,10 @@ duplicate-Source guard. The decision does not authorize unblocking that observed
 unsafe case, native PASS/absence claims or broader host exclusions. Existing
 native observations remain reusable only for their actual facts.
 
-Ordinary `audio.import` remains the main functional lane; its planned ordinary
-named-Source native case is unchanged. Fresh budget remains zero. This approval
-does not close #182/#174 or waive #195's required code gates.
+Ordinary `audio.import`, SoundBank generation and external-source conversion
+retain their separately selected representative evidence. Definition-file
+acceptance does not require experiments to infer undocumented cross-file merge
+or exclusion behavior: disclose any weaker result-only verification before
+authorization and never assert an unobserved business effect. Fresh budget
+remains zero. This approval does not close #182/#183/#174 or waive #195's
+required code gates.
