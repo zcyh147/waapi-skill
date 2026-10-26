@@ -191,7 +191,9 @@ def _collect(runtime, *, localized):
             receipt["stage"] = "witness"
             def inspect(dispatch):
                 assert dispatch["uri"] == "ak.wwise.core.audio.import" and dispatch["args"]["importOperation"] == "useExisting"
-                row, = dispatch["args"]["imports"]
+                owner_row, row = dispatch["args"]["imports"]
+                assert owner_row == {"objectPath": before["existing"]["path"], "event": "\\Events\\Default Work Unit\\" + event_name + "@Play"}
+                assert "event" not in row and row["objectPath"] == ""
                 assert row["notes"] == requested_notes and "audioSourceNotes" not in row
                 assert row["importLocation"] == by_language["English(US)"]["object"]["id"]
                 assert row["originalsSubFolder"] == "After"

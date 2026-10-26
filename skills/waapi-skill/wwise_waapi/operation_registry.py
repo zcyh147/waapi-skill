@@ -14492,6 +14492,7 @@ def _materialize_audio_import_dynamic_rows(
     *,
     dispatch_args: Mapping[str, Any],
     targets: Sequence[Mapping[str, Any]],
+    version: str | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Materialize Sound/MusicTrack fields onto their native owner.
 
@@ -14503,6 +14504,8 @@ def _materialize_audio_import_dynamic_rows(
     explicit ``AudioFileSource`` media row, while the WAAPI call count remains
     exactly one. MusicTrack media always uses an explicit source: importing
     onto an already-created Track path alone can silently create no media.
+    Events on an exact existing source binding likewise require a separate
+    owner row: an AudioFileSource cannot be the Event Action's Sound target.
     """
 
     raw_rows = dispatch_args.get("imports")
@@ -14583,7 +14586,11 @@ def _materialize_audio_import_dynamic_rows(
                 "An audio.import target lacks its explicit media expectation.",
                 details={"index": index},
             )
-        if not _import_requires_explicit_source(target):
+        bound_source_id = target.get("localized_audio_file_source_id")
+        if not (_valid_object_id(bound_source_id) and row.get("importLocation") == bound_source_id):
+            bound_source_id = target.get("existing_sfx_source_id") if version == "2025.1" else None
+        source_targeted_event = bool(media_expected and row.get("event") and _valid_object_id(bound_source_id))
+        if not _import_requires_explicit_source(target) and not source_targeted_event:
             row.update(dynamic_fields)
             native_index = len(native_rows)
             native_rows.append(row)
@@ -14629,7 +14636,7 @@ def _materialize_audio_import_dynamic_rows(
             )
         claimed_source_paths.add(source_key)
 
-        object_path = row.get("objectPath")
+        object_path = target.get("canonical_target_path") if source_targeted_event else row.get("objectPath")
         source_name = expected_source_path.rpartition("\\")[2]
         if (
             not isinstance(object_path, str)
@@ -14681,6 +14688,9 @@ def _materialize_audio_import_dynamic_rows(
             )
             if key in row
         }
+        if source_targeted_event:
+            structure_row["objectPath"] = object_path
+            structure_row.pop("importLocation", None)
         if target.get("requested_notes_destination") == "target_object" and "notes" in row:
             structure_row["notes"] = row["notes"]
         structure_row.update(dynamic_fields)
@@ -14697,6 +14707,9 @@ def _materialize_audio_import_dynamic_rows(
         ):
             if key in row:
                 media_row[key] = row[key]
+        if source_targeted_event:
+            media_row["objectPath"] = ""
+            media_row["importLocation"] = bound_source_id
         if "audioSourceNotes" in row:
             media_row["notes"] = row["audioSourceNotes"]
         elif (
@@ -15573,6 +15586,7 @@ def _prepare_closed_import_plan(
         dispatch_args, native_row_mapping = _materialize_audio_import_dynamic_rows(
             dispatch_args=dispatch_args,
             targets=targets,
+            version=request.version,
         )
         if request.version == "2025.1":
             # This lane has proven source-GUID importLocation support. Bind only

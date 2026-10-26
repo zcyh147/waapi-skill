@@ -1930,7 +1930,7 @@ class LocalizedFieldsClient(ImportFieldsClient):
     EVENT_PARENT = "{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}"
     LANGUAGE = "{88888888-8888-8888-8888-888888888888}"
 
-    def __init__(self, tmp_path: Path, version: str, *, outcome: str = "normal") -> None:
+    def __init__(self, tmp_path: Path, version: str, *, outcome: str = "normal", language: str = "English(US)") -> None:
         super().__init__(tmp_path, version)
         self.outcome = outcome
         self.imported = False
@@ -1959,6 +1959,14 @@ class LocalizedFieldsClient(ImportFieldsClient):
         self.event = {"id": self.EVENT, "name": "Play_Voice", "type": "Event", "path": self.event_path}
         self.action = {"id": self.ACTION, "name": "Play", "type": "Action", "path": self.event_path + r"\Play",
             "parent": {"id": self.EVENT}, "@ActionType": 1, "@Target": {"id": self.OWNER, "path": self.owner["path"]}}
+        if language == "SFX":
+            self.owner["@IsVoice"] = False
+            self.sources = self.sources[:1]
+            self.sources[0]["audioSource:language"]["name"] = "SFX"
+            self.copied = _project_path(tmp_path).parent / "Originals/SFX/Dialogue/Line.wav"
+            self.copied.parent.mkdir(parents=True, exist_ok=True)
+            self.copied.write_bytes(b"old SFX media")
+            self.sources[0].update(originalFilePath=str(self.copied), originalWavFilePath=str(self.copied))
         project = _project_path(tmp_path)
         project.write_text(project.read_text().replace("</LanguageList>",
             f'<Language Name="English(US)" ID="{self.LANGUAGE}"/></LanguageList>'), encoding="utf-8")
@@ -1980,7 +1988,12 @@ class LocalizedFieldsClient(ImportFieldsClient):
         if uri == "ak.wwise.core.audio.import":
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
             self.imported = True
-            row, = args["imports"]
+            row, = [row for row in args["imports"] if "audioFile" in row]
+            event_row, = [row for row in args["imports"] if "event" in row]
+            # Retained 2025.1 r2 Action.Target was null when event shared the
+            # exact AudioFileSource importLocation instead of its Sound owner.
+            if event_row.get("importLocation") == self.SOURCE or self.outcome == "null-event-target":
+                self.action["@Target"] = {"id": "{00000000-0000-0000-0000-000000000000}"}
             self.copied.write_bytes(Path(row["audioFile"]).read_bytes())
             if self.outcome != "ignored-notes":
                 self.sources[0]["notes"] = row.get("audioSourceNotes", row.get("notes", self.sources[0]["notes"]))
@@ -2016,8 +2029,8 @@ class LocalizedFieldsClient(ImportFieldsClient):
         return super().call(uri, args, options)
 
 
-def _localized_fields_draft(tmp_path: Path, version: str, *, note_field: str = "audio_source_notes", outcome: str = "normal"):
-    client = LocalizedFieldsClient(tmp_path, version, outcome=outcome)
+def _localized_fields_draft(tmp_path: Path, version: str, *, note_field: str = "audio_source_notes", outcome: str = "normal", language: str = "English(US)"):
+    client = LocalizedFieldsClient(tmp_path, version, outcome=outcome, language=language)
     env = set_gateway_config(_env(tmp_path), wwise_version=version)
 
     def run(*argv):
@@ -2042,7 +2055,7 @@ def _localized_fields_draft(tmp_path: Path, version: str, *, note_field: str = "
     bound = command("draft-bind-object", "--object-id", client.OWNER)
     event_bound = command("draft-bind-object", "--object-id", client.EVENT_PARENT)
     command("draft-declare-existing", "--declaration-id", "voice", "--object-handle", bound["bound_object"]["handle"],
-        "--field", "language", "English(US)", "--field", "media_file", str(tmp_path / "Line.wav"),
+        "--field", "language", language, "--field", "media_file", str(tmp_path / "Line.wav"),
         "--field", "originals_subfolder", "Dialogue", "--field", note_field, "requested source notes",
         *(("--field", "notes", "conflicting notes") if outcome == "competing-notes" else ()),
         "--event-parent-handle", event_bound["bound_object"]["handle"], "--event-name", "Play_Voice", "--event-action", "Play")
@@ -2070,13 +2083,52 @@ def test_localized_existing_fields_reach_public_execute_and_independent_verifica
     assert code == 0 and verified["verified"] is True, json.dumps(verified, indent=2)
     writes = [args for uri, args, _ in client.calls if uri == "ak.wwise.core.audio.import"]
     assert len(writes) == 1
-    row, = writes[0]["imports"]
+    row, = [row for row in writes[0]["imports"] if "audioFile" in row]
+    event_row, = [row for row in writes[0]["imports"] if "event" in row]
     assert row["originalsSubFolder"] == "Dialogue"
-    assert row["audioSourceNotes" if note_field == "audio_source_notes" else "notes"] == "requested source notes"
-    assert row["event"] == r"\Events\Default Work Unit\Play_Voice@Play"
+    if version == "2025.1":
+        assert len(writes[0]["imports"]) == 2
+        assert event_row == {"objectPath": client.owner["path"], "event": client.event_path + "@Play"}
+        assert row["objectPath"] == "" and row["importLocation"] == client.SOURCE
+        assert row["notes"] == "requested source notes" and "event" not in row
+    else:
+        assert len(writes[0]["imports"]) == 1
+        assert row["audioSourceNotes" if note_field == "audio_source_notes" else "notes"] == "requested source notes"
+    assert event_row["event"] == r"\Events\Default Work Unit\Play_Voice@Play"
     assert client.owner["notes"] == "keep owner notes"
     assert client.sources[0]["notes"] == "requested source notes"
     assert client.other_file.read_bytes() == b"keep Japanese media"
+    code, repeated = run("execute", transaction)
+    assert code == 2, repeated
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
+
+
+@pytest.mark.parametrize("outcome", ("normal", "null-event-target"))
+def test_existing_sfx_source_event_targets_owner_in_one_public_execution(tmp_path, outcome):
+    (tmp_path / "Line.wav").write_bytes(b"requested SFX media")
+    command, run, client = _localized_fields_draft(tmp_path, "2025.1", note_field="notes", outcome=outcome, language="SFX")
+    command("draft-check")
+    preview = command("preview-from-draft")
+    transaction = preview["transaction_id"]
+    code, shown = run("transaction-show", transaction)
+    assert code == 0, shown
+    owner_row, media_row = shown["artifact"]["prepared_operation"]["dispatch"]["args"]["imports"]
+    assert owner_row == {"objectPath": client.owner["path"], "objectType": "Sound SFX", "event": client.event_path + "@Play"}
+    assert media_row["objectPath"] == "" and media_row["importLocation"] == client.SOURCE
+    assert "event" not in media_row and media_row["notes"] == "requested source notes"
+    assert shown["artifact"]["prepared_operation"]["semantic_preview"]["envelope"]["metadata"]["native_row_mapping"][0]["logical_index"] == 0
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = run("execute", transaction)
+    assert code == 0, executed
+    code, verified = run("verify", transaction)
+    assert (code == 0 and verified["verified"] is True) is (outcome == "normal"), verified
+    if outcome != "normal":
+        assert any("Action target is the imported object" in row["name"] and not row["passed"]
+            for row in verified["verification"]["assertions"])
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
+    assert client.sources[0]["id"] == client.SOURCE and client.sources[0]["notes"] == "requested source notes"
+    assert client.owner["notes"] == "keep owner notes" and client.copied.read_bytes() == b"requested SFX media"
     code, repeated = run("execute", transaction)
     assert code == 2, repeated
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
@@ -2087,6 +2139,7 @@ def test_localized_existing_fields_reach_public_execute_and_independent_verifica
     ("ignored-notes", "Audio Source notes match exactly"),
     ("wrong-subfolder", "Originals subfolder matches"),
     ("wrong-event-target", "Action target is the imported object"),
+    ("null-event-target", "Action target is the imported object"),
     ("lost-other-language", "preserves existing source identities and other languages"),
 ))
 def test_localized_existing_fields_do_not_verify_missing_requested_effects(
@@ -2245,8 +2298,10 @@ class ImportWitnessClient(ImportFieldsClient):
                     event = {"id": self.identity(), "name": event_path.rsplit("\\", 1)[-1], "type": "Event", "classId": 262145,
                         "path": event_path, "notes": ""}
                     action = {"id": self.identity(), "name": "Play", "type": "Action", "classId": 327681,
-                        "path": event_path + r"\Play", "parent": {"id": event["id"]}, "@ActionType": 1, "@Target": {"id": existing["id"]}}
+                        "path": event_path + r"\Play", "parent": {"id": event["id"]}, "@ActionType": 1,
+                        "@Target": {"id": "{00000000-0000-0000-0000-000000000000}" if location and location["type"] == "AudioFileSource" else existing["id"]}}
                     self.objects.update({event["id"]: event, action["id"]: action})
+            returned = list({value["id"]: value for value in returned}.values())
             return {"log": [], "files": files, "objects": [{key: deepcopy(value[key]) for key in options["return"] if key in value} for value in returned]}
         if uri == "ak.wwise.core.object.get":
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -2364,7 +2419,7 @@ def _assert_import_collector_final_writer(tmp_path, workflow, monkeypatch, *, fa
         assert receipt["observations"]["after"]["owner"]["notes"] == "Keep owner notes"
         selected, = [row for row in receipt["observations"]["after"]["sources"] if row["object"]["source_language"]["name"] == "English(US)"]
         assert selected["object"]["notes"] == "Requested literal Notes"
-        assert receipt["phases"][-1]["compiled_native_request"]["args"]["imports"][0]["notes"] == "Requested literal Notes"
+        assert receipt["phases"][-1]["compiled_native_request"]["args"]["imports"][1]["notes"] == "Requested literal Notes"
     lifecycle = tmp_path / "lifecycle"; lifecycle.mkdir()
     fixture, events, _ = _fixture_run(lifecycle, workflow, monkeypatch)
     target = tmp_path / "final.jsonl"; monkeypatch.setenv("WWISE_CATEGORY_EVIDENCE_PATH", str(target))
