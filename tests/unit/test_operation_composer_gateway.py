@@ -332,12 +332,26 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # GUID identities reuse the complete existing typed-TSV target policy.
+    # Invert this wording delta before all historical schema seals.
+    assert canonical_sha256(non_object_set_digests) == "3fd1e7e36d961a8ea781046a8527ba81ede47c090d0529428136dc1b262cce97"
+    class_parity_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        assert contract["constraints"][4] == (
+            "canonical GUID Object Path cells resolve exact existing identities under the shared typed-TSV target class and root policy before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries"
+        )
+        contract["constraints"][4] = (
+            "canonical GUID Object Path cells resolve exact existing Sound or AudioFileSource identities before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries"
+        )
+        class_parity_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
     # GUID target support adds one reviewed TSV disclosure without new fields.
     # Invert only this delta and retain the complete native-path schema seal.
     assert canonical_sha256(non_object_set_digests) == "3c08c10105192d1609df5875122ab106722ff8d50b618a8433d18e3d1a0b79f7"
     guid_target_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = class_parity_contracts[version]
         assert contract["constraints"].pop(4) == (
             "canonical GUID Object Path cells resolve exact existing Sound or AudioFileSource identities before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries"
         )

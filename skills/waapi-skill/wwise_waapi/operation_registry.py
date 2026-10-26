@@ -2292,7 +2292,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "TSV Notes verifies target-object notes independently from Audio Source Notes; the exact user table is never rewritten",
             "an explicit typed AudioFileSource media row may reimport one existing exact Sound child in the requested language using Notes on the Source; a separate typed owner-only Notes row retains the same exact-table transaction",
             "Audio File cells retain their native spelling and bind a hashed local file; relative paths resolve from the table directory, including parent navigation; proven Wine hosts require Windows absolute or table-relative media cells",
-            "canonical GUID Object Path cells resolve exact existing Sound or AudioFileSource identities before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries",
+            "canonical GUID Object Path cells resolve exact existing identities under the shared typed-TSV target class and root policy before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries",
             "fixed and dynamic native headers are parsed under bounded grammar; importLanguage remains a call argument",
             "the parser hashes the TSV, regular media, and decoded inline base64 before preview",
             "a missing or invalid row rejects the whole request before dispatch",
@@ -13441,8 +13441,6 @@ def _prepare_audio_import_tab_delimited(
         for index, guid in enumerate(tab_import_guid_targets(arguments.get("import_file"))):
             role = f"tab_guid_targets[{index}]"
             resolved = _resolve_identity({"kind": "id", "value": guid}, role=role, read=read)
-            if _object_type_token(resolved.row.get("type")) not in {"sound", "audiofilesource"}:
-                raise OperationContractError("INVALID_TARGET_TYPE", "A GUID TSV target must be an existing supported Sound or AudioFileSource.")
             if not isinstance(resolved.row.get("path"), str):
                 raise OperationContractError("INVALID_READBACK", "A GUID TSV target must expose an absolute canonical path.")
             guid_targets[guid] = resolved.row

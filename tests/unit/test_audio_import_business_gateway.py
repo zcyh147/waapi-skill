@@ -3086,7 +3086,7 @@ class ExplicitSourceTabClient(LocalizedFieldsClient):
         return result
 
 
-def _explicit_source_tab_draft(tmp_path, version, *, outcome="normal", client=None):
+def _explicit_source_tab_draft(tmp_path, version, *, outcome="normal", client=None, language="English(US)"):
     client = client or ExplicitSourceTabClient(tmp_path, version, outcome=outcome)
     media = tmp_path / "Different.wav"
     media.write_bytes(b"requested explicit Source media")
@@ -3110,7 +3110,7 @@ def _explicit_source_tab_draft(tmp_path, version, *, outcome="normal", client=No
         return result
     bound = command("draft-bind-object", "--role", "import_location", "--object-id", PARENT_ID)
     command("draft-declare-artifact-plan", "--table-file", str(table),
-        "--location-handle", bound["bound_object"]["handle"], "--language", "English(US)", "--mode", "reimport")
+        "--location-handle", bound["bound_object"]["handle"], "--language", language, "--mode", "reimport")
     return command, run, client, table
 
 
@@ -3151,7 +3151,10 @@ class GuidSourceTabClient(ExplicitSourceTabClient):
 
     def call(self, uri, args=None, options=None):
         if uri != "ak.wwise.core.audio.importTabDelimited":
-            return super().call(uri, args, options)
+            result = super().call(uri, args, options)
+            if uri == "ak.wwise.core.object.getTypes" and hasattr(self, "extra_type"):
+                result["return"].append(self.extra_type)
+            return result
         import csv
         from copy import deepcopy
         self.calls.append((uri, deepcopy(args), deepcopy(options or {})))
@@ -3164,6 +3167,57 @@ class GuidSourceTabClient(ExplicitSourceTabClient):
         self.copied.write_bytes(Path(source["Audio File"]).read_bytes())
         self.imported = True
         return {"objects": deepcopy([self.owner, self.sources[0]])}
+
+
+class GuidContainerTabClient(GuidSourceTabClient):
+    """Existing container Notes use the same GUID/path import policy."""
+
+    def __init__(self, tmp_path, version):
+        super().__init__(tmp_path, version)
+        self.container = {"id": "{C1234567-1234-1234-1234-123456789ABC}", "name": "ExistingContainer",
+            "type": "RandomSequenceContainer", "classId": 2, "parent": {"id": PARENT_ID},
+            "path": self.parent["path"] + r"\ExistingContainer", "notes": "old container notes"}
+
+    def call(self, uri, args=None, options=None):
+        from copy import deepcopy
+        if uri != "ak.wwise.core.audio.importTabDelimited":
+            result = super().call(uri, args, options)
+            identity = (args or {}).get("from", {})
+            if uri == "ak.wwise.core.object.get" and (
+                self.container["id"] in identity.get("id", []) or self.container["path"] in identity.get("path", [])
+            ):
+                result["return"].append({key: deepcopy(value) for key, value in self.container.items()
+                    if key in options["return"]})
+            return result
+        import csv
+        self.calls.append((uri, deepcopy(args), deepcopy(options or {})))
+        with Path(args["importFile"]).open(encoding="utf-8", newline="") as stream:
+            row, = list(csv.DictReader(stream, delimiter="\t"))
+        assert row["Object Path"].upper() == self.container["id"]
+        assert "Audio File" not in row
+        self.container["notes"] = row["Notes"]
+        return {"objects": [deepcopy(self.container)]}
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_exact_table_guid_container_notes_reuses_shared_class_policy(tmp_path, version):
+    client = GuidContainerTabClient(tmp_path, version)
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, version, client=client, language="SFX")
+    table.write_text("Object Path\tNotes\n" + client.container["id"].lower() + "\tupdated container notes\n", encoding="utf-8")
+    original = table.read_bytes(); sources_before = json.loads(json.dumps(client.sources))
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    prepared = shown["artifact"]["prepared_operation"]
+    target, = prepared["verification_plan"]["targets"]
+    assert target["metadata_object_type"] == "RandomSequenceContainer" and target["metadata_class_id"] == 2
+    assert target["canonical_target_path"] == client.container["path"] and target["media_expected"] is False
+    assert prepared["dispatch"]["args"]["importFile"] == str(table.resolve())
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
+    assert client.container["notes"] == "updated container notes" and client.owner["notes"] == "keep owner notes" and client.sources == sources_before
+    assert client.copied.read_bytes() == b"old English media" and table.read_bytes() == original
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
 
 
 def _guid_source_tab_draft(tmp_path, version):
@@ -3199,7 +3253,7 @@ def test_exact_table_guid_owner_and_source_keep_table_and_prove_media(tmp_path, 
 @pytest.mark.parametrize("fault,error", (
     ("missing-guid", "AMBIGUOUS_IDENTITY"),
     ("malformed-guid", "INVALID_IDENTITY"),
-    ("wrong-guid-class", "INVALID_TARGET_TYPE"),
+    ("unsupported-guid-class", "UNSUPPORTED_OBJECT_TYPE"),
     ("wrong-object-type", "INVALID_TARGET_TYPE"),
     ("wrong-source-class", "INVALID_TARGET_TYPE"),
     ("other-language", "IDENTITY_MISMATCH"),
@@ -3213,8 +3267,9 @@ def test_exact_table_guid_targets_reject_missing_wrong_class_and_language(tmp_pa
         client.sources.pop(0)
     elif fault == "malformed-guid":
         table.write_text(table.read_text().replace(client.SOURCE.lower(), "{not-a-guid}"), encoding="utf-8")
-    elif fault == "wrong-guid-class":
-        client.sources[0].update(type="Folder", classId=11)
+    elif fault == "unsupported-guid-class":
+        client.sources[0].update(type="Effect", classId=517)
+        client.extra_type = {"name": "Effect", "type": "Effect", "classId": 517}
     elif fault == "wrong-object-type":
         table.write_text(table.read_text().replace("Notes\n", "Notes\tObject Type\n").replace(
             "requested owner notes\n", "requested owner notes\tSound\n").replace(
