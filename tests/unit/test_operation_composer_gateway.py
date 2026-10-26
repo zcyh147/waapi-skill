@@ -333,13 +333,32 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # This inventory owns the exact seals for both import routes in all lanes;
+    # the Registry unit test separately checks version/prose/hash semantics.
+    assert {
+        f"{operation}@{version}"
+        for operation in ("audio.import", "audio.importTabDelimited")
+        for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+    } <= non_object_set_digests.keys()
+    # Exact Help and the retained native result establish creation for name
+    # alone. Invert only the corrected promise, retaining the previous seal.
+    assert canonical_sha256(non_object_set_digests) == "5da8cc04ba3f0f1596ec4dd13cfa95c7333d3115df8e20360a6a47403e4450c2"
+    association_promise_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.import", version)
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            assert fields["dialogue_event"]["description"] == "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; name/path alone requests Event creation, not a decision-path association. Explicit decision paths remain separate closed support work."
+            fields["dialogue_event"]["description"] = "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; verifies the Entry.owner and AudioNode association, without asserting unspecified decision-path defaults."
+        association_promise_contracts[version] = deepcopy(contract)
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
     # Dialogue creation now owns path syntax and independently proves the
     # Entry.owner / AudioNode link. Invert only the two ordinary row/default
     # field shapes; TSV disclosures and every historical seal stay intact.
     assert canonical_sha256(non_object_set_digests) == "6a7e5b1ccfaf0a5afb714a8fe8f26cfae4219fc8113edc4acb5de068d5e9cb0c"
     previous_dialogue_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.import", version)
+        contract = deepcopy(association_promise_contracts[version])
         props = contract["argument_contract"]["properties"]
         for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
             assert fields["dialogue_event"] == {

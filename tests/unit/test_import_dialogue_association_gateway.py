@@ -34,6 +34,8 @@ class DialogueImportClient(SwitchImportClient):
         self.entry = {'id': self.ENTRY, 'name': '', 'type': 'MultiSwitchEntry', 'classId': self.entry_class,
                       'path': self.event['path'] + r'\[opaque display (MultiSwitchEntry)]',
                       'owner': {'id': self.EVENT}, 'AudioNode': {'id': self.CHILD}}
+        self.effect = False  # Name/path-only native r1 created no Entry.
+        self.event_class = 3014672
         self.event_created = False
         self.linked = False
         self.metadata = deepcopy(AUDIO_NODE)
@@ -69,7 +71,7 @@ class DialogueImportClient(SwitchImportClient):
             if self.switch_requested:
                 for row in result['return']:
                     if row['name']=='SwitchContainer':row['classId']=655376
-            result['return'] += [{'name':'DialogueEvent','classId':3014672,'type':'WObject'},
+            result['return'] += [{'name':'DialogueEvent','classId':self.event_class,'type':'WObject'},
                                  {'name':'MultiSwitchEntry','classId':self.entry_class,'type':'WObject'}]
             return result
         if uri == 'ak.wwise.core.object.getPropertyInfo' and args['property'] == 'AudioNode':
@@ -143,7 +145,7 @@ def _draft(tmp_path, version='2025.1', *, existing=False, regular_event=False, s
 
 
 @pytest.mark.parametrize('version',('2021.1','2022.1','2023.1','2024.1','2025.1'))
-def test_import_creates_bound_dialogue_event_and_verifies_actual_owner_link(tmp_path,version):
+def test_import_creates_bound_dialogue_event_without_implied_association(tmp_path,version):
     command,client = _draft(tmp_path,version)
     command('draft-check'); tx=command('preview-from-draft')['transaction_id']
     shown=command('transaction-show',tx)
@@ -152,7 +154,7 @@ def test_import_creates_bound_dialogue_event_and_verifies_actual_owner_link(tmp_
     command('execute',tx)
     result=command('verify',tx)
     assert result['verified'] is True,result
-    assert client.entry['owner']['id']==client.EVENT and client.entry['AudioNode']['id']==client.CHILD
+    assert client.event_created and not client.linked
     assert Path(client.source['originalFilePath']).read_bytes()==WAV_BYTES
     assert len([u for u,_,_ in client.calls if u=='ak.wwise.core.audio.import'])==1
     assert not any(u.endswith(('.setReference','.set','.create')) for u,_,_ in client.calls)
@@ -173,7 +175,7 @@ def test_existing_sfx_media_and_dialogue_only_reuse_preserves_owner_and_unrelate
 
 
 @pytest.mark.parametrize('fault',('missing','wrong-event'))
-def test_event_creation_and_media_cannot_verify_an_ignored_dialogue_association(tmp_path,fault):
+def test_name_only_creation_accepts_absent_entry_but_rejects_foreign_entry(tmp_path,fault):
     command,client = _draft(tmp_path)
     client.effect=fault!='missing'
     if fault=='wrong-event':client.entry['owner']={'id':'{DDDDDDDD-1111-1111-1111-111111111111}'}
@@ -182,11 +184,14 @@ def test_event_creation_and_media_cannot_verify_an_ignored_dialogue_association(
     command('confirm',tx,'--confirmation-token',shown['confirmation']['token']);command('execute',tx)
     code,result=waapi_gateway.execute_gateway(['--state-dir',str(tmp_path/'state'),'verify',tx],
         env=set_gateway_config(_env(tmp_path),wwise_version='2025.1'),client_factory=lambda _url:client)
+    if fault=='missing':
+        assert code==0 and result['verified'] is True,result
+        return
     assert code==2,result
     assert result['verified'] is False and client.event_created
     assert client.linked == (fault!='missing')
     assert Path(client.source['originalFilePath']).read_bytes()==WAV_BYTES
-    assert any(not row['passed'] and 'Dialogue association' in row['name'] for row in result['verification']['assertions'])
+    assert any(not row['passed'] and 'Dialogue creation' in row['name'] for row in result['verification']['assertions'])
 
 
 @pytest.mark.parametrize('drift',('event-path','metadata','membership'))
@@ -195,7 +200,7 @@ def test_dialogue_event_identity_metadata_and_membership_drift_block_import(tmp_
     command('draft-check');tx=command('preview-from-draft')['transaction_id'];shown=command('transaction-show',tx)
     command('confirm',tx,'--confirmation-token',shown['confirmation']['token'])
     if drift=='event-path':client.event_created=True
-    elif drift=='metadata':client.metadata['restriction']['restrictions'][0]['type']=['Music Segment']
+    elif drift=='metadata':client.event_class=3014673
     else:client.before_links.clear()
     command('execute',tx,expected_error='ROLE_GUARD_MISMATCH')
     assert not any(u=='ak.wwise.core.audio.import' for u,_,_ in client.calls)
@@ -237,7 +242,7 @@ def test_event_and_dialogue_import_verify_both_planned_referrers(tmp_path):
     command('confirm',tx,'--confirmation-token',shown['confirmation']['token']);command('execute',tx)
     result=command('verify',tx)
     assert result['verified'] is True,result
-    assert client.entry['owner']['id']==client.EVENT and client.entry['AudioNode']['id']==client.CHILD
+    assert client.event_created and not client.linked
     assert client.action['parent']['id']==client.REGULAR_EVENT and client.action['Target']['id']==client.CHILD
     assert Path(client.source['originalFilePath']).read_bytes()==WAV_BYTES
     assert len([u for u,_,_ in client.calls if u=='ak.wwise.core.audio.import'])==1
@@ -255,8 +260,8 @@ def test_combined_dialogue_rejects_unplanned_or_incorrect_event_referrers(tmp_pa
     code,result=waapi_gateway.execute_gateway(['--state-dir',str(tmp_path/'state'),'verify',tx],
         env=set_gateway_config(_env(tmp_path),wwise_version='2025.1'),client_factory=lambda _url:client)
     assert code==2 and result['verified'] is False,result
-    assert client.linked and Path(client.source['originalFilePath']).read_bytes()==WAV_BYTES
-    expected='Dialogue association' if fault=='unexpected' else 'Action target is the imported object'
+    assert client.event_created and Path(client.source['originalFilePath']).read_bytes()==WAV_BYTES
+    expected='Dialogue creation' if fault=='unexpected' else 'Action target is the imported object'
     assert any(not row['passed'] and expected in row['name'] for row in result['verification']['assertions'])
 
 
@@ -278,3 +283,17 @@ def test_existing_switch_and_dialogue_reconcile_only_bound_container_and_entry(t
     assert command('verify',tx)['verified'] is True
     assert client.assignments==[*before,{'child':client.CHILD,'stateOrSwitch':client.VALUE}]
     assert client.before_links==links
+
+
+def test_name_only_dialogue_creation_does_not_require_an_entry(tmp_path):
+    # Exact native r1 outcome: media + Play Event + DialogueEvent creation,
+    # Sound referencesTo contains only the Play Action; no @Path was requested.
+    command,client = _draft(tmp_path,regular_event=True)
+    client.effect=False
+    command('draft-check');tx=command('preview-from-draft')['transaction_id'];shown=command('transaction-show',tx)
+    command('confirm',tx,'--confirmation-token',shown['confirmation']['token']);command('execute',tx)
+    result=command('verify',tx)
+    assert result['verified'] is True,result
+    assert client.event_created and not client.linked
+    assert Path(client.source['originalFilePath']).read_bytes()==WAV_BYTES
+    assert not any(u.endswith('getPropertyInfo') and a.get('property')=='AudioNode' for u,a,_ in client.calls)

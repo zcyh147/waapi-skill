@@ -1197,7 +1197,7 @@ def collect_dialogue_read_probe(runtime, *, memberships=False):
 
 
 def collect_dialogue_import_acceptance(runtime):
-    """One basic import creates media, a Play Event and a Dialogue association."""
+    """One basic import creates media, a Play Event and a named DialogueEvent."""
     import xml.etree.ElementTree as ET
     from tests.destructive.test_gateway_workflow_transaction_matrix import (
         REPO_ROOT, _start_business_draft, _update_business_draft, _bind_business_object, _write_fixture_wav,
@@ -1206,12 +1206,12 @@ def collect_dialogue_import_acceptance(runtime):
     output = runtime.state_dir / "dialogue-import-witness.json"
     assert not output.exists(), "Never overwrite an original Dialogue witness"
     category = {"category": "audio-import-dialogue-and-play-event", "status": "FAIL", "transaction_ids": [],
-        "observation_path": str(output), "verifier_strength": "public_verifier_plus_exact_owner_audionode_event_target_media_and_preservation"}
+        "observation_path": str(output), "verifier_strength": "public_verifier_plus_exact_event_creation_target_media_and_preservation"}
     runtime.category_results.append(category)
     report = {"contract": "waapi-skill.dialogue-import-witness/v1", "candidate": runtime.candidate,
         "version": runtime.version, "transaction_budget": 1, "business_effect_verified": False, "stage": "baseline",
         "calls": [], "witness": {}, "observations": {}, "inputs": {}, "failure": None,
-        "scope": "Basic creation/link only; no conditional path, weight, ordering or internal default claim",
+        "scope": "Name/path-only Event creation; no requested decision path or promised association, weight, ordering or internal default claim",
         "limits": {"calls": 64, "reply_bytes": 524288, "receipt_bytes": 4194304}}
     attempted = set()
     def persist():
@@ -1337,11 +1337,12 @@ def collect_dialogue_import_acceptance(runtime):
         assert new_source["source_language"]["name"] == "SFX" and after["source_media"]["sha256"] == report["inputs"][str(media)]["sha256"]
         action, = after["actions"]
         assert action["type"] == "Action" and action["action_type"] == 1 and action["target"]["id"] == sound["id"], action
-        assert len(after["entries"]) == 1, "Exactly one requested Dialogue association must be observed"
-        linked_entry, = after["entries"]
-        assert linked_entry["class_id"] == classes["MultiSwitchEntry"] and linked_entry["owner"]["id"] == dialogue["id"]
-        assert linked_entry["references"]["AudioNode"]["id"] == sound["id"]
-        assert {row["id"] for row in referrers} == {action["id"],linked_entry["id"]}
+        # Name/path-only requests Event creation. Any observed owned Entries
+        # are diagnostics, not a required default decision-path association.
+        for linked_entry in after["entries"]:
+            assert linked_entry["class_id"] == classes["MultiSwitchEntry"] and linked_entry["owner"]["id"] == dialogue["id"]
+            assert linked_entry["references"]["AudioNode"]["id"] == sound["id"]
+        assert {row["id"] for row in referrers} == {action["id"],*(row["id"] for row in after["entries"])}
         assert proof(str(media)) == report["inputs"][str(media)]
         assert code == 0 and verified.get("verified") is True, verified
         report.update(stage="complete",business_effect_verified=True); category["status"]="PASS"

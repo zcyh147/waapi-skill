@@ -12,6 +12,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from tests.support.compound_undo import compound_undo_request
 
+from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.builders.common import SemanticValidationError  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImports]
     allowed_import_hierarchy_roots,
@@ -269,7 +270,9 @@ def test_input_mode_selection_is_isolated_by_exact_operation_not_shared_native_u
     }
 
 
-def test_operation_request_schema_digest_owns_only_versioned_machine_contract() -> None:
+def test_operation_request_schema_digest_owns_only_versioned_machine_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     contract_2022 = operation_request_machine_contract("object.set", "2022.1")
     contract_2025 = operation_request_machine_contract("object.set", "2025.1")
 
@@ -286,24 +289,70 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     # the closed RTPC List variant; b06dfe1c names its object.set owner inside
     # that machine schema (nested descriptions remain sealed).
     assert operation_request_schema_digest("object.set", "2022.1") == (
+        "6a85d5221d1589c6684226846b64d2ec9780b52d2c0514908b581479e8153e0c"
+    )
+    # Invert only reviewed owned ControlInput construction (20cc2a6f), exact
+    # existing-GUID rename semantics (17cfcdd7), and staged Voice provenance
+    # (74920639/5afb9669); retain the previous complete machine-contract seal.
+    previous_set = copy.deepcopy(contract_2022)
+    assert previous_set["optional_arguments"].pop() == "voice_source_staging"
+    assert previous_set["argument_contract"]["optional"].pop() == "voice_source_staging"
+    set_fields = previous_set["argument_contract"]["properties"]
+    assert set_fields.pop("voice_source_staging") == {
+        "type": "object",
+        "description": "Gateway-generated exact staged declaration/provenance; strictly reparsed, never caller-authored.",
+    }
+    row_fields = set_fields["objects"]["items"]["properties"]
+    assert row_fields["name"].pop("description") == (
+        "Exact new name of this existing GUID; child creation conflict policy does not choose a different name."
+    )
+    assert row_fields["on_name_conflict"].pop("description") == (
+        "Collision policy for new child/list-member creation; existing GUID name edits remain exact."
+    )
+    list_variants = row_fields["lists"]["items"]["properties"]["objects"]["items"]["oneOf"]
+    for fields in (row_fields, row_fields["children"]["items"]["properties"],
+                   list_variants[0]["properties"]):
+        variants = fields["references"]["items"]["properties"]["target"]["oneOf"]
+        assert variants.pop(1)["required"] == ["new_control_input"]
+    control = list_variants[1]["properties"]["rtpc"]["properties"]["control_input"]
+    assert len(control["oneOf"]) == 2
+    assert control["oneOf"][1]["required"] == ["new_control_input"]
+    control["oneOf"] = control["oneOf"][0]["oneOf"]
+    assert canonical_sha256(previous_set) == (
         "6085aea6f7d6397947c36d245497ca9300d281fe816f30cd726d659ea56b6a97"
     )
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
     )
-    # Reviewed closure adds exact Boolean conditions and bounded recursive activation.
-    assert operation_request_schema_digest("audio.import", "2022.1") == (
-        "07210c0a9f7ca6f9889c92fa69cee39a3279372cec8128823c1395fd5cb40861"
-    )
-    assert operation_request_schema_digest("audio.import", "2025.1") == (
-        "0a35fbdef3e729798483979f9626044c644f9403765d9530681ee854ecc478bc"
-    )
-    assert operation_request_schema_digest(
-        "audio.importTabDelimited", "2022.1"
-    ) == "66596c320b3cb9905249882d588ce91be6fd13c0ab683f8114ca7399d949c3d7"
-    assert operation_request_schema_digest(
-        "audio.importTabDelimited", "2025.1"
-    ) == "231a06eaa5f85cbd1b842af68e7ec93eb096dad57f918b85140a2a04642530c3"
+    # The composer inventory solely owns exact import seals and their history.
+    # Here prove version binding, prose exclusion and machine-field sensitivity.
+    import wwise_waapi.operation_registry as registry
+
+    import_names = ("audio.import", "audio.importTabDelimited")
+    versions = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+    import_digests = {}
+    for name in import_names:
+        for version in versions:
+            contract = operation_request_machine_contract(name, version)
+            assert contract["operation"] == name and contract["version"] == version
+            assert contract["request_contract"] == OPERATION_REQUEST_CONTRACT
+            assert not {"summary", "selection_guidance", "next_step"} & contract.keys()
+            import_digests[name, version] = operation_request_schema_digest(name, version)
+    assert len(set(import_digests.values())) == 10
+    prose_specs = dict(registry.OPERATION_SPECS)
+    for name in import_names:
+        prose_specs[name] = replace(prose_specs[name], summary="Different human summary",
+            selection_guidance={"human_hint": "Different routing prose"}, next_step="Different next step")
+    monkeypatch.setattr(registry, "OPERATION_SPECS", prose_specs)
+    for (name, version), digest in import_digests.items():
+        assert operation_request_schema_digest(name, version) == digest
+    machine_specs = dict(prose_specs)
+    for name in import_names:
+        machine_specs[name] = replace(machine_specs[name],
+            constraints=(*machine_specs[name].constraints, "Different machine validity constraint"))
+    monkeypatch.setattr(registry, "OPERATION_SPECS", machine_specs)
+    for (name, version), digest in import_digests.items():
+        assert operation_request_schema_digest(name, version) != digest
     assert contract_2025["argument_contract"] != {}
 
     with pytest.raises(OperationContractError, match="Unknown closed operation"):
