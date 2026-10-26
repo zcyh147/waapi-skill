@@ -2627,4 +2627,3 @@ def test_localized_exact_table_new_language_source_is_independent_of_default_act
     assert client.owner["activeSource"]["id"] == client.OTHER_SOURCE
     assert client.sources[1]["notes"] == "keep Japanese notes"
     assert client.other_file.read_bytes() == b"keep Japanese media"
-
