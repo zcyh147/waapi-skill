@@ -39,3 +39,14 @@ Complete only the exact branch scope and evidence owned by this ticket. A native
 
 This resolves only that acceptance decision. Other #182 obligations remain
 open; the separate all-five-version GUID TSV question remains unapproved.
+
+## User-approved Dialogue acceptance method — 2026-10-27
+
+Apply [proportional Dialogue acceptance](../SPEC.md#user-approved-proportional-dialogue-acceptance--2026-10-27):
+closed wrapper, program proof and one representative successful owned native
+basic flow. Source/program proof may establish explicit condition inputs;
+internal ordering/default matrices and comprehensive native QA are not required.
+Documented inputs, five-version mapping and existing Gateway safety/outcome
+requirements remain in scope. The known Event-plus-Dialogue false failure still
+requires repair. Preserve raw evidence and unknowns; this method excludes no
+Dialogue feature and does not close this ticket.

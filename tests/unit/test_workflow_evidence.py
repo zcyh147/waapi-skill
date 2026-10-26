@@ -977,6 +977,15 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
 
 @pytest.mark.parametrize("fault", (None, "incomplete", "transport-error"))
 def test_dialogue_read_probe_reaches_persisted_final_writer_without_association_claim(tmp_path, monkeypatch, fault):
+    _assert_dialogue_probe_final_writer(tmp_path, monkeypatch, fault=fault)
+
+
+@pytest.mark.parametrize("fault", (None, "incomplete", "wrong-owner", "structured-unsupported"))
+def test_dialogue_membership_probe_reaches_persisted_final_writer_without_order_claim(tmp_path, monkeypatch, fault):
+    _assert_dialogue_probe_final_writer(tmp_path, monkeypatch, fault=fault, memberships=True)
+
+
+def _assert_dialogue_probe_final_writer(tmp_path, monkeypatch, *, fault, memberships=False):
     """Synthetic public packets test collection honesty, never native member shape."""
     import hashlib
     import json
@@ -995,18 +1004,57 @@ def test_dialogue_read_probe_reaches_persisted_final_writer_without_association_
     def raw(argv):
         sent.append(list(argv))
         packet = {"ok": True, "detected_version": "2025.1", "endpoint": endpoint}
+        if argv[0] == "query-schema":
+            schema = workflow.waapi_gateway.execute_gateway(["--version", "2025.1", "query-schema", "--advanced"])[1]
+            return 0, schema
+        if memberships and argv[0] == "query-object" and "--advanced-waql" in argv:
+            source = json.loads((runtime.state_dir / "dialogue-list-read-probe.json").read_text())["source_scope"]
+            expression = argv[argv.index("--advanced-waql") + 1]
+            kind = expression.split()[2]
+            if fault == "structured-unsupported":
+                packet.update(ok=False, error_code="SYNTHETIC_UNSUPPORTED_ENUMERATION")
+                return 2, packet
+            scopes = {"MultiSwitchEntry": (source["event_entry_ids"], source["event"]["id"]),
+                "ArgumentsSlot": ([row["xml_id"] for row in source["argument_slots"]], source["event"]["id"]),
+                "EntryPathSlot": ([row["xml_id"] for row in source["entry_path_slots"]], source["entry"]["id"])}
+            ids, owner = scopes[kind]
+            assert expression == f'from type {kind} where owner.id = "{owner}"'
+            # Deliberately synthetic opaque identities, not native Slot paths.
+            rows = [{"id": identity, "name": "", "type": kind, "path": "<synthetic opaque member identity>",
+                "class_id": next(row["classId"] for row in catalog if row["name"] == kind),
+                "owner": {"id": owner if fault != "wrong-owner" else source["sound"]["id"]}} for identity in ids]
+            original_call = client.call
+            native_rows = [{("classId" if key == "class_id" else key): value for key, value in row.items()} for row in rows]
+            def native_query(uri, args=None, options=None):
+                if uri == "ak.wwise.core.object.get" and args.get("waql", "").startswith("from type " + kind + " "):
+                    client.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options)))
+                    assert args["waql"].startswith(expression + " take ")
+                    return {"return": [{key: copy.deepcopy(row[key]) for key in options["return"] if key in row} for row in native_rows]}
+                return original_call(uri, args, options)
+            monkeypatch.setattr(client, "call", native_query)
+            try:
+                code, packet = workflow.waapi_gateway.execute_gateway(["--state-dir", str(runtime.state_dir), *argv], env=runtime.env)
+            finally:
+                monkeypatch.setattr(client, "call", original_call)
+            assert code == 0, packet
+            if fault == "incomplete": packet.update(projection_complete=False, status="partial")
+            return code, packet
         if argv[0] == "status":
             packet["agent_result"] = {"project": {"path": str(runtime.sandbox.sandbox_project)}}
         elif argv[:2] == ["metadata", "types"]:
             if fault == "transport-error": raise RuntimeError("synthetic Gateway transport failure")
             packet["agent_result"] = {"types": [{**row, "selection": "synthetic-type-" + row["name"]}
-                for row in catalog if row["name"] in ("DialogueEvent", "MultiSwitchEntry")], "complete": True}
+                for row in catalog if row["name"] in (("MultiSwitchEntry", "ArgumentsSlot", "EntryPathSlot") if memberships else ("DialogueEvent", "MultiSwitchEntry"))], "complete": True}
         elif argv[0] == "metadata":
             # These minimal metadata transport packets are synthetic and based
             # only on documented field kinds, never a claimed live response.
             # Do not fabricate any native Entry object/member projection.
             if argv[1] == "list":
-                fields = ("Entries", "Arguments") if any("DialogueEvent" in word for word in argv) else ("AudioNode",)
+                if memberships:
+                    # Omitted reference metadata is retained without guessing a getter.
+                    fields = ()
+                else:
+                    fields = ("Entries", "Arguments") if any("DialogueEvent" in word for word in argv) else ("AudioNode",)
                 packet["agent_result"] = {"fields": [{"name": field, "selection": "synthetic-field-" + field} for field in fields], "complete": True}
             else:
                 name = argv[argv.index("--selection") + 1].removeprefix("synthetic-field-")
@@ -1023,24 +1071,38 @@ def test_dialogue_read_probe_reaches_persisted_final_writer_without_association_
         else: raise AssertionError(argv)
         return 0, packet
     monkeypatch.setattr(workflow._WorkflowSandboxRuntime, "raw_gateway", lambda _runtime, argv: raw(argv))
-    node = "test_read_only_dialogue_association_metadata_observation"
+    node = ("test_read_only_dialogue_list_membership_observation" if memberships
+        else "test_read_only_dialogue_association_metadata_observation")
     error = None
     try: getattr(workflow, node)(runtime)
     except (AssertionError, RuntimeError) as exc: error = exc
     category, = runtime.category_results
     body = Path(category["observation_path"]).read_bytes(); report = json.loads(body)
     final = _finish(context, tmp_path, monkeypatch, [(node, error)])[-1]
-    assert (error is None) == (fault is None), error
-    assert final["invocation"]["outcome"] == ("PASS" if fault is None else "FAIL")
+    succeeds = fault is None or (memberships and fault == "structured-unsupported")
+    assert (error is None) is succeeds, error
+    assert final["invocation"]["outcome"] == ("PASS" if succeeds else "FAIL")
     assert final["transactions"] == [] and category["transaction_ids"] == []
     assert final["categories"][0]["observation_sha256"] == hashlib.sha256(body).hexdigest()
-    assert report["collection_complete"] is (fault is None)
+    assert report["collection_complete"] is succeeds
     assert report["business_effect_verified"] is False and report["coverage_credit"] is False
     assert report["mutation_allowed"] is False
-    assert all(argv[0] in ("status", "metadata", "query-object") for argv in sent)
+    assert all(argv[0] in ("status", "metadata", "query-object", "query-schema") for argv in sent)
     assert report["source_scope"]["entry_path_slot_count"] == 3
     assert report["source_scope"]["event_entry_count"] == 24
-    assert final["residual_state"]["sandbox"] == ("deleted" if fault is None else "quarantined")
+    assert final["residual_state"]["sandbox"] == ("deleted" if succeeds else "quarantined")
+    if memberships:
+        assert report["ordering_proven"] is False
+        if succeeds:
+            assert report["boundaries"], "Omitted/unsupported observations stay visible"
+            assert report["membership_reads"]
+            if fault == "structured-unsupported":
+                assert all(row["rows"] is None for row in report["membership_reads"])
+            else:
+                assert [len(row["rows"]) for row in report["membership_reads"]] == [24, 3, 3]
+        else:
+            assert report["failure"] and report["calls"]
+        return
     if fault is None:
         assert report["boundaries"] and any(row.get("error_code") == "SYNTHETIC_UNSUPPORTED_READ" for row in report["boundaries"])
         assert report["association_status"] == "observed_requires_review"
