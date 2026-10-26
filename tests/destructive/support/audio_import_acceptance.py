@@ -755,7 +755,7 @@ def collect_switch_import_acceptance(runtime):
         value_id = "{8E435F66-9998-4396-8BBC-1BEAF62FD304}"
         container = exact(container_id, fields=("SwitchGroupOrStateGroup",))
         assert (container["name"], container["type"], container["class_id"], container["path"], container["parent"]["id"]) == (
-            "Player_Footsteps", "SwitchContainer", 655376, r"\Containers\Default Work Unit\PlayerFootstepsMaintenance\Player_Footsteps", "{8570736F-FDCF-4C43-AF64-C99A25B16722}"), container
+            "Player_Footsteps", "SwitchContainer", 655376, r"\Containers\Default Work Unit\WAAPI Skill Integration V2\PlayerFootstepsMaintenance\Player_Footsteps", "{8570736F-FDCF-4C43-AF64-C99A25B16722}"), container
         assert container["references"]["SwitchGroupOrStateGroup"]["id"] == group_id, container
         group = exact(group_id)
         assert (group["name"], group["type"], group["class_id"], group["path"], group["parent"]["id"]) == (

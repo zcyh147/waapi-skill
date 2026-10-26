@@ -379,12 +379,19 @@ def test_switch_import_native_witness_reaches_persisted_final_writer(tmp_path, m
             super().__init__(tmp_path, "2025.1")
             self.objects, self.import_count, self.assignments = {}, 0, []
             document = ET.parse(source / "Containers/Default Work Unit.wwu")
-            work = document.find(".//WorkUnit"); parent = document.find('.//PropertyContainer[@Name="PlayerFootstepsMaintenance"]')
-            self.objects[work.attrib["ID"]] = self.object(work, r"\Containers", None)
-            self.objects[parent.attrib["ID"]] = self.object(parent, r"\Containers\Default Work Unit", work.attrib["ID"])
-            container = parent.find("./ChildrenList/SwitchContainer")
-            self.container = self.object(container, self.objects[parent.attrib["ID"]]["path"], parent.attrib["ID"])
-            self.objects[self.container["id"]] = self.container
+            def bind_ancestry(document, target, hierarchy):
+                parents = {child: parent for parent in document.iter() for child in parent}
+                chain, node = [], target
+                while node is not None:
+                    if node.tag in classes and {"ID", "Name"} <= node.attrib.keys(): chain.append(node)
+                    node = parents.get(node)
+                path, identity = "\\" + hierarchy, None
+                for node in reversed(chain):
+                    row = self.object(node, path, identity); self.objects[row["id"]] = row
+                    path, identity = row["path"], row["id"]
+                return self.objects[target.attrib["ID"]]
+            container = document.find('.//SwitchContainer[@Name="Player_Footsteps"]')
+            self.container = bind_ancestry(document, container, "Containers")
             def children(node, owner):
                 for child in node.findall("./ChildrenList/*"):
                     row = self.object(child, owner["path"], owner["id"])
@@ -399,10 +406,8 @@ def test_switch_import_native_witness_reaches_persisted_final_writer(tmp_path, m
                     children(child, row)
             children(container, self.container)
             group_doc = ET.parse(source / "Switches/Default Work Unit.wwu")
-            group_work = group_doc.find(".//WorkUnit")
             group = group_doc.find('.//SwitchGroup[@Name="WAAPI_V2_Surface"]')
-            self.group = self.object(group, r"\Switches\Default Work Unit", group_work.attrib["ID"])
-            self.objects[self.group["id"]] = self.group
+            self.group = bind_ancestry(group_doc, group, "Switches")
             for value in group.findall("./ChildrenList/Switch"):
                 row = self.object(value, self.group["path"], self.group["id"]); self.objects[row["id"]] = row
             self.container["SwitchGroupOrStateGroup"] = {"id": self.group["id"]}
