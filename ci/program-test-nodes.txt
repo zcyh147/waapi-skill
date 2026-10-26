@@ -311,6 +311,7 @@ tests/unit/test_namespaced_business_condition_fixture.py
 tests/unit/test_namespaced_business_output_fixture.py
 tests/unit/test_namespaced_query_fixture.py
 tests/unit/test_object_query_origin_evidence.py
+tests/unit/test_older_codec_read_probe.py
 tests/unit/test_older_playlist_read_probe.py
 tests/unit/test_owned_named_list_stages_gateway.py
 tests/unit/test_owned_rtpc_control_input_gateway.py
