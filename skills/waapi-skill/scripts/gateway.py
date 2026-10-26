@@ -32765,6 +32765,9 @@ def transaction_show_summary(
             "field": proof["field"], "condition": proof["condition"], "platform": proof["platform"],
             "native_enabled_state": proof["native_enabled_state"], "ancestry_count": len(proof["rows"]),
             "proof_sha256": canonical_sha256(proof)} for proof in structural]
+    owned_replacements = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("owned_control_input_replacements")
+    if owned_replacements:
+        derived_notice["owned_control_input_replacements"] = owned_replacements
     source_linkage = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("source_linkage")
     blend_assignment = prepared.get("pre_state", {}).get("blend_assignment")
     conversion_plugin = prepared.get("pre_state", {}).get("conversion_plugin")

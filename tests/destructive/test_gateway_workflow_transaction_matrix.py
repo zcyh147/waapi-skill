@@ -7086,15 +7086,17 @@ def test_rtpc_graph_acceptance_across_selected_version(workflow_sandbox_runtime:
     assert category['status'] == 'PASS', category
 
 
-def _collect_owned_control_input_disposition(runtime: _WorkflowSandboxRuntime, *, name: str) -> dict[str, Any]:
+def _collect_owned_control_input_disposition(runtime: _WorkflowSandboxRuntime, *, name: str, replace_with_owned: bool = False) -> dict[str, Any]:
     """Observe old-custom lifetime after a shared-reference change; no custom→custom claim."""
-    output = runtime.state_dir / 'owned-control-input-disposition-diagnostic.json'
-    category = {'category': 'owned-control-input-disposition-diagnostic', 'status': 'FAIL',
-        'observation_path': str(output), 'verifier_strength': 'bounded_disposition_observation_only_no_owned_replacement_acceptance'}
+    category_name = 'owned-control-input-replacement-acceptance' if replace_with_owned else 'owned-control-input-disposition-diagnostic'
+    output = runtime.state_dir / (category_name + '.json')
+    category = {'category': category_name, 'status': 'FAIL',
+        'observation_path': str(output), 'verifier_strength': ('gateway_verified_owned_replacement_plus_independent_GUID_class_owner_Curve_and_old_absence'
+            if replace_with_owned else 'bounded_disposition_observation_only_no_owned_replacement_acceptance')}
     runtime.category_results.append(category)
     receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
         'complete': False, 'owned_to_owned_acceptance': False, 'business_effect_verified': False,
-        'observational_scope': 'owned_ControlInput_displaced_by_verified_shared_target_only',
+        'observational_scope': ('owned_ControlInput_replaced_by_fresh_owned_Time_with_required_old_absence' if replace_with_owned else 'owned_ControlInput_displaced_by_verified_shared_target_only'),
         'old_input_disposition': {'state': 'unobserved'},
         'lifecycle_acceptance': 'Existing host-category-evidence/v3 finalizer owns source, host and cleanup proof'}
     def persist():
@@ -7145,6 +7147,10 @@ def _collect_owned_control_input_disposition(runtime: _WorkflowSandboxRuntime, *
         phase.update(transaction_id=tx, artifact_hash=preview['artifact_hash'],
             compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
         assert shown['artifact']['request']['operation'] == operation and phase['compiled_native_request']['uri'] == uri, shown
+        if replace_with_owned:
+            phase['public_preview_summary'] = gateway.gateway(['transaction-show', tx, '--summary-only'], live=False)['preview_summary']
+            notice, = phase['public_preview_summary']['owned_control_input_replacements']
+            assert notice['intent'] == 'remove_previous_owned_ControlInput', notice
         gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
         phase['native_outcome'] = 'indeterminate'
         code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code, 'payload': executed}
@@ -7155,6 +7161,8 @@ def _collect_owned_control_input_disposition(runtime: _WorkflowSandboxRuntime, *
         final = gateway.gateway(['transaction-show', tx], live=False)
         assert final['artifact'] == shown['artifact'], 'Stored immutable Preview changed'
         phase['artifact_unchanged'] = True
+        phase['final_verification'] = next(event['details']['verification'] for event in final['events']
+            if event['event_type'] == 'verification_recorded')
         return phase
     def ref(row, token):
         value = row.get('references', {}).get(token)
@@ -7177,40 +7185,70 @@ def _collect_owned_control_input_disposition(runtime: _WorkflowSandboxRuntime, *
         curve = member['curve']['id']
         receipt['before'] = before
         assert len({owner, rtpc, old, curve}) == 4
-        setup = _start_business_draft(gateway, 'object.set')
-        parent = _bind_business_object(gateway, setup, path_segments=('Game Parameters', 'Default Work Unit'))
-        kind = _discover_business_type(gateway, setup, meaning='GameParameter', role='object', expected_label='GameParameter')
-        duration = member['control_input']['properties']['TimeModDuration']
-        assert type(duration) in (int, float) and math.isfinite(duration) and duration > 0, member
-        field_values = []
-        for token, value in (('Min', 0), ('Max', duration)):
-            found = _update_business_draft(gateway, setup, 'draft-discover-fields',
-                ['--type-handle', kind, '--meaning', token], live=True)
-            field_values.extend(('--field-value', discovered_business_field_handle(found, token), json.dumps(value)))
-        receipt['shared_target_domain'] = {'minimum': 0, 'maximum': duration,
-            'source': 'observed_custom_TimeModDuration_seconds', 'curve_points': member['curve']['curve_points']}
-        _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', 'shared',
-            '--parent-handle', parent, '--kind', kind, '--name', name + '_Shared', '--field', 'notes', 'Keep shared target',
-            *field_values], live=False)
-        complete(setup, 'shared_target_setup_no_credit', 'object.set', 'ak.wwise.core.object.set')
-        shared, = query([*(arg for segment in ('Game Parameters', 'Default Work Unit', name + '_Shared')
-            for arg in ('--path-segment', segment))])
-        identity = exact(shared['id'])
-        assert identity == shared and shared['type'] == 'GameParameter' and shared['class_id'] == 1507344, shared
-        shared = exact(shared['id'], ('Min', 'Max'))
-        assert shared.get('owner') is None and isinstance(shared.get('parent'), Mapping), shared
-        assert shared['properties'] == {'Min': 0, 'Max': duration}, shared
-        receipt['shared_target_before'] = shared
-        draft = _start_business_draft(gateway, 'object.setReference')
-        target = _bind_business_object(gateway, draft, object_id=rtpc)
-        control = _bind_business_object(gateway, draft, object_id=shared['id'])
-        found = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target, '--meaning', 'ControlInput'], live=True)
-        field = discovered_business_field_handle(found, 'ControlInput')
-        _update_business_draft(gateway, draft, 'draft-declare-field-change', ['--object-handle', target,
-            '--field-handle', field, '--target-handle', control], live=False)
-        complete(draft, 'displace_owned_with_shared', 'object.setReference', 'ak.wwise.core.object.setReference')
+        if replace_with_owned:
+            draft = _start_business_draft(gateway, 'object.set')
+            target = _bind_business_object(gateway, draft, object_id=rtpc)
+            found = _update_business_draft(gateway, draft, 'draft-discover-fields',
+                ['--object-handle', target, '--meaning', 'ControlInput'], live=True)
+            field = discovered_business_field_handle(found, 'ControlInput')
+            kind = _discover_business_type(gateway, draft, meaning='ModulatorTime', role='object', expected_label='ModulatorTime')
+            values = []
+            for token, value in (('TimeModDuration', member['control_input']['properties']['TimeModDuration']),
+                    ('EnvelopeStopPlayback', False)):
+                found = _update_business_draft(gateway, draft, 'draft-discover-fields',
+                    ['--type-handle', kind, '--meaning', token], live=True)
+                values.extend(('--new-control-input-field-value', discovered_business_field_handle(found, token), json.dumps(value)))
+            _update_business_draft(gateway, draft, 'draft-declare-field-change', ['--object-handle', target,
+                '--field-handle', field, '--new-control-input-kind', kind, '--new-control-input-name', 'TimeModFresh',
+                '--new-control-input-notes', 'New time control', *values], live=False)
+            phase = complete(draft, 'replace_owned_with_owned', 'object.set', 'ak.wwise.core.object.set')
+        else:
+            setup = _start_business_draft(gateway, 'object.set')
+            parent = _bind_business_object(gateway, setup, path_segments=('Game Parameters', 'Default Work Unit'))
+            kind = _discover_business_type(gateway, setup, meaning='GameParameter', role='object', expected_label='GameParameter')
+            duration = member['control_input']['properties']['TimeModDuration']
+            assert type(duration) in (int, float) and math.isfinite(duration) and duration > 0, member
+            field_values = []
+            for token, value in (('Min', 0), ('Max', duration)):
+                found = _update_business_draft(gateway, setup, 'draft-discover-fields',
+                    ['--type-handle', kind, '--meaning', token], live=True)
+                field_values.extend(('--field-value', discovered_business_field_handle(found, token), json.dumps(value)))
+            receipt['shared_target_domain'] = {'minimum': 0, 'maximum': duration,
+                'source': 'observed_custom_TimeModDuration_seconds', 'curve_points': member['curve']['curve_points']}
+            _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', 'shared',
+                '--parent-handle', parent, '--kind', kind, '--name', name + '_Shared', '--field', 'notes', 'Keep shared target',
+                *field_values], live=False)
+            complete(setup, 'shared_target_setup_no_credit', 'object.set', 'ak.wwise.core.object.set')
+            shared, = query([*(arg for segment in ('Game Parameters', 'Default Work Unit', name + '_Shared')
+                for arg in ('--path-segment', segment))])
+            identity = exact(shared['id'])
+            assert identity == shared and shared['type'] == 'GameParameter' and shared['class_id'] == 1507344, shared
+            shared = exact(shared['id'], ('Min', 'Max'))
+            assert shared.get('owner') is None and isinstance(shared.get('parent'), Mapping), shared
+            assert shared['properties'] == {'Min': 0, 'Max': duration}, shared
+            receipt['shared_target_before'] = shared
+            draft = _start_business_draft(gateway, 'object.setReference')
+            target = _bind_business_object(gateway, draft, object_id=rtpc)
+            control = _bind_business_object(gateway, draft, object_id=shared['id'])
+            found = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target, '--meaning', 'ControlInput'], live=True)
+            field = discovered_business_field_handle(found, 'ControlInput')
+            _update_business_draft(gateway, draft, 'draft-declare-field-change', ['--object-handle', target,
+                '--field-handle', field, '--target-handle', control], live=False)
+            complete(draft, 'displace_owned_with_shared', 'object.setReference', 'ak.wwise.core.object.setReference')
         after = exact(rtpc, ('PropertyName', 'ControlInput', 'Curve'))
-        assert ref(after, 'ControlInput') == shared['id'] and ref(after, 'Curve') == curve, after
+        assert ref(after, 'Curve') == curve, after
+        if replace_with_owned:
+            new_id = ref(after, 'ControlInput')
+            assert new_id not in {old, rtpc, curve, owner}, after
+            new_input = exact(new_id, ('TimeModDuration', 'EnvelopeStopPlayback'))
+            assert new_input['type'] == 'ModulatorTime' and new_input['class_id'] == 5111824 and new_input['name'] == 'TimeModFresh', new_input
+            assert new_input['owner']['id'] == rtpc and new_input['notes'] == 'New time control', new_input
+            assert new_input['properties'] == member['control_input']['properties'], new_input
+            bound, = [check['evidence'] for check in phase['final_verification']['assertions']
+                if check.get('kind') == 'verified_owned_control_input_identity' and check['passed'] is True]
+            assert bound['object']['id'] == new_id and bound['owner_id'] == rtpc, bound
+        else:
+            assert ref(after, 'ControlInput') == shared['id'], after
         preserved_before, preserved_after = deepcopy(member['object']), deepcopy(after)
         for row in (preserved_before, preserved_after):
             row['references'].pop('ControlInput')
@@ -7220,12 +7258,14 @@ def _collect_owned_control_input_disposition(runtime: _WorkflowSandboxRuntime, *
         preserved_before.pop('path'); preserved_after.pop('path')
         assert preserved_after == preserved_before, (preserved_before, preserved_after)
         observed = {'rtpc': after, 'curve': exact(curve, curve=True), 'owner': exact(owner, ('Volume',)),
-            'members': query(['--advanced-waql', f'from object "{owner}" select @RTPC']), 'shared_target': exact(shared['id'], ('Min', 'Max'))}
+            'members': query(['--advanced-waql', f'from object "{owner}" select @RTPC'])}
+        observed.update({'new_input': new_input} if replace_with_owned else {'shared_target': exact(shared['id'], ('Min', 'Max'))})
         receipt['after'] = observed
         curve_before, curve_after = deepcopy(member['curve']), deepcopy(observed['curve'])
         curve_before.pop('path'); curve_after.pop('path')
         assert curve_after == curve_before and observed['owner'] == before['owner'], observed
-        assert [row['id'] for row in observed['members']] == [rtpc] and observed['shared_target'] == shared, observed
+        assert [row['id'] for row in observed['members']] == [rtpc], observed
+        if not replace_with_owned: assert observed['shared_target'] == shared, observed
         # The existing normalizer is used only after binding the complete public
         # failure to this exact GUID, version, endpoint and bounded query frame.
         code, payload = gateway.raw_gateway(['query-object', '--exact-id', old, '--max-results', '2', '--detail', *projection])
@@ -7253,6 +7293,7 @@ def _collect_owned_control_input_disposition(runtime: _WorkflowSandboxRuntime, *
             assert normalized.get('ok') is True and normalized.get('result') == {'return': []}, payload
             receipt['absence_normalization'] = normalized['normalization']
             rows = []
+        if replace_with_owned: assert rows == [], 'Previous owned input must be absent; no automatic cleanup'
         if rows:
             row, = rows
             assert row['id'] == old and row['type'] == 'ModulatorTime' and row['class_id'] == 5111824, row
@@ -7261,6 +7302,7 @@ def _collect_owned_control_input_disposition(runtime: _WorkflowSandboxRuntime, *
                 'owner_observed': row.get('owner'), 'owner_unavailable': 'owner' in row.get('unavailable_fields', [])}
         else:
             receipt['old_input_disposition'] = {'state': 'absent', 'id': old}
+        receipt['owned_to_owned_acceptance'] = receipt['business_effect_verified'] = replace_with_owned
         receipt['complete'] = True
         category['status'] = 'PASS'
         return category
@@ -7277,6 +7319,15 @@ def _collect_owned_control_input_disposition(runtime: _WorkflowSandboxRuntime, *
 def test_owned_control_input_disposition_diagnostic_2022(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
     category = _collect_owned_control_input_disposition(workflow_sandbox_runtime,
         name='WAAPI_INPUT_LIFETIME_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+@pytest.mark.skipif(os.environ.get('WWISE_VERSION') != '2022.1', reason='First owned-input replacement witness is pinned to2022.1')
+def test_owned_control_input_replacement_2022_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    category = _collect_owned_control_input_disposition(workflow_sandbox_runtime,
+        name='WAAPI_INPUT_REPLACE_' + uuid.uuid4().hex[:10], replace_with_owned=True)
     assert category['status'] == 'PASS', category
 
 

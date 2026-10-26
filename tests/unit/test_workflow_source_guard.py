@@ -5828,3 +5828,54 @@ def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path,
     assert retained['status'] == ('FAIL' if failed else 'PASS')  # Program fake finalization only.
     assert json.loads(Path(retained['observation_path']).read_text())['old_input_disposition']['state'] == state
     assert events.index('shutdown') < events.index('release')
+
+
+@pytest.mark.parametrize('fault', [None, 'retained-old', 'missing-old-observation'])
+def test_owned_to_new_owned_collector_reaches_current_final_writer(tmp_path, workflow, monkeypatch, fault):
+    runtime, commands, writes, task = _rtpc_graph_runtime(tmp_path / 'collector', workflow, '2022.1')
+    original, removed = task.call, None
+    def call(uri, args=None, options=None):
+        nonlocal removed
+        if removed and uri.endswith('object.get') and args.get('from', {}).get('id') == [removed] and fault == 'missing-old-observation':
+            return {}
+        old = None
+        if uri.endswith('object.set') and len(writes) == 2:
+            node, = args['objects']
+            old = task.objects[node['object']]['@ControlInput']['id']
+        result = original(uri, args, options)
+        if old:
+            rtpc = args['objects'][0]['object']
+            task.objects[rtpc]['path'] = r'\reference-derived-fresh-RTPC'
+            task.objects[task.objects[rtpc]['@Curve']['id']]['path'] = r'\reference-derived-fresh-RTPC\<Unnamed Curve>'
+            if fault != 'retained-old': task.objects.pop(old); removed = old
+        return result
+    task.call = call
+    if fault:
+        with pytest.raises(AssertionError):
+            workflow._collect_owned_control_input_disposition(runtime, name='WAAPI_RTPC_TEST', replace_with_owned=True)
+        category = next(row for row in runtime.category_results if row['category'] == 'owned-control-input-replacement-acceptance')
+    else:
+        category = workflow._collect_owned_control_input_disposition(runtime, name='WAAPI_RTPC_TEST', replace_with_owned=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == ('FAIL' if fault else 'PASS') and receipt['owned_to_owned_acceptance'] is (fault is None)
+    assert receipt['old_input_disposition']['state'] == ('unobserved' if fault else 'absent')
+    assert len(writes) == 3 and [cmd[0] for cmd in commands].count('execute') == 3
+    assert len(receipt['transactions']) == 1
+    if not fault: assert receipt['transactions'][0]['artifact_unchanged'] is True
+    else: assert receipt['transactions'][0]['verify']['exit_code'] == 2
+    assert not any(row['type'] == 'GameParameter' for row in task.objects.values())
+    (tmp_path / 'lifecycle').mkdir()
+    fixture, events, _records = _fixture_run(tmp_path / 'lifecycle', workflow, monkeypatch)
+    from tests.destructive.support import category_evidence
+    target = tmp_path / 'category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    monkeypatch.setattr(exact_real_evidence, 'append_category_evidence', category_evidence.append_category_evidence)
+    fixture_runtime = next(fixture)
+    fixture_runtime.category_results.extend(runtime.category_results)
+    with pytest.raises(StopIteration): next(fixture)
+    final = json.loads(target.read_text().splitlines()[-1])
+    retained, = [row for row in final['categories'] if row['category'] == 'owned-control-input-replacement-acceptance']
+    assert final['invocation']['phase'] == 'final' and retained['status'] == ('FAIL' if fault else 'PASS')
+    assert retained['observation_sha256'] == category['observation_sha256']
+    assert json.loads(Path(retained['observation_path']).read_text())['owned_to_owned_acceptance'] is (fault is None)
+    assert events.index('shutdown') < events.index('release')

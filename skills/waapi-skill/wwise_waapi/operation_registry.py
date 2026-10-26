@@ -7301,6 +7301,12 @@ def _prepare_object_set(
             "list_mode": global_list_mode,
             "auto_add_to_source_control": auto_add_to_source_control,
             "partial_success_is_failure": True,
+            **({"owned_control_input_replacements": [{"rtpc_id": spec["target_id"],
+                "old_input_id": spec["owned_control_input_replacement"]["old_control_input"],
+                "intent": spec["owned_control_input_replacement"]["old_input_disposition"],
+                "postcondition": "new_owned_input_and_preserved_RTPC_Curve_owner_list;_old_custom_absent_or_old_shared_preserved"}
+                for spec in node_specs if spec.get("owned_control_input_replacement")]}
+                if any(spec.get("owned_control_input_replacement") for spec in node_specs) else {}),
         },
     )
     for spec in node_specs:
@@ -7703,16 +7709,30 @@ def _prepare_owned_control_replacement(target, descriptor, *, target_spec, versi
     old_id = _reference_identity(_field_value(row, "ControlInput"))
     if not _valid_object_id(owner_id) or not _valid_object_id(old_id):
         raise OperationContractError("OWNED_CONTROL_INPUT_REPLACEMENT_UNPROVEN", "The existing RTPC must have observed canonical owner/input identities.", details={"tracking_issue": 180})
-    shared = _read_shared_reference_target(old_id, read=read, platform=None, version=version, require_match=False)
-    if shared["owner_absent"] is not True or not _valid_object_id(shared["parent_id"]):
-        raise OperationContractError("OWNED_INPUT_REPLACEMENT_DISPOSITION_UNPROVEN", "Replacing an old owned custom input remains unfinished under issue #180.", details={"tracking_issue": 180})
+    old_rows = _read_object_id_rows(old_id, fields=(*IDENTITY_RETURN_FIELDS, "classId", "owner"), read=read)
+    if len(old_rows) != 1 or not _same_identity(old_rows[0].get("id"), old_id):
+        raise OperationContractError("INVALID_READBACK", "Previous ControlInput must resolve once by its exact GUID.")
+    old_owner = _reference_identity(old_rows[0].get("owner"))
+    old_owned = _valid_object_id(old_owner)
+    if old_owned:
+        if (old_rows[0].get("type") not in CONTROL_INPUT_CLASSES
+                or not _object_class_matches(old_rows[0].get("classId"), CONTROL_INPUT_CLASSES.get(old_rows[0].get("type")))
+                or not _same_identity(old_owner, target.object)
+                or _valid_object_id(_reference_identity(old_rows[0].get("parent")))):
+            raise OperationContractError("INVALID_READBACK", "Previous custom ControlInput must expose its exact Modulator class and selected RTPC owner.")
+    else:
+        shared = _read_shared_reference_target(old_id, read=read, platform=None, version=version, require_match=False)
+        if shared["owner_absent"] is not True or not _valid_object_id(shared["parent_id"]):
+            raise OperationContractError("INVALID_READBACK", "Previous shared ControlInput must expose an independent parent and native absence of an owner.")
     baseline = _read_graph_rtpc_rows(owner_id, version=version, class_id=1441808, read=read)
     if sum(_same_identity(member["id"], target.object) for member in baseline) != 1:
         raise OperationContractError("INVALID_READBACK", "The selected RTPC must occur exactly once in its complete owning list.")
     curve = _field_value(row, "Curve")
     proof = _prepare_owned_control_input(descriptor.target, version=version, read=read, inherited_platform=target_spec.get("platform"),
         curve_points=curve.get("points") if isinstance(curve, Mapping) else None, curve_context="replacement_preservation")
-    proof.update(baseline_rows=baseline, old_control_input=old_id, owner_id=owner_id)
+    proof.update(baseline_rows=baseline, old_control_input=old_id, owner_id=owner_id,
+        old_input_disposition="remove_previous_owned_ControlInput" if old_owned else "preserve_previous_shared_ControlInput",
+        lifetime_evidence_scope="required_verification_postcondition;_shared_displacement_observation_is_not_custom_target_equivalence")
     path = target_spec["request_path"] + ".owned_control_input"
     spec = {"request_path": path, "parent_request_path": target_spec["request_path"],
         "existing_target": False, "requested_name": proof["name"], "requested_type": proof["type"],
@@ -7727,14 +7747,25 @@ def _prepare_owned_control_replacement(target, descriptor, *, target_spec, versi
         if _same_identity(member["id"], target.object):
             fields = [field for field in fields if field.lstrip("@") != "ControlInput"]
         expected = {field: member[field] for field in fields if field in member}
-        snapshots.append({"object_id": member["id"], "fields": fields, "rows": [expected], "preserve_after_write": True})
+        snapshots.append({"object_id": member["id"], "fields": fields, "rows": [expected], "preserve_after_write": True,
+            **({"reference_derived_display_path": "RTPC_ControlInput"} if _same_identity(member["id"], target.object) else {})})
+    curve_id = _reference_identity(curve)
+    curve_fields = [*IDENTITY_RETURN_FIELDS, "classId", "owner", "points"]
+    curve_rows = _read_object_id_rows(curve_id, fields=curve_fields, read=read)
+    if (len(curve_rows) != 1 or not _same_identity(curve_rows[0].get("id"), curve_id)
+            or curve_rows[0].get("type") != "Curve" or not _object_class_matches(curve_rows[0].get("classId"), 917520)
+            or not _same_identity(_reference_identity(curve_rows[0].get("owner")), target.object)
+            or not _native_snapshot_equal(curve_rows[0].get("points"), curve.get("points"))):
+        raise OperationContractError("INVALID_READBACK", "Preserved Curve must retain its exact GUID/class/RTPC owner and points.")
+    snapshots.append({"object_id": curve_id, "fields": curve_fields, "rows": curve_rows, "preserve_after_write": True,
+        "reference_derived_display_path": "RTPC_ControlInput_Curve"})
     membership_fields = [*IDENTITY_RETURN_FIELDS, "classId", "@RTPC"]
     membership = _read_object_id_rows(owner_id, fields=membership_fields, read=read)
     if len(membership) != 1 or not _same_identity(membership[0].get("id"), owner_id):
         raise OperationContractError("INVALID_READBACK", "RTPC owner membership must independently resolve once.")
     snapshots.append({"object_id": owner_id, "fields": membership_fields, "rows": membership, "preserve_after_write": True})
-    # Discovery owns the projection tokens; bounded pages preserve every
-    # discovered old shared-input field without assuming a fixed Modulator set.
+    # Every old input is sealed for execution drift. Only an independent shared
+    # target is preserved after writing; a previous custom must be absent then.
     from .builders.query import MAX_STRUCTURED_RETURN_FIELDS
     names = parse_property_and_reference_names_result(read(GET_PROPERTY_AND_REFERENCE_NAMES_URI, {"object": old_id}, {}))
     base = _dedupe_fields([*IDENTITY_RETURN_FIELDS, "classId", "owner"])
@@ -7744,8 +7775,8 @@ def _prepare_owned_control_replacement(target, descriptor, *, target_spec, versi
         fields = [*base, *tokens[offset:offset + page_size]]
         rows = _read_object_id_rows(old_id, fields=fields, read=read)
         if len(rows) != 1 or not _same_identity(rows[0].get("id"), old_id):
-            raise OperationContractError("INVALID_READBACK", "The old shared ControlInput must independently resolve once.")
-        snapshots.append({"object_id": old_id, "fields": fields, "rows": rows, "preserve_after_write": True})
+            raise OperationContractError("INVALID_READBACK", "The previous ControlInput must independently resolve once.")
+        snapshots.append({"object_id": old_id, "fields": fields, "rows": rows, "preserve_after_write": not old_owned})
     return proof, spec, snapshots
 
 
@@ -21688,6 +21719,16 @@ def verify_prepared_operation(
                     readbacks.extend(owned_reads)
                 else:
                     check("replacement ControlInput exposes a canonical GUID", False, row)
+                if proof.get("old_input_disposition") == "remove_previous_owned_ControlInput":
+                    old_rows, failure = None, None
+                    try:
+                        old_rows = read_object(object_id=proof["old_control_input"], fields=("id", "name", "type", "classId", "owner"))
+                    except OperationContractError as exc:
+                        failure = exc.as_dict()
+                    assertions.append({"name": "previous owned ControlInput GUID is absent",
+                        "kind": "replaced_owned_control_input_absent", "passed": old_rows == [],
+                        "evidence": {"old_id": proof["old_control_input"], "rows": old_rows, "failure": failure,
+                            "scope": "verified_postcondition_not_a_native_lifetime_guarantee"}})
             expected_path = spec.get("expected_path")
             if owned_stage_identities and not spec.get('existing_target'):
                 from .object_graph_paths import project_compound_path
@@ -21717,6 +21758,11 @@ def verify_prepared_operation(
             if compound_path_context and kind == 'object-set-batch' and isinstance(spec.get('pre_state'), Mapping):
                 from .object_graph_paths import project_compound_snapshot
                 expected_path = project_compound_snapshot(spec['pre_state'], compound_path_context)['path']
+            if spec.get("owned_control_input_replacement"):
+                # This exact RTPC's display label derives from ControlInput;
+                # its sealed GUID/class/owner and snapshot fields certify it.
+                # The scoped preservation snapshot records before/after paths.
+                expected_path = None
             if isinstance(expected_path, str):
                 check(
                     f"{request_path} exact path matches",
@@ -22865,6 +22911,19 @@ def verify_prepared_operation(
             # new id spliced into them. All unselected fields remain exact.
             expected_unselected = {key: value for key, value in expected.items() if key.lstrip("@") not in selected_references}
             actual_unselected = [{key: value for key, value in row.items() if key.lstrip("@") not in selected_references} for row in actual]
+            if snapshot.get("reference_derived_display_path") in {"RTPC_ControlInput", "RTPC_ControlInput_Curve"}:
+                # RTPC/Curve display paths reflect the changed ControlInput.
+                # Intrinsic GUID/class/owner/fields remain the identity proof;
+                # retain rendered paths without reconstructing localized labels.
+                check("reference-derived RTPC display path is observed with exact identity",
+                    len(actual) == 1 and isinstance(actual[0].get("path"), str) and actual[0]["path"].startswith("\\")
+                    and not any(ord(char) < 32 for char in actual[0]["path"]),
+                    {"object_id": snapshot["object_id"], "before": expected.get("path"),
+                        "after": actual[0].get("path") if len(actual) == 1 else None,
+                        "scope": snapshot["reference_derived_display_path"]})
+                expected_unselected.pop("path", None)
+                for actual_row in actual_unselected:
+                    actual_row.pop("path", None)
             passed = (_native_snapshot_equal(actual_unselected, [expected_unselected]) and len(actual) == 1
                 and all(_reference_requirement_matches(actual[0], name, value) for name, value in selected_references.items()))
             check("unrequested existing anonymous member state remains unchanged", passed,

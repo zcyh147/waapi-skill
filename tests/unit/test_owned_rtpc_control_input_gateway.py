@@ -399,6 +399,9 @@ class ReplacementTask(OwnedControlTask):
             '@PropertyName': 'Volume', '@ControlInput': {'id': OLD_CONTROL},
             '@Curve': {'id': CURVE, 'points': [{'x': 0, 'y': -20, 'shape': 'Linear'},
                 {'x': 5 if self.input_type == 'ModulatorTime' else 1000, 'y': 0, 'shape': 'Linear'}]}}
+        self.objects[CURVE] = {'id': CURVE, 'name': '', 'type': 'Curve', 'classId': 917520,
+            'path': r'\opaque-rtpc\<Unnamed Curve>', 'owner': {'id': RTPC}, 'notes': 'Keep Curve',
+            'points': deepcopy(self.objects[RTPC]['@Curve']['points'])}
         self.objects[FIRST]['@RTPC'] = [{'id': RTPC}]
         self.objects[CHILD] = {**deepcopy(self.objects[RTPC]), 'id': CHILD, '@PropertyName': 'Pitch',
             'notes': 'Keep unrelated RTPC', '@Curve': {'id': '{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}',
@@ -408,7 +411,9 @@ class ReplacementTask(OwnedControlTask):
     def call(self, uri, args=None, options=None):
         if uri.endswith('object.get') and args.get('waql', '').startswith('from object "' + OLD_CONTROL):
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
-            return {'return': [{'id': OLD_CONTROL}] + ([{'id': RTPC}] if self.objects[OLD_CONTROL].get('owner') else [])}
+            owned = bool(self.objects.get(OLD_CONTROL, {}).get('owner'))
+            return {'return': ([{'id': OLD_CONTROL}, {'id': RTPC}] if owned else [{'id': OLD_CONTROL}])
+                if self.version == '2022.1' else ([] if owned else [{'id': OLD_CONTROL}])}
         if uri.endswith('object.set'):
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
             self.writes.append(deepcopy(args))
@@ -473,6 +478,7 @@ def test_time_replacement_rejects_malformed_preserved_curve_readback_before_writ
 def test_time_replacement_preserves_curve_or_requires_supported_duration_choice(tmp_path, duration):
     task = ReplacementTask(tmp_path)
     task.objects[RTPC]['@Curve']['points'][-1]['x'] = 6
+    task.objects[CURVE]['points'] = deepcopy(task.objects[RTPC]['@Curve']['points'])
     task.input_properties['TimeModDuration'] = duration
     before = deepcopy(task.objects)
     declare_replacement(task)
@@ -517,6 +523,7 @@ def test_public_schema_discloses_closed_existing_rtpc_owned_reference_route(tmp_
     assert '"unit": "seconds"' in encoded and '"native_domain_complete": false' in encoded
     assert 'partial_duration_endpoints' in encoded and 'native_field_order' in encoded
     assert 'non_fail_conflicts' not in encoded and 'nested_RTPCs' not in encoded
+    assert 'exact_old_GUID_absence' in encoded and 'native_guarantee' in encoded
     assert 'mixed_platform_workflow' in encoded and 'new_object.setProperty_Draft' in encoded
     code, named = task.run('operation-schema', 'object.setRTPC')
     assert code == 0 and '"unit": "seconds"' in json.dumps(named), named
@@ -537,13 +544,65 @@ def test_replacement_rejects_changed_preserved_state_or_wrong_owned_identity(tmp
     assert len(task.writes) == 1
 
 
-def test_replacing_a_prior_owned_input_stops_before_preview_or_write(tmp_path):
-    task = ReplacementTask(tmp_path)
-    task.objects[OLD_CONTROL]['owner'] = {'id': RTPC}
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_replacing_a_prior_owned_input_preserves_rtpc_and_requires_old_absence(tmp_path, version):
+    task = prior_owned_replacement_task(tmp_path, version)
+    before = deepcopy(task.objects)
     declare_replacement(task)
-    code, checked = task.step('draft-check')
-    assert code == 2 and 'OWNED_INPUT_REPLACEMENT_DISPOSITION_UNPROVEN' in json.dumps(checked), checked
-    assert task.writes == []
+    tx, shown = task.preview()
+    assert 'remove_previous_owned_ControlInput' in json.dumps(shown), shown
+    code, compact = task.run('transaction-show', tx, '--summary-only')
+    assert code == 0, compact
+    notice, = compact['preview_summary']['owned_control_input_replacements']
+    assert notice['rtpc_id'] == RTPC and notice['old_input_id'] == OLD_CONTROL
+    assert notice['intent'] == 'remove_previous_owned_ControlInput'
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+    assert OLD_CONTROL not in task.objects and len(task.writes) == 1
+    assert task.objects[FIRST] == before[FIRST] and task.objects[CHILD] == before[CHILD]
+    assert task.objects[RTPC]['@Curve'] == before[RTPC]['@Curve']
+    code, recorded = task.run('transaction-show', tx)
+    assert code == 0, recorded
+    checks = next(event['details']['verification']['assertions'] for event in recorded['events']
+        if event['event_type'] == 'verification_recorded')
+    absence, = [check for check in checks if check.get('kind') == 'replaced_owned_control_input_absent']
+    assert absence['passed'] is True and absence['evidence']['old_id'] == OLD_CONTROL, absence
+
+
+def prior_owned_replacement_task(path, version='2022.1', fault=None):
+    task = ReplacementTask(path, version)
+    task.objects[OLD_CONTROL] = {'id': OLD_CONTROL, 'name': 'OldTime', 'type': 'ModulatorTime',
+        'classId': 5111824, 'path': r'\opaque-old-time', 'parent': None, 'owner': {'id': RTPC},
+        'notes': 'Old owned', '@TimeModDuration': 5, '@EnvelopeStopPlayback': False}
+    shared = '{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}'
+    task.objects[shared] = {'id': shared, 'name': 'PeerControl', 'type': 'GameParameter', 'classId': 1507344,
+        'path': r'\Game Parameters\Default Work Unit\PeerControl', 'parent': {'id': SECOND}, 'owner': None}
+    task.objects[CHILD]['@ControlInput'] = {'id': shared}
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('from', {}).get('id') == [OLD_CONTROL] and task.writes:
+            if fault == 'missing-readback': return {}
+            if fault in {'native-absence', 'foreign-error'}:
+                from tests.unit.test_waapi_gateway import WaapiRequestFailed
+                raise WaapiRequestFailed('ak.wwise.query.invalid_query', {'message':
+                    'Object not found (13)' if fault == 'native-absence' else 'Unsupported projection'})
+        result = original(uri, args, options)
+        if uri.endswith('object.set'):
+            # The retained native packet proves this reference changes rendered
+            # RTPC/Curve paths. These deliberately different labels are observed,
+            # never parsed or reconstructed by production verification.
+            task.objects[RTPC]['path'] = r'\new-rendered-rtpc'
+            task.objects[CURVE]['path'] = r'\new-rendered-rtpc\<Unnamed Curve>'
+            if fault == 'reused-old-id':
+                new = task.objects.pop(CONTROL); new['id'] = OLD_CONTROL
+                task.objects[OLD_CONTROL] = new
+                task.objects[RTPC]['@ControlInput'] = {'id': OLD_CONTROL}
+            elif fault != 'retained-old': task.objects.pop(OLD_CONTROL)
+            if fault == 'curve-owner': task.objects[CURVE]['owner'] = {'id': FIRST}
+            elif fault == 'curve-class': task.objects[CURVE]['classId'] = 1441808
+        return result
+    task.call = call
+    return task
 
 
 def test_graph_replacement_has_copy_ready_business_declaration(tmp_path):
@@ -990,3 +1049,37 @@ def test_verified_input_accepts_separately_previewed_platform_field_assignment(t
     assert code == 0 and verified.get('verified') is True, verified
     assert len(task.writes) == 2 and platform_duration == 6.0
     assert task.objects == before  # Generic values, RTPC/Curve and identity stay fixed.
+
+
+@pytest.mark.parametrize('fault,success', [('native-absence', True), ('retained-old', False),
+    ('missing-readback', False), ('foreign-error', False), ('reused-old-id', False),
+    ('curve-owner', False), ('curve-class', False)])
+def test_owned_replacement_requires_complete_old_absence_without_retry(tmp_path, fault, success):
+    task = declare_replacement(prior_owned_replacement_task(tmp_path, fault=fault))
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == (0 if success else 2) and verified.get('verified') is success, verified
+    assert len(task.writes) == 1
+    code, recorded = task.run('transaction-show', tx)
+    assert code == 0, recorded
+    assert recorded['state'] == ('verified' if success else 'verification_failed')
+    checks = next(event['details']['verification']['assertions'] for event in recorded['events']
+        if event['event_type'] == 'verification_recorded')
+    absence, = [check for check in checks if check.get('kind') == 'replaced_owned_control_input_absent']
+    assert absence['passed'] is (success or fault in {'curve-owner', 'curve-class'}), absence
+    if fault == 'reused-old-id':
+        assert any(check['passed'] is False and check['name'] ==
+            'new ControlInput identity is absent from the complete owning baseline' for check in checks), checks
+    code, replay = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == 1, replay
+
+
+@pytest.mark.parametrize('field,value', [('owner', {'id': FIRST}), ('classId', 1507344), ('type', 'GameParameter')])
+def test_owned_replacement_seals_previous_class_and_owner_for_execution_drift(tmp_path, field, value):
+    task = declare_replacement(prior_owned_replacement_task(tmp_path))
+    tx, shown = task.preview()
+    task.objects[OLD_CONTROL][field] = value
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and task.writes == [], rejected

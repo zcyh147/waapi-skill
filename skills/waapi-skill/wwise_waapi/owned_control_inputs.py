@@ -4,9 +4,10 @@ Authority: matching 2022.1--2025.1 WObjects.xml RTPC.ControlInput custom
 restrictions and the matching SDK object.set custom ModulatorTime example.
 Exact fragments, matching schema/class/example digests and introduction facts
 are packaged per version in resources/metadata/*/owned-control-input-construction.json.
-This property-bound constructor was introduced in 2022.1. The previous
-custom input replacement disposition remains unfinished
-under issue #180; the 2021.1 boundary does not classify other creation routes.
+This property-bound constructor was introduced in 2022.1. Existing custom
+replacement requires independently verified old-GUID absence, rather than
+assuming its lifetime from constructor sources. The 2021.1 boundary does not
+classify other creation routes.
 """
 from __future__ import annotations
 
