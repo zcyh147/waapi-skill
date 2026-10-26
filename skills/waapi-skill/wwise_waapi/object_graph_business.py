@@ -18,7 +18,6 @@ from .business_declarations import (
     OwnedRtpcTarget,
     business_repair,
     resolve_semantic_kind,
-    require_bound_name_mutability,
 )
 from .object_graph_business_contracts import object_graph_business_contract_data
 from .documented_list_fields import resolve_list_choice, resolve_planned_list_evidence
@@ -1227,7 +1226,6 @@ def _compile_existing_set_fields(
             )
         compiled["on_name_conflict"] = conflict
     if "new_name" in fields:
-        require_bound_name_mutability(source)
         semantics = object_identity_semantics(source.object_type)
         if not semantics.mutable_intrinsic_name:
             raise _repair(
