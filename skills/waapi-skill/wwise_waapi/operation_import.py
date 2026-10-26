@@ -532,13 +532,21 @@ def build_audio_import_plan(
             oracle_row["requested_event"] = {key: value for key, value in event.items() if key != "waapi_value"}
         if "dialogue_event" in effective:
             dialogue_event = effective.get("dialogue_event")
-            if (not isinstance(dialogue_event, Mapping) or set(dialogue_event) != {"path"}
-                    or not isinstance(dialogue_event["path"], str)
+            if (not isinstance(dialogue_event, Mapping) or set(dialogue_event) - {"path", "conditions", "probability", "weight"}
+                    or not isinstance(dialogue_event.get("path"), str)
                     or not dialogue_event["path"].startswith("\\Dynamic Dialogue\\")
                     or len(dialogue_event["path"]) > 4096
                     or any(c in dialogue_event["path"] for c in "<>:@|\r\n\t\x00")
                     or not dialogue_event["path"].rpartition("\\")[2]):
                 raise ImportContractError("INVALID_ARGUMENT", "dialogue_event requires a closed absolute DialogueEvent path; native directive strings are not accepted.")
+            conditions = dialogue_event.get("conditions")
+            if conditions is not None and (not isinstance(conditions, list) or not 1 <= len(conditions) <= 32
+                    or any(not isinstance(c, Mapping) or set(c) != {"group", "value"} for c in conditions)):
+                raise ImportContractError("INVALID_ARGUMENT", "Dialogue conditions require one to 32 closed group/value choices.")
+            for key in ("probability", "weight"):
+                if key in dialogue_event and (not conditions or type(dialogue_event[key]) not in (int, float)
+                        or not 0 <= dialogue_event[key] <= 100):
+                    raise ImportContractError("INVALID_ARGUMENT", "Dialogue Probability/Weight require an explicit path and a finite value from 0 to 100.")
             dialogue_event = dict(dialogue_event)
             dispatch["dialogueEvent"] = dialogue_event["path"]
             oracle_row["requested_dialogue_event"] = dialogue_event
@@ -1469,6 +1477,38 @@ def _require_dynamic_field_name(value: Any, *, field: str) -> str:
             f"{field} is not a valid Wwise property/reference token.",
         )
     return name
+
+
+def parse_dialogue_import_directive(value: str) -> dict[str, Any]:
+    """Parse the documented exact-table form into closed identity choices."""
+    parts = value.split("|")
+    event, marker, decision = parts[0].partition("@Path:")
+    if not event.startswith("\\"):
+        event = "\\Dynamic Dialogue\\Default Work Unit\\" + event
+    if not event.startswith("\\Dynamic Dialogue\\") or event.endswith("\\") or any(c in event for c in "<>:@|\r\n\t"):
+        raise ImportContractError("INVALID_ARGUMENT", "Dialogue Event must name one exact Dynamic Dialogue path.")
+    result = {"path":event}
+    if marker:
+        conditions = []
+        for component in decision.split("."):
+            match = re.fullmatch(r"<(Switch Group|State Group):([^<>:@|]+)>([^<>:@|]+)", component)
+            if match is None:
+                raise ImportContractError("INVALID_ARGUMENT", "Dialogue paths require documented group/value choices or wildcard.")
+            group_type, group_name, selected = match.groups()
+            root = "Switches" if group_type == "Switch Group" else "States"
+            group_path = f"\\{root}\\Default Work Unit\\{group_name}"
+            result_type = "Switch" if root == "Switches" else "State"
+            conditions.append({"group":{"kind":"path","value":group_path},
+                "value":"*" if selected == "*" else {"kind":"scoped-name","parent":{"kind":"path","value":group_path},"type":result_type,"name":selected}})
+        if not 1 <= len(conditions) <= 32:
+            raise ImportContractError("INVALID_ARGUMENT", "Dialogue path must have one to 32 conditions.")
+        result["conditions"] = conditions
+    for option in parts[1:]:
+        match = re.fullmatch(r"(Probability|Weight):([0-9]+(?:\.[0-9]+)?)", option)
+        if match is None or not marker or match[1].lower() in result or not 0 <= float(match[2]) <= 100:
+            raise ImportContractError("INVALID_ARGUMENT", "Dialogue Probability/Weight require one explicit path and finite values from 0 to 100.")
+        result[match[1].lower()] = float(match[2])
+    return result
 
 
 def _require_native_import_directive(value: Any, *, field: str) -> str:
