@@ -1677,7 +1677,8 @@ def media_id_product_capture(request):
 @pytest.mark.parametrize('version,change', [
     *[(version, change) for version in ('2021.1', '2022.1', *VERSIONS)
         for change in (None, 'wrong-media-id', 'unrelated-property')],
-    ('2025.1', 'mode-unchanged'),
+    *[(version, 'default-elided') for version in ('2021.1', '2022.1', *VERSIONS)],
+    ('2025.1', 'mode-unchanged'), ('2025.1', 'malformed-mode'), ('2025.1', 'duplicate-mode'),
 ])
 def test_cli_media_id_transfer_back_verifies_central_records_in_work_units(tmp_path, version, change):
     class TransferBackTask(CliProjectTask):
@@ -1693,6 +1694,14 @@ def test_cli_media_id_transfer_back_verifies_central_records_in_work_units(tmp_p
                 tree = ET.parse(self.project_file)
                 if change != 'mode-unchanged':
                     tree.find('.//Property[@Name="MediaIDsInSingleFile"]/ValueList/Value').text = 'False'
+                if change == 'default-elided':
+                    properties = tree.find('./ProjectInfo/Project/PropertyList')
+                    properties.remove(properties.find('./Property[@Name="MediaIDsInSingleFile"]'))
+                elif change == 'malformed-mode':
+                    tree.find('.//Property[@Name="MediaIDsInSingleFile"]/ValueList/Value').text = 'unknown'
+                elif change == 'duplicate-mode':
+                    properties = tree.find('./ProjectInfo/Project/PropertyList')
+                    properties.append(deepcopy(properties.find('./Property[@Name="MediaIDsInSingleFile"]')))
                 tree.write(self.project_file)
                 # The native contract requires transfer, not deletion of the
                 # inactive central file. Both retained and absent are permitted.
@@ -1726,15 +1735,18 @@ def test_cli_media_id_transfer_back_verifies_central_records_in_work_units(tmp_p
     tx = task.execute_plan()
     before = len(task.calls)
     code, payload = task.run('verify', tx)
-    assert payload['verified'] is (change is None), payload
-    assert (code == 0) is (change is None), payload
-    assert payload['state'] == ('verified' if change is None else 'verification_failed'), payload
-    if change is None:
+    assert payload['verified'] is (change in (None, 'default-elided')), payload
+    assert (code == 0) is (change in (None, 'default-elided')), payload
+    assert payload['state'] == ('verified' if change in (None, 'default-elided') else 'verification_failed'), payload
+    if change in (None, 'default-elided'):
         observation = next(row for row in payload['verification']['readbacks']
             if row.get('kind') == 'cli-media-id-artifacts')
         assert observation['work_unit_media_id_count_before'] == 0
         assert observation['work_unit_media_id_count_after'] == 1
         assert observation['unresolved'] == []
+        if change == 'default-elided':
+            assert observation['project_storage_mode_after']['representation'] == 'default_elided'
+            assert observation['project_storage_mode_after']['source']['version'] == version
     assert not any(row[0].endswith('object.get') for row in task.calls[before:])
     code, payload = task.run('execute', tx)
     assert code != 0, payload

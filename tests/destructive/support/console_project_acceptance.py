@@ -9,7 +9,7 @@ from pathlib import Path
 import shutil
 import xml.etree.ElementTree as ET
 
-from wwise_waapi.console_media_ids import compact_records, mapping_records, work_unit_records, project_storage_mode
+from wwise_waapi.console_media_ids import compact_records, mapping_records, work_unit_records, project_storage_mode, project_storage_observation
 from wwise_waapi.console_project_operations import _read_xml_artifact, _project_model_paths
 from wwise_waapi.operation_soundbank import capture_artifact_tree, capture_file_proof
 from wwise_waapi.transactions import TransactionStore
@@ -216,6 +216,26 @@ def collect_console_project_acceptance(runtime, case):
         assert len(raw) <= receipt['limits']['receipt_bytes']
         pending = output.with_suffix('.pending'); pending.write_bytes(raw); pending.replace(output)
         category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+    def retain_created_output(transaction):
+        stored = TransactionStore(runtime.state_dir).load_preview(transaction)
+        request = stored.artifact['request']['arguments']
+        api = request.get('api')
+        if api not in {'ak.wwise.cli.createNewProject', 'ak.wwise.console.project.create'}:
+            return
+        project = Path(request['args']['project' if api.startswith('ak.wwise.cli.') else 'path'])
+        project.relative_to(runtime.sandbox.sandbox_root)
+        root = runtime.state_dir / 'console184-created-output'
+        root.mkdir(exist_ok=False)
+        link = {'requested_project': str(project), 'api': api, 'transaction_id': transaction,
+            'captured_before_verification': True}
+        receipt['created_output'] = link
+        image = ConsoleModelImageIndex(root=root, project=project, phase='after', link=link)
+        try:
+            image.save(project, observe_console_file(project, io_root=project.parent))
+        except Exception as exc:
+            image.error(project, exc)
+        finally:
+            image.finish()
     class Gateway:
         def __getattr__(self, key): return getattr(runtime, key)
         def raw_gateway(self, argv):
@@ -238,6 +258,11 @@ def collect_console_project_acceptance(runtime, case):
                         terminal_transaction = argv[1]
                 return code, payload
             finally:
+                if argv[0] == 'execute':
+                    try:
+                        retain_created_output(argv[1])
+                    except Exception as capture:
+                        receipt['created_output_capture_error'] = str(capture)[:2048]
                 persist()
         def gateway(self, argv, *, live):
             code, payload = self.raw_gateway(argv)
@@ -345,34 +370,30 @@ def collect_console_project_acceptance(runtime, case):
             receipt['phases'].append({'api': 'ak.wwise.core.project.save', 'setup_only': True, **saved})
             before, descriptors, documents = media_model(project)
             mapping_file = project.with_suffix('.mediaid')
-            if case == 'media-back':
-                records = mapping_records(_read_xml_artifact(str(mapping_file), str(project.parent), require_wwise_document=False)[0])
-                assert before == [] and compact_records(records) == receipt['prelaunch']['mapping_records']
-                assert project_storage_mode(documents[project][0]) is True
-            else:
-                assert compact_records(before) == receipt['prelaunch']['mapping_records']
-                assert project_storage_mode(documents[project][0]) is False
-                raw, records, _ = retained_mapping()
-                stale = ET.fromstring(raw)
-                media = list(stale.iter('MediaID'))
-                replacement = next(row.get('ID') for row in media if row.get('ID') != media[0].get('ID'))
-                media[0].set('ID', replacement)
-                ET.ElementTree(stale).write(mapping_file, encoding='utf-8', xml_declaration=True)
-                receipt['stale_mapping_records'] = compact_records(mapping_records(stale))
-                assert receipt['stale_mapping_records'] != compact_records(before)
+            records = mapping_records(_read_xml_artifact(str(mapping_file), str(project.parent), require_wwise_document=False)[0])
+            assert before == [] and compact_records(records) == receipt['prelaunch']['mapping_records']
+            assert project_storage_mode(documents[project][0]) is True
+            if case == 'media-refresh':
+                # Native refresh owns an existing active central map. Preserve
+                # its valid Preview records; no stale-ID repair is promised.
+                receipt['refresh_scope'] = 'existing_valid_central_mapping_preservation'
             receipt['mapping_before'] = observe_console_file(mapping_file, io_root=project.parent)
             receipt['model_before'] = retain_model(project, runtime.state_dir / 'console184-model-images', 'before')
             api = 'ak.wwise.cli.moveMediaIdsToWorkUnits' if case == 'media-back' else 'ak.wwise.cli.updateMediaIdsInSingleFile'
             complete(api, ['--value', 'project_file', str(project)])
             after, after_descriptors, documents = media_model(project)
-            assert compact_records(after) == compact_records(records)
+            assert compact_records(after) == compact_records(records if case == 'media-back' else before)
             assert compact_records(descriptors) == compact_records(after_descriptors)
-            assert project_storage_mode(documents[project][0]) is False
+            receipt['storage_after'] = project_storage_observation(documents[project][0])
+            assert receipt['storage_after']['value'] is (case == 'media-refresh')
             if case == 'media-refresh':
                 refreshed = mapping_records(_read_xml_artifact(str(mapping_file), str(project.parent), require_wwise_document=False)[0])
-                assert compact_records(refreshed) == compact_records(before) == compact_records(after)
+                assert compact_records(refreshed) == compact_records(records)
             receipt['media_records_after'] = compact_records(after)
             receipt['model_after'] = retain_model(project, runtime.state_dir / 'console184-model-images', 'after')
+        if case in {'cli-create', 'create-close'}:
+            assert receipt['created_output']['complete'] and not receipt.get('created_output_capture_error'), \
+                'Created project output was not completely retained before verification'
         receipt['complete'] = True; category['status'] = 'PASS'
     except Exception as exc:
         receipt['failure'] = {'type': type(exc).__name__, 'details': str(exc)[:16384]}

@@ -150,6 +150,45 @@ def project_storage_mode(document):
     return value == 'True'
 
 
+def project_storage_observation(document):
+    """Keep direct absence distinct from the version-pinned Project default."""
+    value = project_storage_mode(document)
+    observation = {'value': value, 'representation': 'explicit' if value is not None else 'missing',
+        'property_present': value is not None}
+    # Native 2025.1.7 removes the true override when moving IDs back to WWUs.
+    # All five matching pinned Project definitions declare the same false
+    # default. A same-named backing row is never an active property.
+    # Malformed explicit rows already raise rather than taking this fallback.
+    lane = re.fullmatch(r'v(202[1-5]\.1)\.[0-9]+', document.get('WwiseVersion', ''))
+    if (value is not None or document.tag != 'WwiseDocument' or document.get('Type') != 'Project'
+            or lane is None or not document.get('SchemaVersion', '').isdigit()
+            or int(document.get('SchemaVersion')) < 1
+            or len(document.findall('./ProjectInfo/Project')) != 1
+            or len(document.findall('./ProjectInfo/Project/PropertyList')) != 1):
+        return observation
+    from pathlib import Path
+    from xml.etree import ElementTree as ET
+    version = lane.group(1)
+    path = Path(__file__).resolve().parents[1] / 'resources/semantic' / version / 'project_media_storage_default.json'
+    raw = path.read_bytes()
+    if len(raw) > 16384:
+        raise ValueError('Project storage default source exceeds its bound')
+    source = json.loads(raw)
+    fragment = source['property_xml']
+    field = ET.fromstring(fragment)
+    if (source['contract'] != 'waapi-skill.project-media-storage-default/v1'
+            or source['version'] != version or not source['installed_build'].startswith(version + '.')
+            or source['class'] != {'Name': 'Project', 'CompanyID': '1', 'PluginID': '3'}
+            or source['property'] != 'MediaIDsInSingleFile' or source['type'] != 'bool' or source['default'] is not False
+            or hashlib.sha256(fragment.encode()).hexdigest() != source['property_xml_sha256']
+            or field.tag != 'Property' or field.get('Name') != source['property'] or field.get('Type') != source['type']
+            or field.findtext('DefaultValue') != 'false'):
+        raise ValueError('Project storage default does not match its pinned source')
+    return {'value': False, 'representation': 'default_elided', 'property_present': False,
+        'source': {key: source[key] for key in ('version', 'installed_build', 'source_member',
+            'source_member_sha256', 'class', 'property', 'type', 'default', 'property_xml_sha256')}}
+
+
 def none_state_source(version):
     """Exact installed-build sources; no runtime help/SDK dependency or sentinel."""
     from pathlib import Path

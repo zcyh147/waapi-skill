@@ -45,12 +45,16 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
                 ConsoleProjectTask.write_created_project(self, create_args)
                 tree = ET.parse(self.created_file)
                 tree.find('./ProjectInfo/Project').set('Name', self.created_file.stem)
-                if case == 'cli-create' and fault:
+                if case == 'cli-create' and fault is True:
                     tree.find('./ProjectInfo/Project/Platforms/Platform').set('ReferencePlatform', 'Mac')
+                if fault == 'missing-default':
+                    properties = tree.find('./ProjectInfo/Project/PropertyList')
+                    properties.remove(properties.find('./Property[@Name="DefaultLanguage"]'))
                 tree.write(self.created_file)
                 if uri == 'ak.wwise.console.project.create': self.active_file = self.created_file
                 self.calls.append((uri, deepcopy(args), deepcopy(options)))
                 if uri.startswith('ak.wwise.cli.'): self.terminal = True
+                if fault == 'indeterminate-created': raise TimeoutError('Native outcome unknown after creating owned output')
                 return {'result': 0} if uri.startswith('ak.wwise.cli.') else {}
             if uri == 'ak.wwise.console.project.close':
                 self.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -96,16 +100,26 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
                             for attributes in by_owner[source.get('ID').upper()]:
                                 ET.SubElement(ids, 'MediaID', dict(attributes))
                     if path == self.project_file:
-                        document.find('./ProjectInfo/Project/PropertyList/Property[@Name="MediaIDsInSingleFile"]').set('Value', 'False')
+                        properties = document.find('./ProjectInfo/Project/PropertyList')
+                        properties.remove(properties.find('./Property[@Name="MediaIDsInSingleFile"]'))
                     if fault and not fault_applied[0] and document.find('.//MediaID') is not None:
                         media = document.find('.//MediaID'); media.set('ID', str(int(media.get('ID')) + 1))
                         fault_applied[0] = True
                     ET.ElementTree(document).write(path, encoding='utf-8')
+                self.project_file.with_suffix('.mediaid').unlink()
                 self.calls.append((uri, deepcopy(args), deepcopy(options))); self.terminal = True
                 return {'result': 0}
             if uri == 'ak.wwise.cli.updateMediaIdsInSingleFile':
                 from tests.destructive.support.console_project_acceptance import retained_mapping
-                if not fault: self.project_file.with_suffix('.mediaid').write_bytes(retained_mapping()[0])
+                from wwise_waapi.console_media_ids import project_storage_mode
+                if project_storage_mode(ET.parse(self.project_file).getroot()) is not True:
+                    raise WaapiRequestFailed(uri, 'ak.wwise.MediaIdUpdateError')
+                raw = retained_mapping()[0]
+                if fault:
+                    tree = ET.fromstring(raw)
+                    media = next(tree.iter('MediaID')); media.set('ID', str(int(media.get('ID')) + 1))
+                    raw = ET.tostring(tree, encoding='utf-8')
+                self.project_file.with_suffix('.mediaid').write_bytes(raw)
                 self.calls.append((uri, deepcopy(args), deepcopy(options))); self.terminal = True
                 return {'result': 0}
             return super().call(uri, args, options)
@@ -123,7 +137,7 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
         normalize_project_copy(client.project_file, io_root=io, owned_root=tmp_path,
             request=ProjectPrelaunchRequest(scenario_id='gateway-workflow-transaction-matrix',
                 auro_isolation_profile=WWISE_2025_SOUNDBANK_AURO_PROFILE))
-        prelaunch = stage_media_storage_fixture(client.project_file, central=case == 'media-back')
+        prelaunch = stage_media_storage_fixture(client.project_file, central=True)
     if donor is not None:
         owned = client.project_file.parent
         shutil.rmtree(owned); shutil.copytree(donor.parent, owned)
@@ -273,12 +287,19 @@ def test_media_transfer_collector_uses_complete_native_fixture_and_persisted_wri
     receipt = json.loads(Path(final['categories'][0]['observation_path']).read_text())
     assert receipt['complete'] is (not fault)
     assert receipt['prelaunch']['mapping_records']['count'] == 749
+    if not fault:
+        observed = next(call['payload']['verification']['readbacks'][1] for call in receipt['calls']
+            if call['argv'][0] == 'verify' and call['payload'].get('verified') is True)
+        assert observed['project_storage_mode_after']['value'] is False
+        assert observed['project_storage_mode_after']['representation'] == 'default_elided'
+        assert observed['project_storage_mode_after']['source']['installed_build'] == '2025.1.7.9143'
+        assert receipt['mapping_after'] == {'exists': False}
     assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.core.project.save']) == 1
     assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.cli.moveMediaIdsToWorkUnits']) == 1
 
 
 @pytest.mark.parametrize('fault', [False, True])
-def test_media_refresh_collector_replaces_stale_owned_file_and_preserves_saved_sources(tmp_path, monkeypatch, fault):
+def test_media_refresh_collector_preserves_existing_valid_central_mapping_and_sources(tmp_path, monkeypatch, fault):
     workflow, runtime, client, proof = _collector_runtime(tmp_path, monkeypatch, 'media-refresh', fault=fault)
     failure = None
     try:
@@ -292,7 +313,12 @@ def test_media_refresh_collector_replaces_stale_owned_file_and_preserves_saved_s
     receipt = json.loads(Path(final['categories'][0]['observation_path']).read_text())
     assert receipt['complete'] is (not fault)
     assert receipt['prelaunch']['mapping_records']['count'] == 749
-    assert receipt['stale_mapping_records'] != receipt['prelaunch']['mapping_records']
+    assert 'stale_mapping_records' not in receipt
+    assert receipt['refresh_scope'] == 'existing_valid_central_mapping_preservation'
+    if not fault:
+        assert receipt['storage_after']['value'] is True
+        assert receipt['media_records_after']['count'] == 0
+        assert receipt['mapping_after']['file_proof']['sha256'] == receipt['mapping_before']['file_proof']['sha256']
     assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.core.project.save']) == 1
     assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.cli.updateMediaIdsInSingleFile']) == 1
 
@@ -350,3 +376,32 @@ def test_complete_retained_media_fixture_matches_normalized_source_before_stagin
         assert proof['mapping_records']['count'] == 749
         assert proof['work_unit_records_after']['count'] == 0
         assert proof['source_descriptors_preserved'] is True
+
+
+@pytest.mark.parametrize('case,fault', [('create-close', 'missing-default'), ('create-close', 'indeterminate-created'),
+    ('cli-create', 'indeterminate-created')])
+def test_creation_failure_retains_exact_requested_output_before_verification_and_cleanup(tmp_path, monkeypatch, case, fault):
+    import hashlib
+    workflow, runtime, client, proof = _collector_runtime(tmp_path, monkeypatch, case, fault=fault)
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(tmp_path / 'category.jsonl'))
+    node = ('test_console_project_create_close_acceptance' if case == 'create-close'
+        else 'test_console_project_cli_create_acceptance')
+    with pytest.raises(AssertionError) as failure:
+        getattr(workflow, node)(runtime)
+    expected = client.created_file.read_bytes()
+    receipt = json.loads((runtime.state_dir / ('console184-' + case + '.json')).read_text())
+    captured = receipt['created_output']
+    assert captured['requested_project'] == str(client.created_file)
+    index = json.loads(Path(captured['index_path']).read_text())
+    image = Path(captured['index_path']).parent.parent / index['files'][client.created_file.name]['artifact_path']
+    assert image.read_bytes() == expected
+    assert index['files'][client.created_file.name]['sha256'] == hashlib.sha256(expected).hexdigest()
+    assert captured['complete'] is True and receipt['complete'] is False
+    final = _finalize(tmp_path, monkeypatch, workflow, runtime, proof, failure=failure.value, node=node)
+    assert final['transactions'][0]['state'] == ('verification_failed' if fault == 'missing-default' else 'indeterminate')
+    assert Path(captured['index_path']).is_file() and image.read_bytes() == expected
+    assert not any(uri == 'ak.wwise.console.project.close' for uri, _, _ in client.calls)
+    create_uri = 'ak.wwise.console.project.create' if case == 'create-close' else 'ak.wwise.cli.createNewProject'
+    target = next(i for i, (uri, _, _) in enumerate(client.calls) if uri == create_uri)
+    if fault == 'indeterminate-created':
+        assert all(uri == 'ak.wwise.core.getInfo' for uri, _, _ in client.calls[target + 1:])

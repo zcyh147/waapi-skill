@@ -525,6 +525,8 @@ def inspect_cli_project_effect(effect):
         return {'observations': [{'kind': 'cli-media-id-artifacts', 'mapping_file': mapping,
             'saved_model_files': len(model['files']), 'work_unit_media_id_count_before': source_count,
             'work_unit_media_id_count_after': sum(rows['count'] for rows in model['media_ids'].values()),
+            'project_storage_mode_before': old_model.get('media_storage_observation'),
+            'project_storage_mode_after': model.get('media_storage_observation'),
             'unresolved': unresolved}, *none_observations], 'checks': [
             {'name': 'Project identity, platforms and languages were preserved during media ID maintenance',
                 'passed': project == effect['project_before']},
@@ -846,6 +848,7 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
     files = _project_model_paths(project_path, root)
     summary = {'files': {}, 'platform_settings': {name: {} for name in selected_platforms}, 'anchors': {}, 'media_ids': {}}
     media_rows, media_sources, media_unresolved, media_mode = [], [], set(), None
+    storage_observation = None
     total_bytes = 0
     documents = {}
     for path in sorted(files):
@@ -858,14 +861,15 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
         if none_state_version is not None or none_state_expected is not None:
             documents[relative] = (document, proof)
         if exclude_media_storage:
-            from .console_media_ids import work_unit_records, project_storage_mode
+            from .console_media_ids import work_unit_records, project_storage_observation
             rows, descriptors, unresolved = work_unit_records(document)
             media_rows.extend(rows)
             media_sources.extend(descriptors)
             media_unresolved.update(unresolved)
             if Path(path) == Path(project_path):
                 try:
-                    media_mode = project_storage_mode(document)
+                    storage_observation = project_storage_observation(document)
+                    media_mode = storage_observation['value']
                 except ValueError:
                     media_unresolved.add('project_media_storage_mode')
         summary['files'][relative] = {'proof': proof,
@@ -898,7 +902,7 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
     if exclude_media_storage:
         from .console_media_ids import compact_records
         summary.update(media_mapping=compact_records(media_rows), media_sources=compact_records(media_sources), media_mapping_unresolved=sorted(media_unresolved),
-            media_storage_mode=media_mode)
+            media_storage_mode=media_mode, media_storage_observation=storage_observation)
     if none_state_version is not None:
         from .console_media_ids import none_state_eligibility
         summary['optional_none_state_materialization'] = none_state_eligibility(

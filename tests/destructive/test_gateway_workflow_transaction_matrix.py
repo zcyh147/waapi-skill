@@ -1309,7 +1309,7 @@ def workflow_sandbox_runtime(
                 soundbank_prelaunch = prelaunch.as_dict()
         if console_project_case in {'media-back', 'media-refresh'}:
             console_project_prelaunch = stage_media_storage_fixture(
-                sandbox.sandbox_project, central=console_project_case == 'media-back')
+                sandbox.sandbox_project, central=True)
         if source_profile == REPEATED_PROFILE:
             from tests.destructive.support.source_copy_fixture import prepare_repeated_source_fixture
             source_fixture_io = case_sandbox_root / 'source-copy-prelaunch-io'
