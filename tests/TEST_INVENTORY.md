@@ -5,6 +5,32 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #182 guarded TSV batch and Switch program progress
+
+Reviewed `293fb909` adds five-version ordinary Switch new/reuse media and
+additive assignment program proof: **14 distinct passing component checks**.
+The earlier 2025.1 native PASS retains its scoped effects; older native lanes
+and other forms remain unproven. Tests-only `84e6c86a` separates exact host
+command paths from the unchanged compact-summary budget: **2 focused PASS**.
+These separate results are not a combined Program/Non-live gate.
+
+Combined localized TSV root `import182-tsv-combined-2025-r1` at `b997fbd6`,
+Console 2025.1.7/build 9143: **FAIL, 8.77s**. Owner fields and English bytes
+were correct, but native added an extra English Source. Original English and
+Japanese GUIDs stayed, with Japanese bytes unchanged. The witness ended
+`verification_failed` after two verified setups; its failed sandbox remains
+quarantined, with source preservation and clean process cleanup. Original
+assessment/final category evidence remains under the full-coverage root;
+receipt SHA-256 `e84e7d01e12825a71f44a7c98ccbe7961ceaee060f2cbba142fbd58eebd04400`.
+
+Reviewed `c5c13278` blocks that exact Console host/build before Preview and
+at prewrite when an existing localized `useExisting` owner combines fields
+and media and the selected Source path is shared across languages. **11
+focused checks passed**. This records an observed unsafe configuration,
+without a proven cause or all-five-version ban. Otherwise-unambiguous combined
+native Source identity and broader #182 forms remain pending. #182 stays OPEN;
+no Fresh, broad gates, native-Windows proof or global coverage counts were added.
+
 ## 2026-10-26 #182 Switch import native milestone
 
 Console 2025.1.7.9143, macOS, candidate `19bb77ea`: **PASS, 6.05s** in
