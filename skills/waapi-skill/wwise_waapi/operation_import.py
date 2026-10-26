@@ -66,6 +66,7 @@ _DYNAMIC_FIELD_NAME = re.compile(r"^[:_a-zA-Z0-9]+$")
 _PROPERTY_HEADER = re.compile(r"^Property\[([:_a-zA-Z0-9]+)\]$")
 _REFERENCE_HEADER = re.compile(r"^Reference\[([:_a-zA-Z0-9]+)\]$")
 _AT_HEADER = re.compile(r"^@([:_a-zA-Z0-9]+)$")
+_TAB_OBJECT_GUID = re.compile(r"^\{[0-9A-Fa-f]{8}-(?:[0-9A-Fa-f]{4}-){3}[0-9A-Fa-f]{12}\}$")
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
 
 # These pairs describe reviewed import-syntax aliases, not reflected-class
@@ -615,6 +616,30 @@ def _tab_media_host_path(value: str, *, table_directory: Path) -> str:
     return localize_waapi_host_path(value)
 
 
+def tab_import_guid_targets(import_file: str | os.PathLike[str]) -> list[str]:
+    """Discover only bounded canonical GUID cells for registry-owned resolution.
+
+    The complete parser still validates and proves the file after these reads;
+    an intervening new GUID cannot use a name/path fallback.
+    """
+    _, data, _ = _read_proven_bytes(import_file, field="import_file", max_bytes=MAX_TAB_BYTES)
+    try:
+        text = data.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise ImportContractError("INVALID_ENCODING", "import_file must be strict UTF-8.", details={"start": exc.start}) from exc
+    try:
+        records = list(csv.reader(io.StringIO(text, newline=""), delimiter="\t", strict=True))
+    except csv.Error as exc:
+        raise ImportContractError("INVALID_TAB_FILE", "import_file is not valid tab-delimited data.", details={"error": str(exc)}) from exc
+    if not records or records[0].count("Object Path") != 1:
+        return []  # The complete parser owns header/record diagnostics.
+    if len(records) - 1 > MAX_TAB_ROWS:
+        raise ImportContractError("LIMIT_EXCEEDED", "import_file exceeds the closed row limit.")
+    column = records[0].index("Object Path")
+    return list(dict.fromkeys(record[column].upper() for record in records[1:]
+        if len(record) > column and _TAB_OBJECT_GUID.fullmatch(record[column])))
+
+
 def parse_tab_delimited_import_file(
     import_file: str | os.PathLike[str],
     *,
@@ -624,6 +649,7 @@ def parse_tab_delimited_import_file(
     import_operation: str,
     auto_add_to_source_control: bool = False,
     auto_check_out_to_source_control: bool | None = None,
+    guid_targets: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Parse and prove a reviewed UTF-8 TSV subset without trusting caller rows."""
 
@@ -740,7 +766,7 @@ def parse_tab_delimited_import_file(
             single_value("Object Path"),
             field=f"row[{offset}].Object Path",
         )
-        target = derive_tab_target(object_path, import_location=location, version=lane)
+        target = derive_tab_target(object_path, import_location=location, version=lane, guid_targets=guid_targets)
         target_key = target["canonical_target_path"].casefold()
         if target_key in seen_targets:
             raise ImportContractError(
@@ -791,7 +817,7 @@ def parse_tab_delimited_import_file(
             source_name_path = str(source_proof["relative_path"])
 
         object_type_value = single_value("Object Type")
-        inferred_type = _typed_leaf_object_type(object_path)
+        inferred_type = target.get("resolved_object_type") or _typed_leaf_object_type(object_path)
         if object_type_value:
             object_type = _require_object_type(
                 object_type_value,
@@ -1068,11 +1094,20 @@ def canonical_import_location(import_location: str, *, version: str) -> str:
     return "\\" + "\\".join(segments)
 
 
-def derive_tab_target(object_path: str, *, import_location: str, version: str) -> dict[str, str]:
+def derive_tab_target(object_path: str, *, import_location: str, version: str,
+                      guid_targets: Mapping[str, Mapping[str, Any]] | None = None) -> dict[str, str]:
     """Resolve a tab row's absolute or relative object path deterministically."""
 
     lane = _require_version(version)
     location = canonical_import_location(import_location, version=lane)
+    if _TAB_OBJECT_GUID.fullmatch(object_path):
+        row = (guid_targets or {}).get(object_path.upper())
+        if not isinstance(row, Mapping):
+            raise ImportContractError("UNRESOLVED_GUID_TARGET", "A GUID Object Path requires exact live identity resolution.", details={"object_path": object_path})
+        return {**canonical_import_target(row["path"], version=lane),
+                "requested_target_id": object_path, "resolved_object_type": row["type"]}
+    if object_path.startswith("{") or object_path.endswith("}"):
+        raise ImportContractError("INVALID_IDENTITY", "Object Path GUID targets must use a canonical braced GUID.")
     if object_path.startswith("\\"):
         return canonical_import_target(object_path, version=lane)
     relative = _canonical_wwise_segments(object_path, field="Object Path", absolute=False)
@@ -1883,6 +1918,7 @@ __all__ = [
     "canonical_import_location",
     "canonical_import_target",
     "derive_tab_target",
+    "tab_import_guid_targets",
     "import_operation_policy",
     "language_requires_live_project_validation",
     "normalize_auto_check_out_to_source_control",

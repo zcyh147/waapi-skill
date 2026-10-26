@@ -3072,6 +3072,116 @@ def test_exact_table_can_update_existing_source_media_and_notes_with_separate_ow
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
 
 
+class GuidSourceTabClient(ExplicitSourceTabClient):
+    """External Wwise boundary recognizes exact GUID Object Path cells."""
+
+    OWNER = "{A3333333-3333-3333-3333-333333333333}"
+    SOURCE = "{B4444444-4444-4444-4444-444444444444}"
+
+    def call(self, uri, args=None, options=None):
+        if uri != "ak.wwise.core.audio.importTabDelimited":
+            return super().call(uri, args, options)
+        import csv
+        from copy import deepcopy
+        self.calls.append((uri, deepcopy(args), deepcopy(options or {})))
+        with Path(args["importFile"]).open(encoding="utf-8", newline="") as stream:
+            owner, source = list(csv.DictReader(stream, delimiter="\t"))
+        assert owner["Object Path"].upper() == self.OWNER.upper()
+        assert source["Object Path"].upper() == self.SOURCE.upper()
+        self.owner["notes"] = owner["Notes"]
+        self.sources[0]["notes"] = source["Notes"]
+        self.copied.write_bytes(Path(source["Audio File"]).read_bytes())
+        self.imported = True
+        return {"objects": deepcopy([self.owner, self.sources[0]])}
+
+
+def _guid_source_tab_draft(tmp_path, version):
+    client = GuidSourceTabClient(tmp_path, version)
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, version, client=client)
+    table.write_text(table.read_text().replace(
+        r"<Sound Voice>Voice\<AudioFileSource>Line", client.SOURCE.lower()).replace(
+        "<Sound Voice>Voice", client.OWNER.lower()), encoding="utf-8")
+    return command, run, client, table
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_exact_table_guid_owner_and_source_keep_table_and_prove_media(tmp_path, version):
+    command, run, client, table = _guid_source_tab_draft(tmp_path, version)
+    original = table.read_bytes()
+    command("draft-check")
+    transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    prepared = shown["artifact"]["prepared_operation"]
+    targets = prepared["verification_plan"]["targets"]
+    assert [target["canonical_target_path"] for target in targets] == [client.owner["path"], client.sources[0]["path"]]
+    assert prepared["dispatch"]["args"]["importFile"] == str(table.resolve())
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
+    assert client.owner["notes"] == "requested owner notes" and client.sources[0]["notes"] == "requested Source notes"
+    assert client.copied.read_bytes() == b"requested explicit Source media"
+    assert client.sources[0]["id"] == client.SOURCE and client.sources[1]["notes"] == "keep Japanese notes"
+    assert table.read_bytes() == original
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
+
+
+@pytest.mark.parametrize("fault,error", (
+    ("missing-guid", "AMBIGUOUS_IDENTITY"),
+    ("malformed-guid", "INVALID_IDENTITY"),
+    ("wrong-guid-class", "INVALID_TARGET_TYPE"),
+    ("wrong-object-type", "INVALID_TARGET_TYPE"),
+    ("wrong-source-class", "INVALID_TARGET_TYPE"),
+    ("other-language", "IDENTITY_MISMATCH"),
+    ("foreign-parent", "INVALID_TARGET_TYPE"),
+    ("invalid-property-value", "INVALID_PROPERTY_VALUE"),
+    ("outside-import-root", "INVALID_TARGET"),
+))
+def test_exact_table_guid_targets_reject_missing_wrong_class_and_language(tmp_path, fault, error):
+    command, _run, client, table = _guid_source_tab_draft(tmp_path, "2025.1")
+    if fault == "missing-guid":
+        client.sources.pop(0)
+    elif fault == "malformed-guid":
+        table.write_text(table.read_text().replace(client.SOURCE.lower(), "{not-a-guid}"), encoding="utf-8")
+    elif fault == "wrong-guid-class":
+        client.sources[0].update(type="Folder", classId=11)
+    elif fault == "wrong-object-type":
+        table.write_text(table.read_text().replace("Notes\n", "Notes\tObject Type\n").replace(
+            "requested owner notes\n", "requested owner notes\tSound\n").replace(
+            "requested Source notes\n", "requested Source notes\tSound\n"), encoding="utf-8")
+    elif fault == "wrong-source-class":
+        client.sources[0]["classId"] = 65552
+    elif fault == "other-language":
+        client.sources[0]["audioSource:language"]["name"] = "Japanese"
+    elif fault == "invalid-property-value":
+        table.write_text(table.read_text().replace("Notes\n", "Notes\tProperty[IsVoice]\n").replace(
+            "requested owner notes\n", "requested owner notes\tnot-bool\n").replace(
+            "requested Source notes\n", "requested Source notes\t\n"), encoding="utf-8")
+    elif fault == "outside-import-root":
+        client.sources[0]["path"] = r"\Events\Default Work Unit\Source"
+    else:
+        client.sources[0]["parent"] = {"id": PARENT_ID}
+    original = table.read_bytes()
+    command("draft-check", expected_error=error)
+    assert table.read_bytes() == original and client.copied.read_bytes() == b"old English media"
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+    assert not list((tmp_path / "state/transactions").glob("tx1-*"))
+
+
+@pytest.mark.parametrize("drift", ("class", "guid-path", "table"))
+def test_exact_table_guid_targets_revalidate_before_dispatch(tmp_path, drift):
+    command, run, client, table = _guid_source_tab_draft(tmp_path, "2025.1")
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    if drift == "class": client.sources[0]["classId"] = 65552
+    elif drift == "guid-path": client.sources[0].update(name="Moved", path=client.owner["path"] + r"\Moved")
+    else: table.write_text(table.read_text().replace(client.SOURCE.lower(), client.OTHER_SOURCE.lower()), encoding="utf-8")
+    code, executed = run("execute", transaction)
+    assert code == 2 and executed["executed"] is False and executed["status"] == "repreview_required", executed
+    assert client.copied.read_bytes() == b"old English media"
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+
+
 def test_exact_table_existing_source_can_be_proven_when_native_omits_its_result(tmp_path):
     command, run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1", outcome="omitted-source")
     command("draft-check")
