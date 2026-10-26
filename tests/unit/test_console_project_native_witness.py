@@ -74,6 +74,9 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
                 tree = ET.parse(self.project_file)
                 ET.SubElement(tree.find('./ProjectInfo/Project/Platforms'), 'Platform',
                     Name='ReviewCopy', ReferencePlatform='Windows', ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                for name in ('SoundBankPaths', 'ExternalSourcesOutputPath'):
+                    values = tree.find('./ProjectInfo/Project/PropertyList/Property[@Name="' + name + '"]/ValueList')
+                    ET.SubElement(values, 'Value', Platform='ReviewCopy').text = 'native-ReviewCopy-' + name
                 tree.write(self.project_file)
                 tree = ET.parse(self.unit)
                 for parent in tree.iter():
@@ -126,6 +129,16 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
     fault_applied = [False]
     client = Client(tmp_path, version, 'ak.wwise.cli.createNewProject')
     client.unit = saved_fixture_project(client)
+    if case == 'add-copy':
+        tree = ET.parse(client.project_file)
+        for name in ('SoundBankPaths', 'ExternalSourcesOutputPath'):
+            field = ET.SubElement(tree.find('./ProjectInfo/Project/PropertyList'), 'Property', Name=name, Type='string')
+            ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value', Platform='Windows').text = 'original-Windows-' + name
+        tree.write(client.project_file)
+        tree = ET.parse(client.unit)
+        field = ET.SubElement(tree.find('.//Sound/PropertyList'), 'Property', Name='SoundBankPaths', Type='string')
+        ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value', Platform='Windows').text = 'keep-sound-scope'
+        tree.write(client.unit)
     prelaunch = None
     if case in {'media-back', 'media-refresh'}:
         from tests.destructive.support.console_project_acceptance import stage_media_storage_fixture
@@ -240,6 +253,10 @@ def test_platform_copy_collector_retains_actual_copy_and_preservation_outcome(tm
     assert len(final['transactions']) == 2
     receipt = json.loads(Path(final['categories'][0]['observation_path']).read_text())
     assert receipt['complete'] is (not fault)
+    if not fault:
+        assert receipt['excluded_project_settings']['source'] != receipt['excluded_project_settings']['target']
+        assert {row['property'] for row in receipt['excluded_project_settings']['target']} == {'SoundBankPaths', 'ExternalSourcesOutputPath'}
+        assert any(row[2] == 'SoundBankPaths' for row in receipt['explicit_source_values'])
     assert [uri for uri, _, _ in client.calls if uri in ('ak.wwise.core.project.save', 'ak.wwise.cli.addNewPlatform')] == [
         'ak.wwise.core.project.save', 'ak.wwise.cli.addNewPlatform']
 

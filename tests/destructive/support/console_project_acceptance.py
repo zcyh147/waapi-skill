@@ -169,15 +169,39 @@ def load_created_fixture(manifest):
     return project, {**data, 'manifest': str(manifest), 'manifest_sha256': proof['sha256']}
 
 
+# Matching Project SoundBanks/External Sources tabs are excluded from Copy
+# Settings by the pinned manual; same-named fields on other owners still copy.
+PROJECT_COPY_TAB_FIELDS = frozenset({'SoundBankPaths', 'SoundBankPreGenerateCustomCmdDescription',
+    'SoundBankPreGenerateCustomCmdLines', 'SoundBankPostGenerateCustomCmdDescription',
+    'SoundBankPostGenerateCustomCmdLines', 'ExternalSourcesInputPath', 'ExternalSourcesOutputPath'})
+
+
+def project_copy_tab_values(project, platform):
+    document, _ = _read_xml_artifact(str(project), str(project.parent))
+    return sorted([{'property': field.get('Name'), 'type': field.get('Type'), 'value': value.text or ''}
+        for field in document.findall('./ProjectInfo/Project/PropertyList/Property')
+        if field.get('Name') in PROJECT_COPY_TAB_FIELDS
+        for value in field.findall('./ValueList/Value') if value.get('Platform') == platform],
+        key=lambda row: (row['property'], row['type'] or '', row['value']))
+
+
 def platform_values(project, platform):
     rows = []
     for path in _project_model_paths(str(project), str(project.parent)):
         document, _ = _read_xml_artifact(path, str(project.parent))
-        for field in document.iter('Property'):
-            for value in field.findall('./ValueList/Value'):
-                if value.get('Platform') == platform:
-                    rows.append([Path(path).relative_to(project.parent).as_posix(), field.get('Name'),
-                        value.text, sorted((key, item) for key, item in value.attrib.items() if key != 'Platform')])
+        excluded = {id(field) for field in document.findall('./ProjectInfo/Project/PropertyList/Property')
+            if Path(path) == project and field.get('Name') in PROJECT_COPY_TAB_FIELDS}
+        def visit(node, owners):
+            if node.tag == 'Property' and id(node) not in excluded:
+                for value in node.findall('./ValueList/Value'):
+                    if value.get('Platform') == platform:
+                        rows.append([Path(path).relative_to(project.parent).as_posix(), owners,
+                            node.get('Name'), node.get('Type'), value.text,
+                            sorted((key, item) for key, item in value.attrib.items() if key != 'Platform')])
+            owner = [node.tag, node.get('ID', ''), node.get('Name', '')]
+            for child in node:
+                visit(child, [*owners, owner])
+        visit(document, [])
     return sorted(rows, key=repr)
 
 
@@ -337,10 +361,12 @@ def collect_console_project_acceptance(runtime, case):
             expected = platform_values(project, 'Windows')
             assert expected and not platform_values(project, 'ReviewCopy'), 'Copy fixture needs explicit source values and no unregistered target values'
             receipt['explicit_source_values'] = expected
+            receipt['excluded_project_settings'] = {'source': project_copy_tab_values(project, 'Windows')}
             complete('ak.wwise.cli.addNewPlatform', ['--value', 'project_file', str(project),
                 '--value', 'base_platform', 'Windows', '--value', 'platform_name', 'ReviewCopy',
                 '--value', 'copy_settings_from_platform', 'Windows'])
             receipt['copied_values'] = platform_values(project, 'ReviewCopy')
+            receipt['excluded_project_settings']['target'] = project_copy_tab_values(project, 'ReviewCopy')
             assert receipt['copied_values'] == expected
             receipt['model_after'] = retain_model(project, runtime.state_dir / 'console184-model-images', 'after')
         elif case == 'migrate':
