@@ -340,12 +340,25 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Existing Dialogue Event identity is the only new machine field. Revert
+    # that field and its disclosure before all prior component/history seals.
+    assert canonical_sha256(non_object_set_digests) == "4808739b8ef500377baf8bd7eb02caae2366b40ab28bf4eaaa44d5c5876e72b7"
+    before_dialogue_lifecycle = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.import", version)
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            assert fields["dialogue_event"]["properties"].pop("existing_id") == {
+                "type":"string", "description":"Gateway-bound exact existing DialogueEvent GUID; omitted for new Event creation."}
+            fields["dialogue_event"]["description"] = "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; name/path alone requests Event creation, not a decision-path association. Optional ordered bound group/value or wildcard conditions request an association; Probability/Weight require that path. Entry owner/AudioNode and supplied numeric values are checked; exact decision-path sequence is not read back."
+        before_dialogue_lifecycle[version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
     # Reconcile the independent Switch extension before the Dialogue component
     # and all earlier seals. Only its two descriptions/one constraint changed.
     assert canonical_sha256(non_object_set_digests) == "c56f61d0fb3a1911e6b32c223bc1b482c3e6219676cc09937e36f5787dddcf40"
     before_switch_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.import", version)
+        contract = deepcopy(before_dialogue_lifecycle[version])
         props = contract["argument_contract"]["properties"]
         for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
             assert fields["switch_assignment"]["description"] == (

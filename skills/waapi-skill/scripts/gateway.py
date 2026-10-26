@@ -1121,6 +1121,7 @@ def _add_business_declaration_arguments(
             "value without encoding it as a generic field pair"
         ),
     )
+    parser.add_argument("--dialogue-event-handle")
     parser.add_argument("--dialogue-event-parent-handle")
     parser.add_argument("--dialogue-event-name")
     parser.add_argument("--dialogue-condition", action="append", nargs=2, default=[], metavar=("GROUP_HANDLE", "VALUE_HANDLE_OR_WILDCARD"))
@@ -17926,6 +17927,7 @@ def _parse_audio_import_business_fields(
     switch_value: str | None = None,
     allow_switch_value_pair: bool = True,
     field_value_pairs: Sequence[Sequence[str]] = (),
+    dialogue_event_handle: str | None = None,
     dialogue_event_parent_handle: str | None = None,
     dialogue_event_name: str | None = None,
     dialogue_condition: Sequence[Sequence[str]] = (),
@@ -17985,10 +17987,15 @@ def _parse_audio_import_business_fields(
                 session=session,
             )
         fields["field_values"] = dynamic
-    if dialogue_event_parent_handle is not None or dialogue_event_name is not None or dialogue_condition or dialogue_probability is not None or dialogue_weight is not None:
-        if dialogue_event_parent_handle is None or dialogue_event_name is None:
-            raise GatewayInputError("Dialogue Event creation requires --dialogue-event-parent-handle and --dialogue-event-name together")
-        fields["dialogue_event"] = {"parent_handle": dialogue_event_parent_handle, "name": dialogue_event_name}
+    if dialogue_event_handle is not None or dialogue_event_parent_handle is not None or dialogue_event_name is not None or dialogue_condition or dialogue_probability is not None or dialogue_weight is not None:
+        if dialogue_event_handle is not None:
+            if dialogue_event_parent_handle is not None or dialogue_event_name is not None:
+                raise GatewayInputError("Existing Dialogue Event handle cannot be combined with parent/name creation fields")
+            fields["dialogue_event"] = {"event_handle":dialogue_event_handle}
+        else:
+            if dialogue_event_parent_handle is None or dialogue_event_name is None:
+                raise GatewayInputError("Dialogue Event requires an existing --dialogue-event-handle or both creation parent/name fields")
+            fields["dialogue_event"] = {"parent_handle": dialogue_event_parent_handle, "name": dialogue_event_name}
         if dialogue_condition:
             fields["dialogue_event"]["conditions"] = [{"group_handle": group, "value_handle": value} for group, value in dialogue_condition]
         for key, value in (("probability", dialogue_probability), ("weight", dialogue_weight)):
@@ -18675,6 +18682,7 @@ def dispatch_offline_business_draft_update(
                 switch_value=args.switch_value,
                 allow_switch_value_pair=False,
                 field_value_pairs=args.field_value,
+                dialogue_event_handle=args.dialogue_event_handle,
                 dialogue_event_parent_handle=args.dialogue_event_parent_handle,
                 dialogue_event_name=args.dialogue_event_name,
                 dialogue_condition=args.dialogue_condition,

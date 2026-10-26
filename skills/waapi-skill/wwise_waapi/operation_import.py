@@ -541,13 +541,16 @@ def build_audio_import_plan(
             oracle_row["requested_event"] = {key: value for key, value in event.items() if key != "waapi_value"}
         if "dialogue_event" in effective:
             dialogue_event = effective.get("dialogue_event")
-            if (not isinstance(dialogue_event, Mapping) or set(dialogue_event) - {"path", "conditions", "probability", "weight"}
+            if (not isinstance(dialogue_event, Mapping) or set(dialogue_event) - {"path", "existing_id", "conditions", "probability", "weight"}
                     or not isinstance(dialogue_event.get("path"), str)
                     or not dialogue_event["path"].startswith("\\Dynamic Dialogue\\")
                     or len(dialogue_event["path"]) > 4096
                     or any(c in dialogue_event["path"] for c in "<>:@|\r\n\t\x00")
                     or not dialogue_event["path"].rpartition("\\")[2]):
                 raise ImportContractError("INVALID_ARGUMENT", "dialogue_event requires a closed absolute DialogueEvent path; native directive strings are not accepted.")
+            if "existing_id" in dialogue_event and (not isinstance(dialogue_event["existing_id"], str)
+                    or not re.fullmatch(r"\{[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}", dialogue_event["existing_id"])):
+                raise ImportContractError("INVALID_ARGUMENT", "Existing Dialogue Event requires one canonical bound GUID.")
             conditions = dialogue_event.get("conditions")
             if conditions is not None and (not isinstance(conditions, list) or not 1 <= len(conditions) <= 32
                     or any(not isinstance(c, Mapping) or set(c) != {"group", "value"} for c in conditions)):
@@ -947,6 +950,10 @@ def parse_tab_delimited_import_file(
         if dialogue_events:
             row_plan["dialogue_events"] = dialogue_events
             oracle_row["requested_dialogue_events"] = dialogue_events
+            if (not oracle_row["media_expected"] and language_requires_live_project_validation(language)
+                    and _import_object_type_token(str(oracle_row.get("requested_object_type", ""))) == "soundvoice"):
+                oracle_row["requested_language"] = language
+                oracle_row["localized_owner_only"] = True
 
         switch_assignments = [
             _require_native_import_directive(

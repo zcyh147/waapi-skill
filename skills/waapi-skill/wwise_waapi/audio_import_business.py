@@ -763,16 +763,26 @@ def _append_dynamic_fields(
 
 
 def _compile_dialogue_event(session: BusinessDeclarationSession, value: Any) -> dict[str, Any]:
-    if not isinstance(value, Mapping) or set(value) - {"parent_handle", "name", "conditions", "probability", "weight"} or not {"parent_handle", "name"} <= set(value):
-        raise _field_type_repair(session, "dialogue_event", "parent_handle and exact child name object")
-    parent = _resolve_object(session, value["parent_handle"])
-    name = value["name"]
-    if (parent.object_type not in {"WorkUnit", "Folder"} or not parent.path.startswith("\\Dynamic Dialogue\\")
-            or not isinstance(name, str) or not name or name != name.strip() or len(name) > 255
-            or any(c in name for c in "\\/<>:@|\r\n\t\x00")):
-        raise _repair(session, "AUDIO_IMPORT_DIALOGUE_EVENT_INVALID", field="dialogue_event",
-            action="provide an exact Dynamic Dialogue folder/Work Unit handle and one child name without directive grammar")
-    result = {"path": f"{parent.path}\\{name}"}
+    if not isinstance(value, Mapping) or set(value) - {"event_handle", "parent_handle", "name", "conditions", "probability", "weight"}:
+        raise _field_type_repair(session, "dialogue_event", "existing Event handle or parent/name with optional conditions")
+    if "event_handle" in value:
+        if "parent_handle" in value or "name" in value:
+            raise _field_type_repair(session, "dialogue_event", "one existing Event handle without creation fields")
+        event = _resolve_object(session, value["event_handle"])
+        if event.object_type != "DialogueEvent" or not event.path.startswith("\\Dynamic Dialogue\\"):
+            raise _repair(session, "AUDIO_IMPORT_DIALOGUE_EVENT_INVALID", field="dialogue_event", action="bind one exact existing DialogueEvent")
+        result = {"path":event.path, "existing_id":event.object_id}
+    else:
+        if not {"parent_handle", "name"} <= set(value):
+            raise _field_type_repair(session, "dialogue_event", "parent_handle and exact child name")
+        parent = _resolve_object(session, value["parent_handle"])
+        name = value["name"]
+        if (parent.object_type not in {"WorkUnit", "Folder"} or not parent.path.startswith("\\Dynamic Dialogue\\")
+                or not isinstance(name, str) or not name or name != name.strip() or len(name) > 255
+                or any(c in name for c in "\\/<>:@|\r\n\t\x00")):
+            raise _repair(session, "AUDIO_IMPORT_DIALOGUE_EVENT_INVALID", field="dialogue_event",
+                action="provide an exact Dynamic Dialogue folder/Work Unit handle and one child name without directive grammar")
+        result = {"path": f"{parent.path}\\{name}"}
     if "conditions" in value:
         conditions = value["conditions"]
         if not isinstance(conditions, list) or not 1 <= len(conditions) <= 32:
