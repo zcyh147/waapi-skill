@@ -403,8 +403,37 @@ def test_gateway_binds_three_roles_then_materializes_assignment(
     assert container["draft"]["next_action_binding"]["object_binding"][
         "next_role"
     ] == "child"
+    assert gateway.gateway_json_document_size(
+        container
+    ) <= gateway.MAX_GATEWAY_RESULT_JSON_BYTES
+    # Host paths and Windows command encoding vary. Check the three exact
+    # continuations separately, retaining the compact business-summary budget.
+    summary = json.loads(json.dumps(container))
+    object_binding = summary["draft"]["next_action_binding"]["object_binding"]
+    prefix = [
+        "python",
+        SCRIPT_PATH.with_name("run.py").as_posix(),
+        "gateway.py",
+        "draft-bind-object",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+    ]
+    for selector in ("by_id", "by_verified_creation", "by_path_segments"):
+        action = object_binding[selector]
+        expected = prefix if selector == "by_verified_creation" else [
+            *prefix, "--role", "child"
+        ]
+        assert action.pop("fixed_argv_prefix_copy") == (
+            gateway.operation_draft_copy_command(expected)
+        )
+        assert action["fixed_argv_prefix_copy_instruction"]["source_field"] == (
+            "fixed_argv_prefix_copy"
+        )
     assert len(
-        json.dumps(container, ensure_ascii=False, separators=(",", ":")).encode(
+        json.dumps(summary, ensure_ascii=False, separators=(",", ":")).encode(
             "utf-8"
         )
     ) <= 5_500
