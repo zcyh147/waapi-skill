@@ -81,9 +81,9 @@ def add_soundbank_plan_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--source",
         action="append",
-        nargs=3,
+        nargs="+",
         default=[],
-        metavar=("INPUT", "PLATFORM", "OUTPUT"),
+        metavar="INPUT_PLATFORM_OPTIONAL_OUTPUT",
     )
     parser.add_argument("--definition-file", action="append", default=[])
     parser.add_argument("--io-root")
@@ -299,13 +299,12 @@ def soundbank_plan_from_namespace(
                 plan[name] = value if value == "native-default" else value == "true"
         return plan
     if operation == "soundbank.convertExternalSources":
-        return {
-            "sources": [
-                {"input": input_path, "platform": platform, "output": output}
-                for input_path, platform, output in args.source
-            ],
-            "io_root": args.io_root,
-        }
+        sources = []
+        for row in args.source:
+            if len(row) not in {2, 3}:
+                raise SoundBankBusinessCliError("one source requires INPUT PLATFORM and optional OUTPUT")
+            sources.append(dict(zip(("input", "platform", "output"), row)))
+        return {"sources": sources, "io_root": args.io_root}
     return {
         "files": list(args.definition_file),
         "io_root": args.io_root,

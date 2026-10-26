@@ -1284,3 +1284,87 @@ def test_all_user_generation_supports_bound_bank_layout_overrides(tmp_path: Path
     (output / "English(US)").mkdir()
     (output / "English(US)" / "Dialogue.bnk").write_bytes(b"BKHD-Dialogue")
     assert verify_prepared_operation(prepared, execution_result={"result": {}}, read_call=Client().call).ok
+@pytest.mark.parametrize("version,fault", [(v, None) for v in ("2022.1", "2023.1", "2024.1", "2025.1")] +
+    [("2025.1", f) for f in ("outside-cache", "missing-cache", "unsafe-base", "cache-drift", "platform-drift", "source-drift", "missing-output", "extra-output")])
+def test_external_source_omitted_output_uses_live_custom_cache_and_base_platform(tmp_path, version, fault):
+    from tests.unit.test_operation_registry_soundbank import _project as project_fixture
+    io_root, project = project_fixture(tmp_path)
+    project_root = Path(project["directories"]["root"])
+    project["directories"]["cache"] = str(io_root / "custom-cache")
+    project["platforms"][0]["name"] = "StudioMac"
+    source = project_root / "external.wav"
+    source.write_bytes(b"RIFF" + b"0" * 64)
+    source_list = project_root / "external.wsources"
+    source_list.write_text('<ExternalSourcesList SchemaVersion="1"><Source Path="external.wav" /></ExternalSourcesList>', encoding="utf-8")
+    output = io_root / "custom-cache" / "ExternalSources" / "Mac" / "external.wem"
+    if fault == "outside-cache":
+        project["directories"]["cache"] = str(tmp_path / "unowned-cache")
+    elif fault == "missing-cache":
+        del project["directories"]["cache"]
+    elif fault == "unsafe-base":
+        project["platforms"][0]["baseName"] = "../escape"
+    calls = []
+    class Client:
+        def call(self, uri, args=None, options=None):
+            calls.append((uri, args, options))
+            if uri == "ak.wwise.core.getInfo":
+                info = _info()
+                info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
+                return info
+            if uri == "ak.wwise.core.getProjectInfo":
+                return project
+            if uri == "ak.wwise.core.soundbank.convertExternalSources":
+                assert args == {"sources": [{"input": str(source_list), "platform": project["platforms"][0]["id"]}]}
+                output.parent.mkdir(parents=True, exist_ok=True)
+                if fault != "missing-output":
+                    output.write_bytes(b"WEM!" + b"1" * 32)
+                if fault == "extra-output":
+                    (output.parent / "unplanned.tmp").write_bytes(b"unexpected")
+                return {}
+            raise AssertionError((uri, args, options))
+        def disconnect(self):
+            pass
+    env = set_gateway_config(_env(tmp_path), wwise_version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv], env=env, client_factory=lambda _: Client())
+    code, started = run("draft-start", "soundbank.convertExternalSources")
+    assert code == 0, started
+    draft, authority = started["draft"]["draft_id"], started["task_authority"]
+    code, declared = run("draft-declare-soundbank-plan", draft, "--task-authority", authority,
+        "--expected-revision", "1", "--source", str(source_list), "StudioMac", "--io-root", str(io_root))
+    assert code == 0, declared
+    code, checked = run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(declared["draft"]["revision"]))
+    if fault in {"outside-cache", "missing-cache", "unsafe-base"}:
+        assert code == 2, checked
+        assert not any(uri.endswith("convertExternalSources") for uri, _, _ in calls)
+        return
+    assert code == 0, checked
+    code, preview = run("preview-from-draft", draft, "--task-authority", authority, "--expected-revision", str(checked["draft"]["revision"]))
+    assert code == 0, preview
+    prepared = TransactionStore(tmp_path / "state").load_preview(preview["transaction_id"]).artifact["prepared_operation"]
+    assert prepared["verification_plan"]["plan"]["requests"][0]["output_root"] == str(output.parent)
+    tx = preview["transaction_id"]
+    code, shown = run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if fault == "cache-drift":
+        project["directories"]["cache"] = str(io_root / "changed-cache")
+    elif fault == "platform-drift":
+        project["platforms"][0]["baseName"] = "ChangedMac"
+    elif fault == "source-drift":
+        source.write_bytes(b"changed-source")
+    code, executed = run("execute", tx)
+    if fault in {"cache-drift", "platform-drift", "source-drift"}:
+        assert code == 2 and executed["error_code"] == "ROLE_GUARD_MISMATCH", executed
+        assert not any(uri.endswith("convertExternalSources") for uri, _, _ in calls)
+        return
+    assert code == 0, executed
+    code, verified = run("verify", tx)
+    if fault in {"missing-output", "extra-output"}:
+        assert code == 2, verified
+    else:
+        assert code == 0, verified
+        assert output.is_file()
+        assert source.read_bytes() == b"RIFF" + b"0" * 64
+    assert sum(uri.endswith("convertExternalSources") for uri, _, _ in calls) == 1

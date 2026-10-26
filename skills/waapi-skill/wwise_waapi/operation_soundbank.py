@@ -90,7 +90,6 @@ _DEFAULT_COPY_STREAMED_FILES_COMMAND = (
     '-languages "$(LanguageList)"'
 )
 
-_EXTERNAL_ROW_KEYS = frozenset({"input", "platform", "output"})
 _EXTERNAL_ROOT_ATTRIBUTES = frozenset({"SchemaVersion", "Root"})
 _EXTERNAL_SOURCE_ATTRIBUTES = frozenset({"Path", "Conversion", "Destination", "AnalysisTypes"})
 _ANALYSIS_TYPES = frozenset({"0", "2", "4", "6"})
@@ -1399,8 +1398,8 @@ def build_external_sources_operation_plan(
             )
         _require_exact_keys(
             row,
-            required=_EXTERNAL_ROW_KEYS,
-            optional=frozenset(),
+            required=frozenset({"input", "platform"}),
+            optional=frozenset({"output"}),
             context=f"sources[{index}]",
         )
         requested_platforms.append(_require_text(row.get("platform"), field=f"sources[{index}].platform"))
@@ -1424,7 +1423,14 @@ def build_external_sources_operation_plan(
     project_root = project["directories"]["root"]
     for index, (raw, platform) in enumerate(zip(source_rows, selected_platforms, strict=True)):
         input_path = _require_text(raw.get("input"), field=f"sources[{index}].input")
-        output_path = _require_text(raw.get("output"), field=f"sources[{index}].output")
+        if "output" in raw:
+            output_path = _require_text(raw["output"], field=f"sources[{index}].output")
+        else:
+            # getProjectInfo owns the configured cache and filesystem platform
+            # spelling; never assume project/.cache or use the display name.
+            cache = _require_text(project_info["directories"].get("cache"), field="project_info.directories.cache")
+            platform_segment = _safe_artifact_segment(platform["baseName"], field=f"sources[{index}].platform.baseName")
+            output_path = str(Path(cache) / "ExternalSources" / platform_segment)
         output_proof = prove_artifact_path(
             output_path,
             io_root=io_root,
@@ -1486,9 +1492,10 @@ def build_external_sources_operation_plan(
                     "verification": "created_or_modified_and_nonempty_wem",
                 }
             )
-        dispatch_rows.append(
-            {"input": parsed["path"], "platform": platform["id"], "output": output_root}
-        )
+        dispatch_row = {"input": parsed["path"], "platform": platform["id"]}
+        if "output" in raw:
+            dispatch_row["output"] = output_root
+        dispatch_rows.append(dispatch_row)
         snapshot_roots.append(output_root)
         request_plans.append(
             {
@@ -1521,7 +1528,7 @@ def build_external_sources_operation_plan(
         "artifact_plan": {
             "snapshot_roots": _dedupe_strings(snapshot_roots),
             "expected_output_count": sum(len(request["expected_outputs"]) for request in request_plans),
-            "all_outputs_explicit": True,
+            "all_outputs_explicit": all("output" in row for row in source_rows),
             "cross_platform_output_roots_are_distinct": True,
             "required_verification": "bounded_pre_post_tree_delta_plus_exact_nonempty_wem_outputs",
         },
