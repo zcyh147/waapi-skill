@@ -355,9 +355,8 @@ def test_combined_owner_media_tsv_native_witness_stops_at_observed_source_bounda
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault="source-identity-boundary", witness_kind="owner-fields-media-tsv")
 
 
-@pytest.mark.parametrize("fault", (None, "ignored-media"))
-def test_distinct_source_combined_tsv_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
-    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="distinct-owner-fields-media-tsv")
+def test_distinct_source_combined_tsv_native_witness_stops_at_observed_source_boundary(tmp_path, monkeypatch):
+    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault="source-identity-boundary", witness_kind="distinct-owner-fields-media-tsv")
 
 
 @pytest.mark.parametrize("fault", (None, "missing-assignment", "indeterminate"))

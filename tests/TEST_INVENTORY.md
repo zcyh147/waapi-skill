@@ -5,6 +5,29 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #182 distinct-Source failure and current host boundary
+
+Console 2025.1.7/build 9143, `784e1bfe`, root
+`import182-tsv-distinct-source-2025-r1`: **FAIL, 8.31s**. Despite initially
+distinct English/Japanese Source paths, the combined TSV added another English
+Source. Old GUIDs and Japanese bytes stayed; English bytes and owner fields
+updated. After two verified setups, the witness ended `verification_failed`.
+Source preservation and process cleanup passed; the failed sandbox remains
+quarantined. Original assessment/final category evidence remains under the
+full-coverage root; receipt SHA-256:
+`7bee26cdbc80b0f16d5d69809e84a6a10676b8bcbc2f14a7d3a65d151e222b02`.
+
+Reviewed `35432c76` blocks combined localized existing-owner `useExisting`
+fields/media with a bound existing Source on that exact Console host/build,
+regardless of path uniqueness, before Preview and at prewrite. **20 distinct
+focused checks passed**; owner-only, pure-media and other hosts/builds/versions
+retain their existing boundaries. Both original native FAILs remain intact;
+shared paths are not necessary for the failure, and its cause remains unproven.
+Native variants have stopped. The user's decision remains pending: preserve
+Source identity with the current-host limit, explicitly accept additional-Source
+behavior, or authorize investigation. #182 is not coverage-complete; no Fresh,
+broad gate, native-Windows proof or global count is added.
+
 ## 2026-10-26 #182 guarded TSV batch and Switch program progress
 
 Reviewed `293fb909` adds five-version ordinary Switch new/reuse media and
