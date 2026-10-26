@@ -566,3 +566,169 @@ def test_marker_result_pages_revalidate_exact_owner_class_metadata_and_zero_valu
     code,continued = task.run(*result['agent_result']['next_command']['gateway_argv'])
     if change == 'none': assert code == 0 and continued['status'] == 'partial',continued
     else: assert code == 2 and continued['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED',continued
+
+
+def marker_record_task(tmp_path, version='2025.1'):
+    from tests.unit.test_object_query_result_pages import QueryTask
+    task = QueryTask(tmp_path, version)
+    # Program transport built from R90's actual manual-member scalar values;
+    # this is not a recorded plain-Markers composition or file-cue result.
+    member = MARKER_PACKET['exact_read']['result']['return'][0]
+    task.row = {'id':MARKER_OWNER,'name':'audit_outside','type':'AudioFileSource','path':r'\Sounds\audit_outside',
+        'owner':{'id':SOUND,'name':'Sound'},
+        'waapiMarkerRecords':[{'time':member['@Time'],'label':member['@Label'],'extension':{'retained':True}},
+            {'time':1.25,'label':''}]}
+    return task
+
+
+def test_marker_records_fixed_composition_keeps_source_context_and_actual_records(tmp_path):
+    task = marker_record_task(tmp_path)
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--max-results','1',
+        '--include','owner','--include','marker-records','--detail')
+    assert code == 0,result
+    row, = result['agent_result']
+    assert {key:row[key] for key in ('id','name','type','path','owner')} == {key:task.row[key] for key in ('id','name','type','path','owner')}
+    assert row['marker_records'] == task.row['waapiMarkerRecords']
+    assert list(result)[-1] == 'agent_result'
+    reads = [(args,options) for uri,args,options in task.calls if uri.endswith('object.get')]
+    assert reads == [({'waql':f'from object "{MARKER_OWNER}" take 1'},
+        {'return':['id','name','type','path','owner','Markers.{time,label} as waapiMarkerRecords']})]
+    code,schema = task.run('query-schema','--output','marker-records')
+    assert code == 0,schema
+    output = schema['business_output']
+    assert output['available'] is True and output['supported_versions'] == ['2023.1','2024.1','2025.1']
+    assert output['computed_file_cue_semantics_proven'] is False
+    assert output['native_definition'] is None and output['source']['wwise_build'] == '2025.1.7.9143'
+    assert output['source']['composition'] == 'Markers.{time,label}'
+    assert output['source']['alias_rule'] == 'EXPRESSION as NAME'
+    assert output['result_scope'] == 'root AudioFileSource records; no canonical per-record identity or mutation authority'
+
+
+@pytest.mark.parametrize('version', ['2021.1','2022.1','2023.1','2024.1','2025.1'])
+def test_marker_records_schema_version_and_related_scope_are_explicit(tmp_path, version):
+    task = marker_record_task(tmp_path, version)
+    code,schema = task.run('query-schema','--output','marker-records')
+    assert code == 0 and schema['business_output']['available'] is (version >= '2023.1'),schema
+    assert schema['business_output']['supported_versions'] == ['2023.1','2024.1','2025.1']
+    code,contract = task.run('query-schema')
+    assert code == 0 and contract['related_outputs']['outputs']['marker-records']['available'] is False,contract
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include-related','parent','marker-records')
+    assert code == 2 and result['error_code'] == 'GatewayInputError' and not task.calls,result
+    if version < '2023.1':
+        code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include','marker-records')
+        assert code == 2 and result['error_code'] == 'GatewayInputError' and not task.calls,result
+        assert '2023.1' in result['message']
+    else:
+        code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include','marker-records')
+        assert code == 0 and result['agent_result'][0]['marker_records'] == task.row['waapiMarkerRecords'],result
+
+
+@pytest.mark.parametrize('presence', ['missing','null','empty','missing-null-fields'])
+def test_marker_records_preserve_actual_presence_and_native_values(tmp_path, presence):
+    task = marker_record_task(tmp_path)
+    if presence == 'missing': task.row.pop('waapiMarkerRecords')
+    elif presence == 'null': task.row['waapiMarkerRecords'] = None
+    elif presence == 'empty': task.row['waapiMarkerRecords'] = []
+    else: task.row['waapiMarkerRecords'] = [{'time':-5.670529842376709},{'label':''},
+        {'time':None,'label':None},{'extension':{'null':None,'enabled':False}}]
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include','marker-records')
+    assert code == 0,result
+    row, = result['agent_result']
+    if presence == 'missing': assert 'marker_records' not in row and row['unavailable_fields'] == ['marker_records']
+    else: assert row['marker_records'] == task.row['waapiMarkerRecords']
+
+
+@pytest.mark.parametrize('value', ['records',[1],[{'time':False}],[{'time':'0'}],[{'label':42}]])
+def test_marker_record_shape_errors_retain_the_original_bounded_packet(tmp_path, value):
+    task = marker_record_task(tmp_path)
+    task.row['waapiMarkerRecords'] = value
+    packets = tmp_path/'packets'; task.env['WWISE_EVIDENCE_DIR'] = str(packets)
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include','marker-records')
+    assert code == 2 and result['error_code'] == 'QUERY_MARKER_RECORDS_SHAPE',result
+    assert result['details']['id'] == MARKER_OWNER and result['details']['native_key'] == 'waapiMarkerRecords'
+    assert not result.get('agent_result')
+    native = [json.loads(path.read_text()) for path in packets.glob('*.json')]
+    packet, = [row for row in native if row['api'].endswith('object.get')]
+    assert packet['result']['return'][0]['waapiMarkerRecords'] == value
+
+
+def test_marker_record_roots_remain_independent_after_advanced_source_selection(tmp_path):
+    task = marker_record_task(tmp_path)
+    second = copy.deepcopy(task.row)
+    second.update(id=RTPC2,name='Other source',owner={'id':OTHER,'name':'Other sound'},
+        waapiMarkerRecords=[{'time':2,'label':'Other marker'}])
+    original = task.call
+    def native(uri,args=None,options=None):
+        result = original(uri,args,options)
+        if uri.endswith('object.get') and args != {'waql':'from type Project take 1'}:
+            result = {'return':[copy.deepcopy(second),copy.deepcopy(task.row)]}
+        return result
+    task.call = native
+    code,result = task.run('query-object','--advanced-waql','from type AudioFileSource','--max-results','2',
+        '--include','owner','--include','marker-records')
+    assert code == 0,result
+    rows = result['agent_result']
+    assert [(row['id'],row['owner'],row['marker_records']) for row in rows] == [
+        (row['id'],row['owner'],row['waapiMarkerRecords']) for row in (second,task.row)]
+    assert [(args,options) for uri,args,options in task.calls if uri.endswith('object.get')] == [
+        ({'waql':'from type AudioFileSource take 2'},
+         {'return':['id','name','type','path','owner','Markers.{time,label} as waapiMarkerRecords']})]
+
+
+@pytest.mark.parametrize('change', ['none','native-result'])
+def test_marker_record_pages_deliver_actual_values_and_reject_changed_native_records(tmp_path, change):
+    task = marker_record_task(tmp_path)
+    label = '声"\\\n' * 8000
+    task.row['waapiMarkerRecords'] = [{'time':2.5,'label':label,'extension':{'kept':True}},
+        {'time':0,'label':'second'}]
+    code,page = task.run('query-object','--exact-id',MARKER_OWNER,'--max-results','1','--include','marker-records')
+    assert code == 0 and page['status'] == 'partial',page
+    if change != 'none':
+        task.row['waapiMarkerRecords'][0]['label'] += '!'
+        code,result = task.run(*page['agent_result']['next_command']['gateway_argv'])
+        assert code == 2 and result['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED' and not result.get('agent_result'),result
+        return
+    entries=[]; count=0
+    while True:
+        count += 1; assert count <= 32
+        assert len(json.dumps(page,ensure_ascii=False,indent=2).encode()) <= 32*1024
+        assert list(page)[-1] == 'agent_result'
+        value=page['agent_result']; assert value['entries_encoding'] == 'json-pointer-entries'
+        assert value['objects'][0]['id'] == MARKER_OWNER and value['page']['mutation_authority'] is False
+        entries.extend(value['entries'])
+        if value['projection_complete']: break
+        code,page = task.run(*value['next_command']['gateway_argv'])
+        assert code == 0,page
+    assert ''.join(entry['value'] for entry in entries if entry['pointer']=='/objects/0/marker_records/0/label') == label
+    assert [entry['value'] for entry in entries if entry['pointer']=='/objects/0/marker_records/0/time'] == [2.5]
+    assert [entry['value'] for entry in entries if entry['pointer']=='/objects/0/marker_records/1/time'] == [0]
+    assert [entry['value'] for entry in entries if entry['pointer']=='/objects/0/marker_records/1/label'] == ['second']
+    assert [entry['value'] for entry in entries if entry['pointer']=='/objects/0/marker_records/0/extension/kept'] == [True]
+    reads=[(args,options) for uri,args,options in task.calls if uri.endswith('object.get') and args!={'waql':'from type Project take 1'}]
+    assert reads and all(read == ({'waql':f'from object "{MARKER_OWNER}" take 1'},
+        {'return':['id','name','type','path','Markers.{time,label} as waapiMarkerRecords']}) for read in reads)
+
+
+def test_marker_records_keep_existing_native_byte_ceiling_and_root_row_limit(tmp_path):
+    task = marker_record_task(tmp_path)
+    code,rejected = task.run('query-object','--exact-id',MARKER_OWNER,'--max-results','1001','--include','marker-records')
+    assert code == 2 and rejected['error_code'] == 'SemanticValidationError' and not task.calls,rejected
+    assert rejected['details'] == {'minimum':0,'maximum':1000,'take':1001}
+    task.row['waapiMarkerRecords']=[{'time':0,'label':'x'*(1024*1024)}]
+    code,result=task.run('query-object','--exact-id',MARKER_OWNER,'--max-results','1','--include','marker-records')
+    assert code == 2 and result['call']['error_code'] == 'RESULT_TOO_LARGE' and not result.get('agent_result'),result
+    assert len(json.dumps(result,ensure_ascii=False,indent=2).encode()) <= 32*1024
+    assert sum(uri.endswith('object.get') for uri,_,_ in task.calls) == 1
+
+
+def test_marker_records_preserve_native_rejection_without_retry_or_mode_claim(tmp_path):
+    task=marker_record_task(tmp_path); original=task.call
+    def native(uri,args=None,options=None):
+        if uri.endswith('object.get') and args!={'waql':'from type Project take 1'}:
+            task.calls.append((uri,args,options)); raise RuntimeError('selected Marker record projection rejected')
+        return original(uri,args,options)
+    task.call=native
+    code,result=task.run('query-object','--exact-id',MARKER_OWNER,'--include','marker-records')
+    assert code == 2 and result['call']['ok'] is False and not result.get('agent_result'),result
+    assert result['call']['error_code'] == 'RuntimeError' and 'selected Marker record projection rejected' in result['call']['message']
+    assert sum(uri.endswith('object.get') for uri,_,_ in task.calls) == 1
