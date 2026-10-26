@@ -381,5 +381,5 @@ tests/unit/test_conversion_plugin_collector.py
 tests/unit/test_query_legacy_curve_points.py
 tests/unit/test_legacy_curve_points_fixture.py
 tests/unit/test_soundbank_native_witness.py
-tests/unit/test_branch_evidence_readers.py
 tests/unit/test_console_project_native_witness.py
+tests/unit/test_branch_evidence_readers.py
