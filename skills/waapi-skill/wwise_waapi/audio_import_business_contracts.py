@@ -24,6 +24,7 @@ AUDIO_IMPORT_BUSINESS_VALUE_TYPES = {
     "language": "string",
     "media_file": "string",
     "originals_subfolder": "string",
+    "source_name": "string",
     "switch_value": "string",
 }
 AUDIO_IMPORT_BUSINESS_DECLARATION_FIELDS = (
@@ -71,6 +72,15 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
         "field_value_types": dict(AUDIO_IMPORT_BUSINESS_VALUE_TYPES),
         "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
         "row_requirements": {
+            "named_source": {
+                "field": "source_name",
+                "owner": "sound-sfx_or_sound-voice; Sound_result_handle_remains_the_owner",
+                "target": "exact_named_AudioFileSource_under_that_Sound; media_required",
+                "shared_owner": "multiple_named_Source_rows_may_share_one_Sound; create_owner_only_if_absent",
+                "owner_fields": "declare_separately_on_the_Sound",
+                "replacement": "bind_the_existing_Source_handle_for_replacement; new_Source_rows_require_absence",
+            },
+            "existing_source": "bind_exact_AudioFileSource_handle; media_and_language_required; reimport_preserves_Source_GUID; replace_retires_only_that_Source_GUID; preserve_Sound_and_other_Source_identities_and_media",
             "structure_only": {
                 "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
                 "media": "omit_media_file_and_inline_wav",

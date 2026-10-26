@@ -697,3 +697,44 @@ def test_source_control_version_boundary_and_implicit_existing_reimport(
                 build_continuation=_continuation,
             )
         assert unavailable.value.repair["error_code"] == "VERSION_BEHAVIOR_BOUNDARY"
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_named_sound_sources_keep_independent_names_and_sound_result_handle(version, tmp_path):
+    session, parent, _ = _session(version)
+    for declaration_id, source_name in (("first", "_MyActiveSource"), ("second", "OtherSource")):
+        media = tmp_path / (declaration_id + ".wav")
+        media.write_bytes(b"RIFF-" + declaration_id.encode())
+        session = session.with_new_declaration(
+            declaration_id=declaration_id,
+            target=NewDescendantTarget(parent_handle=parent, name="MySound", kind="sound-sfx"),
+            fields={"source_name": source_name, "media_file": str(media)},
+        )
+    session = session.with_settings({"mode": "replace"})
+    request = materialize_audio_import_business_request(session)
+    rows = request["arguments"]["imports"]
+    assert [row["object_path"].rsplit("\\", 1)[-1] for row in rows] == [
+        "<AudioFileSource>_MyActiveSource", "<AudioFileSource>OtherSource"]
+    assert all(row["object_type"] == "AudioFileSource" for row in rows)
+    # A Sound result remains the Sound when used as a later business parent.
+    first = session.declarations[0]
+    child = session.with_new_declaration(
+        declaration_id="child", target=NewDescendantTarget(
+            parent_handle=first.result_handle, name="Nested", kind="sound-sfx"), fields={})
+    assert materialize_audio_import_business_request(child)["arguments"]["imports"][-1]["object_path"].endswith(
+        r"\<Sound SFX>MySound\<Sound SFX>Nested")
+
+
+@pytest.mark.parametrize("fields,kind,error", (
+    ({"source_name": "bad\\path", "inline_wav": "wave.wav|UklGRgQAAABXQVZFZGF0YQ=="}, "sound-sfx", "FIELD_VALUE_TYPE_MISMATCH"),
+    ({"source_name": "Named"}, "sound-sfx", "AUDIO_IMPORT_NAMED_SOURCE_OWNER"),
+    ({"source_name": "Named", "inline_wav": "wave.wav|UklGRgQAAABXQVZFZGF0YQ=="}, "music-track", "AUDIO_IMPORT_NAMED_SOURCE_OWNER"),
+    ({"source_name": "Named", "inline_wav": "wave.wav|UklGRgQAAABXQVZFZGF0YQ==", "volume_db": -3}, "sound-sfx", "AUDIO_IMPORT_NAMED_SOURCE_OWNER_FIELDS"),
+))
+def test_named_source_rejects_path_syntax_structure_only_and_unowned_fields(fields, kind, error):
+    session, parent, _ = _session("2025.1")
+    session = session.with_new_declaration(declaration_id="source",
+        target=NewDescendantTarget(parent_handle=parent, name="Owner", kind=kind), fields=fields)
+    with pytest.raises(BusinessDeclarationError) as rejected:
+        materialize_audio_import_business_request(session)
+    assert rejected.value.repair["error_code"] == error

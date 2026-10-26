@@ -468,6 +468,11 @@ def _compile_declaration(
         row["audio_file_base64"] = normalized_inline
 
     has_media = media_file is not None or inline_wav is not None
+    if _type_token(object_type) == "audiofilesource":
+        unavailable = set(fields) - {"media_file", "inline_wav", "language", "originals_subfolder", "notes", "audio_source_notes"}
+        if not has_media or unavailable:
+            raise _repair(session, "AUDIO_IMPORT_SOURCE_FIELDS_UNAVAILABLE", field="fields",
+                action="reimport or replace this exact media Source; declare owner fields on its bound Sound")
     language = fields.get("language")
     if has_media:
         if language is None and (
@@ -624,6 +629,31 @@ def _compile_declaration(
     if "dialogue_event" in fields:
         row["dialogue_event"] = _compile_dialogue_event(session, fields["dialogue_event"])
 
+    if "source_name" in fields:
+        source_name = fields["source_name"]
+        if (not isinstance(source_name, str) or not source_name or len(source_name) > 255
+                or source_name != source_name.strip() or source_name in {".", ".."}
+                or any(c in source_name for c in '<>:"/\\|?*\x00\r\n\t')):
+            raise _field_type_repair(session, "source_name", "one exact bounded Source name without path syntax")
+        if semantic_kind_name not in {"sound-sfx", "sound-voice"} or not has_media:
+            raise _repair(session, "AUDIO_IMPORT_NAMED_SOURCE_OWNER", field="source_name",
+                action="name one media Source owned by a Sound SFX or Sound Voice declaration")
+        owner_fields = set(fields) - {"source_name", "media_file", "inline_wav", "language", "originals_subfolder", "audio_source_notes"}
+        if owner_fields:
+            raise _repair(session, "AUDIO_IMPORT_NAMED_SOURCE_OWNER_FIELDS", field="source_name",
+                action="declare Sound fields separately from the named media Source")
+        if isinstance(target, ExistingObjectTarget) and session.settings.get("mode") == "replace":
+            raise _repair(session, "AUDIO_IMPORT_REPLACE_SOURCE_HANDLE_REQUIRED", field="source_name",
+                action="bind the exact existing Source handle before requesting its replacement")
+        object_path = f"{object_path}\\<AudioFileSource>{source_name}"
+        object_type = "AudioFileSource"
+        row.update(object_path=object_path, object_type=object_type)
+        if "audio_source_notes" in row:
+            row["notes"] = row.pop("audio_source_notes")
+        # The declaration's result is still its Sound, including when another
+        # row creates a second Source below that same owner. Do not replace the
+        # owner identity cached above with the terminal native Source identity.
+
     readable = [
         f"对象：{object_name}",
         f"类型：{kind.path_segment_type if isinstance(target, NewDescendantTarget) else readable_type}",
@@ -638,6 +668,13 @@ def _compile_declaration(
         readable.append(f"输出总线：{_resolve_object(session, fields['output_bus']).name}")
     if has_media:
         readable.append(f"语言：{row['import_language']}")
+    if "source_name" in fields:
+        readable.append(f"音频源：{fields['source_name']}")
+    if _type_token(object_type) == "audiofilesource" and "audio_source_notes" in row:
+        if "notes" in row:
+            raise _repair(session, "AMBIGUOUS_EXISTING_AUDIO_SOURCE_NOTES", field="notes",
+                action="declare the Source notes once")
+        row["notes"] = row.pop("audio_source_notes")
     return (
         BusinessEffect.create(
             effect_id=f"import:{declaration.declaration_id}",

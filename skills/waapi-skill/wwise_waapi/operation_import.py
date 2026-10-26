@@ -446,11 +446,20 @@ def build_audio_import_plan(
             expected_source_path = expected_audio_file_source_result_path(
                 target["canonical_target_path"],
                 source_name_path,
+                target_is_audio_file_source=(
+                    str(effective.get("object_type", _typed_leaf_object_type(object_path))).casefold() == "audiofilesource"
+                ),
             )
             if expected_source_path is not None:
                 oracle_row["expected_audio_file_source_result_path"] = expected_source_path
+            elif str(effective.get("object_type", _typed_leaf_object_type(object_path))).casefold() == "audiofilesource":
+                raise ImportContractError("INVALID_TARGET_TYPE", "An explicit AudioFileSource requires reviewed audio media, not MIDI topology.")
 
         explicit_type = effective.get("object_type")
+        if str(explicit_type or _typed_leaf_object_type(object_path)).casefold() == "audiofilesource":
+            owner_type = _typed_leaf_object_type(object_path.rpartition("\\")[0])
+            if owner_type is not None:
+                oracle_row["requested_source_owner_type"] = owner_type
         inferred_type = _typed_leaf_object_type(object_path)
         if explicit_type is not None:
             object_type = _require_object_type(
