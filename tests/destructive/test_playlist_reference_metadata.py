@@ -51,6 +51,12 @@ def test_existing_playlist_slot_reference_change_preserves_peer_and_order(workfl
     _observe_existing_playlist_reference_change(workflow_sandbox_runtime)
 
 
+@pytest.mark.skip(reason=(
+    "Historical capability probe: Console 2025.1.7.9143 rejected PlaylistSlot setName; "
+    "the packaged playlist-slot-name-native-boundary.json now blocks this route before Preview. "
+    "Original inner-rename180-2025-native-r1 FAIL and indeterminate transaction are preserved; "
+    "this skip supplies no passing native evidence."
+))
 def test_existing_playlist_slot_rename_preserves_peer_order_and_references(workflow_sandbox_runtime):
     """One ordinary public rename attempt; native support awaits this outcome."""
     runtime = workflow_sandbox_runtime
