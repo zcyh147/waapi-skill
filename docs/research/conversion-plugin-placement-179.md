@@ -173,8 +173,9 @@ read-r1 SKIPs remain: 2021 **9.26s**, 2022 **4.31s**; raw class 2818064/empty
 pluginName describe a generic wrapper, not concrete Vorbis. Pinned-wrapper
 metadata-r2 passed **5.94s/4.07s**; 2023 read-r1 passed **4.39s** with 262145/Vorbis.
 One 2021 FieldHandle scalar case at `a47152b7` passed **6.35s**, VERIFIED 3→4 with
-exact GUID/name/type/opaque path/owner/raw class/pluginName retained. Production
-already worked. Source GUIDs are test oracles; ordinary changes require exact
+exact GUID/name/type/opaque path/owner/raw class/pluginName retained. After the
+shared opaque-identity correction (`73f944c7`), the existing object.setProperty
+route required no further production change. Source GUIDs are test oracles; ordinary changes require exact
 chosen live GUIDs and live FieldHandles. No replacement or platform lookup is
 credited. Sources/processes were preserved/cleaned; nonpasses stay frozen. Exact
 roots/receipts: [test inventory](../../tests/TEST_INVENTORY.md).

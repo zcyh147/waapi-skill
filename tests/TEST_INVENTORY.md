@@ -38,7 +38,9 @@ and older-codec179-{2021,2022}-metadata-r2.
 At `a47152b7`, Console 2021 existing object.setProperty FieldHandle passed
 **6.35s**: transaction `tx1-y5an0z8y2dkgeh4nw7vh` VERIFIED QualityFactor 3.0→4.0,
 with GUID/name/type/opaque path/owner/raw class 2818064/empty pluginName unchanged.
-No production change was needed. Root older-codec179-2021-field-r1 retains
+After the shared opaque-identity correction (`73f944c7`), existing
+object.setProperty required no further production change. Root
+older-codec179-2021-field-r1 retains
 independent readback/artifact/final category. Every native source tree/full
 hash/project mtime was preserved and processes cleaned; PASS sandboxes were
 deleted, original SKIPs/FAIL quarantined. This proves exact chosen-GUID scalar
