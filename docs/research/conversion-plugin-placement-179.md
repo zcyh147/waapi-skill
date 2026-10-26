@@ -1,9 +1,10 @@
 # Conversion codec placement and configuration, #179
 
 This increment strengthens the existing 2024.1/2025.1
-`ak.wwise.core.audio.setConversionPlugin` Business Draft. Its setter path is program-tested; native placement remains blocked by
-ambiguous platform association. Older exact-GUID read/field effects below are
-separate evidence. Build/conversion execution remains #183.
+`ak.wwise.core.audio.setConversionPlugin` Business Draft. Its setter path is
+program-tested; native placement remains blocked by ambiguous platform
+association. Older exact-GUID read/field effects below are separate evidence.
+Build/conversion execution remains #183.
 
 The public plan binds an exact Conversion Settings object, one live project
 platform and one installed Conversion Type Handle. The Gateway derives the
@@ -59,8 +60,8 @@ None of these project sources was opened in Wwise or modified.
 | 2021.1.14.8108 | ConversionPluginInfoList contains anonymous per-platform codec GUIDs; installed codec classes discovered as Conversion | Exact-GUID read/metadata and one live-bound QualityFactor scalar change proven; arbitrary codec replacement/platform lookup unresolved |
 | 2022.1.19.8584 | Same persisted topology, independently inspected | Exact-GUID read/metadata proven; shared FieldHandle configuration program-tested; arbitrary replacement/platform lookup unresolved |
 | 2023.1.19.8928 | Same persisted topology, independently inspected | Exact-GUID read/metadata proven; shared FieldHandle configuration program-tested; arbitrary replacement/platform lookup unresolved |
-| 2024.1.13.9056 | Same topology plus reflected setter and documented ConversionPlugin getter example | Installed Type Handle selection, exact platform binding and independent attachment verifier; exact codec Field Handle configuration |
-| 2025.1.7.9143 | Same topology plus matching reflected setter/getter example | Same shared mechanism |
+| 2024.1.13.9056 | Same topology plus reflected setter and documented ConversionPlugin getter example | Program-tested Type Handle/platform setter and codec Field Handles; native placement blocked |
+| 2025.1.7.9143 | Same topology plus matching reflected setter/getter example | Same program-tested mechanism; native placement blocked |
 
 `object.create` in 2021 has no classId field; a native `Conversion` ShareSet
 creation is distinct from choosing its embedded codec. Neither XML PluginID

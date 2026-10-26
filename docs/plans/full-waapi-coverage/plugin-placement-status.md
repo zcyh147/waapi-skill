@@ -12,8 +12,8 @@ independent verification. Native scope and original verdicts are recorded below.
 | 2021.1.14.8108 | Existing Source donor copy; new-class constructor boundary | Class-selected constructor introduced in 2022.1; older alternative unresolved | Discovery; constructor unresolved | Exact chosen-GUID read/fields; arbitrary attachment unresolved | Discovery; constructor unresolved |
 | 2022.1.19.8584 | Source child | Owner fixed slots / independent ShareSet | Independent AudioDevice ShareSet | Exact chosen-GUID read/fields; arbitrary attachment unresolved | Independent Metadata ShareSet |
 | 2023.1.19.8928 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Exact chosen-GUID read/fields; arbitrary attachment unresolved | Independent Metadata ShareSet |
-| 2024.1.13.9056 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Installed Type Handle / platform setter; exact codec Field Handles | Independent Metadata ShareSet |
-| 2025.1.7.9143 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Installed Type Handle / platform setter; exact codec Field Handles | Independent Metadata ShareSet |
+| 2024.1.13.9056 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Program-tested Type Handle/platform setter and codec Field Handles; native placement blocked | Independent Metadata ShareSet |
+| 2025.1.7.9143 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Program-tested Type Handle/platform setter and codec Field Handles; native placement blocked | Independent Metadata ShareSet |
 
 Creation rows describe implemented Gateway construction and model controls.
 They do not establish successful native creation or a host/build equivalence.
@@ -76,10 +76,9 @@ succeeds. No committed project was opened or modified.
   native-proven 2021 Source donor copy requires a compatible donor and does not
   create an arbitrary installed class. Do not guess numeric object types,
   infer absence from one failed classic spelling, or bypass the Gateway.
-- **Owner metadata (#179):** native source exposes MetadataSlot and its Metadata
-  reference; creation/append, OverrideMetadata applicability, preservation and
-  native effects remain implementation and evidence work. An independent
-  Metadata ShareSet is not credit for this branch.
+- **Owner metadata:** [R89 selected 2025 flow](../../../tests/TEST_INVENTORY.md#2026-10-23-r89-condition-mapping-and-inner-policy-increment)
+  proved MetadataSlot identity/owner, ordered membership and local Metadata
+  reference. This is scoped native proof, not all-version/owner acceptance.
 - **Sink attachment (#179):** selection on a Bus is distinct from independent
   AudioDevice creation. Use the existing exact-object Reference Field Handle
   route where supported; complete applicability and effect proof separately.
@@ -109,9 +108,9 @@ succeeds. No committed project was opened or modified.
   scalar/default/reference-presence handling is reused here, not blanket-blocked
   on missing native receipts. Class Field Handle restrictions not yet admitted
   by discovery remain an implementation boundary rather than native absence.
-- **Staged provenance (#178/#179):** the durable verified-created-from selector
-  currently binds an object.create root. Created plugins and recursive/list
-  children need their own sealed identity continuation where required.
+- **Staged provenance:** [#178 verified-node continuation](../../../tests/TEST_INVENTORY.md#2026-10-26-178-playlist-construction-and-verified-node-continuation)
+  supports selected created nodes beyond the ordinary root, with drift refusal
+  and MetadataSlot compatibility; this adds no donor-copy/plugin binding claim.
 - **Native acceptance:** select representative mechanisms/host-version risks per
   business acceptance while retaining complete option mapping. Both user decisions
   (2021 Sink/Metadata direct-factory boundary and modern verification depth) remain
