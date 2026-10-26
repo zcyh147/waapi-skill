@@ -5,6 +5,12 @@ batch, classifying a failure, changing a grader, or deciding what to rerun.
 It governs future test coordination and acceptance reports, including Windows
 impact assessment. Historical results retain their original contracts.
 
+For table-based audio import acceptance and rerun decisions, apply the
+[2026-10-27 lightweight policy](../../docs/plans/full-waapi-coverage/SPEC.md#user-approved-lightweight-table-audio-acceptance--2026-10-27):
+closed wrappers/code tests suffice across all five lanes, including multilingual
+forms; no additional native table-import validation is required. Ordinary
+import acceptance and the retained exact-host safety guard remain separate.
+
 ## 1. Judge the outcome, then classify the discrepancy
 
 Report three separate facts for each unit: independent business checks, material

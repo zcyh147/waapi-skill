@@ -50,3 +50,12 @@ Documented inputs, five-version mapping and existing Gateway safety/outcome
 requirements remain in scope. The known Event-plus-Dialogue false failure still
 requires repair. Preserve raw evidence and unknowns; this method excludes no
 Dialogue feature and does not close this ticket.
+
+## User-approved table-audio acceptance method — 2026-10-27
+
+Apply [lightweight table-audio acceptance](../SPEC.md#user-approved-lightweight-table-audio-acceptance--2026-10-27)
+to all table audio forms, including multilingual imports, across all five lanes:
+closed wrappers and passing code tests suffice; no additional native cases,
+probes or native functional gate. Documented inputs/version mapping and safety
+remain required. Preserve raw evidence and the known exact-host guard; ordinary
+import's planned named-Source native case and Fresh-zero policy are unchanged.
