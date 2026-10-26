@@ -12,25 +12,27 @@ import pytest
 
 from tests.destructive.support.console_file_observation import observe_console_file
 from tests.semantic.support.codex_project_prelaunch_v3 import WWISE_2025_SOUNDBANK_AURO_PROFILE
-from wwise_waapi.operation_soundbank import capture_file_proof, capture_artifact_tree, prove_artifact_path
+from wwise_waapi.operation_soundbank import capture_file_proof, capture_artifact_tree, compare_artifact_trees, prove_artifact_path
 from wwise_waapi.host_paths import localize_waapi_host_path
 from wwise_waapi.transactions import TransactionStore
 
 
-def collect_core_file_acceptance(runtime):
+def collect_core_file_acceptance(runtime, *, external_only=False):
     from tests.destructive.test_gateway_workflow_transaction_matrix import (
         _start_business_draft, _update_business_draft, _bind_business_object,
         _complete_business_draft, _complete_core_result_schema_draft, _write_fixture_wav, _write_external_sources_document,
+        _capture_workflow_pre_teardown_process,
     )
-    output = runtime.state_dir / 'core-soundbank-file-acceptance.json'
+    output = runtime.state_dir / ('core-external-only-acceptance.json' if external_only else 'core-soundbank-file-acceptance.json')
     output.parent.mkdir(parents=True, exist_ok=True)
     assert not output.exists(), 'Never replace an original Core file witness'
     categories = [{"category": category, "status": "blocked", "transaction_ids": [],
         "observation_path": str(output), "verifier_strength": "public_verification_plus_independent_file_input_identity_preservation"}
-        for category in ('core-audio-convert-configured-source', 'core-soundbank-temporary-file', 'core-external-sources-default-output')]
+        for category in (('core-external-sources-default-output',) if external_only else
+            ('core-audio-convert-configured-source', 'core-soundbank-temporary-file', 'core-external-sources-default-output'))]
     runtime.category_results.extend(categories)
     receipt = {"contract": "waapi-skill.core-soundbank-file-acceptance/v1", "version": runtime.version,
-        "candidate": runtime.candidate, "prelaunch": runtime.soundbank_prelaunch,
+        "candidate": runtime.candidate, "prelaunch": runtime.soundbank_prelaunch, "external_only": external_only,
         "complete": False, "calls": [], "phases": [], "inputs_before": {}, "failure": None,
         "limits": {"calls": 64, "reply_bytes": 262144, "receipt_bytes": 2097152}}
     attempted = set()
@@ -96,12 +98,101 @@ def collect_core_file_acceptance(runtime):
         plan = prepared['verification_plan'].get('plan')
         return phase, result, plan
 
+    def diagnostic_error(diagnostic, stage, exc):
+        diagnostic['capture_errors'].append({'stage': stage, 'type': type(exc).__name__, 'message': str(exc)[:2048]})
+
+    def diagnostic_tree():
+        tree = capture_artifact_tree(owned, io_root=owned)
+        assert len(json.dumps(tree).encode('utf-8')) <= 384 * 1024, 'Owned-parent inventory exceeds diagnostic snapshot byte limit'
+        return tree
+
+    def start_external_diagnostics():
+        diagnostic = receipt['external_output_diagnostics'] = {'diagnostic_only': True,
+            'business_effect_verified': False, 'complete': False, 'capture_errors': [],
+            'limits': {'snapshot_bytes': 384 * 1024, 'changed_wem_files': 32, 'process_record_bytes': 16 * 1024},
+            'changed_wem_files': []}
+        try:
+            diagnostic['owned_parent_before'] = diagnostic_tree()
+        except Exception as exc:
+            diagnostic_error(diagnostic, 'owned_parent_before', exc)
+            raise
+
+    def finish_external_diagnostics():
+        # Preserve observations before the ordinary finalizer removes sibling roots.
+        # None of these observations can replace the exact expected-output verifier.
+        diagnostic = receipt['external_output_diagnostics']
+        try:
+            directory = runtime.state_dir / 'external-only-diagnostics'
+            _capture_workflow_pre_teardown_process(runtime.lifecycle, directory,
+                version=runtime.version, candidate=runtime.candidate)
+            path = directory / 'workflow-pre-teardown-process.json'
+            capture_file_proof(path, field='External Console diagnostics', io_root=runtime.state_dir, max_bytes=16 * 1024)
+            diagnostic['process'] = json.loads(path.read_text(encoding='utf-8'))
+            assert diagnostic['process']['capture_status'] == 'complete', 'Owned Console diagnostics are partial'
+        except Exception as exc:
+            diagnostic_error(diagnostic, 'console_output', exc)
+        try:
+            diagnostic['owned_parent_after'] = diagnostic_tree()
+            phase = receipt['phases'][-1]
+            prepared = TransactionStore(runtime.state_dir).load_preview(phase['transaction_id']).artifact['prepared_operation']
+            phase['native_dispatch'] = prepared['dispatch']
+            request, = prepared['verification_plan']['plan']['requests']
+            artifact, = request['expected_outputs']
+            phase['expected_artifact_path'] = artifact['absolute_path']
+            expected = Path(artifact['absolute_path']).relative_to(owned).as_posix()
+            diagnostic['expected_relative_path'] = expected
+            delta = diagnostic['tree_delta'] = compare_artifact_trees(diagnostic['owned_parent_before'],
+                diagnostic['owned_parent_after'], expected_relative_paths=[expected])
+            changed = [path for path in [*delta['created'], *delta['modified']] if path.casefold().endswith('.wem')]
+            assert len(changed) <= 32, 'Changed WEM count exceeds diagnostic proof limit'
+            for relative in changed:
+                diagnostic['changed_wem_files'].append({'relative_path': relative, 'file_proof': proof(owned / relative)})
+        except Exception as exc:
+            diagnostic_error(diagnostic, 'owned_parent_after', exc)
+        diagnostic['complete'] = not diagnostic['capture_errors']
+
+    def external_phase(category):
+        if external_only:
+            receipt['inputs_before'][str(runtime.sandbox.sandbox_project)] = proof(runtime.sandbox.sandbox_project)
+        media = _write_fixture_wav(owned / 'core-external-media', 'external')
+        source_list = owned / 'core-external.wsources'
+        _write_external_sources_document(source_list, media_root=media.parent,
+            project_root=runtime.sandbox.sandbox_path, source_file=media, destination='CoreWitness/external.wav')
+        for path in (media, source_list): receipt['inputs_before'][str(path)] = proof(path)
+        draft = _start_business_draft(gateway, 'soundbank.convertExternalSources')
+        _update_business_draft(gateway, draft, 'draft-declare-soundbank-plan', [
+            '--source', str(source_list), 'Windows', '--io-root', str(owned)], live=True)
+        if external_only:
+            start_external_diagnostics()
+        try:
+            phase, result, plan = complete(draft, category, phase_name='external_conversion_native_output_default')
+        finally:
+            if external_only:
+                finish_external_diagnostics()
+        native_row, = phase['native_dispatch']['args']['sources']
+        assert 'output' not in native_row, 'The witness must exercise real native output omission'
+        request, = plan['requests']; artifact, = request['expected_outputs']
+        phase['expected_artifact_path'] = artifact['absolute_path']
+        phase['artifact'] = proof(Path(artifact['absolute_path']))
+        assert phase['artifact']['size'] > 0 and Path(phase['artifact']['path']).suffix == '.wem'
+        if external_only:
+            phase['inputs_after'] = {path: proof(Path(path)) for path in receipt['inputs_before']}
+            assert phase['inputs_after'] == receipt['inputs_before'], 'External conversion changed inputs'
+            assert receipt['external_output_diagnostics']['complete'], 'External output diagnostics are incomplete'
+        return phase
+
     persist()
     try:
         assert runtime.version == '2025.1'
         isolation = receipt['prelaunch']['auro_soundbank_isolation']
         assert isolation['profile'] == WWISE_2025_SOUNDBANK_AURO_PROFILE
         assert isolation['remaining_auro_plugin_instances'] == isolation['remaining_auro_object_references'] == 0
+        if external_only:
+            phase = external_phase(categories[0])
+            assert len(attempted) == len(receipt['phases']) == 1
+            phase['effect_verified'] = True; categories[0]['status'] = 'PASS'
+            receipt['complete'] = True
+            return categories
         # Convert an existing configured Sound before generation can warm cache.
         audio = receipt['audio_conversion'] = {'cold_cache': False}
         containers = runtime.sandbox.sandbox_path / 'Containers' / 'Default Work Unit.wwu'
@@ -205,21 +296,7 @@ def collect_core_file_acceptance(runtime):
         assert phase['inputs_after'] == receipt['inputs_before'], 'Generation changed fixture inputs'
         phase['effect_verified'] = True; categories[1]['status'] = 'PASS'; persist()
 
-        media = _write_fixture_wav(owned / 'core-external-media', 'external')
-        source_list = owned / 'core-external.wsources'
-        _write_external_sources_document(source_list, media_root=media.parent,
-            project_root=runtime.sandbox.sandbox_path, source_file=media, destination='CoreWitness/external.wav')
-        for path in (media, source_list): receipt['inputs_before'][str(path)] = proof(path)
-        draft = _start_business_draft(gateway, 'soundbank.convertExternalSources')
-        _update_business_draft(gateway, draft, 'draft-declare-soundbank-plan', [
-            '--source', str(source_list), 'Windows', '--io-root', str(owned)], live=True)
-        phase, result, plan = complete(draft, categories[2], phase_name='external_conversion_native_output_default')
-        native_row, = phase['native_dispatch']['args']['sources']
-        assert 'output' not in native_row, 'The witness must exercise real native output omission'
-        request, = plan['requests']; artifact, = request['expected_outputs']
-        phase['expected_artifact_path'] = artifact['absolute_path']
-        phase['artifact'] = proof(Path(artifact['absolute_path']))
-        assert phase['artifact']['size'] > 0 and Path(phase['artifact']['path']).suffix == '.wem'
+        phase = external_phase(categories[2])
         receipt['inputs_after'] = {path: proof(Path(path)) for path in receipt['inputs_before']}
         assert receipt['inputs_after'] == receipt['inputs_before'], 'Core file inputs changed'
         receipt['event_after'] = exact_event(event_id)
