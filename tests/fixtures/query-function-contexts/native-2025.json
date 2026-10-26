@@ -1,0 +1,480 @@
+{
+  "candidate": "36de89a12e0a100fd38c9a3c9e2a13b59095ca48",
+  "version": "2025.1",
+  "build": "2025.1.7.9143",
+  "receipt_sha256": "0eb4a13412e18b08985242e0b0fb7addce93db495f6cc4e79cf6f98a7c6d23b3",
+  "original_campaign_status": "FAIL",
+  "native_write_count": 0,
+  "groups": [
+    {
+      "label": "state",
+      "original_status": "PASS",
+      "invocations": [
+        {
+          "argv": [
+            "query-object",
+            "--exact-id",
+            "{9861812D-295E-47DC-BB84-803555479814}",
+            "--max-results",
+            "1",
+            "--detail"
+          ],
+          "packets": [
+            {
+              "sha256": "d3dcfb9a1160706f010e616d7de1746359859a40395d9ee35b5951666e519290",
+              "packet": {
+                "api": "ak.wwise.core.object.get",
+                "category": "core.object",
+                "dry_run": false,
+                "error_code": null,
+                "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/query181-2025-functions-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792984735657300000-cdd4acf0c04b47c0b71e6c5161e0b3a1-ak_wwise_core_object_get.json",
+                "item_type": "function",
+                "message": "ok",
+                "ok": true,
+                "result": {
+                  "return": [
+                    {
+                      "id": "{9861812D-295E-47DC-BB84-803555479814}",
+                      "name": "Stealth",
+                      "path": "\\Containers\\Music\\Music\\01_In-Game Music\\Outro to Stealth or Stress\\Stealth",
+                      "type": "MusicTrack"
+                    }
+                  ]
+                },
+                "risk_level": "low",
+                "timeout": 29.994112665997818,
+                "version": "2025.1"
+              }
+            }
+          ],
+          "agent_result": [
+            {
+              "id": "{9861812D-295E-47DC-BB84-803555479814}",
+              "name": "Stealth",
+              "type": "MusicTrack",
+              "path": "\\Containers\\Music\\Music\\01_In-Game Music\\Outro to Stealth or Stress\\Stealth"
+            }
+          ]
+        },
+        {
+          "argv": [
+            "query-object",
+            "--advanced-waql",
+            "from object \"{9861812D-295E-47DC-BB84-803555479814}\" select state(\"{20A3B196-D22F-42F7-8592-A37A3E5B467A}\")",
+            "--max-results",
+            "1",
+            "--detail"
+          ],
+          "packets": [
+            {
+              "sha256": "e9d796249fe16207bbcdbf4da98499e868f8a6cdc62ab4234f4108c52229cf4c",
+              "packet": {
+                "api": "ak.wwise.core.object.get",
+                "category": "core.object",
+                "dry_run": false,
+                "error_code": null,
+                "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/query181-2025-functions-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792984735678921000-2d2aa68e17084c2cba7a9a23cb251167-ak_wwise_core_object_get.json",
+                "item_type": "function",
+                "message": "ok",
+                "ok": true,
+                "result": {
+                  "return": [
+                    {
+                      "id": "{4C10E9EB-9AC1-4134-93D8-5EF9364E4E06}",
+                      "name": "Custom State",
+                      "path": "Custom State",
+                      "type": "CustomState"
+                    }
+                  ]
+                },
+                "risk_level": "low",
+                "timeout": 29.994410541956313,
+                "version": "2025.1"
+              }
+            }
+          ],
+          "agent_result": [
+            {
+              "id": "{4C10E9EB-9AC1-4134-93D8-5EF9364E4E06}",
+              "name": "Custom State",
+              "type": "CustomState",
+              "path": "Custom State"
+            }
+          ]
+        },
+        {
+          "argv": [
+            "query-object",
+            "--exact-id",
+            "{4C10E9EB-9AC1-4134-93D8-5EF9364E4E06}",
+            "--max-results",
+            "1",
+            "--detail"
+          ],
+          "packets": [
+            {
+              "sha256": "ec0da0ad8f5f75ab9d9d611760106604f5a05bcf37fcc145ac0063406dcc6a4b",
+              "packet": {
+                "api": "ak.wwise.core.object.get",
+                "category": "core.object",
+                "dry_run": false,
+                "error_code": null,
+                "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/query181-2025-functions-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792984735699427000-8c0ebbd535cf4e6e8691d1a490bb28de-ak_wwise_core_object_get.json",
+                "item_type": "function",
+                "message": "ok",
+                "ok": true,
+                "result": {
+                  "return": [
+                    {
+                      "id": "{4C10E9EB-9AC1-4134-93D8-5EF9364E4E06}",
+                      "name": "Custom State",
+                      "path": "Custom State",
+                      "type": "CustomState"
+                    }
+                  ]
+                },
+                "risk_level": "low",
+                "timeout": 29.994662416982464,
+                "version": "2025.1"
+              }
+            }
+          ],
+          "agent_result": [
+            {
+              "id": "{4C10E9EB-9AC1-4134-93D8-5EF9364E4E06}",
+              "name": "Custom State",
+              "type": "CustomState",
+              "path": "Custom State"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "panner",
+      "original_status": "PASS",
+      "invocations": [
+        {
+          "argv": [
+            "query-object",
+            "--exact-id",
+            "{3FCC7FC1-63CD-46F4-BB87-7741E08706E5}",
+            "--max-results",
+            "1",
+            "--detail"
+          ],
+          "packets": [
+            {
+              "sha256": "6180fdd9bfa257753fbc29df930132a3e915d8458913345d45fa783206b0f412",
+              "packet": {
+                "api": "ak.wwise.core.object.get",
+                "category": "core.object",
+                "dry_run": false,
+                "error_code": null,
+                "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/query181-2025-functions-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792984735730208000-c6bbaeb9cd3b4083827478311490a11a-ak_wwise_core_object_get.json",
+                "item_type": "function",
+                "message": "ok",
+                "ok": true,
+                "result": {
+                  "return": [
+                    {
+                      "id": "{3FCC7FC1-63CD-46F4-BB87-7741E08706E5}",
+                      "name": "Amb_CityTone_01",
+                      "path": "\\Containers\\NYC Ambience\\24h New York City Ambience\\Amb_CityTone_01",
+                      "type": "Sound"
+                    }
+                  ]
+                },
+                "risk_level": "low",
+                "timeout": 29.99441487493459,
+                "version": "2025.1"
+              }
+            }
+          ],
+          "agent_result": [
+            {
+              "id": "{3FCC7FC1-63CD-46F4-BB87-7741E08706E5}",
+              "name": "Amb_CityTone_01",
+              "type": "Sound",
+              "path": "\\Containers\\NYC Ambience\\24h New York City Ambience\\Amb_CityTone_01"
+            }
+          ]
+        },
+        {
+          "argv": [
+            "query-object",
+            "--advanced-waql",
+            "from object \"{3FCC7FC1-63CD-46F4-BB87-7741E08706E5}\" select panner",
+            "--max-results",
+            "1",
+            "--detail"
+          ],
+          "packets": [
+            {
+              "sha256": "e659c4f83a25ccdf3fb4b86f59588fcd73479add103815168bbcf4ff498c06c6",
+              "packet": {
+                "api": "ak.wwise.core.object.get",
+                "category": "core.object",
+                "dry_run": false,
+                "error_code": null,
+                "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/query181-2025-functions-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792984735751115000-c27c2ef9ab864c18ad1edf5465d8e627-ak_wwise_core_object_get.json",
+                "item_type": "function",
+                "message": "ok",
+                "ok": true,
+                "result": {
+                  "return": [
+                    {
+                      "id": "{15866C0E-BAE4-47B2-BDE5-1BD5A3DD9D77}",
+                      "name": "",
+                      "path": "\\Containers\\NYC Ambience\\24h New York City Ambience\\Amb_CityTone_01\\<Unnamed Panner>",
+                      "type": "Panner"
+                    }
+                  ]
+                },
+                "risk_level": "low",
+                "timeout": 29.994609000044875,
+                "version": "2025.1"
+              }
+            }
+          ],
+          "agent_result": [
+            {
+              "id": "{15866C0E-BAE4-47B2-BDE5-1BD5A3DD9D77}",
+              "name": "",
+              "type": "Panner",
+              "path": "\\Containers\\NYC Ambience\\24h New York City Ambience\\Amb_CityTone_01\\<Unnamed Panner>"
+            }
+          ]
+        },
+        {
+          "argv": [
+            "query-object",
+            "--exact-id",
+            "{15866C0E-BAE4-47B2-BDE5-1BD5A3DD9D77}",
+            "--max-results",
+            "1",
+            "--detail"
+          ],
+          "packets": [
+            {
+              "sha256": "6c74c92d496419a03d1ccf781c94de7ca7d4b9083e83fa8dff4e4ef31e784d38",
+              "packet": {
+                "api": "ak.wwise.core.object.get",
+                "category": "core.object",
+                "dry_run": false,
+                "error_code": null,
+                "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/query181-2025-functions-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792984735771219000-6512fa0d108842d78063b5c20f700ac0-ak_wwise_core_object_get.json",
+                "item_type": "function",
+                "message": "ok",
+                "ok": true,
+                "result": {
+                  "return": [
+                    {
+                      "id": "{15866C0E-BAE4-47B2-BDE5-1BD5A3DD9D77}",
+                      "name": "",
+                      "path": "\\Containers\\NYC Ambience\\24h New York City Ambience\\Amb_CityTone_01\\<Unnamed Panner>",
+                      "type": "Panner"
+                    }
+                  ]
+                },
+                "risk_level": "low",
+                "timeout": 29.994705124991015,
+                "version": "2025.1"
+              }
+            }
+          ],
+          "agent_result": [
+            {
+              "id": "{15866C0E-BAE4-47B2-BDE5-1BD5A3DD9D77}",
+              "name": "",
+              "type": "Panner",
+              "path": "\\Containers\\NYC Ambience\\24h New York City Ambience\\Amb_CityTone_01\\<Unnamed Panner>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "max-duration-source-object",
+      "original_status": "FAIL",
+      "invocations": [
+        {
+          "argv": [
+            "query-object",
+            "--exact-id",
+            "{0030BF58-90C3-428B-B940-44CC1C5A51B5}",
+            "--max-results",
+            "1",
+            "--detail"
+          ],
+          "packets": [
+            {
+              "sha256": "9d0f9e2b3f28d46ecdeb1341dbd7999749a8d73cd90c2b786394dba0bd81dc9a",
+              "packet": {
+                "api": "ak.wwise.core.object.get",
+                "category": "core.object",
+                "dry_run": false,
+                "error_code": null,
+                "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/query181-2025-functions-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792984735791469000-721c30267211448ab9ed7b21afa8845f-ak_wwise_core_object_get.json",
+                "item_type": "function",
+                "message": "ok",
+                "ok": true,
+                "result": {
+                  "return": [
+                    {
+                      "id": "{0030BF58-90C3-428B-B940-44CC1C5A51B5}",
+                      "name": "Footstep_Crouching_Concrete_01",
+                      "path": "\\Containers\\Footsteps\\Footstep_Types\\FS_Crouching\\FS_Concrete\\Footstep_Crouching_Concrete_01",
+                      "type": "Sound"
+                    }
+                  ]
+                },
+                "risk_level": "low",
+                "timeout": 29.99450995901134,
+                "version": "2025.1"
+              }
+            }
+          ],
+          "agent_result": [
+            {
+              "id": "{0030BF58-90C3-428B-B940-44CC1C5A51B5}",
+              "name": "Footstep_Crouching_Concrete_01",
+              "type": "Sound",
+              "path": "\\Containers\\Footsteps\\Footstep_Types\\FS_Crouching\\FS_Concrete\\Footstep_Crouching_Concrete_01"
+            }
+          ]
+        },
+        {
+          "argv": [
+            "query-object",
+            "--advanced-waql",
+            "from object \"{0030BF58-90C3-428B-B940-44CC1C5A51B5}\" select maxDurationSourceObject",
+            "--max-results",
+            "1",
+            "--detail"
+          ],
+          "packets": [
+            {
+              "sha256": "1db4959e54b9b4fbb8a9b98729c2f088129027aa154a24fd8a85fac0071c92b0",
+              "packet": {
+                "api": "ak.wwise.core.object.get",
+                "category": "core.object",
+                "dry_run": false,
+                "error_code": null,
+                "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/query181-2025-functions-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792984735822297000-b8d806d72fc144af932144e46d0aaf39-ak_wwise_core_object_get.json",
+                "item_type": "function",
+                "message": "ok",
+                "ok": true,
+                "result": {
+                  "return": []
+                },
+                "risk_level": "low",
+                "timeout": 29.994598416960798,
+                "version": "2025.1"
+              }
+            }
+          ],
+          "agent_result": []
+        }
+      ]
+    },
+    {
+      "label": "max-radius-attenuation-object",
+      "original_status": "FAIL",
+      "invocations": [
+        {
+          "argv": [
+            "query-object",
+            "--exact-id",
+            "{D5594A4B-DDB0-47F3-AC2F-08F104C72438}",
+            "--max-results",
+            "1",
+            "--detail"
+          ],
+          "packets": [
+            {
+              "sha256": "4c985568de5e71f2829f6b7e2e43caea3cd74f75d7e144d6d9a2a10f5ab8c805",
+              "packet": {
+                "api": "ak.wwise.core.object.get",
+                "category": "core.object",
+                "dry_run": false,
+                "error_code": null,
+                "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/query181-2025-functions-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792984735842577000-bef0dc99541f47b4b9f44a32a25376cf-ak_wwise_core_object_get.json",
+                "item_type": "function",
+                "message": "ok",
+                "ok": true,
+                "result": {
+                  "return": [
+                    {
+                      "id": "{D5594A4B-DDB0-47F3-AC2F-08F104C72438}",
+                      "name": "FS_Concrete",
+                      "path": "\\Containers\\Footsteps\\Footstep_Types\\FS_Crouching\\FS_Concrete",
+                      "type": "RandomSequenceContainer"
+                    }
+                  ]
+                },
+                "risk_level": "low",
+                "timeout": 29.99480675009545,
+                "version": "2025.1"
+              }
+            }
+          ],
+          "agent_result": [
+            {
+              "id": "{D5594A4B-DDB0-47F3-AC2F-08F104C72438}",
+              "name": "FS_Concrete",
+              "type": "RandomSequenceContainer",
+              "path": "\\Containers\\Footsteps\\Footstep_Types\\FS_Crouching\\FS_Concrete"
+            }
+          ]
+        },
+        {
+          "argv": [
+            "query-object",
+            "--advanced-waql",
+            "from object \"{D5594A4B-DDB0-47F3-AC2F-08F104C72438}\" select maxRadiusAttenuationObject",
+            "--max-results",
+            "1",
+            "--detail"
+          ],
+          "packets": [
+            {
+              "sha256": "4bc7c9c2435709b940495ad3f3b79842b0d3e77d5f3bf8388061ddab7cb122b4",
+              "packet": {
+                "api": "ak.wwise.core.object.get",
+                "category": "core.object",
+                "dry_run": false,
+                "error_code": null,
+                "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/query181-2025-functions-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792984735862441000-b35ccacb36694ee1b2f91a3e4f5eb7cd-ak_wwise_core_object_get.json",
+                "item_type": "function",
+                "message": "ok",
+                "ok": true,
+                "result": {
+                  "return": [
+                    {
+                      "id": "{DD088B98-4DAD-4C54-B1EE-CA3427643E93}",
+                      "name": "Footsteps",
+                      "path": "\\Attenuations\\Footsteps\\Footsteps",
+                      "type": "Attenuation"
+                    }
+                  ]
+                },
+                "risk_level": "low",
+                "timeout": 29.994870834052563,
+                "version": "2025.1"
+              }
+            }
+          ],
+          "agent_result": [
+            {
+              "id": "{DD088B98-4DAD-4C54-B1EE-CA3427643E93}",
+              "name": "Footsteps",
+              "type": "Attenuation",
+              "path": "\\Attenuations\\Footsteps\\Footsteps"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

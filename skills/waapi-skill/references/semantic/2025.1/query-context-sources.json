@@ -1,0 +1,42 @@
+{
+  "version": "2025.1",
+  "wwise_build": "2025.1.7.9143",
+  "definitions_sha256": "39a04186fa2686278fe2df42479350e77f4670923f0e999d421dd76482ec8f96",
+  "archive_sha256": "c54b729388040e9df540a2f58d0d0eda966ac5da6410d3cd715ae256d898166d",
+  "page": "waql_reference.html",
+  "page_sha256": "99bac5a48b124535cf2d11b9d010ba21ffda60e8321f558c35f0eeeba51fe201",
+  "sections": {
+    "maximum-duration-source": {
+      "html_lines": [
+        390,
+        399
+      ],
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">maxDurationSourceObject</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the Audio Source object that has the maximum playback duration (in seconds) for all descendants of the current object.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with Containers objects and Events.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from object \"\\Containers\" select <span style=\"color: rgb(23,43,77);\">maxDurationSource</span> </td></tr>\r\n",
+      "sha256": "0e096e54ce9f7d33e41095f6d7abec2fbed0c89c836f0a20bda3633310cc3186"
+    },
+    "maximum-radius-attenuation": {
+      "html_lines": [
+        410,
+        419
+      ],
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">maxRadiusAttenuationObject</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the attenuation object that has the maximum radius distance in all descendants of the current objects.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with Containers objects and Events.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from type Sound select <span style=\"color: rgb(23,43,77);\">maxRadiusAttenuation</span> </td></tr>\r\n",
+      "sha256": "ac235c5d172638ccdbca3abb65652b8e3bc8c220630ae517bc0db24ecb6cfa43"
+    },
+    "panner": {
+      "html_lines": [
+        450,
+        461
+      ],
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">panner</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the Speaker Panner object.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects that support Positioning.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\">$ where <span style=\"color: rgb(23,43,77);\">panner.panX &gt; 5</span></p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>\r\n",
+      "sha256": "3a8e4ac53b6434fa498c86425e9e385ee2758bc86f22c1e89dbc5193a5a148ea"
+    },
+    "state": {
+      "html_lines": [
+        333,
+        343
+      ],
+      "html": "<tr>\r\n<td>state(&quot;<b>STATE_NAME</b>&quot;) </td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the custom state object associated with the specified state.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>STATE_NAME</b> refers to the qualified name, path or GUID of a state for the current object. See <a class=\"el\" href=\"wobjects_index.html\">Wwise Objects Reference</a> for the complete list of object types and their properties. The name is case-insensitive.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\">$ from type sound where state(&quot;State:myState&quot;) != null <br  />\r\n $ from type sound where state(&quot;{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}&quot;) != null <br  />\r\n </p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>\r\n",
+      "sha256": "14db5dc0fda7e78010a6cc0eecebb94806b83c950928f9099dd2a81386aa38e7"
+    }
+  }
+}

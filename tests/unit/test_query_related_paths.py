@@ -620,3 +620,275 @@ def test_unknown_class_kind_uses_exact_endpoint_metadata_without_inventing_actio
     assert selected['selected'] == {'name': 'PlaylistObject', 'kind': 'reference'}
     assert [args for uri, args, _ in task.calls if uri.endswith('getPropertyAndReferenceNames')] == [
         {'classId': class_id}, {'object': PARENT['id']}]
+
+
+CONTEXT_NATIVE = json.loads((Path(__file__).parents[1] / 'fixtures/query-function-contexts/native-2025.json').read_text())
+
+
+class ContextTask(PathTask):
+    """Actual retained SELECT identities, with explicit simulated property values."""
+    def projection(self, row, expressions):
+        from tests.unit.test_query_related_lists import ListTask
+        return ListTask.projection(self, row, expressions)
+
+    @staticmethod
+    def comma_fields(value):
+        from tests.unit.test_query_related_lists import ListTask
+        return ListTask.comma_fields(value)
+
+    def __init__(self, tmp_path, label='panner', version='2025.1'):
+        super().__init__(tmp_path, version)
+        self.context_label = label
+        group = next(row for row in CONTEXT_NATIVE['groups'] if row['label'] == label)
+        self.row = copy.deepcopy(group['invocations'][0]['agent_result'][0])
+        self.rows = [self.row]
+        selected = group['invocations'][1]['agent_result']
+        self.selected = copy.deepcopy(selected)
+        self.objects = {self.row['id']: self.row}
+        for value in self.selected: self.objects[value['id']] = value
+        self.context_expression = group['invocations'][1]['argv'][2].split(' select ')[1]
+
+    def call(self, uri, args=None, options=None):
+        if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}:
+            import re
+            self.calls.append((uri, args, options))
+            query = args.get('waql', '')
+            if ' select ' in query:
+                owner = re.findall(r'"(\{[0-9A-Fa-f-]{36}\})"', query)[0]
+                if ' select children' in query:
+                    rows = [self.objects[value['id']] for value in self.objects[owner].get('children', [])]
+                else:
+                    assert ' select ' + self.context_expression in query, query
+                    rows = self.selected
+            else:
+                ids = args.get('from', {}).get('id') or re.findall(r'"(\{[0-9A-Fa-f-]{36}\})"', query)
+                if 'path' in args.get('from', {}):
+                    rows = [row for row in self.objects.values() if row['path'] in args['from']['path']]
+                elif query.startswith('from type State where name = '):
+                    name = json.loads(query.split(' where name = ')[1].rsplit(' take ', 1)[0])
+                    rows = [row for row in self.objects.values() if row['type'] == 'State' and row['name'] == name]
+                else:
+                    rows = [self.objects[identity] for identity in ids] if ids else self.rows
+            return {'return': [self.projection(row, options['return']) for row in rows]}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_closed_panner_hop_preserves_actual_empty_name_and_opaque_path_then_reads_values(tmp_path, version):
+    task = ContextTask(tmp_path, version=version)
+    selected, = task.selected
+    selected['@PanX'] = -20.5  # Program-only value, not a native claim.
+    code, result = task.run('query-object', '--exact-id', task.row['id'],
+        '--include-related', 'panner', 'notes')
+    assert code == 0, result
+    row, = result['agent_result']
+    context = row['related']['panner']
+    assert context['object']['id'] == '{15866C0E-BAE4-47B2-BDE5-1BD5A3DD9D77}'
+    assert context['object']['name'] == ''
+    assert context['object']['path'].endswith('\\<Unnamed Panner>')
+    assert context['unavailable_fields'] == ['notes']
+    assert row['id'] == task.row['id'] and list(result)[-1] == 'agent_result'
+    reads = [args['waql'] for uri, args, _ in task.calls if uri.endswith('object.get') and 'waql' in args]
+    assert any(' select panner take 2' in value for value in reads)
+
+
+@pytest.mark.parametrize('label,hop', [
+    ('max-duration-source-object', 'maximum-duration-source'),
+    ('max-radius-attenuation-object', 'maximum-radius-attenuation'),
+])
+@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
+def test_computed_context_uses_actual_selection_and_preserves_completed_no_match(tmp_path, label, hop, version):
+    task = ContextTask(tmp_path, label, version)
+    code, result = task.run('query-object', '--exact-id', task.row['id'], '--include-related', hop, 'notes')
+    assert code == 0, result
+    context = result['agent_result'][0]['related'][hop]
+    if label == 'max-duration-source-object':
+        assert context == {'object': None, 'selection_status': 'no-match'}
+        assert not any('806D447C' in str(args) for uri, args, _ in task.calls)
+    else:
+        assert context['object']['id'] == '{DD088B98-4DAD-4C54-B1EE-CA3427643E93}'
+        assert context['object']['name'] == 'Footsteps'
+        assert context['object']['path'] == '\\Attenuations\\Footsteps\\Footsteps'
+        assert context['unavailable_fields'] == ['notes']
+        assert not any('CB2B7556' in str(args) for uri, args, _ in task.calls)
+
+
+def test_state_context_resolves_original_state_guid_and_returns_associated_custom_state(tmp_path):
+    task = ContextTask(tmp_path, 'state')
+    state = '{20A3B196-D22F-42F7-8592-A37A3E5B467A}'
+    task.objects[state] = {'id': state, 'name': 'c_Fight', 'type': 'State', 'path': '\\States\\Music\\c_Fight'}
+    code, result = task.run('query-object', '--exact-id', task.row['id'],
+        '--include-related', 'state', state, 'notes')
+    assert code == 0, result
+    selected = result['agent_result'][0]['related']['states'][state]
+    assert selected['object'] == task.selected[0]
+    assert selected['object']['path'] == 'Custom State'
+    assert selected['unavailable_fields'] == ['notes']
+    assert any(args == {'from': {'id': [state]}} for uri, args, _ in task.calls if uri.endswith('object.get'))
+
+
+@pytest.mark.parametrize('route', ['list', 'combined'])
+def test_context_hops_keep_member_occurrences_and_combination_origins(tmp_path, route):
+    task = ContextTask(tmp_path)
+    selected, = task.selected
+    owner = copy.deepcopy(task.row)
+    selected['notes'] = 'Context value'
+    parent = {'id': SOUND, 'name': 'Root', 'type': 'RandomSequenceContainer', 'path': '\\Containers\\Root',
+        'children': [{key: owner[key] for key in ('id', 'name', 'type', 'path')}]}
+    task.objects[parent['id']] = parent
+    task.row, task.rows = parent, [parent]
+    if route == 'list':
+        tokens = ['children', 'panner', 'notes']
+    else:
+        tokens = ['combine', 'children', 'panner', 'and', 'children', 'panner', 'end', 'notes']
+    code, result = task.run('query-object', '--exact-id', parent['id'], '--include-related', *tokens)
+    assert code == 0, result
+    related = result['agent_result'][0]['related']
+    if route == 'list':
+        member, = related['children']['items']
+        assert member['object']['id'] == owner['id']
+        assert member['related']['panner']['notes'] == 'Context value'
+    else:
+        items = related['projections'][0]['items']
+        assert [row['object']['id'] for row in items] == [selected['id'], selected['id']]
+        assert [row['origin']['arm'] for row in items] == [0, 1]
+        assert all(row['notes'] == 'Context value' for row in items)
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_context_schema_maps_exact_version_sources_and_rejects_older_lanes(tmp_path, version):
+    task = ContextTask(tmp_path, version=version)
+    code, result = task.run('query-schema')
+    assert code == 0, result
+    contract = result['related_outputs']['object_contexts']
+    assert {name: spec['available'] for name, spec in contract['hops'].items()} == {
+        'panner': version >= '2024.1', 'state': version >= '2025.1',
+        'maximum-duration-source': version >= '2023.1', 'maximum-radius-attenuation': version >= '2023.1'}
+    assert contract['mutation_authority'] is False
+    assert 'no-match' in contract['empty_selection']
+    assert contract['native_return_context_syntax_required'] is False
+    if contract['source'] is not None:
+        import hashlib
+        for section in contract['source']['sections'].values():
+            assert hashlib.sha256(section['html'].encode()).hexdigest() == section['sha256']
+        definitions = Path(__file__).parents[2] / 'skills/waapi-skill/resources/manifest' / version / 'definitions.json'
+        assert hashlib.sha256(definitions.read_bytes()).hexdigest() == contract['source']['definitions_sha256']
+    for name, spec in contract['hops'].items():
+        if not spec['available']:
+            tokens = [name, SOUND] if name == 'state' else [name]
+            code, result = task.run('query-object', '--exact-id', task.row['id'], '--include-related', *tokens, 'notes')
+            assert code == 2 and task.calls == [], result
+
+
+def test_context_field_reads_bind_the_selected_object_not_the_root_metadata(tmp_path):
+    task = ContextTask(tmp_path)
+    selected, = task.selected
+    task.metadata[selected['id']] = {'PanX': {'name': 'PanX', 'type': 'Real64', 'display': {'name': 'Pan Left-Right'}}}
+    task.metadata[task.row['id']] = {'OtherPan': {'name': 'OtherPan', 'type': 'string', 'display': {'name': 'Pan Left-Right'}}}
+    selected['@PanX'] = -20.5
+    code, result = task.run('query-object', '--exact-id', task.row['id'],
+        '--include-related-field', 'panner', 'Pan Left-Right', '--detail')
+    assert code == 0, result
+    assert result['agent_result'][0]['related']['panner']['properties'] == {'PanX': -20.5}
+    selections = result['related_scope_binding']['scopes']
+    assert all(row['scope'] == {'object': selected['id']} for row in selections)
+    assert not any(args.get('object') == task.row['id'] for uri, args, _ in task.calls if uri.endswith('getPropertyInfo'))
+
+
+@pytest.mark.parametrize('fault', ['duplicate', 'bad-guid', 'bad-name', 'wrong-type'])
+def test_context_identity_and_singleton_cardinality_fail_before_value_reads(tmp_path, fault):
+    task = ContextTask(tmp_path)
+    if fault == 'duplicate': task.selected.append(copy.deepcopy(task.selected[0]))
+    elif fault == 'bad-guid': task.selected[0]['id'] = 'opaque-id'
+    elif fault == 'bad-name': task.selected[0]['name'] = None
+    else: task.selected[0]['type'] = 'Sound'
+    code, result = task.run('query-object', '--exact-id', task.row['id'], '--include-related', 'panner', 'notes')
+    assert code == 2, result
+    assert result['error_code'] in {'RELATED_QUERY_CONTEXT_IDENTITY', 'RELATED_QUERY_CONTEXT_CARDINALITY', 'RELATED_QUERY_RESULT_SHAPE'}
+    assert not any('15866C0E' in str(args) and ' select ' not in str(args) for uri, args, _ in task.calls)
+
+
+def test_wrong_original_state_type_cannot_grant_association_authority(tmp_path):
+    task = ContextTask(tmp_path, 'state')
+    state = '{20A3B196-D22F-42F7-8592-A37A3E5B467A}'
+    task.objects[state] = {'id': state, 'name': 'c_Fight', 'type': 'Switch', 'path': '\\Switches\\c_Fight'}
+    code, result = task.run('query-object', '--exact-id', task.row['id'], '--include-related', 'state', state, 'notes')
+    assert code == 2 and result['error_code'] == 'RELATED_QUERY_CONTEXT_STATE', result
+    assert not any(' select state(' in str(args) for uri, args, _ in task.calls)
+
+
+@pytest.mark.parametrize('change', ['none', 'selected-identity', 'value', 'metadata'])
+def test_context_result_pages_seal_selected_identity_values_and_exact_metadata(tmp_path, change):
+    task = ContextTask(tmp_path)
+    selected, = task.selected
+    task.row['notes'] = '音声' * 16000
+    selected['@PanX'] = -20.5
+    task.metadata[selected['id']] = {'PanX': {'name': 'PanX', 'type': 'Real64', 'display': {'name': 'Pan Left-Right'}}}
+    code, result = task.run('query-object', '--exact-id', task.row['id'], '--include', 'notes',
+        '--include-related-field', 'panner', 'Pan Left-Right')
+    assert code == 0 and result['status'] == 'partial', result
+    if change == 'selected-identity':
+        selected['id'] = '{0D853199-9578-467F-AC34-A4252BA36912}'
+        task.objects[selected['id']] = selected
+        task.metadata[selected['id']] = {'PanX': {'name': 'PanX', 'type': 'Real64', 'display': {'name': 'Pan Left-Right'}}}
+    elif change == 'value': selected['@PanX'] = 0
+    elif change == 'metadata': task.metadata[selected['id']]['PanX']['type'] = 'int32'
+    code, continued = task.run(*result['agent_result']['next_command']['gateway_argv'])
+    if change == 'none': assert code == 0 and continued['status'] == 'partial', continued
+    else: assert code == 2 and continued['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', continued
+
+
+def test_context_member_bound_counts_occurrences_without_truncating_shared_target(tmp_path, monkeypatch):
+    from wwise_waapi import object_query_related_lists
+    monkeypatch.setattr(object_query_related_lists, 'MAX_RELATED_MEMBER_OCCURRENCES', 2)
+    import uuid
+    task = ContextTask(tmp_path)
+    source = copy.deepcopy(task.row)
+    task.rows = [{**source, 'id': '{' + str(uuid.UUID(int=index + 1)).upper() + '}'} for index in range(3)]
+    task.objects.update({row['id']: row for row in task.rows})
+    code, result = task.run('query-object', '--kind', 'all-sounds', '--max-results', str(len(task.rows)),
+        '--include-related', 'panner', 'notes')
+    assert code == 2 and result['error_code'] == 'RELATED_QUERY_MEMBER_LIMIT', result
+    assert result.get('agent_result') is None
+
+
+@pytest.mark.parametrize('form', ['id', 'path', 'exact-type-name'])
+def test_original_state_selector_forms_resolve_before_association(tmp_path, form):
+    task = ContextTask(tmp_path, 'state')
+    state = '{20A3B196-D22F-42F7-8592-A37A3E5B467A}'
+    original = {'id': state, 'name': 'c_Fight', 'type': 'State', 'path': '\\States\\Music\\c_Fight'}
+    task.objects[state] = original
+    selector = {'kind': form, **({'type': 'State', 'name': 'c_Fight'} if form == 'exact-type-name' else
+        {'value': state if form == 'id' else original['path']})}
+    code, result = task.run('query-object', '--exact-id', task.row['id'],
+        '--include-related', 'state', json.dumps(selector), 'notes')
+    assert code == 0, result
+    assert result['agent_result'][0]['related']['states'][state]['object']['id'] == '{4C10E9EB-9AC1-4134-93D8-5EF9364E4E06}'
+
+
+def test_equivalent_original_state_selectors_share_one_context_and_reject_duplicate_terminal(tmp_path):
+    task = ContextTask(tmp_path, 'state')
+    state = '{20A3B196-D22F-42F7-8592-A37A3E5B467A}'
+    path = '\\States\\Music\\c_Fight'
+    task.objects[state] = {'id': state, 'name': 'c_Fight', 'type': 'State', 'path': path}
+    code, result = task.run('query-object', '--exact-id', task.row['id'],
+        '--include-related', 'state', state, 'notes',
+        '--include-related', 'state', json.dumps({'kind': 'path', 'value': path}), 'notes')
+    assert code == 2 and result['error_code'] == 'RELATED_QUERY_DUPLICATE_FIELD', result
+
+
+def test_original_state_identity_drift_stops_before_association_read(tmp_path):
+    state = '{20A3B196-D22F-42F7-8592-A37A3E5B467A}'
+    class DriftingStateTask(ContextTask):
+        state_reads = 0
+        def call(self, uri, args=None, options=None):
+            result = super().call(uri, args, options)
+            if uri.endswith('object.get') and args == {'from': {'id': [state]}}:
+                self.state_reads += 1
+                if self.state_reads > 1: result['return'][0]['name'] = 'Changed State'
+            return result
+    task = DriftingStateTask(tmp_path, 'state')
+    task.objects[state] = {'id': state, 'name': 'c_Fight', 'type': 'State', 'path': '\\States\\Music\\c_Fight'}
+    code, result = task.run('query-object', '--exact-id', task.row['id'], '--include-related', 'state', state, 'notes')
+    assert code == 2 and result['error_code'] == 'RELATED_QUERY_CONTEXT_STATE', result
+    assert not any(' select state(' in str(args) for uri, args, _ in task.calls)
