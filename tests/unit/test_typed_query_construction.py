@@ -1008,8 +1008,15 @@ def test_query_schema_covers_every_named_native_return_through_closed_outputs(tm
         if pointer.startswith("/definitions/returnExpression/items/anyOf/0/enum/"):
             enum = definitions["documents"]["waapi_definitions.json"]["definitions"]["returnExpression"]["items"]["anyOf"][0]["enum"]
             field = enum[int(pointer.rsplit("/", 1)[1])]
-            assert field == "blendTracks" and output == "blend-tracks"
-            assert selected["result_schema_source"]["pointer"].startswith("/definitions/objectReturn/patternProperties/")
+            if field == "blendTracks":
+                assert output == "blend-tracks"
+                assert selected["result_schema_source"]["pointer"].startswith("/definitions/objectReturn/patternProperties/")
+            else:
+                assert output == field
+                assert selected["selected_spelling"] == field
+                assert selected["native_semantics_proven"] is False
+                assert selected["alias_equivalence_proven"] is False
+                assert selected["result_shape"] is None
             covered_enum.add(field)
             continue
         field = pointer.rsplit("/", 1)[1]
@@ -1033,20 +1040,11 @@ def test_query_schema_covers_every_named_native_return_through_closed_outputs(tm
         assert client.calls == [("ak.wwise.core.object.get", {"waql": 'from object "{11111111-1111-1111-1111-111111111111}"'},
             {"return": ["id", "name", "type", "path", field]})]
         covered_enum.add(field)
-    # These retained spellings remain source-reconciliation questions under
-    # #181, not dynamic public inputs or proven normalized-equivalent routes.
-    pending_enum = {
-        field: "legacy_spelling_for_existing_concept_exact_equivalence_unproven"
-        for field in (
-            "sound:convertedWemFilePath", "sound:originalWavFilePath", "soundbank:bnkFilePath",
-            "music:transitionRoot", "music:playlistRoot", "audioSource:maxDurationSource",
-            "audioSource:trimValues", "workunit:isDefault", "workunit:type", "workunit:isDirty",
-            "switchContainerChild:context",
-        )
-    }
+    # The remaining typo conflicts with the separately documented spelling;
+    # the twelve explicitly admitted enum choices above assert no equivalence.
+    pending_enum = {}
     if version == "2025.1":
-        pending_enum.update(states="specific_semantics_unproven",
-            suppportsRandomizer="spelling_conflicts_with_documented_supportsRandomizer")
+        pending_enum.update(suppportsRandomizer="spelling_conflicts_with_documented_supportsRandomizer")
     enum = set(definitions["documents"]["waapi_definitions.json"]["definitions"]["returnExpression"]["items"]["anyOf"][0]["enum"])
     assert enum - (covered | covered_enum) == set(pending_enum)
     assert not set(pending_enum).intersection(covered | covered_enum)
@@ -1888,3 +1886,190 @@ def test_public_source_query_uses_exact_versioned_file_and_active_bindings(tmp_p
     else:
         code, schema = gateway.execute_gateway(["query-schema"], env=env)
         assert code == 0 and "active-source" not in schema["relationships"]
+
+
+@pytest.mark.parametrize('version', SUPPORTED_WWISE_VERSION_KEYS)
+def test_query_schema_discloses_finite_declared_spellings_without_inventing_alias_meaning(tmp_path, version):
+    choices = (
+        'sound:convertedWemFilePath', 'sound:originalWavFilePath', 'soundbank:bnkFilePath',
+        'music:transitionRoot', 'music:playlistRoot', 'audioSource:maxDurationSource',
+        'audioSource:trimValues', 'workunit:isDefault', 'workunit:type', 'workunit:isDirty',
+        'switchContainerChild:context', 'states',
+    )
+    env = _env(tmp_path, version)
+    code, schema = gateway.execute_gateway(['query-schema'], env=env)
+    assert code == 0, schema
+    for spelling in choices:
+        available = spelling != 'states' or version == '2025.1'
+        assert (spelling in schema['business_outputs']) is available
+        code, result = gateway.execute_gateway(['query-schema', '--output', spelling], env=env)
+        assert code == 0, result
+        detail = result['business_output']
+        assert detail['available'] is available
+        assert detail['supported_versions'] == (['2025.1'] if spelling == 'states' else list(SUPPORTED_WWISE_VERSION_KEYS))
+        assert detail['selected_spelling'] == spelling
+        assert detail['native_semantics_proven'] is False
+        assert detail['alias_equivalence_proven'] is False
+        assert detail['result_shape'] is None
+        assert detail['output_field'] == 'declared_return_observation'
+        if available:
+            source = detail['native_definition']
+            definitions = json.loads((SCRIPT_PATH.parents[1] / 'resources/manifest' / version / 'definitions.json').read_text())
+            field = definitions['documents'][source['document']]
+            for part in source['pointer'].split('/')[1:]:
+                field = field[int(part)] if isinstance(field, list) else field[part]
+            assert field == spelling
+            assert source['wwise_build'] == definitions['wwise_build']
+
+
+@pytest.mark.parametrize('version', SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize('detail', [False, True])
+def test_declared_return_choices_compile_exactly_once_and_preserve_actual_keys_without_attribution(tmp_path, version, detail):
+    from tests.unit.test_object_query_result_pages import QueryTask, PROJECT_GUID
+
+    task = QueryTask(tmp_path, version)
+    task.row.pop('notes')
+    task.row.update(originalWavFilePath='Originals/actual.wav',
+        unknownNativeKey={'future': [False, 0, None, {}, []]},
+        **{'workunit:isDirty': None})
+    choices = [
+        'sound:convertedWemFilePath', 'sound:originalWavFilePath', 'soundbank:bnkFilePath',
+        'music:transitionRoot', 'music:playlistRoot', 'audioSource:maxDurationSource',
+        'audioSource:trimValues', 'workunit:isDefault', 'workunit:type', 'workunit:isDirty',
+        'switchContainerChild:context',
+    ]
+    if version == '2025.1':
+        choices.append('states')
+    flags = [part for choice in choices for part in ('--include', choice)]
+    code, result = task.run('query-object', '--exact-id', PROJECT_GUID,
+        '--include', 'original-wav-file-path', *flags, *(['--detail'] if detail else []))
+    assert code == 0, result
+    row = result['agent_result'][0]
+    assert row['original_wav_file_path'] == 'Originals/actual.wav'
+    assert row['declared_return_observation'] == {
+        'selected_spellings': choices, 'returned_values': {
+            'originalWavFilePath': 'Originals/actual.wav',
+            'unknownNativeKey': {'future': [False, 0, None, {}, []]},
+            'workunit:isDirty': None,
+        },
+    }
+    assert 'unavailable_fields' not in row
+    assert all(choice not in row for choice in choices)
+    assert list(result)[-1] == 'agent_result'
+    reads = [call for call in task.calls if call[0].endswith('object.get')]
+    assert reads == [('ak.wwise.core.object.get', {'waql': 'from object "' + PROJECT_GUID + '"'},
+        {'return': ['id', 'name', 'type', 'path', 'originalWavFilePath', *choices]})]
+
+
+@pytest.mark.parametrize('version', SUPPORTED_WWISE_VERSION_KEYS)
+def test_declared_return_uses_version_gate_and_closed_output_limits_before_transport(tmp_path, version):
+    from tests.unit.test_object_query_result_pages import QueryTask, PROJECT_GUID
+
+    task = QueryTask(tmp_path, version)
+    if version != '2025.1':
+        code, result = task.run('query-object', '--exact-id', PROJECT_GUID, '--include', 'states')
+        assert code == 2, result
+        assert '2025.1' in result['message']
+        assert task.calls == []
+    for count in (2, 33):
+        code, result = task.run('query-object', '--exact-id', PROJECT_GUID,
+            *['--include', 'sound:originalWavFilePath'] * count)
+        assert code == 2, result
+        assert ('must be unique' if count == 2 else 'at most 32') in result['message']
+        assert task.calls == []
+
+
+@pytest.mark.parametrize('policy', ['read_only', 'ask_before_changes', 'allow_changes'])
+def test_failed_declared_return_read_keeps_native_error_and_can_refine_without_permission(tmp_path, policy):
+    from tests.unit.test_object_query_result_pages import QueryTask, PROJECT_GUID
+
+    class Task(QueryTask):
+        def call(self, uri, args=None, options=None):
+            if uri.endswith('object.get') and 'sound:originalWavFilePath' in (options or {}).get('return', ()):
+                self.calls.append((uri, args, options))
+                raise RuntimeError('native read error: declared spelling rejected')
+            return super().call(uri, args, options)
+
+    task = Task(tmp_path)
+    config = Path(task.env['WAAPI_SKILL_CONFIG_PATH'])
+    settings = json.loads(config.read_text())
+    settings['project_modification_policy'] = policy
+    config.write_text(json.dumps(settings))
+    task.row.pop('notes')
+    task.row['originalWavFilePath'] = 'Originals/refined.wav'
+    code, error = task.run('query-object', '--exact-id', PROJECT_GUID,
+        '--include', 'sound:originalWavFilePath')
+    assert code == 2, error
+    assert 'native read error: declared spelling rejected' in json.dumps(error)
+    recovery = error['recovery']
+    assert recovery['stage'] == 'read_failure'
+    assert recovery['read_only_continuation_allowed'] is True
+    assert recovery['additional_read_permission_required'] is False
+    assert recovery['project_write_outcome'] == 'no_project_write_in_this_invocation'
+    code, refined = task.run('query-object', '--exact-id', PROJECT_GUID,
+        '--include', 'original-wav-file-path')
+    assert code == 0, refined
+    assert refined['agent_result'][0]['original_wav_file_path'] == 'Originals/refined.wav'
+    assert all(uri.endswith(('getInfo', 'object.get')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('change', ['none', 'native-value', 'configuration'])
+def test_mixed_large_declared_and_canonical_returns_page_losslessly_and_reject_drift(tmp_path, change):
+    from tests.unit.test_object_query_result_pages import QueryTask, PROJECT_GUID
+
+    task = QueryTask(tmp_path)
+    task.row.pop('notes')
+    # One bounded native response, including a large canonical value selected
+    # alongside two declared spellings whose actual native keys can differ.
+    text = '音' * 220000
+    task.row.update(originalWavFilePath=text, **{'states': {'future': [None, False, 0, [], {}]}})
+    assert len(json.dumps({'return': [task.row]}, ensure_ascii=False).encode()) < 1024 * 1024
+    code, result = task.run('query-object', '--exact-id', PROJECT_GUID,
+        '--include', 'original-wav-file-path', '--include', 'sound:originalWavFilePath', '--include', 'states')
+    assert code == 0 and result['status'] == 'partial', result
+    argv = result['agent_result']['next_command']['gateway_argv']
+    if change == 'native-value':
+        task.row['states']['future'][2] = 1
+    elif change == 'configuration':
+        config = Path(task.env['WAAPI_SKILL_CONFIG_PATH'])
+        settings = json.loads(config.read_text()); settings['waapi_port'] += 1
+        config.write_text(json.dumps(settings))
+    if change != 'none':
+        code, error = task.run(*argv)
+        assert code == 2, error
+        assert error['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED'
+        assert 'agent_result' not in error
+        return
+    entries = []
+    while True:
+        assert list(result)[-1] == 'agent_result'
+        assert len(json.dumps(result, ensure_ascii=False, indent=2).encode()) <= 32 * 1024
+        page = result['agent_result']
+        entries.extend(page['entries'])
+        if page['projection_complete']:
+            break
+        code, result = task.run(*page['next_command']['gateway_argv'])
+        assert code == 0, result
+    for pointer in ('/objects/0/original_wav_file_path',
+                    '/objects/0/declared_return_observation/returned_values/originalWavFilePath'):
+        assert ''.join(entry['value'] for entry in entries if entry['pointer'] == pointer) == text
+    assert [entry['value'] for entry in entries
+        if entry['pointer'] == '/objects/0/declared_return_observation/selected_spellings/0'] == ['sound:originalWavFilePath']
+    assert [entry['value'] for entry in entries
+        if entry['pointer'] == '/objects/0/declared_return_observation/returned_values/states/future/0'] == [None]
+    options = [options for uri, args, options in task.calls
+        if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}]
+    assert all(option == {'return': ['id', 'name', 'type', 'path', 'originalWavFilePath',
+        'sound:originalWavFilePath', 'states']} for option in options)
+
+
+def test_declared_return_respects_existing_native_response_byte_ceiling(tmp_path):
+    from tests.unit.test_object_query_result_pages import QueryTask, PROJECT_GUID
+
+    task = QueryTask(tmp_path)
+    task.row.pop('notes')
+    task.row['states'] = '音' * 400000
+    code, result = task.run('query-object', '--exact-id', PROJECT_GUID, '--include', 'states')
+    assert code == 2, result
+    assert result['agent_result'] is None
+    assert result['call']['error_code'] == 'RESULT_TOO_LARGE'

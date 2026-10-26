@@ -159,10 +159,22 @@ _NAMED_OUTPUT_PAIRS = (
     ("switchGroupGameParameter", "switch-group-game-parameter"),
     ("workunitIsLoaded", "work-unit-is-loaded"),
 )
+# Exact, finite return choices disclosed by the pinned request enums. Their
+# membership proves request availability, not alias equivalence or result shape.
+# Do not derive this public vocabulary from an arbitrary reflected enum member.
+DECLARED_QUERY_RETURN_SPELLINGS = (
+    "sound:convertedWemFilePath", "sound:originalWavFilePath", "soundbank:bnkFilePath",
+    "music:transitionRoot", "music:playlistRoot", "audioSource:maxDurationSource",
+    "audioSource:trimValues", "workunit:isDefault", "workunit:type", "workunit:isDirty",
+    "switchContainerChild:context", "states",
+)
+
 QUERY_BUSINESS_OUTPUTS = {
     **LEGACY_OUTPUTS,
     **{business: (native, business.replace("-", "_")) for native, business in _NAMED_OUTPUT_PAIRS},
     "blend-tracks": ("blendTracks", "blend_tracks"),
+    **{spelling: (spelling, "declared_return_observation")
+       for spelling in DECLARED_QUERY_RETURN_SPELLINGS},
 }
 
 # Reviewed built-ins absent from objectReturn.properties; enum membership alone
@@ -185,7 +197,8 @@ def available_query_outputs(version: str) -> dict[str, tuple[str | None, str]]:
     native_enum = _definition_graph(version).documents["waapi_definitions.json"]["definitions"]["returnExpression"]["items"]["anyOf"][0]["enum"]
     outputs = {name: binding for name, binding in QUERY_BUSINESS_OUTPUTS.items()
                if name in LEGACY_OUTPUTS or binding[0] in properties
-               or (version in _ENUM_OUTPUT_VERSIONS.get(binding[0], ()) and binding[0] in native_enum)}
+               or (version in _ENUM_OUTPUT_VERSIONS.get(binding[0], ()) and binding[0] in native_enum)
+               or (name in DECLARED_QUERY_RETURN_SPELLINGS and binding[0] in native_enum)}
     if version == "2021.1":
         # Fixed closed candidate. Lexical permission is separate from native
         # acceptance; query_output_detail discloses that distinction.
@@ -218,6 +231,28 @@ def override_source_value_contract(version: str) -> dict[str, Any]:
 
 
 def query_output_detail(version: str, name: str) -> dict[str, Any]:
+    if name in DECLARED_QUERY_RETURN_SPELLINGS:
+        graph = _definition_graph(version)
+        enum = graph.documents["waapi_definitions.json"]["definitions"]["returnExpression"]["items"]["anyOf"][0]["enum"]
+        available = name in enum
+        return {
+            "name": name, "selected_spelling": name,
+            "output_field": "declared_return_observation", "available": available,
+            "supported_versions": [item for item in SUPPORTED_WWISE_VERSION_KEYS
+                                   if name in available_query_outputs(item)],
+            "description": "Select this exact declared return spelling and inspect the actual native response; its specific meaning and equivalence to other outputs are unproven.",
+            "native_definition": {"version": version, "wwise_build": graph.wwise_build,
+                "document": "waapi_definitions.json",
+                "pointer": f"/definitions/returnExpression/items/anyOf/0/enum/{enum.index(name)}"} if available else None,
+            "result_schema": None, "result_shape": None,
+            "native_semantics_proven": False, "alias_equivalence_proven": False,
+            "native_absence_proven": False,
+            "observation": {"selected_spellings": "exact requested choices in declaration order",
+                "returned_values": "all actual additional native keys and values; id/name/type/path remain in the ordinary row identity; no per-choice attribution or inferred aliases",
+                "presence": "omitted keys stay omitted; explicit null, empty values and unknown shapes remain exact",
+                "limits": "ordinary query row, byte and continuation bounds apply",
+                "failure": "native error retained; refine this authorized read through the existing recovery guidance"},
+        }
     if version == "2021.1" and name == "curve-points":
         from .object_query_local_lists import curve_points_postcondition
         graph = _definition_graph(version)
