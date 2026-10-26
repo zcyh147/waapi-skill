@@ -109,6 +109,7 @@ from .operation_import import (
     normalize_inline_audio_file,
     normalize_originals_subfolder,
     parse_tab_delimited_import_file,
+    tab_import_guid_targets,
     regular_file_proof as import_regular_file_proof,
     validate_import_media_extension,
     verify_regular_file_proof as verify_import_file_proof,
@@ -2291,6 +2292,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "TSV Notes verifies target-object notes independently from Audio Source Notes; the exact user table is never rewritten",
             "an explicit typed AudioFileSource media row may reimport one existing exact Sound child in the requested language using Notes on the Source; a separate typed owner-only Notes row retains the same exact-table transaction",
             "Audio File cells retain their native spelling and bind a hashed local file; relative paths resolve from the table directory, including parent navigation; proven Wine hosts require Windows absolute or table-relative media cells",
+            "canonical GUID Object Path cells resolve exact existing Sound or AudioFileSource identities before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries",
             "fixed and dynamic native headers are parsed under bounded grammar; importLanguage remains a call argument",
             "the parser hashes the TSV, regular media, and decoded inline base64 before preview",
             "a missing or invalid row rejects the whole request before dispatch",
@@ -13433,11 +13435,23 @@ def _prepare_audio_import_tab_delimited(
     location_path = location.row.get("path")
     if not isinstance(location_path, str):
         raise OperationContractError("INVALID_READBACK", "import_location must expose an absolute path.")
+    guid_roles: dict[str, ResolvedObject] = {}
     try:
+        guid_targets: dict[str, Mapping[str, Any]] = {}
+        for index, guid in enumerate(tab_import_guid_targets(arguments.get("import_file"))):
+            role = f"tab_guid_targets[{index}]"
+            resolved = _resolve_identity({"kind": "id", "value": guid}, role=role, read=read)
+            if _object_type_token(resolved.row.get("type")) not in {"sound", "audiofilesource"}:
+                raise OperationContractError("INVALID_TARGET_TYPE", "A GUID TSV target must be an existing supported Sound or AudioFileSource.")
+            if not isinstance(resolved.row.get("path"), str):
+                raise OperationContractError("INVALID_READBACK", "A GUID TSV target must expose an absolute canonical path.")
+            guid_targets[guid] = resolved.row
+            guid_roles[role] = resolved
         plan = parse_tab_delimited_import_file(
             arguments.get("import_file"),
             version=request.version,
             import_location=location_path,
+            guid_targets=guid_targets,
             import_language=str(arguments.get("import_language")),
             import_operation=str(arguments.get("import_operation", "createNew")),
             auto_add_to_source_control=arguments.get(
@@ -13460,7 +13474,7 @@ def _prepare_audio_import_tab_delimited(
         read=read,
     )
     preview, roles, state, verification, cleanup = prepared
-    roles = {"import_location": location, **roles}
+    roles = {"import_location": location, **guid_roles, **roles}
     return preview, roles, state, verification, cleanup
 
 
@@ -15089,6 +15103,12 @@ def _prepare_closed_import_plan(
                 "Import target path must resolve to at most one object.",
                 details={"path": target_path, "rows": rows},
             )
+        requested_target_id = target.get("requested_target_id")
+        if requested_target_id is not None and (
+            len(rows) != 1 or not _same_identity(rows[0].get("id"), requested_target_id)
+        ):
+            raise OperationContractError("IDENTITY_MISMATCH", "The GUID TSV target must still match its exact canonical path and selected language.",
+                details={"id": requested_target_id, "path": target_path, "rows": rows})
         if import_operation == "createNew" and rows:
             raise OperationContractError(
                 "TARGET_EXISTS",

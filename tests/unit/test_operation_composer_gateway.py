@@ -332,12 +332,23 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # GUID target support adds one reviewed TSV disclosure without new fields.
+    # Invert only this delta and retain the complete native-path schema seal.
+    assert canonical_sha256(non_object_set_digests) == "3c08c10105192d1609df5875122ab106722ff8d50b618a8433d18e3d1a0b79f7"
+    guid_target_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        assert contract["constraints"].pop(4) == (
+            "canonical GUID Object Path cells resolve exact existing Sound or AudioFileSource identities before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries"
+        )
+        guid_target_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
     # Native media cells add one reviewed TSV constraint; invert that exact
     # disclosure while retaining the complete earlier combined schema seal.
     assert canonical_sha256(non_object_set_digests) == "073025d7216355087c4fe62331316385f54da4a100aeeec0df7c5c4b53655a46"
     native_path_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = guid_target_contracts[version]
         assert contract["constraints"].pop(3) == (
             "Audio File cells retain their native spelling and bind a hashed local file; relative paths resolve from the table directory, including parent navigation; proven Wine hosts require Windows absolute or table-relative media cells"
         )
