@@ -808,7 +808,7 @@ def test_definition_parser_supports_strong_event_aux_dialogue_and_effect_subset(
     assert rows[2]["filters"] == ["events", "media"]
     assert rows[3]["object_type"] == "Effect"
     assert rows[3]["identity"] == {"kind": "short_id", "value": 26, "source_format": "hexadecimal"}
-    assert parsed["unsupported_boundary"]["GameSyncExclusion"].startswith("rejected")
+    assert parsed["unsupported_boundary"]["GameSyncExclusion"] == "accepted names only; effects are not proven by getInclusions"
     _assert_seal(parsed, "document_sha256")
 
 
@@ -848,14 +848,13 @@ def test_definition_parser_accepts_only_official_identity_quote_forms(
     ("contents", "error_code"),
     [
         ("<SoundBanksInfo/>\n", "INVALID_DEFINITION_FORMAT"),
-        ("Bank_A\t-GameSyncExclusion\tState\tGroup\tValue\n", "UNSUPPORTED_DEFINITION_DIRECTIVE"),
+        ("Bank_A\t-GameSyncExclusion\t-State\tGroup\tValue\n", "INVALID_DEFINITION_ROW"),
         ("Bank_A\t-Unknown\tObject\n", "UNSUPPORTED_DEFINITION_DIRECTIVE"),
         ('Bank_A\t-EffectShareset\t"Effect_A"\tEvent\n', "UNSUPPORTED_DEFINITION_FILTER"),
         ('Bank_A\t"Event_A"\tUnknown\n', "UNSUPPORTED_DEFINITION_FILTER"),
-        ('Bank_A\t"Event_A"\nBank_A\t"Event_A"\tMedia\n', "DUPLICATE_DEFINITION_INCLUSION"),
     ],
 )
-def test_definition_parser_rejects_xml_exclusions_unknowns_and_duplicates(
+def test_definition_parser_rejects_xml_malformed_exclusions_and_unknowns(
     tmp_path: Path,
     contents: str,
     error_code: str,
@@ -925,7 +924,7 @@ def test_process_definition_plan_derives_names_and_readback_oracle_from_files(tm
     _assert_seal(plan, "plan_sha256")
 
 
-def test_process_definition_plan_rejects_same_bank_across_files_and_2021(tmp_path: Path) -> None:
+def test_process_definition_plan_preserves_same_bank_files_without_predicting_union_and_rejects_2021(tmp_path: Path) -> None:
     io_root, project = _project(tmp_path)
     project_root = Path(project["directories"]["root"])
     first = project_root / "first.txt"
@@ -933,14 +932,12 @@ def test_process_definition_plan_rejects_same_bank_across_files_and_2021(tmp_pat
     first.write_text(f"Gameplay_Main\t{AUX_ID}\n", encoding="utf-8")
     second.write_text(f"Gameplay_Main\t{AUX_ID}\n", encoding="utf-8")
 
-    with pytest.raises(SoundBankContractError) as collision:
-        build_process_definition_operation_plan(
-            {"files": [str(first), str(second)]},
-            version="2022.1",
-            project_info=project,
-            io_root=io_root,
-        )
-    assert collision.value.error_code == "CROSS_FILE_SOUNDBANK_COLLISION"
+    plan = build_process_definition_operation_plan(
+        {"files": [str(first), str(second)]}, version="2022.1", project_info=project, io_root=io_root)
+    assert plan["dispatch_args"] == {"files": [str(first), str(second)]}
+    assert plan["soundbanks"][0]["source_files"] == [str(first), str(second)]
+    assert plan["soundbanks"][0]["verification_boundary_reasons"] == ["repeated_bank_across_files"]
+    assert len(plan["soundbanks"][0]["expected_inclusions"]) == 2
 
     with pytest.raises(SoundBankContractError) as old_version:
         build_process_definition_operation_plan(

@@ -268,6 +268,14 @@ def test_every_soundbank_schema_exposes_only_the_business_plan(
     assert payload["business_adapter"]["legacy_inline_typed_public"] is False
     assert "composer" not in payload
     assert "typed_operation" not in payload
+    if operation == "soundbank.processDefinitionFiles":
+        adapter = payload["business_adapter"]
+        assert adapter["definition_format"]["gamesync_exclusion_rows"] == [
+            ["BANK", "-GameSyncExclusion", "State", "GROUP_NAME", "STATE_NAME"],
+            ["BANK", "-GameSyncExclusion", "Switch", "GROUP_NAME", "SWITCH_NAME"],
+            ["BANK", "-GameSyncExclusion", "Trigger", "TRIGGER_NAME"],
+        ]
+        assert set(adapter["verification_modes"]) == {"exact_inclusion_readback", "result_schema_only"}
 
 
 def test_definition_2021_retains_the_actual_native_api_boundary(tmp_path: Path) -> None:
@@ -1368,3 +1376,166 @@ def test_external_source_omitted_output_uses_live_custom_cache_and_base_platform
         assert output.is_file()
         assert source.read_bytes() == b"RIFF" + b"0" * 64
     assert sum(uri.endswith("convertExternalSources") for uri, _, _ in calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("scenario,fault", [("repeated", fault) for fault in ("none", "file-drift", "identity-drift", "outside-root")]
+    + [(kind, "none") for kind in ("State", "Switch", "Trigger", "duplicate-row", "nonempty")]
+    + [("State", fault) for fault in ("sync-wrong-type", "sync-wrong-parent", "sync-ambiguous", "sync-drift")])
+def test_definition_ordered_repeated_bank_files_disclose_result_only_before_authorization(
+    tmp_path: Path, version: str, scenario: str, fault: str,
+) -> None:
+    from tests.unit.test_operation_registry_soundbank import _project as project_fixture, DefinitionReader, EVENT_ID
+    io_root, project = project_fixture(tmp_path)
+    root = Path(project["directories"]["root"])
+    first, second = root / "first.tsv", root / "second.tsv"
+    first.write_text(f"Gameplay_Main\t{EVENT_ID}\tEvent\n", encoding="utf-8")
+    second.write_text(f"Gameplay_Main\t{EVENT_ID}\tMedia\n", encoding="utf-8")
+    if fault == "outside-root":
+        second = tmp_path / "unowned.tsv"
+        second.write_text(f"Gameplay_Main\t{EVENT_ID}\tMedia\n", encoding="utf-8")
+    is_sync = scenario in {"State", "Switch", "Trigger"}
+    if scenario == "duplicate-row":
+        second.write_text(f"Gameplay_Main\t{EVENT_ID}\tEvent\nGameplay_Main\t{EVENT_ID}\tMedia\n", encoding="utf-8")
+    if is_sync:
+        names = '\t"Weather"\t"Rain"\n' if scenario == "Switch" else "\tWeather\tRain\n"
+        second.write_text("Gameplay_Main\t-GameSyncExclusion\t" + scenario +
+            (names if scenario != "Trigger" else "\tLightning\n"), encoding="utf-8")
+    files = [second, first] if scenario == "repeated" else [second]
+    reader = DefinitionReader(project, version=version)
+    if scenario == "nonempty":
+        reader.target_exists = True
+    group_id = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+    sync_id = "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}"
+    group = {"id": group_id, "name": "Weather", "type": scenario + "Group", "path": "\\Game Syncs\\Weather"}
+    sync = {"id": sync_id, "name": "Lightning" if scenario == "Trigger" else "Rain", "type": scenario,
+        "path": "\\Game Syncs\\Weather\\Rain", "parent": {"id": group_id}}
+    if fault == "sync-wrong-type":
+        sync["type"] = "Sound"
+    elif fault == "sync-wrong-parent":
+        sync["parent"] = {"id": EVENT_ID}
+    calls = []
+    class Client:
+        def call(self, uri, args=None, options=None):
+            calls.append((uri, args, options))
+            if uri == "ak.wwise.core.getInfo":
+                info = _info()
+                info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
+                return info
+            if uri.endswith("processDefinitionFiles"):
+                assert args == {"files": list(map(str, files))}
+                # Deliberately no synthetic union or target creation: an empty
+                # native result cannot prove any undocumented merge outcome.
+                return {}
+            if is_sync and uri == "ak.wwise.core.object.get":
+                query = args.get("waql", "")
+                if f"from type {scenario}Group " in query:
+                    return {"return": [group]}
+                if "select children" in query or "from type Trigger " in query:
+                    return {"return": [sync, sync] if fault == "sync-ambiguous" else [sync]}
+                if args.get("from", {}).get("id") == [group_id]:
+                    return {"return": [group]}
+                ids = args.get("from", {}).get("id", [])
+                if sync_id in ids:
+                    return {"return": [row for row in [reader.event, reader.control, group, sync] if row["id"] in ids]}
+            if uri == "ak.wwise.core.object.get" and len(args.get("from", {}).get("id", [])) > 1:
+                ids = args["from"]["id"]
+                return {"return": [row for row in [reader.event, reader.control, reader.target] if row["id"] in ids]}
+            return reader(uri, args or {}, options or {})
+        def disconnect(self):
+            pass
+    env = set_gateway_config(_env(tmp_path), wwise_version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv], env=env, client_factory=lambda _: Client())
+    code, started = run("draft-start", "soundbank.processDefinitionFiles")
+    assert code == 0, started
+    draft, authority = started["draft"]["draft_id"], started["task_authority"]
+    code, declared = run("draft-declare-soundbank-plan", draft, "--task-authority", authority,
+        "--expected-revision", "1", *[value for path in files for value in ("--definition-file", str(path))], "--io-root", str(io_root))
+    assert code == 0, json.dumps(declared, indent=2)
+    code, checked = run("draft-check", draft, "--task-authority", authority, "--expected-revision", "2")
+    if fault in {"sync-wrong-type", "sync-wrong-parent", "sync-ambiguous"}:
+        assert code == 2 and checked["error_code"] == ("AMBIGUOUS_IDENTITY" if fault == "sync-ambiguous" else "IDENTITY_MISMATCH"), checked
+        assert not any(uri.endswith("processDefinitionFiles") for uri, _, _ in calls)
+        return
+    if fault == "outside-root":
+        assert code == 2 and checked["error_code"] == "PATH_OUTSIDE_IO_ROOT", checked
+        assert not any(uri.endswith("processDefinitionFiles") for uri, _, _ in calls)
+        return
+    assert code == 0, checked
+    code, preview = run("preview-from-draft", draft, "--task-authority", authority, "--expected-revision", str(checked["draft"]["revision"]))
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    prepared = TransactionStore(tmp_path / "state").load_preview(tx).artifact["prepared_operation"]
+    assert prepared["dispatch"]["args"] == {"files": list(map(str, files))}
+    documents = prepared["verification_plan"]["plan"]["documents"]
+    assert [row["path"] for row in documents] == list(map(str, files))
+    assert len({row["file_proof"]["sha256"] for row in documents}) == len(files)
+    assert prepared["verification_plan"]["definition_oracle"]["banks"][0]["expected_inclusions"] is None
+    assert "result_schema_only" in json.dumps(preview)
+    code, shown = run("transaction-show", tx)
+    assert code == 0 and "result_schema_only" in json.dumps(shown), shown
+    code, confirmed = run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if fault == "file-drift":
+        second.write_text("changed", encoding="utf-8")
+    elif fault == "identity-drift":
+        reader.event["name"] = "Changed"
+    elif fault == "sync-drift":
+        sync["name"] = "Changed"
+    code, executed = run("execute", tx)
+    if fault in {"file-drift", "identity-drift", "sync-drift"}:
+        assert code == 2 and executed["error_code"] == "ROLE_GUARD_MISMATCH", executed
+        assert not any(uri.endswith("processDefinitionFiles") for uri, _, _ in calls)
+        return
+    assert code == 0, executed
+    code, verified = run("verify", tx)
+    assert code == 0, verified
+    assert verified["verification"]["status"] == "result_schema_checked"
+    assert verified["verification"]["business_state_verified"] is False
+    code, replay = run("execute", tx)
+    assert code == 2, replay
+    assert sum(uri.endswith("processDefinitionFiles") for uri, _, _ in calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("columns,error", [
+    ("-State\tWeather\tRain", "INVALID_DEFINITION_ROW"),
+    ("State\tWeather", "INVALID_DEFINITION_ROW"),
+    ("State\tWeather\tRain\tMedia", "INVALID_DEFINITION_ROW"),
+    ("Trigger\tLightning\tMedia", "INVALID_DEFINITION_ROW"),
+    ("Trigger\t123", "INVALID_DEFINITION_IDENTITY"),
+    ("Switch\tWeather\t0x123", "INVALID_DEFINITION_IDENTITY"),
+    ("Trigger\t{22222222-2222-2222-2222-222222222222}", "INVALID_DEFINITION_IDENTITY"),
+])
+def test_definition_gamesync_invalid_forms_stop_at_public_check(tmp_path: Path, version: str, columns: str, error: str) -> None:
+    from tests.unit.test_operation_registry_soundbank import _project as project_fixture
+    io_root, project = project_fixture(tmp_path)
+    definition = Path(project["directories"]["root"]) / "invalid.tsv"
+    definition.write_text("Harbor\t-GameSyncExclusion\t" + columns + "\n", encoding="utf-8")
+    calls = []
+    class Client:
+        def call(self, uri, args=None, options=None):
+            calls.append(uri)
+            if uri == "ak.wwise.core.getInfo":
+                info = _info()
+                info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
+                return info
+            if uri == "ak.wwise.core.getProjectInfo":
+                return project
+            pytest.fail(f"Invalid Definition dispatched {uri}")
+        def disconnect(self):
+            pass
+    env = set_gateway_config(_env(tmp_path), wwise_version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv], env=env, client_factory=lambda _: Client())
+    code, started = run("draft-start", "soundbank.processDefinitionFiles")
+    assert code == 0, started
+    draft, authority = started["draft"]["draft_id"], started["task_authority"]
+    code, declared = run("draft-declare-soundbank-plan", draft, "--task-authority", authority,
+        "--expected-revision", "1", "--definition-file", str(definition), "--io-root", str(io_root))
+    assert code == 0, declared
+    code, rejected = run("draft-check", draft, "--task-authority", authority, "--expected-revision", "2")
+    assert code == 2 and rejected["error_code"] == error, rejected
+    assert not any(uri.endswith("processDefinitionFiles") for uri in calls)
+    assert not list((tmp_path / "state" / "transactions").glob("*.json"))

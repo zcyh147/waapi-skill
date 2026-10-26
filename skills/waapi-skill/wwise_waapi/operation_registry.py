@@ -3589,7 +3589,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "soundbank.processDefinitionFiles",
         "ak.wwise.core.soundbank.processDefinitionFiles",
         "soundbank",
-        "Process strict proven SoundBank Definition TSV files after resolving every derived object, then verify exact SoundBank GUID/inclusion state.",
+        "Process proven ordered SoundBank Definition TSV files with resolved identities and an explicit outcome-verification scope.",
         ("files", "io_root"),
         argument_contract=_object_contract(
             ("files", "io_root"),
@@ -3599,13 +3599,14 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             },
         ),
         constraints=(
-            "SoundBank names and inclusion rows are derived only from hashed UTF-8 tab-delimited files",
-            "Wwise 2022.1 Definition object identities are limited to GUIDs and "
+            "SoundBank names and ordered inclusion/exclusion rows are derived only from hashed UTF-8 tab-delimited files within the declared owned I/O root",
+            "Wwise 2022.1 Definition inclusion identities are limited to GUIDs and "
             "supported uint32 Short IDs because quoted names can complete without "
-            "applying inclusions; 2023.1 and later retain the official quoted-name form",
-            "unsupported directives, duplicate rows, unknown objects, and ambiguous names fail before dispatch",
+            "applying inclusions; GameSync exclusion names remain available; "
+            "2023.1 and later retain the official quoted inclusion-name form",
+            "documented State/Switch group-and-value or Trigger name exclusions and ordered repeated bank/object rows are accepted; unknown directives, unknown objects, and ambiguous identities fail before dispatch",
             "Event, DialogueEvent, AuxBus and Effect uint32 Short IDs resolve through a version-pinned bounded typed read; exact numeric Short ID, canonical GUID and directive type are checked independently",
-            "execution replays file/project and SoundBank inclusion snapshots; verification checks exact target inclusions and one unrelated control Bank",
+            "execution replays file/project and SoundBank inclusion snapshots; only single-file empty-prestate unique-inclusion banks have exact target inclusion verification; repeated bank/object rows, nonempty prestate and GameSync exclusions disclose result-only verification before authorization, without inferring union/removal/exclusion effects",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
         selection_guidance=_selection_guidance(
@@ -16910,6 +16911,13 @@ def _prepare_closed_soundbank_operation(
         }
     if definition_oracle is not None:
         verification["definition_oracle"] = _json_mapping(definition_oracle)
+        weak_banks = [bank for bank in definition_oracle["banks"] if bank["expected_inclusions"] is None]
+        verification["verification_scope"] = {
+            "mode": "result_schema_only" if weak_banks else "exact_inclusion_readback",
+            "business_state_verification_available": not bool(weak_banks),
+            "unverified_banks": [{"name": bank["name"], "reasons": bank["verification_boundary_reasons"]} for bank in weak_banks],
+            "boundary": "Repeated-file merge, repeated-object filter precedence, preexisting inclusion preservation/removal and GameSync exclusion effects are not independently verified; a successful empty result does not establish those effects.",
+        }
     cleanup = {
         "kind": "retain-project-and-outputs",
         "automatic": False,
@@ -17398,9 +17406,25 @@ def _prepare_definition_oracle(
             before_inclusions = _inclusion_rows(before_map)
 
         expected_map: dict[str, dict[str, Any]] = {}
+        declared_inclusions: list[dict[str, Any]] = []
+        boundary_reasons = list(raw_bank.get("verification_boundary_reasons", []))
+        if before_map:
+            boundary_reasons.append("nonempty_preexisting_inclusions")
         raw_inclusions = raw_bank.get("expected_inclusions")
-        if not isinstance(raw_inclusions, list) or not raw_inclusions:
-            raise OperationContractError("INVALID_PREVIEW", "A Definition target lacks expected inclusions.")
+        if not isinstance(raw_inclusions, list):
+            raise OperationContractError("INVALID_PREVIEW", "A Definition target lacks inclusion declarations.")
+        for exclusion_index, exclusion in enumerate(raw_bank.get("exclusions", [])):
+            role = f"definition.bank[{bank_index}].exclusion[{exclusion_index}]"
+            kind = exclusion["object_type"]
+            if kind == "Trigger":
+                identity = {"kind": "exact-type-name", "type": kind, "name": exclusion["name"]}
+            else:
+                group = _resolve_identity({"kind": "exact-type-name", "type": kind + "Group",
+                    "name": exclusion["group_name"]}, role=role + ".group", read=read)
+                roles[role + ".group"] = group
+                identity = {"kind": "scoped-name", "type": kind, "name": exclusion["name"],
+                    "parent": {"kind": "id", "value": group.object}}
+            roles[role] = _resolve_identity(identity, role=role, read=read)
         for inclusion_index, raw_inclusion in enumerate(raw_inclusions):
             if not isinstance(raw_inclusion, Mapping):
                 raise OperationContractError("INVALID_PREVIEW", "A Definition inclusion is malformed.")
@@ -17419,20 +17443,15 @@ def _prepare_definition_oracle(
             roles[f"definition.bank[{bank_index}].inclusion[{inclusion_index}]"] = resolved
             key = _identity_key(resolved.object)
             if key in expected_map:
-                raise OperationContractError(
-                    "DUPLICATE_DEFINITION_INCLUSION",
-                    "Definition rows resolve to the same live object more than once.",
-                    details={"soundbank": name, "object_id": resolved.object},
-                )
+                boundary_reasons.append("repeated_resolved_object")
             filters = raw_inclusion.get("filters")
-            expected_map[key] = {
-                "object": resolved.object,
-                "filters": set(_closed_inclusion_filters(filters, field="definition.filters")),
-            }
+            normalized_filters = _closed_inclusion_filters(filters, field="definition.filters")
+            declared_inclusions.append({"object": resolved.object, "filters": list(normalized_filters)})
+            expected_map[key] = {"object": resolved.object, "filters": set(normalized_filters)}
         definition_inclusions = _inclusion_rows(expected_map)
-        expected_after = _inclusion_rows(
-            _apply_inclusion_mode(before_map, expected_map, mode="add")
-        )
+        # getInclusions exposes no exclusions, and the available sources do not
+        # establish cross-file merge, filter precedence or old-row preservation.
+        expected_after = None if boundary_reasons else definition_inclusions
         banks.append(
             {
                 "name": name,
@@ -17440,8 +17459,9 @@ def _prepare_definition_oracle(
                 "pre_state_rows": rows,
                 "preexisting_id": preexisting_id,
                 "before_inclusions": before_inclusions,
-                "definition_inclusions": definition_inclusions,
+                "definition_inclusions": declared_inclusions if boundary_reasons else definition_inclusions,
                 "expected_inclusions": expected_after,
+                "verification_boundary_reasons": sorted(set(boundary_reasons)),
             }
         )
 
@@ -21879,6 +21899,13 @@ def verify_prepared_operation(
         for index, raw_bank in enumerate(raw_banks):
             if not isinstance(raw_bank, Mapping) or not isinstance(raw_bank.get("name"), str):
                 raise OperationContractError("INVALID_PREVIEW", "Closed Definition target Bank is malformed.")
+            if raw_bank.get("expected_inclusions") is None:
+                success_status = "result_schema_checked"
+                verification_strength = "result_schema_only"
+                business_state_verified = False
+                check(f"Definition target SoundBank {index} has an explicit result-only boundary", True,
+                    {"name": raw_bank["name"], "reasons": raw_bank.get("verification_boundary_reasons")})
+                continue
             name = str(raw_bank["name"])
             query = f"from type SoundBank where name = {json.dumps(name, ensure_ascii=False)} take 2"
             args = {"waql": query}
@@ -21916,7 +21943,7 @@ def verify_prepared_operation(
             actual = _inclusion_rows(_inclusion_map(inclusion_result))
             expected = raw_bank.get("expected_inclusions")
             check(
-                f"Definition target SoundBank {index} has the exact additive inclusion set",
+                f"Definition target SoundBank {index} has the exact inclusion set",
                 actual == expected,
                 {"expected": expected, "actual": actual},
             )
@@ -26288,9 +26315,13 @@ def verify_prepared_operation(
         success_status=success_status,
         verification_strength=verification_strength,
         business_state_verified=business_state_verified,
-        verification_scope=plan.get("verification_scope") if plan.get("source_copy_live_fields") is True or kind == "blend-assignment" else None,
+        verification_scope=plan.get("verification_scope") if plan.get("source_copy_live_fields") is True or kind in {"blend-assignment", "soundbank-definition-exact"} else None,
     )
 
+    if kind == "soundbank-definition-exact" and plan.get("verification_scope", {}).get("mode") == "result_schema_only":
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
+            "The bounded native result and input/control safety checks were checked. Definition merge, inclusion preservation/removal and GameSync exclusion effects remain unverified. Do not replay the executed import.",
+            outcome.verification_strength, False, plan.get("verification_scope"))
     if kind == "result-schema" and plan.get("uri") == PROFILER_ENABLE_DATA_URI:
         message = (
             "Wwise acknowledged the submitted capture-data directives; the native result schema was checked. "
