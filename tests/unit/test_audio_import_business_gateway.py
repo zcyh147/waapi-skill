@@ -9,6 +9,7 @@ import pytest
 from collections import deque
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+from tests.unit.test_workflow_source_guard import workflow
 
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.canonical import canonical_sha256
@@ -2149,3 +2150,178 @@ def test_localized_existing_fields_keep_event_ownership_and_notes_unambiguous(
     command("draft-check", expected_error=error)
     assert record.read_bytes() == before
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
+
+
+class ImportWitnessClient(ImportFieldsClient):
+    """Only the external Wwise boundary is substituted for collector tests."""
+    def __init__(self, tmp_path, *, fault=None):
+        super().__init__(tmp_path, "2025.1")
+        self.fault, self.counter, self.write_count = fault, 20, 0
+        self.parent.update(name="Default Work Unit", type="WorkUnit", classId=1638416,
+            path=r"\Containers\Default Work Unit", notes="")
+        self.objects = {PARENT_ID: self.parent,
+            "{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}": {"id": "{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}",
+                "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+                "path": r"\Events\Default Work Unit", "notes": ""}}
+        self.language_ids = {"SFX": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
+            "English(US)": "{88888888-8888-8888-8888-888888888888}",
+            "Japanese": "{99999999-9999-9999-9999-999999999999}"}
+
+    def identity(self):
+        import uuid
+        self.counter += 1
+        return "{" + str(uuid.UUID(int=self.counter)).upper() + "}"
+
+    def call(self, uri, args=None, options=None):
+        import re
+        from copy import deepcopy
+        args, options = args or {}, options or {}
+        if uri == "ak.wwise.core.getProjectInfo":
+            result = super().call(uri, args, options)
+            result["languages"] = [{"id": value, "name": name, "shortId": index + 1}
+                for index, (name, value) in enumerate(self.language_ids.items())]
+            return result
+        if uri == "ak.wwise.core.object.getTypes":
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {"return": [{"name": name, "type": "WObject", "classId": class_id} for name, class_id in (
+                ("WorkUnit", 1638416), ("PropertyContainer", 1441792), ("Sound", 65552),
+                ("AudioFileSource", 16), ("Event", 262145), ("Action", 327681))]}
+        if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+            return {"return": ["IsVoice"]}
+        if uri == "ak.wwise.core.object.getPropertyInfo":
+            return {"name": args["property"], "type": "bool", "default": False, "dependencies": []}
+        if uri.startswith("ak.wwise.core.undo."):
+            return {}
+        if uri == "ak.wwise.core.audio.import":
+            self.calls.append((uri, deepcopy(args), deepcopy(options))); self.write_count += 1
+            mode, returned, files = args.get("importOperation", "createNew"), [], []
+            for row in args["imports"]:
+                location = self.objects.get(row.get("importLocation"))
+                path = re.sub(r"<[^>]+>", "", row["objectPath"])
+                if not path and location:
+                    path = self.objects[location["parent"]["id"]]["path"]
+                existing = next((value for value in self.objects.values() if value["path"] == path and value["type"] != "AudioFileSource"), None)
+                if existing and mode == "replaceExisting":
+                    for identity in [identity for identity, value in self.objects.items()
+                            if identity == existing["id"] or value.get("parent") == {"id": existing["id"]}]:
+                        self.objects.pop(identity)
+                    existing = None
+                if existing is None:
+                    wire_type = row.get("objectType", "Sound SFX")
+                    object_type = "Sound" if wire_type.startswith("Sound") else "PropertyContainer"
+                    parent_path = path.rsplit("\\", 1)[0]
+                    parent = next(value for value in self.objects.values() if value["path"] == parent_path)
+                    existing = {"id": self.identity(), "name": path.rsplit("\\", 1)[-1], "type": object_type,
+                        "classId": 65552 if object_type == "Sound" else 1441792, "path": path,
+                        "parent": {"id": parent["id"]}, "notes": row.get("notes", ""), "@IsVoice": wire_type == "Sound Voice"}
+                    self.objects[existing["id"]] = existing
+                    newly_created = True
+                else:
+                    newly_created = False
+                returned.append(existing)
+                if "audioFile" in row:
+                    media = Path(row["audioFile"]); language = row.get("importLanguage", "SFX")
+                    source = next((value for value in self.objects.values() if value.get("parent") == {"id": existing["id"]}
+                        and value.get("audioSource:language", {}).get("name") == language and value["name"] == media.stem), None)
+                    copied = _project_path(self.tmp_path).parent / "Originals" / ("SFX" if language == "SFX" else "Voices/" + language)
+                    from pathlib import PureWindowsPath
+                    copied = copied.joinpath(*PureWindowsPath(row.get("originalsSubFolder", "")).parts) / media.name
+                    copied.parent.mkdir(parents=True, exist_ok=True); copied.write_bytes(media.read_bytes())
+                    source = source or {"id": self.identity(), "name": media.stem, "type": "AudioFileSource", "classId": 16,
+                        "path": path + "\\" + media.stem, "parent": {"id": existing["id"]}, "notes": ""}
+                    if not (self.fault == "ignored-notes" and self.write_count == 3):
+                        source["notes"] = row.get("audioSourceNotes", row.get("notes", source["notes"]) if not newly_created else "")
+                    source.update(originalFilePath=str(copied), originalWavFilePath=str(copied),
+                        **{"audioSource:language": {"id": self.language_ids[language], "name": language}})
+                    self.objects[source["id"]] = source
+                    existing.update(activeSource={"id": source["id"]}, originalFilePath=str(copied),
+                        **{"sound:originalWavFilePath": str(copied), "audioSource:language": source["audioSource:language"]})
+                    returned.append(source); files.append(str(copied))
+                    if self.fault == "corrupt-media" and mode == "replaceExisting":
+                        copied.write_bytes(b"wrong copied content")
+                if "event" in row:
+                    event_path, action_name = row["event"].rsplit("@", 1)
+                    assert action_name == "Play"
+                    event = {"id": self.identity(), "name": event_path.rsplit("\\", 1)[-1], "type": "Event", "classId": 262145,
+                        "path": event_path, "notes": ""}
+                    action = {"id": self.identity(), "name": "Play", "type": "Action", "classId": 327681,
+                        "path": event_path + r"\Play", "parent": {"id": event["id"]}, "@ActionType": 1, "@Target": {"id": existing["id"]}}
+                    self.objects.update({event["id"]: event, action["id"]: action})
+            return {"log": [], "files": files, "objects": [{key: deepcopy(value[key]) for key in options["return"] if key in value} for value in returned]}
+        if uri == "ak.wwise.core.object.get":
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            expression = args.get("waql", "")
+            identities = re.findall(r'"([^"\n]+)"', expression)
+            selected = args.get("from", {})
+            rows = [value for value in self.objects.values() if value["id"] in selected.get("id", [])
+                or value["path"] in selected.get("path", []) or value["id"] in identities or value["path"] in identities]
+            if "select children" in expression or args.get("transform"):
+                parents = {row["id"] for row in rows}
+                rows = [value for value in self.objects.values() if value.get("parent", {}).get("id") in parents]
+            if options.get("language"):
+                rows = [value for value in rows if value["type"] != "AudioFileSource"
+                    or value["audioSource:language"]["name"] == options["language"]]
+            return {"return": [{key: deepcopy(value.get(key, value.get("@" + key))) for key in options["return"]
+                if key in value or "@" + key in value} for value in rows]}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("fault", (None, "corrupt-media", "after-verify"))
+@pytest.mark.parametrize("localized", (False, True))
+def test_import_collectors_reach_actual_final_writer_with_partial_failure(tmp_path, workflow, monkeypatch, fault, localized):
+    from types import SimpleNamespace
+    from tests.unit.test_workflow_source_guard import _fixture_run
+    from tests.destructive.support import category_evidence, exact_real_evidence
+    owned = tmp_path / "collector"; owned.mkdir()
+    client = ImportWitnessClient(owned, fault="ignored-notes" if localized and fault == "corrupt-media" else fault)
+    env = set_gateway_config(_env(owned), wwise_version="2025.1")
+    runtime = SimpleNamespace(version="2025.1", candidate="a" * 40, category_results=[], state_dir=owned / "state",
+        sandbox=SimpleNamespace(sandbox_path=_project_path(owned).parent), env=env, port=31337,
+        lifecycle=SimpleNamespace(host="127.0.0.1", waapi_url="ws://127.0.0.1:31337/waapi"))
+    def raw_gateway(argv):
+        code, payload = waapi_gateway.execute_gateway(["--state-dir", str(runtime.state_dir), *argv],
+            env=env, client_factory=lambda _url: client)
+        if fault == "after-verify" and argv[0] == "verify" and payload.get("verified") is True and client.write_count == (3 if localized else 2):
+            if localized:
+                selected = next(row for row in client.objects.values() if row["type"] == "AudioFileSource"
+                    and row["audioSource:language"]["name"] == "English(US)")
+                selected["notes"] = "Not the requested notes"
+            else:
+                selected = next(row for row in client.objects.values() if row["type"] == "AudioFileSource" and row["name"] == "Replacement")
+                Path(selected["originalFilePath"]).write_bytes(b"changed after verification")
+        return code, payload
+    runtime.raw_gateway = raw_gateway
+    failure = None
+    try:
+        (workflow.test_audio_import_localized_notes_placement_event if localized
+            else workflow.test_audio_import_mixed_replace_create_scope_and_media)(runtime)
+    except AssertionError as exc:
+        failure = exc
+    category, = runtime.category_results
+    receipt = json.loads(Path(category["observation_path"]).read_text())
+    assert (failure is None) is (fault is None), receipt.get("failure")
+    assert category["status"] == ("PASS" if fault is None else "FAIL")
+    assert receipt["observations"]["before"] and receipt["phases"][-1]["name"] == "witness"
+    if fault == "after-verify":
+        assert receipt["phases"][-1]["verify"]["verified"] is True
+        assert receipt["observations"]["after"] and receipt["business_effect_verified"] is False
+    elif fault is None and localized:
+        assert receipt["observations"]["after"]["owner"]["notes"] == "Keep owner notes"
+        selected, = [row for row in receipt["observations"]["after"]["sources"] if row["object"]["source_language"]["name"] == "English(US)"]
+        assert selected["object"]["notes"] == "Requested literal Notes"
+        assert receipt["phases"][-1]["compiled_native_request"]["args"]["imports"][0]["notes"] == "Requested literal Notes"
+    lifecycle = tmp_path / "lifecycle"; lifecycle.mkdir()
+    fixture, events, _ = _fixture_run(lifecycle, workflow, monkeypatch)
+    target = tmp_path / "final.jsonl"; monkeypatch.setenv("WWISE_CATEGORY_EVIDENCE_PATH", str(target))
+    monkeypatch.setattr(exact_real_evidence, "append_category_evidence", category_evidence.append_category_evidence)
+    monkeypatch.setattr(exact_real_evidence, "exact_transaction_outcomes", lambda _state: category_evidence.exact_transaction_outcomes(runtime.state_dir))
+    fixture_runtime = next(fixture); fixture_runtime.category_results.extend(runtime.category_results)
+    if failure is None:
+        with pytest.raises(StopIteration): next(fixture)
+    else:
+        with pytest.raises(AssertionError): fixture.throw(failure)
+    final = json.loads(target.read_text().splitlines()[-1])
+    assert final["invocation"]["phase"] == "final" and final["invocation"]["outcome"] == category["status"]
+    assert final["residual_state"]["sandbox"] == ("deleted" if fault is None else "quarantined")
+    assert len(final["transactions"]) == (3 if localized else 2) and client.write_count == (3 if localized else 2)
+    assert final["categories"][0] == category

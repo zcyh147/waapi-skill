@@ -956,6 +956,25 @@ def test_voice_languages_reimport_preserves_other_language_and_sound_identity(
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_audio_import_mixed_replace_create_scope_and_media(workflow_sandbox_runtime):
+    """One owned replacement/create witness; setup is not new API credit."""
+    from tests.destructive.support.audio_import_acceptance import collect_mixed_import_acceptance
+    collect_mixed_import_acceptance(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+@pytest.mark.parametrize("workflow_sandbox_runtime", [pytest.param(("Japanese",), id="japanese")], indirect=True)
+def test_audio_import_localized_notes_placement_event(workflow_sandbox_runtime):
+    """2025 Source-GUID reimport keeps the owner and other language intact."""
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("This representative Source-GUID witness is selected for Wwise 2025.1")
+    from tests.destructive.support.audio_import_acceptance import collect_localized_import_acceptance
+    collect_localized_import_acceptance(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_music_playlist_canonical_query_create_and_import_parent(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
