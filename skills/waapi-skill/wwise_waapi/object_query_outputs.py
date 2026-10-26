@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -187,9 +188,6 @@ def available_query_outputs(version: str) -> dict[str, tuple[str | None, str]]:
                if name in LEGACY_OUTPUTS or binding[0] in properties
                or (version in _ENUM_OUTPUT_VERSIONS.get(binding[0], ()) and binding[0] in native_enum)}
     if version == "2021.1":
-        # Fixed closed candidate. Lexical permission is separate from native
-        # acceptance; query_output_detail discloses that distinction.
-        outputs["curve-points"] = ("points", "curve_points")
         # The pinned 2021 object.get return contract uses the older WAV accessor.
         # None marks an owned derivation, never a native return accessor.
         outputs["original-file-path"] = ("originalWavFilePath", "original_file_path")
@@ -219,24 +217,24 @@ def override_source_value_contract(version: str) -> dict[str, Any]:
 
 def query_output_detail(version: str, name: str) -> dict[str, Any]:
     if version == "2021.1" and name == "curve-points":
-        from .object_query_local_lists import curve_points_postcondition
         graph = _definition_graph(version)
-        pattern = graph.documents['waapi_definitions.json']['definitions']['returnExpression']['items']['anyOf'][1]['pattern']
-        if re.fullmatch(pattern, 'points') is None:
-            raise ValueError('The fixed 2021 points candidate must satisfy its matching request schema')
-        return {"name": name, "output_field": "curve_points", "available": True,
-            "supported_versions": list(SUPPORTED_WWISE_VERSION_KEYS),
-            "description": "Inspect ordered points of one exact Curve; 2021 native accessor semantics remain unverified.",
-            "scope": "2021 requires one exact-ID root Curve/class917520; no advanced or related candidate",
+        path = Path(__file__).resolve().parents[1] / 'references/semantic/2021.1/query-curve-points-native-boundary.json'
+        with path.open('rb') as source:
+            raw = source.read(8193)
+        if len(raw) > 8192 or hashlib.sha256(raw).hexdigest() != 'adb9e934824829fa32711882d457312df7d8497d6fc7521f100310a1c81eafc7':
+            raise ValueError('Pinned Curve points native-boundary source changed')
+        boundary = json.loads(raw)
+        if (boundary['version'], boundary['wwise_build']) != (version, graph.wwise_build):
+            raise ValueError('Curve points native boundary differs from the selected version/build')
+        reason = 'Wwise 2021.1.14.8108 Console rejected the fixed object.get points return accessor: Unknown accessor points; other legacy Curve or RTPC reads are not excluded'
+        return {"name": name, "output_field": "curve_points", "available": False,
+            "supported_versions": list(SUPPORTED_WWISE_VERSION_KEYS[1:]),
+            "description": reason, "availability_reason": reason,
+            "scope": boundary['scope'],
             "native_definition": None, "result_schema": None, "result_shape": None,
-            "native_semantics_proven": False, "native_absence_proven": False,
-            "request_legality": {"version": version, "wwise_build": graph.wwise_build,
-                "document": "waapi_definitions.json", "pointer": "/definitions/returnExpression/items/anyOf/1",
-                "pattern": pattern, "semantic_authority": False},
-            "typed_postcondition": {"version": version, "wwise_build": graph.wwise_build,
-                "uri": "ak.wwise.core.object.getAttenuationCurve", "pointer": "/resultSchema/properties/points",
-                "schema": curve_points_postcondition(version), "semantic_equivalence_proven": False},
-            "presence": "optional; unavailable_fields preserves absence and explicit null stays null"}
+            "native_accessor_rejection_proven": True, "native_absence_proven": False,
+            "native_boundary": boundary,
+            "alternative": {"guidance": reason + '; ' + boundary['alternatives']}}
     if name == "blend-tracks":
         return _blend_tracks_detail(version)
     if version == "2021.1" and name == "active-source":

@@ -56,7 +56,7 @@ switch-group-game-parameter work-unit-is-loaded
 
 def related_output_detail(version: str, name: str) -> dict[str, Any]:
     if version == '2021.1' and name == 'curve-points':
-        return {'available': False, 'output_field': 'curve_points', 'reason': '2021 curve-points permits only the exact-ID root Curve candidate; related native semantics remain unproven'}
+        return {'available': False, 'output_field': 'curve_points', 'reason': query_output_detail(version, name)['availability_reason']}
     outputs = available_query_outputs(version)
     allowed = set(_COMMON_OUTPUTS)
     for first_version, additions in _ADDITIONAL_OUTPUTS.items():

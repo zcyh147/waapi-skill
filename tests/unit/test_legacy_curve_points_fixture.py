@@ -12,6 +12,12 @@ from tests.unit.test_workflow_source_guard import workflow
 from tests.destructive.support import exact_real_evidence, sandbox_fixture
 
 
+def test_retired_legacy_curve_probe_is_explicitly_skipped(workflow):
+    from tests.destructive import test_query_legacy_curve_points as historical
+    marks = historical.test_exact_legacy_curve_points_capability.pytestmark
+    assert any(mark.name == 'skip' and 'original query181-2021-points-r1 remains FAIL' in mark.kwargs['reason'] for mark in marks)
+
+
 def exercise_collector(tmp_path, workflow, monkeypatch, fault=None):
     from tests.destructive import test_query_legacy_curve_points as witness
     source = tmp_path / 'source'; shutil.copytree(witness.REPO / 'tests/_org/2021.1', source)
@@ -70,6 +76,7 @@ def exercise_collector(tmp_path, workflow, monkeypatch, fault=None):
     return task, receipt, final, error
 
 
+@pytest.mark.skip(reason='Historical capability collector: 2021 points admission retired after sealed native rejection; no passing native credit')
 def test_legacy_curve_collector_reaches_final_writer_with_independent_source_xy(tmp_path, workflow, monkeypatch):
     task, receipt, final, error = exercise_collector(tmp_path, workflow, monkeypatch, 'float32')
     assert error is None and final['invocation']['outcome'] == 'PASS'
@@ -86,6 +93,7 @@ def test_legacy_curve_collector_reaches_final_writer_with_independent_source_xy(
 
 
 @pytest.mark.parametrize('fault', ['missing','null','rejection','wrong-shape','wrong-value'])
+@pytest.mark.skip(reason='Historical capability collector: 2021 points admission retired after sealed native rejection; no passing native credit')
 def test_legacy_curve_collector_retains_nonproof_and_original_packet_without_retry(tmp_path, workflow, monkeypatch, fault):
     task, receipt, final, error = exercise_collector(tmp_path, workflow, monkeypatch, fault)
     assert isinstance(error, AssertionError) and final['invocation']['outcome'] == 'FAIL'

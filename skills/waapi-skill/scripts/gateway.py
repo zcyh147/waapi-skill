@@ -6074,11 +6074,6 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
             "query-object requested the same native result field more than once"
         )
     native_fields = list(dict.fromkeys(binding[1] for binding in bindings if binding[0] != "derived"))
-    if version == '2021.1' and 'curve-points' in requested:
-        if not args.object_id or args.advanced_waql is not None or args.relationships:
-            raise GatewayInputError('2021 Curve points require one exact-ID root Curve; advanced and relationship candidates remain unresolved')
-        if 'classId' not in native_fields:
-            native_fields.append('classId')
     if args.query_related_requests:
         try:
             related_native_fields(bindings, SELECTED_REQUIRED_RETURN_FIELDS)
@@ -25646,9 +25641,6 @@ def _project_query_business_rows(
                 if kind == 'business' and output == 'curve_points':
                     from wwise_waapi.object_query_local_lists import validate_curve_points
                     from wwise_waapi.object_query_related_runtime import RelatedQueryError
-                    if args.query_related_version == '2021.1' and (row.get('type') != 'Curve' or type(row.get('classId')) is not int or row['classId'] != 917520):
-                        raise GatewayResultShapeError('2021 points candidate requires the exact native Curve class',
-                            details={'id': row.get('id'), 'type': row.get('type'), 'class_id': row.get('classId')}, error_code='QUERY_CURVE_POINTS_SCOPE')
                     try:
                         validate_curve_points(args.query_related_version, row[native], RelatedQueryError)
                     except RelatedQueryError as exc:

@@ -1,4 +1,4 @@
-"""One fixed 2021 Curve-points candidate through the existing closed query seam."""
+"""Exact 2021 fixed-accessor boundary and unchanged modern closed point outputs."""
 import copy
 import json
 from pathlib import Path
@@ -19,30 +19,49 @@ def curve_task(tmp_path, version='2021.1'):
     return task
 
 
-def test_exact_2021_curve_candidate_preserves_order_and_discloses_unproven_semantics(tmp_path):
+def test_2021_fixed_points_rejection_is_disclosed_and_blocks_before_transport(tmp_path):
     task = curve_task(tmp_path)
-    code, result = task.run('query-object', '--exact-id', CURVE, '--max-results', '1',
-        '--include', 'curve-points', '--detail')
+    packet_path = Path(__file__).parents[1] / 'fixtures/query-legacy-curve-points/native-rejection-2021.original.json'
+    raw = packet_path.read_bytes(); packet = json.loads(raw)
+    import hashlib
+    assert hashlib.sha256(raw).hexdigest() == 'f5f154606eab29977b856784fded6df949ae0f045c5d9406aab72184387f2513'
+    assert packet['ok'] is False and packet['waapi_error_uri'] == 'ak.wwise.query.invalid_query'
+    code, schema = task.run('query-schema', '--output', 'curve-points')
+    assert code == 0, schema
+    detail = schema['business_output']
+    assert detail['available'] is False and detail['supported_versions'] == list(VERSIONS[1:])
+    assert detail['native_accessor_rejection_proven'] is True and detail['native_absence_proven'] is False
+    boundary = detail['native_boundary']
+    assert boundary['scope'] == 'fixed object.get return accessor points on Curve; not all legacy Curve or RTPC reads'
+    assert boundary['observation']['native_error_uri'] == packet['waapi_error_uri']
+    assert boundary['observation']['native_error_details'] == packet['waapi_error_details']
+    assert boundary['observation']['packet_sha256'] == hashlib.sha256(raw).hexdigest()
+    assert boundary['observation']['original_verdict'] == 'FAIL'
+    assert boundary['observation']['build'] == '2021.1.14.8108'
+    assert boundary['source_delta']['2021']['named_points'] is False
+    assert boundary['source_delta']['2022']['named_points'] is True
+    assert detail['result_schema'] is None
+    code, result = task.run('query-object', '--exact-id', CURVE, '--include', 'curve-points')
+    assert code == 2 and result['error_code'] == 'GatewayInputError', result
+    assert 'Unknown accessor points' in result['message'] and not task.calls
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+def test_modern_exact_curve_points_preserve_native_order_and_values(tmp_path, version):
+    task = curve_task(tmp_path, version)
+    code, result = task.run('query-object', '--exact-id', CURVE, '--max-results', '1', '--include', 'curve-points')
     assert code == 0, result
     row, = result['agent_result']
     assert row['id'] == CURVE and row['curve_points'] == POINTS
     assert list(result)[-1] == 'agent_result'
-    value_reads = [(args, options) for uri, args, options in task.calls if uri.endswith('object.get')]
-    assert len(value_reads) == 1 and value_reads[0][0] == {'waql': f'from object "{CURVE}" take 1'}
-    assert value_reads[0][1]['return'][-2:] == ['points', 'classId']
-    code, schema = task.run('query-schema', '--output', 'curve-points')
-    assert code == 0, schema
-    detail = schema['business_output']
-    assert detail['native_semantics_proven'] is False and detail['native_absence_proven'] is False
-    assert detail['request_legality']['pointer'] == '/definitions/returnExpression/items/anyOf/1'
-    assert detail['typed_postcondition']['uri'] == 'ak.wwise.core.object.getAttenuationCurve'
-    assert detail['typed_postcondition']['semantic_equivalence_proven'] is False
-    assert detail['result_schema'] is None
+    reads = [(args, options) for uri, args, options in task.calls if uri.endswith('object.get')]
+    assert reads == [({'waql': f'from object "{CURVE}" take 1'}, {'return':['id','name','type','path','points']})]
 
 
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 @pytest.mark.parametrize('value', [None, 'missing'])
-def test_curve_candidate_preserves_missing_and_null_without_inventing_empty_points(tmp_path, value):
-    task = curve_task(tmp_path)
+def test_curve_candidate_preserves_missing_and_null_without_inventing_empty_points(tmp_path, value, version):
+    task = curve_task(tmp_path, version)
     if value == 'missing': task.row.pop('points')
     else: task.row['points'] = value
     code, result = task.run('query-object', '--exact-id', CURVE, '--include', 'curve-points')
@@ -52,7 +71,7 @@ def test_curve_candidate_preserves_missing_and_null_without_inventing_empty_poin
     else: assert row['curve_points'] is None
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', VERSIONS[1:])
 @pytest.mark.parametrize('fault', ['text', 'extra-field', 'missing-coordinate', 'boolean-coordinate', 'unknown-shape'])
 def test_root_points_require_ordered_typed_values_and_keep_original_packet(tmp_path, version, fault):
     task = curve_task(tmp_path, version)
@@ -70,30 +89,22 @@ def test_root_points_require_ordered_typed_values_and_keep_original_packet(tmp_p
     assert len(value_packets) == 1 and value_packets[0]['result']['return'][0]['points'] == task.row['points']
 
 
-@pytest.mark.parametrize('fault', ['class', 'boolean-class', 'type'])
-def test_2021_candidate_cannot_borrow_another_native_class(tmp_path, fault):
-    task = curve_task(tmp_path)
-    task.row['classId' if fault != 'type' else 'type'] = {'class': 65552, 'boolean-class': True, 'type': 'Sound'}[fault]
-    code, result = task.run('query-object', '--exact-id', CURVE, '--include', 'curve-points')
-    assert code == 2 and result['error_code'] == 'QUERY_CURVE_POINTS_SCOPE', result
-
-
 @pytest.mark.parametrize('source', [ ['--kind', 'all-sounds', '--max-results', '1'],
     ['--advanced-waql', 'from type Curve', '--max-results', '1'],
     ['--exact-id', CURVE, '--relationship', 'children', '--max-results', '1']])
-def test_2021_candidate_does_not_open_unreviewed_query_contexts(tmp_path, source):
+def test_2021_fixed_points_boundary_also_blocks_other_query_contexts(tmp_path, source):
     task = curve_task(tmp_path)
     code, result = task.run('query-object', *source, '--include', 'curve-points')
     assert code == 2 and result['error_code'] == 'GatewayInputError', result
     assert not task.calls
 
 
-def test_legacy_related_curve_scope_discloses_its_exact_root_alternative(tmp_path):
+def test_legacy_related_curve_scope_discloses_the_same_fixed_accessor_rejection(tmp_path):
     task = curve_task(tmp_path)
     code, result = task.run('query-schema')
     assert code == 0, result
     detail = result['related_outputs']['outputs']['curve-points']
     assert detail['available'] is False and detail['output_field'] == 'curve_points'
-    assert 'exact-ID root Curve' in detail['reason'] and 'unproven' in detail['reason']
+    assert 'Unknown accessor points' in detail['reason'] and 'other legacy Curve or RTPC reads are not excluded' in detail['reason']
     code, result = task.run('query-object', '--exact-id', CURVE, '--include-related', 'parent', 'curve-points')
     assert code == 2 and result['error_code'] == 'GatewayInputError' and not task.calls, result
