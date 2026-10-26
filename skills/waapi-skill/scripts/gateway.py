@@ -6026,7 +6026,7 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
             raise ValueError("query-object related declarations must be unique")
         args.query_related_requests = tuple(requests)
         args.query_related_version = version
-        args.query_related_has_lists = any(kind in {"list", "sequence"} for request in requests for kind, _ in request["hops"])
+        args.query_related_has_lists = any(kind in {"list", "sequence", "context"} for request in requests for kind, _ in request["hops"])
         args.query_related_preparation_required = any(request["option"] != "--include-related" or
             any(kind != "relation" for kind, _ in request["hops"]) for request in requests)
         if not args.query_related_has_lists:

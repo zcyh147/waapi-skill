@@ -14,6 +14,7 @@ from .versions import SUPPORTED_WWISE_VERSION_KEYS
 from .metadata_discovery import MAX_METADATA_DISCOVERY_QUERY_CHARS
 from .object_query_randomizer import RANDOMIZER_OUTPUTS, randomizer_contract
 from .object_query_functions import FIELD_STATUSES, curve_choices, function_contract
+from .object_query_contexts import CONTEXTS, context_spec, context_contract
 from .object_query_local_lists import LOCAL_LISTS, local_list_contract
 
 RELATED_QUERY_LIST_RELATIONS = {"children": "children", "descendants": "descendants", "ancestors": "ancestors", "references-to": "referencesTo"}
@@ -129,6 +130,13 @@ def parse_related_request(version: str, values: list[str], option: str) -> dict[
     hops, index = [], 0
     while index < len(tokens):
         name = tokens[index]
+        if name in CONTEXTS:
+            if name == 'state' and index + 1 >= len(tokens):
+                raise ValueError('state requires one closed original State selector and a terminal')
+            spec = context_spec(version, name, tokens[index + 1] if name == 'state' else None)
+            hops.append(('context', json.dumps(spec, separators=(',', ':'))))
+            index += 2 if name == 'state' else 1
+            continue
         if name in LOCAL_LISTS and version < LOCAL_LISTS[name]['first']:
             raise ValueError('This local List context lacks the matching source contract in this version; native absence is not established')
         if name == 'combine' or name in RELATED_QUERY_RELATIONS or name in RELATED_QUERY_LIST_RELATIONS:
@@ -341,6 +349,7 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
             "reference_kind_evidence": query_read_kind_contract(version),
             "randomizers": randomizer_contract(version),
             "functions": function_contract(version),
+            "object_contexts": context_contract(version),
             "local_object_lists": local_list_contract(version),
             "custom_terminal_modes": {option: {kind: {"native_prefix": prefix, "output_group": {"property": "properties", "reference": "references", "override_source_value": "override_source_values", "local_reference": "local_references"}[binding_kind]}
                 for kind, (binding_kind, prefix) in mode.bindings.items()} for option, mode in RELATED_FIELD_MODES.items()},
