@@ -54,6 +54,18 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
                 if uri == 'ak.wwise.console.project.create': self.active_file = self.created_file
                 self.calls.append((uri, deepcopy(args), deepcopy(options)))
                 if uri.startswith('ak.wwise.cli.'): self.terminal = True
+                if isinstance(fault, str) and fault.startswith('partial-'):
+                    self.created_file.unlink()
+                    events = self.created_file.parent / 'Events'; events.mkdir()
+                    (events / 'partial.wwu').write_bytes(b'partial native Work Unit bytes')
+                    (self.created_file.parent / 'Unfinished' / 'Empty').mkdir(parents=True)
+                    (self.created_file.parent / 'creation.log').write_bytes(b'partial creation log')
+                    if fault == 'partial-link':
+                        outside = tmp_path / 'outside-target.bin'; outside.write_bytes(b'outside target bytes')
+                        (events / 'unsafe.wwu').symlink_to(outside)
+                    if fault == 'partial-oversize':
+                        with (events / 'oversized.bin').open('wb') as stream: stream.truncate(8 * 1024 * 1024 + 1)
+                    raise TimeoutError('Native outcome unknown with partial target subtree')
                 if fault == 'indeterminate-created': raise TimeoutError('Native outcome unknown after creating owned output')
                 return {'result': 0} if uri.startswith('ak.wwise.cli.') else {}
             if uri == 'ak.wwise.console.project.close':
@@ -422,3 +434,41 @@ def test_creation_failure_retains_exact_requested_output_before_verification_and
     target = next(i for i, (uri, _, _) in enumerate(client.calls) if uri == create_uri)
     if fault == 'indeterminate-created':
         assert all(uri == 'ak.wwise.core.getInfo' for uri, _, _ in client.calls[target + 1:])
+
+
+@pytest.mark.parametrize('fault', ['partial-no-project', 'partial-link', 'partial-oversize'])
+def test_partial_creation_retains_bounded_owned_subtree_without_a_project_file(tmp_path, monkeypatch, fault):
+    import hashlib
+    workflow, runtime, client, proof = _collector_runtime(tmp_path, monkeypatch, 'cli-create', fault=fault)
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(tmp_path / 'category.jsonl'))
+    with pytest.raises(AssertionError) as failure:
+        workflow.test_console_project_cli_create_acceptance(runtime)
+    receipt = json.loads((runtime.state_dir / 'console184-cli-create.json').read_text())
+    capture = receipt['created_output']['target_tree']
+    manifest_path = Path(capture['manifest_path'])
+    manifest = json.loads(manifest_path.read_text())
+    assert hashlib.sha256(manifest_path.read_bytes()).hexdigest() == capture['manifest_sha256']
+    assert receipt['complete'] is False and not client.created_file.exists()
+    assert receipt.get('created_fixture') is None
+    if fault == 'partial-no-project':
+        assert capture['complete'] is True and capture['file_count'] == 2
+        expected = {'Events/partial.wwu': b'partial native Work Unit bytes', 'creation.log': b'partial creation log'}
+        assert {row['path'] for row in manifest['files']} == set(expected)
+        assert manifest['directories'] == ['Events', 'Unfinished', 'Unfinished/Empty']
+        assert (manifest_path.parent / 'target/Unfinished/Empty').is_dir()
+        for row in manifest['files']:
+            image = manifest_path.parent / row['artifact_path']
+            assert image.read_bytes() == expected[row['path']]
+            assert row['sha256'] == hashlib.sha256(expected[row['path']]).hexdigest()
+    else:
+        assert capture['complete'] is False
+        assert manifest['errors'][0]['code'] == ('SYMLINK_NOT_ALLOWED' if fault == 'partial-link' else 'LIMIT_EXCEEDED')
+        assert manifest['files'] == []
+        if fault == 'partial-link': assert (tmp_path / 'outside-target.bin').read_bytes() == b'outside target bytes'
+    final = _finalize(tmp_path, monkeypatch, workflow, runtime, proof, failure=failure.value,
+        node='test_console_project_cli_create_acceptance')
+    assert final['transactions'][0]['state'] == 'indeterminate'
+    assert not client.created_file.parent.exists() and manifest_path.is_file()
+    assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.cli.createNewProject']) == 1
+    target = next(i for i, (uri, _, _) in enumerate(client.calls) if uri == 'ak.wwise.cli.createNewProject')
+    assert all(uri == 'ak.wwise.core.getInfo' for uri, _, _ in client.calls[target + 1:])

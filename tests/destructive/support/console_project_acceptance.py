@@ -2,16 +2,17 @@
 from __future__ import annotations
 
 import gzip
+import base64
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import xml.etree.ElementTree as ET
 
 from wwise_waapi.console_media_ids import compact_records, mapping_records, work_unit_records, project_storage_mode, project_storage_observation
 from wwise_waapi.console_project_operations import _read_xml_artifact, _project_model_paths
-from wwise_waapi.operation_soundbank import capture_artifact_tree, capture_file_proof
+from wwise_waapi.operation_soundbank import capture_artifact_tree, capture_file_proof, prove_artifact_path
 from wwise_waapi.transactions import TransactionStore
 from tests.destructive.support.console_file_observation import observe_console_file, ConsoleModelImageIndex
 
@@ -214,6 +215,90 @@ def retain_model(project, root, phase):
     return link
 
 
+def retain_created_target_tree(project, root, owned_root, link):
+    """Retain only the requested creation subtree, including non-project files."""
+    from wwise_waapi.filesystem_security import metadata_is_link_or_reparse
+    limits = dict(max_files=512, max_entries=16384, max_total_bytes=32 * 1024 * 1024,
+        max_file_bytes=8 * 1024 * 1024, max_depth=64)
+    body = {'contract': 'waapi-skill.created-target-tree/v1', 'target': str(project.parent),
+        'requested_project': str(project), 'complete': False, 'files': [], 'directories': [],
+        'errors': [], 'limits': {**limits, 'manifest_bytes': 2 * 1024 * 1024}}
+    manifest = root / 'target-tree.json'
+    destination = root / 'target'
+    def error(exc):
+        body['errors'].append({'code': getattr(exc, 'error_code', type(exc).__name__), 'message': str(exc)[:2048]})
+    try:
+        project.parent.relative_to(owned_root)
+        before = capture_artifact_tree(project.parent, io_root=owned_root, **limits)
+        body['source_before'] = before
+        if not before['exists']:
+            raise ValueError('Requested creation target directory is absent')
+        destination.mkdir(exist_ok=False)
+        # Snapshot helper owns file/link/byte limits. Preserve empty directories
+        # too, with a separately bounded no-follow walk before copying files.
+        pending, entries = [(project.parent, PurePosixPath(), 0)], 0
+        while pending:
+            directory, relative, depth = pending.pop()
+            if depth > limits['max_depth']:
+                raise ValueError('Creation target changed beyond its directory depth bound')
+            prove_artifact_path(directory, io_root=owned_root, field='created directory', must_exist=True, expect_directory=True)
+            with os.scandir(directory) as scan:
+                for entry in scan:
+                    entries += 1
+                    if entries > limits['max_entries']:
+                        raise ValueError('Creation target changed beyond its entry bound')
+                    if metadata_is_link_or_reparse(entry.stat(follow_symlinks=False)):
+                        raise ValueError('Creation target gained a linked or reparse entry')
+                    if entry.is_dir(follow_symlinks=False):
+                        child = relative / entry.name
+                        pending.append((Path(entry.path), child, depth + 1))
+                        target = destination.joinpath(*child.parts)
+                        prove_artifact_path(target, io_root=root, field='created directory image', must_exist=False, expect_directory=True)
+                        target.mkdir(exist_ok=False)
+                        body['directories'].append(child.as_posix())
+        for row in before['files']:
+            relative = PurePosixPath(row['path'])
+            if relative.is_absolute() or '..' in relative.parts:
+                raise ValueError('Creation inventory contains an unowned relative path')
+            path = project.parent.joinpath(*relative.parts)
+            observation = observe_console_file(path, io_root=project.parent)
+            raw = base64.b64decode(observation['content_base64'], validate=True)
+            proof = observation['file_proof']
+            if (proof['size'], proof['sha256']) != (row['size'], row['sha256']):
+                raise ValueError('Created file changed after its inventory')
+            target = destination.joinpath(*relative.parts)
+            prove_artifact_path(target, io_root=root, field='created file image', must_exist=False, expect_directory=False)
+            with target.open('xb') as stream:
+                stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+            copied = capture_file_proof(target, field='created file image', io_root=root, max_bytes=limits['max_file_bytes'])
+            if (copied['size'], copied['sha256']) != (row['size'], row['sha256']):
+                raise ValueError('Created file image differs from its observed bytes')
+            body['files'].append({**row, 'artifact_path': target.relative_to(root).as_posix(),
+                'file_proof': proof, 'artifact_proof': copied})
+        after = capture_artifact_tree(project.parent, io_root=owned_root, **limits)
+        body['source_after'] = after
+        if before != after:
+            raise ValueError('Created target changed during bounded capture')
+        body['directories'].sort()
+        body['complete'] = True
+    except Exception as exc:
+        error(exc)
+    finally:
+        raw = json.dumps(body, ensure_ascii=False, sort_keys=True, indent=2).encode()
+        if len(raw) > body['limits']['manifest_bytes']:
+            body.update(complete=False, files=[], directories=[], inventory_omitted='manifest byte bound')
+            body.pop('source_before', None); body.pop('source_after', None)
+            error(ValueError('Creation target inventory exceeds manifest byte bound'))
+            raw = json.dumps(body, ensure_ascii=False, sort_keys=True, indent=2).encode()
+        assert len(raw) <= body['limits']['manifest_bytes']
+        with manifest.open('xb') as stream:
+            stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+        proof = capture_file_proof(manifest, field='created target manifest', io_root=root,
+            max_bytes=body['limits']['manifest_bytes'])
+        link.update(manifest_path=str(manifest), manifest_sha256=proof['sha256'], complete=body['complete'],
+            file_count=len(body['files']), total_bytes=sum(row['size'] for row in body['files']))
+
+
 def collect_console_project_acceptance(runtime, case):
     """One selected witness, captured through the existing public Gateway path."""
     from tests.destructive.test_gateway_workflow_transaction_matrix import (
@@ -253,6 +338,8 @@ def collect_console_project_acceptance(runtime, case):
         link = {'requested_project': str(project), 'api': api, 'transaction_id': transaction,
             'captured_before_verification': True}
         receipt['created_output'] = link
+        link['target_tree'] = {}
+        retain_created_target_tree(project, root, runtime.sandbox.sandbox_root, link['target_tree'])
         image = ConsoleModelImageIndex(root=root, project=project, phase='after', link=link)
         try:
             image.save(project, observe_console_file(project, io_root=project.parent))
@@ -418,7 +505,8 @@ def collect_console_project_acceptance(runtime, case):
             receipt['media_records_after'] = compact_records(after)
             receipt['model_after'] = retain_model(project, runtime.state_dir / 'console184-model-images', 'after')
         if case in {'cli-create', 'create-close'}:
-            assert receipt['created_output']['complete'] and not receipt.get('created_output_capture_error'), \
+            assert (receipt['created_output']['complete'] and receipt['created_output']['target_tree']['complete']
+                and not receipt.get('created_output_capture_error')), \
                 'Created project output was not completely retained before verification'
         receipt['complete'] = True; category['status'] = 'PASS'
     except Exception as exc:
