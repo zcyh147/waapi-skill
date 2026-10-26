@@ -37,6 +37,7 @@ from .audio_import_business_contracts import (
 )
 from .operation_import import (
     ImportContractError,
+    canonical_import_target,
     normalize_inline_audio_file,
     normalize_originals_subfolder,
 )
@@ -179,6 +180,43 @@ def materialize_audio_import_business_request(
     ).request
 
 
+def validate_audio_import_replacement_scope(
+    session: BusinessDeclarationSession,
+    compiled: CompiledBusinessPlan,
+    prepared: Mapping[str, Any],
+) -> None:
+    """Bind replace permission to declared existing targets, never new collisions.
+
+    The successful Draft check seals this exact prepared snapshot; Preview and
+    execution retain their existing digest and prewrite drift checks.
+    """
+
+    if compiled.request["arguments"].get("import_operation") != "replaceExisting":
+        return
+    targets = prepared.get("verification_plan", {}).get("targets", [])
+    by_path = {row["canonical_target_path"].casefold(): row for row in targets}
+    declarations = {f"import:{row.declaration_id}": row for row in session.declarations}
+    if len(by_path) != len(targets) or len(targets) != len(declarations):
+        raise _repair(session, "AUDIO_IMPORT_SCOPE_INVALID", field="targets",
+            action="prepare every declared import target exactly once")
+    for effect_id, expectation in zip(compiled.ordered_effect_ids, compiled.verifier_expectations, strict=True):
+        declaration = declarations[effect_id]
+        path = canonical_import_target(expectation["object_path"], version=session.context.wwise_version)["canonical_target_path"]
+        target = by_path.pop(path.casefold(), None)
+        if target is None:
+            raise _repair(session, "AUDIO_IMPORT_SCOPE_INVALID", field="targets",
+                action="prepare the exact declared import targets")
+        if isinstance(declaration.target, NewDescendantTarget):
+            if target.get("pre_state_rows") or target.get("preexisting_id") is not None:
+                raise _repair(session, "NEW_IMPORT_TARGET_EXISTS", field="target", path=path,
+                    action="keep the new target absent or bind it explicitly before requesting replacement")
+        else:
+            expected_id = session.handles.resolve_object(declaration.target.object_handle).object_id
+            if str(target.get("preexisting_id")).upper() != expected_id.upper():
+                raise _repair(session, "EXISTING_IMPORT_TARGET_CHANGED", field="target", path=path,
+                    action="bind the exact existing replacement target again before preparing a new Preview")
+
+
 def _normalize_settings(session: BusinessDeclarationSession) -> dict[str, Any]:
     unknown = sorted(set(session.settings) - _SETTING_FIELDS)
     if unknown:
@@ -259,8 +297,6 @@ def _resolve_mode(
         )
     assert isinstance(explicit_mode, str)
     if explicit_mode == "create" and forms != {"new"}:
-        raise _mode_target_mismatch(session, explicit_mode, forms)
-    if explicit_mode == "replace" and forms != {"existing"}:
         raise _mode_target_mismatch(session, explicit_mode, forms)
     return explicit_mode
 
@@ -797,4 +833,5 @@ def _type_token(value: str) -> str:
 __all__ = [
     "compile_audio_import_business",
     "materialize_audio_import_business_request",
+    "validate_audio_import_replacement_scope",
 ]

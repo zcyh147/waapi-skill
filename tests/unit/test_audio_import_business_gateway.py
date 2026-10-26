@@ -1641,9 +1641,9 @@ class ImportFieldsClient(BusinessCheckClient):
         raise AssertionError(f"Unexpected WAAPI call: {uri} {args!r} {options!r}")
 
 
-def _import_fields_draft(tmp_path: Path, version: str):
+def _import_fields_draft(tmp_path: Path, version: str, client: ImportFieldsClient | None = None):
     env = set_gateway_config(_env(tmp_path), wwise_version=version)
-    client = ImportFieldsClient(tmp_path, version)
+    client = client or ImportFieldsClient(tmp_path, version)
 
     def gateway(*argv: str):
         return waapi_gateway.execute_gateway(
@@ -1658,8 +1658,11 @@ def _import_fields_draft(tmp_path: Path, version: str):
 
     def command(name: str, *argv: str, expected_error: str | None = None):
         nonlocal revision
-        code, result = gateway(name, draft_id, "--task-authority", authority,
-            "--expected-revision", str(revision), *argv)
+        if name.startswith("draft-") or name == "preview-from-draft":
+            code, result = gateway(name, draft_id, "--task-authority", authority,
+                "--expected-revision", str(revision), *argv)
+        else:
+            code, result = gateway(name, *argv)
         if expected_error is not None:
             assert code == 2, result
             assert result["error_code"] == expected_error, result
@@ -1728,6 +1731,152 @@ def test_import_preview_transports_empty_notes_without_conflating_omission(
         else:
             assert field not in rows[0]
         assert rows[1][field] == row_note
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)
+
+
+class MixedReplaceClient(ImportFieldsClient):
+    OLD_ID = "{22222222-2222-2222-2222-222222222222}"
+    REPLACEMENT_ID = "{33333333-3333-3333-3333-333333333333}"
+    CREATED_ID = "{44444444-4444-4444-4444-444444444444}"
+    UNRELATED_ID = "{55555555-5555-5555-5555-555555555555}"
+
+    def __init__(self, tmp_path: Path, version: str) -> None:
+        super().__init__(tmp_path, version)
+        self.existing_path = self.parent["path"] + r"\Existing"
+        self.new_path = self.parent["path"] + r"\New"
+        self.objects = {
+            self.OLD_ID: self.sound(self.OLD_ID, self.existing_path),
+            self.UNRELATED_ID: self.sound(self.UNRELATED_ID, self.parent["path"] + r"\Unrelated"),
+        }
+        self.swap_on_existing_path_read = False
+
+    @staticmethod
+    def sound(object_id: str, path: str) -> dict[str, Any]:
+        return {"id": object_id, "name": path.rsplit("\\", 1)[-1], "type": "Sound", "classId": 65552,
+            "path": path, "notes": "", "@IsVoice": False}
+
+    def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        if uri == "ak.wwise.core.object.get" and "from" in args:
+            self.calls.append((uri, args, options))
+            source = args["from"]
+            if self.swap_on_existing_path_read and source.get("path") == [self.existing_path]:
+                self.swap_on_existing_path_read = False
+                self.objects[self.REPLACEMENT_ID] = {**self.objects.pop(self.OLD_ID), "id": self.REPLACEMENT_ID}
+            rows = [self.parent, *self.objects.values()]
+            matches = [row for row in rows if row["id"] in source.get("id", []) or row["path"] in source.get("path", [])]
+            return {"return": [{key: value for key, value in row.items() if key in options.get("return", [])} for row in matches]}
+        if uri == "ak.wwise.core.audio.import":
+            self.calls.append((uri, args, options))
+            assert args["importOperation"] == "replaceExisting"
+            self.objects.pop(self.OLD_ID)
+            result_rows, files = [], []
+            for index, (object_id, path) in enumerate(((self.REPLACEMENT_ID, self.existing_path), (self.CREATED_ID, self.new_path))):
+                source_file = Path(args["imports"][index]["audioFile"])
+                copied = _project_path(self.tmp_path).parent / "Originals/SFX" / source_file.name
+                copied.parent.mkdir(parents=True, exist_ok=True)
+                copied.write_bytes(source_file.read_bytes())
+                source_id = "{66666666-6666-6666-6666-66666666666" + str(index) + "}"
+                language = {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "SFX"}
+                sound = {**self.sound(object_id, path), "activeSource": {"id": source_id},
+                    "sound:originalWavFilePath": str(copied), "originalFilePath": str(copied), "audioSource:language": language}
+                source = {"id": source_id, "name": source_file.stem, "type": "AudioFileSource", "classId": 16,
+                    "path": path + "\\" + source_file.stem, "notes": "", "parent": {"id": object_id},
+                    "originalFilePath": str(copied), "audioSource:language": language}
+                self.objects.update({object_id: sound, source_id: source})
+                result_rows.extend({key: row[key] for key in options["return"] if key in row} for row in (sound, source))
+                files.append(str(copied))
+            result = {"objects": result_rows}
+            if self.version in {"2023.1", "2024.1", "2025.1"}:
+                result.update(log=[], files=files)
+            return result
+        return super().call(uri, args, options)
+
+
+def _mixed_replace_draft(tmp_path: Path, version: str):
+    client = MixedReplaceClient(tmp_path, version)
+    command, parent, client = _import_fields_draft(tmp_path, version, client)
+    bound = command("draft-bind-object", "--object-id", client.OLD_ID)
+    command("draft-business-configure", "--mode", "replace")
+    for name in ("existing", "new"):
+        (tmp_path / f"{name}.wav").write_bytes(b"RIFF-owned-" + name.encode())
+    command("draft-declare-existing", "--declaration-id", "replace", "--object-handle", bound["bound_object"]["handle"],
+        "--field", "media_file", str(tmp_path / "existing.wav"))
+    command("draft-declare-new", "--declaration-id", "create", "--parent-handle", parent,
+        "--name", "New", "--kind", "sound-sfx", "--field", "media_file", str(tmp_path / "new.wav"))
+    return command, client
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_mixed_replace_import_public_transaction_replaces_and_creates_exact_targets(tmp_path: Path, version: str) -> None:
+    command, client = _mixed_replace_draft(tmp_path, version)
+    unrelated = dict(client.objects[client.UNRELATED_ID])
+    command("draft-check")
+    preview = command("preview-from-draft")
+    assert preview["state"] == "awaiting_confirmation"
+    request = preview["agent_result"]["request"]
+    assert request["arguments"]["import_operation"] == "replaceExisting"
+    assert len(request["arguments"]["imports"]) == 2
+    transaction_id = preview["transaction_id"]
+    shown = command(*preview["next_command"]["gateway_argv"])
+    command(*shown["next_command"]["gateway_argv"])
+    executed = command("execute", transaction_id)
+    assert executed["state"] == "executed_unverified"
+    verified = command("verify", transaction_id)
+    assert verified["state"] == "verified", verified
+    assert client.OLD_ID not in client.objects
+    assert client.objects[client.REPLACEMENT_ID]["path"] == client.existing_path
+    assert client.objects[client.CREATED_ID]["path"] == client.new_path
+    assert client.objects[client.UNRELATED_ID] == unrelated
+    for name in ("existing", "new"):
+        assert (tmp_path / f"{name}.wav").read_bytes() == b"RIFF-owned-" + name.encode()
+        copied = _project_path(tmp_path).parent / "Originals/SFX" / f"{name}.wav"
+        assert copied.read_bytes() == (tmp_path / f"{name}.wav").read_bytes()
+    assert sum(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_mixed_replace_import_does_not_authorize_replacing_declared_new_collision(tmp_path: Path, version: str) -> None:
+    command, client = _mixed_replace_draft(tmp_path, version)
+    client.objects[client.CREATED_ID] = client.sound(client.CREATED_ID, client.new_path)
+    record = next((tmp_path / "state/operation-drafts-v1/records").glob("*.json"))
+    before = record.read_bytes()
+    command("draft-check", expected_error="NEW_IMPORT_TARGET_EXISTS")
+    assert record.read_bytes() == before
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_mixed_replace_import_keeps_exact_bound_guid_during_preparation(tmp_path: Path, version: str) -> None:
+    command, client = _mixed_replace_draft(tmp_path, version)
+    client.swap_on_existing_path_read = True
+    record = next((tmp_path / "state/operation-drafts-v1/records").glob("*.json"))
+    before = record.read_bytes()
+    command("draft-check", expected_error="EXISTING_IMPORT_TARGET_CHANGED")
+    assert record.read_bytes() == before
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("change", ("collision_before_preview", "collision_before_execute", "media_before_execute"))
+def test_mixed_replace_import_rejects_scope_and_media_drift_before_dispatch(tmp_path: Path, version: str, change: str) -> None:
+    command, client = _mixed_replace_draft(tmp_path, version)
+    command("draft-check")
+    if change == "collision_before_preview":
+        record = next((tmp_path / "state/operation-drafts-v1/records").glob("*.json"))
+        before = record.read_bytes()
+        client.objects[client.CREATED_ID] = client.sound(client.CREATED_ID, client.new_path)
+        command("preview-from-draft", expected_error="OPERATION_DRAFT_BINDING_DRIFT")
+        assert record.read_bytes() == before
+    else:
+        preview = command("preview-from-draft")
+        shown = command(*preview["next_command"]["gateway_argv"])
+        command(*shown["next_command"]["gateway_argv"])
+        if change == "collision_before_execute":
+            client.objects[client.CREATED_ID] = client.sound(client.CREATED_ID, client.new_path)
+        else:
+            (tmp_path / "new.wav").write_bytes(b"changed after Preview")
+        rejected = command("execute", preview["transaction_id"], expected_error="ROLE_GUARD_MISMATCH")
+        assert rejected["state"] == "repreview_required"
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)
 
 

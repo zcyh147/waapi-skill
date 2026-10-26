@@ -17732,6 +17732,12 @@ def dispatch_operation_draft_check(
         checked_artifact.get("prepared_operation"),
         "checked prepared operation",
     )
+    if business_operation == "audio.import" and compiled_business is not None:
+        from wwise_waapi.audio_import_business import validate_audio_import_replacement_scope
+        try:
+            validate_audio_import_replacement_scope(business_session, compiled_business, prepared)
+        except BusinessDeclarationError as exc:
+            raise repair_at_draft_revision(exc, draft_revision=materialized.record.revision) from exc
     runtime_guard = require_mapping(
         checked_artifact.get("runtime_guard"),
         "checked runtime guard",
