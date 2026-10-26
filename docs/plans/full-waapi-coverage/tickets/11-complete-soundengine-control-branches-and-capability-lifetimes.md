@@ -1,6 +1,6 @@
 # 11: Complete SoundEngine control branches and capability lifetimes
 
-Status: approved for implementation on 2026-10-17. Published as [11: Complete SoundEngine control branches and capability lifetimes](https://github.com/zcyh147/waapi-skill/issues/185).
+Status: functional scope accepted on 2026-10-27; [GitHub #185](https://github.com/zcyh147/waapi-skill/issues/185). Final combined gates remain #195.
 
 ## Parent
 
@@ -10,25 +10,84 @@ Status: approved for implementation on 2026-10-17. Published as [11: Complete So
 
 Users can perform every in-scope reflected runtime control through meaningful business inputs, with valid game-object and playing-resource lifetimes.
 
+## Current acceptance method — user-approved 2026-10-26
+
+Keep complete legitimate parameter/option support and native-to-public mapping against the five pinned definitions. Aim for one or two representative public cases per meaningful parameter branch or shared mechanism; remaining legal values stay selectable. Mapping leaves, enum values, optional-field permutations and collection sizes are not separate execution-receipt or evidence-ID quotas. Simple APIs use an ordinary happy path and relevant retained proof. Select native work for actual business risk, independent behavior and host/version differences, reusing valid matching observations.
+
+Representative registration/play/control/stop/release flows and materially different global/object/playing scopes; verify available state/effects and shared stale-capability/cleanup boundaries.
+
+CRUD, queries and compound changes retain appropriate identity, policy, execute-once, outcome and cleanup checks. A known Wwise defect or native absence is recorded as an explicit source-supported boundary, not Wwise repair/QA work. Unsupported normal-user functionality remains assigned. This method supersedes stronger proof quotas in earlier execution notes without rewriting their original results. #194 owns Fresh with current budget zero; #195 coordinates required stable-candidate full Program/Non-live gates, not per-ticket sweeps.
+
 ## Acceptance criteria
 
-- [ ] Map the SoundEngine contract set by URI, version, enum/union meaning and required runtime identity; include registered game objects, playback/event actions, listener/spatial controls, runtime values and other assigned controls.
-- [ ] Fill missing permitted scalar, optional, nested and collection inputs without exposing numeric wire guesses, raw requests or unbound runtime IDs.
-- [ ] Bind, revoke and revalidate capabilities according to the actual resource lifetime and host; distinguish global scope, object scope and playing scope where native semantics differ.
-- [ ] Prove native state/effects with available independent observations; disclose a genuinely native observation limitation without presenting schema-only success as business verification.
-- [ ] Cover wrong/stale/revoked capabilities, missing runtime prerequisites, incompatible modes, partial results and resource cleanup. Split an oversized exact URI batch into same-parent children before implementation; none may leave scope.
-- [ ] Account explicitly for Wwise 2021.1, 2022.1, 2023.1, 2024.1 and 2025.1, with exact host/build provenance and applicable native shapes. A current packaged boundary is not proof of native absence.
-- [ ] Maintain exact owned branch IDs, public input/routing, construction, result/verification alternatives and required evidence, including reachable shared definitions and newly discovered variants. In-scope omissions must be implemented here or split into linked same-parent implementation children; they never leave the overall scope.
-- [ ] Verify the highest existing public Gateway seam with positive and meaningful negative controls. Use sequential owned native tests where behavior needs native proof; preserve source projects and original evidence. No Fresh run is authorized until a separate exact budget is approved.
-- [ ] Preserve Gateway-owned request construction, configuration binding, the three modification policies, immutable Preview, execute-once semantics and truthful uncertainty. Do not add a raw-input escape or weaken safety to claim coverage.
-
-## Blocked by
-
-- [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
+- [x] Map the SoundEngine contract set by URI, version, enum/union meaning and required runtime identity; include registered game objects, playback/event actions, listener/spatial controls, runtime values and other assigned controls.
+- [x] Fill missing permitted scalar, optional, nested and collection inputs without exposing numeric wire guesses, raw requests or unbound runtime IDs.
+- [x] Bind, revoke and revalidate capabilities according to the actual resource lifetime and host; distinguish global scope, object scope and playing scope where native semantics differ.
+- [x] Prove native state/effects with available independent observations; disclose a genuinely native observation limitation without presenting schema-only success as business verification.
+- [x] Cover wrong/stale/revoked capabilities, missing runtime prerequisites, incompatible modes, partial results and resource cleanup. Split an oversized exact URI batch into same-parent children before implementation; none may leave scope.
+- [x] Account explicitly for Wwise 2021.1, 2022.1, 2023.1, 2024.1 and 2025.1, with exact host/build provenance and applicable native shapes. A current packaged boundary is not proof of native absence.
+- [x] Maintain exact owned native-to-public branch/field/option mappings, including reachable shared definitions and newly discovered variants. Map them to the selected representative mechanism tests and required business proof; do not demand a separate execution or evidence receipt per reflected leaf. In-scope omissions must be implemented here or split into linked same-parent implementation children; they never leave the overall scope.
+- [x] Verify the highest existing public Gateway seam with positive and meaningful negative controls. Use sequential owned native tests where behavior needs native proof; preserve source projects and original evidence. No Fresh run is authorized until a separate exact budget is approved.
+- [x] Preserve Gateway-owned request construction, configuration binding, the three modification policies, immutable Preview, execute-once semantics and truthful uncertainty. Do not add a raw-input escape or weaken safety to claim coverage.
 
 ## Completion boundary
 
-Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+Complete the owned functional scope and selected evidence required by the current user-approved representative testing policy. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+
+## Approved prerequisite and batch delivery — 2026-10-25
+
+Blocked by #197. Batch: **C: runtime/event**. Preserve this ticket's implementation scope, applicable 2021.1–2025.1 mappings and native distinctions; apply the current user-approved representative evidence method above. Use the shared prerequisite's deduplicated batch selection, independent outcomes, failed/affected reruns and durable result summaries. Reuse valid original results after relevant dependency review; a commit-number or unrelated documentation change does not require another native run.
+
+Functional tickets use Python tests and proportional real-Wwise validation. Fresh is centralized in #194 with a separately approved exact budget; #195 aggregates those results rather than scheduling a duplicate Fresh campaign. Necessary final combined Program/Nonlive gates are coordinated under #195 rather than repeated per functional ticket.
+
+The required post-#197 report was completed and the user explicitly resumed downstream work; this historical pause is satisfied.
+
+
+## Functional closeout — 2026-10-27
+
+Closed wrapping covers all **26 owned URIs / 124 reflected version rows** across
+2021.1–2025.1. These are structural counts, not native-effect counts. A current
+scope audit and independent closeout review found the required public contracts,
+version mappings, lifetime controls and available observer paths implemented.
+No additional runtime change or new test run was needed for this reconciliation.
+
+| Shared mechanism | All owned `ak.soundengine.*` routes | Acceptance basis |
+| --- | --- | --- |
+| Registration | registerGameObj, unregisterGameObj | Closed handles/generation/retirement controls and accepted registration/release workflow. |
+| Playback | postEvent, executeActionOnEvent, seekOnEvent, stopAll, stopPlayingID | Closed Event/playing scopes and action/fade/seek choices; accepted post/seek/stop/release effects, with per-enum native repetition unnecessary. |
+| State/Switch | setState, setSwitch, getState, getSwitch | Bound identities and bounded getters; accepted exact State/Switch GUID readback where supported. |
+| Values/trigger | setRTPCValue, resetRTPCValue, postTrigger | Complete business-field mapping and global/object/default scope controls; representative shared dispatch mechanism, not a separate native-effect claim for every route. |
+| Listener/spatial | setDefaultListeners, setListeners, setPosition, setMultiplePositions, setObjectObstructionAndOcclusion, setScalingFactor, setGameObjectOutputBusVolume, setListenerSpatialization, setGameObjectAuxSendValues | Closed clear/list/position/gain/layout/offset inputs and meaningful negatives; accepted representative listener/spatial workflow. No acoustic or per-channel QA claim. |
+| Banks | loadBank, unloadBank | Bound bank identity, versioned construction and public lifecycle controls; no invented distinct native bank-effect receipt. |
+| Monitor | postMsgMonitor | Bounded message/severity and accepted dispatch; observer receipt remains explicitly unproved. |
+
+Current controls in `tests/unit/test_soundengine_business_gateway.py` cover
+registry/catalog equality, legitimate field construction, stale/reused/retired
+handles, pending publication, conflicting scopes, journal/storage failure,
+cleanup and independent State/Switch readback failures. Opaque capabilities
+attest Gateway control authority, not continuing native resource liveness.
+
+Accepted representative evidence is reused from
+[#88](https://github.com/zcyh147/waapi-skill/issues/88#issuecomment-5465036074)
+and [#59](https://github.com/zcyh147/waapi-skill/issues/59#issuecomment-5470272661).
+The original `ea36a60` Authoring test was checked for its actual registration,
+post/seek/stop/release, spatial/listener and exact State/Switch observations on
+2022.1/2025.1 and both hosts. This does not claim current-candidate native reruns,
+all-26 independently observed effects or a new Fresh campaign.
+
+Retain the disclosed 2021 State/Switch observation and newer omitted-object
+Switch-equivalence limits. They do not prohibit the mapped setter inputs and
+are not asserted native absence. The original named raw ledgers are unavailable
+in the current local archive; this closeout reuses accepted historical records
+without claiming a new transaction-hash revalidation or raw-evidence publication.
+#195 owns any required archive/global-inventory reconciliation and final combined
+gates. #194 retains separately budgeted Fresh work; its current budget is zero.
+No new scope exception, deferred implementation or native QA quota is introduced.
+
+## Retained source and implementation history
+
+The dated record below is preserved unchanged. Its original results remain scoped; the current acceptance method and functional closeout above supersede historical proof quotas, not the recorded facts.
 
 ## Pinned-source findings from the 2026-10-18 implementation batch
 
