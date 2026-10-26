@@ -5718,10 +5718,19 @@ def test_compound_render_history_collector_keeps_native_metadata_and_complete_re
 
 
 @pytest.mark.parametrize('disposition', ['retained', 'absent-empty', 'absent-error',
-    'missing-result', 'ambiguous-result', 'unrelated-error', 'changed-curve'])
+    'missing-result', 'ambiguous-result', 'unrelated-error', 'changed-curve',
+    'native-packet', 'native-packet-wrong-guid', 'native-packet-wrong-version', 'native-packet-wrong-error'])
 def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path, workflow, monkeypatch, disposition):
     from copy import deepcopy
     runtime, commands, writes, task = _rtpc_graph_runtime(tmp_path / 'collector', workflow, '2022.1')
+    packet_case = disposition.startswith('native-packet')
+    recorded = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/owned-control-input-2022-disposition-absence.json').read_text())
+    native_call = recorded['recorded_call']
+    native_id = native_call['argv'][2]
+    if packet_case:
+        config = Path(task.env['WAAPI_SKILL_CONFIG_PATH'])
+        values = json.loads(config.read_text()); values['waapi_port'] = native_call['payload']['endpoint']['port']
+        config.write_text(json.dumps(values))  # Isolated fake-runtime configuration only.
     original, old_id = task.call, None
     def call(uri, args=None, options=None):
         nonlocal old_id
@@ -5732,7 +5741,7 @@ def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path,
             row = task.objects[args['object']]
             old_id = row['@ControlInput']['id']
             row['@ControlInput'] = {'id': args['value']}
-            if disposition.startswith('absent'):
+            if disposition.startswith('absent') or packet_case:
                 del task.objects[old_id]
             if disposition == 'changed-curve':
                 task.objects[row['@Curve']['id']]['points'][0]['y'] += 1
@@ -5742,20 +5751,44 @@ def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path,
             from tests.unit.test_waapi_gateway import WaapiRequestFailed
             raise WaapiRequestFailed('ak.wwise.query.invalid_query', {'details': {'procedureUri': uri},
                 'message': args['waql'] + (' - Object not found' if disposition == 'absent-error' else ' - Unsupported projection')})
-        return original(uri, args, options)
+        result = original(uri, args, options)
+        if packet_case and uri.endswith('object.set'):
+            # Reuse the actual packet's GUID in the fake constructor outcome;
+            # the retained public error packet's values remain exact.
+            for identity, row in list(task.objects.items()):
+                if row['type'] == 'ModulatorTime' and identity != native_id:
+                    task.objects.pop(identity); row['id'] = native_id; task.objects[native_id] = row
+                    task.objects[row['owner']['id']]['@ControlInput'] = {'id': native_id}
+                    def replace(value):
+                        if isinstance(value, dict):
+                            for key, item in value.items():
+                                if key == 'id' and item == identity: value[key] = native_id
+                                else: replace(item)
+                        elif isinstance(value, list):
+                            for item in value: replace(item)
+                    replace(result)
+        return result
     task.call = call
     original_raw = runtime.raw_gateway
     def raw(command):
         code, payload = original_raw(command)
         if old_id and command[:3] == ['query-object', '--exact-id', old_id] and '--detail' in command:
             payload = deepcopy(payload)
+            if packet_case:
+                assert old_id == native_id and command == native_call['argv']
+                code, payload = native_call['exit_code'], deepcopy(native_call['payload'])
+                if disposition == 'native-packet-wrong-guid':
+                    payload['semantic_preview']['envelope']['args']['waql'] = 'from object "{11111111-1111-1111-1111-111111111111}" take 2'
+                elif disposition == 'native-packet-wrong-version': payload['detected_version'] = '2025.1'
+                elif disposition == 'native-packet-wrong-error':
+                    payload['call']['waapi_error_details']['message'] = 'Unsupported projection'
             if disposition == 'missing-result': payload.pop('objects')
             elif disposition == 'ambiguous-result':
                 payload['objects'] *= 2
                 payload['count'] = 2
         return code, payload
     runtime.raw_gateway = raw
-    failed = disposition in {'missing-result', 'ambiguous-result', 'unrelated-error', 'changed-curve'}
+    failed = disposition in {'missing-result', 'ambiguous-result', 'unrelated-error', 'changed-curve'} or disposition.startswith('native-packet-wrong-')
     if failed:
         with pytest.raises(AssertionError):
             workflow._collect_owned_control_input_disposition(runtime, name='WAAPI_RTPC_TEST')
@@ -5764,12 +5797,16 @@ def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path,
         category = workflow._collect_owned_control_input_disposition(runtime, name='WAAPI_RTPC_TEST')
     receipt = json.loads(Path(category['observation_path']).read_text())
     assert category['status'] == ('FAIL' if failed else 'PASS') and receipt['complete'] is not failed
-    state = 'unobserved' if failed else 'absent' if disposition.startswith('absent') else 'retained'
+    state = 'unobserved' if failed else 'absent' if disposition.startswith('absent') or packet_case else 'retained'
     assert receipt['old_input_disposition']['state'] == state
     if failed: assert receipt['failure']['type'] == 'AssertionError'
     if disposition == 'changed-curve':
         assert receipt['after']['curve']['curve_points'] != receipt['before']['members'][0]['curve']['curve_points']
-    if disposition == 'absent-error': assert receipt['absence_normalization']['source'] == 'ak.wwise.query.invalid_query:object-not-found'
+    if disposition in {'absent-error', 'native-packet'}:
+        assert receipt['absence_normalization']['source'] == 'ak.wwise.query.invalid_query:object-not-found'
+    if disposition == 'native-packet':
+        assert receipt['calls'][-1] == native_call
+        assert receipt['absence_normalization']['original']['waapi_error_details'] == native_call['payload']['call']['waapi_error_details']
     assert receipt['owned_to_owned_acceptance'] is False
     assert receipt['observational_scope'] == 'owned_ControlInput_displaced_by_verified_shared_target_only'
     assert len(writes) == 4 and [cmd[0] for cmd in commands].count('execute') == 4
@@ -5790,4 +5827,55 @@ def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path,
     assert retained['observation_sha256'] == category['observation_sha256']
     assert retained['status'] == ('FAIL' if failed else 'PASS')  # Program fake finalization only.
     assert json.loads(Path(retained['observation_path']).read_text())['old_input_disposition']['state'] == state
+    assert events.index('shutdown') < events.index('release')
+
+
+@pytest.mark.parametrize('fault', [None, 'retained-old', 'missing-old-observation'])
+def test_owned_to_new_owned_collector_reaches_current_final_writer(tmp_path, workflow, monkeypatch, fault):
+    runtime, commands, writes, task = _rtpc_graph_runtime(tmp_path / 'collector', workflow, '2022.1')
+    original, removed = task.call, None
+    def call(uri, args=None, options=None):
+        nonlocal removed
+        if removed and uri.endswith('object.get') and args.get('from', {}).get('id') == [removed] and fault == 'missing-old-observation':
+            return {}
+        old = None
+        if uri.endswith('object.set') and len(writes) == 2:
+            node, = args['objects']
+            old = task.objects[node['object']]['@ControlInput']['id']
+        result = original(uri, args, options)
+        if old:
+            rtpc = args['objects'][0]['object']
+            task.objects[rtpc]['path'] = r'\reference-derived-fresh-RTPC'
+            task.objects[task.objects[rtpc]['@Curve']['id']]['path'] = r'\reference-derived-fresh-RTPC\<Unnamed Curve>'
+            if fault != 'retained-old': task.objects.pop(old); removed = old
+        return result
+    task.call = call
+    if fault:
+        with pytest.raises(AssertionError):
+            workflow._collect_owned_control_input_disposition(runtime, name='WAAPI_RTPC_TEST', replace_with_owned=True)
+        category = next(row for row in runtime.category_results if row['category'] == 'owned-control-input-replacement-acceptance')
+    else:
+        category = workflow._collect_owned_control_input_disposition(runtime, name='WAAPI_RTPC_TEST', replace_with_owned=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == ('FAIL' if fault else 'PASS') and receipt['owned_to_owned_acceptance'] is (fault is None)
+    assert receipt['old_input_disposition']['state'] == ('unobserved' if fault else 'absent')
+    assert len(writes) == 3 and [cmd[0] for cmd in commands].count('execute') == 3
+    assert len(receipt['transactions']) == 1
+    if not fault: assert receipt['transactions'][0]['artifact_unchanged'] is True
+    else: assert receipt['transactions'][0]['verify']['exit_code'] == 2
+    assert not any(row['type'] == 'GameParameter' for row in task.objects.values())
+    (tmp_path / 'lifecycle').mkdir()
+    fixture, events, _records = _fixture_run(tmp_path / 'lifecycle', workflow, monkeypatch)
+    from tests.destructive.support import category_evidence
+    target = tmp_path / 'category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    monkeypatch.setattr(exact_real_evidence, 'append_category_evidence', category_evidence.append_category_evidence)
+    fixture_runtime = next(fixture)
+    fixture_runtime.category_results.extend(runtime.category_results)
+    with pytest.raises(StopIteration): next(fixture)
+    final = json.loads(target.read_text().splitlines()[-1])
+    retained, = [row for row in final['categories'] if row['category'] == 'owned-control-input-replacement-acceptance']
+    assert final['invocation']['phase'] == 'final' and retained['status'] == ('FAIL' if fault else 'PASS')
+    assert retained['observation_sha256'] == category['observation_sha256']
+    assert json.loads(Path(retained['observation_path']).read_text())['owned_to_owned_acceptance'] is (fault is None)
     assert events.index('shutdown') < events.index('release')
