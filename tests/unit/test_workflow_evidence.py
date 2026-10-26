@@ -341,6 +341,11 @@ def test_owner_source_native_witnesses_reach_persisted_final_writer(tmp_path, mo
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind=witness_kind)
 
 
+@pytest.mark.parametrize("fault", ("missing-bus", "wrong-bus-parent"))
+def test_ordinary_owner_source_native_witness_rejects_invalid_selected_bus(tmp_path, monkeypatch, fault):
+    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="ordinary-owner-source")
+
+
 def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, fault, witness_kind):
     """Real public Gateway/collector/finalizer; only native Wwise is substituted."""
     import importlib
@@ -365,9 +370,25 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 "path": r"\Containers\Default Work Unit", "notes": "keep placement", "parent": None}
             self.objects = {PARENT_ID: self.parent}
             self.tab_count = self.import_count = 0
-            self.bus = {"id": "{B0B0B0B0-B0B0-B0B0-B0B0-B0B0B0B0B0B0}", "name": "Master Audio Bus", "type": "Bus", "classId": 524304,
-                "path": r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus", "notes": "keep bus", "parent": None}
-            self.objects[self.bus["id"]] = self.bus
+            self.bus_work_unit = {"id": "{A74EEB4A-0805-4AFA-969C-53DCB862B550}", "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+                "path": r"\Busses\Default Work Unit", "notes": "", "parent": None}
+            self.objects[self.bus_work_unit["id"]] = self.bus_work_unit
+            self.bus = {"id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}", "name": "Main Audio Bus", "type": "Bus", "classId": 524304,
+                "path": r"\Busses\Default Work Unit\Main Audio Bus", "notes": "keep bus", "parent": {"id": self.bus_work_unit["id"]}}
+            # The retained r2 public children reply and committed baseline
+            # contain all four Buses. Put the selected Main Bus last so taking
+            # the first valid Bus cannot pass this public-flow control.
+            for identity, name in (
+                ("{D2E0BC7E-7B3F-4FFE-A670-FAE02761B631}", "Secondary Bus"),
+                ("{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}", "WAAPI_V2_Weapons"),
+                ("{EF9E9851-4728-4F6C-9939-2C84CF0367A3}", "WAAPI_V2_Footsteps"),
+            ):
+                self.objects[identity] = {**self.bus, "id": identity, "name": name,
+                    "path": "\\Busses\\Default Work Unit\\" + name}
+            if fault != "missing-bus":
+                self.objects[self.bus["id"]] = self.bus
+            if fault == "wrong-bus-parent":
+                self.bus["parent"] = {"id": PARENT_ID}
         def projected(self, rows, options):
             result = []
             for raw in rows:
@@ -402,7 +423,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 if "@" + name in row:
                     owner["@" + name] = {"id": row["@" + name]} if name == "OutputBus" else row["@" + name]
             if owner["type"] == "Sound":
-                owner.setdefault("@Volume", 0.0); owner.setdefault("@OutputBus", None)
+                owner.setdefault("@Volume", 0.0); owner.setdefault("@OutputBus", None); owner.setdefault("@OverrideOutput", False)
             if "notes" in row and not explicit_source and "audioFile" not in row and "audioFileBase64" not in row:
                 owner["notes"] = row["notes"]
             returned = [owner]
@@ -416,7 +437,8 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                     and item["type"] == "AudioFileSource" and item["name"] == source_name
                     and item["audioSource:language"]["name"] == language), None)
                 copied = tmp_path / "project/Originals" / ("SFX" if language == "SFX" else "Voices/" + language)
-                copied = copied / row.get("originalsSubFolder", "") / media.name
+                copied = (copied / row.get("originalsSubFolder", "") / media.name if "audioFile" in row
+                    else tmp_path / "project/Originals" / media)
                 copied.parent.mkdir(parents=True, exist_ok=True); copied.write_bytes(data)
                 if source is None:
                     source = {"id": "{" + str(uuid.uuid4()).upper() + "}", "name": source_name,
@@ -439,12 +461,16 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
             if uri.endswith("getTypes"):
                 return {"return": [{"classId": n, "name": name, "type": "WObject"} for n, name in (
                     (1, "PropertyContainer"), (65552, "Sound"), (16, "AudioFileSource"), (1638416, "WorkUnit"), (524304, "Bus"))]}
-            if uri.endswith("getPropertyAndReferenceNames"): return {"return": ["IsVoice", "Volume", "OutputBus"]}
+            if uri.endswith("getPropertyAndReferenceNames"): return {"return": ["IsVoice", "Volume", "OutputBus", "OverrideOutput"]}
             if uri.endswith("getPropertyInfo"):
                 if args["property"] == "Volume":
-                    return {"name": "Volume", "type": "Real32", "restriction": {"type": "range", "min": -200, "max": 200}}
+                    return {"name": "Volume", "type": "Real64", "restriction": {"type": "range", "min": -200, "max": 200}}
+                dependency = {"type": "override", "action": "Enable", "context": "Self", "property": "OverrideOutput"}
                 if args["property"] == "OutputBus":
-                    return {"name": "OutputBus", "type": "Reference", "restriction": {"type": "reference", "restrictions": [{"type": ["Bus"]}]}}
+                    return {"name": "OutputBus", "type": "", "restriction": {"type": "reference", "restrictions": [{"type": ["Audio Bus"], "sharedOnlyTypes": []}, "notNull"]},
+                        "dependencies": [dependency]}
+                if args["property"] == "OverrideOutput":
+                    return {"name": "OverrideOutput", "type": "bool", "default": False, "dependencies": [dependency]}
                 return {"name": "IsVoice", "type": "bool", "default": False, "dependencies": []}
             if uri.endswith("getProjectInfo"):
                 info = super().call(uri, args, options)
@@ -558,6 +584,19 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
     assert final["invocation"]["outcome"] == ("PASS" if fault is None else "FAIL")
     assert report["business_effect_verified"] is (fault is None)
     assert report["transaction_budget"] == {"setup": 2, "witness": 1, "maximum_total": 3}
+    if witness_kind == "ordinary-owner-source":
+        assert all("Master-Mixer Hierarchy" not in json.dumps(call) and "Master Audio Bus" not in json.dumps(call)
+            for call in report["calls"])
+        assert any(call["argv"][:3] == ["query-object", "--path-segment", "Busses"] for call in report["calls"])
+        if fault in {"missing-bus", "wrong-bus-parent"}:
+            assert len(final["transactions"]) == client.import_count == 2
+            assert all(phase["verify"]["state"] == "verified" for phase in report["setup"])
+            assert not report["witness"] and not report["observations"].get("after")
+            assert final["residual_state"]["sandbox"] == "quarantined"
+            return
+        assert report["bus_before"]["id"] == client.bus["id"]
+        assert any(call["argv"][0] == "draft-bind-object" and "--object-id" in call["argv"]
+            and client.bus["id"] in call["argv"] for call in report["calls"])
     if witness_kind != "notes-columns":
         assert len(final["transactions"]) == 3
         assert final["residual_state"]["sandbox"] == ("deleted" if fault is None else "quarantined")
