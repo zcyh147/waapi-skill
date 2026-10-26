@@ -483,6 +483,45 @@ def inspect_cli_project_effect(effect):
                     and sum(row['count'] for row in model['media_ids'].values()) == 0
                     and model['media_storage_mode'] is True},
             ]
+        elif effect['uri'].endswith('moveMediaIdsToWorkUnits'):
+            previous = effect['mapping_before'].get('observation', {})
+            if previous.get('format') == 'wwise-media-ids-xml':
+                unresolved = sorted(set(old_model['media_mapping_unresolved'] + model['media_mapping_unresolved']))
+                if old_model['media_storage_mode'] is not True or source_count != 0:
+                    unresolved.append('mixed_or_unestablished_previous_media_storage')
+                mapping_checks = [
+                    {'name': 'Work Units preserve every central source, language, filename and media ID',
+                     'passed': model['media_mapping'] == previous['records']
+                        and previous['sources'] == old_model['media_sources'] == model['media_sources']
+                        and sum(row['count'] for row in model['media_ids'].values()) == previous['records']['count']},
+                    {'name': 'Project media storage mode is disabled after transfer to Work Units',
+                     'passed': model['media_storage_mode'] is False},
+                ]
+        elif effect['uri'].endswith('updateMediaIdsInSingleFile'):
+            unresolved = sorted(set(old_model['media_mapping_unresolved'] + model['media_mapping_unresolved']))
+            mapping_checks = [
+                {'name': 'Refreshing the central file preserves Work Unit media IDs and project storage mode',
+                 'passed': old_model['media_ids'] == model['media_ids']
+                    and old_model['media_mapping'] == model['media_mapping']
+                    and old_model['media_storage_mode'] == model['media_storage_mode']},
+            ]
+            if not effect['mapping_before']['exists']:
+                mapping_checks.append({'name': 'Refresh leaves an absent central media ID file absent',
+                    'passed': mapping['exists'] is False})
+            elif mapping.get('format') == 'wwise-media-ids-xml':
+                expected = old_model['media_mapping']
+                if old_model['media_storage_mode'] is True:
+                    previous = effect['mapping_before'].get('observation', {})
+                    if previous.get('format') == 'wwise-media-ids-xml' and source_count == 0:
+                        expected = previous['records']
+                    else:
+                        unresolved.append('mixed_or_unestablished_previous_media_storage')
+                mapping_checks.append({
+                    'name': 'Refreshed central mapping matches every saved source, language, filename and media ID',
+                    'passed': mapping['records'] == expected
+                        and mapping['sources'] == old_model['media_sources'] == model['media_sources']})
+            else:
+                unresolved.append('central_media_id_mapping_representation')
         return {'observations': [{'kind': 'cli-media-id-artifacts', 'mapping_file': mapping,
             'saved_model_files': len(model['files']), 'work_unit_media_id_count_before': source_count,
             'work_unit_media_id_count_after': sum(rows['count'] for rows in model['media_ids'].values()),

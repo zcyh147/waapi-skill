@@ -1674,6 +1674,209 @@ def media_id_product_capture(request):
     return observed
 
 
+@pytest.mark.parametrize('version,change', [
+    *[(version, change) for version in ('2021.1', '2022.1', *VERSIONS)
+        for change in (None, 'wrong-media-id', 'unrelated-property')],
+    ('2025.1', 'mode-unchanged'),
+])
+def test_cli_media_id_transfer_back_verifies_central_records_in_work_units(tmp_path, version, change):
+    class TransferBackTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.unit)
+                source = tree.find('.//AudioFileSource')
+                ET.SubElement(ET.SubElement(source, 'MediaIDList'), 'MediaID',
+                    ID='654321' if change == 'wrong-media-id' else '123456')
+                if change == 'unrelated-property':
+                    tree.find('.//Sound/PropertyList/Property/ValueList/Value').text = '-12'
+                tree.write(self.unit)
+                tree = ET.parse(self.project_file)
+                if change != 'mode-unchanged':
+                    tree.find('.//Property[@Name="MediaIDsInSingleFile"]/ValueList/Value').text = 'False'
+                tree.write(self.project_file)
+                # The native contract requires transfer, not deletion of the
+                # inactive central file. Both retained and absent are permitted.
+                if version == '2025.1':
+                    self.project_file.with_suffix('.mediaid').unlink()
+            return super().call(uri, args, options)
+
+    task = TransferBackTask(tmp_path, version, 'ak.wwise.cli.moveMediaIdsToWorkUnits')
+    task.unit = saved_fixture_project(task)
+    tree = ET.parse(task.unit)
+    source = ET.SubElement(ET.SubElement(tree.find('.//Sound'), 'ChildrenList'),
+        'AudioFileSource', Name='Renamed source', ID='{33333333-3333-3333-3333-333333333333}')
+    ET.SubElement(source, 'Language').text = 'SFX'
+    ET.SubElement(source, 'AudioFile').text = 'Keep.wav'
+    tree.write(task.unit)
+    tree = ET.parse(task.project_file)
+    field = ET.SubElement(tree.find('./ProjectInfo/Project/PropertyList'), 'Property',
+        Name='MediaIDsInSingleFile', Type='bool')
+    ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value').text = 'True'
+    tree.write(task.project_file)
+    task.project_file.with_suffix('.mediaid').write_text('''<WwiseDocument Type="MediaIDs"><MediaIDInfo><MediaIDs>
+<Language ID="393239870" Name="SFX"><File Name="Keep.wav"><WObject ID="{33333333-3333-3333-3333-333333333333}">
+<MediaID ID="123456"/></WObject></File></Language></MediaIDs></MediaIDInfo></WwiseDocument>''')
+    if version in ('2021.1', '2022.1', '2023.1'):
+        task.result_payload = {}
+    code, schema = task.run('request-schema', task.operation)
+    assert code == 0, schema
+    assert schema['business_adapter']['effect_verification']['central_mapping_record_representation'] == (
+        'Preview_central_records_equal_resulting_Work_Unit_source_GUID_language_file_and_all_media_ID_attributes; '
+        'exact_disabled_project_storage_mode; central_file_removal_not_required')
+    tx = task.execute_plan()
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert payload['verified'] is (change is None), payload
+    assert (code == 0) is (change is None), payload
+    assert payload['state'] == ('verified' if change is None else 'verification_failed'), payload
+    if change is None:
+        observation = next(row for row in payload['verification']['readbacks']
+            if row.get('kind') == 'cli-media-id-artifacts')
+        assert observation['work_unit_media_id_count_before'] == 0
+        assert observation['work_unit_media_id_count_after'] == 1
+        assert observation['unresolved'] == []
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('version,change', [
+    *[(version, change) for version in ('2021.1', '2022.1', *VERSIONS)
+        for change in (None, 'wrong-media-id', 'unrelated-property')],
+    *[('2025.1', change) for change in
+        ('work-unit-id', 'storage-mode', 'missing-existing-file', 'already-central')],
+])
+def test_cli_media_id_refresh_matches_saved_source_records_and_preserves_work_units(tmp_path, version, change):
+    class RefreshTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.project_file.with_suffix('.mediaid').write_text('''<WwiseDocument Type="MediaIDs"><MediaIDInfo><MediaIDs>
+<Language ID="393239870" Name="SFX"><File Name="Keep.wav"><WObject ID="{33333333-3333-3333-3333-333333333333}">
+<MediaID ID="123456"/><Hash Platform="Windows" Value="3181527220"/>
+</WObject></File></Language></MediaIDs></MediaIDInfo></WwiseDocument>''')
+                if change == 'wrong-media-id':
+                    mapping = self.project_file.with_suffix('.mediaid')
+                    mapping.write_text(mapping.read_text().replace('123456', '654321'))
+                elif change == 'unrelated-property':
+                    tree = ET.parse(self.unit)
+                    tree.find('.//Sound/PropertyList/Property/ValueList/Value').text = '-12'
+                    tree.write(self.unit)
+                elif change == 'work-unit-id':
+                    tree = ET.parse(self.unit)
+                    tree.find('.//MediaID').set('ID', '654321')
+                    tree.write(self.unit)
+                elif change == 'storage-mode':
+                    tree = ET.parse(self.project_file)
+                    tree.find('.//Property[@Name="MediaIDsInSingleFile"]/ValueList/Value').text = 'True'
+                    tree.write(self.project_file)
+                elif change == 'missing-existing-file':
+                    self.project_file.with_suffix('.mediaid').unlink()
+            return super().call(uri, args, options)
+
+    task = RefreshTask(tmp_path, version, 'ak.wwise.cli.updateMediaIdsInSingleFile')
+    task.unit = saved_fixture_project(task)
+    tree = ET.parse(task.unit)
+    source = ET.SubElement(ET.SubElement(tree.find('.//Sound'), 'ChildrenList'),
+        'AudioFileSource', Name='Renamed source', ID='{33333333-3333-3333-3333-333333333333}')
+    ET.SubElement(source, 'Language').text = 'SFX'
+    ET.SubElement(source, 'AudioFile').text = 'Keep.wav'
+    ET.SubElement(ET.SubElement(source, 'MediaIDList'), 'MediaID', ID='123456')
+    tree.write(task.unit)
+    tree = ET.parse(task.project_file)
+    field = ET.SubElement(tree.find('./ProjectInfo/Project/PropertyList'), 'Property',
+        Name='MediaIDsInSingleFile', Type='bool')
+    ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value').text = 'False'
+    tree.write(task.project_file)
+    # An existing stale file is refreshed from the saved project records;
+    # matching its own old rows would be a false success.
+    task.project_file.with_suffix('.mediaid').write_text('''<WwiseDocument Type="MediaIDs"><MediaIDInfo><MediaIDs>
+<Language ID="393239870" Name="SFX"><File Name="Stale.wav"><WObject ID="{44444444-4444-4444-4444-444444444444}">
+<MediaID ID="654321"/></WObject></File></Language></MediaIDs></MediaIDInfo></WwiseDocument>''')
+    if change == 'already-central':
+        tree = ET.parse(task.unit)
+        source = tree.find('.//AudioFileSource')
+        source.remove(source.find('MediaIDList'))
+        tree.write(task.unit)
+        tree = ET.parse(task.project_file)
+        tree.find('.//Property[@Name="MediaIDsInSingleFile"]/ValueList/Value').text = 'True'
+        tree.write(task.project_file)
+        task.project_file.with_suffix('.mediaid').write_text('''<WwiseDocument Type="MediaIDs"><MediaIDInfo><MediaIDs>
+<Language ID="393239870" Name="SFX"><File Name="Keep.wav"><WObject ID="{33333333-3333-3333-3333-333333333333}">
+<MediaID ID="123456"/></WObject></File></Language></MediaIDs></MediaIDInfo></WwiseDocument>''')
+    if version in ('2021.1', '2022.1', '2023.1'):
+        task.result_payload = {}
+    code, schema = task.run('request-schema', task.operation)
+    assert code == 0, schema
+    assert schema['business_adapter']['effect_verification']['central_mapping_record_representation'] == (
+        'existing_file_matches_exact_saved_source_media_records; already_central_uses_Preview_records; '
+        'Work_Unit_media_and_storage_mode_preserved; absent_file_stays_absent')
+    tx = task.execute_plan()
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    expected_success = change in (None, 'already-central')
+    assert payload['verified'] is expected_success, payload
+    assert (code == 0) is expected_success, payload
+    assert payload['state'] == ('verified' if expected_success else 'verification_failed'), payload
+    if expected_success:
+        observation = next(row for row in payload['verification']['readbacks']
+            if row.get('kind') == 'cli-media-id-artifacts')
+        assert observation['mapping_file']['media_count'] == 1
+        assert observation['work_unit_media_id_count_before'] == observation['work_unit_media_id_count_after'] == (
+            0 if change == 'already-central' else 1)
+        assert observation['unresolved'] == []
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('version,change', [
+    *[(version, None) for version in ('2021.1', '2022.1', *VERSIONS)],
+    ('2025.1', 'unexpected-file'), ('2025.1', 'changed-work-unit-id'),
+])
+def test_cli_media_id_refresh_without_existing_file_is_a_preserving_noop(tmp_path, version, change):
+    class MissingMappingTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                if change == 'unexpected-file':
+                    self.project_file.with_suffix('.mediaid').write_text('''<WwiseDocument Type="MediaIDs">
+<MediaIDInfo><MediaIDs/></MediaIDInfo></WwiseDocument>''')
+                elif change == 'changed-work-unit-id':
+                    tree = ET.parse(self.unit)
+                    tree.find('.//MediaID').set('ID', '654321')
+                    tree.write(self.unit)
+            return super().call(uri, args, options)
+
+    task = MissingMappingTask(tmp_path, version, 'ak.wwise.cli.updateMediaIdsInSingleFile')
+    task.unit = saved_fixture_project(task)
+    tree = ET.parse(task.unit)
+    source = ET.SubElement(ET.SubElement(tree.find('.//Sound'), 'ChildrenList'),
+        'AudioFileSource', Name='Keep source', ID='{33333333-3333-3333-3333-333333333333}')
+    ET.SubElement(source, 'Language').text = 'SFX'
+    ET.SubElement(source, 'AudioFile').text = 'Keep.wav'
+    ET.SubElement(ET.SubElement(source, 'MediaIDList'), 'MediaID', ID='123456')
+    tree.write(task.unit)
+    if version in ('2021.1', '2022.1', '2023.1'):
+        task.result_payload = {}
+    tx = task.execute_plan()
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert payload['verified'] is (change is None), payload
+    assert (code == 0) is (change is None), payload
+    assert payload['state'] == ('verified' if change is None else 'verification_failed'), payload
+    if change is None:
+        observation = next(row for row in payload['verification']['readbacks']
+            if row.get('kind') == 'cli-media-id-artifacts')
+        assert observation['mapping_file']['exists'] is False
+        assert observation['work_unit_media_id_count_before'] == observation['work_unit_media_id_count_after'] == 1
+        assert observation['unresolved'] == []
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
 @pytest.mark.parametrize('failure', ['missing-mapping', 'malformed-mapping', 'lost-workunit', 'unrelated-setting'])
 def test_cli_media_id_artifact_or_preservation_failure_cannot_verify(tmp_path, failure):
     class MediaFailure(CliProjectTask):

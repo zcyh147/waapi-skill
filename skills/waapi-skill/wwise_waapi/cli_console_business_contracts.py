@@ -764,7 +764,11 @@ def cli_console_business_contract_data(
             'central_mapping_record_representation': (
                 'exact_source_GUID_language_ID_and_name_file_and_all_media_ID_attributes; no_remaining_Work_Unit_IDs; exact_project_storage_mode'
                 if operation == 'ak.wwise.cli.moveMediaIdsToSingleFile'
-                else 'parsed_mapping_available; transfer_or_refresh_semantics_still_require_independent_effect_proof'),
+                else 'Preview_central_records_equal_resulting_Work_Unit_source_GUID_language_file_and_all_media_ID_attributes; '
+                    'exact_disabled_project_storage_mode; central_file_removal_not_required'
+                if operation == 'ak.wwise.cli.moveMediaIdsToWorkUnits'
+                else 'existing_file_matches_exact_saved_source_media_records; already_central_uses_Preview_records; '
+                    'Work_Unit_media_and_storage_mode_preserved; absent_file_stays_absent'),
             'source_kinds': ['AudioFileSource', 'MidiFileSource', 'PluginMediaSource'],
             **({'optional_saved_none_state_materialization': {
                 'force_save_scope': 'all_project_work_units',
