@@ -13,6 +13,7 @@ from .schema_inventory import load_definition_graph
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 from .metadata_discovery import MAX_METADATA_DISCOVERY_QUERY_CHARS
 from .object_query_randomizer import RANDOMIZER_OUTPUTS, randomizer_contract
+from .object_query_functions import FIELD_STATUSES, curve_choices, function_contract
 from .object_query_local_lists import LOCAL_LISTS, local_list_contract
 
 RELATED_QUERY_LIST_RELATIONS = {"children": "children", "descendants": "descendants", "ancestors": "ancestors", "references-to": "referencesTo"}
@@ -176,6 +177,16 @@ def parse_related_request(version: str, values: list[str], option: str) -> dict[
                     stages.append(stage)
                 if stages:
                     hops[-1] = ("sequence", json.dumps({**(spec or {'source':name}), 'stages': stages}, separators=(",", ":")))
+        elif name == 'curve-selection' and index + 1 == len(tokens):
+            if version != '2025.1' or option != '--include-related' or terminal not in curve_choices(version):
+                raise ValueError('curve-selection CURVE_ROLE requires a disclosed curve role and Wwise 2025.1 matching source')
+            hops.append(('curve-selection', terminal))
+            index += 1
+        elif name == 'field-status' and index + 2 == len(tokens):
+            if version != '2025.1' or option != '--include-related' or terminal not in FIELD_STATUSES:
+                raise ValueError('field-status MEANING linked|overridable|override-source|present requires Wwise 2025.1 matching source')
+            hops.append(('field-status', _meaning(tokens[index + 1])))
+            index += 2
         elif name == 'randomizer' and index + 2 == len(tokens):
             hops.append(('randomizer', _meaning(tokens[index + 1])))
             index += 2
@@ -203,6 +214,8 @@ def parse_related_request(version: str, values: list[str], option: str) -> dict[
     if hops and hops[-1][0] == 'randomizer':
         if option != '--include-related' or terminal not in RANDOMIZER_OUTPUTS:
             raise ValueError('randomizer MEANING requires --include-related and enabled, min-offset or max-offset')
+    elif hops and hops[-1][0] in {'field-status', 'curve-selection'}:
+        pass
     elif option == "--include-related" and not reducer:
         detail = related_output_detail(version, terminal)
         if not detail["available"]:
@@ -327,6 +340,7 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
             "custom_terminal_options": list(RELATED_FIELD_MODES),
             "reference_kind_evidence": query_read_kind_contract(version),
             "randomizers": randomizer_contract(version),
+            "functions": function_contract(version),
             "local_object_lists": local_list_contract(version),
             "custom_terminal_modes": {option: {kind: {"native_prefix": prefix, "output_group": {"property": "properties", "reference": "references", "override_source_value": "override_source_values", "local_reference": "local_references"}[binding_kind]}
                 for kind, (binding_kind, prefix) in mode.bindings.items()} for option, mode in RELATED_FIELD_MODES.items()},

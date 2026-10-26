@@ -34,7 +34,27 @@ class RelatedFieldBinder:
             self.observations.append({'api': uri, 'args': copy.deepcopy(args), 'result': copy.deepcopy(result)})
         return copy.deepcopy(self.metadata_cache[key])
 
-    def bind(self, meaning, reference, class_id, native, index, option, *, namespaced_property=False):
+    def bind(self, meaning, reference, class_id, native, index, option, *, namespaced_property=False, status=None):
+        if option == 'curve-selection':
+            from .object_query_functions import curve_argument
+            candidate = curve_argument(self.version, meaning, class_id, self.error)
+            selection = {'scope': {'object': reference['id'].upper(), 'classId': class_id}, 'meaning': meaning,
+                'candidate': candidate, 'candidate_names': [meaning], 'complete': True}
+            self.selections.append({'path': native, 'requested_option': option, 'row_index': index,
+                'scope': selection['scope'], 'selected': candidate})
+            return selection
+        if option == 'field-status':
+            from .object_query_functions import documented_status_field, known_presence_field
+            selected = documented_status_field(self.version, meaning, class_id)
+            if selected is None and status == 'present':
+                selected = known_presence_field(self.version, meaning)
+            if selected is not None:
+                selection = {'scope': {'object': reference['id'].upper(), 'classId': class_id},
+                    'meaning': meaning, 'candidate': selected, 'candidate_names': [selected['name']], 'complete': True}
+                self.selections.append({'path': native, 'requested_option': option, 'row_index': index,
+                    **{key: value for key, value in selection.items() if key != 'candidate'},
+                    'selected': selected})
+                return selection
         scope = {'classId': class_id} if type(class_id) is int and 0 <= class_id <= 4294967295 else {'object': reference['id'].upper()}
         def lookup(scope):
             key = (canonical_sha256(scope), meaning)
@@ -61,7 +81,7 @@ class RelatedFieldBinder:
             selection = lookup({'object': reference['id'].upper()})
         if (selection['candidate'] is not None and selection['candidate'].get('kind') == 'unknown'
                 and 'object' in selection['scope'] and option in {'reference', 'local-reference',
-                    '--include-related-field', '--include-related-local-reference'}):
+                    '--include-related-field', '--include-related-local-reference', 'field-status'}):
             from .reference_kind_evidence import certify_query_candidate
             candidate = certify_query_candidate(selection['candidate'], version=self.version,
                 object_id=reference['id'].upper(), class_id=class_id, read=self.cached_read)
@@ -72,6 +92,12 @@ class RelatedFieldBinder:
         # exact-object facts remain insufficient, retain scoped clarification.
         if selection['candidate'] is not None and selection['candidate'].get('kind') not in {'property', 'reference'}:
             selection = {**selection, 'insufficient_kind': selection['candidate'].get('kind'), 'candidate': None}
+        if status == 'present' and selection['candidate'] is not None:
+            candidate = selection['candidate']
+            display = candidate.get('metadata', {}).get('display')
+            if meaning.casefold() not in {candidate['name'].casefold(),
+                    display.get('name', '').casefold() if isinstance(display, Mapping) else ''}:
+                selection = {**selection, 'candidate': None, 'exact_concept_required': True}
         candidate = selection['candidate']
         # Apply the current use's policy after exact-object kind fallback, on
         # every bind. Cached property discovery cannot grant its token permission

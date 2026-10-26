@@ -25610,6 +25610,14 @@ def _project_query_business_rows(
                         except RelatedQueryError as exc:
                             code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
                             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
+                    if 'function_value' in output:
+                        from wwise_waapi.object_query_functions import validate_function_value
+                        from wwise_waapi.object_query_related_runtime import RelatedQueryError
+                        try:
+                            validate_function_value(output['function_value'], row[native], RelatedQueryError)
+                        except RelatedQueryError as exc:
+                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+                            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
                     if group is None and field == 'curve_points':
                         from wwise_waapi.object_query_local_lists import validate_curve_points
                         from wwise_waapi.object_query_related_runtime import RelatedQueryError
