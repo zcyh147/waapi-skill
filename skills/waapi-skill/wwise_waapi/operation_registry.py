@@ -2298,7 +2298,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "OriginalsSubFolder is a TSV column from Wwise 2023.1 (WG-60834); ordinary audio.import Originals placement remains separate",
             "Switch Assignation binds an exact existing group and optional exact values; group-only descriptors associate a typed SwitchContainer without creating a group or adding a child pair; explicitly typed new direct containers use the same single-import path and full group/pair readback",
             "TSV Notes verifies target-object notes independently from Audio Source Notes; the exact user table is never rewritten",
-            "an explicit path-spelled AudioFileSource media row requires one exact Sound child path across all languages at Preview and execution, matching the selected GUID, class and parent; Notes targets that Source and a separate owner-only Notes row retains the exact-table transaction",
+            "explicit Sound-owned AudioFileSource media rows support createNew/useExisting/replaceExisting with exact absent-or-selected Source paths across languages; a missing Sound kind is bound by its typed parent or same-table typed owner row; unchanged owners and unplanned Source identities/files are preserved, while an explicitly declared Sound replacement retires the complete sealed child set and rebinds requested Sources; regular or bounded inline WAV media and live metadata-proven Source fields retain independent verification; table bytes are never rewritten",
             "Audio File cells retain their native spelling and bind a hashed local file; relative paths resolve from the table directory, including parent navigation; proven Wine hosts require Windows absolute or table-relative media cells",
             "canonical GUID Object Path cells resolve exact existing identities under the shared typed-TSV target class and root policy before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries",
             "fixed and dynamic native headers are parsed under bounded grammar; importLanguage remains a call argument",
@@ -14108,7 +14108,7 @@ def _prepare_import_dynamic_fields(
         target["metadata_object_type"] = type_info.name
         target["metadata_class_id"] = type_info.class_id
         target["class_metadata"] = [type_info.as_dict()]
-        if _is_ordinary_audio_file_source_target(target, source_operation):
+        if _is_explicit_import_source_target(target, source_operation):
             owner_type = _resolve_object_type("Sound", catalog=type_catalog)
             target["source_owner_class_id"] = owner_type.class_id
             target["class_metadata"].append(owner_type.as_dict())
@@ -14409,13 +14409,18 @@ def _localized_import_source_preservation(before: Mapping[str, Any], after: Mapp
     planned: dict[str, set[str]] = {}
     retired_ids: set[str] = set()
     planned_after_ids: set[str] = set()
+    replaced_owner_paths = {target["explicit_source_owner_path"] for target in targets
+        if _same_identity(target.get("replaced_source_owner_id"), owner_id)}
+    if replaced_owner_paths:
+        retired_ids.update(before_rows)
     for target in targets:
         if target.get("media_expected") is not True:
             continue
         snapshot = target.get("localized_source_snapshot", {})
-        if not _same_identity(snapshot.get("owner_id"), owner_id):
+        if (not _same_identity(snapshot.get("owner_id"), owner_id)
+                and str(target.get("expected_audio_file_source_result_path", "")).rpartition("\\")[0] not in replaced_owner_paths):
             continue
-        if target.get("ordinary_source_replaces_existing") is True:
+        if target.get("ordinary_source_replaces_existing") is True or target.get("table_source_replaces_existing") is True:
             retired_ids.add(str(target["preexisting_id"]).casefold())
         source_id = target.get("localized_audio_file_source_id")
         for key, row in {**before_rows, **after_rows}.items():
@@ -14442,7 +14447,8 @@ def _localized_import_source_preservation(before: Mapping[str, Any], after: Mapp
         expected = {field: value for field, value in row.items() if field not in ignored}
         actual = {field: value for field, value in after_rows.get(key, {}).items() if field not in ignored}
         rows_ok = rows_ok and actual == expected
-    before_proofs = {row["source_id"].casefold(): row for row in before.get("media_proofs", []) if row["source_id"].casefold() not in planned}
+    before_proofs = {row["source_id"].casefold(): row for row in before.get("media_proofs", [])
+        if row["source_id"].casefold() not in planned and row["source_id"].casefold() not in retired_ids}
     after_proofs = {row["source_id"].casefold(): row for row in after.get("media_proofs", []) if row["source_id"].casefold() not in planned}
     return rows_ok and before_proofs == after_proofs, {"planned_source_ids": sorted(planned),
         "before": before, "after": after}
@@ -15088,7 +15094,9 @@ def _is_explicit_import_source_target(target: Mapping[str, Any], source_operatio
             or _is_ordinary_audio_file_source_target(target, source_operation))
 
 
-def _prepare_ordinary_import_source(target: dict[str, Any], *, index: int, version: str,
+def _prepare_sound_import_source(target: dict[str, Any], *, index: int, version: str,
+                                    source_operation: str,
+                                    replace_owner: bool = False,
                                     roles: dict[str, ResolvedObject], path_snapshots: list[dict[str, Any]],
                                     read: ReadCall) -> None:
     """Bind the exact named Source and its Sound without replacing the owner."""
@@ -15099,12 +15107,16 @@ def _prepare_ordinary_import_source(target: dict[str, Any], *, index: int, versi
         raise OperationContractError("AMBIGUOUS_IDENTITY", "A named Source requires one exact Sound owner.")
     owner_type = _object_type_token(target.get("requested_source_owner_type", "Sound"))
     if owner_type not in {"sound", "soundsfx", "soundvoice"}:
-        raise OperationContractError("INVALID_TARGET_TYPE", "Ordinary named Sources require a Sound SFX or Sound Voice owner.")
+        raise OperationContractError("INVALID_TARGET_TYPE", "Explicit media Sources require a Sound SFX or Sound Voice owner.")
     expected_voice = target.get("requested_language") != "SFX"
     if owner_type == "soundvoice" and not expected_voice or owner_type == "soundsfx" and expected_voice:
         raise OperationContractError("INVALID_TARGET_TYPE", "The named Source language must match its typed Sound owner.")
-    target["ordinary_source_owner_path"] = owner_path
-    target["ordinary_source_replaces_existing"] = False
+    target["explicit_source_owner_path"] = owner_path
+    if source_operation == "audio.import":
+        target["ordinary_source_owner_path"] = owner_path
+        target["ordinary_source_replaces_existing"] = False
+    else:
+        target["table_source_binding"] = True
     if not owners:
         if target["pre_state_rows"] or owner_type == "sound":
             raise OperationContractError("INVALID_TARGET_TYPE", "A missing Source owner requires its explicit typed Sound kind.")
@@ -15112,24 +15124,36 @@ def _prepare_ordinary_import_source(target: dict[str, Any], *, index: int, versi
         return
     owner = owners[0]
     if (not _valid_object_id(owner.get("id")) or owner.get("path") != owner_path
+            or owner.get("name") != owner_path.rpartition("\\")[2]
             or _object_type_token(owner.get("type")) != "sound"
             or not _object_class_matches(owner.get("classId"), target.get("source_owner_class_id"))
-            or _field_value(owner, "@IsVoice") is not expected_voice
+            or (not replace_owner and _field_value(owner, "@IsVoice") is not expected_voice)
+            or type(_field_value(owner, "@IsVoice")) is not bool
             or owner_type == "soundvoice" and not expected_voice
             or owner_type == "soundsfx" and expected_voice):
         raise OperationContractError("INVALID_TARGET_TYPE", "The named Source requires its exact Sound parent and matching Voice kind.")
     snapshot = _localized_source_snapshot(owner["id"], read=read, preserve_media_version=version)
     candidates = [row for row in snapshot["rows"]
         if str(row.get("path", "")).casefold() == target["canonical_target_path"].casefold()]
+    if source_operation == "audio.importTabDelimited" and target.get("requested_target_id") is not None:
+        candidates = [row for row in candidates if _same_identity(row.get("id"), target["requested_target_id"])]
     before = target["pre_state_rows"]
-    if len(candidates) != len(before) or any(
+    if before and (not _same_identity(_reference_identity(before[0].get("parent")), owner["id"])
+            or before[0].get("name") != target["canonical_target_path"].rpartition("\\")[2]):
+        raise OperationContractError("INVALID_TARGET_TYPE", "The selected Source must retain its exact name and Sound parent.")
+    if not replace_owner and (len(candidates) != len(before) or any(
             not _same_identity(row.get("id"), before[0].get("id"))
             or not _object_class_matches(row.get("classId"), target.get("audio_source_class_id"))
             or _import_language_name(row.get("audioSource:language")) != target.get("requested_language")
-            for row in candidates):
+            for row in candidates)):
         raise OperationContractError("AMBIGUOUS_SOURCE_WIRE_PATH", "The named Source path must be absent or identify its exact GUID, class, owner and language across all languages.")
     target["explicit_source_owner"] = owner
     target["localized_source_snapshot"] = snapshot
+    if replace_owner:
+        target["replaced_source_owner_id"] = owner["id"]
+        collision = ResolvedObject(identity=ObjectIdentity(path=owner_path), object=owner["id"], resolution="live-path", row=owner)
+        _reject_protected_replace_boundary(collision)
+        target["source_owner_replace_subtree"] = _capture_replace_subtree_snapshot(collision, read=read)
     roles[f"targets[{index}].source_owner"] = ResolvedObject(
         identity=ObjectIdentity(path=owner_path), object=owner["id"], resolution="live-path", row=owner)
     path_snapshots.append({"path": owner_path, "fields": fields, "rows": owners})
@@ -15144,6 +15168,11 @@ def _require_unique_import_source_wire_path(target: Mapping[str, Any], snapshot:
     path = target.get("canonical_target_path")
     candidates = [row for row in snapshot["rows"]
         if isinstance(path, str) and str(row.get("path", "")).casefold() == path.casefold()]
+    if not target.get("pre_state_rows"):
+        if candidates:
+            raise OperationContractError("AMBIGUOUS_SOURCE_WIRE_PATH", "A new exact-table Source wire path must remain absent across all languages.",
+                details={"path": path, "candidate_ids": [row.get("id") for row in candidates]})
+        return
     if len(candidates) != 1:
         raise OperationContractError("AMBIGUOUS_SOURCE_WIRE_PATH", "The unchanged TSV Source path must identify one child across all languages.",
             details={"path": path, "candidate_count": len(candidates), "candidate_ids": [row.get("id") for row in candidates]})
@@ -15615,38 +15644,7 @@ def _prepare_closed_import_plan(
                     },
                 )
             target["preexisting_id"] = existing_id
-            if _is_tab_audio_file_source_target(target, source_operation):
-                if import_operation != "useExisting":
-                    raise OperationContractError("INVALID_TARGET_TYPE", "An explicit TSV AudioFileSource media target requires existing-source reimport.")
-                owner_fields = [*IDENTITY_RETURN_FIELDS, "classId", "@IsVoice"]
-                owner_rows = _read_object_path_rows(target["canonical_parent_path"], fields=owner_fields, read=read)
-                if (len(owner_rows) != 1 or _object_type_token(owner_rows[0].get("type")) != "sound"
-                        or not _same_identity(_reference_identity(rows[0].get("parent")), owner_rows[0].get("id"))
-                        or _field_value(owner_rows[0], "@IsVoice") is not (target.get("requested_language") != "SFX")):
-                    raise OperationContractError("INVALID_TARGET_TYPE", "An explicit TSV AudioFileSource requires its exact Sound parent and matching Voice state.")
-                owner = owner_rows[0]
-                owner_type = _object_type_token(target.get("requested_source_owner_type", "Sound"))
-                if (owner_type not in {"sound", "soundvoice", "soundsfx"}
-                        or owner_type == "soundvoice" and _field_value(owner, "@IsVoice") is not True
-                        or owner_type == "soundsfx" and _field_value(owner, "@IsVoice") is not False):
-                    raise OperationContractError("INVALID_TARGET_TYPE", "The typed TSV Source parent conflicts with the existing Sound kind.")
-                snapshot = _localized_source_snapshot(owner["id"], read=read)
-                matches = [source for source in snapshot["rows"]
-                           if source.get("path") == target_path
-                           and _object_type_token(source.get("type")) == "audiofilesource"
-                           and _import_language_name(source.get("audioSource:language")) == target.get("requested_language")]
-                if (len(matches) != 1 or not _same_identity(matches[0].get("id"), existing_id)
-                        or not _object_class_matches(matches[0].get("classId"), target.get("audio_source_class_id"))):
-                    raise OperationContractError("INVALID_TARGET_TYPE", "An explicit TSV AudioFileSource must match one existing Source GUID, class and language.")
-                if target.get("requested_target_id") is None:
-                    _require_unique_import_source_wire_path(target, snapshot)
-                target["explicit_source_owner"] = owner
-                target["localized_source_snapshot"] = snapshot
-                target["localized_audio_file_source_id"] = existing_id
-                roles[f"targets[{index}].source_owner"] = ResolvedObject(
-                    identity=ObjectIdentity(path=target["canonical_parent_path"]), object=owner["id"], resolution="live-path", row=owner)
-                path_snapshots.append({"path": target["canonical_parent_path"], "fields": owner_fields, "rows": owner_rows})
-            elif localized_tab and import_operation == "useExisting":
+            if localized_tab and not _is_tab_audio_file_source_target(target, source_operation) and import_operation == "useExisting":
                 if (_object_type_token(rows[0].get("type")) != "sound"
                         or _field_value(rows[0], "@IsVoice") is not True
                         or isinstance(requested_type, str)
@@ -15683,13 +15681,25 @@ def _prepare_closed_import_plan(
                 resolution="live-path",
                 row=rows[0],
             )
-        if _is_tab_audio_file_source_target(target, source_operation) and not rows:
-            raise OperationContractError("INVALID_TARGET_TYPE", "An explicit TSV AudioFileSource media target must already exist in the selected language.")
-        if _is_ordinary_audio_file_source_target(target, source_operation):
-            _prepare_ordinary_import_source(target, index=index, version=request.version,
+        if _is_explicit_import_source_target(target, source_operation):
+            declared_owners = ([row for row in targets if row["canonical_target_path"] == target["canonical_parent_path"]]
+                              if source_operation == "audio.importTabDelimited" else [])
+            if len(declared_owners) == 1:
+                owner_type = declared_owners[0].get("requested_object_type")
+                explicit_owner = target.get("requested_source_owner_type")
+                if explicit_owner is not None and owner_type is not None and _object_type_token(explicit_owner) != _object_type_token(owner_type):
+                    raise OperationContractError("INVALID_TARGET_TYPE", "The explicit Source parent kind must match its declared Sound owner row.")
+                if owner_type is not None:
+                    target["requested_source_owner_type"] = owner_type
+            _prepare_sound_import_source(target, index=index, version=request.version,
+                source_operation=source_operation, replace_owner=bool(declared_owners) and import_operation == "replaceExisting",
                 roles=roles, path_snapshots=path_snapshots, read=read)
-            target["ordinary_source_replaces_existing"] = import_operation == "replaceExisting" and bool(rows)
-            allowed_result_paths.add(target["ordinary_source_owner_path"].casefold())
+            replacement_field = ("ordinary_source_replaces_existing" if source_operation == "audio.import"
+                                 else "table_source_replaces_existing")
+            target[replacement_field] = import_operation == "replaceExisting" and bool(rows)
+            if source_operation == "audio.importTabDelimited" and import_operation == "useExisting" and rows:
+                target["localized_audio_file_source_id"] = rows[0]["id"]
+            allowed_result_paths.add(target["explicit_source_owner_path"].casefold())
         notes_destination = (
             "audio_file_source"
             if source_operation == "audio.import" and import_operation == "useExisting" and bool(rows)
@@ -15862,6 +15872,7 @@ def _prepare_closed_import_plan(
                         isinstance(target.get("source_file"), Mapping)
                         and target["source_file"].get("kind") == "inline_base64"
                         and source_operation != "audio.import"
+                        and not _is_tab_audio_file_source_target(target, source_operation)
                     )),
                     ("import_location", "requested_import_location" in target),
                     ("dialogue_event", (
@@ -15872,9 +15883,9 @@ def _prepare_closed_import_plan(
                         "requested_switch_assignment" in target
                         or bool(target.get("requested_switch_assignments"))
                     )),
-                    ("properties", source_operation != "audio.import" and target.get("localized_owner_fields") is not True and bool(target.get("validated_properties"))),
-                    ("references", source_operation != "audio.import" and target.get("localized_owner_fields") is not True and bool(target.get("validated_references"))),
-                    ("dynamic_fields", target.get("localized_owner_fields") is not True and bool(target.get("requested_dynamic_fields"))),
+                    ("properties", source_operation != "audio.import" and not _is_tab_audio_file_source_target(target, source_operation) and target.get("localized_owner_fields") is not True and bool(target.get("validated_properties"))),
+                    ("references", source_operation != "audio.import" and not _is_tab_audio_file_source_target(target, source_operation) and target.get("localized_owner_fields") is not True and bool(target.get("validated_references"))),
+                    ("dynamic_fields", not _is_tab_audio_file_source_target(target, source_operation) and target.get("localized_owner_fields") is not True and bool(target.get("requested_dynamic_fields"))),
                 )
                 if present
             ]
@@ -16410,6 +16421,8 @@ def _prepare_closed_import_plan(
                                        if "empty_sfx_source_snapshot" in target],
         "localized_source_snapshots": [target["localized_source_snapshot"] for target in targets
                                        if "localized_source_snapshot" in target],
+        "source_owner_replace_subtrees": [{"owner": target["explicit_source_owner"], "rows": target["source_owner_replace_subtree"]}
+            for target in targets if "source_owner_replace_subtree" in target],
         "language_inventory": _json_mapping(language_inventory) if language_inventory is not None else None,
     }
     if wire_path_input_audit is not None:
@@ -19352,6 +19365,25 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             assertions.append({"name": "existing SFX source identities and placement unchanged since preview",
                                "passed": actual == snapshot, "evidence": {"expected": snapshot, "actual": actual}})
         actual_source_snapshots: dict[tuple[str, str | None], dict[str, Any]] = {}
+        for snapshot in import_guard.get("source_owner_replace_subtrees", []):
+            if (not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("owner"), Mapping)
+                    or not _valid_object_id(snapshot["owner"].get("id")) or not isinstance(snapshot["owner"].get("path"), str)
+                    or not isinstance(snapshot.get("rows"), list) or not snapshot["rows"]):
+                raise OperationContractError("INVALID_PREVIEW", "An explicit table Sound replacement needs its exact bounded subtree snapshot.")
+            owner = snapshot["owner"]
+            try:
+                current_owners = _read_object_id_rows(owner["id"], fields=OBJECT_REPLACE_SNAPSHOT_FIELDS, read=read_call)
+                if len(current_owners) == 1:
+                    collision = ResolvedObject(identity=ObjectIdentity(path=owner["path"]), object=owner["id"], resolution="live-id", row=current_owners[0])
+                    actual_subtree = _capture_replace_subtree_snapshot(collision, read=read_call)
+                else:
+                    actual_subtree = []
+            except OperationContractError as exc:
+                passed, evidence = False, {"expected": snapshot["rows"], "error": exc.as_dict()}
+            else:
+                passed, evidence = actual_subtree == snapshot["rows"], {"expected": snapshot["rows"], "actual": actual_subtree}
+            assertions.append({"name": "explicit table Sound replacement subtree unchanged since Preview",
+                "passed": passed, "evidence": evidence})
         for snapshot in import_guard.get("localized_source_snapshots", []):
             if not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("rows"), list):
                 raise OperationContractError("INVALID_PREVIEW", "Localized source guard is malformed.")
@@ -19370,8 +19402,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             for target in prepared.get("verification_plan", {}).get("targets", []):
                 if not _is_tab_audio_file_source_target(target, "audio.importTabDelimited") or target.get("requested_target_id") is not None:
                     continue
+                if target.get("replaced_source_owner_id") is not None:
+                    continue  # The exact declared Sound replacement retires the complete sealed child set.
                 owner_id = target.get("explicit_source_owner", {}).get("id")
-                actual = actual_source_snapshots.get((str(owner_id).casefold(), None))
+                if owner_id is None and target.get("table_source_binding") is True and not target.get("pre_state_rows"):
+                    continue  # Immutable owner/Source absence snapshots already guard this new owner.
+                actual = actual_source_snapshots.get((str(owner_id).casefold(), prepared_version))
+                if actual is None:
+                    actual = actual_source_snapshots.get((str(owner_id).casefold(), None))
                 if actual is None:
                     raise OperationContractError("INVALID_PREVIEW", "A path-spelled TSV Source requires its complete owner-child snapshot.")
                 try:
@@ -19379,7 +19417,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 except OperationContractError as exc:
                     passed, evidence = False, {"error": exc.as_dict()}
                 else:
-                    passed, evidence = True, {"path": target["canonical_target_path"], "selected_id": target["preexisting_id"]}
+                    passed, evidence = True, {"path": target["canonical_target_path"], "selected_id": target.get("preexisting_id")}
                 assertions.append({"name": "TSV native Source wire path retains one exact identity", "passed": passed, "evidence": evidence})
         for binding in import_guard.get("dialogue_associations", []):
             for expected in binding.get("entry_field_metadata", []):
@@ -24732,11 +24770,19 @@ def verify_prepared_operation(
         for target in targets:
             for binding in target.get("dialogue_association_bindings", []):
                 expected_target_types[binding["path"].casefold()] = "DialogueEvent"
-            if _is_ordinary_audio_file_source_target(target, source_operation):
-                if (target.get("ordinary_source_owner_path") != target["canonical_parent_path"]
-                        or target.get("ordinary_source_replaces_existing") is not (import_operation == "replaceExisting" and bool(target["pre_state_rows"]))):
+            if _is_ordinary_audio_file_source_target(target, source_operation) or target.get("table_source_binding") is True:
+                owner_path = target.get("explicit_source_owner_path", target.get("ordinary_source_owner_path"))
+                replacement_field = "table_source_replaces_existing" if source_operation == "audio.importTabDelimited" else "ordinary_source_replaces_existing"
+                if (owner_path != target["canonical_parent_path"]
+                        or target.get(replacement_field) is not (import_operation == "replaceExisting" and bool(target["pre_state_rows"]))):
                     raise OperationContractError("INVALID_PREVIEW", "The named Source must retain its exact owner and replacement scope.")
-                expected_target_types[target["ordinary_source_owner_path"].casefold()] = "Sound"
+                expected_target_types[owner_path.casefold()] = "Sound"
+                retired_owner = target.get("replaced_source_owner_id")
+                if retired_owner is not None and (source_operation != "audio.importTabDelimited"
+                        or import_operation != "replaceExisting"
+                        or sum(other["canonical_target_path"] == owner_path and _same_identity(other.get("preexisting_id"), retired_owner)
+                               for other in targets) != 1):
+                    raise OperationContractError("INVALID_PREVIEW", "Source owner retirement requires the exact existing Sound declared for replacement.")
         returned_paths = [row.get("path") for row in object_rows]
         expected_source_path_set = set(expected_source_paths)
         unexpected_result_rows: list[dict[str, Any]] = []
@@ -24976,19 +25022,21 @@ def verify_prepared_operation(
             if live_row is not None:
                 live_id = live_row.get("id")
                 source_owner_id = live_id
-                ordinary_source = _is_ordinary_audio_file_source_target(target, source_operation)
+                ordinary_source = (_is_ordinary_audio_file_source_target(target, source_operation)
+                                   or target.get("table_source_binding") is True)
+                source_owner_path = target.get("explicit_source_owner_path", target.get("ordinary_source_owner_path"))
                 if ordinary_source:
-                    owner_rows = read_object(path=target["ordinary_source_owner_path"], fields=[*IDENTITY_RETURN_FIELDS, "classId", "@IsVoice"])
+                    owner_rows = read_object(path=source_owner_path, fields=[*IDENTITY_RETURN_FIELDS, "classId", "@IsVoice"])
                     owner = owner_rows[0] if len(owner_rows) == 1 else {}
                     source_owner_id = owner.get("id")
                     check(f"{label} named Source has its exact Sound owner",
                         _valid_object_id(source_owner_id)
-                        and owner.get("path") == target["ordinary_source_owner_path"]
-                        and owner.get("name") == target["ordinary_source_owner_path"].rpartition("\\")[2]
+                        and owner.get("path") == source_owner_path
+                        and owner.get("name") == source_owner_path.rpartition("\\")[2]
                         and _object_type_token(owner.get("type")) == "sound"
                         and _object_class_matches(owner.get("classId"), target.get("source_owner_class_id"))
                         and _field_value(owner, "@IsVoice") is (target.get("requested_language") != "SFX"), owner_rows)
-                    returned_owners = [row for row in object_rows if row.get("path") == target["ordinary_source_owner_path"]]
+                    returned_owners = [row for row in object_rows if row.get("path") == source_owner_path]
                     check(f"{label} returned Sound owner matches its independent live identity",
                         len(returned_owners) <= 1 and all(_same_identity(row.get("id"), source_owner_id) for row in returned_owners),
                         {"live_owner": source_owner_id, "returned_owners": returned_owners})
@@ -24999,7 +25047,13 @@ def verify_prepared_operation(
                     source_owner_id = target["explicit_source_owner"]["id"]
                 if explicit_source_target:
                     owner_before = target.get("explicit_source_owner")
-                    if isinstance(owner_before, Mapping):
+                    replaced_owner = target.get("replaced_source_owner_id")
+                    if replaced_owner is not None:
+                        old_owner_rows = read_object(object_id=replaced_owner, fields=IDENTITY_RETURN_FIELDS)
+                        check(f"{label} explicit Sound replacement retires and rebinds its owner",
+                            _valid_object_id(source_owner_id) and not _same_identity(source_owner_id, replaced_owner) and not old_owner_rows,
+                            {"old_owner": replaced_owner, "new_owner": source_owner_id, "old_rows": old_owner_rows})
+                    elif isinstance(owner_before, Mapping):
                         owner_rows = read_object(object_id=source_owner_id, fields=[*IDENTITY_RETURN_FIELDS, "classId", "@IsVoice"])
                         expected_owner = dict(owner_before)
                         for owner_target in targets:
@@ -25313,6 +25367,14 @@ def verify_prepared_operation(
 
                 localized_snapshot = target.get("localized_source_snapshot")
                 if isinstance(localized_snapshot, Mapping):
+                    if target.get("replaced_source_owner_id") is not None:
+                        retired_ids = [row["id"] for row in target["source_owner_replace_subtree"]]
+                        retirement_args = {"from": {"id": retired_ids}}
+                        retirement_options = {"return": list(IDENTITY_RETURN_FIELDS)}
+                        retirement = read_call(OBJECT_GET_URI, retirement_args, retirement_options) if retired_ids else {"return": []}
+                        if retired_ids:
+                            readbacks.append({"uri": OBJECT_GET_URI, "args": retirement_args, "options": retirement_options, "result": retirement})
+                        check(f"{label} replaced Sound retires its complete old subtree", not _rows(retirement), retirement)
                     def read_localized_sources(uri, args, options):
                         result = read_call(uri, args, options)
                         readbacks.append({"uri": uri, "args": args, "options": options, "result": result})
@@ -25352,8 +25414,8 @@ def verify_prepared_operation(
                         return result
                     after = _localized_source_snapshot(source_owner_id, read=read_new_owner_sources)
                     planned_sources = {(other["canonical_target_path"], other.get("requested_language"))
-                        for other in targets if _is_ordinary_audio_file_source_target(other, source_operation)
-                        and other.get("ordinary_source_owner_path") == target["ordinary_source_owner_path"]}
+                        for other in targets if _is_explicit_import_source_target(other, source_operation)
+                        and other.get("explicit_source_owner_path", other.get("ordinary_source_owner_path")) == source_owner_path}
                     actual_sources = {(row["path"], _import_language_name(row.get("audioSource:language"))) for row in after["rows"]}
                     check(f"{label} new Sound contains exactly its declared named Sources",
                         len(after["rows"]) == len(planned_sources) and actual_sources == planned_sources,

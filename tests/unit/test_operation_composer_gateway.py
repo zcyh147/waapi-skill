@@ -340,6 +340,20 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Source lifecycle extends one TSV disclosure across all five lanes.
+    # Invert exactly that delta before retaining every prior component seal.
+    assert canonical_sha256(non_object_set_digests) == "0a067c9f0ac14b8c48378170821fbcfdb6d9568d54fd0df39f87f4638a4e3ef4"
+    before_source_lifecycle = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        assert contract["constraints"][3] == (
+            "explicit Sound-owned AudioFileSource media rows support createNew/useExisting/replaceExisting with exact absent-or-selected Source paths across languages; a missing Sound kind is bound by its typed parent or same-table typed owner row; unchanged owners and unplanned Source identities/files are preserved, while an explicitly declared Sound replacement retires the complete sealed child set and rebinds requested Sources; regular or bounded inline WAV media and live metadata-proven Source fields retain independent verification; table bytes are never rewritten"
+        )
+        contract["constraints"][3] = (
+            "an explicit path-spelled AudioFileSource media row requires one exact Sound child path across all languages at Preview and execution, matching the selected GUID, class and parent; Notes targets that Source and a separate owner-only Notes row retains the exact-table transaction"
+        )
+        before_source_lifecycle[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
     # Reconcile the independent Switch extension before the Dialogue component
     # and all earlier seals. Only its two descriptions/one constraint changed.
     assert canonical_sha256(non_object_set_digests) == "c56f61d0fb3a1911e6b32c223bc1b482c3e6219676cc09937e36f5787dddcf40"
@@ -370,7 +384,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
             )
         before_switch_contracts["audio.import", version] = contract
         non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
-        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = deepcopy(before_source_lifecycle[version])
         assert contract["constraints"].pop(1) == (
             "Switch Assignation binds an exact existing group and optional exact values; group-only descriptors associate a typed SwitchContainer without creating a group or adding a child pair; explicitly typed new direct containers use the same single-import path and full group/pair readback"
         )

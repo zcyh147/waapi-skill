@@ -65,6 +65,7 @@ tests/unit/test_operation_draft_gateway.py
 tests/unit/test_audio_import_business_adapter.py
 tests/unit/test_audio_import_business_gateway.py
 tests/unit/test_audio_import_named_sources.py
+tests/unit/test_tsv_source_lifecycle_gateway.py
 tests/unit/test_import_switch_assignment_gateway.py
 tests/unit/test_tsv_combined_fields_media_gateway.py
 tests/unit/test_tsv_switch_columns_gateway.py
