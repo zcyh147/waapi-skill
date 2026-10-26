@@ -291,15 +291,6 @@ def _validate_tab_media_path_namespace(prepared: PreparedOperation, project_guar
             raise TransactionGuardError("NATIVE_MEDIA_PATH_REQUIRED",
                 "An exact TSV for the proven Wine host requires a native Windows media path or a path relative to the table directory; its bytes cannot be rewritten.",
                 details={"native_path": proof["native_path"], "host_path": proof["path"]})
-        try:
-            parsed = parse_absolute_host_path(proof["native_path"])
-        except HostPathError:
-            # The closed parser already proved a table-relative path and base.
-            continue
-        if mode == "native_posix_identity" and parsed.flavor != "posix":
-            raise TransactionGuardError("NATIVE_MEDIA_PATH_NAMESPACE_UNAVAILABLE",
-                "A Windows TSV media path cannot be certified for the proven native POSIX host.",
-                details={"native_path": proof["native_path"]})
 
 
 def build_transaction_preview_artifact(
