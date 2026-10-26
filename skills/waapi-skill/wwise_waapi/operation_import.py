@@ -27,20 +27,6 @@ SUPPORTED_WWISE_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 SUPPORTED_IMPORT_OPERATIONS = ("createNew", "useExisting", "replaceExisting")
 AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS = ("2023.1", "2024.1", "2025.1")
 
-# Wwise 2022 evidence establishes only audioFile/objectPath/importLanguage for
-# a useExisting row that resolves to a localized object.  The fields below are
-# therefore creation- or placement-sensitive at that boundary; they must not
-# be silently removed from a caller's request.
-# A useExisting request may legitimately mix live and absent target paths, so
-# the registry applies this row policy only after it has captured each path's
-# actual pre-state.
-LOCALIZED_EXISTING_UNSUPPORTED_FIELDS = (
-    "originals_subfolder",
-    "notes",
-    "audio_source_notes",
-    "event",
-)
-
 MAX_IMPORT_ITEMS = 128
 MAX_TAB_BYTES = 256 * 1024
 MAX_TAB_ROWS = 128
@@ -224,37 +210,6 @@ def import_operation_policy(import_operation: str) -> dict[str, Any]:
         "cleanup_policy": "retain_project_and_imported_media",
         "in_place_restore_supported": False,
     }
-
-
-def unsupported_localized_existing_fields(
-    *,
-    import_language: Any,
-    originals_subfolder_supplied: bool,
-    notes_supplied: bool,
-    audio_source_notes_supplied: bool,
-    event_supplied: bool,
-) -> tuple[str, ...]:
-    """Return fields unsafe on an existing localized useExisting target.
-
-    Wwise's import operation is call-wide, but localization state is row-wide:
-    some useExisting rows can resolve to live Sound Voice objects while other
-    rows in the same call are still absent.  The caller must therefore invoke
-    this only for a row already proven to exist.  ``SFX`` and rows without an
-    explicit language are outside this narrow localized boundary.
-    """
-
-    if not isinstance(import_language, str) or import_language.casefold() == "sfx":
-        return ()
-    requested: list[str] = []
-    if originals_subfolder_supplied:
-        requested.append("originals_subfolder")
-    if notes_supplied:
-        requested.append("notes")
-    if audio_source_notes_supplied:
-        requested.append("audio_source_notes")
-    if event_supplied:
-        requested.append("event")
-    return tuple(requested)
 
 
 def regular_file_proof(value: str | os.PathLike[str], *, field: str) -> dict[str, Any]:

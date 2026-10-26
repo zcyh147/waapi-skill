@@ -110,7 +110,6 @@ from .operation_import import (
     normalize_originals_subfolder,
     parse_tab_delimited_import_file,
     regular_file_proof as import_regular_file_proof,
-    unsupported_localized_existing_fields,
     validate_import_media_extension,
     verify_regular_file_proof as verify_import_file_proof,
 )
@@ -2197,7 +2196,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "dynamic @ fields are produced only after live object-type and getPropertyInfo validation",
             "each row accepts one regular audio_file, one bounded RIFF/WAVE audio_file_base64, or a typed structure-only import",
             "useExisting preserves an existing target GUID; replaceExisting requires the old GUID to disappear",
-            "a live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight and other requested row fields are rejected",
+            "an ordinary audio.import live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight; Originals placement, one source notes field and a new Event retain ordinary import verification; other requested row fields are rejected",
             "replaceExisting is irreversible; replaced objects and media have no automatic restoration",
             "auto_add_to_source_control is explicit and defaults to false",
             "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
@@ -15164,23 +15163,18 @@ def _prepare_closed_import_plan(
             )
             if not localized_existing:
                 continue
-            unsupported = unsupported_localized_existing_fields(
-                import_language=language,
-                originals_subfolder_supplied=(
-                    "requested_originals_subfolder" in target
-                ),
-                notes_supplied="requested_notes" in target,
-                audio_source_notes_supplied=(
-                    "requested_audio_source_notes" in target
-                ),
-                event_supplied=(
-                    "requested_event" in target
-                    or bool(target.get("requested_events"))
-                ),
-            )
+            # TSV does not enter the ordinary import's exact localized-source
+            # normalization below. Retain its existing field boundary until
+            # that preparation/verification path is implemented as well.
+            localized_tab = source_operation == "audio.importTabDelimited"
             additional_unsupported = [
                 field_name
                 for field_name, present in (
+                    ("originals_subfolder", localized_tab and "requested_originals_subfolder" in target),
+                    ("notes", localized_tab and "requested_notes" in target),
+                    ("audio_source_notes", localized_tab and "requested_audio_source_notes" in target),
+                    ("event", localized_tab and (
+                        "requested_event" in target or bool(target.get("requested_events")))),
                     ("audio_file_base64", (
                         isinstance(target.get("source_file"), Mapping)
                         and target["source_file"].get("kind") == "inline_base64"
@@ -15200,7 +15194,7 @@ def _prepare_closed_import_plan(
                 )
                 if present
             ]
-            unsupported = (*unsupported, *additional_unsupported)
+            unsupported = tuple(additional_unsupported)
             if (
                 source_operation == "audio.importTabDelimited"
                 and "requested_object_type" in target
@@ -15218,10 +15212,10 @@ def _prepare_closed_import_plan(
         if unsupported_existing_rows:
             raise OperationContractError(
                 "LOCALIZED_EXISTING_IMPORT_FIELDS",
-                "A localized useExisting row that resolves to a live target may "
-                "accept only media and language inputs; the Gateway owns native source targeting. Remove "
-                "creation/placement fields or submit their semantics through a "
-                "separately previewed operation.",
+                "The requested localized useExisting fields are outside this "
+                "operation's current closed preparation and verification path. "
+                "The unsupported fields are listed per row; no native limitation "
+                "is established by this implementation boundary.",
                 details={
                     "import_operation": import_operation,
                     "call_wide_rejection": True,
@@ -15461,6 +15455,17 @@ def _prepare_closed_import_plan(
                     row.pop("objectType")
                     consumed.append("object_type")
                 expected_wire_fields = {"audioFile", "objectPath", "importLanguage"}
+                # Preserve ordinary import fields through the localized source
+                # binding. Their existing oracles verify placement, source notes,
+                # and the new Event/Action independently after dispatch.
+                for requested, native in (
+                    ("requested_originals_subfolder", "originalsSubFolder"),
+                    ("requested_notes", "notes"),
+                    ("requested_audio_source_notes", "audioSourceNotes"),
+                    ("validated_events", "event"),
+                ):
+                    if requested in target:
+                        expected_wire_fields.add(native)
                 if localized_guid_location:
                     expected_wire_fields.add("importLocation")
                 if set(row) != expected_wire_fields:
