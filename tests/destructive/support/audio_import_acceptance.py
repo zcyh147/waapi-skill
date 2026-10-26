@@ -276,7 +276,8 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
         _complete_business_draft, _write_fixture_wav,
     )
     assert runtime.version == "2025.1", "Representative unchanged-table witness is pinned to 2025.1"
-    assert witness_kind in {"notes-columns", "ordinary-owner-source", "explicit-source-tsv", "guid-source-tsv"}
+    assert witness_kind in {"notes-columns", "ordinary-owner-source", "explicit-source-tsv", "guid-source-tsv", "owner-fields-tsv"}
+    owner_fields = witness_kind == "owner-fields-tsv"
     explicit_source_table = witness_kind in {"explicit-source-tsv", "guid-source-tsv"}
     ordinary = witness_kind == "ordinary-owner-source"
     name = "TSV_Witness_" + uuid.uuid4().hex[:10]
@@ -340,7 +341,7 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
         return payload["objects"]
     def exact(identity):
         rows = query(["--exact-id", identity], ("notes", "parent", "class-id"),
-            ("Volume", "OutputBus", "OverrideOutput") if ordinary and identities.get("VoiceSource") == identity else ())
+            ("Volume", "OutputBus", "OverrideOutput") if (ordinary or owner_fields) and identities.get("VoiceNotes" if owner_fields else "VoiceSource") == identity else ())
         assert len(rows) == 1 and rows[0]["id"] == identity and isinstance(rows[0].get("notes"), str), rows
         return rows[0]
     def at(*segments):
@@ -442,10 +443,27 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
                 "--field", "audio_source_notes", "Japanese explicit Source notes", "--field", "originals_subfolder", "After",
                 "--field-value", fields["Volume"], "-6", "--field-value", fields["OutputBus"], bus], live=False)
         else:
-            replacement = ({"VoiceNotes": audio(4, "DifferentMedia")} if explicit_source_table else
+            replacement = ({} if owner_fields else {"VoiceNotes": audio(4, "DifferentMedia")} if explicit_source_table else
                 {key: audio(index + 4, stem) for index, (key, stem) in enumerate((("VoiceNotes", "LineNotes"), ("VoiceSource", "LineSource")))})
             table = owned / "GatewayTSVWitness/exact-localized.tsv"
-            if explicit_source_table:
+            if owner_fields:
+                bus_work_unit = at("Busses", "Default Work Unit")
+                report["buses_before"] = {}
+                for label, identity, bus_name in (
+                    ("Main", "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}", "Main Audio Bus"),
+                    ("Secondary", "{D2E0BC7E-7B3F-4FFE-A670-FAE02761B631}", "Secondary Bus"),
+                ):
+                    bus = exact(identity)
+                    expected = {"id": identity, "name": bus_name, "type": "Bus", "class_id": 524304,
+                        "path": "\\Busses\\Default Work Unit\\" + bus_name}
+                    assert all(bus.get(key) == value for key, value in expected.items()) and bus["parent"]["id"] == bus_work_unit, bus
+                    report["buses_before"][label] = bus
+                secondary_id = report["buses_before"]["Secondary"]["id"]
+                assert before["VoiceNotes"]["owner"]["references"]["OutputBus"]["id"] == report["buses_before"]["Main"]["id"] != secondary_id
+                assert before["VoiceNotes"]["owner"]["properties"] == {"Volume": 0.0, "OverrideOutput": False}
+                table.write_text("Object Path\tProperty[Volume]\tProperty[OverrideOutput]\tReference[OutputBus]\n"
+                    + f"<Sound Voice>VoiceNotes\t-6\ttrue\t{secondary_id}\n", encoding="utf-8", newline="\n")
+            elif explicit_source_table:
                 from wwise_waapi.platform_paths import adapt_cli_dispatch_paths
                 shown_setup = gateway.gateway(["transaction-show", report["setup"][0]["transaction_id"]], live=False)
                 media_path = str(replacement["VoiceNotes"].resolve(strict=True))
@@ -531,6 +549,8 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
             report["bus_after"] = exact(bus_id)
         else:
             report["table_after"] = proof(str(table))
+            if owner_fields:
+                report["buses_after"] = {label: exact(bus["id"]) for label, bus in report["buses_before"].items()}
         persist()
         assert not report["observation_errors"], report["observation_errors"]
         assert len(actual) == 1 and isinstance(actual[0].get("readbacks"), list), "Actual verifier readbacks missing"
@@ -555,6 +575,15 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
             assert current["owner"]["properties"]["Volume"] == -6
             assert current["owner"]["properties"]["OverrideOutput"] is True
             assert current["owner"]["references"]["OutputBus"]["id"] == bus_id
+        elif owner_fields:
+            assert after["VoiceSource"] == before["VoiceSource"]
+            assert after["VoiceNotes"]["sources"] == before["VoiceNotes"]["sources"]
+            assert report["buses_after"] == report["buses_before"]
+            prior, current = before["VoiceNotes"]["owner"], after["VoiceNotes"]["owner"]
+            assert {key: value for key, value in current.items() if key not in {"properties", "references"}} == {
+                key: value for key, value in prior.items() if key not in {"properties", "references"}}
+            assert current["properties"] == {"Volume": -6, "OverrideOutput": True}
+            assert current["references"]["OutputBus"]["id"] == secondary_id
         elif explicit_source_table:
             assert after["VoiceSource"] == before["VoiceSource"]
             prior, current = before["VoiceNotes"], after["VoiceNotes"]
@@ -604,3 +633,7 @@ def collect_localized_explicit_source_tsv_acceptance(runtime):
 
 def collect_localized_guid_source_tsv_acceptance(runtime):
     return collect_localized_tsv_import_acceptance(runtime, witness_kind="guid-source-tsv")
+
+
+def collect_localized_owner_fields_tsv_acceptance(runtime):
+    return collect_localized_tsv_import_acceptance(runtime, witness_kind="owner-fields-tsv")

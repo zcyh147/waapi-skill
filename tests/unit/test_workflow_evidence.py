@@ -346,6 +346,11 @@ def test_guid_source_native_witness_reaches_persisted_final_writer(tmp_path, mon
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="guid-source-tsv")
 
 
+@pytest.mark.parametrize("fault", (None, "ignored-reference", "indeterminate"))
+def test_owner_only_tsv_fields_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
+    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="owner-fields-tsv")
+
+
 @pytest.mark.parametrize("fault", ("missing-bus", "wrong-bus-parent"))
 def test_ordinary_owner_source_native_witness_rejects_invalid_selected_bus(tmp_path, monkeypatch, fault):
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="ordinary-owner-source")
@@ -429,7 +434,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 if "@" + name in row:
                     owner["@" + name] = {"id": row["@" + name]} if name == "OutputBus" else row["@" + name]
             if owner["type"] == "Sound":
-                owner.setdefault("@Volume", 0.0); owner.setdefault("@OutputBus", None); owner.setdefault("@OverrideOutput", False)
+                owner.setdefault("@Volume", 0.0); owner.setdefault("@OutputBus", {"id": self.bus["id"]} if witness_kind == "owner-fields-tsv" else None); owner.setdefault("@OverrideOutput", False)
             if "notes" in row and not explicit_source and "audioFile" not in row and "audioFileBase64" not in row:
                 owner["notes"] = row["notes"]
             returned = [owner]
@@ -543,7 +548,13 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                         assert row["Object Type"] == ("AudioFileSource" if explicit_source else "Sound Voice")
                     elif not object_path.startswith("\\"):
                         object_path = self.objects[args["importLocation"]]["path"] + "\\" + object_path
-                    native = {"objectPath": object_path, "notes": row.get("Notes", "")}
+                    native = {"objectPath": object_path}
+                    if "Notes" in row: native["notes"] = row["Notes"]
+                    if witness_kind == "owner-fields-tsv":
+                        native["@Volume"] = float(row["Property[Volume]"])
+                        assert row["Property[OverrideOutput]"] in {"true", "false"}
+                        native["@OverrideOutput"] = row["Property[OverrideOutput]"] == "true"
+                        if fault != "ignored-reference": native["@OutputBus"] = row["Reference[OutputBus]"]
                     if row.get("Audio File"):
                         if witness_kind in {"explicit-source-tsv", "guid-source-tsv"}:
                             assert not row["Audio File"].startswith("/"), "Wine cannot consume a POSIX absolute media cell"
@@ -587,7 +598,8 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
     node = {"notes-columns": "test_audio_import_localized_exact_tsv_independent_notes",
         "ordinary-owner-source": "test_audio_import_new_localized_source_owner_fields",
         "explicit-source-tsv": "test_audio_import_exact_tsv_owner_notes_existing_source_media",
-        "guid-source-tsv": "test_audio_import_exact_tsv_guid_owner_and_source_media"}[witness_kind]
+        "guid-source-tsv": "test_audio_import_exact_tsv_guid_owner_and_source_media",
+        "owner-fields-tsv": "test_audio_import_exact_tsv_owner_only_fields_preserve_sources"}[witness_kind]
     error = None
     try: getattr(workflow, node)(runtime)
     except AssertionError as exc: error = exc
@@ -634,7 +646,16 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
             assert client.import_count == 2 and client.tab_count == 1
             assert "Audio Source Notes" not in report["table"]["utf8"]
             cells = [line.split("\t") for line in report["table"]["utf8"].splitlines()]
-            if witness_kind == "guid-source-tsv":
+            if witness_kind == "owner-fields-tsv":
+                assert cells == [["Object Path", "Property[Volume]", "Property[OverrideOutput]", "Reference[OutputBus]"],
+                    ["<Sound Voice>VoiceNotes", "-6", "true", "{D2E0BC7E-7B3F-4FFE-A670-FAE02761B631}"]]
+                assert "Audio File" not in report["table"]["utf8"]
+                if fault != "indeterminate":
+                    assert report["observations"]["after"]["VoiceNotes"]["sources"] == report["observations"]["before"]["VoiceNotes"]["sources"]
+                    assert report["buses_after"] == report["buses_before"]
+                if fault == "ignored-reference":
+                    assert witness["verify_exit_code"] == 2
+            elif witness_kind == "guid-source-tsv":
                 assert cells[0] == ["Audio File", "Object Path", "Object Type", "Notes", "OriginalsSubFolder"]
                 assert cells[1] == ["", report["guid_target_bindings"]["owner"]["id"], "Sound Voice", "TSV requested object Notes", ""]
                 assert cells[2][1:] == [report["guid_target_bindings"]["source"]["id"], "AudioFileSource", "TSV requested source Notes", "After"]
