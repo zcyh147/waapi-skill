@@ -123,6 +123,7 @@ class _WorkflowSandboxRuntime:
     source_copy_prelaunch: dict[str, Any] | None = None
     namespaced_query_prelaunch: dict[str, Any] | None = None
     soundbank_prelaunch: dict[str, Any] | None = None
+    console_project_prelaunch: dict[str, Any] | None = None
 
     @property
     def port(self) -> int:
@@ -1220,6 +1221,13 @@ def workflow_sandbox_runtime(
     from tests.destructive.support.namespaced_query_fixture import PROFILE as NAMESPACED_QUERY_PROFILE
     selection = getattr(request, 'param', ())
     source_profile = selection if isinstance(selection, str) else None
+    from tests.destructive.support.console_project_acceptance import (
+        select_console_project_case, prepare_console_project_environment, stage_media_storage_fixture,
+    )
+    console_project_case = select_console_project_case(
+        [item.nodeid for item in request.session.items if Path(item.path).resolve() == Path(__file__).resolve()], version)
+    if console_project_case:
+        env = prepare_console_project_environment(env, console_project_case)
     assert source_profile in {None, REPEATED_PROFILE, NAMESPACED_QUERY_PROFILE}, 'Unknown closed workflow fixture profile'
     if source_profile == REPEATED_PROFILE and version != '2021.1':
         pytest.skip('Native-donor repeated Source fixture is pinned to2021.1.14.8108')
@@ -1228,6 +1236,7 @@ def workflow_sandbox_runtime(
     source_copy_prelaunch = None
     namespaced_query_prelaunch = None
     soundbank_prelaunch = None
+    console_project_prelaunch = None
     lock = LiveSandboxLock(_safe_lock_root(env))
     sandbox: SandboxProject | None = None
     lifecycle: HeadlessLifecycle | None = None
@@ -1272,7 +1281,7 @@ def workflow_sandbox_runtime(
                     "Name": language, "ID": "{" + str(uuid.uuid4()).upper() + "}",
                 })
             tree.write(sandbox.sandbox_project, encoding="utf-8", xml_declaration=True)
-        if version in {"2022.1", "2025.1"}:
+        if version in {"2022.1", "2025.1"} and console_project_case != 'migrate':
             prelaunch_io_root = case_sandbox_root / "prelaunch-io"
             prelaunch_io_root.mkdir(parents=True, exist_ok=False)
             prelaunch = normalize_project_copy(
@@ -1298,6 +1307,9 @@ def workflow_sandbox_runtime(
             else:
                 assert prelaunch.auro_soundbank_isolation is not None
                 soundbank_prelaunch = prelaunch.as_dict()
+        if console_project_case in {'media-back', 'media-refresh'}:
+            console_project_prelaunch = stage_media_storage_fixture(
+                sandbox.sandbox_project, central=console_project_case == 'media-back')
         if source_profile == REPEATED_PROFILE:
             from tests.destructive.support.source_copy_fixture import prepare_repeated_source_fixture
             source_fixture_io = case_sandbox_root / 'source-copy-prelaunch-io'
@@ -1361,6 +1373,7 @@ def workflow_sandbox_runtime(
             source_copy_prelaunch=source_copy_prelaunch,
             namespaced_query_prelaunch=namespaced_query_prelaunch,
             soundbank_prelaunch=soundbank_prelaunch,
+            console_project_prelaunch=console_project_prelaunch,
         )
         yield runtime
     finally:
@@ -1458,6 +1471,48 @@ def workflow_sandbox_runtime(
 
         if deferred_error is not None:
             raise deferred_error
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_project_cli_create_acceptance(workflow_sandbox_runtime):
+    from tests.destructive.support.console_project_acceptance import collect_console_project_acceptance
+    collect_console_project_acceptance(workflow_sandbox_runtime, 'cli-create')
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_project_create_close_acceptance(workflow_sandbox_runtime):
+    from tests.destructive.support.console_project_acceptance import collect_console_project_acceptance
+    collect_console_project_acceptance(workflow_sandbox_runtime, 'create-close')
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_project_add_platform_copy_acceptance(workflow_sandbox_runtime):
+    from tests.destructive.support.console_project_acceptance import collect_console_project_acceptance
+    collect_console_project_acceptance(workflow_sandbox_runtime, 'add-copy')
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_project_migrate_created_fixture_acceptance(workflow_sandbox_runtime):
+    from tests.destructive.support.console_project_acceptance import collect_console_project_acceptance
+    collect_console_project_acceptance(workflow_sandbox_runtime, 'migrate')
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_project_media_ids_to_work_units_acceptance(workflow_sandbox_runtime):
+    from tests.destructive.support.console_project_acceptance import collect_console_project_acceptance
+    collect_console_project_acceptance(workflow_sandbox_runtime, 'media-back')
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_project_media_ids_refresh_acceptance(workflow_sandbox_runtime):
+    from tests.destructive.support.console_project_acceptance import collect_console_project_acceptance
+    collect_console_project_acceptance(workflow_sandbox_runtime, 'media-refresh')
 
 
 @pytest.mark.live
