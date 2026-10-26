@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+import hashlib
 import json
+import math
 from pathlib import Path
 import re
 from typing import Any, Mapping
@@ -163,7 +165,39 @@ QUERY_BUSINESS_OUTPUTS = {
     **LEGACY_OUTPUTS,
     **{business: (native, business.replace("-", "_")) for native, business in _NAMED_OUTPUT_PAIRS},
     "blend-tracks": ("blendTracks", "blend_tracks"),
+    "marker-records": ("Markers.{time,label} as waapiMarkerRecords", "marker_records"),
 }
+MARKER_RECORDS_RESULT_KEY = 'waapiMarkerRecords'
+MARKER_RECORD_SOURCE_SHA256 = {
+    '2023.1':'cda46faae59f0e9dfe9078c19f50c224badc906af34a42d67f8b2e0e6c82b509',
+    '2024.1':'63f4a1bd46e5acde7997fda5f50fcaf5c0901b050a46f7c3d8ab607476438613',
+    '2025.1':'2559d80fd20099e51dd31c0ef0322e3b5fde628b952adf8f9e3c9790e8a2892c',
+}
+
+
+def _marker_records_source(version):
+    path = Path(__file__).resolve().parents[1] / 'references/semantic' / version / 'query-marker-records-sources.json'
+    with path.open('rb') as stream:
+        raw = stream.read(8193)
+    if len(raw) > 8192 or hashlib.sha256(raw).hexdigest() != MARKER_RECORD_SOURCE_SHA256[version]:
+        raise ValueError('Pinned Marker record composition source changed')
+    source = json.loads(raw)
+    if (source['version'], source['wwise_build']) != (version, _definition_graph(version).wwise_build):
+        raise ValueError('Marker record source differs from selected version/build')
+    return source
+
+
+def validate_marker_records(value):
+    """Retain optional/null fields and extensions; never synthesize identities or units."""
+    if value is None: return
+    if not isinstance(value, list) or any(not isinstance(row, dict) for row in value):
+        raise ValueError('Marker records must be an ordered array of record objects or explicit null')
+    for row in value:
+        time = row.get('time')
+        if time is not None and (type(time) not in (int, float) or type(time) is float and not math.isfinite(time)):
+            raise ValueError('A present non-null Marker time must retain a finite native number')
+        if row.get('label') is not None and not isinstance(row['label'], str):
+            raise ValueError('A present non-null Marker label must retain a native string')
 
 # Reviewed built-ins absent from objectReturn.properties; enum membership alone
 # never admits another output or another version.
@@ -186,6 +220,9 @@ def available_query_outputs(version: str) -> dict[str, tuple[str | None, str]]:
     outputs = {name: binding for name, binding in QUERY_BUSINESS_OUTPUTS.items()
                if name in LEGACY_OUTPUTS or binding[0] in properties
                or (version in _ENUM_OUTPUT_VERSIONS.get(binding[0], ()) and binding[0] in native_enum)}
+    if version in MARKER_RECORD_SOURCE_SHA256:
+        _marker_records_source(version)
+        outputs['marker-records'] = QUERY_BUSINESS_OUTPUTS['marker-records']
     if version == "2021.1":
         # Fixed closed candidate. Lexical permission is separate from native
         # acceptance; query_output_detail discloses that distinction.
@@ -218,6 +255,20 @@ def override_source_value_contract(version: str) -> dict[str, Any]:
 
 
 def query_output_detail(version: str, name: str) -> dict[str, Any]:
+    if name == 'marker-records':
+        available = version in MARKER_RECORD_SOURCE_SHA256
+        guidance = 'Marker records use the documented 2023.1–2025.1 root composition; use one exact AudioFileSource or an advanced SELECT returning Source roots; no related-record hop is exposed'
+        return {'name':name,'output_field':'marker_records','available':available,
+            'supported_versions':list(MARKER_RECORD_SOURCE_SHA256),
+            'description':'Return the actual ordered time/label records of the fixed documented Markers composition',
+            'result_scope':'root AudioFileSource records; no canonical per-record identity or mutation authority',
+            'native_definition':None,'result_schema':None,
+            'source':_marker_records_source(version) if available else None,
+            'computed_file_cue_semantics_proven':False,'direct_stored_list_equivalence_proven':False,
+            'presence':'missing output stays unavailable; explicit null and each missing/null record field stay unchanged; extensions retained',
+            'native_units':'no conversion; Time units remain unknown from these source sections',
+            'limits':'existing object-query time/row/transport and final-result paging limits; records grant no query-exhaustion or mutation-selection authority',
+            'alternative':{'guidance':guidance}}
     if version == "2021.1" and name == "curve-points":
         from .object_query_local_lists import curve_points_postcondition
         graph = _definition_graph(version)

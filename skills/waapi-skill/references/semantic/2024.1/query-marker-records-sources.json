@@ -1,0 +1,39 @@
+{
+  "contract": "waapi-skill.marker-record-output-source/v1",
+  "version": "2024.1",
+  "wwise_build": "2024.1.13.9056",
+  "page": "waql_reference.html",
+  "page_sha256": "a030dec88e3b956cea1a9595980ddd54e4d40e646453e87198605b60a065ac20",
+  "composition": "Markers.{time,label}",
+  "composition_lines": [
+    1288,
+    1301
+  ],
+  "composition_key_rule": "enumerated expressions become keys on the resulting objects",
+  "alias_rule": "EXPRESSION as NAME",
+  "alias_lines": [
+    1316,
+    1327
+  ],
+  "alias_key_rule": "NAME becomes the result key",
+  "gateway_owned_alias": "waapiMarkerRecords",
+  "marker_fields": {
+    "class_id": 5373968,
+    "owner_class_id": 16,
+    "owner_type": "AudioFileSource",
+    "page": "wwiseobject_marker.html",
+    "page_sha256": "c04348b8dfeb41f54e6b3c538859113c3ab0c38659c0da4fe50b092fe30facab",
+    "properties": {
+      "Time": {
+        "type": "Real64"
+      },
+      "Label": {
+        "type": "string"
+      }
+    }
+  },
+  "native_units": "unconverted; Time units not established by these source sections",
+  "computed_file_cue_semantics_proven": false,
+  "direct_stored_list_equivalence_proven": false,
+  "native_marker_record_receipt_claimed": false
+}

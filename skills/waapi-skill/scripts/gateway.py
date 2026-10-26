@@ -25637,6 +25637,15 @@ def _project_query_business_rows(
                         context["identity_completeness"] = {"complete": False, "unavailable_fields": missing, "mutation_authority": False}
                 continue
             group = QUERY_FIELD_OUTPUT_GROUPS.get(kind)
+            if kind == 'business' and output == 'marker_records':
+                from wwise_waapi.object_query_outputs import MARKER_RECORDS_RESULT_KEY, validate_marker_records
+                native = MARKER_RECORDS_RESULT_KEY
+                if native in row:
+                    try:
+                        validate_marker_records(row[native])
+                    except ValueError as exc:
+                        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else 'QUERY_MARKER_RECORDS_SHAPE'
+                        raise GatewayResultShapeError(str(exc),details={'id':row.get('id'),'output':'marker_records','native_key':native},error_code=code) from exc
             if native not in row:
                 unavailable.append(f"{group}.{output}" if group else output)
                 continue
