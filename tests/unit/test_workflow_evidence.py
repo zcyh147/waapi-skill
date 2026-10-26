@@ -1115,7 +1115,7 @@ def _assert_dialogue_probe_final_writer(tmp_path, monkeypatch, *, fault, members
         assert report["calls"][-1].get("exception") or report["calls"][-1].get("payload")
 
 
-@pytest.mark.parametrize("fault", (None, "ignored-association", "indeterminate"))
+@pytest.mark.parametrize("fault", (None, "missing-dialogue-event", "indeterminate"))
 def test_dialogue_import_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
     """Real collector/Gateway/verifier/writer; only native execution is fake."""
     import importlib
@@ -1157,7 +1157,7 @@ def test_dialogue_import_native_witness_reaches_persisted_final_writer(tmp_path,
             self.baseline_sound=source_row("Containers/Dialogues.wwu","Sound","UNA-DB-OS_01","Containers")
             self.baseline_entry={"id":"{A1AEBDF2-1B8E-4E92-9CE8-336DB7CB44CA}","name":"","type":"MultiSwitchEntry","classId":classes["MultiSwitchEntry"],
                 "path":"opaque fixture Entry path","owner":{"id":self.baseline_event["id"]},"AudioNode":{"id":self.baseline_sound["id"]},"notes":""}
-            self.regular_requested=True; self.effect=fault!="ignored-association"; self.import_count=0
+            self.regular_requested=True; self.effect=False; self.import_count=0
         def call(self,uri,args=None,options=None):
             args,options=args or {},options or {}
             if uri.endswith("getTypes"): self.calls.append((uri,copy.deepcopy(args),copy.deepcopy(options))); return {"return":catalog}
@@ -1200,6 +1200,7 @@ def test_dialogue_import_native_witness_reaches_persisted_final_writer(tmp_path,
                 self.entry.update(path=self.event["path"]+'\\opaque fixture association',owner={"id":self.EVENT},AudioNode={"id":self.CHILD},notes="")
                 copied=Path(self.source["originalFilePath"]); copied.parent.mkdir(parents=True,exist_ok=True); copied.write_bytes(wav.read_bytes())
                 self.created=self.event_created=True; self.linked=self.effect
+                if fault=="missing-dialogue-event":self.event["path"] += "_missing"
                 return {"objects":copy.deepcopy([self.child,self.source,self.event]),"log":[],"files":[str(copied)]}
             return super().call(uri,args,options)
     client=Client(); state=tmp_path/'state'; env=set_gateway_config(_env(tmp_path),wwise_version='2025.1')
@@ -1228,5 +1229,5 @@ def test_dialogue_import_native_witness_reaches_persisted_final_writer(tmp_path,
         assert 'after' not in report['observations']
     elif fault:
         assert report['witness']['verify']['state']=='verification_failed'
-        assert report['observations']['after']['source_media'] and report['observations']['after']['actions']
-        assert report['observations']['after']['entries']==[], 'Media/Event success cannot hide absent Dialogue link'
+        assert any(not row['passed'] and 'exact new DialogueEvent identity' in row['name']
+            for row in report['witness']['verify']['verification']['assertions']), 'Creation remains a required effect'

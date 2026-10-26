@@ -1155,7 +1155,7 @@ _IMPORT_COMMON_ARGUMENT_PROPERTIES: Mapping[str, Any] = {
     "dialogue_event": {
         "type": "object", "additionalProperties": False, "required": ["path"],
         "properties": {"path": {"type": "string", "minLength": 1, "maxLength": 4096}},
-        "description": "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; verifies the Entry.owner and AudioNode association, without asserting unspecified decision-path defaults.",
+        "description": "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; name/path alone requests Event creation, not a decision-path association. Explicit decision paths remain separate closed support work.",
     },
     "switch_assignment": _AUDIO_IMPORT_SWITCH_ASSIGNMENT_SCHEMA,
     "properties": {
@@ -15141,20 +15141,18 @@ def _prepare_import_dialogue_association(target: dict[str, Any], *, index: int,
         raise OperationContractError("DIALOGUE_EVENT_TARGET_EXISTS", "This import association requires one distinct new DialogueEvent path.")
     catalog = _read_object_type_catalog(read)
     event_class = _resolve_object_type("DialogueEvent", catalog=catalog)
-    entry_class = _resolve_object_type("MultiSwitchEntry", catalog=catalog)
-    info = _read_property_info(read, name="AudioNode", class_id=entry_class.class_id)
-    _require_object_reference_metadata(info)
-    planned_owner = ResolvedObject(identity=ObjectIdentity(path=target["canonical_target_path"]),
-        object=target["canonical_target_path"], resolution="planned-import-owner", row={"type": "Sound"})
-    _require_reference_target_allowed(info, planned_owner)
+    # A name-only declaration creates the Event. AudioNode metadata/Entry
+    # availability is not a prerequisite without an explicit decision path.
+    entry_classes = [row for row in catalog if row.name == "MultiSwitchEntry"]
     before = target.get("pre_state_rows", [])
     owner_id = before[0]["id"] if before else None
     before_referrers = _read_import_dialogue_referrers(owner_id, read=read) if owner_id else []
     target["dialogue_association_binding"] = {"path": event_path, "parent_id": parent.object,
-        "event_class_id": event_class.class_id, "entry_class_id": entry_class.class_id,
-        "audio_node_metadata": info.as_dict(), "owner_id": owner_id,
+        "event_class_id": event_class.class_id,
+        "entry_class_id": entry_classes[0].class_id if len(entry_classes) == 1 else None,
+        "requested_effect": "create_event", "owner_id": owner_id,
         "before": before_referrers}
-    target["class_metadata"].extend([event_class.as_dict(), entry_class.as_dict()])
+    target["class_metadata"].append(event_class.as_dict())
     roles[f"import_dialogue[{index}].parent"] = parent
     path_snapshots.append({"path": event_path, "fields": list(IDENTITY_RETURN_FIELDS), "rows": []})
 
@@ -19180,11 +19178,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                     passed, evidence = True, {"path": target["canonical_target_path"], "selected_id": target["preexisting_id"]}
                 assertions.append({"name": "TSV native Source wire path retains one exact identity", "passed": passed, "evidence": evidence})
         for binding in import_guard.get("dialogue_associations", []):
-            actual_metadata = _read_property_info(read_call, name="AudioNode", class_id=binding["entry_class_id"]).as_dict()
             actual = _read_import_dialogue_referrers(binding["owner_id"], read=read_call) if binding["owner_id"] else []
-            assertions.append({"name": "import Dialogue metadata and owner associations unchanged since Preview",
-                "passed": _native_snapshot_equal(actual_metadata, binding["audio_node_metadata"]) and actual == binding["before"],
-                "evidence": {"expected": binding, "actual_metadata": actual_metadata, "actual_referrers": actual}})
+            assertions.append({"name": "import Dialogue owner referrers unchanged since Preview",
+                "passed": actual == binding["before"],
+                "evidence": {"expected": binding, "actual_referrers": actual}})
         for binding in import_guard.get("switch_assignments", []):
             reference_result = read_call(OBJECT_GET_URI, {"from": {"id": [binding["container_id"]]}}, {"return": ["id", SWITCH_GROUP_REFERENCE]})
             reference_rows = _rows(reference_result)
@@ -25452,16 +25449,13 @@ def verify_prepared_operation(
                 planned_ok = ({_identity_key(row["id"]) for row in planned} == verified_event_action_ids
                     and all(row.get("type") == "Action" for row in planned)
                     and all(row.get("type") == "SwitchContainer" for row in switch_members))
-                association_ok = (planned_ok and len(entries) == 1 and event_ok and entries[0].get("type") == "MultiSwitchEntry"
-                    and entries[0].get("classId") == dialogue["entry_class_id"]
-                    and _same_identity(_reference_identity(entries[0].get("owner")), event_id)
-                    and _same_identity(_reference_identity(entries[0].get("AudioNode")), live_id))
-                if association_ok:
-                    actual_entry = read_object(object_id=entries[0]["id"], fields=[*IDENTITY_RETURN_FIELDS, "classId", "owner", "AudioNode"])
-                    association_ok = actual_entry == entries
-                    actual_metadata = _read_property_info(dialogue_read, name="AudioNode", object_id=entries[0]["id"]).as_dict()
-                    association_ok = association_ok and _native_snapshot_equal(actual_metadata, dialogue["audio_node_metadata"])
-                check(f"{label} Dialogue association and unrelated referrers preserved", association_ok and preserved,
+                # Preserve old links and reject foreign effects, but do not
+                # require an unrequested default Entry or inspect path internals.
+                optional_entries_ok = all(row.get("type") == "MultiSwitchEntry"
+                    and row.get("classId") == dialogue["entry_class_id"]
+                    and _same_identity(_reference_identity(row.get("owner")), event_id)
+                    and _same_identity(_reference_identity(row.get("AudioNode")), live_id) for row in entries)
+                check(f"{label} Dialogue creation has only planned effects and preserves referrers", event_ok and planned_ok and optional_entries_ok and preserved,
                     {"event": event_rows, "owner_id": live_id, "before": dialogue["before"], "actual": referrers, "verified_event_actions": sorted(verified_event_action_ids),
                         "verified_switch_containers": sorted(verified_switch_referrers)})
     # Compatibility for already-persisted legacy previews only. Current public
