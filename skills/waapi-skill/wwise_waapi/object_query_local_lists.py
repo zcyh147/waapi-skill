@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .documented_list_fields import load_catalog
 from .schema_inventory import load_definition_graph
+from .builders.common import ManifestSchemaLoader
 
 LOCAL_LISTS = {
     'local-rtpcs': {'native': '@RTPC', 'field': 'RTPC', 'first': '2022.1'},
@@ -85,12 +86,20 @@ def local_list_contract(version):
             'other precise source-proven plugin-to-base bridges']}
 
 
+def curve_points_postcondition(version):
+    """Typed value requirement; the 2021 source does not certify object.get semantics."""
+    if version == '2021.1':
+        return ManifestSchemaLoader().schema_for('ak.wwise.core.object.getAttenuationCurve', version)['resultSchema']['properties']['points']
+    definitions = load_definition_graph(version).documents['waapi_definitions.json']['definitions']
+    return definitions['pointsDefinition']
+
+
 def validate_curve_points(version, value, error):
     # Native null/omission retain the ordinary query presence contract. Actual
     # non-null point arrays follow the matching read schema, not mutation caps.
     if value is None: return
     definitions = load_definition_graph(version).documents['waapi_definitions.json']['definitions']
-    schema = definitions['pointsDefinition']['items']['properties']['shape']
+    schema = curve_points_postcondition(version)['items']['properties']['shape']
     shapes = schema.get('enum') or definitions[schema['$ref'].rsplit('/', 1)[-1]]['enum']
     if (not isinstance(value, list) or any(not isinstance(point, dict) or set(point) != {'x', 'y', 'shape'}
             or point['shape'] not in shapes or any(type(point[key]) not in (int, float)
