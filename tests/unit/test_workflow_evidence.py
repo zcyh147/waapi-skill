@@ -1229,5 +1229,5 @@ def test_dialogue_import_native_witness_reaches_persisted_final_writer(tmp_path,
         assert 'after' not in report['observations']
     elif fault:
         assert report['witness']['verify']['state']=='verification_failed'
-        assert any(not row['passed'] and 'exact new DialogueEvent identity' in row['name']
+        assert any(not row['passed'] and 'exact requested DialogueEvent identity' in row['name']
             for row in report['witness']['verify']['verification']['assertions']), 'Creation remains a required effect'

@@ -340,12 +340,64 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Reconcile the independent Switch extension before the Dialogue component
+    # and all earlier seals. Only its two descriptions/one constraint changed.
+    assert canonical_sha256(non_object_set_digests) == "c56f61d0fb3a1911e6b32c223bc1b482c3e6219676cc09937e36f5787dddcf40"
+    before_switch_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.import", version)
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            assert fields["switch_assignment"]["description"] == (
+                "One exact Switch/State value name for a direct imported child of an "
+                "existing SwitchContainer with its group already bound. Gateway resolves "
+                "that value under the actual group, constructs the native directive, and "
+                "verifies the complete assignment set and unchanged group. Supports "
+                "create/reuse/replace and localized owner/media reuse with groups below "
+                "Default Work Unit, including VirtualFolders. Replacement removes old-owner "
+                "pairs and verifies the requested new-owner pairs. Native directive grammar, "
+                "object paths and GUIDs are not caller inputs."
+            )
+            fields["switch_assignment"]["description"] = (
+                "One exact Switch/State value name for a direct imported child of an "
+                "existing SwitchContainer with its group already bound. Gateway resolves "
+                "that value under the actual group, constructs the native directive, and "
+                "verifies the complete assignment set and unchanged group. This first "
+                "slice supports create/reuse with groups below Default Work Unit, including "
+                "VirtualFolders; replacement, new group/container setup and existing "
+                "localized reuse remain outside this slice. Native directive grammar, "
+                "object paths and GUIDs are not caller inputs."
+            )
+        before_switch_contracts["audio.import", version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        assert contract["constraints"].pop(1) == (
+            "Switch Assignation binds an exact existing group and optional exact values; group-only descriptors associate a typed SwitchContainer without creating a group or adding a child pair; explicitly typed new direct containers use the same single-import path and full group/pair readback"
+        )
+        before_switch_contracts["audio.importTabDelimited", version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    # Explicit path choices add only the ordinary row/default Dialogue fields.
+    # Invert that exact extension before all historical schema seals below.
+    assert canonical_sha256(non_object_set_digests) == "4fabdc0d5496d180c8f0adf680d812204692dd157c26dc85e4e3965890ec9de8"
+    dialogue_input_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(before_switch_contracts["audio.import", version])
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            dialogue = fields["dialogue_event"]
+            assert set(dialogue["properties"]) == {"path", "conditions", "probability", "weight"}
+            assert dialogue["properties"]["conditions"]["maxItems"] == 32
+            for field in ("conditions", "probability", "weight"):
+                dialogue["properties"].pop(field)
+            dialogue["description"] = "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; name/path alone requests Event creation, not a decision-path association. Explicit decision paths remain separate closed support work."
+        dialogue_input_contracts[version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
     # Exact Help and the retained native result establish creation for name
     # alone. Invert only the corrected promise, retaining the previous seal.
     assert canonical_sha256(non_object_set_digests) == "5da8cc04ba3f0f1596ec4dd13cfa95c7333d3115df8e20360a6a47403e4450c2"
     association_promise_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.import", version)
+        contract = deepcopy(dialogue_input_contracts[version])
         props = contract["argument_contract"]["properties"]
         for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
             assert fields["dialogue_event"]["description"] == "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; name/path alone requests Event creation, not a decision-path association. Explicit decision paths remain separate closed support work."
@@ -372,7 +424,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
     # The second native failure removes only the unsupported unique-path escape.
     assert canonical_sha256(non_object_set_digests) == "1b5534697041f3bca74cd5c548d5c09afe76e61634d2aa54dd4326ff993cb9a9"
-    previous_owner_media_host_contract = operation_request_machine_contract("audio.importTabDelimited", "2025.1")
+    previous_owner_media_host_contract = deepcopy(before_switch_contracts["audio.importTabDelimited", "2025.1"])
     assert previous_owner_media_host_contract["constraints"][-2] == (
         "WwiseConsole 2025.1.7 build 9143 blocks combined localized existing-owner fields/media rows reusing an existing language Source: both shared and distinct Source-path native configurations added an extra Source despite correct fields and copied bytes; preparation and prewrite checks enforce this observed host boundary, not an API-absence claim or proven cause; owner-only, pure-media and other-host forms retain their existing boundaries"
     )
@@ -393,7 +445,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     assert canonical_sha256(non_object_set_digests) == "3d4da617cf27e38485a15d5f716e97cb6221ebe45a620c96e871868545df9962"
     before_combined_media_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = deepcopy(previous_source_boundary_contract) if version == "2025.1" else operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = deepcopy(previous_source_boundary_contract) if version == "2025.1" else deepcopy(before_switch_contracts["audio.importTabDelimited", version])
         assert contract["constraints"].pop() == (
             "localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows bind the intended language Source, verify planned media changes and preserve other Source files without rewriting the exact table"
         )

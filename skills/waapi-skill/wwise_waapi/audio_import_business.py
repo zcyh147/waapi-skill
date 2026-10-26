@@ -752,7 +752,7 @@ def _append_dynamic_fields(
 
 
 def _compile_dialogue_event(session: BusinessDeclarationSession, value: Any) -> dict[str, Any]:
-    if not isinstance(value, Mapping) or set(value) != {"parent_handle", "name"}:
+    if not isinstance(value, Mapping) or set(value) - {"parent_handle", "name", "conditions", "probability", "weight"} or not {"parent_handle", "name"} <= set(value):
         raise _field_type_repair(session, "dialogue_event", "parent_handle and exact child name object")
     parent = _resolve_object(session, value["parent_handle"])
     name = value["name"]
@@ -761,7 +761,22 @@ def _compile_dialogue_event(session: BusinessDeclarationSession, value: Any) -> 
             or any(c in name for c in "\\/<>:@|\r\n\t\x00")):
         raise _repair(session, "AUDIO_IMPORT_DIALOGUE_EVENT_INVALID", field="dialogue_event",
             action="provide an exact Dynamic Dialogue folder/Work Unit handle and one child name without directive grammar")
-    return {"path": f"{parent.path}\\{name}"}
+    result = {"path": f"{parent.path}\\{name}"}
+    if "conditions" in value:
+        conditions = value["conditions"]
+        if not isinstance(conditions, list) or not 1 <= len(conditions) <= 32:
+            raise _field_type_repair(session, "dialogue_event", "one to 32 ordered group/value conditions")
+        result["conditions"] = []
+        for condition in conditions:
+            if not isinstance(condition, Mapping) or set(condition) != {"group_handle", "value_handle"}:
+                raise _field_type_repair(session, "dialogue_event", "group_handle/value_handle conditions")
+            group = _resolve_object(session, condition["group_handle"])
+            selected = condition["value_handle"]
+            result["conditions"].append({"group": {"kind":"id", "value":group.object_id},
+                "value": "*" if selected == "*" else {"kind":"id", "value":_resolve_object(session, selected).object_id}})
+    for key in ("probability", "weight"):
+        if key in value: result[key] = value[key]
+    return result
 
 
 def _compile_event(

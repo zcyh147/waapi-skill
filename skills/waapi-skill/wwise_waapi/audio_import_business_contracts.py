@@ -145,13 +145,13 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
             "bound_field_handle_container": "field_values",
             "dedicated_declaration_parameters": {
                 "switch_value": "--switch-value",
-                "dialogue_event": "--dialogue-event-parent-handle + --dialogue-event-name",
+                "dialogue_event": "--dialogue-event-parent-handle + --dialogue-event-name; optional repeated --dialogue-condition GROUP_HANDLE VALUE_HANDLE_OR_*; --dialogue-probability/--dialogue-weight require conditions",
             },
             "generic_declaration_field_exclusions": ["switch_value"],
             "reference_value_rule": (
                 "copy_one_bound_object_handle_never_a_path_or_name"
             ),
-            "dialogue_event_rule": "new_DialogueEvent_from_bound_parent_and_exact_name; Gateway_owns_path_syntax; verify_Event_creation_only; association_requires_an_explicit_decision_path; explicit_decision_path_Probability_Weight_remain_unavailable",
+            "dialogue_event_rule": "new_DialogueEvent_from_bound_parent_and_exact_name; Gateway_owns_path_syntax; verify_Event_creation_only; association_requires_an_explicit_decision_path; explicit_ordered_group_value_or_wildcard_conditions_with_path_only_Probability_Weight_0_to_100; verify_association_and_supplied_numeric_values; decision_path_sequence_not_read_back",
             "switch_value_rule": (
                 "exact_value_name_below_the_existing_parent_SwitchContainers_actual_group; "
                 "Gateway_binds_group_and_value_and_owns_native_directive; "

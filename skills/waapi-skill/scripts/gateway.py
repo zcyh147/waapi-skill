@@ -1123,6 +1123,9 @@ def _add_business_declaration_arguments(
     )
     parser.add_argument("--dialogue-event-parent-handle")
     parser.add_argument("--dialogue-event-name")
+    parser.add_argument("--dialogue-condition", action="append", nargs=2, default=[], metavar=("GROUP_HANDLE", "VALUE_HANDLE_OR_WILDCARD"))
+    parser.add_argument("--dialogue-probability", type=float)
+    parser.add_argument("--dialogue-weight", type=float)
     parser.add_argument("--event-parent-handle")
     parser.add_argument("--event-name")
     parser.add_argument(
@@ -17925,6 +17928,9 @@ def _parse_audio_import_business_fields(
     field_value_pairs: Sequence[Sequence[str]] = (),
     dialogue_event_parent_handle: str | None = None,
     dialogue_event_name: str | None = None,
+    dialogue_condition: Sequence[Sequence[str]] = (),
+    dialogue_probability: float | None = None,
+    dialogue_weight: float | None = None,
     event_parent_handle: str | None = None,
     event_name: str | None = None,
     event_action: str | None = None,
@@ -17979,10 +17985,14 @@ def _parse_audio_import_business_fields(
                 session=session,
             )
         fields["field_values"] = dynamic
-    if dialogue_event_parent_handle is not None or dialogue_event_name is not None:
+    if dialogue_event_parent_handle is not None or dialogue_event_name is not None or dialogue_condition or dialogue_probability is not None or dialogue_weight is not None:
         if dialogue_event_parent_handle is None or dialogue_event_name is None:
             raise GatewayInputError("Dialogue Event creation requires --dialogue-event-parent-handle and --dialogue-event-name together")
         fields["dialogue_event"] = {"parent_handle": dialogue_event_parent_handle, "name": dialogue_event_name}
+        if dialogue_condition:
+            fields["dialogue_event"]["conditions"] = [{"group_handle": group, "value_handle": value} for group, value in dialogue_condition]
+        for key, value in (("probability", dialogue_probability), ("weight", dialogue_weight)):
+            if value is not None: fields["dialogue_event"][key] = value
     event_parts = (event_parent_handle, event_name, event_action)
     if any(value is not None for value in event_parts):
         if event_parent_handle is None or event_name is None:
@@ -18667,6 +18677,9 @@ def dispatch_offline_business_draft_update(
                 field_value_pairs=args.field_value,
                 dialogue_event_parent_handle=args.dialogue_event_parent_handle,
                 dialogue_event_name=args.dialogue_event_name,
+                dialogue_condition=args.dialogue_condition,
+                dialogue_probability=args.dialogue_probability,
+                dialogue_weight=args.dialogue_weight,
                 event_parent_handle=args.event_parent_handle,
                 event_name=args.event_name,
                 event_action=args.event_action,
