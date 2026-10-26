@@ -340,11 +340,35 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Definition completion changes exactly four constraints on four lanes.
+    # Reverse those fields before all historical checks, including later
+    # contracts rebuilt independently rather than using the current inventory.
+    assert canonical_sha256(non_object_set_digests) == "03eb91bf7009108273d838047a3cc5d12af2073527cfc3263661155e5da0be5c"
+    def before_definition_completion(operation, version):
+        contract = operation_request_machine_contract(operation, version)
+        if operation == "soundbank.processDefinitionFiles":
+            changes = {
+                0: ("SoundBank names and ordered inclusion/exclusion rows are derived only from hashed UTF-8 tab-delimited files within the declared owned I/O root",
+                    "SoundBank names and inclusion rows are derived only from hashed UTF-8 tab-delimited files"),
+                1: ("Wwise 2022.1 Definition inclusion identities are limited to GUIDs and supported uint32 Short IDs because quoted names can complete without applying inclusions; GameSync exclusion names remain available; 2023.1 and later retain the official quoted inclusion-name form",
+                    "Wwise 2022.1 Definition object identities are limited to GUIDs and supported uint32 Short IDs because quoted names can complete without applying inclusions; 2023.1 and later retain the official quoted-name form"),
+                2: ("documented State/Switch group-and-value or Trigger name exclusions and ordered repeated bank/object rows are accepted; unknown directives, unknown objects, and ambiguous identities fail before dispatch",
+                    "unsupported directives, duplicate rows, unknown objects, and ambiguous names fail before dispatch"),
+                4: ("execution replays file/project and SoundBank inclusion snapshots; only single-file empty-prestate unique-inclusion banks have exact target inclusion verification; repeated bank/object rows, nonempty prestate and GameSync exclusions disclose result-only verification before authorization, without inferring union/removal/exclusion effects",
+                    "execution replays file/project and SoundBank inclusion snapshots; verification checks exact target inclusions and one unrelated control Bank"),
+            }
+            for index, (current, previous) in changes.items():
+                assert contract["constraints"][index] == current
+                contract["constraints"][index] = previous
+        return contract
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"soundbank.processDefinitionFiles@{version}"] = canonical_sha256(
+            before_definition_completion("soundbank.processDefinitionFiles", version))
     # Core generation and external-source output omission have separate,
     # exact field inverses; retain both component and earlier aggregate seals.
     assert canonical_sha256(non_object_set_digests) == "8093b7d95a13b3d6da49917b977c86df26b335a1a4c4707dd9d35339270c1128"
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("soundbank.generate", version)
+        contract = before_definition_completion("soundbank.generate", version)
         assert contract['argument_contract']['optional'] == ['all_user_soundbanks', 'all_user_bank_expectations', 'skip_languages', 'write_to_disk', 'languages', 'rebuild_soundbanks', 'clear_audio_file_cache', 'rebuild_init_bank']
         contract['argument_contract']['optional'] = ['languages', 'rebuild_soundbanks', 'clear_audio_file_cache', 'rebuild_init_bank']
         assert contract['argument_contract']['properties']['all_user_bank_expectations'] == {'type': 'array', 'maxItems': 64, 'items': {'type': 'object', 'additionalProperties': False, 'required': ['soundbank', 'artifact_expectation'], 'properties': {'soundbank': IDENTITY_ARGUMENT_SCHEMA, 'artifact_expectation': {'type': 'string', 'enum': ['nonlocalized', 'localized', 'mixed']}}}}
@@ -390,7 +414,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         non_object_set_digests[f"soundbank.generate@{version}"] = canonical_sha256(contract)
     assert canonical_sha256(non_object_set_digests) == "20f53f6814e0129d5a71177e058e320d4c570bbcad761201913ceb8635a9a75e"
     for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("soundbank.convertExternalSources", version)
+        contract = before_definition_completion("soundbank.convertExternalSources", version)
         row = contract["argument_contract"]["properties"]["sources"]["items"]
         assert row["required"] == ["input", "platform"]
         assert row["optional"] == ["output"]
@@ -403,7 +427,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     before_localized_table_final = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
         for operation in ("audio.import", "audio.importTabDelimited"):
-            contract = operation_request_machine_contract(operation, version)
+            contract = before_definition_completion(operation, version)
             if operation == "audio.importTabDelimited":
                 assert contract["constraints"][-1] == 'localized typed Sound Voice owner-only rows support createNew/useExisting/replaceExisting with live metadata-proven fields; create/replace require explicit prerequisite columns and replacement retires the complete old GUID subtree, while existing useExisting may retain satisfied prerequisites and preserves Source identities and files; localized existing-owner regular or bounded inline WAV media binds the exact selected-language Source and preserves other Source files; combined owner-field/media rows retain the exact observed-host guard and table bytes are never rewritten'
                 contract["constraints"][-1] = 'localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows bind the intended language Source, verify planned media changes and preserve other Source files without rewriting the exact table'
@@ -778,7 +802,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # constraint to the same five setName lanes. Preserve all earlier seals.
     assert canonical_sha256(non_object_set_digests) == "d1cf6cc2d1a3977c8cfbe4e7bf12f0396af64af5c27913f7cd4a0cbdb17f9257"
     def before_playlist_name_native_boundary(version):
-        contract = operation_request_machine_contract("object.setName", version)
+        contract = before_definition_completion("object.setName", version)
         assert contract["constraints"].pop() == (
             "2025.1 PlaylistSlot class 5636096 renaming is blocked before Preview from representative Console 2025.1.7.9143 native rejection; other hosts/builds are unobserved; other classes retain their contracts"
         )
@@ -804,7 +828,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # before retaining every reviewed prior aggregate below.
     assert canonical_sha256(non_object_set_digests) == "b4b9f6bcc8653b91d0ae37b34a24b80cdd3d5a4bcf476688ff6dd635e20f4fd5"
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("object.setProperty", version)
+        contract = before_definition_completion("object.setProperty", version)
         contract["optional_arguments"].remove("switch_child_context")
         contract["argument_contract"]["optional"].remove("switch_child_context")
         assert contract["argument_contract"]["properties"].pop("switch_child_context") == {
@@ -846,7 +870,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # Only four createPlugin contracts add source-proven Effect Folder placement.
     # Invert that exact constraint before retaining every earlier reviewed seal.
     def before_effect_folder_placement(version):
-        contract = operation_request_machine_contract("object.createPlugin", version)
+        contract = before_definition_completion("object.createPlugin", version)
         assert contract["constraints"][6] == (
             "independent ShareSets verify parent/class/name/fields and sibling preservation; Effect placement additionally admits a fresh source-proven Folder beneath an Effects Work Unit, while Sink and Metadata require their matching Work Unit"
         )
@@ -863,7 +887,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # Only the five create contracts add same-graph result bindings here.
     # Invert the exact closed field before retaining every historical seal.
     def before_graph_result_bindings(version):
-        contract = operation_request_machine_contract("object.create", version)
+        contract = before_definition_completion("object.create", version)
         contract["optional_arguments"].remove("graph_result_bindings")
         contract["argument_contract"]["optional"].remove("graph_result_bindings")
         assert contract["argument_contract"]["properties"].pop("graph_result_bindings") == {
@@ -883,7 +907,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # Only five internal waapi.call contracts add the history expectation proof.
     # Remove that exact field and reuse this inverse in later historical checks.
     def before_history_binding(version):
-        contract = operation_request_machine_contract("waapi.call", version)
+        contract = before_definition_completion("waapi.call", version)
         contract["optional_arguments"].remove("history_binding")
         contract["argument_contract"]["optional"].remove("history_binding")
         assert contract["argument_contract"]["properties"].pop("history_binding") == {
@@ -948,7 +972,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # Only the five Undo Group contracts add this closed cancellation choice.
     # Remove that exact addition to retain the earlier reviewed aggregate.
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("waapi.undoGroup", version)
+        contract = before_definition_completion("waapi.undoGroup", version)
         assert contract["optional_arguments"] == ["failure_cancellation"]
         contract["optional_arguments"] = []
         assert contract["argument_contract"]["optional"] == ["failure_cancellation"]
@@ -963,7 +987,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # Only the four supported Definition lanes add this reviewed Short ID
     # resolution contract. Restore that exact addition to retain earlier seals.
     for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("soundbank.processDefinitionFiles", version)
+        contract = before_definition_completion("soundbank.processDefinitionFiles", version)
         constraint = (
             "Event, DialogueEvent, AuxBus and Effect uint32 Short IDs resolve through a version-pinned bounded typed read; exact numeric Short ID, canonical GUID and directive type are checked independently"
         )
@@ -977,7 +1001,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # Restore only those exact fifteen lane deltas before checking prior seals.
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
         for operation in ("object.copy", "object.move"):
-            contract = operation_request_machine_contract(operation, version)
+            contract = before_definition_completion(operation, version)
             conflict = contract["argument_contract"]["properties"]["on_name_conflict"]
             assert conflict["enum"] == ["fail", "rename", "replace"]
             conflict["enum"] = ["fail", "rename"]
@@ -1039,7 +1063,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     )
     previous = dict(non_object_set_digests)
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("object.setReference", version)
+        contract = before_definition_completion("object.setReference", version)
         # This older inverse rebuilds the live schema rather than reusing the
         # substituted digest, so invert R70's exact wording here as well.
         null_target = contract["argument_contract"]["properties"]["target"]["oneOf"][1]

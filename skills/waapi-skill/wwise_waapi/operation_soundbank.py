@@ -1548,7 +1548,7 @@ def build_external_sources_operation_plan(
 def parse_soundbank_definition_file(
     definition_file: str | os.PathLike[str],
 ) -> dict[str, Any]:
-    """Parse the strongly verifiable subset of a SoundBank Definition TSV."""
+    """Parse the documented closed SoundBank Definition TSV forms."""
 
     path, data, proof = _read_proven_bytes(
         definition_file,
@@ -1600,7 +1600,6 @@ def parse_soundbank_definition_file(
     banks: dict[str, dict[str, Any]] = {}
     bank_order: list[str] = []
     normalized_rows: list[dict[str, Any]] = []
-    seen_inclusions: set[tuple[str, str, str]] = set()
     for row_number, (cells, quoted_columns) in enumerate(
         zip(parsed_rows, quoted_rows, strict=True),
         start=1,
@@ -1635,11 +1634,27 @@ def parse_soundbank_definition_file(
         bank_name = _require_bank_name(cells[0], field=f"row[{row_number}].soundbank")
         token = cells[1]
         if token == "-GameSyncExclusion":
-            raise SoundBankContractError(
-                "UNSUPPORTED_DEFINITION_DIRECTIVE",
-                "-GameSyncExclusion is not strongly verifiable through getInclusions and is rejected.",
-                details={"row": row_number, "directive": token},
-            )
+            kind = cells[2] if len(cells) > 2 else None
+            count = 4 if kind == "Trigger" else 5
+            if kind not in {"State", "Switch", "Trigger"} or len(cells) != count or any(quoted_columns[:3]):
+                raise SoundBankContractError("INVALID_DEFINITION_ROW",
+                    "GameSyncExclusion requires State/Switch group and value names, or Trigger and its name; no filters.",
+                    details={"row": row_number})
+            for column in range(3, len(cells)):
+                if not quoted_columns[column] and _definition_identity(cells[column], row_number=row_number)["kind"] != "name":
+                    raise SoundBankContractError("INVALID_DEFINITION_IDENTITY",
+                        "GameSync exclusions use names, not GUID or numeric identities.", details={"row": row_number})
+            exclusion = {"row_number": row_number, "definition_keyword": token,
+                "object_type": kind, "name": cells[-1]}
+            if kind != "Trigger":
+                exclusion["group_name"] = cells[3]
+            bank_key = bank_name.casefold()
+            if bank_key not in banks:
+                banks[bank_key] = {"name": bank_name, "inclusions": [], "exclusions": []}
+                bank_order.append(bank_key)
+            banks[bank_key]["exclusions"].append(exclusion)
+            normalized_rows.append({"soundbank": bank_name, **exclusion})
+            continue
         if token.startswith("-"):
             directive = _DEFINITION_DIRECTIVES.get(token)
             if directive is None:
@@ -1694,14 +1709,6 @@ def parse_soundbank_definition_file(
             allowed=allowed_filters,
             row_number=row_number,
         )
-        duplicate_key = (bank_name.casefold(), object_type, _identity_key(identity))
-        if duplicate_key in seen_inclusions:
-            raise SoundBankContractError(
-                "DUPLICATE_DEFINITION_INCLUSION",
-                "A SoundBank Definition must not repeat one object inclusion.",
-                details={"row": row_number, "soundbank": bank_name, "identity": identity},
-            )
-        seen_inclusions.add(duplicate_key)
         inclusion = {
             "row_number": row_number,
             "definition_keyword": keyword,
@@ -1711,7 +1718,7 @@ def parse_soundbank_definition_file(
         }
         bank_key = bank_name.casefold()
         if bank_key not in banks:
-            banks[bank_key] = {"name": bank_name, "inclusions": []}
+            banks[bank_key] = {"name": bank_name, "inclusions": [], "exclusions": []}
             bank_order.append(bank_key)
         banks[bank_key]["inclusions"].append(inclusion)
         normalized_rows.append({"soundbank": bank_name, **inclusion})
@@ -1724,8 +1731,8 @@ def parse_soundbank_definition_file(
         "rows": normalized_rows,
         "soundbanks": [banks[key] for key in bank_order],
         "unsupported_boundary": {
-            "GameSyncExclusion": "rejected because getInclusions cannot prove exclusion state",
-            "identity_quoting": "string names require double quotes; GUID and uint32 identities must be unquoted",
+            "GameSyncExclusion": "accepted names only; effects are not proven by getInclusions",
+            "identity_quoting": "inclusion string names require double quotes; inclusion GUID/uint32 identities are unquoted; GameSync names allow quotes",
             "unknown_directives": "rejected",
             "unknown_filters": "rejected",
         },
@@ -1768,7 +1775,7 @@ def build_process_definition_operation_plan(
     dispatch_files: list[str] = []
     soundbanks: list[dict[str, Any]] = []
     seen_files: set[HostPathKey] = set()
-    bank_sources: dict[str, str] = {}
+    bank_sources: dict[str, dict[str, Any]] = {}
     for index, value in enumerate(raw_files):
         if not isinstance(value, (str, os.PathLike)):
             raise SoundBankContractError(
@@ -1776,12 +1783,13 @@ def build_process_definition_operation_plan(
                 "Definition file paths must be strings.",
                 details={"index": index},
             )
+        prove_artifact_path(value, io_root=io_root, field=f"files[{index}]", must_exist=True, expect_directory=False)
         document = parse_soundbank_definition_file(value)
         if lane == "2022.1":
             name_rows = [
                 int(row["row_number"])
                 for row in document["rows"]
-                if row["identity"]["kind"] == "name"
+                if row.get("identity", {}).get("kind") == "name"
             ]
             if name_rows:
                 raise SoundBankContractError(
@@ -1809,21 +1817,25 @@ def build_process_definition_operation_plan(
             bank_key = bank["name"].casefold()
             previous = bank_sources.get(bank_key)
             if previous is not None:
-                raise SoundBankContractError(
-                    "CROSS_FILE_SOUNDBANK_COLLISION",
-                    "One SoundBank may be defined by only one file in the closed route.",
-                    details={"soundbank": bank["name"], "files": [previous, document["path"]]},
-                )
-            bank_sources[bank_key] = document["path"]
-            soundbanks.append(
-                {
-                    "name": bank["name"],
-                    "source_file": document["path"],
-                    "expected_inclusions": list(bank["inclusions"]),
-                    "pre_state_required": True,
-                    "post_state": "exact_additive_getInclusions_match_after_live_identity_resolution",
-                }
-            )
+                previous["source_files"].append(document["path"])
+                previous["expected_inclusions"].extend(bank["inclusions"])
+                previous["exclusions"].extend(bank["exclusions"])
+                if bank["exclusions"]:
+                    previous["verification_boundary_reasons"].append("gamesync_exclusion_effect_unobserved")
+                previous["verification_boundary_reasons"].append("repeated_bank_across_files")
+                continue
+            target = {
+                "name": bank["name"],
+                "source_file": document["path"],
+                "source_files": [document["path"]],
+                "expected_inclusions": list(bank["inclusions"]),
+                "exclusions": list(bank["exclusions"]),
+                "verification_boundary_reasons": (["gamesync_exclusion_effect_unobserved"] if bank["exclusions"] else []),
+                "pre_state_required": True,
+                "post_state": "exact_inclusions_only_when_independently_predictable",
+            }
+            bank_sources[bank_key] = target
+            soundbanks.append(target)
         documents.append(document)
         dispatch_files.append(document["path"])
     body = {
@@ -1839,7 +1851,8 @@ def build_process_definition_operation_plan(
             "resolve_every_identity_before_dispatch": True,
             "unknown_or_ambiguous_identity_policy": "reject_before_dispatch",
             "capture_existing_soundbank_guid_and_inclusions": True,
-            "verify_new_or_preserved_guid_and_exact_additive_inclusions": True,
+            "verify_exact_inclusions_only_for_single_file_empty_prestate_unique_rows": True,
+            "merge_removal_and_exclusion_effects_independently_verified": False,
             "verify_unrelated_control_soundbank_unchanged": True,
             "result_schema_is_business_state_proof": False,
             "no_retry_after_dispatch": True,

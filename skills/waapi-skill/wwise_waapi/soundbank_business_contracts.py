@@ -269,6 +269,22 @@ def soundbank_business_contract_data(
                 "topic_schema_argv": ["topic-schema", "ak.wwise.core.soundbank.generated"],
                 "transaction_captures_topic_data": False},
         }
+    if operation == "soundbank.processDefinitionFiles":
+        result["definition_format"] = {
+            "encoding": "UTF-8 TSV; existing files are hashed and dispatched in the exact supplied order without rewriting",
+            "inclusions": "Event or -DialogueEvent/-AuxBus/-EffectShareset with documented identity/filter columns; 2022.1 inclusion names retain their observed restriction",
+            "gamesync_exclusion_rows": [
+                ["BANK", "-GameSyncExclusion", "State", "GROUP_NAME", "STATE_NAME"],
+                ["BANK", "-GameSyncExclusion", "Switch", "GROUP_NAME", "SWITCH_NAME"],
+                ["BANK", "-GameSyncExclusion", "Trigger", "TRIGGER_NAME"],
+            ],
+            "gamesync_identity": "names; quotes optional; GUID and numeric selectors unavailable",
+            "repeated_bank_or_object_rows": "preserved in original files; no Gateway merge or filter-precedence prediction",
+        }
+        result["verification_modes"] = {
+            "exact_inclusion_readback": "Only unique inclusion rows for a bank defined in one file with empty inclusion prestate; verifies bank GUID and exact inclusions, not exclusion effects.",
+            "result_schema_only": "Repeated bank/object rows, nonempty inclusion prestate or GameSync exclusions retain input/identity/control safety checks but leave their import effects unverified; business_state_verified=false. Scope is disclosed in immutable Preview before authorization.",
+        }
     return result
 
 
