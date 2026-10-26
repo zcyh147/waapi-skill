@@ -12,6 +12,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from tests.support.compound_undo import compound_undo_request
 
+from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.builders.common import SemanticValidationError  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImports]
     allowed_import_hierarchy_roots,
@@ -286,24 +287,56 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     # the closed RTPC List variant; b06dfe1c names its object.set owner inside
     # that machine schema (nested descriptions remain sealed).
     assert operation_request_schema_digest("object.set", "2022.1") == (
+        "6a85d5221d1589c6684226846b64d2ec9780b52d2c0514908b581479e8153e0c"
+    )
+    # Invert only reviewed owned ControlInput construction (20cc2a6f), exact
+    # existing-GUID rename semantics (17cfcdd7), and staged Voice provenance
+    # (74920639/5afb9669); retain the previous complete machine-contract seal.
+    previous_set = copy.deepcopy(contract_2022)
+    assert previous_set["optional_arguments"].pop() == "voice_source_staging"
+    assert previous_set["argument_contract"]["optional"].pop() == "voice_source_staging"
+    set_fields = previous_set["argument_contract"]["properties"]
+    assert set_fields.pop("voice_source_staging") == {
+        "type": "object",
+        "description": "Gateway-generated exact staged declaration/provenance; strictly reparsed, never caller-authored.",
+    }
+    row_fields = set_fields["objects"]["items"]["properties"]
+    assert row_fields["name"].pop("description") == (
+        "Exact new name of this existing GUID; child creation conflict policy does not choose a different name."
+    )
+    assert row_fields["on_name_conflict"].pop("description") == (
+        "Collision policy for new child/list-member creation; existing GUID name edits remain exact."
+    )
+    list_variants = row_fields["lists"]["items"]["properties"]["objects"]["items"]["oneOf"]
+    for fields in (row_fields, row_fields["children"]["items"]["properties"],
+                   list_variants[0]["properties"]):
+        variants = fields["references"]["items"]["properties"]["target"]["oneOf"]
+        assert variants.pop(1)["required"] == ["new_control_input"]
+    control = list_variants[1]["properties"]["rtpc"]["properties"]["control_input"]
+    assert len(control["oneOf"]) == 2
+    assert control["oneOf"][1]["required"] == ["new_control_input"]
+    control["oneOf"] = control["oneOf"][0]["oneOf"]
+    assert canonical_sha256(previous_set) == (
         "6085aea6f7d6397947c36d245497ca9300d281fe816f30cd726d659ea56b6a97"
     )
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
     )
-    # Reviewed closure adds exact Boolean conditions and bounded recursive activation.
+    # Import construction/disclosure changes are independently history-sealed
+    # (with exact inversions) by the composer inventory test. Keep these exact
+    # per-version machine seals as well; no runtime contract changes here.
     assert operation_request_schema_digest("audio.import", "2022.1") == (
-        "07210c0a9f7ca6f9889c92fa69cee39a3279372cec8128823c1395fd5cb40861"
+        "569d053127a66628f9bb92c18d4029d0723f17354ad971f13e396f0f9b00e933"
     )
     assert operation_request_schema_digest("audio.import", "2025.1") == (
-        "0a35fbdef3e729798483979f9626044c644f9403765d9530681ee854ecc478bc"
+        "60dac8850ab3bf628a12e0acb37731a873ffe82c6daad57cbe324391739944ed"
     )
     assert operation_request_schema_digest(
         "audio.importTabDelimited", "2022.1"
-    ) == "66596c320b3cb9905249882d588ce91be6fd13c0ab683f8114ca7399d949c3d7"
+    ) == "aa181e0caca760f47205d8289d33abf74b5e576eb79221435626d49f1863b15c"
     assert operation_request_schema_digest(
         "audio.importTabDelimited", "2025.1"
-    ) == "231a06eaa5f85cbd1b842af68e7ec93eb096dad57f918b85140a2a04642530c3"
+    ) == "828161c1fa928370206a77111612ab1b0b233ccf39fbb390ac55168215fc536a"
     assert contract_2025["argument_contract"] != {}
 
     with pytest.raises(OperationContractError, match="Unknown closed operation"):
