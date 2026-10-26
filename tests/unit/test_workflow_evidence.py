@@ -340,6 +340,10 @@ def test_owner_source_native_witnesses_reach_persisted_final_writer(tmp_path, mo
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind=witness_kind)
 
 
+def test_ordinary_owner_source_native_witness_rejects_ambiguous_bus(tmp_path, monkeypatch):
+    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault="ambiguous-bus", witness_kind="ordinary-owner-source")
+
+
 def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, fault, witness_kind):
     """Real public Gateway/collector/finalizer; only native Wwise is substituted."""
     import importlib
@@ -364,9 +368,16 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
                 "path": r"\Containers\Default Work Unit", "notes": "keep placement", "parent": None}
             self.objects = {PARENT_ID: self.parent}
             self.tab_count = self.import_count = 0
-            self.bus = {"id": "{B0B0B0B0-B0B0-B0B0-B0B0-B0B0B0B0B0B0}", "name": "Master Audio Bus", "type": "Bus", "classId": 524304,
-                "path": r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus", "notes": "keep bus", "parent": None}
+            self.bus_work_unit = {"id": "{A74EEB4A-0805-4AFA-969C-53DCB862B550}", "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+                "path": r"\Busses\Default Work Unit", "notes": "", "parent": None}
+            self.objects[self.bus_work_unit["id"]] = self.bus_work_unit
+            self.bus = {"id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}", "name": "Main Audio Bus", "type": "Bus", "classId": 524304,
+                "path": r"\Busses\Default Work Unit\Main Audio Bus", "notes": "keep bus", "parent": {"id": self.bus_work_unit["id"]}}
             self.objects[self.bus["id"]] = self.bus
+            if fault == "ambiguous-bus":
+                other_bus = {**self.bus, "id": "{B0B0B0B0-B0B0-B0B0-B0B0-B0B0B0B0B0B0}",
+                    "name": "Other Bus", "path": r"\Busses\Default Work Unit\Other Bus"}
+                self.objects[other_bus["id"]] = other_bus
         def projected(self, rows, options):
             result = []
             for raw in rows:
@@ -548,6 +559,19 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
     assert final["invocation"]["outcome"] == ("PASS" if fault is None else "FAIL")
     assert report["business_effect_verified"] is (fault is None)
     assert report["transaction_budget"] == {"setup": 2, "witness": 1, "maximum_total": 3}
+    if witness_kind == "ordinary-owner-source":
+        assert all("Master-Mixer Hierarchy" not in json.dumps(call) and "Master Audio Bus" not in json.dumps(call)
+            for call in report["calls"])
+        assert any(call["argv"][:3] == ["query-object", "--path-segment", "Busses"] for call in report["calls"])
+        if fault == "ambiguous-bus":
+            assert len(final["transactions"]) == client.import_count == 2
+            assert all(phase["verify"]["state"] == "verified" for phase in report["setup"])
+            assert not report["witness"] and not report["observations"].get("after")
+            assert final["residual_state"]["sandbox"] == "quarantined"
+            return
+        assert report["bus_before"]["id"] == client.bus["id"]
+        assert any(call["argv"][0] == "draft-bind-object" and "--object-id" in call["argv"]
+            and client.bus["id"] in call["argv"] for call in report["calls"])
     if witness_kind != "notes-columns":
         assert len(final["transactions"]) == 3
         assert final["residual_state"]["sandbox"] == ("deleted" if fault is None else "quarantined")

@@ -411,9 +411,15 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
             replacement = {"VoiceSource": audio(4, "LineSource")}
             draft = _start_business_draft(gateway, "audio.import")
             voice = _bind_business_object(gateway, draft, object_id=identities["VoiceSource"])
-            bus = _bind_business_object(gateway, draft, path_segments=("Master-Mixer Hierarchy", "Default Work Unit", "Master Audio Bus"))
-            bus_id = at("Master-Mixer Hierarchy", "Default Work Unit", "Master Audio Bus")
+            # Match the existing version-aware bus fixture collectors. Resolve
+            # the baseline's unique direct Bus instead of assuming its label.
+            bus_root = "Busses" if runtime.version == "2025.1" else "Master-Mixer Hierarchy"
+            bus_work_unit = at(bus_root, "Default Work Unit")
+            buses = query(["--exact-id", bus_work_unit, "--relationship", "children"], ("parent",))
+            assert len(buses) == 1 and buses[0]["type"] == "Bus" and buses[0]["parent"]["id"] == bus_work_unit, buses
+            bus_id = buses[0]["id"]
             report["bus_before"] = exact(bus_id)
+            bus = _bind_business_object(gateway, draft, object_id=bus_id)
             fields = {}
             for meaning in ("Volume", "OutputBus"):
                 found = _update_business_draft(gateway, draft, "draft-discover-fields",
