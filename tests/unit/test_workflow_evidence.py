@@ -361,6 +361,15 @@ def test_distinct_source_combined_tsv_native_witness_stops_at_observed_source_bo
 
 @pytest.mark.parametrize("fault", (None, "missing-assignment", "indeterminate"))
 def test_switch_import_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
+    _assert_switch_import_native_witness_final_writer(tmp_path, monkeypatch, fault=fault)
+
+
+@pytest.mark.parametrize("fault", (None, "missing-second-assignment", "indeterminate"))
+def test_repeated_switch_columns_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
+    _assert_switch_import_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, tab_delimited=True)
+
+
+def _assert_switch_import_native_witness_final_writer(tmp_path, monkeypatch, *, fault, tab_delimited=False):
     """Actual producer/Gateway/verifier/final writer, source-backed external graph."""
     import importlib
     import hashlib
@@ -501,6 +510,23 @@ def test_switch_import_native_witness_reaches_persisted_final_writer(tmp_path, m
                     identities = args["from"]
                     rows = [item for item in self.objects.values() if item["id"] in identities.get("id", []) or item["path"] in identities.get("path", [])]
                 return {"return": self.projected(rows, options)}
+            if uri == "ak.wwise.core.audio.importTabDelimited":
+                import csv
+                from wwise_waapi.host_paths import localize_waapi_host_path
+                self.import_count += 1
+                if fault == "indeterminate": raise RuntimeError("fake native transport lost after repeated Switch TSV dispatch")
+                with Path(localize_waapi_host_path(args["importFile"])).open(encoding="utf-8", newline="") as stream:
+                    table_rows = list(csv.reader(stream, delimiter="\t"))
+                assert len(table_rows) == 2 and table_rows[0] == ["Object Path", "Audio File", "Switch Assignation", "Switch Assignation"]
+                cells = table_rows[1]
+                assert cells[2:] == ["<Switch Group:WAAPI_V2_Surface>Snow", "<Switch Group:WAAPI_V2_Surface>Metal"]
+                assert cells[0].startswith("<Sound SFX>ImportSwitch_") and cells[0].endswith("New")
+                rows = self.ingest({"objectPath": self.container["path"] + "\\" + cells[0],
+                    "audioFile": localize_waapi_host_path(cells[1]), "switchAssignation": cells[2]})
+                owner, = [row for row in rows if row["type"] == "Sound"]
+                if fault != "missing-second-assignment":
+                    self.assignments.append({"child": owner["id"], "stateOrSwitch": "{D457E7BF-4C4D-41A9-93F9-C127198EC739}"})
+                return {"objects": self.projected(rows, options)}
             if uri == "ak.wwise.core.audio.import":
                 self.import_count += 1
                 if self.import_count == 2 and fault == "indeterminate": raise RuntimeError("fake native transport lost after Switch import dispatch")
@@ -525,7 +551,8 @@ def test_switch_import_native_witness_reaches_persisted_final_writer(tmp_path, m
     runtime_raw = lambda argv: waapi_gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client)
     monkeypatch.setattr(workflow._WorkflowSandboxRuntime, "raw_gateway", lambda _runtime, argv: runtime_raw(argv))
     lock = sandbox_fixture.LiveSandboxLock(tmp_path / "locks"); lock.__enter__()
-    node = "test_audio_import_switch_assignment_media_and_preservation"
+    node = ("test_audio_import_exact_tsv_repeated_switch_columns_preserve_baseline" if tab_delimited
+        else "test_audio_import_switch_assignment_media_and_preservation")
     error = None
     try: getattr(workflow, node)(runtime)
     except AssertionError as exc: error = exc
@@ -540,6 +567,12 @@ def test_switch_import_native_witness_reaches_persisted_final_writer(tmp_path, m
     assert len(final["transactions"]) == client.import_count == 2
     assert final["residual_state"]["sandbox"] == ("deleted" if fault is None else "quarantined")
     assert not any(uri.endswith(".addAssignment") or uri.endswith(".setReference") for uri, _, _ in client.calls)
+    if tab_delimited:
+        assert report["table"]["utf8"].count("Switch Assignation") == 2
+        assert "<Switch Group:WAAPI_V2_Surface>Metal" in report["table"]["utf8"]
+        assert len([uri for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.importTabDelimited"]) == 1
+        assert report["witness"]["compiled_native_request"]["args"]["importFile"] == report["table"]["path"]
+
     if fault == "indeterminate":
         assert report["witness"]["execute"]["state"] == "indeterminate"
         assert report["calls"][-1]["argv"] == ["execute", report["witness"]["transaction_id"]]
@@ -549,7 +582,16 @@ def test_switch_import_native_witness_reaches_persisted_final_writer(tmp_path, m
         assert report["observations"]["after"]["group"] == report["observations"]["baseline"]["group"]
         if fault:
             assert report["witness"]["verify_exit_code"] == 2
-            assert report["observations"]["after"]["pairs"] == report["observations"]["baseline"]["pairs"]
+            actual_pairs = report["observations"]["after"]["pairs"]
+            baseline_pairs = report["observations"]["baseline"]["pairs"]
+            if tab_delimited:
+                assert len(actual_pairs) == len(baseline_pairs) + 1
+                assert all(pair in actual_pairs for pair in baseline_pairs)
+                added, = [pair for pair in actual_pairs if pair not in baseline_pairs]
+                assert added["stateOrSwitch"] == "{8E435F66-9998-4396-8BBC-1BEAF62FD304}"
+                assert report["witness"]["verify"]["state"] == "verification_failed"
+            else:
+                assert actual_pairs == baseline_pairs
             assert report["observations"]["after"]["subtree"], "Retain observed media/state despite failed assignment"
 
 
