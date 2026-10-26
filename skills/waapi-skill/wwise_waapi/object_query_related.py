@@ -15,7 +15,7 @@ from .metadata_discovery import MAX_METADATA_DISCOVERY_QUERY_CHARS
 from .object_query_randomizer import RANDOMIZER_OUTPUTS, randomizer_contract
 from .object_query_functions import FIELD_STATUSES, curve_choices, function_contract
 from .object_query_contexts import CONTEXTS, context_spec, context_contract
-from .object_query_local_lists import LOCAL_LISTS, local_list_contract, local_marker_boundary_message
+from .object_query_local_lists import LOCAL_LISTS, local_list_contract, local_marker_boundary_message, local_rtpc_boundary_message
 
 RELATED_QUERY_LIST_RELATIONS = {"children": "children", "descendants": "descendants", "ancestors": "ancestors", "references-to": "referencesTo"}
 
@@ -140,6 +140,8 @@ def parse_related_request(version: str, values: list[str], option: str) -> dict[
         if name in LOCAL_LISTS and version < LOCAL_LISTS[name]['first']:
             if name == 'local-markers':
                 raise ValueError(local_marker_boundary_message(version))
+            if name == 'local-rtpcs':
+                raise ValueError(local_rtpc_boundary_message(version))
             raise ValueError('This local List context lacks the matching source contract in this version; native absence is not established')
         if name == 'combine' or name in RELATED_QUERY_RELATIONS or name in RELATED_QUERY_LIST_RELATIONS:
             spec = None
