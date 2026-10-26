@@ -324,6 +324,7 @@ def _archive_test_object_set_composer_discloses_every_exact_typed_action_shape(
 
 
 def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
+    from copy import deepcopy
     non_object_set_digests = {
         f"{spec.name}@{version}": operation_request_schema_digest(spec.name, version)
         for spec in list_operation_specs()
@@ -332,8 +333,11 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
-    # Closed import Switch value binding changes only the reviewed description.
-    assert canonical_sha256(non_object_set_digests) == "c34ee7bdbb35217f637d58f8bab27564f9127d7ef262b6cb4b3a88dfc5561357"
+    # Combined five-version owner fields + closed Switch binding schema.
+    assert canonical_sha256(non_object_set_digests) == "d3b68dd3cd376da66b1e5926b931feaaee985fc6fb0eb5afc1ec9cd73c7213d0"
+    # Invert only Switch wording on a copy to preserve the independently
+    # reviewed five-version owner-field component seal.
+    owner_fields_component_digests = dict(non_object_set_digests)
     switch_import_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
         contract = operation_request_machine_contract("audio.import", version)
@@ -358,14 +362,33 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
                 "the value object's path in that common case."
             )
         switch_import_contracts[version] = contract
+        owner_fields_component_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(owner_fields_component_digests) == "8bbef24dd1abb4e7212a8de4c530ff3372b281972e741cf0edd74b47f52d6b9d"
+    # Invert only the five-version owner-field disclosure to preserve the
+    # independently reviewed Switch component before all historical seals.
+    previous_owner_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        assert contract["constraints"].pop() == (
+            "localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows remain outside the closed preparation path"
+        )
+        if version == "2025.1":
+            contract["constraints"].append(
+                "the first localized owner-field TSV slice admits an existing typed Sound Voice owner-only row in useExisting on 2025.1; live class metadata validates property/reference fields, required activation columns stay explicit, and Source Notes, identities, languages, placement and file bytes remain preserved; broader localized field/media combinations remain outside this slice"
+            )
+        previous_owner_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == "c34ee7bdbb35217f637d58f8bab27564f9127d7ef262b6cb4b3a88dfc5561357"
+    for version, contract in switch_import_contracts.items():
         non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+
     # Combined owner-only field + global Source-wire identity schema.
     assert canonical_sha256(non_object_set_digests) == "27ba4a25e057a70e89d3955e23803cea448054f7d3ff2b0205cf219d3eae59d2"
     # Preserve the independently committed owner-only component seal by
     # inverting only the already-reviewed Source-wire wording on a copy.
     owner_component_digests = dict(non_object_set_digests)
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = deepcopy(previous_owner_contracts[version])
         assert contract["constraints"][2] == (
             "an explicit path-spelled AudioFileSource media row requires one exact Sound child path across all languages at Preview and execution, matching the selected GUID, class and parent; Notes targets that Source and a separate owner-only Notes row retains the exact-table transaction"
         )
@@ -375,7 +398,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         owner_component_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
     assert canonical_sha256(owner_component_digests) == "6bf96594342dac95d9c41ce5cbdaca2ad4c3c79aed0f02ee1c23fcc76fb7d6c5"
     # Remove only the new 2025 owner-only disclosure to retain Root's seal.
-    owner_only_contract = operation_request_machine_contract("audio.importTabDelimited", "2025.1")
+    owner_only_contract = deepcopy(previous_owner_contracts["2025.1"])
     assert owner_only_contract["constraints"].pop() == (
         "the first localized owner-field TSV slice admits an existing typed Sound Voice owner-only row in useExisting on 2025.1; live class metadata validates property/reference fields, required activation columns stay explicit, and Source Notes, identities, languages, placement and file bytes remain preserved; broader localized field/media combinations remain outside this slice"
     )
@@ -385,7 +408,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     assert canonical_sha256(non_object_set_digests) == "166dc73c36e9d647890490f633dd099a5c54134b16fa13b13c662e6775e245e4"
     wire_path_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = owner_only_contract if version == "2025.1" else operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = owner_only_contract if version == "2025.1" else deepcopy(previous_owner_contracts[version])
         assert contract["constraints"][2] == (
             "an explicit path-spelled AudioFileSource media row requires one exact Sound child path across all languages at Preview and execution, matching the selected GUID, class and parent; Notes targets that Source and a separate owner-only Notes row retains the exact-table transaction"
         )

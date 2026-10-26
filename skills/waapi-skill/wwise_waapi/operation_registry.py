@@ -3953,7 +3953,8 @@ def operation_request_machine_contract(name: str, version: str) -> dict[str, Any
     constraints = list(spec.constraints)
     if name == "audio.importTabDelimited" and version == "2025.1":
         constraints.append("WwiseConsole 2025.1.7 build 9143 blocks GUID Object Path TSV cells before preview and execution: retained native evidence interpreted them as literal object names and created unintended objects; other host/version GUID semantics remain unproven pending scope decision")
-        constraints.append("the first localized owner-field TSV slice admits an existing typed Sound Voice owner-only row in useExisting on 2025.1; live class metadata validates property/reference fields, required activation columns stay explicit, and Source Notes, identities, languages, placement and file bytes remain preserved; broader localized field/media combinations remain outside this slice")
+    if name == "audio.importTabDelimited":
+        constraints.append("localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows remain outside the closed preparation path")
     return {
         "additional_properties": False,
         "argument_contract": _operation_argument_contract(
@@ -14295,7 +14296,12 @@ def _prepare_import_dynamic_fields(
                 for name in derived_properties
                 if name.casefold() not in explicitly_supplied
             )
-            if missing_activation_columns:
+            if missing_activation_columns and target.get("localized_owner_only") is True:
+                # The exact existing owner is resolved below. An unchanged TSV
+                # may omit activators only when its live state already satisfies
+                # them; validated_properties retains their prewrite/verify guard.
+                target["required_existing_activation"] = missing_activation_columns
+            elif missing_activation_columns:
                 raise OperationContractError(
                     "TAB_REFERENCE_DEPENDENCY_REQUIRES_COLUMN",
                     "A tab-delimited reference requires explicit Boolean activation property columns.",
@@ -14331,9 +14337,9 @@ def _localized_source_snapshot(owner_id: str, *, read: ReadCall,
         raise OperationContractError("INVALID_READBACK", "Voice source owner must be a canonical GUID.")
     fields = ["id", "name", "type", "classId", "path", "parent", "audioSource:language"]
     if preserve_media_version is not None:
-        if preserve_media_version != "2025.1":
-            raise OperationContractError("INVALID_PREVIEW", "Owner-only TSV Source media preservation currently requires 2025.1.")
-        fields.extend(["notes", "originalFilePath"])
+        if preserve_media_version not in SUPPORTED_WWISE_VERSION_KEYS:
+            raise OperationContractError("INVALID_PREVIEW", "Owner-only TSV Source media preservation requires a supported version.")
+        fields.extend(["notes", "originalWavFilePath" if preserve_media_version == "2021.1" else "originalFilePath"])
     rows = _rows(read(
         OBJECT_GET_URI,
         {"waql": f'from object "{owner_id}" select children take {OBJECT_LIST_MAX_SUBTREE_NODES + 1}'},
@@ -14369,8 +14375,9 @@ def _localized_source_snapshot(owner_id: str, *, read: ReadCall,
             if not isinstance(source.get("notes"), str):
                 raise OperationContractError("INVALID_READBACK", "Owner-only TSV Source preservation requires exact Notes.")
             try:
-                proof = import_regular_file_proof(_localize_waapi_file_path(source.get("originalFilePath")),
-                    field="existing localized Source originalFilePath")
+                file_field = "originalWavFilePath" if preserve_media_version == "2021.1" else "originalFilePath"
+                proof = import_regular_file_proof(_localize_waapi_file_path(source.get(file_field)),
+                    field=f"existing localized Source {file_field}")
             except ImportContractError as exc:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
             media_proofs.append({"source_id": source["id"], **proof})
@@ -15223,6 +15230,13 @@ def _prepare_closed_import_plan(
         if target.get("localized_owner_only") is True and (import_operation != "useExisting" or not rows):
             raise OperationContractError("LOCALIZED_OWNER_ONLY_TSV_REQUIRES_EXISTING_VOICE",
                 "This owner-only localized TSV field slice requires an exact existing Sound Voice and useExisting.")
+        missing_activation = [name for name in target.get("required_existing_activation", [])
+            if not any(spec["name"] == name and _typed_value_equal(_field_value(rows[0], "@" + name),
+                spec["value"], spec["metadata_type"]) for spec in target.get("validated_properties", []))]
+        if missing_activation:
+            raise OperationContractError("TAB_REFERENCE_DEPENDENCY_REQUIRES_COLUMN",
+                "An unsatisfied existing reference prerequisite requires an explicit activation property column.",
+                details={"index": index, "missing_properties": missing_activation})
         target["pre_state_rows"] = rows
         target["anchor_id"] = anchor.object
         anchor_path = anchor.row.get("path")
@@ -24657,7 +24671,8 @@ def verify_prepared_operation(
                         "expected_class": target.get("metadata_class_id"), "actual_class": live_row.get("classId")},
                 )
                 if target.get("localized_owner_only") is True:
-                    preserved_fields = ["activeSource", "originalFilePath", "sound:originalWavFilePath", "audioSource:language"]
+                    preserved_fields = (["sound:originalWavFilePath", "audioSource:language"] if version == "2021.1"
+                        else ["activeSource", "originalFilePath", "sound:originalWavFilePath", "audioSource:language"])
                     before_owner = target["pre_state_rows"][0]
                     check(f"{label} owner-only TSV preserves the owner media selection and placement",
                           all(_native_snapshot_equal(_field_value(live_row, field), _field_value(before_owner, field))
