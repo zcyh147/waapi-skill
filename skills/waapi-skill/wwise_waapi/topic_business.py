@@ -266,7 +266,8 @@ class TopicBusinessContract:
             row.token == selected_row for row in self.row_fields
         ):
             raise TopicBusinessError(
-                f"Unknown event row collection {selected_row!r}"
+                f"Unknown event row collection {selected_row!r}; use a disclosed "
+                f"collection within schema-depth limit {MAX_TYPED_SCHEMA_DEPTH}"
             )
         if selected_row_field_group is not None and selected_row is None:
             raise TopicBusinessError(
@@ -738,14 +739,17 @@ def _business_row_fields(
         *,
         path: tuple[str | None, ...],
         depth: int,
-        active: frozenset[str],
+        active: frozenset[tuple[str, int]],
     ) -> None:
         if depth > MAX_TYPED_SCHEMA_DEPTH:
             return
         expanded = typed_contract_expanded_schema(
             contract, node, section="args"
         )
-        marker = canonical_sha256(expanded)
+        # Repeated schemas may make progress through recursive array rows.
+        # Keep object-only cycles closed and bound every descent by the same
+        # schema-depth ceiling used by the underlying typed constructor.
+        marker = (canonical_sha256(expanded), path.count(None))
         if marker in active:
             return
         next_active = active | {marker}
@@ -800,6 +804,16 @@ def _business_row_fields(
                     walk(
                         variant,
                         path=path,
+                        depth=depth + 1,
+                        active=next_active,
+                    )
+            for variant in item_variants:
+                if typed_contract_expanded_schema(
+                    contract, variant, section="args"
+                ).get("type") == "array":
+                    walk(
+                        variant,
+                        path=(*path, None),
                         depth=depth + 1,
                         active=next_active,
                     )
@@ -1180,7 +1194,8 @@ def _apply_business_rows(
         row = by_token.get(fact.collection)
         if row is None:
             raise TopicBusinessError(
-                f"Unknown event row collection {fact.collection!r}"
+                f"Unknown event row collection {fact.collection!r}; use a disclosed "
+                f"collection within schema-depth limit {MAX_TYPED_SCHEMA_DEPTH}"
             )
         if len(fact.indices) != row.index_depth or any(
             isinstance(index, bool)
@@ -1241,7 +1256,8 @@ def _apply_empty_business_rows(
         row = by_token.get(fact.collection)
         if row is None:
             raise TopicBusinessError(
-                f"Unknown empty event row collection {fact.collection!r}"
+                f"Unknown empty event row collection {fact.collection!r}; use a disclosed "
+                f"collection within schema-depth limit {MAX_TYPED_SCHEMA_DEPTH}"
             )
         expected_depth = row.index_depth - 1
         if len(fact.parent_indices) != expected_depth or any(
@@ -1259,6 +1275,19 @@ def _apply_empty_business_rows(
             raise TopicBusinessError("Event row collection path is malformed")
         parent_path = collection_path[:-1]
         collection_name = collection_path[-1]
+        if collection_name is None:
+            # An array-valued array item has no property name. Its final
+            # parent index selects the inner collection to leave empty.
+            parent = _ensure_row_target(
+                target, parent_path, fact.parent_indices[:-1], leaf_type=list,
+            )
+            index = fact.parent_indices[-1]
+            if len(parent) > index:
+                raise TopicBusinessError("Empty event row conflicts with another fact")
+            while len(parent) < index:
+                parent.append([])
+            parent.append([])
+            continue
         if not isinstance(collection_name, str):
             raise TopicBusinessError("Event row collection path is malformed")
         parent = (
@@ -1530,11 +1559,15 @@ def _ensure_row_target(
     root: dict[str, Any],
     path: Sequence[str | None],
     indices: Sequence[int],
-) -> dict[str, Any]:
+    *,
+    leaf_type: type = dict,
+) -> Any:
     current: Any = root
     index_cursor = 0
     for position, part in enumerate(path):
-        next_part = path[position + 1] if position + 1 < len(path) else "row"
+        next_part = path[position + 1] if position + 1 < len(path) else (
+            None if leaf_type is list else "row"
+        )
         if part is not None:
             if not isinstance(current, dict):
                 raise TopicBusinessError("Event row path conflicts with another fact")
@@ -1557,7 +1590,7 @@ def _ensure_row_target(
         if not isinstance(current[index], item_factory):
             raise TopicBusinessError("Event row index conflicts with another fact")
         current = current[index]
-    if not isinstance(current, dict):
+    if not isinstance(current, leaf_type):
         raise TopicBusinessError("Event row item must be an object")
     return current
 
@@ -1711,6 +1744,8 @@ def _gateway_row_table(
         for row in rows
     ]
     payload: dict[str, Any] = {
+        "bounds": {"schema_depth": MAX_TYPED_SCHEMA_DEPTH, "array_items": MAX_TYPED_ARRAY_ITEMS},
+        "catalog_scope": "bounded_schema_descent; deeper_or_unknown_collections_rejected_before_subscription",
         "columns": [
             "collection",
             "index_depth",

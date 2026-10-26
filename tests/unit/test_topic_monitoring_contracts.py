@@ -244,6 +244,121 @@ def test_2021_implicit_collection_descendants_remain_matchable(tmp_path, collect
     assert result["match"] == event
 
 
+def test_2021_recursive_soundbank_children_keep_reflected_nested_arrays(tmp_path):
+    topic = "ak.wwise.core.soundbank.generated"
+    collection = "bank-info-included-events-switch-containers-children-children"
+    # The pinned soundBankInfoSwitchContainer id belongs to the array, so
+    # each Children item is another array, including at recursive levels.
+    event = {"bankInfo": [{"IncludedEvents": [{"SwitchContainers": [{
+        "Children": [[{"Children": [[{"SwitchValue": GUID}]]}]],
+    }]}]}]}
+    code, schema = gateway.execute_gateway(
+        ["--version", "2021.1", "topic-schema", topic, "--row", collection],
+        env={"WAAPI_SKILL_CONFIG_PATH": str(tmp_path / "absent.json")},
+        client_factory=lambda _url: pytest.fail("offline disclosure connected"),
+    )
+    assert code == 0, schema
+    assert schema["business_input"]["event_rows"]["selected"]["index_depth"] == 7
+    code, result, client, _ = run(
+        tmp_path, "2021.1", "wait-topic", topic, [event],
+        "--event-row", collection, "0,0,0,0,0,0,0", "switch-value", GUID,
+        timeout_seconds=1.0,
+    )
+    assert code == 0, result
+    assert result["event"] == result["match"] == event
+    assert result["monitoring_outcome"]["target_completed"] is True
+    assert client.unsubscribed == 1
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_modern_recursive_soundbank_children_keep_object_items(tmp_path, version):
+    switch = {"GroupType": "Switch", "GroupId": "1", "Id": "7"}
+    leaf = {"SwitchValue": switch}
+    branch = {"SwitchValue": switch, "Children": [leaf]}
+    event = {"soundbank": {"id": GUID}, "platform": {"id": GUID}, "bankInfo": [{
+        "Id": "10", "ShortName": "Owned", "Language": "SFX", "Events": [{
+            "Id": "20", "Name": "Play", "SwitchContainers": [{
+                "SwitchValue": switch, "Children": [branch],
+            }],
+        }],
+    }]}
+    code, result, client, _ = run(
+        tmp_path, version, "wait-topic", "ak.wwise.core.soundbank.generated", [event],
+        "--event-row", "bank-info-events-switch-containers-children-children", "0,0,0,0,0",
+        "switch-value-id", "7", timeout_seconds=1.0,
+    )
+    assert code == 0, result
+    assert result["event"] == event
+    assert result["match"] == {"bankInfo": [{"Events": [{"SwitchContainers": [{
+        "Children": [{"Children": [{"SwitchValue": {"Id": "7"}}]}],
+    }]}]}]}
+    assert client.unsubscribed == 1
+
+
+def test_2021_nested_soundbank_children_empty_inner_list_is_matchable(tmp_path):
+    event = {"bankInfo": [{"IncludedEvents": [{"SwitchContainers": [{
+        "Children": [[]],
+    }]}]}]}
+    code, result, client, _ = run(
+        tmp_path, "2021.1", "wait-topic", "ak.wwise.core.soundbank.generated", [event],
+        "--event-row-empty", "bank-info-included-events-switch-containers-children", "0,0,0,0",
+        timeout_seconds=1.0,
+    )
+    assert code == 0, result
+    assert result["event"] == result["match"] == event
+    assert client.unsubscribed == 1
+
+
+def test_recursive_soundbank_row_disclosure_states_existing_construction_limits(tmp_path):
+    code, schema = gateway.execute_gateway(
+        ["--version", "2021.1", "topic-schema", "ak.wwise.core.soundbank.generated", "--catalog"],
+        env={"WAAPI_SKILL_CONFIG_PATH": str(tmp_path / "absent.json")},
+        client_factory=lambda _url: pytest.fail("offline disclosure connected"),
+    )
+    assert code == 0, schema
+    rows = schema["business_input"]["event_rows"]
+    assert rows["bounds"] == {"schema_depth": 16, "array_items": 256}
+    assert rows["catalog_scope"] == "bounded_schema_descent; deeper_or_unknown_collections_rejected_before_subscription"
+
+
+@pytest.mark.parametrize("fault", ("arity", "index-limit", "unknown-field", "depth"))
+def test_recursive_soundbank_predicate_errors_stop_before_monitoring(tmp_path, fault):
+    collection = "bank-info-included-events-switch-containers-children"
+    indices, field = "0,0,0,0,0", "switch-value"
+    if fault == "arity":
+        indices = "0,0,0,0"
+    elif fault == "index-limit":
+        indices = "0,0,0,0,256"
+    elif fault == "unknown-field":
+        field = "not-a-field"
+    elif fault == "depth":
+        collection += "-children-children-children"
+        indices = "0,0,0,0,0,0,0,0,0,0,0"
+    code, result, client, _ = run(
+        tmp_path, "2021.1", "wait-topic", "ak.wwise.core.soundbank.generated", [],
+        "--event-row", collection, indices, field, GUID,
+    )
+    assert code != 0, result
+    assert client.calls == client.subscriptions == []
+    assert ("schema-depth limit 16" if fault == "depth" else
+            "Unknown" if fault == "unknown-field" else "0 through 255") in result["message"]
+
+
+def test_recursive_soundbank_does_not_reinterpret_reflected_array_item_as_object(tmp_path):
+    event = {"bankInfo": [{"IncludedEvents": [{"SwitchContainers": [{
+        "Children": [{"SwitchValue": GUID}],
+    }]}]}]}
+    code, result, client, _ = run(
+        tmp_path, "2021.1", "wait-topic", "ak.wwise.core.soundbank.generated", [event],
+        "--event-row", "bank-info-included-events-switch-containers-children", "0,0,0,0,0",
+        "switch-value", GUID, timeout_seconds=1.0,
+    )
+    assert code != 0, result
+    assert result["cleanup"] == "unsubscribed"
+    assert result["call"]["error_code"] == "TOPIC_EVENT_SCHEMA_MISMATCH"
+    assert client.unsubscribed == 1
+
+
 @pytest.mark.parametrize("mode", ("wait-topic", "stream-topic"))
 def test_native_shape_mismatch_retains_small_exact_event_for_diagnosis(tmp_path, mode):
     event = {"transport": -1, "state": "playing", "object": GUID}
