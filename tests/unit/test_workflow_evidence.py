@@ -331,6 +331,16 @@ def test_switch_assignment_business_evidence_rejects_relationship_tampering() ->
 
 @pytest.mark.parametrize("fault", (None, "notes-on-source", "partial-post-read", "indeterminate"))
 def test_localized_tsv_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
+    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="notes-columns")
+
+
+@pytest.mark.parametrize("witness_kind", ("ordinary-owner-source", "explicit-source-tsv"))
+@pytest.mark.parametrize("fault", (None, "missing-field", "wrong-identity", "indeterminate"))
+def test_owner_source_native_witnesses_reach_persisted_final_writer(tmp_path, monkeypatch, fault, witness_kind):
+    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind=witness_kind)
+
+
+def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, fault, witness_kind):
     """Real public Gateway/collector/finalizer; only native Wwise is substituted."""
     import importlib
     import hashlib
@@ -353,10 +363,15 @@ def test_localized_tsv_native_witness_reaches_persisted_final_writer(tmp_path, m
             self.parent = {"id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
                 "path": r"\Containers\Default Work Unit", "notes": "keep placement", "parent": None}
             self.objects = {PARENT_ID: self.parent}
-            self.tab_count = 0
+            self.tab_count = self.import_count = 0
+            self.bus = {"id": "{B0B0B0B0-B0B0-B0B0-B0B0-B0B0B0B0B0B0}", "name": "Master Audio Bus", "type": "Bus", "classId": 524304,
+                "path": r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus", "notes": "keep bus", "parent": None}
+            self.objects[self.bus["id"]] = self.bus
         def projected(self, rows, options):
             result = []
             for raw in rows:
+                if raw["type"] == "AudioFileSource" and options.get("language") and raw["audioSource:language"]["name"] != options["language"]:
+                    continue
                 row = copy.deepcopy(raw)
                 if row["type"] == "Sound":
                     children = [source for source in self.objects.values() if (source.get("parent") or {}).get("id") == row["id"]
@@ -367,7 +382,10 @@ def test_localized_tsv_native_witness_reaches_persisted_final_writer(tmp_path, m
                 result.append({key: row.get(key, row.get("@" + key)) for key in options["return"] if key in row or "@" + key in row})
             return result
         def ingest(self, row, language):
+            explicit_source = "<AudioFileSource>" in row["objectPath"]
             path = re.sub(r"<[^>]+>", "", row["objectPath"])
+            source_name = path.rsplit("\\", 1)[-1] if explicit_source else None
+            if explicit_source: path = path.rsplit("\\", 1)[0]
             owner = next((item for item in self.objects.values() if item["path"] == path and item["type"] != "AudioFileSource"), None)
             if owner is None:
                 parent_path, _, name = path.rpartition("\\")
@@ -379,22 +397,34 @@ def test_localized_tsv_native_witness_reaches_persisted_final_writer(tmp_path, m
                     "path": path, "parent": {"id": parent["id"]}, "notes": ""}
                 if sound: owner["@IsVoice"] = "voice" in kind.casefold()
                 self.objects[owner["id"]] = owner
+            for name in ("Volume", "OutputBus", "OverrideOutput"):
+                if "@" + name in row:
+                    owner["@" + name] = {"id": row["@" + name]} if name == "OutputBus" else row["@" + name]
+            if owner["type"] == "Sound":
+                owner.setdefault("@Volume", 0.0); owner.setdefault("@OutputBus", None)
+            if "notes" in row and not explicit_source and "audioFile" not in row and "audioFileBase64" not in row:
+                owner["notes"] = row["notes"]
             returned = [owner]
-            if "audioFile" in row:
-                media = Path(row["audioFile"])
+            if "audioFile" in row or "audioFileBase64" in row:
+                import base64
+                relative, _, encoded = row.get("audioFileBase64", "").partition("|")
+                media = Path(row["audioFile"]) if "audioFile" in row else Path(relative.replace("\\", "/"))
+                data = media.read_bytes() if "audioFile" in row else base64.b64decode(encoded)
+                source_name = source_name or media.stem
                 source = next((item for item in self.objects.values() if (item.get("parent") or {}).get("id") == owner["id"]
-                    and item["type"] == "AudioFileSource" and item["name"] == media.stem
+                    and item["type"] == "AudioFileSource" and item["name"] == source_name
                     and item["audioSource:language"]["name"] == language), None)
                 copied = tmp_path / "project/Originals" / ("SFX" if language == "SFX" else "Voices/" + language)
                 copied = copied / row.get("originalsSubFolder", "") / media.name
-                copied.parent.mkdir(parents=True, exist_ok=True); copied.write_bytes(media.read_bytes())
+                copied.parent.mkdir(parents=True, exist_ok=True); copied.write_bytes(data)
                 if source is None:
-                    source = {"id": "{" + str(uuid.uuid4()).upper() + "}", "name": media.stem,
-                        "type": "AudioFileSource", "classId": 16, "path": path + "\\" + media.stem,
+                    source = {"id": "{" + str(uuid.uuid4()).upper() + "}", "name": source_name,
+                        "type": "AudioFileSource", "classId": 16, "path": path + "\\" + source_name,
                         "notes": "", "parent": {"id": owner["id"]},
                         "audioSource:language": {"id": ENGLISH if language == "English(US)" else JAPANESE if language == "Japanese" else SFX, "name": language}}
                     self.objects[source["id"]] = source
                 source["originalFilePath"] = str(copied)
+                if explicit_source and "notes" in row: source["notes"] = row["notes"]
                 returned.append(source)
             return returned
         def call(self, uri, args=None, options=None):
@@ -405,9 +435,14 @@ def test_localized_tsv_native_witness_reaches_persisted_final_writer(tmp_path, m
                 return info
             if uri.endswith("getTypes"):
                 return {"return": [{"classId": n, "name": name, "type": "WObject"} for n, name in (
-                    (1, "PropertyContainer"), (65552, "Sound"), (16, "AudioFileSource"), (1638416, "WorkUnit"))]}
-            if uri.endswith("getPropertyAndReferenceNames"): return {"return": ["IsVoice"]}
-            if uri.endswith("getPropertyInfo"): return {"name": "IsVoice", "type": "bool", "default": False, "dependencies": []}
+                    (1, "PropertyContainer"), (65552, "Sound"), (16, "AudioFileSource"), (1638416, "WorkUnit"), (524304, "Bus"))]}
+            if uri.endswith("getPropertyAndReferenceNames"): return {"return": ["IsVoice", "Volume", "OutputBus"]}
+            if uri.endswith("getPropertyInfo"):
+                if args["property"] == "Volume":
+                    return {"name": "Volume", "type": "Real32", "restriction": {"type": "range", "min": -200, "max": 200}}
+                if args["property"] == "OutputBus":
+                    return {"name": "OutputBus", "type": "Reference", "restriction": {"type": "reference", "restrictions": [{"type": ["Bus"]}]}}
+                return {"name": "IsVoice", "type": "bool", "default": False, "dependencies": []}
             if uri.endswith("getProjectInfo"):
                 info = super().call(uri, args, options)
                 info["languages"].extend([{"id": ENGLISH, "name": "English(US)", "shortId": 2}, {"id": JAPANESE, "name": "Japanese", "shortId": 3}])
@@ -431,11 +466,23 @@ def test_localized_tsv_native_witness_reaches_persisted_final_writer(tmp_path, m
                         owners = {item["id"] for item in rows}
                         rows = [item for item in self.objects.values() if isinstance(item.get("parent"), dict) and item["parent"].get("id") in owners]
                 self.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options)))
-                return {"return": self.projected(rows, options)}
+                projected = self.projected(rows, options)
+                if fault == "missing-field" and (self.tab_count or self.import_count == 3) and "waql" in args:
+                    target = "VoiceSource" if witness_kind == "ordinary-owner-source" else "VoiceNotes"
+                    for row in projected:
+                        if row.get("type") == "Sound" and row.get("name") == target: row.pop("notes", None)
+                return {"return": projected}
             if uri == "ak.wwise.core.audio.import":
                 self.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options)))
+                self.import_count += 1
+                if witness_kind == "ordinary-owner-source" and self.import_count == 3 and fault == "indeterminate":
+                    raise RuntimeError("fake native transport lost after dispatch")
                 returned = []
                 for row in args["imports"]: returned.extend(self.ingest(row, row.get("importLanguage", "SFX")))
+                returned = list({row["id"]: row for row in returned}.values())
+                if witness_kind == "ordinary-owner-source" and self.import_count == 3 and fault == "wrong-identity":
+                    source = next(row for row in returned if row["type"] == "AudioFileSource")
+                    source["parent"] = {"id": PARENT_ID}
                 return {"objects": self.projected(returned, options), "log": [],
                     "files": [item["originalFilePath"] for item in returned if item["type"] == "AudioFileSource"]}
             if uri == "ak.wwise.core.audio.importTabDelimited":
@@ -449,11 +496,18 @@ def test_localized_tsv_native_witness_reaches_persisted_final_writer(tmp_path, m
                     object_path = row["Object Path"]
                     if not object_path.startswith("\\"):
                         object_path = self.objects[args["importLocation"]]["path"] + "\\" + object_path
-                    owner, source = self.ingest({"objectPath": object_path, "audioFile": row["Audio File"],
-                        "originalsSubFolder": row["OriginalsSubFolder"]}, "English(US)")
-                    if row["Notes"]: (source if fault == "notes-on-source" else owner)["notes"] = row["Notes"]
-                    if row["Audio Source Notes"]: source["notes"] = row["Audio Source Notes"]
-                    returned.extend([owner, source])
+                    native = {"objectPath": object_path, "notes": row.get("Notes", "")}
+                    if row.get("Audio File"): native["audioFile"] = row["Audio File"]
+                    if row.get("OriginalsSubFolder"): native["originalsSubFolder"] = row["OriginalsSubFolder"]
+                    objects = self.ingest(native, "English(US)")
+                    owner = objects[0]; source = objects[-1] if len(objects) > 1 else None
+                    if row.get("Notes") and source is not None and "<AudioFileSource>" not in object_path:
+                        (source if fault == "notes-on-source" else owner)["notes"] = row["Notes"]
+                    if row.get("Audio Source Notes") and source is not None: source["notes"] = row["Audio Source Notes"]
+                    if fault == "wrong-identity" and source is not None:
+                        self.objects.pop(source["id"]); source["id"] = "{" + str(uuid.uuid4()).upper() + "}"; self.objects[source["id"]] = source
+                    returned.extend(objects)
+                returned = list({row["id"]: row for row in returned}.values())
                 return {"objects": self.projected(returned, options)}
             if uri.startswith("ak.wwise.core.undo."): return {}
             return super().call(uri, args, options)
@@ -480,9 +534,11 @@ def test_localized_tsv_native_witness_reaches_persisted_final_writer(tmp_path, m
         state_dir=state, env=env, category_results=[], raw_gateway=raw,
         lifecycle=SimpleNamespace(host="127.0.0.1", waapi_url="ws://127.0.0.1:31337/waapi"), port=31337)
     lock = sandbox_fixture.LiveSandboxLock(tmp_path / "locks"); lock.__enter__()
-    node = "test_audio_import_localized_exact_tsv_independent_notes"
+    node = {"notes-columns": "test_audio_import_localized_exact_tsv_independent_notes",
+        "ordinary-owner-source": "test_audio_import_new_localized_source_owner_fields",
+        "explicit-source-tsv": "test_audio_import_exact_tsv_owner_notes_existing_source_media"}[witness_kind]
     error = None
-    try: collector.collect_localized_tsv_import_acceptance(runtime)
+    try: getattr(workflow, node)(runtime)
     except AssertionError as exc: error = exc
     assert (error is None) == (fault is None), error
     category, = runtime.category_results
@@ -492,6 +548,32 @@ def test_localized_tsv_native_witness_reaches_persisted_final_writer(tmp_path, m
     assert final["invocation"]["outcome"] == ("PASS" if fault is None else "FAIL")
     assert report["business_effect_verified"] is (fault is None)
     assert report["transaction_budget"] == {"setup": 2, "witness": 1, "maximum_total": 3}
+    if witness_kind != "notes-columns":
+        assert len(final["transactions"]) == 3
+        assert final["residual_state"]["sandbox"] == ("deleted" if fault is None else "quarantined")
+        witness = report["witness"]
+        if fault == "indeterminate":
+            assert witness["execute"]["state"] == "indeterminate"
+            assert report["calls"][-1]["argv"] == ["execute", witness["transaction_id"]]
+            assert not report["observations"].get("after")
+        else:
+            assert len(witness["actual_verifications"]) == 1 and witness["actual_verifications"][0]["readbacks"]
+            assert report["observations"]["after"]["Spare"] == report["observations"]["before"]["Spare"]
+            if fault == "missing-field":
+                assert report["observation_errors"]
+            if fault == "wrong-identity":
+                assert witness["verify_exit_code"] == 2
+        if witness_kind == "ordinary-owner-source":
+            assert client.import_count == 3 and client.tab_count == 0
+            assert "table" not in report
+        else:
+            assert client.import_count == 2 and client.tab_count == 1
+            assert "Audio Source Notes" not in report["table"]["utf8"]
+            cells = [line.split("\t") for line in report["table"]["utf8"].splitlines()]
+            assert cells[1][0] == "" and cells[1][2] == "TSV requested object Notes"
+            assert cells[2][1].endswith("<AudioFileSource>LineNotes") and cells[2][2] == "TSV requested source Notes"
+            if fault != "indeterminate": assert report["table_after"]["sha256"] == report["table"]["sha256"]
+        return
     table_bytes = report["table"]["utf8"].encode("utf-8")
     assert hashlib.sha256(table_bytes).hexdigest() == report["table"]["sha256"]
     cells = [line.split("\t") for line in report["table"]["utf8"].splitlines()]

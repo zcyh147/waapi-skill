@@ -269,22 +269,24 @@ def collect_localized_import_acceptance(runtime):
     return _collect(runtime, localized=True)
 
 
-def collect_localized_tsv_import_acceptance(runtime):
+def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-columns"):
     """One unchanged table, two independent Notes columns; preserve failed facts."""
     from tests.destructive.test_gateway_workflow_transaction_matrix import (
         _start_business_draft, _update_business_draft, _bind_business_object,
         _complete_business_draft, _write_fixture_wav,
     )
     assert runtime.version == "2025.1", "Representative unchanged-table witness is pinned to 2025.1"
+    assert witness_kind in {"notes-columns", "ordinary-owner-source", "explicit-source-tsv"}
+    ordinary = witness_kind == "ordinary-owner-source"
     name = "TSV_Witness_" + uuid.uuid4().hex[:10]
-    output = runtime.state_dir / "localized-exact-tsv-notes-witness.json"
+    output = runtime.state_dir / ("localized-exact-tsv-notes-witness.json" if witness_kind == "notes-columns" else "localized-" + witness_kind + "-witness.json")
     assert not output.exists(), "Never overwrite original native observations"
-    category = {"category": "audio-import-localized-exact-tsv-notes", "status": "FAIL",
+    category = {"category": "audio-import-localized-exact-tsv-notes" if witness_kind == "notes-columns" else "audio-import-localized-" + witness_kind, "status": "FAIL",
         "verifier_strength": "gateway_verifier_plus_independent_owner_source_notes_identity_media_and_preservation",
         "observation_path": str(output), "transaction_ids": []}
     runtime.category_results.append(category)
     report = {"contract": "waapi-skill.localized-tsv-witness/v1", "candidate": runtime.candidate,
-        "version": runtime.version, "setup_coverage_credit": False, "business_effect_verified": False,
+        "version": runtime.version, "witness_kind": witness_kind, "setup_coverage_credit": False, "business_effect_verified": False,
         "transaction_budget": {"setup": 2, "witness": 1, "maximum_total": 3},
         "stage": "setup", "calls": [], "setup": [], "witness": {}, "rows": [],
         "observations": {}, "observation_errors": [], "inputs": {}, "failure": None,
@@ -328,14 +330,16 @@ def collect_localized_tsv_import_acceptance(runtime):
         assert path.is_relative_to(owned) and path.is_file(), path
         body = path.read_bytes(); assert 0 < len(body) <= 65536
         return {"path": str(path), "size": len(body), "sha256": hashlib.sha256(body).hexdigest()}
-    def query(argv, includes=()):
+    def query(argv, includes=(), fields=()):
         payload = gateway.gateway(["query-object", *argv,
+            *(word for field in fields for word in ("--include-field", field)),
             *(word for field in includes for word in ("--include", field)), "--max-results", "8"], live=True)
         assert payload.get("projection_complete") is not False and payload.get("limit_reached") is not True and payload.get("status") != "partial", payload
         assert payload["count"] == len(payload["objects"]), payload
         return payload["objects"]
     def exact(identity):
-        rows = query(["--exact-id", identity], ("notes", "parent", "class-id"))
+        rows = query(["--exact-id", identity], ("notes", "parent", "class-id"),
+            ("Volume", "OutputBus") if ordinary and identities.get("VoiceSource") == identity else ())
         assert len(rows) == 1 and rows[0]["id"] == identity and isinstance(rows[0].get("notes"), str), rows
         return rows[0]
     def at(*segments):
@@ -399,18 +403,46 @@ def collect_localized_tsv_import_acceptance(runtime):
             report["rows"].append({"name": key, "owner_id": identities[key],
                 "baseline_owner_notes": before[key]["owner"]["notes"],
                 "baseline_source_notes": {row["object"]["source_language"]["name"]: row["object"]["notes"] for row in before[key]["sources"]}})
-        replacement = {key: audio(index + 4, stem) for index, (key, stem) in enumerate((("VoiceNotes", "LineNotes"), ("VoiceSource", "LineSource")))}
-        table = owned / "GatewayTSVWitness/exact-localized.tsv"
-        table.write_text("Audio File\tObject Path\tNotes\tAudio Source Notes\tOriginalsSubFolder\n"
-            + "".join(f"{replacement[key]}\t<Sound Voice>{key}\t{notes}\t{source_notes}\tAfter\n"
-                for key, notes, source_notes in (("VoiceNotes", "TSV requested object Notes", ""), ("VoiceSource", "", "TSV requested source Notes"))),
-            encoding="utf-8", newline="\n")
-        table_proof = proof(str(table)); report["table"] = {**table_proof, "utf8": table.read_text(encoding="utf-8")}
+        table = table_proof = None
         report["stage"] = "witness"
-        draft = _start_business_draft(gateway, "audio.importTabDelimited")
-        location = _bind_business_object(gateway, draft, role="import_location", object_id=container)
-        _update_business_draft(gateway, draft, "draft-declare-artifact-plan", ["--table-file", str(table), "--location-handle", location,
-            "--language", "English(US)", "--mode", "reimport"], live=False)
+        if ordinary:
+            import base64
+            from tests.semantic.support.typed_gateway_input import discovered_business_field_handle
+            replacement = {"VoiceSource": audio(4, "LineSource")}
+            draft = _start_business_draft(gateway, "audio.import")
+            voice = _bind_business_object(gateway, draft, object_id=identities["VoiceSource"])
+            bus = _bind_business_object(gateway, draft, path_segments=("Master-Mixer Hierarchy", "Default Work Unit", "Master Audio Bus"))
+            bus_id = at("Master-Mixer Hierarchy", "Default Work Unit", "Master Audio Bus")
+            report["bus_before"] = exact(bus_id)
+            fields = {}
+            for meaning in ("Volume", "OutputBus"):
+                found = _update_business_draft(gateway, draft, "draft-discover-fields",
+                    ["--object-handle", voice, "--meaning", meaning], live=True)
+                fields[meaning] = discovered_business_field_handle(found, meaning)
+            inline = "Voices/Japanese/After/LineSource.wav|" + base64.b64encode(replacement["VoiceSource"].read_bytes()).decode("ascii")
+            _update_business_draft(gateway, draft, "draft-declare-existing", ["--declaration-id", "japanese", "--object-handle", voice,
+                "--field", "inline_wav", inline, "--field", "language", "Japanese",
+                "--field", "audio_source_notes", "Japanese explicit Source notes", "--field", "originals_subfolder", "After",
+                "--field-value", fields["Volume"], "-6", "--field-value", fields["OutputBus"], bus], live=False)
+        else:
+            replacement = ({"VoiceNotes": audio(4, "DifferentMedia")} if witness_kind == "explicit-source-tsv" else
+                {key: audio(index + 4, stem) for index, (key, stem) in enumerate((("VoiceNotes", "LineNotes"), ("VoiceSource", "LineSource")))})
+            table = owned / "GatewayTSVWitness/exact-localized.tsv"
+            if witness_kind == "explicit-source-tsv":
+                table.write_text("Audio File\tObject Path\tNotes\tOriginalsSubFolder\n"
+                    + "\t<Sound Voice>VoiceNotes\tTSV requested object Notes\t\n"
+                    + f"{replacement['VoiceNotes']}\t<Sound Voice>VoiceNotes\\<AudioFileSource>LineNotes\tTSV requested source Notes\tAfter\n",
+                    encoding="utf-8", newline="\n")
+            else:
+                table.write_text("Audio File\tObject Path\tNotes\tAudio Source Notes\tOriginalsSubFolder\n"
+                    + "".join(f"{replacement[key]}\t<Sound Voice>{key}\t{notes}\t{source_notes}\tAfter\n"
+                        for key, notes, source_notes in (("VoiceNotes", "TSV requested object Notes", ""), ("VoiceSource", "", "TSV requested source Notes"))),
+                    encoding="utf-8", newline="\n")
+            table_proof = proof(str(table)); report["table"] = {**table_proof, "utf8": table.read_text(encoding="utf-8")}
+            draft = _start_business_draft(gateway, "audio.importTabDelimited")
+            location = _bind_business_object(gateway, draft, role="import_location", object_id=container)
+            _update_business_draft(gateway, draft, "draft-declare-artifact-plan", ["--table-file", str(table), "--location-handle", location,
+                "--language", "English(US)", "--mode", "reimport"], live=False)
         _update_business_draft(gateway, draft, "draft-check", live=True)
         preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
         witness = report["witness"]; transaction = preview["transaction_id"]
@@ -418,16 +450,29 @@ def collect_localized_tsv_import_acceptance(runtime):
         witness.update(transaction_id=transaction, preview=preview)
         shown = gateway.gateway(["transaction-show", transaction], live=False)
         dispatch = shown["artifact"]["prepared_operation"]["dispatch"]; witness["compiled_native_request"] = dispatch
-        assert dispatch["uri"] == "ak.wwise.core.audio.importTabDelimited"
-        assert dispatch["args"] == {"importFile": str(table), "importLocation": container,
-            "importLanguage": "English(US)", "importOperation": "useExisting", "autoAddToSourceControl": False, "autoCheckOutToSourceControl": False}
-        assert proof(str(table)) == table_proof
+        if ordinary:
+            assert dispatch["uri"] == "ak.wwise.core.audio.import" and dispatch["args"]["importOperation"] == "useExisting"
+            owner_row, source_row = dispatch["args"]["imports"]
+            assert owner_row["@Volume"] == -6 and owner_row["@OutputBus"] == bus_id
+            assert "audioFileBase64" not in owner_row and "notes" not in owner_row
+            assert source_row["objectPath"].endswith("\\<Sound Voice>VoiceSource\\<AudioFileSource>LineSource")
+            assert source_row["notes"] == "Japanese explicit Source notes" and source_row["importLanguage"] == "Japanese"
+            assert "importLocation" not in source_row and "audioSourceNotes" not in source_row
+            assert source_row["audioFileBase64"] == inline.partition("|")[0].replace("/", "\\") + "|" + inline.partition("|")[2]
+        else:
+            assert dispatch["uri"] == "ak.wwise.core.audio.importTabDelimited"
+            assert dispatch["args"] == {"importFile": str(table), "importLocation": container,
+                "importLanguage": "English(US)", "importOperation": "useExisting", "autoAddToSourceControl": False, "autoCheckOutToSourceControl": False}
+            assert proof(str(table)) == table_proof
         gateway.gateway(["confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]], live=False)
         code, executed = gateway.raw_gateway(["execute", transaction]); witness.update(execute_exit_code=code, execute=executed); persist()
         if code != 0 or executed.get("state") != "executed_unverified":
             category["status"] = "blocked"
             raise AssertionError("Native TSV outcome is not determinate; no follow-up writes or reads")
         code, verified = gateway.raw_gateway(["verify", transaction]); witness.update(verify_exit_code=code, verify=verified); persist()
+        if verified.get("state") == "indeterminate" or verified.get("status") == "indeterminate":
+            category["status"] = "blocked"
+            raise AssertionError("Verification is indeterminate; no follow-up calls")
         # Successful Verify stdout is compact; one public journal read retains
         # the original verifier's readbacks without repeating native Verify.
         saved_code, saved = gateway.raw_gateway(["transaction-show", transaction])
@@ -439,25 +484,62 @@ def collect_localized_tsv_import_acceptance(runtime):
         after = report["observations"]["after"] = {}
         for key, identity in identities.items():
             after[key] = {}; observe(identity, after[key])
-        report["table_after"] = proof(str(table)); persist()
+        if ordinary:
+            report["bus_after"] = exact(bus_id)
+        else:
+            report["table_after"] = proof(str(table))
+        persist()
         assert not report["observation_errors"], report["observation_errors"]
         assert len(actual) == 1 and isinstance(actual[0].get("readbacks"), list), "Actual verifier readbacks missing"
-        assert report["table_after"] == table_proof
+        if not ordinary:
+            assert report["table_after"] == table_proof
         assert all(proof(path) == original for path, original in report["inputs"].items())
         assert after["Spare"] == before["Spare"]
-        for key in ("VoiceNotes", "VoiceSource"):
-            prior, current = before[key], after[key]
+        if ordinary:
+            assert after["VoiceNotes"] == before["VoiceNotes"] and report["bus_after"] == report["bus_before"]
+            prior, current = before["VoiceSource"], after["VoiceSource"]
             old = {row["object"]["source_language"]["name"]: row for row in prior["sources"]}
             new = {row["object"]["source_language"]["name"]: row for row in current["sources"]}
-            assert len(new) == len(current["sources"]) == len(old) == len(prior["sources"])
-            assert set(new) == set(old)
-            assert current["owner"] == {**prior["owner"], "notes": "TSV requested object Notes" if key == "VoiceNotes" else prior["owner"]["notes"]}
-            assert new["English(US)"]["object"]["id"] == old["English(US)"]["object"]["id"]
-            assert new["English(US)"]["object"]["notes"] == (old["English(US)"]["object"]["notes"] if key == "VoiceNotes" else "TSV requested source Notes")
-            assert new["English(US)"]["media"]["sha256"] == report["inputs"][str(replacement[key])]["sha256"]
+            assert len(new) == len(current["sources"]) == 2 and set(new) == {"English(US)", "Japanese"}
+            assert new["English(US)"] == old["English(US)"]
+            selected = new["Japanese"]
+            assert selected["object"]["id"] not in {identities["VoiceSource"], old["English(US)"]["object"]["id"]}
+            assert selected["object"]["notes"] == "Japanese explicit Source notes"
+            assert selected["media"]["sha256"] == report["inputs"][str(replacement["VoiceSource"])]["sha256"]
+            assert Path(selected["media"]["path"]).parent.name == "After"
+            assert {key: value for key, value in current["owner"].items() if key not in {"properties", "references"}} == {
+                key: value for key, value in prior["owner"].items() if key not in {"properties", "references"}}
+            assert current["owner"]["properties"]["Volume"] == -6
+            assert current["owner"]["references"]["OutputBus"]["id"] == bus_id
+        elif witness_kind == "explicit-source-tsv":
+            assert after["VoiceSource"] == before["VoiceSource"]
+            prior, current = before["VoiceNotes"], after["VoiceNotes"]
+            old = {row["object"]["source_language"]["name"]: row for row in prior["sources"]}
+            new = {row["object"]["source_language"]["name"]: row for row in current["sources"]}
+            assert len(new) == len(current["sources"]) == 2 and set(new) == set(old)
+            assert current["owner"] == {**prior["owner"], "notes": "TSV requested object Notes"}
+            assert new["Japanese"] == old["Japanese"]
+            for key in ("id", "name", "path", "parent", "class_id", "type", "source_language"):
+                assert new["English(US)"]["object"][key] == old["English(US)"]["object"][key]
+            assert new["English(US)"]["object"]["name"] == "LineNotes"
+            assert new["English(US)"]["object"]["notes"] == "TSV requested source Notes"
+            assert new["English(US)"]["media"]["sha256"] == report["inputs"][str(replacement["VoiceNotes"])]["sha256"]
+            assert Path(new["English(US)"]["media"]["path"]).name == "DifferentMedia.wav"
             assert Path(new["English(US)"]["media"]["path"]).parent.name == "After"
-            assert new["English(US)"]["media"]["path"] != old["English(US)"]["media"]["path"]
-            if "Japanese" in old: assert new["Japanese"] == old["Japanese"]
+        else:
+            for key in ("VoiceNotes", "VoiceSource"):
+                prior, current = before[key], after[key]
+                old = {row["object"]["source_language"]["name"]: row for row in prior["sources"]}
+                new = {row["object"]["source_language"]["name"]: row for row in current["sources"]}
+                assert len(new) == len(current["sources"]) == len(old) == len(prior["sources"])
+                assert set(new) == set(old)
+                assert current["owner"] == {**prior["owner"], "notes": "TSV requested object Notes" if key == "VoiceNotes" else prior["owner"]["notes"]}
+                assert new["English(US)"]["object"]["id"] == old["English(US)"]["object"]["id"]
+                assert new["English(US)"]["object"]["notes"] == (old["English(US)"]["object"]["notes"] if key == "VoiceNotes" else "TSV requested source Notes")
+                assert new["English(US)"]["media"]["sha256"] == report["inputs"][str(replacement[key])]["sha256"]
+                assert Path(new["English(US)"]["media"]["path"]).parent.name == "After"
+                assert new["English(US)"]["media"]["path"] != old["English(US)"]["media"]["path"]
+                if "Japanese" in old: assert new["Japanese"] == old["Japanese"]
         assert code == 0 and verified.get("verified") is True, verified
         report.update(stage="complete", business_effect_verified=True); category["status"] = "PASS"
         return category
@@ -466,3 +548,11 @@ def collect_localized_tsv_import_acceptance(runtime):
         raise
     finally:
         persist()
+
+
+def collect_localized_owner_source_import_acceptance(runtime):
+    return collect_localized_tsv_import_acceptance(runtime, witness_kind="ordinary-owner-source")
+
+
+def collect_localized_explicit_source_tsv_acceptance(runtime):
+    return collect_localized_tsv_import_acceptance(runtime, witness_kind="explicit-source-tsv")
