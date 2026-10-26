@@ -5,6 +5,27 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-26 #182 Switch import native milestone
+
+Console 2025.1.7.9143, macOS, candidate `19bb77ea`: **PASS, 6.05s** in
+`import182-switch-2025-r2`, two verified transactions including setup. One
+import reused an existing SFX Sound with media plus Switch-only intent and
+created a new Sound assigned to Snow. Independent checks proved changed reuse
+media with preserved owner/Source identity, original three assignment pairs,
+group/values, baseline subtree/media, spare and inputs. Source preservation
+and process cleanup passed; the PASS sandbox was deleted. Receipt SHA-256:
+`3c6354a754c236b7a0ee4fa52fe48f6dc1a3c57b0f8ffc6bcfa1437f9ee788d6`.
+
+Original `import182-switch-2025-r1` at `60e33e47` remains **FAIL, 8.34s**:
+the fixture omitted a named ancestor folder; zero transactions ran. Source
+remained untouched, process cleanup passed and its sandbox stays quarantined.
+Both roots retain `main-assessment.json` and final `category.jsonl` under
+`.waapi-skill-state/full-coverage/`. Five-version Switch program proof and
+other forms remain pending. Reviewed `594e7a42` adds the first combined
+localized TSV owner-field/media flow with unchanged table and planned-Source
+preservation; it is program-only, with native effects and broader forms still
+pending. #182 remains OPEN; no Fresh, broad gates or coverage totals were added.
+
 ## 2026-10-26 #182 owner-only exact TSV fields milestone
 
 The public Gateway admits metadata-proven owner-only localized TSV fields on
