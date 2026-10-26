@@ -564,31 +564,36 @@ class ReplacingDialogueClient(DialogueImportClient):
             assert args['importOperation']=='replaceExisting'
             assert args['imports']==[{'objectPath':self.child['path'],'objectType':'Sound SFX',
                 'dialogueEvent':self.event['path']+'@Path:<Switch Group:Surface>Snow'}]
-            self.replaced=True;self.child['id']=self.NEW_OWNER
+            self.replaced=True;self.event_created=True;self.child['id']=self.NEW_OWNER
             self.entry['AudioNode']={'id':self.CHILD if self.keep_old_link else self.NEW_OWNER}
             self.before_links[0]['AudioNode']=None
-            self.before_links[-1]=deepcopy(self.entry)
+            for index,old in enumerate(self.before_links):
+                if old['id']==self.ENTRY:self.before_links[index]=deepcopy(self.entry)
             self.linked=False
             return {'objects':[deepcopy(self.child)],**({'log':[],'files':[]} if self.version in {'2023.1','2024.1','2025.1'} else {})}
         return super().call(uri,args,options)
 
 
-def _replacing_dialogue_draft(tmp_path,version='2025.1'):
+def _replacing_dialogue_draft(tmp_path,version='2025.1',*,existing_event=True):
     client=ReplacingDialogueClient(tmp_path,version)
+    if not existing_event:
+        client.event_created=False
+        client.before_links=[r for r in client.before_links if r["id"]!=client.ENTRY]
     command,_,_=_import_fields_draft(tmp_path,version,client)
     owner=command('draft-bind-object','--object-id',client.CHILD)['bound_object']['handle']
-    event=command('draft-bind-object','--object-id',client.EVENT)['bound_object']['handle']
+    event=command('draft-bind-object','--object-id',client.EVENT if existing_event else client.EVENT_PARENT)['bound_object']['handle']
     group=command('draft-bind-object','--object-id',client.GROUP)['bound_object']['handle']
     value=command('draft-bind-object','--object-id',client.VALUE)['bound_object']['handle']
     command('draft-business-configure','--mode','replace')
     command('draft-declare-existing','--declaration-id','snow','--object-handle',owner,
-        '--dialogue-event-handle',event,'--dialogue-condition',group,value)
+        *(('--dialogue-event-handle',event) if existing_event else ('--dialogue-event-parent-handle',event,'--dialogue-event-name','Greeting')),
+        '--dialogue-condition',group,value)
     return command,client
 
 
 @pytest.mark.parametrize('version',('2021.1','2022.1','2023.1','2024.1','2025.1'))
-def test_dialogue_replacement_reconciles_requested_entry_to_new_owner_and_preserves_other_referrer_identity(tmp_path,version):
-    command,client=_replacing_dialogue_draft(tmp_path,version)
+def test_new_dialogue_event_with_sound_replacement_reconciles_requested_entry_and_other_referrers(tmp_path,version):
+    command,client=_replacing_dialogue_draft(tmp_path,version,existing_event=False)
     old_event=deepcopy(client.event)
     command('draft-check');tx=command('preview-from-draft')['transaction_id'];shown=command('transaction-show',tx)
     command('confirm',tx,'--confirmation-token',shown['confirmation']['token']);command('execute',tx)
@@ -665,12 +670,13 @@ def test_tsv_dialogue_replacement_reconciles_new_owner_without_rewriting_file(tm
             if uri=='ak.wwise.core.audio.importTabDelimited':
                 self.calls.append((uri,deepcopy(args),deepcopy(options)))
                 assert args['importOperation']=='replaceExisting'
-                self.replaced=True;self.child['id']=self.NEW_OWNER
+                self.replaced=True;self.event_created=True;self.child['id']=self.NEW_OWNER
                 self.entry['AudioNode']={'id':self.NEW_OWNER}
-                self.before_links[0]['AudioNode']=None;self.before_links[-1]=deepcopy(self.entry)
+                self.before_links[0]['AudioNode']=None
                 return {'objects':[deepcopy(self.child)]}
             return super().call(uri,args,options)
     client=TableReplacingClient(tmp_path,'2025.1')
+    client.event_created=False;client.before_links=[r for r in client.before_links if r['id']!=client.ENTRY]
     table=tmp_path/'replace.tsv';table.write_text('Object Path\tDialogue Event\n<Sound SFX>SnowSounds\t'+client.event['path']+'@Path:<Switch Group:Surface>Snow\n')
     command,run=_table_lifecycle_draft(tmp_path,'2025.1',client,table,mode='replace')
     before=table.read_bytes()
@@ -720,7 +726,7 @@ def test_existing_dialogue_event_lifecycle_rejects_drift_and_unobserved_requeste
 
 @pytest.mark.parametrize('fault',('stale-link','unrelated-referrer-loss'))
 def test_dialogue_replacement_rejects_stale_owner_links_and_unrelated_loss(tmp_path,fault):
-    command,client=_replacing_dialogue_draft(tmp_path)
+    command,client=_replacing_dialogue_draft(tmp_path,existing_event=False)
     client.keep_old_link=fault=='stale-link'
     command('draft-check');tx=command('preview-from-draft')['transaction_id'];shown=command('transaction-show',tx)
     command('confirm',tx,'--confirmation-token',shown['confirmation']['token']);command('execute',tx)
@@ -736,6 +742,7 @@ def test_existing_media_replacement_keeps_dialogue_directive_on_owner_and_rebind
         NEW_SOURCE='{F3333333-3333-3333-3333-333333333333}'
         def __init__(self):
             super().__init__(tmp_path,'2025.1')
+            self.event_created=False;self.before_links=[r for r in self.before_links if r['id']!=self.ENTRY]
             self.old_source_id=self.source['id']
             self.child['activeSource']={'id':self.old_source_id}
         def call(self,uri,args=None,options=None):
@@ -756,7 +763,7 @@ def test_existing_media_replacement_keeps_dialogue_directive_on_owner_and_rebind
                 self.child['id']=self.NEW_OWNER;self.child['activeSource']={'id':self.NEW_SOURCE}
                 self.source['id']=self.NEW_SOURCE;self.source['parent']={'id':self.NEW_OWNER}
                 Path(self.source['originalFilePath']).write_bytes(Path(source['audioFile']).read_bytes())
-                self.entry['AudioNode']={'id':self.NEW_OWNER};self.before_links[-1]=deepcopy(self.entry)
+                self.entry['AudioNode']={'id':self.NEW_OWNER};self.event_created=True
                 self.before_links[0]['AudioNode']=None;self.replaced=True
                 return {'objects':deepcopy([self.child,self.source]),'log':[],'files':[self.source['originalFilePath']]}
             return super().call(uri,args,options)
@@ -764,12 +771,12 @@ def test_existing_media_replacement_keeps_dialogue_directive_on_owner_and_rebind
     command,_,_=_import_fields_draft(tmp_path,'2025.1',client)
     media=tmp_path/'Snow.wav';media.write_bytes(WAV_BYTES)
     owner=command('draft-bind-object','--object-id',client.CHILD)['bound_object']['handle']
-    event=command('draft-bind-object','--object-id',client.EVENT)['bound_object']['handle']
+    event=command('draft-bind-object','--object-id',client.EVENT_PARENT)['bound_object']['handle']
     group=command('draft-bind-object','--object-id',client.GROUP)['bound_object']['handle']
     value=command('draft-bind-object','--object-id',client.VALUE)['bound_object']['handle']
     command('draft-business-configure','--mode','replace')
     command('draft-declare-existing','--declaration-id','snow','--object-handle',owner,'--field','media_file',str(media),
-        '--dialogue-event-handle',event,'--dialogue-condition',group,value)
+        '--dialogue-event-parent-handle',event,'--dialogue-event-name','Greeting','--dialogue-condition',group,value)
     command('draft-check');tx=command('preview-from-draft')['transaction_id'];shown=command('transaction-show',tx)
     command('confirm',tx,'--confirmation-token',shown['confirmation']['token']);command('execute',tx)
     result=command('verify',tx)
@@ -846,7 +853,7 @@ def test_two_table_owners_can_share_new_dialogue_event_but_not_one_decision_path
     assert not result['verified'] and table.read_bytes()==before
 
 
-def test_localized_owner_only_tsv_dialogue_replacement_retires_voice_owner_without_preserving_deleted_sources(tmp_path):
+def test_existing_dialogue_event_with_localized_tsv_replace_rejects_before_preview(tmp_path):
     class ReplacingVoiceClient(LocalizedDialogueClient):
         NEW_OWNER='{F6666666-6666-6666-6666-666666666666}'
         def call(self,uri,args=None,options=None):
@@ -864,7 +871,125 @@ def test_localized_owner_only_tsv_dialogue_replacement_retires_voice_owner_witho
     table=tmp_path/'voice-replace.tsv';table.write_text('Object Path\tDialogue Event\n<Sound Voice>Voice\t'+client.dialogue['path']+'@Path:<Switch Group:Surface>Snow\n')
     command,run=_table_lifecycle_draft(tmp_path,'2025.1',client,table,language='English(US)',mode='replace')
     before=table.read_bytes()
-    command('draft-check');tx=command('preview-from-draft')['transaction_id'];_,shown=run('transaction-show',tx)
-    run('confirm',tx,'--confirmation-token',shown['confirmation']['token']);assert run('execute',tx)[0]==0
-    code,result=run('verify',tx);assert code==0 and result['verification']['failed_assertion_count']==0,result
-    assert not result['verified'] and table.read_bytes()==before and client.owner['id']==client.NEW_OWNER
+    command('draft-check',expected_error='IMPORT_DIALOGUE_EXISTING_EVENT_MODE_UNSAFE')
+    assert table.read_bytes()==before and client.owner['id']==client.OWNER
+
+
+@pytest.mark.parametrize('route',('ordinary','table'))
+def test_existing_dialogue_event_with_global_replace_rejects_before_preview_or_write(tmp_path,route):
+    if route=='ordinary':
+        command,client=_replacing_dialogue_draft(tmp_path)
+    else:
+        client=ReplacingDialogueClient(tmp_path,'2025.1')
+        table=tmp_path/'unsafe.tsv';table.write_text('Object Path\tDialogue Event\n<Sound SFX>SnowSounds\t'+client.event['path']+'@Path:<Switch Group:Surface>Snow\n')
+        command,_=_table_lifecycle_draft(tmp_path,'2025.1',client,table,mode='replace')
+    event=deepcopy(client.event)
+    result=command('draft-check',expected_error='IMPORT_DIALOGUE_EXISTING_EVENT_MODE_UNSAFE')
+    assert result['details']['safe_workflow'][0]['mode']=='replace'
+    assert result['details']['safe_workflow'][1]['mode']=='reimport'
+    assert 'existing Event' in result['message']
+    assert client.event==event and not client.replaced
+    assert not any(u in {'ak.wwise.core.audio.import','ak.wwise.core.audio.importTabDelimited'} for u,_,_ in client.calls)
+    assert not list((tmp_path/'state/transactions').glob('tx1-*'))
+
+
+@pytest.mark.parametrize('occupied',(False,True))
+def test_new_sound_with_existing_dialogue_event_uses_one_reimport_and_keeps_new_owner_absence(tmp_path,occupied):
+    command,client=_draft(tmp_path)
+    client.event_created=True;client.effect=True
+    event=command('draft-bind-object','--object-id',client.EVENT)['bound_object']['handle']
+    group=command('draft-bind-object','--object-id',client.GROUP)['bound_object']['handle']
+    value=command('draft-bind-object','--object-id',client.VALUE)['bound_object']['handle']
+    command('draft-revise-declaration','--declaration-id','snow','--field','media_file',str(tmp_path/'Snow.wav'),
+        '--dialogue-event-handle',event,'--dialogue-condition',group,value)
+    client.expected_dialogue=client.event['path']+'@Path:<Switch Group:Surface>Snow'
+    if occupied:
+        client.created=True
+        copied=Path(client.source['originalFilePath']);copied.parent.mkdir(parents=True,exist_ok=True);copied.write_bytes(b'old owned media')
+        command('draft-check',expected_error='NEW_IMPORT_TARGET_EXISTS')
+        assert not any(u=='ak.wwise.core.audio.import' for u,_,_ in client.calls)
+        return
+    command('draft-check');tx=command('preview-from-draft')['transaction_id'];shown=command('transaction-show',tx)
+    assert shown['artifact']['prepared_operation']['dispatch']['args']['importOperation']=='useExisting'
+    command('confirm',tx,'--confirmation-token',shown['confirmation']['token']);command('execute',tx)
+    result=command('verify',tx)
+    assert result['verification']['failed_assertion_count']==0,result
+    assert not result['verified'] and client.event['id']==client.EVENT and client.linked
+    assert len([u for u,_,_ in client.calls if u=='ak.wwise.core.audio.import'])==1
+
+
+def test_sound_replacement_then_existing_dialogue_reuse_use_two_separate_public_transactions(tmp_path):
+    class StagedClient(ReplacingDialogueClient):
+        def call(self,uri,args=None,options=None):
+            args,options=args or {},options or {}
+            if uri=='ak.wwise.core.object.get' and args.get('waql')==f'from object "{self.NEW_OWNER}" select referencesTo take 129':
+                self.calls.append((uri,deepcopy(args),deepcopy(options)))
+                return {'return':[deepcopy(self.entry)] if self.entry['AudioNode'] and self.entry['AudioNode']['id']==self.NEW_OWNER else []}
+            if uri=='ak.wwise.core.audio.import':
+                self.calls.append((uri,deepcopy(args),deepcopy(options)))
+                row,=args['imports']
+                if args['importOperation']=='replaceExisting':
+                    assert 'dialogueEvent' not in row
+                    self.child['id']=self.NEW_OWNER;self.replaced=True
+                    for old in self.before_links:old['AudioNode']=None
+                    self.entry['AudioNode']=None
+                else:
+                    assert args['importOperation']=='useExisting'
+                    assert row['dialogueEvent']==self.event['path']+'@Path:<Switch Group:Surface>Snow'
+                    self.entry['AudioNode']={'id':self.NEW_OWNER}
+                return {'objects':[deepcopy(self.child)],'log':[],'files':[]}
+            return super().call(uri,args,options)
+    client=StagedClient(tmp_path,'2025.1');event_before=deepcopy(client.event)
+    first,_,_=_import_fields_draft(tmp_path,'2025.1',client)
+    old=first('draft-bind-object','--object-id',client.CHILD)['bound_object']['handle']
+    first('draft-business-configure','--mode','replace')
+    first('draft-declare-existing','--declaration-id','replacement','--object-handle',old)
+    first('draft-check');tx1=first('preview-from-draft')['transaction_id'];shown=first('transaction-show',tx1)
+    first('confirm',tx1,'--confirmation-token',shown['confirmation']['token']);first('execute',tx1)
+    assert first('verify',tx1)['verified'] is True
+    second,_,_=_import_fields_draft(tmp_path,'2025.1',client)
+    owner=second('draft-bind-object','--object-id',client.NEW_OWNER)['bound_object']['handle']
+    event=second('draft-bind-object','--object-id',client.EVENT)['bound_object']['handle']
+    group=second('draft-bind-object','--object-id',client.GROUP)['bound_object']['handle']
+    value=second('draft-bind-object','--object-id',client.VALUE)['bound_object']['handle']
+    second('draft-declare-existing','--declaration-id','association','--object-handle',owner,
+        '--dialogue-event-handle',event,'--dialogue-condition',group,value)
+    second('draft-check');tx2=second('preview-from-draft')['transaction_id'];shown=second('transaction-show',tx2)
+    second('confirm',tx2,'--confirmation-token',shown['confirmation']['token']);second('execute',tx2)
+    result=second('verify',tx2)
+    assert result['verification']['failed_assertion_count']==0,result
+    assert not result['verified'] and client.event==event_before and tx1!=tx2
+    assert client.entry['AudioNode']['id']==client.NEW_OWNER
+    writes=[a for u,a,_ in client.calls if u=='ak.wwise.core.audio.import']
+    assert [a['importOperation'] for a in writes]==['replaceExisting','useExisting']
+    assert not any(u.endswith(('.setReference','.create','.addAssignment')) for u,_,_ in client.calls)
+
+
+@pytest.mark.parametrize('mode,legacy',(('replaceExisting',False),('createNew',True)))
+def test_historical_dialogue_prewrite_guard_rejects_existing_event_under_replacement(tmp_path,mode,legacy):
+    from wwise_waapi.operation_registry import validate_prepared_roles,OperationContractError
+    command,client=_existing_event_lifecycle_draft(tmp_path)
+    command('draft-check');tx=command('preview-from-draft')['transaction_id'];shown=command('transaction-show',tx)
+    # A pre-boundary persisted prepared state had this exact unsafe global mode.
+    # Exercise the exported prewrite validator without bypassing a transaction's
+    # immutable seal or authorizing any native call.
+    historical=deepcopy(shown['artifact']['prepared_operation'])
+    historical['dispatch']['args']['importOperation']=mode
+    historical['request']['arguments']['import_operation']=mode
+    historical['verification_plan']['import_operation']=mode
+    if legacy:
+        for binding in historical['pre_state']['import_guard']['dialogue_associations']:
+            binding.pop('event_id',None);binding.pop('event_before',None)
+    with pytest.raises(OperationContractError) as caught:
+        validate_prepared_roles(historical,read_call=client.call)
+    assert caught.value.error_code=='IMPORT_DIALOGUE_EXISTING_EVENT_MODE_UNSAFE'
+    assert not any(u=='ak.wwise.core.audio.import' for u,_,_ in client.calls)
+
+
+def test_existing_tsv_dialogue_event_with_create_mode_rejects_before_preview(tmp_path):
+    client=ReplacingDialogueClient(tmp_path,'2025.1');client.created=False
+    table=tmp_path/'create.tsv';table.write_text('Object Path\tDialogue Event\n<Sound SFX>SnowSounds\t'+client.event['path']+'@Path:<Switch Group:Surface>Snow\n')
+    command,_=_table_lifecycle_draft(tmp_path,'2025.1',client,table,mode='create')
+    result=command('draft-check',expected_error='IMPORT_DIALOGUE_EXISTING_EVENT_MODE_UNSAFE')
+    assert result['details']['safe_workflow'][0]['mode']=='create'
+    assert not any(u=='ak.wwise.core.audio.importTabDelimited' for u,_,_ in client.calls)

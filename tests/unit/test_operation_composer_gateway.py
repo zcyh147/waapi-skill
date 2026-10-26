@@ -340,12 +340,29 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # The existing-Event/global-mode safety disclosure owns only the two
+    # ordinary descriptions and one TSV constraint; preserve the combined seal.
+    assert canonical_sha256(non_object_set_digests) == "e84f03b704cef2293600dc17e60e4962fd5d95b18c85d5c9a3aab2181c70ee81"
+    before_dialogue_mode_boundary = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        for operation in ("audio.import", "audio.importTabDelimited"):
+            contract = operation_request_machine_contract(operation, version)
+            if operation == "audio.import":
+                props = contract["argument_contract"]["properties"]
+                suffix = " Existing Events require useExisting; replace the Sound first without that directive, then bind the resulting Sound for a separately previewed existing-Event update."
+                for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+                    assert fields["dialogue_event"]["description"].endswith(suffix)
+                    fields["dialogue_event"]["description"] = fields["dialogue_event"]["description"][:-len(suffix)]
+            else:
+                assert contract["constraints"].pop(2) == "Existing Dialogue Event paths require useExisting; preserve create/replace intent by first importing the owner without that existing-Event directive, then bind the resulting owner and Event for a separately previewed audio.import useExisting update"
+            before_dialogue_mode_boundary[operation, version] = contract
+            non_object_set_digests[f"{operation}@{version}"] = canonical_sha256(contract)
     # Seal the combined final forms, then invert only the closed Switch
     # group alternative before preserving both independent lifecycle seals.
     assert canonical_sha256(non_object_set_digests) == "2b932cf2993e74108be0589ed02f2795718e53d8723b0dbb2f255bf437521fd8"
     before_switch_final_forms = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.import", version)
+        contract = deepcopy(before_dialogue_mode_boundary["audio.import", version])
         props = contract["argument_contract"]["properties"]
         for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
             switch = fields["switch_assignment"]
@@ -378,7 +395,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     assert canonical_sha256(non_object_set_digests) == "0a067c9f0ac14b8c48378170821fbcfdb6d9568d54fd0df39f87f4638a4e3ef4"
     before_source_lifecycle = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        contract = deepcopy(before_dialogue_mode_boundary["audio.importTabDelimited", version])
         assert contract["constraints"][3] == (
             "explicit Sound-owned AudioFileSource media rows support createNew/useExisting/replaceExisting with exact absent-or-selected Source paths across languages; a missing Sound kind is bound by its typed parent or same-table typed owner row; unchanged owners and unplanned Source identities/files are preserved, while an explicitly declared Sound replacement retires the complete sealed child set and rebinds requested Sources; regular or bounded inline WAV media and live metadata-proven Source fields retain independent verification; table bytes are never rewritten"
         )

@@ -185,14 +185,17 @@ def validate_audio_import_replacement_scope(
     compiled: CompiledBusinessPlan,
     prepared: Mapping[str, Any],
 ) -> None:
-    """Bind named-Source absence and replacement permission to declarations.
+    """Bind declared-new absence and replacement permission to declarations.
 
     The successful Draft check seals this exact prepared snapshot; Preview and
     execution retain their existing digest and prewrite drift checks.
     """
 
     replace_existing = compiled.request["arguments"].get("import_operation") == "replaceExisting"
-    if not replace_existing and not any(
+    existing_dialogue_reuse = any(
+        isinstance(row.get("dialogue_event"), Mapping) and row["dialogue_event"].get("existing_id") is not None
+        for row in compiled.request["arguments"].get("imports", []))
+    if not replace_existing and not existing_dialogue_reuse and not any(
         "source_name" in expectation["business_fields"]
         for expectation in compiled.verifier_expectations
     ):
@@ -216,6 +219,9 @@ def validate_audio_import_replacement_scope(
                     action="keep this new Source absent or bind its exact Source handle for reimport or replacement")
             continue
         if not replace_existing:
+            if existing_dialogue_reuse and isinstance(declaration.target, NewDescendantTarget) and target.get("pre_state_rows"):
+                raise _repair(session, "NEW_IMPORT_TARGET_EXISTS", field="target", path=path,
+                    action="keep the declared-new Sound absent or bind its exact existing handle explicitly")
             continue
         if isinstance(declaration.target, NewDescendantTarget):
             if target.get("pre_state_rows") or target.get("preexisting_id") is not None:
@@ -296,6 +302,11 @@ def _resolve_mode(
     }
     if explicit_mode is None:
         if forms == {"new"}:
+            defaults = session.settings.get("defaults", {})
+            if any(isinstance(dialogue, Mapping) and "event_handle" in dialogue
+                    for row in session.declarations
+                    for dialogue in [{**dict(defaults), **dict(row.fields)}.get("dialogue_event")]):
+                return "reimport"  # Creates absent owners while reusing the exact bound Event.
             return "create"
         if forms in ({"existing"}, {"new", "existing"}):
             return "reimport"

@@ -101,7 +101,7 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
         },
         "modes": ["replace"],
         "mode_selection": {
-            "all_new_rows": "derive_create",
+            "all_new_rows": "derive_create_unless_bound_existing_DialogueEvent_then_reimport_with_new_owner_absence_guard",
             "one_or_more_existing_rows": "derive_reimport",
             "replace": "explicit_only_when_user_requests_replacement",
             "use_existing_objects": "row_target_form_not_a_batch_override",
@@ -152,7 +152,7 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
             "reference_value_rule": (
                 "copy_one_bound_object_handle_never_a_path_or_name"
             ),
-            "dialogue_event_rule": "new_DialogueEvent_from_bound_parent_and_exact_name_or_existing_Event_from_exact_handle; Gateway_owns_path_syntax; verify_Event_creation_only; association_requires_an_explicit_decision_path; explicit_ordered_group_value_or_wildcard_conditions_with_path_only_Probability_Weight_0_to_100; verify_association_and_supplied_numeric_values; decision_path_sequence_not_read_back",
+            "dialogue_event_rule": "new_DialogueEvent_from_bound_parent_and_exact_name_or_existing_Event_from_exact_handle; Gateway_owns_path_syntax; verify_Event_creation_only; association_requires_an_explicit_decision_path; explicit_ordered_group_value_or_wildcard_conditions_with_path_only_Probability_Weight_0_to_100; verify_association_and_supplied_numeric_values; decision_path_sequence_not_read_back; existing_Event_requires_useExisting; owner_replacement_then_existing_Event_update_requires_two_separate_previews",
             "switch_value_rule": (
                 "optional_exact_value_name_below_switch_group_bound_handle_or_existing_parent_SwitchContainers_actual_group; "
                 "group_only_on_a_SwitchContainer_associates_that_exact_existing_group; "

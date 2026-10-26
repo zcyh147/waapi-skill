@@ -1165,7 +1165,7 @@ _IMPORT_COMMON_ARGUMENT_PROPERTIES: Mapping[str, Any] = {
                 "properties":{"group":IDENTITY_ARGUMENT_SCHEMA, "value":{"oneOf":[IDENTITY_ARGUMENT_SCHEMA, {"const":"*"}]}}}},
             "probability":{"type":"number","minimum":0,"maximum":100},
             "weight":{"type":"number","minimum":0,"maximum":100}},
-        "description": "Gateway-derived DialogueEvent path from either a bound existing Event handle or a Dynamic Dialogue parent and exact new name; name/path alone requests Event creation or identity reuse, not a decision-path association. Optional ordered bound group/value or wildcard conditions request an association; Probability/Weight require that path. Entry owner/AudioNode and supplied numeric values are checked; exact decision-path sequence is not read back.",
+        "description": "Gateway-derived DialogueEvent path from either a bound existing Event handle or a Dynamic Dialogue parent and exact new name; name/path alone requests Event creation or identity reuse, not a decision-path association. Optional ordered bound group/value or wildcard conditions request an association; Probability/Weight require that path. Entry owner/AudioNode and supplied numeric values are checked; exact decision-path sequence is not read back. Existing Events require useExisting; replace the Sound first without that directive, then bind the resulting Sound for a separately previewed existing-Event update.",
     },
     "switch_assignment": _AUDIO_IMPORT_SWITCH_ASSIGNMENT_SCHEMA,
     "properties": {
@@ -2302,6 +2302,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "OriginalsSubFolder is a TSV column from Wwise 2023.1 (WG-60834); ordinary audio.import Originals placement remains separate",
             "Switch Assignation binds an exact existing group and optional exact values; group-only descriptors associate a typed SwitchContainer without creating a group or adding a child pair; explicitly typed new direct containers use the same single-import path and full group/pair readback",
+            "Existing Dialogue Event paths require useExisting; preserve create/replace intent by first importing the owner without that existing-Event directive, then bind the resulting owner and Event for a separately previewed audio.import useExisting update",
             "TSV Notes verifies target-object notes independently from Audio Source Notes; the exact user table is never rewritten",
             "explicit Sound-owned AudioFileSource media rows support createNew/useExisting/replaceExisting with exact absent-or-selected Source paths across languages; a missing Sound kind is bound by its typed parent or same-table typed owner row; unchanged owners and unplanned Source identities/files are preserved, while an explicitly declared Sound replacement retires the complete sealed child set and rebinds requested Sources; regular or bounded inline WAV media and live metadata-proven Source fields retain independent verification; table bytes are never rewritten",
             "Audio File cells retain their native spelling and bind a hashed local file; relative paths resolve from the table directory, including parent navigation; proven Wine hosts require Windows absolute or table-relative media cells",
@@ -15238,6 +15239,23 @@ def _read_import_dialogue_referrers(owner_id: Any, *, read: ReadCall) -> list[di
     return sorted(rows, key=lambda row: _identity_key(row["id"]))
 
 
+def _require_import_dialogue_existing_event_mode(import_operation: Any, *, event_path: str, event_exists: bool) -> None:
+    if not event_exists or import_operation == "useExisting":
+        return
+    mode = "replace" if import_operation == "replaceExisting" else "create"
+    raise OperationContractError(
+        "IMPORT_DIALOGUE_EXISTING_EVENT_MODE_UNSAFE",
+        "A bound existing Event cannot be reused inside a global createNew/replaceExisting import. "
+        f"First {mode} the Sound without the existing Event directive. Then bind the resulting Sound "
+        "and the existing DialogueEvent in a new audio.import Draft and separately Preview, confirm, execute and verify its useExisting update.",
+        details={"import_operation":import_operation,"event_path":event_path,
+            "boundary":"global_import_mode_does_not_guarantee_existing_DialogueEvent_reuse",
+            "safe_workflow":[
+                {"operation":"audio.import","mode":mode,"action":f"{mode} the Sound without an existing DialogueEvent directive; Preview, authorize, execute and verify"},
+                {"operation":"audio.import","mode":"reimport","action":"bind the resulting Sound and existing DialogueEvent; declare the existing Sound with that Event handle and requested conditions; separately Preview, authorize, execute and verify"}],
+            "no_extra_write_in_this_transaction":True})
+
+
 def _prepare_import_dialogue_association(target: dict[str, Any], *, index: int,
         roles: dict[str, ResolvedObject], path_snapshots: list[dict[str, Any]], read: ReadCall) -> None:
     declaration = target["requested_dialogue_event"]
@@ -15846,6 +15864,8 @@ def _prepare_closed_import_plan(
             _prepare_import_dialogue_association(temporary, index=f"{index}.{position}", roles=roles,
                 path_snapshots=path_snapshots, read=read)
             binding = temporary["dialogue_association_binding"]
+            _require_import_dialogue_existing_event_mode(import_operation, event_path=event_path,
+                event_exists=binding.get("event_id") is not None or bool(binding.get("event_before")))
             if binding["requested_effect"] == "associate_explicit_path":
                 decision_path = binding["directive"].split("|", 1)[0].casefold()
                 owner_path = target["canonical_target_path"].casefold()
@@ -19259,6 +19279,20 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
 
     import_guard = pre_state.get("import_guard") if isinstance(pre_state, Mapping) else None
     if isinstance(import_guard, Mapping):
+        import_dispatch = prepared.get("dispatch", {})
+        import_args = import_dispatch.get("args", {}) if isinstance(import_dispatch, Mapping) else {}
+        import_operation = import_args.get("importOperation") if isinstance(import_args, Mapping) else None
+        for binding in import_guard.get("dialogue_associations", []):
+            if import_operation not in {"createNew", "replaceExisting"}:
+                continue
+            path = binding.get("path")
+            if not isinstance(path, str):
+                raise OperationContractError("INVALID_PREVIEW", "Dialogue import prewrite guard requires its sealed Event path.")
+            # Retained prepared states may predate event_id/event_before. A
+            # fresh bounded exact-path read closes the same boundary for them.
+            existing = _read_object_path_rows(path, fields=IDENTITY_RETURN_FIELDS, read=read_call)
+            _require_import_dialogue_existing_event_mode(import_operation, event_path=path,
+                event_exists=binding.get("event_id") is not None or bool(binding.get("event_before")) or bool(existing))
         for index, item in enumerate(import_guard.get("file_proofs", [])):
             if not isinstance(item, Mapping) or not isinstance(item.get("proof"), Mapping):
                 raise OperationContractError("INVALID_PREVIEW", "Import file proof guard is malformed.")
