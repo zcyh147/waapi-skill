@@ -35,10 +35,12 @@ class CombinedFieldsMediaClient(LocalizedOwnerOnlyTabClient):
             if row.get('Audio File'):
                 if getattr(self, 'fault', None) != 'ignored-media':
                     self.copied.write_bytes(Path(localize_waapi_host_path(row['Audio File'])).read_bytes())
-                # Retained r1: existing bytes changed, both old GUIDs remained,
-                # and native returned an extra selected-language Source.
-                if len({source['audioSource:language']['name'] for source in self.sources
-                        if source['path'] == self.sources[0]['path']}) > 1:
+                # Both retained configurations changed bytes and retained old
+                # GUIDs while adding another English Source. Shared paths were
+                # not necessary. The explicit fault also tests the verifier on
+                # an unobserved fake host without claiming its native behavior.
+                if (getattr(self, 'fault', None) == 'extra-source'
+                        or (getattr(self, 'native_build', 9143) == 9143 and getattr(self, 'console_host', True))):
                     extra = deepcopy(self.sources[0])
                     extra['id'] = '{68892A05-8E58-4976-9AE2-144BBA01774E}'
                     self.sources.append(extra)
@@ -47,7 +49,9 @@ class CombinedFieldsMediaClient(LocalizedOwnerOnlyTabClient):
         return {'objects': deepcopy([self.owner, *([self.sources[0]] if any(row.get('Audio File') for row in rows) else [])])}
 
 
-def _draft(tmp_path, *, shared_path=False, native_build=9143, console_host=True):
+def _draft(tmp_path, *, shared_path=False, native_build=9142, console_host=True):
+    # Generic compiler/verifier cases use an unobserved fake build. Observed
+    # host admission controls opt into9143; neither is native acceptance.
     client = CombinedFieldsMediaClient(tmp_path, '2025.1')
     client.native_build, client.console_host = native_build, console_host
     command, run, client, table = _explicit_source_tab_draft(tmp_path, '2025.1', client=client, unique_source_path=not shared_path)
@@ -59,8 +63,9 @@ def _draft(tmp_path, *, shared_path=False, native_build=9143, console_host=True)
     return command, run, client, table
 
 
-def test_combined_duplicate_source_path_is_refused_before_preview_on_observed_console(tmp_path):
-    command, _, client, table = _draft(tmp_path, shared_path=True)
+@pytest.mark.parametrize('shared_path', (False, True))
+def test_combined_source_reuse_is_refused_before_preview_on_observed_console(tmp_path, shared_path):
+    command, _, client, table = _draft(tmp_path, shared_path=shared_path, native_build=9143)
     original = table.read_bytes(); before = deepcopy(client.sources)
     command('draft-check', expected_error='TSV_COMBINED_SOURCE_IDENTITY_UNSAFE_ON_HOST')
     assert client.sources == before and table.read_bytes() == original
@@ -69,10 +74,12 @@ def test_combined_duplicate_source_path_is_refused_before_preview_on_observed_co
     assert not list((tmp_path / 'state/transactions').glob('tx1-*'))
 
 
-def test_extra_source_counterexample_does_not_verify_partial_success_on_unobserved_fake_host(tmp_path):
+@pytest.mark.parametrize('shared_path', (False, True))
+def test_extra_source_counterexample_does_not_verify_partial_success_on_unobserved_fake_host(tmp_path, shared_path):
     # This external fault models the retained Source outcome, not evidence of
     # the unobserved build. The new boundary must not become a global ban.
-    command, run, client, table = _draft(tmp_path, shared_path=True, native_build=9142)
+    command, run, client, table = _draft(tmp_path, shared_path=shared_path, native_build=9142)
+    client.fault = 'extra-source'
     before = deepcopy(client.sources)
     command('draft-check'); tx = command('preview-from-draft')['transaction_id']
     code, shown = run('transaction-show', tx); assert code == 0, shown
@@ -88,8 +95,9 @@ def test_extra_source_counterexample_does_not_verify_partial_success_on_unobserv
     assert client.other_file.read_bytes() == b'keep Japanese media'
 
 
-def test_combined_historical_preview_stops_when_current_host_matches_unsafe_console(tmp_path):
-    command, run, client, table = _draft(tmp_path, shared_path=True, native_build=9142)
+@pytest.mark.parametrize('shared_path', (False, True))
+def test_combined_historical_preview_stops_when_current_host_matches_unsafe_console(tmp_path, shared_path):
+    command, run, client, table = _draft(tmp_path, shared_path=shared_path, native_build=9142)
     command('draft-check'); tx = command('preview-from-draft')['transaction_id']
     code, shown = run('transaction-show', tx); assert code == 0, shown
     assert run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
@@ -101,7 +109,7 @@ def test_combined_historical_preview_stops_when_current_host_matches_unsafe_cons
 
 
 def test_combined_shared_path_authoring_preview_is_outside_observed_console_boundary(tmp_path):
-    command, _, client, _ = _draft(tmp_path, shared_path=True, console_host=False)
+    command, _, client, _ = _draft(tmp_path, shared_path=True, native_build=9143, console_host=False)
     command('draft-check'); command('preview-from-draft')
     assert not any(u == 'ak.wwise.core.audio.importTabDelimited' for u, _, _ in client.calls)
 
@@ -119,14 +127,14 @@ def test_combined_safe_preview_stops_if_a_cross_language_source_path_later_colli
 
 
 def test_shared_path_pure_media_preview_is_outside_combined_host_boundary(tmp_path):
-    command, _, client, table = _draft(tmp_path, shared_path=True)
+    command, _, client, table = _draft(tmp_path, shared_path=True, native_build=9143)
     table.write_text('Object Path\tAudio File\n<Sound Voice>Voice\t' + z_wire_path(tmp_path / 'Line.wav') + '\n', encoding='utf-8')
     command('draft-check'); command('preview-from-draft')
     assert not any(u == 'ak.wwise.core.audio.importTabDelimited' for u, _, _ in client.calls)
 
 
 def test_shared_path_owner_only_fields_remain_supported_on_observed_console(tmp_path):
-    command, run, client, table = _draft(tmp_path, shared_path=True)
+    command, run, client, table = _draft(tmp_path, shared_path=True, native_build=9143)
     table.write_text('Object Path\tProperty[Volume]\tProperty[OverrideOutput]\tReference[OutputBus]\n'
         '<Sound Voice>Voice\t-6\ttrue\t' + client.bus['path'] + '\n', encoding='utf-8')
     before = deepcopy(client.sources); media = client.copied.read_bytes(), client.other_file.read_bytes()

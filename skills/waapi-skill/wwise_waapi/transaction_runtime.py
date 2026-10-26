@@ -27,13 +27,11 @@ from .execution_contracts import (
 )
 from .host_paths import HostPathError, parse_absolute_host_path
 from .operation_registry import (
-    OperationContractError,
     OperationRequest,
     PreparedOperation,
     ReadCall,
     parse_operation_request,
     prepare_operation,
-    _require_unique_import_source_wire_path,
 )
 from .platform_paths import (
     WwiseWirePathError,
@@ -309,29 +307,23 @@ def _validate_tab_native_boundaries(
             continue
         snapshot = target.get("localized_source_snapshot", {})
         path = target.get("expected_audio_file_source_result_path")
-        candidates = [source for source in snapshot.get("rows", []) if isinstance(source, Mapping)
+        if not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("rows"), list):
+            raise TransactionGuardError("INVALID_PREVIEW", "Combined localized Source reuse requires its sealed owner snapshot.")
+        candidates = [source for source in snapshot["rows"] if isinstance(source, Mapping)
             and source.get("type") == "AudioFileSource" and isinstance(path, str)
             and str(source.get("path", "")).casefold() == path.casefold()]
-        languages = {source.get("audioSource:language", {}).get("name") for source in candidates}
-        if len(candidates) < 2 or len(languages) < 2:
-            continue
-        try:
-            _require_unique_import_source_wire_path({**target, "canonical_target_path": path,
-                "preexisting_id": target["localized_audio_file_source_id"]}, snapshot)
-        except OperationContractError as exc:
-            # Retained combined r1 changed fields/media but added an English
-            # Source while preserving both old GUIDs. Match only that observed
-            # configuration; cross-language path ambiguity is not proven cause.
-            raise TransactionGuardError("TSV_COMBINED_SOURCE_IDENTITY_UNSAFE_ON_HOST",
-                "WwiseConsole 2025.1.7 build 9143 added an extra language Source for a combined localized owner fields/media row with a cross-language shared Source path. This observed configuration is blocked before preview or writing; the exact table is not rewritten.",
-                details={"observed_version": dict(observed_version), "is_command_line": True,
-                    "row": target.get("row_number"), "owner_id": target["preexisting_id"],
-                    "selected_source_id": target["localized_audio_file_source_id"],
-                    "source_path": path, "candidate_ids": [source.get("id") for source in candidates],
-                    "languages": sorted(languages), "identity_guard": exc.as_dict(),
-                    "evidence_case": "import182-tsv-combined-2025-r1",
-                    "root_cause": "unproven; observed configuration only",
-                    "other_host_version_semantics": "unproven; outside this boundary"}) from exc
+        # Both shared-path and distinct-path retained attempts changed fields
+        # and bytes while adding another English Source. Path uniqueness does
+        # not establish safe combined reuse on this exact observed host.
+        raise TransactionGuardError("TSV_COMBINED_SOURCE_IDENTITY_UNSAFE_ON_HOST",
+            "WwiseConsole 2025.1.7 build 9143 added an extra Source during combined localized existing-owner fields/media reuse with both shared and distinct language Source paths. This host configuration is blocked before preview or writing; the exact table is not rewritten. The cause and a safe combined mapping remain unresolved.",
+            details={"observed_version": dict(observed_version), "is_command_line": True,
+                "row": target.get("row_number"), "owner_id": target["preexisting_id"],
+                "selected_source_id": target["localized_audio_file_source_id"],
+                "source_path": path, "candidate_ids": [source.get("id") for source in candidates],
+                "evidence_cases": ["import182-tsv-combined-2025-r1", "import182-tsv-distinct-source-2025-r1"],
+                "root_cause": "unproven; shared paths are not a necessary condition",
+                "other_host_version_semantics": "unproven; outside this boundary"})
 
 
 def _validate_tab_media_path_namespace(prepared: PreparedOperation, project_guard: Mapping[str, Any]) -> None:

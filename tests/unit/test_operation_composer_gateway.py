@@ -333,10 +333,20 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # The second native failure removes only the unsupported unique-path escape.
+    assert canonical_sha256(non_object_set_digests) == "1b5534697041f3bca74cd5c548d5c09afe76e61634d2aa54dd4326ff993cb9a9"
+    previous_owner_media_host_contract = operation_request_machine_contract("audio.importTabDelimited", "2025.1")
+    assert previous_owner_media_host_contract["constraints"][-2] == (
+        "WwiseConsole 2025.1.7 build 9143 blocks combined localized existing-owner fields/media rows reusing an existing language Source: both shared and distinct Source-path native configurations added an extra Source despite correct fields and copied bytes; preparation and prewrite checks enforce this observed host boundary, not an API-absence claim or proven cause; owner-only, pure-media and other-host forms retain their existing boundaries"
+    )
+    previous_owner_media_host_contract["constraints"][-2] = (
+        "WwiseConsole 2025.1.7 build 9143 blocks a combined localized existing-owner fields/media row when its selected Source path is shared across languages: retained native evidence added an extra Source despite correct fields and copied bytes; preparation and prewrite checks match this observed configuration, not a proven root cause; owner-only, pure-media, unambiguous and other-host forms retain their existing boundaries"
+    )
+    non_object_set_digests["audio.importTabDelimited@2025.1"] = canonical_sha256(previous_owner_media_host_contract)
     # Invert only the observed combined-source host boundary, preserving the
     # exact earlier combined disclosure and every component/historical seal.
     assert canonical_sha256(non_object_set_digests) == "04848d1c5153d3ef35c8dd5f57feb858c3b9bb9e74d3d81a833036b25b5affd3"
-    previous_source_boundary_contract = operation_request_machine_contract("audio.importTabDelimited", "2025.1")
+    previous_source_boundary_contract = deepcopy(previous_owner_media_host_contract)
     assert previous_source_boundary_contract["constraints"].pop(-2) == (
         "WwiseConsole 2025.1.7 build 9143 blocks a combined localized existing-owner fields/media row when its selected Source path is shared across languages: retained native evidence added an extra Source despite correct fields and copied bytes; preparation and prewrite checks match this observed configuration, not a proven root cause; owner-only, pure-media, unambiguous and other-host forms retain their existing boundaries"
     )
