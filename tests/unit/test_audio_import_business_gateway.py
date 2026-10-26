@@ -3,6 +3,7 @@ from __future__ import annotations
 from tests.support.gateway_config import set_gateway_config
 
 import importlib.util
+import hashlib
 import json
 import sys
 import pytest
@@ -2749,12 +2750,16 @@ class LocalizedOwnerFieldsClient(LocalizedFieldsClient):
                 has_media = "audioFile" in row or "audioFileBase64" in row
                 if has_media:
                     language = row.get("importLanguage", "SFX")
-                    selected = next((source for source in self.sources if source["audioSource:language"]["name"] == language), None)
+                    explicit = "<AudioFileSource>" in row.get("objectPath", "")
+                    source_name = row["objectPath"].rsplit("<AudioFileSource>", 1)[1] if explicit else "Line"
+                    selected = next((source for source in self.sources
+                        if (source["id"] == row["importLocation"] if row.get("importLocation") else
+                            source["name"] == source_name if explicit else source["audioSource:language"]["name"] == language)), None)
                     if selected is None:
                         copied = self.other_file.parent / "Other/Line.wav"
                         copied.parent.mkdir(parents=True, exist_ok=True)
-                        selected = {"id": self.OTHER_SOURCE, "name": "Line", "type": "AudioFileSource", "classId": 16,
-                            "path": self.owner["path"] + r"\Line", "parent": {"id": self.OWNER}, "notes": "",
+                        selected = {"id": self.OTHER_SOURCE, "name": source_name, "type": "AudioFileSource", "classId": 16,
+                            "path": self.owner["path"] + "\\" + source_name, "parent": {"id": self.OWNER}, "notes": "",
                             "audioSource:language": {"id": "{99999999-9999-9999-9999-999999999999}", "name": language},
                             "originalFilePath": str(copied), "originalWavFilePath": str(copied)}
                         self.sources.append(selected)
@@ -2764,10 +2769,11 @@ class LocalizedOwnerFieldsClient(LocalizedFieldsClient):
                     for name in ("Volume", "OutputBus", "OverrideOutput"):
                         if "@" + name in row:
                             destination["@" + name] = ({"id": row["@" + name]} if name == "OutputBus" else row["@" + name])
-                if "audioFile" in row:
-                    Path(destination["originalFilePath"]).write_bytes(Path(row["audioFile"]).read_bytes())
-                elif "audioFileBase64" in row:
-                    Path(destination["originalFilePath"]).write_bytes(base64.b64decode(row["audioFileBase64"].partition("|")[2]))
+                if has_media and selected["audioSource:language"]["name"] == language:
+                    if "audioFile" in row:
+                        Path(destination["originalFilePath"]).write_bytes(Path(row["audioFile"]).read_bytes())
+                    elif "audioFileBase64" in row:
+                        Path(destination["originalFilePath"]).write_bytes(base64.b64decode(row["audioFileBase64"].partition("|")[2]))
                 if "audioFile" in row or "audioFileBase64" in row:
                     # r1 proved audioSourceNotes on the owner localization-addition row ineffective.
                     destination["notes"] = row.get("notes", destination["notes"])
@@ -2886,19 +2892,26 @@ def test_localized_owner_fields_keep_reference_and_exact_source_boundaries(tmp_p
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
 
 
-def test_new_localization_source_notes_use_explicit_source_row_without_owner_edit(tmp_path):
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("colliding", (False, True))
+def test_new_localization_source_notes_use_explicit_source_row_without_owner_edit(tmp_path, version, colliding):
     from copy import deepcopy
-    client = LocalizedOwnerFieldsClient(tmp_path, "2025.1")
+    client = LocalizedOwnerFieldsClient(tmp_path, version)
     client.sources = client.sources[:1]
+    if not colliding:
+        client.sources[0].update(name="OtherLine", path=client.owner["path"] + r"\OtherLine")
+    project = _project_path(tmp_path)
+    project.write_text(project.read_text().replace("</LanguageList>",
+        '<Language Name="Japanese" ID="{99999999-9999-9999-9999-999999999999}"/></LanguageList>'))
     before = deepcopy(client.sources[0]); before_bytes = client.copied.read_bytes()
     media = tmp_path / "Line.wav"; media.write_bytes(b"requested new Japanese media")
-    command, _parent, _ = _import_fields_draft(tmp_path, "2025.1", client)
+    command, _parent, _ = _import_fields_draft(tmp_path, version, client)
     voice = command("draft-bind-object", "--object-id", client.OWNER)["bound_object"]["handle"]
     command("draft-declare-existing", "--declaration-id", "japanese", "--object-handle", voice,
         "--field", "language", "Japanese", "--field", "media_file", str(media),
         "--field", "audio_source_notes", "Requested Japanese Source notes", "--field", "originals_subfolder", "Other")
     command("draft-check"); preview = command("preview-from-draft"); transaction = preview["transaction_id"]
-    env = set_gateway_config(_env(tmp_path), wwise_version="2025.1")
+    env = set_gateway_config(_env(tmp_path), wwise_version=version)
     def run(*argv):
         return waapi_gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv], env=env,
             client_factory=lambda _url: client)
@@ -2908,7 +2921,9 @@ def test_new_localization_source_notes_use_explicit_source_row_without_owner_edi
     code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
     owner, source = shown["artifact"]["prepared_operation"]["dispatch"]["args"]["imports"]
     assert owner == {"objectPath": client.owner["path"].rsplit("\\", 1)[0] + r"\<Sound Voice>Voice"}
-    assert source["objectPath"].endswith(r"\<Sound Voice>Voice\<AudioFileSource>Line")
+    expected_name = "Line__" + hashlib.sha256(b"Japanese").hexdigest()[:12] if colliding else "Line"
+    assert source["objectPath"].endswith(r"\<Sound Voice>Voice\<AudioFileSource>" + expected_name)
+    assert client.sources[1]["name"] == expected_name and client.sources[1]["path"] == client.owner["path"] + "\\" + expected_name
     assert source["notes"] == "Requested Japanese Source notes" and "audioSourceNotes" not in source
     assert "importLocation" not in source and source["importLanguage"] == "Japanese"
     assert client.sources[0] == before and client.copied.read_bytes() == before_bytes
@@ -2947,7 +2962,7 @@ def test_new_language_owner_fields_and_media_use_absent_source_scope(tmp_path, v
     owner, media = shown["artifact"]["prepared_operation"]["dispatch"]["args"]["imports"]
     assert owner["@Volume"] == -6 and owner["@OutputBus"] == client.BUS
     assert "audioFile" not in owner and "audioFileBase64" not in owner and "notes" not in owner
-    assert media["objectPath"].endswith(r"\<Sound Voice>Voice\<AudioFileSource>Line")
+    assert media["objectPath"].endswith(r"\<Sound Voice>Voice\<AudioFileSource>Line__" + hashlib.sha256(b"Japanese").hexdigest()[:12])
     assert "importLocation" not in media and media["importLanguage"] == "Japanese"
     assert ("audioFileBase64" in media) is inline and ("audioFile" in media) is not inline
     assert media["notes"] == "updated source notes" and not any(key.startswith("@") for key in media)
@@ -2971,13 +2986,69 @@ def test_new_language_source_collision_after_preview_blocks_owner_and_media_writ
     command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
     code, shown = run("transaction-show", transaction); assert code == 0, shown
     code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]); assert code == 0, confirmed
-    client.sources.append({"id": client.OTHER_SOURCE, "name": "Line", "type": "AudioFileSource", "classId": 16,
-        "path": client.owner["path"] + r"\Line", "parent": {"id": client.OWNER}, "notes": "Unexpected live collision",
+    generated_name = "Line__" + hashlib.sha256(b"Japanese").hexdigest()[:12]
+    client.sources.append({"id": client.OTHER_SOURCE, "name": generated_name, "type": "AudioFileSource", "classId": 16,
+        "path": client.owner["path"] + "\\" + generated_name, "parent": {"id": client.OWNER}, "notes": "Unexpected live collision",
         "audioSource:language": {"id": "{99999999-9999-9999-9999-999999999999}", "name": "Japanese"},
         "originalFilePath": str(client.other_file), "originalWavFilePath": str(client.other_file)})
     code, executed = run("execute", transaction)
     assert code == 2 and executed["executed"] is False and executed["status"] == "repreview_required", executed
     assert client.owner["@Volume"] == 0 and client.owner["@OutputBus"] is None
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_generated_language_source_reimport_preserves_its_existing_identity(tmp_path, version):
+    _assert_generated_language_source_reimport(tmp_path, version)
+
+
+def test_generated_language_source_reimport_survives_removed_filename_collision(tmp_path):
+    _assert_generated_language_source_reimport(tmp_path, "2025.1", rename_collider=True)
+
+
+def _assert_generated_language_source_reimport(tmp_path, version, *, rename_collider=False):
+    from copy import deepcopy
+    command, run, client = _localized_owner_fields_draft(tmp_path, version, language="Japanese")
+    generated_name = "Line__" + hashlib.sha256(b"Japanese").hexdigest()[:12]
+    existing_media = client.other_file.parent / "Other/Line.wav"
+    existing_media.parent.mkdir(parents=True, exist_ok=True); existing_media.write_bytes(client.other_file.read_bytes())
+    japanese = {"id": client.OTHER_SOURCE, "name": generated_name, "type": "AudioFileSource", "classId": 16,
+        "path": client.owner["path"] + "\\" + generated_name, "parent": {"id": client.OWNER}, "notes": "Old Japanese notes",
+        "audioSource:language": {"id": "{99999999-9999-9999-9999-999999999999}", "name": "Japanese"},
+        "originalFilePath": str(existing_media), "originalWavFilePath": str(existing_media)}
+    client.sources.append(japanese)
+    if rename_collider:
+        # An unrelated, earlier user rename removed the filename-path
+        # collision; useExisting must still reuse the generated Japanese GUID.
+        client.sources[0].update(name="RenamedEnglish", path=client.owner["path"] + r"\RenamedEnglish")
+    english = deepcopy(client.sources[0]); english_bytes = client.copied.read_bytes()
+    source_ids = {source["id"] for source in client.sources}
+    identity = {key: japanese[key] for key in ("id", "name", "path", "parent")}
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    media = shown["artifact"]["prepared_operation"]["dispatch"]["args"]["imports"][1]
+    if version == "2025.1":
+        assert media["objectPath"] == "" and media["importLocation"] == japanese["id"]
+    else:
+        assert media["objectPath"].endswith("<AudioFileSource>" + generated_name)
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]); assert code == 0, confirmed
+    code, executed = run("execute", transaction); assert code == 0, executed
+    code, verified = run("verify", transaction); assert code == 0 and verified["verified"] is True, verified
+    assert {key: japanese[key] for key in identity} == identity
+    assert {source["id"] for source in client.sources} == source_ids and len(client.sources) == 2
+    assert japanese["notes"] == "updated source notes" and Path(japanese["originalFilePath"]).read_bytes() == (tmp_path / "Line.wav").read_bytes()
+    assert client.sources[0] == english and client.copied.read_bytes() == english_bytes
+    assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
+
+
+def test_new_language_generated_source_path_requires_global_absence(tmp_path):
+    command, _run, client = _localized_owner_fields_draft(tmp_path, "2025.1", language="Japanese")
+    generated_name = "Line__" + hashlib.sha256(b"Japanese").hexdigest()[:12]
+    client.sources.append({"id": client.OTHER_SOURCE, "name": generated_name, "type": "AudioFileSource", "classId": 16,
+        "path": client.owner["path"] + "\\" + generated_name, "parent": {"id": client.OWNER}, "notes": "Preserve French Source",
+        "audioSource:language": {"id": "{77777777-7777-7777-7777-777777777777}", "name": "French"},
+        "originalFilePath": str(client.other_file), "originalWavFilePath": str(client.other_file)})
+    command("draft-check", expected_error="TARGET_EXISTS")
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
 
 
