@@ -2290,7 +2290,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "OriginalsSubFolder is a TSV column from Wwise 2023.1 (WG-60834); ordinary audio.import Originals placement remains separate",
             "TSV Notes verifies target-object notes independently from Audio Source Notes; the exact user table is never rewritten",
-            "an explicit typed AudioFileSource media row may reimport one existing exact Sound child in the requested language using Notes on the Source; a separate typed owner-only Notes row retains the same exact-table transaction",
+            "an explicit path-spelled AudioFileSource media row requires one exact Sound child path across all languages at Preview and execution, matching the selected GUID, class and parent; Notes targets that Source and a separate owner-only Notes row retains the exact-table transaction",
             "Audio File cells retain their native spelling and bind a hashed local file; relative paths resolve from the table directory, including parent navigation; proven Wine hosts require Windows absolute or table-relative media cells",
             "canonical GUID Object Path cells resolve exact existing identities under the shared typed-TSV target class and root policy before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries",
             "fixed and dynamic native headers are parsed under bounded grammar; importLanguage remains a call argument",
@@ -14999,6 +14999,27 @@ def _is_tab_audio_file_source_target(target: Mapping[str, Any], source_operation
             and _object_type_token(target.get("requested_object_type")) == "audiofilesource")
 
 
+def _require_unique_import_source_wire_path(target: Mapping[str, Any], snapshot: Mapping[str, Any]) -> None:
+    """An unchanged path-spelled TSV must select its exact Source globally.
+
+    Import language scopes the observation, not the native objectPath lookup.
+    Reuse the complete owned child snapshot without filtering its languages.
+    """
+    path = target.get("canonical_target_path")
+    candidates = [row for row in snapshot["rows"]
+        if isinstance(path, str) and str(row.get("path", "")).casefold() == path.casefold()]
+    if len(candidates) != 1:
+        raise OperationContractError("AMBIGUOUS_SOURCE_WIRE_PATH", "The unchanged TSV Source path must identify one child across all languages.",
+            details={"path": path, "candidate_count": len(candidates), "candidate_ids": [row.get("id") for row in candidates]})
+    source = candidates[0]
+    if (not _same_identity(source.get("id"), target.get("preexisting_id"))
+            or _object_type_token(source.get("type")) != "audiofilesource"
+            or not _object_class_matches(source.get("classId"), target.get("audio_source_class_id"))
+            or not _same_identity(_reference_identity(source.get("parent")), snapshot.get("owner_id"))):
+        raise OperationContractError("SOURCE_WIRE_IDENTITY_MISMATCH", "The unique TSV Source path must match its exact selected GUID, class and parent.",
+            details={"path": path, "selected_id": target.get("preexisting_id"), "actual": source})
+
+
 def _reconcile_import_media_ownership(targets: Sequence[Mapping[str, Any]]) -> None:
     """One logical row owns each actual language-scoped media Source."""
     claims: dict[tuple[str, ...], tuple[int, Mapping[str, Any]]] = {}
@@ -15090,6 +15111,10 @@ def _prepare_closed_import_plan(
         )
     import_operation = policy.get("import_operation")
     roles: dict[str, ResolvedObject] = {}
+    if (any(target.get("localized_owner_only") is True for target in raw_targets)
+            and any(target.get("media_expected") is True for target in raw_targets)):
+        raise OperationContractError("LOCALIZED_EXISTING_IMPORT_FIELDS",
+            "The first localized owner-only TSV field slice cannot combine Source/media edits; no native limitation is established.")
     targets, dispatch_args, dynamic_roles = _prepare_import_dynamic_fields(
         request,
         source_operation=source_operation,
@@ -15284,6 +15309,8 @@ def _prepare_closed_import_plan(
                 if (len(matches) != 1 or not _same_identity(matches[0].get("id"), existing_id)
                         or not _object_class_matches(matches[0].get("classId"), target.get("audio_source_class_id"))):
                     raise OperationContractError("INVALID_TARGET_TYPE", "An explicit TSV AudioFileSource must match one existing Source GUID, class and language.")
+                if target.get("requested_target_id") is None:
+                    _require_unique_import_source_wire_path(target, snapshot)
                 target["explicit_source_owner"] = owner
                 target["localized_source_snapshot"] = snapshot
                 target["localized_audio_file_source_id"] = existing_id
@@ -18909,16 +18936,36 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             actual = _existing_sfx_source_snapshot(snapshot["owner_id"], version=snapshot["version"], read=read_call)
             assertions.append({"name": "existing SFX source identities and placement unchanged since preview",
                                "passed": actual == snapshot, "evidence": {"expected": snapshot, "actual": actual}})
+        actual_source_snapshots: dict[str, dict[str, Any]] = {}
         for snapshot in import_guard.get("localized_source_snapshots", []):
             if not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("rows"), list):
                 raise OperationContractError("INVALID_PREVIEW", "Localized source guard is malformed.")
-            actual = _localized_source_snapshot(snapshot.get("owner_id"), read=read_call,
-                preserve_media_version=snapshot.get("preserve_media_version"))
+            owner_id = str(snapshot.get("owner_id"))
+            cache_key = owner_id.casefold()
+            if cache_key not in actual_source_snapshots:
+                actual_source_snapshots[cache_key] = _localized_source_snapshot(owner_id, read=read_call,
+                    preserve_media_version=snapshot.get("preserve_media_version"))
+            actual = actual_source_snapshots[cache_key]
             assertions.append({
                 "name": "localized Voice source identities unchanged since preview",
                 "passed": actual == snapshot,
                 "evidence": {"expected": snapshot, "actual": actual},
             })
+        if import_guard.get("source_operation") == "audio.importTabDelimited":
+            for target in prepared.get("verification_plan", {}).get("targets", []):
+                if not _is_tab_audio_file_source_target(target, "audio.importTabDelimited") or target.get("requested_target_id") is not None:
+                    continue
+                owner_id = target.get("explicit_source_owner", {}).get("id")
+                actual = actual_source_snapshots.get(str(owner_id).casefold())
+                if actual is None:
+                    raise OperationContractError("INVALID_PREVIEW", "A path-spelled TSV Source requires its complete owner-child snapshot.")
+                try:
+                    _require_unique_import_source_wire_path(target, actual)
+                except OperationContractError as exc:
+                    passed, evidence = False, {"error": exc.as_dict()}
+                else:
+                    passed, evidence = True, {"path": target["canonical_target_path"], "selected_id": target["preexisting_id"]}
+                assertions.append({"name": "TSV native Source wire path retains one exact identity", "passed": passed, "evidence": evidence})
         for index, snapshot in enumerate(import_guard.get("path_snapshots", [])):
             if not isinstance(snapshot, Mapping):
                 raise OperationContractError("INVALID_PREVIEW", "Import path snapshot is malformed.")

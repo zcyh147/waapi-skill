@@ -3187,8 +3187,10 @@ class ExplicitSourceTabClient(LocalizedFieldsClient):
         return result
 
 
-def _explicit_source_tab_draft(tmp_path, version, *, outcome="normal", client=None, language="English(US)"):
+def _explicit_source_tab_draft(tmp_path, version, *, outcome="normal", client=None, language="English(US)", unique_source_path=True):
     client = client or ExplicitSourceTabClient(tmp_path, version, outcome=outcome)
+    if unique_source_path:
+        client.sources[1].update(name="OtherLine", path=client.owner["path"] + r"\OtherLine")
     media = tmp_path / "Different.wav"
     media.write_bytes(b"requested explicit Source media")
     table = tmp_path / "explicit.tsv"
@@ -3213,6 +3215,31 @@ def _explicit_source_tab_draft(tmp_path, version, *, outcome="normal", client=No
     command("draft-declare-artifact-plan", "--table-file", str(table),
         "--location-handle", bound["bound_object"]["handle"], "--language", language, "--mode", "reimport")
     return command, run, client, table
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_typed_source_tsv_rejects_language_ambiguous_wire_path_before_preview(tmp_path, version):
+    command, _run, client, table = _explicit_source_tab_draft(tmp_path, version, unique_source_path=False)
+    original = table.read_bytes(); before = client.copied.read_bytes(); other = client.other_file.read_bytes()
+    command("draft-check", expected_error="AMBIGUOUS_SOURCE_WIRE_PATH")
+    assert table.read_bytes() == original and client.copied.read_bytes() == before and client.other_file.read_bytes() == other
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
+    assert not list((tmp_path / "state/transactions").glob("tx1-*"))
+
+
+def test_typed_source_tsv_rejects_new_wire_path_collision_before_execution(tmp_path):
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, "2025.1")
+    original = table.read_bytes(); other_bytes = client.other_file.read_bytes()
+    command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
+    code, shown = run("transaction-show", transaction); assert code == 0, shown
+    assert run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    client.sources[1].update(name="Line", path=client.owner["path"] + r"\Line")
+    code, executed = run("execute", transaction)
+    assert code == 2 and executed["executed"] is False and executed["status"] == "repreview_required", executed
+    assert "AMBIGUOUS_SOURCE_WIRE_PATH" in json.dumps(executed)
+    assert table.read_bytes() == original and client.copied.read_bytes() == b"old English media" and client.other_file.read_bytes() == other_bytes
+    assert client.owner["notes"] == "keep owner notes"
+    assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
@@ -3305,7 +3332,7 @@ class GuidContainerTabClient(GuidSourceTabClient):
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 def test_exact_table_guid_container_notes_reuses_shared_class_policy(tmp_path, version):
     client = GuidContainerTabClient(tmp_path, version)
-    command, run, client, table = _explicit_source_tab_draft(tmp_path, version, client=client, language="SFX")
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, version, client=client, language="SFX", unique_source_path=False)
     table.write_text("Object Path\tNotes\n" + client.container["id"].lower() + "\tupdated container notes\n", encoding="utf-8")
     original = table.read_bytes(); sources_before = json.loads(json.dumps(client.sources))
     # Fake-host compiler coverage in other lanes is not native GUID evidence.
@@ -3331,7 +3358,7 @@ def test_exact_table_guid_container_notes_reuses_shared_class_policy(tmp_path, v
 
 def _guid_source_tab_draft(tmp_path, version, *, client=None):
     client = client or GuidSourceTabClient(tmp_path, version)
-    command, run, client, table = _explicit_source_tab_draft(tmp_path, version, client=client)
+    command, run, client, table = _explicit_source_tab_draft(tmp_path, version, client=client, unique_source_path=False)
     table.write_text(table.read_text().replace(
         r"<Sound Voice>Voice\<AudioFileSource>Line", client.SOURCE.lower()).replace(
         "<Sound Voice>Voice", client.OWNER.lower()), encoding="utf-8")
