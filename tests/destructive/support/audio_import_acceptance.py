@@ -1352,3 +1352,170 @@ def collect_dialogue_import_acceptance(runtime):
         raise
     finally:
         persist()
+
+
+def collect_named_sources_acceptance(runtime):
+    """One SDK-shaped ordinary import creates a Sound with two named Sources."""
+    import xml.etree.ElementTree as ET
+    from tests.destructive.test_gateway_workflow_transaction_matrix import (
+        REPO_ROOT, _start_business_draft, _update_business_draft, _bind_business_object, _write_fixture_wav,
+    )
+    assert runtime.version == "2025.1"
+    output = runtime.state_dir / "named-sources-import-witness.json"
+    assert not output.exists(), "Never overwrite an original named-Source witness"
+    category = {"category": "audio-import-two-named-sources", "status": "FAIL", "transaction_ids": [],
+        "observation_path": str(output), "verifier_strength": "public_verifier_plus_exact_owner_two_sources_media_and_preservation"}
+    runtime.category_results.append(category)
+    report = {"contract": "waapi-skill.named-sources-import-witness/v1", "candidate": runtime.candidate,
+        "version": runtime.version, "transaction_budget": 1, "business_effect_verified": False, "stage": "baseline",
+        "calls": [], "witness": {}, "observations": {}, "inputs": {}, "failure": None,
+        "limits": {"calls": 48, "reply_bytes": 524288, "receipt_bytes": 4194304}}
+    attempted = set()
+
+    def persist():
+        body = json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= report["limits"]["receipt_bytes"]
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix(".tmp"); temporary.write_bytes(body); temporary.replace(output)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+
+    class Gateway:
+        version, lifecycle, port = runtime.version, runtime.lifecycle, runtime.port
+
+        def raw_gateway(self, argv):
+            assert len(report["calls"]) < report["limits"]["calls"]
+            if argv[0] == "execute":
+                assert argv[1] not in attempted, "Never retry named-Source import execution"
+                attempted.add(argv[1])
+            call = {"argv": list(argv)}; report["calls"].append(call)
+            try:
+                code, payload = runtime.raw_gateway(argv); call.update(exit_code=code, payload=payload)
+                assert len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) <= report["limits"]["reply_bytes"]
+                return code, payload
+            finally:
+                persist()
+
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get("ok") is True, payload
+            if live:
+                assert payload.get("detected_version") == runtime.version
+                assert payload.get("endpoint") == {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}
+            return payload
+
+    gateway = Gateway()
+    owned = runtime.sandbox.sandbox_path.resolve(strict=True)
+
+    def proof(raw):
+        lexical = Path(localize_waapi_host_path(raw)); assert not lexical.is_symlink()
+        path = lexical.resolve(strict=True); assert path.is_relative_to(owned) and path.is_file()
+        body = path.read_bytes(); assert 0 < len(body) <= 65536
+        return {"path": str(path), "size": len(body), "sha256": hashlib.sha256(body).hexdigest()}
+
+    def query(argv, *, includes=(), maximum=64):
+        payload = gateway.gateway(["query-object", *argv, "--max-results", str(maximum),
+            *(word for include in includes for word in ("--include", include))], live=True)
+        assert payload.get("projection_complete") is not False and payload.get("limit_reached") is not True and payload.get("status") != "partial", payload
+        rows = payload["objects"]; assert payload["count"] == len(rows) <= maximum, payload
+        return rows
+
+    def exact(identity):
+        rows = query(["--exact-id", identity], includes=("class-id", "notes", "parent"), maximum=2)
+        assert len(rows) == 1 and rows[0]["id"] == identity, rows
+        return rows[0]
+
+    def sources(identity):
+        rows = query(["--exact-id", identity, "--relationship", "children"],
+            includes=("class-id", "parent", "source-language", "original-file-path", "notes"))
+        return [{"object": row, "media": proof(row["original_file_path"])} for row in rows]
+
+    try:
+        classes = {row["name"]: row["classId"] for row in json.loads((REPO_ROOT / "skills/waapi-skill/resources/metadata/2025.1/object-types.json").read_text())["types"]}
+        source_path = (owned / "Containers/Default Work Unit.wwu").resolve(strict=True)
+        assert source_path.is_relative_to(owned)
+        document = ET.parse(source_path); work_unit = document.find("./Containers/WorkUnit")
+        borrowed = document.find('.//Sound[@ID="{EDC65EA5-F8B4-468A-BB65-629D2FAE9B2E}"]')
+        assert work_unit is not None and borrowed is not None
+        before = report["observations"]["before"] = {}
+        before["parent"] = parent = exact(work_unit.attrib["ID"])
+        assert parent["type"] == "WorkUnit" and parent["class_id"] == classes["WorkUnit"]
+        assert parent["name"] == work_unit.attrib["Name"] and parent["path"] == "\\Containers\\" + work_unit.attrib["Name"]
+        before["children"] = query(["--exact-id", parent["id"], "--relationship", "children"], includes=("class-id", "notes", "parent"))
+        before["unrelated_sound"] = exact(borrowed.attrib["ID"])
+        xml_parents = {child: owner for owner in document.iter() for child in owner}
+        chain = []; current = borrowed
+        while current is not None:
+            if all(key in current.attrib for key in ("ID", "Name")): chain.append(current)
+            current = xml_parents.get(current)
+        chain.reverse()
+        assert before["unrelated_sound"]["path"] == "\\Containers\\" + "\\".join(node.attrib["Name"] for node in chain)
+        assert before["unrelated_sound"]["parent"]["id"] == chain[-2].attrib["ID"]
+        before["unrelated_sources"] = sources(borrowed.attrib["ID"])
+        assert before["unrelated_sources"]
+        name = "NamedSources_" + uuid.uuid4().hex[:10]
+        requested = (("first", "_MyActiveSource", 440), ("second", "OtherSource", 660))
+        media_by_name = {}
+        for row_id, source_name, frequency in requested:
+            media = _write_fixture_wav(owned / "GatewayNamedSourcesWitness", name + "_" + row_id, frequency=frequency)
+            media_by_name[source_name] = media
+            report["inputs"][str(media)] = proof(str(media))
+        draft = _start_business_draft(gateway, "audio.import")
+        parent_handle = _bind_business_object(gateway, draft, object_id=parent["id"])
+        _update_business_draft(gateway, draft, "draft-business-configure", ["--mode", "replace"], live=False)
+        for row_id, source_name, _frequency in requested:
+            _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", row_id,
+                "--parent-handle", parent_handle, "--name", name, "--kind", "sound-sfx",
+                "--field", "source_name", source_name, "--field", "media_file", str(media_by_name[source_name])], live=False)
+        report["stage"] = "witness"
+        _update_business_draft(gateway, draft, "draft-check", live=True)
+        preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
+        witness = report["witness"]; tx = preview["transaction_id"]; category["transaction_ids"].append(tx)
+        witness.update(transaction_id=tx, preview=preview)
+        shown = gateway.gateway(["transaction-show", tx], live=False)
+        dispatch = witness["compiled_native_request"] = shown["artifact"]["prepared_operation"]["dispatch"]
+        assert dispatch["uri"] == "ak.wwise.core.audio.import" and dispatch["args"]["importOperation"] == "replaceExisting", dispatch
+        assert len(dispatch["args"]["imports"]) == 2
+        for row, (_row_id, source_name, _frequency) in zip(dispatch["args"]["imports"], requested):
+            assert row["objectPath"] == parent["path"] + "\\<Sound SFX>" + name + "\\<AudioFileSource>" + source_name, row
+            assert row["audioFile"] == str(media_by_name[source_name]) and row["importLanguage"] == "SFX", row
+        gateway.gateway(["confirm", tx, "--confirmation-token", shown["confirmation"]["token"]], live=False)
+        code, executed = gateway.raw_gateway(["execute", tx]); witness.update(execute_exit_code=code, execute=executed); persist()
+        if code != 0 or executed.get("state") != "executed_unverified":
+            category["status"] = "blocked"; raise AssertionError("Named-Source import execution unknown; no follow-up calls")
+        code, verified = gateway.raw_gateway(["verify", tx]); witness.update(verify_exit_code=code, verify=verified); persist()
+        if verified.get("state") == "indeterminate" or verified.get("status") == "indeterminate":
+            category["status"] = "blocked"; raise AssertionError("Named-Source verification unknown; no follow-up calls")
+        after = report["observations"]["after"] = {}
+        rows = query(["--path-segment", "Containers", "--path-segment", parent["name"], "--path-segment", name], includes=("class-id", "parent"), maximum=2)
+        assert len(rows) == 1, rows
+        after["sound"] = sound = rows[0]
+        after["sources"] = sources(sound["id"])
+        after["parent"] = exact(parent["id"])
+        after["children"] = query(["--exact-id", parent["id"], "--relationship", "children"], includes=("class-id", "notes", "parent"))
+        after["unrelated_sound"] = exact(borrowed.attrib["ID"])
+        after["unrelated_sources"] = sources(borrowed.attrib["ID"])
+        persist()
+        assert sound["name"] == name and sound["path"] == parent["path"] + "\\" + name
+        assert sound["type"] == "Sound" and sound["class_id"] == classes["Sound"] and sound["parent"]["id"] == parent["id"]
+        assert len(after["sources"]) == 2 and {entry["object"]["name"] for entry in after["sources"]} == set(media_by_name), after["sources"]
+        assert len({sound["id"], *(entry["object"]["id"] for entry in after["sources"])}) == 3
+        for entry in after["sources"]:
+            row = entry["object"]; expected = report["inputs"][str(media_by_name[row["name"]])]
+            assert row["type"] == "AudioFileSource" and row["class_id"] == classes["AudioFileSource"]
+            assert row["parent"]["id"] == sound["id"] and row["path"] == sound["path"] + "\\" + row["name"]
+            assert row["source_language"]["name"] == "SFX" and entry["media"]["sha256"] == expected["sha256"]
+        assert after["parent"] == before["parent"] and after["unrelated_sound"] == before["unrelated_sound"]
+        assert {entry["object"]["id"]: entry for entry in after["unrelated_sources"]} == {
+            entry["object"]["id"]: entry for entry in before["unrelated_sources"]}
+        assert len(after["children"]) == len(before["children"]) + 1
+        assert {row["id"]: row for row in after["children"] if row["id"] != sound["id"]} == {
+            row["id"]: row for row in before["children"]}
+        assert all(proof(path) == expected for path, expected in report["inputs"].items())
+        assert code == 0 and verified.get("verified") is True, verified
+        report.update(stage="complete", business_effect_verified=True); category["status"] = "PASS"
+        return category
+    except Exception as exc:
+        report["failure"] = {"type": type(exc).__name__, "message": str(exc)[:2048]}
+        raise
+    finally:
+        persist()

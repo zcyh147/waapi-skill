@@ -1104,6 +1104,16 @@ def test_audio_import_creates_play_event_and_dialogue_link(workflow_sandbox_runt
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_audio_import_two_named_sources_share_new_sound(workflow_sandbox_runtime):
+    """SDK ordinary import: one new SFX Sound, two explicitly named Sources."""
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("Representative named-Source import is pinned to 2025.1")
+    from tests.destructive.support.audio_import_acceptance import collect_named_sources_acceptance
+    collect_named_sources_acceptance(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_music_playlist_canonical_query_create_and_import_parent(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:

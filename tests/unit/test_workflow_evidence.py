@@ -1231,3 +1231,135 @@ def test_dialogue_import_native_witness_reaches_persisted_final_writer(tmp_path,
         assert report['witness']['verify']['state']=='verification_failed'
         assert any(not row['passed'] and 'exact requested DialogueEvent identity' in row['name']
             for row in report['witness']['verify']['verification']['assertions']), 'Creation remains a required effect'
+
+
+@pytest.mark.parametrize("fault", (None, "missing-second-source"))
+def test_named_sources_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
+    """Real collector, public Gateway and durable final writer; native is fake."""
+    import hashlib
+    import importlib
+    import json
+    from pathlib import Path, PureWindowsPath
+    import re
+    import shutil
+    from types import SimpleNamespace
+    import xml.etree.ElementTree as ET
+    from tests.unit.test_audio_import_named_sources import NamedSourcesClient
+    from tests.unit.test_audio_import_business_gateway import _env, waapi_gateway
+    from tests.support.gateway_config import set_gateway_config
+    from tests.unit.test_profiler_input_native_fixture import _finish
+    from tests.destructive.support import sandbox_fixture
+    monkeypatch.setenv("WWISE_LIVE", "1"); monkeypatch.setenv("WWISE_DESTRUCTIVE", "1")
+    workflow = importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
+    source = workflow.REPO_ROOT / "tests/_org/2025.1"
+    catalog = json.loads((workflow.REPO_ROOT / "skills/waapi-skill/resources/metadata/2025.1/object-types.json").read_text())["types"]
+    classes = {row["name"]: row["classId"] for row in catalog}
+    document = ET.parse(source / "Containers/Default Work Unit.wwu")
+    parents = {child: parent for parent in document.iter() for child in parent}
+    baseline = []
+    for node in document.iter():
+        if node.tag not in classes or not all(key in node.attrib for key in ("ID", "Name")):
+            continue
+        if parents.get(node) is not None and parents[node].tag not in {"ChildrenList", "Containers"}:
+            continue
+        chain = []; current = node
+        while current is not None:
+            if all(key in current.attrib for key in ("ID", "Name")): chain.append(current)
+            current = parents.get(current)
+        chain.reverse()
+        row = {"id": node.attrib["ID"], "name": node.attrib["Name"], "type": node.tag,
+            "classId": classes[node.tag], "path": "\\Containers\\" + "\\".join(item.attrib["Name"] for item in chain),
+            "notes": node.findtext("Comment", default="")}
+        if len(chain) > 1: row["parent"] = {"id": chain[-2].attrib["ID"]}
+        if node.tag == "AudioFileSource":
+            language = node.findtext("Language"); media = node.findtext("AudioFile")
+            row.update({"audioSource:language": {"name": language}, "_fixture_media": media})
+        baseline.append(row)
+    work_unit, = [row for row in baseline if row["type"] == "WorkUnit" and row["name"] == "Default Work Unit"]
+    borrowed, = [row for row in baseline if row["id"] == "{EDC65EA5-F8B4-468A-BB65-629D2FAE9B2E}"]
+
+    class Client(NamedSourcesClient):
+        def __init__(self):
+            super().__init__(tmp_path, "2025.1")
+            self.parent = copy.deepcopy(work_unit); self.owner_name = "MySound"; self.import_count = 0
+            self.owner_path = self.parent["path"] + "\\" + self.owner_name
+            for row in baseline:
+                if row["type"] == "AudioFileSource" and row.get("parent", {}).get("id") == borrowed["id"]:
+                    relative = Path("Originals/SFX") / Path(*PureWindowsPath(row.pop("_fixture_media")).parts)
+                    original = source / relative; copied = tmp_path / "project" / relative
+                    copied.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(original, copied)
+                    row.update(originalFilePath=str(copied), originalWavFilePath=str(copied))
+
+        def owner(self):
+            return {**super().owner(), "name": self.owner_name, "parent": {"id": self.parent["id"]}}
+
+        def call(self, uri, args=None, options=None):
+            args, options = args or {}, options or {}
+            if uri.endswith("getTypes"):
+                self.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options))); return {"return": catalog}
+            if uri.endswith("getPropertyAndReferenceNames"):
+                self.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options))); return {"return": ["IsVoice"]}
+            if uri.endswith("getPropertyInfo"):
+                self.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options)))
+                assert args["property"] == "IsVoice"
+                return {"name": "IsVoice", "type": "bool", "default": False, "dependencies": []}
+            if uri == "ak.wwise.core.object.get" and args.get("waql") not in {"from type Project take 1", "from type Project take 2"}:
+                self.calls.append((uri, copy.deepcopy(args), copy.deepcopy(options)))
+                known = [*baseline, *self.objects.values()]
+                if "waql" in args:
+                    match = re.match(r'from object ("(?:[^"\\]|\\.)*")(.*)', args["waql"]); assert match, args
+                    selected = match[1][1:-1]; tail = match[2]
+                    rows = [row for row in known if row["id"] == selected or row["path"] == selected]
+                    if "select children" in tail:
+                        identities = {row["id"] for row in rows}
+                        rows = [row for row in known if row.get("parent", {}).get("id") in identities]
+                else:
+                    identity = args.get("from", {})
+                    rows = [row for row in known if row["id"] in identity.get("id", []) or row["path"] in identity.get("path", [])]
+                return {"return": [{key: copy.deepcopy(row[key]) for key in options["return"] if key in row} for row in rows]}
+            if uri == "ak.wwise.core.audio.import":
+                self.import_count += 1
+                self.owner_path = re.sub(r'<[^>]+>', '', args["imports"][0]["objectPath"].rpartition('\\')[0])
+                self.owner_name = self.owner_path.rpartition('\\')[2]
+                result = super().call(uri, args, options)
+                if fault == "missing-second-source":
+                    absent = next(row["id"] for row in self.objects.values() if row["name"] == "OtherSource")
+                    self.objects.pop(absent)
+                    result["objects"] = [row for row in result["objects"] if row["id"] != absent]
+                return result
+            return super().call(uri, args, options)
+
+    client = Client(); state = tmp_path / "state"; env = set_gateway_config(_env(tmp_path), wwise_version="2025.1")
+    immutable = tmp_path / "immutable-source"; immutable.mkdir(); project = immutable / "SampleProject.wproj"
+    project.write_text("immutable named Sources source")
+    source_proof = sandbox_fixture.hash_project(immutable)
+    metadata = sandbox_fixture.SandboxMetadata(str(project), str(immutable), str(tmp_path / "project"),
+        str(tmp_path / "project/SampleProject.wproj"), "2025.1", 0, source_proof,
+        sandbox_fixture.hash_project(tmp_path / "project"), project.stat().st_mtime,
+        process_cleanup_result="cleaned", process_cleanup_details={"residual_processes": []})
+    sandbox = sandbox_fixture.SandboxProject(project, immutable, tmp_path, tmp_path / "project", tmp_path / "project/SampleProject.wproj", metadata)
+    destination = sandbox.sandbox_path / "Containers/Default Work Unit.wwu"
+    destination.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(source / "Containers/Default Work Unit.wwu", destination)
+    runtime = workflow._WorkflowSandboxRuntime("2025.1", sandbox,
+        SimpleNamespace(host="127.0.0.1", port=31337, waapi_url="ws://127.0.0.1:31337/waapi"),
+        state, env, workflow.exact_git_candidate(workflow.REPO_ROOT), [])
+    monkeypatch.setattr(workflow._WorkflowSandboxRuntime, "raw_gateway", lambda _runtime, argv: waapi_gateway.execute_gateway(
+        ["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client))
+    lock = sandbox_fixture.LiveSandboxLock(tmp_path / "locks"); lock.__enter__()
+    node = "test_audio_import_two_named_sources_share_new_sound"; error = None
+    try: getattr(workflow, node)(runtime)
+    except AssertionError as exc: error = exc
+    category, = runtime.category_results; body = Path(category["observation_path"]).read_bytes(); report = json.loads(body)
+    final = _finish((workflow, runtime, client, lock, source_proof), tmp_path, monkeypatch, [(node, error)])[-1]
+    assert (error is None) == (fault is None), error
+    assert final["invocation"]["outcome"] == ("PASS" if fault is None else "FAIL")
+    assert final["categories"][0]["observation_sha256"] == hashlib.sha256(body).hexdigest()
+    assert len(final["transactions"]) == client.import_count == report["transaction_budget"] == 1
+    assert report["business_effect_verified"] is (fault is None)
+    assert final["residual_state"]["sandbox"] == ("deleted" if fault is None else "quarantined")
+    assert not any(uri.endswith((".setReference", ".create", ".set")) for uri, _, _ in client.calls)
+    if fault:
+        assert report["witness"]["verify"]["state"] == "verification_failed"
+        assert len(report["observations"]["after"]["sources"]) == 1
+    else:
+        assert {row["object"]["name"] for row in report["observations"]["after"]["sources"]} == {"_MyActiveSource", "OtherSource"}
