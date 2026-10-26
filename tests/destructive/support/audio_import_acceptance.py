@@ -449,12 +449,15 @@ def collect_localized_tsv_import_acceptance(runtime, *, witness_kind="notes-colu
             if owner_fields:
                 bus_work_unit = at("Busses", "Default Work Unit")
                 report["buses_before"] = {}
-                for label, identity, bus_name in (
-                    ("Main", "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}", "Main Audio Bus"),
-                    ("Secondary", "{D2E0BC7E-7B3F-4FFE-A670-FAE02761B631}", "Secondary Bus"),
+                # Both exact Work Unit elements are Bus, not AuxBus. The
+                # pinned 2025.1.7 getTypes catalog binds Bus to 1376272;
+                # 524304 belongs to PropertyContainer, not a Bus subclass.
+                for label, identity, bus_name, class_id in (
+                    ("Main", "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}", "Main Audio Bus", 1376272),
+                    ("Secondary", "{D2E0BC7E-7B3F-4FFE-A670-FAE02761B631}", "Secondary Bus", 1376272),
                 ):
                     bus = exact(identity)
-                    expected = {"id": identity, "name": bus_name, "type": "Bus", "class_id": 524304,
+                    expected = {"id": identity, "name": bus_name, "type": "Bus", "class_id": class_id,
                         "path": "\\Busses\\Default Work Unit\\" + bus_name}
                     assert all(bus.get(key) == value for key, value in expected.items()) and bus["parent"]["id"] == bus_work_unit, bus
                     report["buses_before"][label] = bus
