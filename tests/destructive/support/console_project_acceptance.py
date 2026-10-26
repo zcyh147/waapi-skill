@@ -6,7 +6,7 @@ import base64
 import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import shutil
 import xml.etree.ElementTree as ET
 
@@ -15,6 +15,7 @@ from wwise_waapi.console_project_operations import _read_xml_artifact, _project_
 from wwise_waapi.operation_soundbank import capture_artifact_tree, capture_file_proof, prove_artifact_path
 from wwise_waapi.transactions import TransactionStore
 from tests.destructive.support.console_file_observation import observe_console_file, ConsoleModelImageIndex
+from tests.semantic.support.codex_archive_paths import parse_archive_relative_path, archive_relative_from_absolute
 
 FIXTURES = Path(__file__).resolve().parents[2] / 'fixtures/console-project-184'
 NODE_CASES = {
@@ -225,20 +226,26 @@ def retain_created_target_tree(project, root, owned_root, link):
         'errors': [], 'limits': {**limits, 'manifest_bytes': 2 * 1024 * 1024}}
     manifest = root / 'target-tree.json'
     destination = root / 'target'
+    def snapshot():
+        observed = capture_artifact_tree(project.parent, io_root=owned_root, **limits)
+        for row in observed['files']:
+            if parse_archive_relative_path(row['path']).canonical != row['path']:
+                raise ValueError('Created file inventory must use canonical archive identities')
+        return observed
     def error(exc):
         body['errors'].append({'code': getattr(exc, 'error_code', type(exc).__name__), 'message': str(exc)[:2048]})
     try:
         project.parent.relative_to(owned_root)
-        before = capture_artifact_tree(project.parent, io_root=owned_root, **limits)
+        before = snapshot()
         body['source_before'] = before
         if not before['exists']:
             raise ValueError('Requested creation target directory is absent')
         destination.mkdir(exist_ok=False)
         # Snapshot helper owns file/link/byte limits. Preserve empty directories
         # too, with a separately bounded no-follow walk before copying files.
-        pending, entries = [(project.parent, PurePosixPath(), 0)], 0
+        pending, entries = [(project.parent, 0)], 0
         while pending:
-            directory, relative, depth = pending.pop()
+            directory, depth = pending.pop()
             if depth > limits['max_depth']:
                 raise ValueError('Creation target changed beyond its directory depth bound')
             prove_artifact_path(directory, io_root=owned_root, field='created directory', must_exist=True, expect_directory=True)
@@ -250,16 +257,14 @@ def retain_created_target_tree(project, root, owned_root, link):
                     if metadata_is_link_or_reparse(entry.stat(follow_symlinks=False)):
                         raise ValueError('Creation target gained a linked or reparse entry')
                     if entry.is_dir(follow_symlinks=False):
-                        child = relative / entry.name
-                        pending.append((Path(entry.path), child, depth + 1))
+                        child = parse_archive_relative_path(archive_relative_from_absolute(entry.path, project.parent).canonical)
+                        pending.append((Path(entry.path), depth + 1))
                         target = destination.joinpath(*child.parts)
                         prove_artifact_path(target, io_root=root, field='created directory image', must_exist=False, expect_directory=True)
                         target.mkdir(exist_ok=False)
-                        body['directories'].append(child.as_posix())
+                        body['directories'].append(child.canonical)
         for row in before['files']:
-            relative = PurePosixPath(row['path'])
-            if relative.is_absolute() or '..' in relative.parts:
-                raise ValueError('Creation inventory contains an unowned relative path')
+            relative = parse_archive_relative_path(row['path'])
             path = project.parent.joinpath(*relative.parts)
             observation = observe_console_file(path, io_root=project.parent)
             raw = base64.b64decode(observation['content_base64'], validate=True)
@@ -273,9 +278,10 @@ def retain_created_target_tree(project, root, owned_root, link):
             copied = capture_file_proof(target, field='created file image', io_root=root, max_bytes=limits['max_file_bytes'])
             if (copied['size'], copied['sha256']) != (row['size'], row['sha256']):
                 raise ValueError('Created file image differs from its observed bytes')
-            body['files'].append({**row, 'artifact_path': target.relative_to(root).as_posix(),
+            body['files'].append({**row, 'path': relative.canonical,
+                'artifact_path': archive_relative_from_absolute(target, root).canonical,
                 'file_proof': proof, 'artifact_proof': copied})
-        after = capture_artifact_tree(project.parent, io_root=owned_root, **limits)
+        after = snapshot()
         body['source_after'] = after
         if before != after:
             raise ValueError('Created target changed during bounded capture')

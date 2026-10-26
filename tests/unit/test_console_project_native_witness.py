@@ -3,6 +3,7 @@ from pathlib import Path
 from copy import deepcopy
 import importlib
 import json
+import os
 import shutil
 from types import SimpleNamespace
 import xml.etree.ElementTree as ET
@@ -13,6 +14,7 @@ from tests.semantic.support.codex_project_prelaunch_v3 import (
     normalize_project_copy, ProjectPrelaunchRequest, WWISE_2025_SOUNDBANK_AURO_PROFILE,
 )
 from tests.destructive.support import sandbox_fixture, exact_real_evidence
+from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
 from tests.unit.test_console_project_alternatives_gateway import CliProjectTask, ConsoleProjectTask, saved_fixture_project, WaapiRequestFailed
 from tests.unit.test_object_graph_business_gateway import gateway as public_gateway
 
@@ -63,6 +65,10 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
                     if fault == 'partial-link':
                         outside = tmp_path / 'outside-target.bin'; outside.write_bytes(b'outside target bytes')
                         (events / 'unsafe.wwu').symlink_to(outside)
+                    if fault == 'partial-archive-file':
+                        (events / 'nonportable:entry.wwu').write_bytes(b'nonportable file bytes')
+                    if fault == 'partial-archive-directory':
+                        (self.created_file.parent / 'nonportable:directory').mkdir()
                     if fault == 'partial-oversize':
                         with (events / 'oversized.bin').open('wb') as stream: stream.truncate(8 * 1024 * 1024 + 1)
                     raise TimeoutError('Native outcome unknown with partial target subtree')
@@ -457,8 +463,10 @@ def test_partial_creation_retains_bounded_owned_subtree_without_a_project_file(t
         assert manifest['directories'] == ['Events', 'Unfinished', 'Unfinished/Empty']
         assert (manifest_path.parent / 'target/Unfinished/Empty').is_dir()
         for row in manifest['files']:
-            image = manifest_path.parent / row['artifact_path']
-            assert image.read_bytes() == expected[row['path']]
+            image = manifest_path.parent.joinpath(*parse_archive_relative_path(row['artifact_path']).parts)
+            identity = parse_archive_relative_path(row['path'])
+            assert identity.canonical == row['path']
+            assert image.read_bytes() == expected[identity.canonical]
             assert row['sha256'] == hashlib.sha256(expected[row['path']]).hexdigest()
     else:
         assert capture['complete'] is False
@@ -472,3 +480,23 @@ def test_partial_creation_retains_bounded_owned_subtree_without_a_project_file(t
     assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.cli.createNewProject']) == 1
     target = next(i for i, (uri, _, _) in enumerate(client.calls) if uri == 'ak.wwise.cli.createNewProject')
     assert all(uri == 'ak.wwise.core.getInfo' for uri, _, _ in client.calls[target + 1:])
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='Windows cannot create the physical nonportable POSIX names under test')
+@pytest.mark.parametrize('fault', ['partial-archive-file', 'partial-archive-directory'])
+def test_creation_capture_rejects_nonportable_physical_archive_identities(tmp_path, monkeypatch, fault):
+    workflow, runtime, client, proof = _collector_runtime(tmp_path, monkeypatch, 'cli-create', fault=fault)
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(tmp_path / 'category.jsonl'))
+    with pytest.raises(AssertionError) as failure:
+        workflow.test_console_project_cli_create_acceptance(runtime)
+    receipt = json.loads((runtime.state_dir / 'console184-cli-create.json').read_text())
+    capture = receipt['created_output']['target_tree']
+    manifest_path = Path(capture['manifest_path'])
+    manifest = json.loads(manifest_path.read_text())
+    assert capture['complete'] is False
+    assert manifest['errors'][0]['code'] == 'ArchiveRelativePathError'
+    assert not any(':' in row['path'] for row in manifest['files'])
+    assert not any(':' in row for row in manifest['directories'])
+    final = _finalize(tmp_path, monkeypatch, workflow, runtime, proof, failure=failure.value,
+        node='test_console_project_cli_create_acceptance')
+    assert final['transactions'][0]['state'] == 'indeterminate' and manifest_path.is_file()
