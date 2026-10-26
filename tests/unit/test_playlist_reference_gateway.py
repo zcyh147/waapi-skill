@@ -293,7 +293,38 @@ class InnerRenameTask(PlaylistTask):
         return super().call(uri, args, options)
 
 
-@pytest.mark.parametrize('kind', ['PlaylistSlot', 'MetadataSlot'])
+@pytest.mark.parametrize('initial_name', ['', 'PreviouslyNamed'])
+def test_observed_playlist_slot_rename_rejection_is_a_prewrite_boundary(tmp_path, initial_name):
+    task = InnerRenameTask(tmp_path)
+    task.objects[FIRST]['name'] = initial_name
+    before = deepcopy(task.objects)
+    task.bind(FIRST)
+    code, declared = task.step('draft-declare-object-change', '--new-name', 'RenamedSlot')
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code == 2 and 'PLAYLIST_SLOT_RENAME_NATIVE_BOUNDARY' in json.dumps(rejected), rejected
+    diagnostic = json.dumps(rejected)
+    assert "Can't rename this object." in diagnostic and '2025.1.7.9143' in diagnostic
+    assert 'other hosts and builds remain unobserved' in diagnostic
+    assert 'transaction_id' not in rejected and writes(task) == [] and task.objects == before
+
+
+def test_playlist_name_boundary_discloses_original_native_rejection_without_regrading_it(tmp_path):
+    task = InnerRenameTask(tmp_path)
+    code, schema = task.run('--version', '2025.1', 'operation-schema', 'object.setName')
+    assert code == 0, schema
+    boundary, = schema['business_adapter']['native_name_limitations']
+    assert boundary['class_id'] == 5636096 and boundary['observed_native_build'] == '2025.1.7.9143'
+    assert boundary['observed_host'] == 'wwise-console' and boundary['native_message'] == "Can't rename this object."
+    assert 'MetadataSlot class 5570560' in boundary['unobserved_contexts']
+    assert boundary['observation']['original_verdict'] == 'FAIL'
+    assert boundary['observation']['original_transaction_state'] == 'indeterminate'
+    assert boundary['observation']['observation_sha256'] == '5e897cd2a0232c5058d0327fa1682a972880145fe4b5c6072c20b4b832fc0f63'
+    assert boundary['preserved_outcomes'][:2] == ['object.setNotes', 'object.setReference']
+    assert task.calls == []
+
+
+@pytest.mark.parametrize('kind', ['MetadataSlot'])
 def test_existing_inner_slot_rename_verifies_actual_name_and_preserves_owner_list_and_references(tmp_path, kind):
     task = InnerRenameTask(tmp_path, kind=kind)
     before = deepcopy(task.objects)
@@ -310,7 +341,7 @@ def test_existing_inner_slot_rename_verifies_actual_name_and_preserves_owner_lis
 
 @pytest.mark.parametrize('fault', ['native-rejection', 'native-no-effect'])
 def test_inner_rename_never_claims_success_or_retries_after_native_rejection_or_no_effect(tmp_path, fault):
-    task = InnerRenameTask(tmp_path, fault=fault)
+    task = InnerRenameTask(tmp_path, fault=fault, kind='MetadataSlot')
     before = deepcopy(task.objects)
     task.bind(FIRST)
     assert task.step('draft-declare-object-change', '--new-name', 'RenamedSlot')[0] == 0
@@ -332,13 +363,18 @@ def test_inner_rename_never_claims_success_or_retries_after_native_rejection_or_
 @pytest.mark.parametrize('change', ['source-class', 'source-owner', 'list-order', 'peer-reference', 'target-class'])
 @pytest.mark.parametrize('stage', ['before-execute', 'after-execute'])
 def test_inner_rename_retains_exact_identity_owner_peers_and_references(tmp_path, change, stage):
-    task = InnerRenameTask(tmp_path)
+    task = InnerRenameTask(tmp_path, kind='MetadataSlot')
     task.bind(FIRST)
     assert task.step('draft-declare-object-change', '--new-name', 'RenamedSlot')[0] == 0
     tx = preview_and_confirm(task)
     if stage == 'after-execute':
         assert task.run('execute', tx)[0] == 0
-    damage(task, change)
+    if change == 'list-order':
+        task.objects[OWNER]['@Metadata'].reverse()
+    elif change == 'peer-reference':
+        task.objects[PEER]['@Metadata'] = [{'id': OLD}]
+    else:
+        damage(task, change)
     code, result = task.run('execute' if stage == 'before-execute' else 'verify', tx)
     assert code == 2 and result.get('verified') is not True, result
     assert len(writes(task)) == (0 if stage == 'before-execute' else 1)

@@ -2499,6 +2499,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "object types with source-proven non-mutable derived or embedded-value names fail before preview instead of dispatching setName",
             "exact 2025 PlaylistSlot and MetadataSlot attempts retain class, owner, ordered List, references and display path; native acknowledgment alone never verifies a rename",
+            "2025.1 PlaylistSlot class 5636096 renaming is blocked before Preview from representative Console 2025.1.7.9143 native rejection; other hosts/builds are unobserved; other classes retain their contracts",
         ),
         selection_guidance=_selection_guidance(
             use_when=("Exactly one existing object receives only a rename.",),
@@ -27350,6 +27351,14 @@ def _observe_inner_name_scope(version, object_id, *, read):
         if selected.get("name") == "":
             raise OperationContractError("INVALID_READBACK", "Unnamed Inner rename requires its exact supported class.")
         return None
+    from .object_lifecycle_business_contracts import object_name_native_limitations
+    for limitation in object_name_native_limitations(version):
+        if selected["classId"] == limitation["class_id"]:
+            raise OperationContractError(
+                "PLAYLIST_SLOT_RENAME_NATIVE_BOUNDARY",
+                "PlaylistSlot intrinsic-name changes are blocked in this version lane: representative Console 2025.1.7.9143 returned 'Can't rename this object.'; other hosts and builds remain unobserved. Leave the name unchanged; do not retry or substitute another mutation API. Existing notes, reference and List outcomes retain their own contracts.",
+                details={"operation": "object.setName", "object_id": object_id, "native_boundary": limitation},
+            )
     from .documented_list_fields import resolve_live_list_evidence, observe_list_binding, owned_inner_identity
     collection, reference = profiles[selected["classId"]]
     owner_id = _reference_identity(selected.get("owner"))
