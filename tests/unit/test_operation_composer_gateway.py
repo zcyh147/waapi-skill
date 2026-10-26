@@ -340,6 +340,64 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Core generation and external-source output omission have separate,
+    # exact field inverses; retain both component and earlier aggregate seals.
+    assert canonical_sha256(non_object_set_digests) == "8093b7d95a13b3d6da49917b977c86df26b335a1a4c4707dd9d35339270c1128"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("soundbank.generate", version)
+        assert contract['argument_contract']['optional'] == ['all_user_soundbanks', 'all_user_bank_expectations', 'skip_languages', 'write_to_disk', 'languages', 'rebuild_soundbanks', 'clear_audio_file_cache', 'rebuild_init_bank']
+        contract['argument_contract']['optional'] = ['languages', 'rebuild_soundbanks', 'clear_audio_file_cache', 'rebuild_init_bank']
+        assert contract['argument_contract']['properties']['all_user_bank_expectations'] == {'type': 'array', 'maxItems': 64, 'items': {'type': 'object', 'additionalProperties': False, 'required': ['soundbank', 'artifact_expectation'], 'properties': {'soundbank': IDENTITY_ARGUMENT_SCHEMA, 'artifact_expectation': {'type': 'string', 'enum': ['nonlocalized', 'localized', 'mixed']}}}}
+        del contract['argument_contract']['properties']['all_user_bank_expectations']
+        assert contract['argument_contract']['properties']['all_user_soundbanks'] == {'type': 'string', 'enum': ['nonlocalized', 'localized', 'mixed']}
+        del contract['argument_contract']['properties']['all_user_soundbanks']
+        assert contract['argument_contract']['properties']['languages']['description'] == 'Explicit project language selection; empty or omitted means all project languages. Omission is preserved in native dispatch; SFX is not a localized language.'
+        contract['argument_contract']['properties']['languages']['description'] = 'Batch language selection. Omit when every SoundBank has artifact_expectation=nonlocalized. When any SoundBank is localized or mixed, supply one or more real localized project language names; SFX is not a localized language and is forbidden here.'
+        assert contract['argument_contract']['properties']['languages']['minItems'] == 0
+        contract['argument_contract']['properties']['languages']['minItems'] = 1
+        assert contract['argument_contract']['properties']['skip_languages']['description'] == 'Explicit suppression of localized banks; omitted native control retains its native default. The public business declaration discloses its compatible artifact-derived default separately.'
+        contract['argument_contract']['properties']['skip_languages']['description'] = 'Batch switch derived from the complete soundbanks[] list: true exactly when every SoundBank is nonlocalized, and false when any SoundBank is localized or mixed.'
+        assert 'x-discloseDescription' not in contract['argument_contract']['properties']['skip_languages']
+        contract['argument_contract']['properties']['skip_languages']['x-discloseDescription'] = True
+        assert contract['argument_contract']['properties']['soundbanks']['items']['properties']['artifact_expectation']['description'] == 'Expected artifact layout for this SoundBank. nonlocalized means only the root non-localized/SFX Bank artifact; localized means per-language artifacts; mixed means both root and per-language artifacts. Language selection is a batch-level explicit or native-default choice.'
+        contract['argument_contract']['properties']['soundbanks']['items']['properties']['artifact_expectation']['description'] = 'Expected artifact layout for this SoundBank. nonlocalized means only the root non-localized/SFX Bank artifact; localized means per-language artifacts; mixed means both root and per-language artifacts. Language selection is a batch-level rule derived from all soundbanks[] rows.'
+        assert contract['argument_contract']['properties']['soundbanks']['items']['properties']['aux_busses']['minItems'] == 0
+        contract['argument_contract']['properties']['soundbanks']['items']['properties']['aux_busses']['minItems'] = 1
+        assert contract['argument_contract']['properties']['soundbanks']['items']['properties']['events']['minItems'] == 0
+        contract['argument_contract']['properties']['soundbanks']['items']['properties']['events']['minItems'] = 1
+        assert contract['argument_contract']['properties']['soundbanks']['items']['properties']['inclusions']['minItems'] == 0
+        contract['argument_contract']['properties']['soundbanks']['items']['properties']['inclusions']['minItems'] = 1
+        assert contract['argument_contract']['properties']['soundbanks']['items']['properties']['temporary'] == {'type': 'boolean'}
+        del contract['argument_contract']['properties']['soundbanks']['items']['properties']['temporary']
+        assert contract['argument_contract']['properties']['soundbanks']['minItems'] == 0
+        contract['argument_contract']['properties']['soundbanks']['minItems'] = 1
+        assert 'const' not in contract['argument_contract']['properties']['write_to_disk']
+        contract['argument_contract']['properties']['write_to_disk']['const'] = True
+        assert contract['argument_contract']['properties']['write_to_disk']['description'] == 'Omitted means the native false default: in-memory generation with result-only verification; no bank data is returned by this call.'
+        del contract['argument_contract']['properties']['write_to_disk']['description']
+        assert contract['argument_contract']['properties']['write_to_disk']['type'] == 'boolean'
+        del contract['argument_contract']['properties']['write_to_disk']['type']
+        assert contract['argument_contract']['required'] == ['soundbanks', 'platforms', 'io_root']
+        contract['argument_contract']['required'] = ['soundbanks', 'platforms', 'skip_languages', 'write_to_disk', 'io_root']
+        assert contract['constraints'] == ['SoundBank scope is selected or explicitly all-user; platforms remain bounded and explicit; omitted languages mean all live project languages; Init is an automatic by-product', 'language selection is batch-wide; explicit skip_languages=true conflicts with localized artifact expectations; preserve native omission and explicit options', 'batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent; preserve every explicitly supplied value at its original level', 'Event and AuxBus descriptors resolve live to one GUID before preview', 'Wwise 2021.1 derives project paths from the live Project filePath plus a hashed strict WPROJ parse; later versions use live core.getProjectInfo', 'execution replays project/file/artifact and selection guards; file output requires every requested artifact to be created or changed and non-empty; memory output proves only result schema and diagnostics, not bank delivery']
+        contract['constraints'] = ['the user SoundBank, platform, and language scope is explicit; Init is an automatic by-product and cannot be requested', 'language selection is batch-wide: all-nonlocalized soundbanks require skip_languages=true and languages omitted; any localized or mixed soundbank requires skip_languages=false plus non-empty live project languages, never SFX; one batch may combine nonlocalized with localized or mixed rows', 'batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent; preserve every explicitly supplied value at its original level', 'Event and AuxBus descriptors resolve live to one GUID before preview', 'Wwise 2021.1 derives project paths from the live Project filePath plus a hashed strict WPROJ parse; later versions use live core.getProjectInfo', 'execution replays project/file/artifact guards; verification requires each requested Bank artifact to be created or changed and non-empty']
+        assert contract['identity_arguments'] == ['soundbanks[].events[]', 'soundbanks[].aux_busses[]', 'all_user_bank_expectations[].soundbank']
+        contract['identity_arguments'] = ['soundbanks[].events[]', 'soundbanks[].aux_busses[]']
+        assert contract['optional_arguments'] == ['all_user_soundbanks', 'all_user_bank_expectations', 'skip_languages', 'write_to_disk', 'languages', 'rebuild_soundbanks', 'clear_audio_file_cache', 'rebuild_init_bank']
+        contract['optional_arguments'] = ['languages', 'rebuild_soundbanks', 'clear_audio_file_cache', 'rebuild_init_bank']
+        assert contract['required_arguments'] == ['soundbanks', 'platforms', 'io_root']
+        contract['required_arguments'] = ['soundbanks', 'platforms', 'skip_languages', 'write_to_disk', 'io_root']
+        non_object_set_digests[f"soundbank.generate@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == "20f53f6814e0129d5a71177e058e320d4c570bbcad761201913ceb8635a9a75e"
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("soundbank.convertExternalSources", version)
+        row = contract["argument_contract"]["properties"]["sources"]["items"]
+        assert row["required"] == ["input", "platform"]
+        assert row["optional"] == ["output"]
+        row["required"] = ["input", "platform", "output"]
+        row["optional"] = []
+        non_object_set_digests[f"soundbank.convertExternalSources@{version}"] = canonical_sha256(contract)
+
     # Localized table final forms change only this all-five TSV disclosure.
     assert canonical_sha256(non_object_set_digests) == "99ae222d9f424628d6bbd75387b136cdbbe84f70a4709eea7b75a23d32579cf0"
     before_localized_table_final = {}
