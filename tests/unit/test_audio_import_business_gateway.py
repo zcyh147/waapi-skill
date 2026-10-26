@@ -2330,6 +2330,15 @@ def _assert_import_collector_final_writer(tmp_path, workflow, monkeypatch, *, fa
         failure = exc
     category, = runtime.category_results
     receipt = json.loads(Path(category["observation_path"]).read_text())
+    if localized:
+        setup, = [phase for phase in receipt["phases"] if phase["name"] == "setup_other_language"]
+        setup_row, = setup["compiled_native_request"]["args"]["imports"]
+        assert setup_row["importLanguage"] == "Japanese" and setup_row["originalsSubFolder"] == "Other"
+        assert "audioSourceNotes" not in setup_row and "notes" not in setup_row
+        japanese_before, = [row for row in receipt["observations"]["before"]["sources"]
+            if row["object"]["source_language"]["name"] == "Japanese"]
+        assert japanese_before["object"]["notes"] == ""
+        assert japanese_before["object"]["id"] and japanese_before["media"]["sha256"]
     failed = fault is not None or packet_case not in {None, "structured-missing"}
     if packet_case:
         packet, = [row for row in receipt["calls"] if row.get("exit_code") == 2]

@@ -165,7 +165,7 @@ def _collect(runtime, *, localized):
             _update_business_draft(gateway, draft, "draft-declare-existing", [
                 "--declaration-id", "japanese", "--object-handle", voice,
                 "--field", "media_file", str(japanese_media), "--field", "language", "Japanese",
-                "--field", "audio_source_notes", "Keep Japanese notes", "--field", "originals_subfolder", "Other",
+                "--field", "originals_subfolder", "Other",
             ], live=False)
             complete(draft, "setup_other_language")
         spare_before = {"object": exact(spare_id, includes=("notes", "parent", "class-id")), "sources": sources(spare_id)}
