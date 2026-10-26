@@ -16,6 +16,7 @@ from .object_query_outputs import QUERY_FIELD_OUTPUT_GROUPS, available_query_out
 from .object_query_related import (RELATED_FIELD_MODES, RELATED_QUERY_RELATIONS,
     RelatedQueryOutput, related_native_fields)
 from .object_query_randomizer import randomizer_terminal
+from .object_query_functions import field_status_terminal, curve_selection_terminal
 
 OBJECT_GET = 'ak.wwise.core.object.get'
 IDENTITY = ('id', 'name', 'type', 'path')
@@ -75,14 +76,14 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
 
     from .object_query_related_metadata import RelatedFieldBinder
     binder = RelatedFieldBinder(read, RelatedQueryError, version=version)
-    def bind(meaning, native, index, option):
+    def bind(meaning, native, index, option, *, status=None):
         row = rows[index]
         reference = row if not native else row.get(native)
         if not isinstance(reference, Mapping) or not canonical_guid(reference.get('id')):
             return None
         class_id = row.get(f'{native}.classId' if native else 'classId')
         return binder.bind(meaning, reference, class_id, native, index, option,
-            namespaced_property=option in {'--include-related-field', '--include-related-override-source-value', 'randomizer'})
+            namespaced_property=option in {'--include-related-field', '--include-related-override-source-value', 'randomizer', 'field-status'}, status=status)
 
     # Read all statically known prefixes together, including actual endpoint class.
     initial = list(IDENTITY)
@@ -105,8 +106,9 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
     pending, aliases = [], {}
     for request in requests:
         states = [(index, '', ()) for index in range(len(rows))]
-        randomizer = request['hops'][-1][1] if request['hops'][-1][0] == 'randomizer' else None
-        owner_hops = request['hops'][:-1] if randomizer is not None else request['hops']
+        function_kind = request['hops'][-1][0]
+        function_argument = request['hops'][-1][1] if function_kind in {'randomizer', 'field-status', 'curve-selection'} else None
+        owner_hops = request['hops'][:-1] if function_argument is not None else request['hops']
         for kind, name in owner_hops:
             next_states, added = [], []
             if kind == 'relation':
@@ -151,30 +153,30 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
                 if not isinstance(reference, Mapping) or not canonical_guid(reference.get('id')):
                     raise RelatedQueryError('A related hop must return one canonical object reference, null or absence; list composition requires a separate interface', code='RELATED_QUERY_RESULT_SHAPE')
                 states.append((index, native, path))
-        if randomizer is not None:
+        if function_argument is not None:
             matched, unresolved = [], []
             for index, native, path in states:
-                selected = bind(randomizer, native, index, 'randomizer')
+                selected = bind(function_argument, native, index, function_kind, status=request['terminal'])
                 if selected is None: continue
                 candidate = selected['candidate']
                 if candidate is None:
                     unresolved.append((index, native, path, selected)); continue
-                terminal, output = randomizer_terminal(candidate, request['terminal'], RelatedQueryError)
+                terminal, output = {'randomizer': randomizer_terminal, 'field-status': field_status_terminal, 'curve-selection': curve_selection_terminal}[function_kind](candidate, request['terminal'], RelatedQueryError)
                 identity = (index, native, terminal)
                 if identity in aliases:
-                    raise RelatedQueryError('Randomizer meanings resolved duplicate result fields', code='RELATED_QUERY_DUPLICATE_FIELD')
-                aliases[identity] = randomizer
+                    raise RelatedQueryError('Function meanings resolved duplicate result fields', code='RELATED_QUERY_DUPLICATE_FIELD')
+                aliases[identity] = function_argument
                 binding = RelatedQueryOutput('', native, terminal, output,
-                    path=(*path, ('randomizers', candidate['name'])), row_indices=(index,)).binding()
-                binding[2]['randomizer_value'] = output
+                    path=(*path, ({'randomizer': 'randomizers', 'field-status': 'field_status', 'curve-selection': 'curve_selections'}[function_kind], candidate['name'])), row_indices=(index,)).binding()
+                binding[2]['randomizer_value' if function_kind == 'randomizer' else 'function_value'] = output
                 bindings.append(binding)
                 matched.append(index)
             for index, native, path, selected in unresolved:
                 if matched and selected['complete'] and not selected['candidate_names']:
                     bindings.append(('related_unavailable', '', {'path': path, 'row_indices': (index,),
-                        'meaning': randomizer, 'requested_option': 'randomizer', 'reason': 'no matching property in the complete actual metadata scope'}))
+                        'meaning': function_argument, 'requested_option': function_kind, 'reason': 'no matching field in the complete actual metadata scope'}))
                 else:
-                    pending.append({'option': 'randomizer', 'meaning': randomizer, 'path': native, 'row_index': index, **selected})
+                    pending.append({'option': function_kind, 'meaning': function_argument, 'path': native, 'row_index': index, **selected})
             continue
         if request['option'] == '--include-related':
             terminal, output = available_query_outputs(version)[request['terminal']]
