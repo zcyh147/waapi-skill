@@ -270,7 +270,9 @@ def test_input_mode_selection_is_isolated_by_exact_operation_not_shared_native_u
     }
 
 
-def test_operation_request_schema_digest_owns_only_versioned_machine_contract() -> None:
+def test_operation_request_schema_digest_owns_only_versioned_machine_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     contract_2022 = operation_request_machine_contract("object.set", "2022.1")
     contract_2025 = operation_request_machine_contract("object.set", "2025.1")
 
@@ -322,21 +324,35 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
     )
-    # Import construction/disclosure changes are independently history-sealed
-    # (with exact inversions) by the composer inventory test. Keep these exact
-    # per-version machine seals as well; no runtime contract changes here.
-    assert operation_request_schema_digest("audio.import", "2022.1") == (
-        "569d053127a66628f9bb92c18d4029d0723f17354ad971f13e396f0f9b00e933"
-    )
-    assert operation_request_schema_digest("audio.import", "2025.1") == (
-        "60dac8850ab3bf628a12e0acb37731a873ffe82c6daad57cbe324391739944ed"
-    )
-    assert operation_request_schema_digest(
-        "audio.importTabDelimited", "2022.1"
-    ) == "aa181e0caca760f47205d8289d33abf74b5e576eb79221435626d49f1863b15c"
-    assert operation_request_schema_digest(
-        "audio.importTabDelimited", "2025.1"
-    ) == "828161c1fa928370206a77111612ab1b0b233ccf39fbb390ac55168215fc536a"
+    # The composer inventory solely owns exact import seals and their history.
+    # Here prove version binding, prose exclusion and machine-field sensitivity.
+    import wwise_waapi.operation_registry as registry
+
+    import_names = ("audio.import", "audio.importTabDelimited")
+    versions = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+    import_digests = {}
+    for name in import_names:
+        for version in versions:
+            contract = operation_request_machine_contract(name, version)
+            assert contract["operation"] == name and contract["version"] == version
+            assert contract["request_contract"] == OPERATION_REQUEST_CONTRACT
+            assert not {"summary", "selection_guidance", "next_step"} & contract.keys()
+            import_digests[name, version] = operation_request_schema_digest(name, version)
+    assert len(set(import_digests.values())) == 10
+    prose_specs = dict(registry.OPERATION_SPECS)
+    for name in import_names:
+        prose_specs[name] = replace(prose_specs[name], summary="Different human summary",
+            selection_guidance={"human_hint": "Different routing prose"}, next_step="Different next step")
+    monkeypatch.setattr(registry, "OPERATION_SPECS", prose_specs)
+    for (name, version), digest in import_digests.items():
+        assert operation_request_schema_digest(name, version) == digest
+    machine_specs = dict(prose_specs)
+    for name in import_names:
+        machine_specs[name] = replace(machine_specs[name],
+            constraints=(*machine_specs[name].constraints, "Different machine validity constraint"))
+    monkeypatch.setattr(registry, "OPERATION_SPECS", machine_specs)
+    for (name, version), digest in import_digests.items():
+        assert operation_request_schema_digest(name, version) != digest
     assert contract_2025["argument_contract"] != {}
 
     with pytest.raises(OperationContractError, match="Unknown closed operation"):

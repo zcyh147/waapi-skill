@@ -333,6 +333,13 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # This inventory owns the exact seals for both import routes in all lanes;
+    # the Registry unit test separately checks version/prose/hash semantics.
+    assert {
+        f"{operation}@{version}"
+        for operation in ("audio.import", "audio.importTabDelimited")
+        for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+    } <= non_object_set_digests.keys()
     # Exact Help and the retained native result establish creation for name
     # alone. Invert only the corrected promise, retaining the previous seal.
     assert canonical_sha256(non_object_set_digests) == "5da8cc04ba3f0f1596ec4dd13cfa95c7333d3115df8e20360a6a47403e4450c2"
