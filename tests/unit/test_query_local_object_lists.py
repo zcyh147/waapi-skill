@@ -1,4 +1,4 @@
-"""Owner-preserving, source-certified local RTPC/EffectSlot projections."""
+"""Owner-preserving, source-certified local RTPC/EffectSlot/Marker projections."""
 import copy
 import json
 import re
@@ -35,7 +35,7 @@ class LocalListTask(FieldTask):
 
     def call(self, uri, args=None, options=None):
         waql = (args or {}).get('waql','')
-        if uri.endswith('object.get') and re.search(r' select @(RTPC|Effects)',waql):
+        if uri.endswith('object.get') and re.search(r' select @(RTPC|Effects|Markers)',waql):
             self.calls.append((uri,args,options))
             owner, = re.findall(r'\{[0-9A-Fa-f-]{36}\}',waql.split(' select ')[0])
             relation = re.search(r' select (@\w+)',waql).group(1)
@@ -315,3 +315,225 @@ def test_local_source_admission_precedes_empty_null_absent_membership(tmp_path,v
     if version=='2022.1' or presence=='empty':assert view=={'items':[]}
     elif presence=='null':assert view=={'items':None}
     else:assert view=={'unavailable_fields':['items']}
+
+
+MARKER_PACKET = json.loads((Path(__file__).parents[1]/'fixtures/query-local-lists/marker-2025.json').read_text())
+MARKER = MARKER_PACKET['membership']['result']['return'][0]['id']
+MARKER_OWNER = MARKER_PACKET['exact_read']['result']['return'][0]['owner']['id']
+
+
+def marker_task(tmp_path, version='2025.1'):
+    task = LocalListTask(tmp_path, version)
+    # Retained native identity and metadata; the opaque path is not a hierarchy.
+    member = copy.deepcopy(MARKER_PACKET['exact_read']['result']['return'][0])
+    owner = {'id': MARKER_OWNER, 'name': 'audit_outside', 'type': 'AudioFileSource',
+        'path': r'\Sounds\Owner\audit_outside', 'classId': 16, '@Markers': [{'id': MARKER}]}
+    task.row = owner; task.rows = [owner]; task.members = {MARKER: member}
+    task.objects = {MARKER_OWNER: owner, MARKER: member}
+    fields = {name: copy.deepcopy(packet['result']) for name, packet in MARKER_PACKET['metadata'].items()}
+    task.metadata[5373968] = fields
+    task.metadata[MARKER] = copy.deepcopy(fields)
+    return task
+
+
+@pytest.mark.parametrize('version', ['2023.1','2024.1','2025.1'])
+def test_local_markers_preserve_source_owner_native_guid_opaque_path_and_discovered_values(tmp_path, version):
+    task = marker_task(tmp_path, version)
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,
+        '--include-related','local-markers','class-id',
+        '--include-related','local-markers','owner',
+        '--include-related-field','local-markers','Time',
+        '--include-related-field','local-markers','Label','--detail')
+    assert code == 0,result
+    root, = result['agent_result']
+    assert root['id'] == MARKER_OWNER
+    member, = root['related']['local-markers']['items']
+    assert member == {'object': {'id': MARKER, 'name': '', 'type': 'Marker', 'path': '[Marker]'},
+        'class_id': 5373968, 'owner': {'id': MARKER_OWNER, 'name': 'audit_outside'},
+        'properties': {'Time': 0.0, 'Label': 'R90_MARKER'}}
+    assert result['related_scope_binding']['local_list_sources'][0]['declaration']['element_classes'] == [{'name':'Marker','class_id':5373968}]
+    assert list(result)[-1] == 'agent_result'
+    assert {uri for uri,_,_ in task.calls} <= {'ak.wwise.core.getInfo','ak.wwise.core.object.get',
+        'ak.wwise.core.object.getPropertyAndReferenceNames','ak.wwise.core.object.getPropertyInfo'}
+
+
+@pytest.mark.parametrize('version', ['2021.1','2022.1','2023.1','2024.1','2025.1'])
+def test_local_marker_contract_keeps_modern_stored_list_and_legacy_inner_boundaries(tmp_path, version):
+    task = marker_task(tmp_path, version)
+    code,schema = task.run('query-schema')
+    assert code == 0,schema
+    contract = schema['related_outputs']['local_object_lists']
+    context = contract['contexts']['local-markers']
+    assert context['native'] == '@Markers' and context['field'] == 'Markers'
+    assert context['available'] is (version >= '2023.1')
+    assert 'no imported/effective marker computation claim' in context['scope']
+    assert 'imported/effective marker projection and 2021/2022 Inner Marker representation' in contract['remaining']
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include-related','local-markers','count')
+    if version >= '2023.1':
+        assert code == 0,result
+        assert result['agent_result'][0]['related']['projections'][0]['value'] == 1
+    else:
+        assert code == 2 and not task.calls,result
+
+
+@pytest.mark.parametrize('version', ['2023.1','2025.1'])
+def test_local_marker_selected_combined_and_field_reducers_keep_occurrences_and_zero_values(tmp_path, version):
+    task = marker_task(tmp_path, version)
+    # The second row is a program-only alternate, not an extra retained native observation.
+    second = copy.deepcopy(task.members[MARKER]); second.update(id=RTPC2, **{'@Time': 1.0,'@Label': ''})
+    task.members[RTPC2] = second; task.objects[RTPC2] = second; task.metadata[RTPC2] = task.metadata[MARKER]
+    task.row['@Markers'].append({'id':RTPC2})
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,
+        '--include-related-field','local-markers','Time',
+        '--include-related-field','local-markers','Label',
+        '--include-related-field','local-markers','first','Time',
+        '--include-related-field','local-markers','last','Label',
+        '--include-related-field','local-markers','at','1','Label',
+        '--include-related-field','local-markers','skip','1','take','1','Time',
+        '--include-related-field','combine','local-markers','and','local-markers','end','take','3','Label',
+        '--include-related','local-markers','matching-field','ordinary','Time','at-most','0','count',
+        '--include-related','local-markers','any-match-field','ordinary','Label','is','R90_MARKER',
+        '--include-related','local-markers','all-match-field','ordinary','Time','at-most','0')
+    assert code == 0,result
+    related = result['agent_result'][0]['related']
+    assert [row['properties'] for row in related['local-markers']['items']] == [
+        {'Time':0.0,'Label':'R90_MARKER'}, {'Time':1.0,'Label':''}]
+    views = related['projections']
+    first = next(view for view in views if view['spec'].get('stages') == [{'selection':'first'}])
+    last = next(view for view in views if view['spec'].get('stages') == [{'selection':'last'}])
+    at = next(view for view in views if view['spec'].get('stages') == [{'selection':'at','count':1}])
+    window = next(view for view in views if view['spec'].get('stages') == [{'selection':'skip','count':1},{'selection':'take','count':1}])
+    combined = next(view for view in views if view['spec']['source'] == 'combine')
+    reduced = {view['spec']['reducer']['operation']:view['value'] for view in views if view['spec'].get('reducer')}
+    assert first['items'][0]['object']['id'] == MARKER and first['items'][0]['properties'] == {'Time':0.0}
+    assert last['items'][0]['object']['id'] == RTPC2 and last['items'][0]['properties'] == {'Label':''}
+    assert at['items'][0]['object']['id'] == RTPC2
+    assert window['items'][0]['properties'] == {'Time':1.0}
+    assert [row['object']['id'] for row in combined['items']] == [MARKER,RTPC2,MARKER]
+    assert [row['origin'] for row in combined['items']] == [
+        {'arm':0,'occurrence':0},{'arm':0,'occurrence':1},{'arm':1,'occurrence':0}]
+    assert reduced == {'count':1,'any-match':True,'all-match':False}
+    assert list(result)[-1] == 'agent_result'
+
+
+@pytest.mark.parametrize('path', [ ['local-markers'], ['local-markers','first'],
+    ['combine','local-markers','and','local-markers','end','take','2']])
+@pytest.mark.parametrize('fault', ['class','owner','missing-owner'])
+def test_local_marker_members_fail_closed_on_wrong_class_or_source_owner(tmp_path, path, fault):
+    task = marker_task(tmp_path)
+    row = task.members[MARKER]
+    if fault == 'class': row['classId'] = 65077248  # The older Inner class cannot masquerade as a modern WObject.
+    elif fault == 'owner': row['owner'] = {'id': OTHER}
+    else: row.pop('owner')
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include-related-field',*path,'Time')
+    assert code == 2 and result['error_code'] == 'RELATED_QUERY_LOCAL_LIST_MEMBER',result
+    assert result.get('agent_result') is None
+
+
+@pytest.mark.parametrize('path', [ ['local-markers'], ['local-markers','take','0'],
+    ['combine','local-markers','and','local-markers','end','take','0']])
+def test_empty_or_zero_marker_window_does_not_certify_the_wrong_owner_class(tmp_path, path):
+    task = marker_task(tmp_path)
+    task.row.update(classId=SOUND_CLASS, type='Sound', **{'@Markers': []})
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include-related',*path,'count')
+    assert code == 2 and result['error_code'] == 'RELATED_QUERY_LOCAL_LIST_SOURCE',result
+    assert result['details']['native_absence_proven'] is False
+
+
+@pytest.mark.parametrize('presence', ['empty-list','absent-list','null-list','empty-label','absent-value','null-value'])
+def test_marker_lists_and_values_preserve_empty_missing_null_and_numeric_zero(tmp_path, presence):
+    task = marker_task(tmp_path)
+    if presence == 'empty-list': task.row['@Markers'] = []
+    elif presence == 'absent-list': task.row.pop('@Markers')
+    elif presence == 'null-list': task.row['@Markers'] = None
+    elif presence == 'empty-label': task.members[MARKER]['@Label'] = ''
+    elif presence == 'absent-value': task.members[MARKER].pop('@Label')
+    else: task.members[MARKER]['@Label'] = None
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,
+        '--include-related-field','local-markers','Time','--include-related-field','local-markers','Label')
+    assert code == 0,result
+    view = result['agent_result'][0]['related']['local-markers']
+    if presence == 'empty-list': assert view == {'items':[]}
+    elif presence == 'absent-list': assert view == {'unavailable_fields':['items']}
+    elif presence == 'null-list': assert view == {'items':None}
+    else:
+        member, = view['items']
+        assert member['properties']['Time'] == 0.0
+        if presence == 'absent-value':
+            assert member['properties'] == {'Time':0.0} and member['unavailable_fields'] == ['properties.Label']
+        else:
+            assert member['properties']['Label'] == ('' if presence == 'empty-label' else None)
+
+
+@pytest.mark.parametrize('failure', ['no-match','partial','wrong-kind'])
+def test_marker_values_require_fresh_complete_matching_metadata_without_token_guessing(tmp_path, failure):
+    task = marker_task(tmp_path)
+    if failure == 'no-match': task.metadata[5373968] = {}; task.metadata[MARKER] = {}
+    elif failure == 'partial':
+        task.metadata[5373968] = {f'Field{i}': {'name':f'Field{i}','type':'int32'} for i in range(300)}
+    option = '--include-related-local-reference' if failure == 'wrong-kind' else '--include-related-field'
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,option,'local-markers','Time')
+    if failure == 'wrong-kind':
+        assert code == 2 and result['error_code'] == 'RELATED_QUERY_FIELD_KIND',result
+    else:
+        assert code == 0 and result['status'] == 'needs_clarification',result
+        unresolved, = result['agent_result']['unresolved']
+        assert unresolved['meaning'] == 'Time' and unresolved['complete'] is (failure == 'no-match')
+        assert unresolved['scope'] == ({'classId':5373968} if failure == 'partial' else {'object':MARKER})
+    assert all('@Time' not in json.dumps(options) for uri,_,options in task.calls if uri.endswith('object.get'))
+
+
+@pytest.mark.parametrize('tokens', [ ['local-markers','take','-1','count'], ['local-markers','at','01','count'],
+    ['local-markers.take(1)','count'], ['local-markers','matching','@Time','0','count'],
+    ['combine','local-markers','end','count']])
+def test_marker_context_uses_existing_closed_selector_grammar_before_transport(tmp_path, tokens):
+    task = marker_task(tmp_path)
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include-related',*tokens)
+    assert code == 2 and not task.calls,result
+
+
+@pytest.mark.parametrize('empty', [False,True])
+def test_local_marker_zero_window_and_empty_reducers_do_not_invent_values_or_membership(tmp_path, empty):
+    task = marker_task(tmp_path)
+    if empty: task.row['@Markers'] = []
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,
+        '--include-related','local-markers','count',
+        '--include-related','local-markers','any',
+        '--include-related','local-markers','take','0','count',
+        '--include-related','local-markers','take','0','any',
+        '--include-related','local-markers','take','0','all-match-field','ordinary','Time','at-most','0')
+    assert code == 0,result
+    views = result['agent_result'][0]['related']['projections']
+    whole = {view['spec']['reducer']['operation']:view['value'] for view in views if not view['spec'].get('stages')}
+    zero = {view['spec']['reducer']['operation']:view['value'] for view in views if view['spec'].get('stages')}
+    assert whole == {'count':0 if empty else 1,'any':not empty}
+    assert zero == {'count':0,'any':False,'all-match':False}
+
+
+def test_local_marker_finite_selection_uses_existing_native_cap_before_full_membership_limit(tmp_path):
+    task = marker_task(tmp_path)
+    task.row['@Markers'] = [{'id':MARKER}] * 4097
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,
+        '--include-related-field','local-markers','first','Time','--include-related','local-markers','any')
+    assert code == 0,result
+    views = result['agent_result'][0]['related']['projections']
+    selected, = [view for view in views if view['spec'].get('stages')]
+    assert selected['items'][0]['properties'] == {'Time':0.0}
+    queries = [args['waql'] for uri,args,_ in task.calls if uri.endswith('object.get') and ' select ' in args.get('waql','')]
+    assert queries and all('select @Markers' in query and query.endswith('take 1')
+        and set(re.findall(r' take (\d+)',query)) == {'1'} for query in queries)
+
+
+@pytest.mark.parametrize('change',['none','owner','class','metadata','value'])
+def test_marker_result_pages_revalidate_exact_owner_class_metadata_and_zero_value(tmp_path, change):
+    task = marker_task(tmp_path); task.row['notes'] = '音声' * 16000
+    code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include','notes',
+        '--include-related-field','local-markers','Time','--include-related-field','local-markers','Label')
+    assert code == 0 and result['status'] == 'partial',result
+    if change == 'owner': task.members[MARKER]['owner'] = {'id': OTHER}
+    elif change == 'class': task.members[MARKER]['classId'] = 65077248
+    elif change == 'metadata': task.metadata[5373968]['Time']['type'] = 'bool'
+    elif change == 'value': task.members[MARKER]['@Time'] = 1.0
+    code,continued = task.run(*result['agent_result']['next_command']['gateway_argv'])
+    if change == 'none': assert code == 0 and continued['status'] == 'partial',continued
+    else: assert code == 2 and continued['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED',continued

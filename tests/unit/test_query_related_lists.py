@@ -285,7 +285,7 @@ def test_offline_list_contract_packages_exact_matching_source_and_owned_limits(t
     assert source['page_sha256'] == result['related_outputs']['source']['page_sha256']
     assert lists['strategy'] == source['strategy']
     assert lists['relations'] == {'children':'children','descendants':'descendants','ancestors':'ancestors','references-to':'referencesTo',
-        'local-rtpcs':'@RTPC','local-effect-slots':'@Effects'}
+        'local-rtpcs':'@RTPC','local-effect-slots':'@Effects','local-markers':'@Markers'}
     assert lists['limits']['source_ids_per_read'] == 64 and lists['limits']['unique_member_ids'] == 4096
     assert lists['source']['sections_sha256'] == hashlib.sha256(json.dumps(source['sections'],ensure_ascii=False,separators=(',',':'),sort_keys=True).encode()).hexdigest()
     assert 'direct children' in ''.join(section['html'] for section in source['sections'])

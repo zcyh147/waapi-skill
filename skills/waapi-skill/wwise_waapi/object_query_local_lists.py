@@ -1,4 +1,4 @@
-"""Two fixed local object-list contexts; exact class/source admission, no raw tokens."""
+"""Fixed local object-list contexts; exact class/source admission, no raw tokens."""
 import hashlib
 import json
 import math
@@ -10,6 +10,8 @@ from .schema_inventory import load_definition_graph
 LOCAL_LISTS = {
     'local-rtpcs': {'native': '@RTPC', 'field': 'RTPC', 'first': '2022.1'},
     'local-effect-slots': {'native': '@Effects', 'field': 'Effects', 'first': '2023.1'},
+    'local-markers': {'native': '@Markers', 'field': 'Markers', 'first': '2023.1',
+        'scope': 'directly stored AudioFileSource Marker objects; no imported/effective marker computation claim'},
 }
 
 
@@ -79,7 +81,8 @@ def local_list_contract(version):
         'explicit_class_bridges': ([{'actual_class_id': 9699330, 'actual_object_type': 'SourcePlugin',
             'source_class_id': 1048592, 'native_list': '@RTPC'}] if plugin_bridge(version) else []),
         'remaining': ['2021 RTPC inspection semantics', '2021/2022 fixed Effect0-3 inspection uses existing scalar/reference paths',
-            'modern Marker transport identity and older Inner Marker representation', 'other precise source-proven plugin-to-base bridges']}
+            'imported/effective marker projection and 2021/2022 Inner Marker representation',
+            'other precise source-proven plugin-to-base bridges']}
 
 
 def validate_curve_points(version, value, error):

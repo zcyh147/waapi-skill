@@ -1,0 +1,171 @@
+{
+  "scope": "Retained actual 2025 manual Marker packets; entire original case remains FAIL after successful constructor/read components. Program tests for 2023/2024 reuse the source-certified mechanism, not native acceptance.",
+  "candidate": "42bc090c2e06725a6973933860caebf0b2215172",
+  "receipt_sha256": "2ecee4fdc8d55abc6491d26bc3bd6c4726a321b6e934469873038891e10e6381",
+  "root_review_sha256": "06ffd1800a30ce3e75f314aa88f01992087c2c68d4e163c960a62aa69e722490",
+  "membership": {
+    "file": "1792748207439488000-5d598c296036422895ec9e280cc4261b-ak_wwise_core_object_get.json",
+    "sha256": "8c87e93ffb63d27dc0751156aeefcf52acc4daa0b06ba3e0d21b1b0a9764d689",
+    "args": {
+      "waql": "from object \"{868418A1-6753-44A7-A8F0-4FBC0E79A2B4}\" select @Markers take 2"
+    },
+    "options": {
+      "return": [
+        "id",
+        "name",
+        "type",
+        "path",
+        "classId",
+        "owner"
+      ]
+    },
+    "result": {
+      "return": [
+        {
+          "classId": 5373968,
+          "id": "{51623859-63FD-4731-8418-F298ACD83BE3}",
+          "name": "",
+          "owner": {
+            "id": "{868418A1-6753-44A7-A8F0-4FBC0E79A2B4}",
+            "name": "audit_outside"
+          },
+          "path": "[Marker]",
+          "type": "Marker"
+        }
+      ]
+    }
+  },
+  "exact_read": {
+    "file": "1792748207482419000-28538caa4fb74b6b9c2d2363f54c7374-ak_wwise_core_object_get.json",
+    "sha256": "476ff67cc3f8141a975dcaca820fdd6b5ed77d0b4116b293501969034f67fd55",
+    "args": {
+      "waql": "from object \"{51623859-63FD-4731-8418-F298ACD83BE3}\" take 1"
+    },
+    "options": {
+      "return": [
+        "id",
+        "name",
+        "type",
+        "path",
+        "classId",
+        "owner",
+        "@Time",
+        "@Label"
+      ]
+    },
+    "result": {
+      "return": [
+        {
+          "@Label": "R90_MARKER",
+          "@Time": 0.0,
+          "classId": 5373968,
+          "id": "{51623859-63FD-4731-8418-F298ACD83BE3}",
+          "name": "",
+          "owner": {
+            "id": "{868418A1-6753-44A7-A8F0-4FBC0E79A2B4}",
+            "name": "audit_outside"
+          },
+          "path": "[Marker]",
+          "type": "Marker"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "Time": {
+      "file": "1792748207461937000-b65e7d8576b1428ba996f5675ff63cfd-ak_wwise_core_object_getPropertyInfo.json",
+      "sha256": "ff3b6ef0d30bc346a47e8074e256e3811591e871c646228af531897141b9aa5e",
+      "args": {
+        "object": "{51623859-63FD-4731-8418-F298ACD83BE3}",
+        "property": "Time"
+      },
+      "options": {},
+      "result": {
+        "audioEngineId": 4294967295,
+        "default": 0.0,
+        "dependencies": [],
+        "display": {
+          "group": "",
+          "index": 1700,
+          "name": "Time"
+        },
+        "name": "Time",
+        "restriction": {},
+        "supports": {
+          "randomizer": false,
+          "rtpc": "None",
+          "unlink": false
+        },
+        "type": "Real64",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "None",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false,
+            "percentage": false
+          },
+          "value": {
+            "decimals": 5,
+            "fine": 0.001,
+            "infinity": 0,
+            "max": 3600.0,
+            "min": 0.0,
+            "step": 0.001
+          }
+        }
+      }
+    },
+    "Label": {
+      "file": "1792748207464347000-964450fa07b3458ba48fb9b74a0482d3-ak_wwise_core_object_getPropertyInfo.json",
+      "sha256": "18d8ca1cf9c7a0f8031a8027bc7ffe9ca69feff39f88e84d6e40062e7eab167f",
+      "args": {
+        "object": "{51623859-63FD-4731-8418-F298ACD83BE3}",
+        "property": "Label"
+      },
+      "options": {},
+      "result": {
+        "audioEngineId": 4294967295,
+        "default": "",
+        "dependencies": [],
+        "display": {
+          "group": "",
+          "index": 1701,
+          "name": "Label"
+        },
+        "name": "Label",
+        "restriction": {},
+        "supports": {
+          "randomizer": false,
+          "rtpc": "None",
+          "unlink": false
+        },
+        "type": "string",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "None",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false,
+            "percentage": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 0.0,
+            "infinity": 0,
+            "max": 0.0,
+            "min": 0.0,
+            "step": 0.0
+          }
+        }
+      }
+    }
+  },
+  "remaining": [
+    "imported/effective marker projection",
+    "2021/2022 Inner Marker transport",
+    "native composed Marker RETURN beyond retained SELECT and exact-ID packets"
+  ]
+}
