@@ -1902,7 +1902,7 @@ def test_import_inherited_field_conflict_rejects_check_without_changing_draft(tm
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 @pytest.mark.parametrize("field,value,error", (
-    ("dialogue_event_directive", "", "OPERATION_DRAFT_ACTION_INVALID"),
+    ("dialogue_event_directive", "", "GatewayInputError"),
     ("switch_value", "", "OPERATION_DRAFT_ACTION_INVALID"),
     ("notes", "bad\x00note", "LIMIT_EXCEEDED"),
 ))
@@ -1911,6 +1911,11 @@ def test_import_empty_notes_change_preserves_other_string_guards(
 ) -> None:
     command, parent, client = _import_fields_draft(tmp_path, version)
     field_args = ("--switch-value", value) if field == "switch_value" else ("--field", field, value)
+    if field == "dialogue_event_directive":
+        command("draft-declare-new", "--declaration-id", "invalid", "--parent-handle", parent,
+            "--name", "Invalid", "--kind", "random-container", *field_args, expected_error=error)
+        assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)
+        return
     command("draft-declare-new", "--declaration-id", "invalid", "--parent-handle", parent,
         "--name", "Invalid", "--kind", "random-container", *field_args)
     record = next((tmp_path / "state/operation-drafts-v1/records").glob("*.json"))

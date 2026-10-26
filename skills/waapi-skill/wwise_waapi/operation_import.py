@@ -531,11 +531,16 @@ def build_audio_import_plan(
             dispatch["event"] = event["waapi_value"]
             oracle_row["requested_event"] = {key: value for key, value in event.items() if key != "waapi_value"}
         if "dialogue_event" in effective:
-            dialogue_event = _require_native_import_directive(
-                effective.get("dialogue_event"),
-                field=f"imports[{index}].dialogue_event",
-            )
-            dispatch["dialogueEvent"] = dialogue_event
+            dialogue_event = effective.get("dialogue_event")
+            if (not isinstance(dialogue_event, Mapping) or set(dialogue_event) != {"path"}
+                    or not isinstance(dialogue_event["path"], str)
+                    or not dialogue_event["path"].startswith("\\Dynamic Dialogue\\")
+                    or len(dialogue_event["path"]) > 4096
+                    or any(c in dialogue_event["path"] for c in "<>:@|\r\n\t\x00")
+                    or not dialogue_event["path"].rpartition("\\")[2]):
+                raise ImportContractError("INVALID_ARGUMENT", "dialogue_event requires a closed absolute DialogueEvent path; native directive strings are not accepted.")
+            dialogue_event = dict(dialogue_event)
+            dispatch["dialogueEvent"] = dialogue_event["path"]
             oracle_row["requested_dialogue_event"] = dialogue_event
         if "switch_assignment" in effective:
             switch_assignment = _require_native_import_directive(

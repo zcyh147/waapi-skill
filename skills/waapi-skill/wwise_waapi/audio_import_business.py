@@ -495,7 +495,6 @@ def _compile_declaration(
     for business_name, native_name in (
         ("notes", "notes"),
         ("audio_source_notes", "audio_source_notes"),
-        ("dialogue_event_directive", "dialogue_event"),
         ("switch_value", "switch_assignment"),
     ):
         value = fields.get(business_name)
@@ -622,6 +621,9 @@ def _compile_declaration(
     if "event" in fields:
         row["event"] = _compile_event(session, fields["event"])
 
+    if "dialogue_event" in fields:
+        row["dialogue_event"] = _compile_dialogue_event(session, fields["dialogue_event"])
+
     readable = [
         f"对象：{object_name}",
         f"类型：{kind.path_segment_type if isinstance(target, NewDescendantTarget) else readable_type}",
@@ -710,6 +712,19 @@ def _append_dynamic_fields(
                     "target": {"kind": "id", "value": target.object_id},
                 }
             )
+
+
+def _compile_dialogue_event(session: BusinessDeclarationSession, value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != {"parent_handle", "name"}:
+        raise _field_type_repair(session, "dialogue_event", "parent_handle and exact child name object")
+    parent = _resolve_object(session, value["parent_handle"])
+    name = value["name"]
+    if (parent.object_type not in {"WorkUnit", "Folder"} or not parent.path.startswith("\\Dynamic Dialogue\\")
+            or not isinstance(name, str) or not name or name != name.strip() or len(name) > 255
+            or any(c in name for c in "\\/<>:@|\r\n\t\x00")):
+        raise _repair(session, "AUDIO_IMPORT_DIALOGUE_EVENT_INVALID", field="dialogue_event",
+            action="provide an exact Dynamic Dialogue folder/Work Unit handle and one child name without directive grammar")
+    return {"path": f"{parent.path}\\{name}"}
 
 
 def _compile_event(

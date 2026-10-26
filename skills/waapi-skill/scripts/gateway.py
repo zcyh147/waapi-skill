@@ -1121,6 +1121,8 @@ def _add_business_declaration_arguments(
             "value without encoding it as a generic field pair"
         ),
     )
+    parser.add_argument("--dialogue-event-parent-handle")
+    parser.add_argument("--dialogue-event-name")
     parser.add_argument("--event-parent-handle")
     parser.add_argument("--event-name")
     parser.add_argument(
@@ -17921,6 +17923,8 @@ def _parse_audio_import_business_fields(
     switch_value: str | None = None,
     allow_switch_value_pair: bool = True,
     field_value_pairs: Sequence[Sequence[str]] = (),
+    dialogue_event_parent_handle: str | None = None,
+    dialogue_event_name: str | None = None,
     event_parent_handle: str | None = None,
     event_name: str | None = None,
     event_action: str | None = None,
@@ -17975,6 +17979,10 @@ def _parse_audio_import_business_fields(
                 session=session,
             )
         fields["field_values"] = dynamic
+    if dialogue_event_parent_handle is not None or dialogue_event_name is not None:
+        if dialogue_event_parent_handle is None or dialogue_event_name is None:
+            raise GatewayInputError("Dialogue Event creation requires --dialogue-event-parent-handle and --dialogue-event-name together")
+        fields["dialogue_event"] = {"parent_handle": dialogue_event_parent_handle, "name": dialogue_event_name}
     event_parts = (event_parent_handle, event_name, event_action)
     if any(value is not None for value in event_parts):
         if event_parent_handle is None or event_name is None:
@@ -18657,6 +18665,8 @@ def dispatch_offline_business_draft_update(
                 switch_value=args.switch_value,
                 allow_switch_value_pair=False,
                 field_value_pairs=args.field_value,
+                dialogue_event_parent_handle=args.dialogue_event_parent_handle,
+                dialogue_event_name=args.dialogue_event_name,
                 event_parent_handle=args.event_parent_handle,
                 event_name=args.event_name,
                 event_action=args.event_action,
@@ -30844,11 +30854,11 @@ def _business_next_action_binding(
             "bound_object_handle_fields": [
                 "output_bus",
                 "event_parent",
+                "dialogue_event_parent",
                 "custom_reference_value",
             ],
             "literal_never_bind": [
                 "audio_source_notes",
-                "dialogue_event_directive",
                 "inline_wav",
                 "language",
                 "loop",

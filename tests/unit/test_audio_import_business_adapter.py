@@ -590,6 +590,8 @@ def test_live_field_handles_event_directive_and_batch_defaults_are_lossless(
         object_type="Folder",
         path=r"\Events\Default Work Unit\Weather",
     )
+    dialogue_parent = session.handles.bind_object(object_id="{D1111111-1111-1111-1111-111111111111}", name="Default Work Unit",
+        object_type="WorkUnit", path=r"\Dynamic Dialogue\Default Work Unit")
     pitch = session.handles.bind_field(
         scope_kind="class",
         scope_value="Sound",
@@ -631,7 +633,7 @@ def test_live_field_handles_event_directive_and_batch_defaults_are_lossless(
                 "name": "Play_Custom",
                 "action": "Play",
             },
-            "dialogue_event_directive": "Dialogue_Custom",
+            "dialogue_event": {"parent_handle": dialogue_parent.handle, "name": "Dialogue_Custom"},
         },
     )
 
@@ -653,7 +655,7 @@ def test_live_field_handles_event_directive_and_batch_defaults_are_lossless(
         "path": r"\Events\Default Work Unit\Weather\Play_Custom",
         "action": "Play",
     }
-    assert row["dialogue_event"] == "Dialogue_Custom"
+    assert row["dialogue_event"] == {"path": r"\Dynamic Dialogue\Default Work Unit\Dialogue_Custom"}
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)

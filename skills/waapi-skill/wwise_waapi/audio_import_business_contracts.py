@@ -20,7 +20,6 @@ AUDIO_IMPORT_BUSINESS_VALUE_TYPES = {
     **{name: kind for name, kind in OBJECT_BUSINESS_FIELD_TYPES.items()
        if name not in ACTION_DURATION_FIELDS},
     "audio_source_notes": "string",
-    "dialogue_event_directive": "string",
     "inline_wav": "string",
     "language": "string",
     "media_file": "string",
@@ -30,6 +29,7 @@ AUDIO_IMPORT_BUSINESS_VALUE_TYPES = {
 AUDIO_IMPORT_BUSINESS_DECLARATION_FIELDS = (
     *tuple(AUDIO_IMPORT_BUSINESS_VALUE_TYPES),
     "event",
+    "dialogue_event",
     "field_values",
 )
 AUDIO_IMPORT_BUSINESS_MODES = {
@@ -135,11 +135,13 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
             "bound_field_handle_container": "field_values",
             "dedicated_declaration_parameters": {
                 "switch_value": "--switch-value",
+                "dialogue_event": "--dialogue-event-parent-handle + --dialogue-event-name",
             },
             "generic_declaration_field_exclusions": ["switch_value"],
             "reference_value_rule": (
                 "copy_one_bound_object_handle_never_a_path_or_name"
             ),
+            "dialogue_event_rule": "new_DialogueEvent_from_bound_parent_and_exact_name; Gateway_owns_path_syntax; verify_Entry_owner_and_AudioNode_association_only; explicit_decision_path_Probability_Weight_remain_unavailable",
             "switch_value_rule": (
                 "exact_value_name_below_the_existing_parent_SwitchContainers_actual_group; "
                 "Gateway_binds_group_and_value_and_owns_native_directive; "

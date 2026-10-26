@@ -333,6 +333,24 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # Dialogue creation now owns path syntax and independently proves the
+    # Entry.owner / AudioNode link. Invert only the two ordinary row/default
+    # field shapes; TSV disclosures and every historical seal stay intact.
+    assert canonical_sha256(non_object_set_digests) == "6a7e5b1ccfaf0a5afb714a8fe8f26cfae4219fc8113edc4acb5de068d5e9cb0c"
+    previous_dialogue_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.import", version)
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            assert fields["dialogue_event"] == {
+                "type": "object", "additionalProperties": False, "required": ["path"],
+                "properties": {"path": {"type": "string", "minLength": 1, "maxLength": 4096}},
+                "description": "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; verifies the Entry.owner and AudioNode association, without asserting unspecified decision-path defaults.",
+            }
+            fields["dialogue_event"] = {"type": "string", "minLength": 1, "maxLength": 16 * 1024,
+                "description": "One native Wwise Dialogue Event import directive."}
+        previous_dialogue_contracts[version] = deepcopy(contract)
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
     # The second native failure removes only the unsupported unique-path escape.
     assert canonical_sha256(non_object_set_digests) == "1b5534697041f3bca74cd5c548d5c09afe76e61634d2aa54dd4326ff993cb9a9"
     previous_owner_media_host_contract = operation_request_machine_contract("audio.importTabDelimited", "2025.1")
@@ -372,7 +390,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     owner_fields_component_digests = dict(non_object_set_digests)
     switch_import_contracts = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("audio.import", version)
+        contract = deepcopy(previous_dialogue_contracts[version])
         properties = contract["argument_contract"]["properties"]
         for field in (properties["defaults"]["properties"]["switch_assignment"],
                       properties["imports"]["items"]["properties"]["switch_assignment"]):

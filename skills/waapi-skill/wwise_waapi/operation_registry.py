@@ -1153,10 +1153,9 @@ _IMPORT_COMMON_ARGUMENT_PROPERTIES: Mapping[str, Any] = {
     "audio_source_notes": {"type": "string"},
     "event": _IMPORT_EVENT_ARGUMENT_SCHEMA,
     "dialogue_event": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 16 * 1024,
-        "description": "One native Wwise Dialogue Event import directive.",
+        "type": "object", "additionalProperties": False, "required": ["path"],
+        "properties": {"path": {"type": "string", "minLength": 1, "maxLength": 4096}},
+        "description": "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; verifies the Entry.owner and AudioNode association, without asserting unspecified decision-path defaults.",
     },
     "switch_assignment": _AUDIO_IMPORT_SWITCH_ASSIGNMENT_SCHEMA,
     "properties": {
@@ -14636,6 +14635,7 @@ def _import_requires_explicit_source(target: Mapping[str, Any]) -> bool:
     return target.get("media_expected") is True and (
         bool(target.get("validated_properties") or target.get("validated_references"))
         or isinstance(target.get("switch_assignment_binding"), Mapping)
+        or isinstance(target.get("dialogue_association_binding"), Mapping)
         or (bool(target.get("pre_state_rows"))
             and _localized_import_read_language(target.get("requested_language")) is not None
             and "requested_audio_source_notes" in target)
@@ -14662,7 +14662,7 @@ def _materialize_audio_import_dynamic_rows(
     explicit ``AudioFileSource`` media row, while the WAAPI call count remains
     exactly one. MusicTrack media always uses an explicit source: importing
     onto an already-created Track path alone can silently create no media.
-    Bound Switch assignments also belong on that owner row, including when
+    Bound Switch and Dialogue associations also belong on that owner row, including when
     reuse targets a Source GUID and no property/reference/Event was requested.
     Events on an exact existing source binding likewise require a separate
     owner row: an AudioFileSource cannot be the Event Action's Sound target.
@@ -15115,6 +15115,49 @@ def _reconcile_import_media_ownership(targets: Sequence[Mapping[str, Any]]) -> N
             claims[key] = (index, target)
 
 
+def _read_import_dialogue_referrers(owner_id: Any, *, read: ReadCall) -> list[dict[str, Any]]:
+    if not _valid_object_id(owner_id):
+        raise OperationContractError("INVALID_READBACK", "Dialogue association membership requires an exact Sound GUID.")
+    rows = _rows(read(OBJECT_GET_URI, {"waql": f'from object "{owner_id}" select referencesTo take 129'},
+        {"return": [*IDENTITY_RETURN_FIELDS, "classId", "owner", "AudioNode"]}))
+    if len(rows) > 128 or any(not _valid_object_id(row.get("id")) for row in rows):
+        raise OperationContractError("INVALID_READBACK", "Dialogue association referrers exceed the complete bound or lack canonical GUIDs.")
+    if len({_identity_key(row["id"]) for row in rows}) != len(rows):
+        raise OperationContractError("INVALID_READBACK", "Dialogue association referrers contain duplicate GUIDs.")
+    return sorted(rows, key=lambda row: _identity_key(row["id"]))
+
+
+def _prepare_import_dialogue_association(target: dict[str, Any], *, index: int,
+        roles: dict[str, ResolvedObject], path_snapshots: list[dict[str, Any]], read: ReadCall) -> None:
+    event_path = target["requested_dialogue_event"]["path"]
+    if _object_type_token(target.get("metadata_object_type")) != "sound":
+        raise OperationContractError("IMPORT_DIALOGUE_OWNER_UNSUPPORTED", "This closed Dialogue import association requires a Sound owner; other owner forms remain unimplemented.")
+    parent = _resolve_identity({"kind": "path", "value": event_path.rpartition("\\")[0]},
+        role=f"import_dialogue[{index}].parent", read=read)
+    if parent.row.get("type") not in {"WorkUnit", "Folder"}:
+        raise OperationContractError("INVALID_TARGET_TYPE", "The new DialogueEvent requires an exact existing Dynamic Dialogue folder or Work Unit parent.")
+    existing = _read_object_path_rows(event_path, fields=IDENTITY_RETURN_FIELDS, read=read)
+    if existing:
+        raise OperationContractError("DIALOGUE_EVENT_TARGET_EXISTS", "This import association requires one distinct new DialogueEvent path.")
+    catalog = _read_object_type_catalog(read)
+    event_class = _resolve_object_type("DialogueEvent", catalog=catalog)
+    entry_class = _resolve_object_type("MultiSwitchEntry", catalog=catalog)
+    info = _read_property_info(read, name="AudioNode", class_id=entry_class.class_id)
+    _require_object_reference_metadata(info)
+    planned_owner = ResolvedObject(identity=ObjectIdentity(path=target["canonical_target_path"]),
+        object=target["canonical_target_path"], resolution="planned-import-owner", row={"type": "Sound"})
+    _require_reference_target_allowed(info, planned_owner)
+    before = target.get("pre_state_rows", [])
+    owner_id = before[0]["id"] if before else None
+    target["dialogue_association_binding"] = {"path": event_path, "parent_id": parent.object,
+        "event_class_id": event_class.class_id, "entry_class_id": entry_class.class_id,
+        "audio_node_metadata": info.as_dict(), "owner_id": owner_id,
+        "before": _read_import_dialogue_referrers(owner_id, read=read) if owner_id else []}
+    target["class_metadata"].extend([event_class.as_dict(), entry_class.as_dict()])
+    roles[f"import_dialogue[{index}].parent"] = parent
+    path_snapshots.append({"path": event_path, "fields": list(IDENTITY_RETURN_FIELDS), "rows": []})
+
+
 def _prepare_import_switch_assignment(target: dict[str, Any], *, index: int,
                                       roles: dict[str, ResolvedObject], read: ReadCall,
                                       directives: Sequence[str] | None = None) -> None:
@@ -15559,6 +15602,20 @@ def _prepare_closed_import_plan(
             if len(events) == 1:
                 target["event_pre_state_rows"] = event_pre_state[0]["rows"]
         targets[index] = target
+
+    if source_operation == "audio.import":
+        for index, target in enumerate(targets):
+            if "requested_dialogue_event" not in target:
+                continue
+            if import_operation == "replaceExisting":
+                raise OperationContractError("IMPORT_DIALOGUE_REPLACE_UNSUPPORTED", "Dialogue replacement association lifecycle remains unimplemented.")
+            event_path = target["requested_dialogue_event"]["path"]
+            if event_path.casefold() in event_paths:
+                raise OperationContractError("AMBIGUOUS_EVENT_MAPPING", "Each import row requires its own new DialogueEvent path.")
+            event_paths.add(event_path.casefold())
+            _prepare_import_dialogue_association(target, index=index, roles=roles,
+                path_snapshots=path_snapshots, read=read)
+            allowed_result_paths.add(event_path.casefold())
 
     rows_with_directives = ([dict(row) for row in dispatch_args["imports"]]
                             if source_operation == "audio.import" else None)
@@ -16132,6 +16189,7 @@ def _prepare_closed_import_plan(
         "class_metadata": [row for target in targets for row in target.get("class_metadata", [])],
         "file_proofs": file_proofs,
         "path_snapshots": path_snapshots,
+        "dialogue_associations": [target["dialogue_association_binding"] for target in targets if "dialogue_association_binding" in target],
         "switch_assignments": [target["switch_assignment_binding"] for target in targets if "switch_assignment_binding" in target],
         "existing_sfx_source_snapshots": [target["existing_sfx_source_snapshot"] for target in targets
                                           if "existing_sfx_source_snapshot" in target],
@@ -16167,8 +16225,8 @@ def _prepare_closed_import_plan(
                 for boundary, present in (
                     (
                         "dialogue_event_result_and_target_verified_side_effect_not_fully_reconstructed",
-                        "requested_dialogue_event" in target
-                        or bool(target.get("requested_dialogue_events")),
+                        "dialogue_association_binding" not in target and ("requested_dialogue_event" in target
+                        or bool(target.get("requested_dialogue_events"))),
                     ),
                     (
                         "switch_assignment_result_and_target_verified_side_effect_not_fully_reconstructed",
@@ -19109,6 +19167,12 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 else:
                     passed, evidence = True, {"path": target["canonical_target_path"], "selected_id": target["preexisting_id"]}
                 assertions.append({"name": "TSV native Source wire path retains one exact identity", "passed": passed, "evidence": evidence})
+        for binding in import_guard.get("dialogue_associations", []):
+            actual_metadata = _read_property_info(read_call, name="AudioNode", class_id=binding["entry_class_id"]).as_dict()
+            actual = _read_import_dialogue_referrers(binding["owner_id"], read=read_call) if binding["owner_id"] else []
+            assertions.append({"name": "import Dialogue metadata and owner associations unchanged since Preview",
+                "passed": _native_snapshot_equal(actual_metadata, binding["audio_node_metadata"]) and actual == binding["before"],
+                "evidence": {"expected": binding, "actual_metadata": actual_metadata, "actual_referrers": actual}})
         for binding in import_guard.get("switch_assignments", []):
             reference_result = read_call(OBJECT_GET_URI, {"from": {"id": [binding["container_id"]]}}, {"return": ["id", SWITCH_GROUP_REFERENCE]})
             reference_rows = _rows(reference_result)
@@ -24171,7 +24235,6 @@ def verify_prepared_operation(
                         "requested_originals_subfolder",
                         "requested_notes",
                         "requested_audio_source_notes",
-                        "requested_dialogue_event",
                         "requested_switch_assignment",
                     )
                 )
@@ -24363,6 +24426,12 @@ def verify_prepared_operation(
                     "An existing useExisting target cannot bind both Notes fields to one AudioFileSource.",
                     details={"target_path": target_path},
                 )
+            if "requested_dialogue_event" in target:
+                binding = target.get("dialogue_association_binding")
+                event = target["requested_dialogue_event"]
+                if (not isinstance(event, Mapping) or set(event) != {"path"} or not isinstance(binding, Mapping)
+                        or event.get("path") != binding.get("path") or not isinstance(binding.get("before"), list)):
+                    raise OperationContractError("INVALID_PREVIEW", "Dialogue association must retain its closed Event and complete owner prestate binding.")
             validated_events = target.get("validated_events")
             events = (
                 validated_events
@@ -24438,6 +24507,10 @@ def verify_prepared_operation(
                 "INVALID_PREVIEW",
                 "Closed audio import Event paths must be unique per import row.",
             )
+        for target in targets:
+            binding = target.get("dialogue_association_binding")
+            if isinstance(binding, Mapping):
+                expected_target_types[binding["path"].casefold()] = "DialogueEvent"
         returned_paths = [row.get("path") for row in object_rows]
         expected_source_path_set = set(expected_source_paths)
         unexpected_result_rows: list[dict[str, Any]] = []
@@ -24696,6 +24769,35 @@ def verify_prepared_operation(
                         _same_identity(returned_id, live_id),
                         {"result": returned_id, "readback": live_id},
                     )
+                dialogue = target.get("dialogue_association_binding")
+                if isinstance(dialogue, Mapping):
+                    def dialogue_read(uri, args, options):
+                        result = read_call(uri, args, options)
+                        readbacks.append({"uri": uri, "args": args, "options": options, "result": dict(result)})
+                        return result
+                    event_rows = read_object(path=dialogue["path"], fields=[*IDENTITY_RETURN_FIELDS, "classId", "parent"])
+                    event_ok = (len(event_rows) == 1 and _valid_object_id(event_rows[0].get("id"))
+                        and event_rows[0].get("type") == "DialogueEvent"
+                        and event_rows[0].get("classId") == dialogue["event_class_id"]
+                        and event_rows[0].get("path") == dialogue["path"]
+                        and _same_identity(_parent_value(event_rows[0].get("parent")), dialogue["parent_id"]))
+                    check(f"{label} exact new DialogueEvent identity and parent", event_ok, event_rows)
+                    referrers = _read_import_dialogue_referrers(live_id, read=dialogue_read)
+                    old = {_identity_key(row["id"]): row for row in dialogue["before"]}
+                    added = [row for row in referrers if _identity_key(row["id"]) not in old]
+                    preserved = all(row in referrers for row in old.values())
+                    event_id = event_rows[0].get("id") if event_ok else None
+                    association_ok = (len(added) == 1 and event_ok and added[0].get("type") == "MultiSwitchEntry"
+                        and added[0].get("classId") == dialogue["entry_class_id"]
+                        and _same_identity(_reference_identity(added[0].get("owner")), event_id)
+                        and _same_identity(_reference_identity(added[0].get("AudioNode")), live_id))
+                    if association_ok:
+                        actual_entry = read_object(object_id=added[0]["id"], fields=[*IDENTITY_RETURN_FIELDS, "classId", "owner", "AudioNode"])
+                        association_ok = actual_entry == added
+                        actual_metadata = _read_property_info(dialogue_read, name="AudioNode", object_id=added[0]["id"]).as_dict()
+                        association_ok = association_ok and _native_snapshot_equal(actual_metadata, dialogue["audio_node_metadata"])
+                    check(f"{label} Dialogue association and unrelated referrers preserved", association_ok and preserved,
+                        {"event": event_rows, "owner_id": live_id, "before": dialogue["before"], "actual": referrers})
                 binding = target.get("switch_assignment_binding")
                 if isinstance(binding, Mapping):
                     container_rows = read_object(object_id=binding["container_id"], fields=["id", SWITCH_GROUP_REFERENCE])
