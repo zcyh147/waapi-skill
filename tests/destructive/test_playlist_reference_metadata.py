@@ -51,6 +51,103 @@ def test_existing_playlist_slot_reference_change_preserves_peer_and_order(workfl
     _observe_existing_playlist_reference_change(workflow_sandbox_runtime)
 
 
+def test_existing_playlist_slot_rename_preserves_peer_order_and_references(workflow_sandbox_runtime):
+    """One ordinary public rename attempt; native support awaits this outcome."""
+    runtime = workflow_sandbox_runtime
+    version = runtime.sandbox.metadata.get_info_version
+    assert isinstance(version, dict) and tuple(version.get(key) for key in ('year', 'major', 'minor', 'build')) == (2025, 1, 7, 9143), version
+    identities = {'slot': '{7571D6B0-D614-40B5-B02D-0012FE3743A7}',
+        'peer': '{6298C41E-F7C6-40B6-BFFE-E0B02EE7DC72}', 'owner': '{8C0FD1AD-E45D-408D-9BF3-874970CCC123}',
+        'old_target': '{0DD1BBE3-BB1E-424A-9648-BEBFBB212426}', 'target': '{DB017C8E-EC99-415B-93CF-F7A6136D1AC2}'}
+    output = runtime.state_dir / 'playlist-rename-effect.json'
+    observation = {'candidate': runtime.candidate, 'version': runtime.version, 'operation': 'object.setName',
+        'requested_name': 'RenamedSlot', 'calls': [], 'reads': [], 'transactions': [], 'business_effect_verified': False}
+    category = {'category': 'existing-playlist-slot-rename', 'status': 'FAIL',
+        'verifier_strength': 'independent_name_class_owner_order_peer_reference_readback',
+        'observation_path': str(output), 'business_effect_verified': False}
+    runtime.category_results.append(category)
+    status = 'FAIL'
+
+    class ReceiptGateway:
+        def raw_gateway(self, argv):
+            assert len(observation['calls']) < 48, 'Inner rename public command bound exceeded'
+            record = {'argv': list(argv)}
+            observation['calls'].append(record)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                record.update(exit_code=code, payload=payload)
+                return code, payload
+            except BaseException as exc:
+                record['error'] = f'{type(exc).__name__}: {exc}'
+                raise
+
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            return payload
+
+    gateway = ReceiptGateway()
+
+    def read(label, selector):
+        assert len(observation['reads']) < 16
+        observation['reads'].append({'label': label, 'call_index': len(observation['calls'])})
+        payload = gateway.gateway(['query-object', *selector, '--max-results', '4', '--include', 'class-id',
+            '--include', 'owner', '--include', 'parent', '--include', 'notes'], live=True)
+        rows = payload.get('objects', payload.get('agent_result'))
+        assert payload.get('projection_complete') is not False and payload.get('status') != 'partial', payload
+        assert isinstance(rows, list) and len(rows) < 4, payload
+        return rows
+
+    def observe(phase):
+        result = {}
+        for role, identity in identities.items():
+            rows = read(phase + '-' + role, ['--exact-id', identity])
+            assert len(rows) == 1 and rows[0]['id'] == identity, rows
+            result[role] = rows[0]
+        result['members'] = read(phase + '-playlist', ['--advanced-waql', f'from object "{identities["owner"]}" select @Playlist'])
+        result['references'] = {}
+        for role in ('slot', 'peer'):
+            rows = read(phase + '-' + role + '-target', ['--advanced-waql', f'from object "{identities[role]}" select @PlaylistObject'])
+            assert len(rows) == 1, rows
+            result['references'][role] = rows[0]
+        return result
+
+    try:
+        before = observe('before')
+        observation['before'] = before
+        for role in ('slot', 'peer'):
+            assert before[role]['name'] == '' and before[role]['type'] == 'PluginInnerObject', before[role]
+            assert before[role]['class_id'] == 5636096 and before[role]['owner']['id'] == identities['owner'], before[role]
+        assert before['owner']['type'] == 'RandomSequenceContainer' and before['owner']['class_id'] == 589840
+        for role in ('target', 'old_target'):
+            assert before[role]['type'] == 'Sound' and before[role]['class_id'] == 65552, before[role]
+            assert before[role]['parent']['id'] == identities['owner'], before[role]
+        assert [row['id'] for row in before['members']] == [identities['slot'], identities['peer']]
+        assert before['references']['slot'] == before['old_target'] and before['references']['peer'] == before['target']
+        draft = _start_business_draft(gateway, 'object.setName')
+        _bind_business_object(gateway, draft, object_id=identities['slot'])
+        _update_business_draft(gateway, draft, 'draft-declare-object-change', ['--new-name', 'RenamedSlot'], live=False)
+        observation['transactions'].append(_complete_business_draft(gateway, draft))
+        after = observe('after')
+        observation['after'] = after
+        assert after['slot'] == {**before['slot'], 'name': 'RenamedSlot'}, after['slot']
+        assert after['members'] == [{**before['members'][0], 'name': 'RenamedSlot'}, before['members'][1]], after['members']
+        assert after['references'] == before['references']
+        assert all(after[role] == before[role] for role in ('peer', 'owner', 'target', 'old_target'))
+        observation['business_effect_verified'] = True
+        status = 'PASS'
+    except BaseException as exc:
+        observation['error'] = f'{type(exc).__name__}: {exc}'
+        raise
+    finally:
+        body = json.dumps(observation, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 8 * 1024 * 1024
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(body)
+        category.update(status=status, business_effect_verified=observation['business_effect_verified'],
+            observation_sha256=hashlib.sha256(body).hexdigest())
+
+
 def _observe_existing_playlist_reference_change(runtime, *, staged_notes=None):
     """One reference change on existing objects in the copied SampleProject."""
     version = runtime.sandbox.metadata.get_info_version

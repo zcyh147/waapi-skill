@@ -257,20 +257,98 @@ def test_playlist_reference_retains_each_modification_policy(tmp_path, policy):
     assert len(writes(task)) == 1
 
 
-@pytest.mark.parametrize('operation', ['object.setName', 'object.set'])
-def test_playlist_slot_identity_does_not_grant_intrinsic_rename_authority(tmp_path, operation):
-    task = PlaylistTask(tmp_path, operation=operation)
-    source = task.bind(FIRST)
-    if operation == 'object.setName':
-        code, rejected = task.step('draft-declare-object-change', '--new-name', 'Renamed')
+class InnerRenameTask(PlaylistTask):
+    """A controlled native name outcome, not evidence that Wwise supports it."""
+
+    def __init__(self, path, *, fault=None, kind='PlaylistSlot'):
+        super().__init__(path, operation='object.setName')
+        self.fault = fault
+        if kind == 'MetadataSlot':
+            self.types.extend([{'classId': 5570560, 'name': 'MetadataSlot', 'type': 'Inner'},
+                {'classId': 58982409, 'name': 'Wwise System Output Settings', 'type': 'Metadata'}])
+            self.objects[OWNER]['@Metadata'] = self.objects[OWNER].pop('@Playlist')
+            for identity in (FIRST, PEER):
+                row = self.objects[identity]
+                row['classId'] = 5570560
+                row['@Metadata'] = [row.pop('PlaylistObject')]
+            for identity in (OLD, SECOND):
+                self.objects[identity].update(type='Metadata', classId=58982409)
+        else:
+            assert kind == 'PlaylistSlot'
+
+    def call(self, uri, args=None, options=None):
+        if uri.endswith('setName'):
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if self.fault == 'native-rejection':
+                from tests.unit.test_debug_read_gateway import WaapiRequestFailed
+                raise WaapiRequestFailed('ak.wwise.invalid_arguments', {'message': 'Controlled native rename rejection'})
+            if self.fault != 'native-no-effect':
+                self.objects[args['object']]['name'] = args['value']
+            return {}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize('kind', ['PlaylistSlot', 'MetadataSlot'])
+def test_existing_inner_slot_rename_verifies_actual_name_and_preserves_owner_list_and_references(tmp_path, kind):
+    task = InnerRenameTask(tmp_path, kind=kind)
+    before = deepcopy(task.objects)
+    task.bind(FIRST)
+    code, declared = task.step('draft-declare-object-change', '--new-name', 'RenamedSlot')
+    assert code == 0, declared
+    preview, _, verified, tx = finish(task)
+    assert preview['change_requested'] is True and verified['verified'] is True
+    assert task.objects == {**before, FIRST: {**before[FIRST], 'name': 'RenamedSlot'}}
+    assert writes(task) == [('ak.wwise.core.object.setName', {'object': FIRST, 'value': 'RenamedSlot'})]
+    assert task.run('execute', tx)[0] == 2
+    assert len(writes(task)) == 1
+
+
+@pytest.mark.parametrize('fault', ['native-rejection', 'native-no-effect'])
+def test_inner_rename_never_claims_success_or_retries_after_native_rejection_or_no_effect(tmp_path, fault):
+    task = InnerRenameTask(tmp_path, fault=fault)
+    before = deepcopy(task.objects)
+    task.bind(FIRST)
+    assert task.step('draft-declare-object-change', '--new-name', 'RenamedSlot')[0] == 0
+    tx = preview_and_confirm(task)
+    code, executed = task.run('execute', tx)
+    assert code == (2 if fault == 'native-rejection' else 0), executed
+    if fault == 'native-no-effect':
+        code, verified = task.run('verify', tx)
+        assert code == 2 and verified.get('verified') is not True, verified
+        assert any(row['name'] == 'new name matches' and row['passed'] is False
+            for row in verified['verification']['assertions']), verified
     else:
-        code, rejected = task.step('draft-declare-existing', '--declaration-id', 'rename',
-            '--object-handle', source, '--field', 'new_name', 'Renamed')
-    if code == 0:
-        code, rejected = task.step('draft-check')
-    if code == 0:
-        code, rejected = task.step('preview-from-draft')
-    assert code == 2 and rejected['error_code'] == 'OBJECT_NAME_MUTABILITY_UNPROVEN', rejected
+        assert executed['automatic_retry'] is False, executed
+    assert task.objects == before and len(writes(task)) == 1
+    assert task.run('execute', tx)[0] == 2
+    assert len(writes(task)) == 1
+
+
+@pytest.mark.parametrize('change', ['source-class', 'source-owner', 'list-order', 'peer-reference', 'target-class'])
+@pytest.mark.parametrize('stage', ['before-execute', 'after-execute'])
+def test_inner_rename_retains_exact_identity_owner_peers_and_references(tmp_path, change, stage):
+    task = InnerRenameTask(tmp_path)
+    task.bind(FIRST)
+    assert task.step('draft-declare-object-change', '--new-name', 'RenamedSlot')[0] == 0
+    tx = preview_and_confirm(task)
+    if stage == 'after-execute':
+        assert task.run('execute', tx)[0] == 0
+    damage(task, change)
+    code, result = task.run('execute' if stage == 'before-execute' else 'verify', tx)
+    assert code == 2 and result.get('verified') is not True, result
+    assert len(writes(task)) == (0 if stage == 'before-execute' else 1)
+    assert task.run('execute', tx)[0] == 2
+    assert len(writes(task)) == (0 if stage == 'before-execute' else 1)
+
+
+def test_direct_playlist_object_set_rename_keeps_its_observed_native_boundary(tmp_path):
+    task = PlaylistTask(tmp_path, operation='object.set')
+    source = task.bind(FIRST)
+    code, declared = task.step('draft-declare-existing', '--declaration-id', 'rename',
+        '--object-handle', source, '--field', 'new_name', 'Renamed')
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code == 2 and 'PLAYLIST_SLOT_OBJECT_SET_UNPROVEN' in json.dumps(rejected), rejected
     assert writes(task) == []
 
 

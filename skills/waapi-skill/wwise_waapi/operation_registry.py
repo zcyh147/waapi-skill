@@ -18,6 +18,7 @@ import os
 import re
 import time
 import stat
+from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Mapping, NoReturn, Sequence
@@ -2488,7 +2489,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object.setName",
         "ak.wwise.core.object.setName",
         "property-reference",
-        "Rename one live-resolved object and verify the same GUID at its new path.",
+        "Rename one live-resolved object and verify its actual name on the same GUID.",
         ("object", "value"),
         argument_contract=_object_contract(
             ("object", "value"),
@@ -2496,7 +2497,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         ),
         identity_arguments=("object",),
         constraints=(
-            "object types without a mutable intrinsic name, including derived, embedded-value, and owned-collection objects, fail before preview instead of dispatching setName",
+            "object types with source-proven non-mutable derived or embedded-value names fail before preview instead of dispatching setName",
+            "exact 2025 PlaylistSlot and MetadataSlot attempts retain class, owner, ordered List, references and display path; native acknowledgment alone never verifies a rename",
         ),
         selection_guidance=_selection_guidance(
             use_when=("Exactly one existing object receives only a rename.",),
@@ -9756,6 +9758,8 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=(), compound_path_context=None):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
+    if pre_state.get("inner_name_scope") is not None:
+        assertions.append(_inner_name_scope_assertion(pre_state["inner_name_scope"], read=read, after_write=after_write))
     declared_notes = {_identity_key(node["target_id"]): node["requested_notes"]
         for node in pre_state.get("object_set_nodes", [])
         if node.get("existing_target") is True and node.get("notes_supplied") is True} if after_write else {}
@@ -12417,6 +12421,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 "old_path": target.row.get("path"),
                 "old_parent": _parent_value(target.row.get("parent")),
             }
+            inner_scope = (_observe_inner_name_scope(request.version, target.object, read=read)
+                if target.row.get("type") == "PluginInnerObject" else None)
+            if inner_scope is not None:
+                selected = next(row for row in inner_scope["list_guard"]["members"] if _same_identity(row["id"], target.object))
+                if any(selected.get(field) != target.row.get(field) for field in IDENTITY_RETURN_FIELDS):
+                    raise OperationContractError("INVALID_READBACK", "Inner rename target changed during preparation.")
+                metadata["inner_name_scope"] = {"before": inner_scope, "expected_name": value}
+                verification["inner_name_scope"] = True
         else:
             preview = PropertyReferenceBuilder(version=request.version).set_notes(object=target, value=value)
             verification = {"kind": "same-guid-notes", "object_id": target.object, "expected_notes": value}
@@ -23061,6 +23073,13 @@ def verify_prepared_operation(
                 )
     elif kind == "same-guid-renamed":
         object_id = plan.get("object_id")
+        if plan.get("inner_name_scope") is True:
+            inner_scope = (pre_state or {}).get("inner_name_scope")
+            check("Inner rename retains its sealed exact target and requested name scope",
+                isinstance(inner_scope, Mapping) and isinstance(inner_scope.get("before"), Mapping)
+                and inner_scope["before"].get("version") == "2025.1"
+                and _same_identity(inner_scope["before"].get("object_id"), object_id)
+                and inner_scope.get("expected_name") == plan.get("expected_name"), inner_scope)
         rows = read_object(object_id=object_id, fields=("id", "name", "type", "path", "parent"))
         check("renamed GUID resolves exactly once", len(rows) == 1, rows)
         if len(rows) == 1:
@@ -23068,14 +23087,15 @@ def verify_prepared_operation(
             check("renamed object keeps GUID", _same_identity(row.get("id"), object_id), row.get("id"))
             check("new name matches", row.get("name") == plan.get("expected_name"), row.get("name"))
             path = row.get("path")
-            check("new path ends with name", isinstance(path, str) and path.rstrip("\\").endswith("\\" + str(plan.get("expected_name"))), path)
+            if plan.get("inner_name_scope") is not True:
+                check("new path ends with name", isinstance(path, str) and path.rstrip("\\").endswith("\\" + str(plan.get("expected_name"))), path)
             check(
                 "parent is unchanged",
                 _same_identity(_parent_value(row.get("parent")), plan.get("old_parent")),
                 {"actual": _parent_value(row.get("parent")), "expected": plan.get("old_parent")},
             )
         old_path = plan.get("old_path")
-        if isinstance(old_path, str) and old_path:
+        if plan.get("inner_name_scope") is not True and isinstance(old_path, str) and old_path:
             old_rows = read_object(path=old_path, fields=("id", "path"))
             check("old path no longer resolves to GUID", not any(_same_identity(row.get("id"), object_id) for row in old_rows), old_rows)
     elif kind == "history-result-schema-only":
@@ -27304,6 +27324,80 @@ def _transport_list_rows(result: Mapping[str, Any]) -> tuple[list[dict[str, Any]
         return [], False
     rows = [dict(item) for item in value]
     return rows, all(_valid_transport_id(row.get("transport")) for row in rows)
+
+
+def _observe_inner_name_scope(version, object_id, *, read):
+    """Bind the two exact 2025 Inner classes without inferring name support.
+
+    setName's generic native contract owns the attempt. Its empty result never
+    establishes an effect; the selected name and complete retained scope do.
+    """
+    if version != "2025.1":
+        return None
+    fields = [*IDENTITY_RETURN_FIELDS, "classId", "owner"]
+    batch = _bounded_multi_identity_read([object_id], fields=fields, read=read, context="Inner rename target")
+    if not batch["exact"]:
+        raise OperationContractError("INVALID_READBACK", "Inner rename requires its exact selected GUID once.")
+    selected = batch["result"]["return"][0]
+    profiles = {5636096: ("Playlist", "PlaylistObject"), 5570560: ("Metadata", "@Metadata")}
+    if selected.get("type") != "PluginInnerObject" or type(selected.get("classId")) is not int or selected["classId"] not in profiles:
+        if selected.get("name") == "":
+            raise OperationContractError("INVALID_READBACK", "Unnamed Inner rename requires its exact supported class.")
+        return None
+    from .documented_list_fields import resolve_live_list_evidence, observe_list_binding, owned_inner_identity
+    collection, reference = profiles[selected["classId"]]
+    owner_id = _reference_identity(selected.get("owner"))
+    if not isinstance(owner_id, str) or not _PLUGIN_GUID.fullmatch(owner_id):
+        raise OperationContractError("INVALID_READBACK", "Inner rename requires an exact owner GUID.")
+    try:
+        evidence = resolve_live_list_evidence(version, owner_id, collection, read=read)
+        if owned_inner_identity(evidence, selected["classId"]) is None:
+            raise ValueError("Inner rename owner/List does not match its pinned exact class")
+        guard = observe_list_binding(evidence, read=read)
+        members = [row for row in guard["members"] if _same_identity(row["id"], object_id)]
+        if len(members) != 1 or members[0] != selected:
+            raise ValueError("Inner rename selected GUID differs from its complete owner List")
+        refs = _bounded_multi_identity_read([row["id"] for row in guard["members"]], fields=("id", reference),
+            read=read, context="Inner rename retained references")
+        if not refs["exact"]:
+            raise ValueError("Inner rename needs every member reference once")
+        targets = []
+        for member in guard["members"]:
+            row, = refs["rows_by_key"][_identity_key(member["id"])]
+            value = row.get(reference)
+            # R89 source-certified local Metadata singleton. Keep raw evidence.
+            if reference == "@Metadata" and isinstance(value, list) and len(value) == 1:
+                value = value[0]
+            target_id = _reference_identity(value)
+            if not isinstance(target_id, str) or not _PLUGIN_GUID.fullmatch(target_id):
+                raise ValueError("Inner rename needs each required reference's exact GUID")
+            targets.append(target_id)
+        retained = _bounded_multi_identity_read([owner_id, *targets], fields=fields, read=read,
+            context="Inner rename retained owner and targets")
+        if not retained["exact"]:
+            raise ValueError("Inner rename needs its exact owner and targets once")
+        return {"version": version, "object_id": object_id, "list_guard": guard,
+            "references": [refs["rows_by_key"][_identity_key(row["id"])][0] for row in guard["members"]],
+            "retained_objects": [retained["rows_by_key"][_identity_key(identity)][0]
+                for identity in retained["args"]["from"]["id"]]}
+    except (ValueError, TypeError, KeyError) as exc:
+        raise OperationContractError("INVALID_READBACK", str(exc)) from exc
+
+
+def _inner_name_scope_assertion(proof, *, read, after_write):
+    before = proof["before"]
+    expected = deepcopy(before)
+    if after_write:
+        for row in expected["list_guard"]["members"]:
+            if _same_identity(row["id"], before["object_id"]):
+                row["name"] = proof["expected_name"]
+    try:
+        actual = _observe_inner_name_scope(before["version"], before["object_id"], read=read)
+        passed = actual == expected
+    except (OperationContractError, ValueError, TypeError, KeyError) as exc:
+        actual, passed = {"error": str(exc)}, False
+    return {"name": "Inner rename exact class, owner, ordered peers, display path and references remain bound",
+        "passed": passed, "evidence": {"expected": expected, "actual": actual}}
 
 
 def _reject_non_intrinsic_object_name_operation(

@@ -41,6 +41,102 @@ def test_playlist_observer_preserves_disclosed_restrictions(tmp_path, has_flag):
     assert (tmp_path / "observations" / "playlist-reference-metadata.json").is_file()
 
 
+@pytest.mark.parametrize('fault', ['none', 'native-no-effect', 'native-rejection', 'missing-independent-slot'])
+def test_existing_playlist_rename_collector_reaches_durable_finalizer_without_promoting_failures(tmp_path, monkeypatch, fault):
+    import hashlib
+    import importlib
+    import json
+    from copy import deepcopy
+    from pathlib import Path
+    from tests.unit.test_owned_named_list_stages_gateway import playlist_creation_task
+    monkeypatch.setenv('WWISE_LIVE', '1')
+    monkeypatch.setenv('WWISE_DESTRUCTIVE', '1')
+    collector = importlib.import_module('tests.destructive.test_playlist_reference_metadata')
+    owner = '{8C0FD1AD-E45D-408D-9BF3-874970CCC123}'
+    target = '{DB017C8E-EC99-415B-93CF-F7A6136D1AC2}'
+    first = '{7571D6B0-D614-40B5-B02D-0012FE3743A7}'
+    peer = '{6298C41E-F7C6-40B6-BFFE-E0B02EE7DC72}'
+    old = '{0DD1BBE3-BB1E-424A-9648-BEBFBB212426}'
+    task = playlist_creation_task(tmp_path, fixture_ids=(owner, target, first, peer, '{77777777-7777-7777-7777-777777777777}'))
+    task.objects[old] = {**deepcopy(task.objects[target]), 'id': old, 'name': 'OldTarget',
+        'path': task.objects[owner]['path'] + r'\OldTarget'}
+    task.objects[first]['PlaylistObject'] = {'id': old}
+    original = task.call
+    verified_count = 0
+    def call(uri, args=None, options=None):
+        if uri.endswith('setName'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.writes.append(deepcopy(args))
+            if fault == 'native-rejection':
+                from tests.unit.test_debug_read_gateway import WaapiRequestFailed
+                raise WaapiRequestFailed('ak.wwise.invalid_arguments', {'message': 'Controlled native rename rejection'})
+            if fault != 'native-no-effect':
+                task.objects[args['object']]['name'] = args['value']
+            return {}
+        if (fault == 'missing-independent-slot' and verified_count == 1 and uri.endswith('object.get')
+                and (args or {}).get('waql') == f'from object "{first}" take 4'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': []}
+        return original(uri, args, options)
+    task.call = call
+    def raw(argv):
+        nonlocal verified_count
+        result = task.run(*argv)
+        if argv[0] == 'verify' and result[0] == 0:
+            verified_count += 1
+        return result
+    from tests.destructive.support import sandbox_fixture
+    from tests.unit import test_profiler_input_native_fixture as finalizer
+    workflow = importlib.import_module('tests.destructive.test_gateway_workflow_transaction_matrix')
+    source = tmp_path / 'source'
+    source.mkdir()
+    source_project = source / 'SampleProject.wproj'
+    source_project.write_text('immutable Inner rename source')
+    proof = sandbox_fixture.hash_project(source)
+    project_root = task.project_file.parent
+    metadata = sandbox_fixture.SandboxMetadata(str(source_project), str(source), str(project_root),
+        str(task.project_file), '2025.1', 0, proof, sandbox_fixture.hash_project(project_root),
+        source_project.stat().st_mtime, process_cleanup_result='cleaned', process_cleanup_details={'residual_processes': []})
+    metadata.get_info_version = dict(year=2025, major=1, minor=7, build=9143)
+    sandbox = sandbox_fixture.SandboxProject(source_project, source, tmp_path, project_root, task.project_file, metadata)
+    runtime = SimpleNamespace(version='2025.1', candidate=workflow.exact_git_candidate(workflow.REPO_ROOT),
+        state_dir=tmp_path / 'state', sandbox=sandbox, category_results=[], raw_gateway=raw)
+    lock = sandbox_fixture.LiveSandboxLock(tmp_path / 'locks')
+    lock.__enter__()
+    error = None
+    node = 'test_existing_playlist_slot_rename_preserves_peer_order_and_references'
+    try:
+        getattr(collector, node)(runtime)
+    except AssertionError as exc:
+        error = exc
+    assert (error is not None) == (fault != 'none'), error
+    category, = runtime.category_results
+    body = Path(category['observation_path']).read_bytes()
+    observation = json.loads(body)
+    assert category['observation_sha256'] == hashlib.sha256(body).hexdigest()
+    assert task.writes == [{'object': first, 'value': 'RenamedSlot'}]
+    assert len(observation['calls']) <= 48
+    assert len([row for row in observation['calls'] if row['argv'][0] == 'execute']) == 1
+    if fault != 'native-rejection':
+        assert len([row for row in observation['calls'] if row['argv'][0] == 'verify']) == 1
+    monkeypatch.setattr(finalizer, 'MODULE', 'tests/destructive/test_playlist_reference_metadata.py::')
+    module = SimpleNamespace(__file__=collector.__file__, REPO_ROOT=workflow.REPO_ROOT)
+    records = finalizer._finish((module, runtime, task, lock, proof), tmp_path, monkeypatch, [(node, error)])
+    final = records[-1]
+    assert final['source']['hash_before'] == final['source']['hash_after'] == proof.digest
+    assert final['residual_state']['process_cleanup'] == 'cleaned'
+    transaction, = final['transactions']
+    assert transaction['state'] == {'none': 'verified', 'native-no-effect': 'verification_failed',
+        'native-rejection': 'indeterminate', 'missing-independent-slot': 'verified'}[fault]
+    final_category, = final['categories']
+    assert final_category['status'] == final['invocation']['outcome'] == ('PASS' if fault == 'none' else 'FAIL')
+    assert final_category['observation_sha256'] == hashlib.sha256(body).hexdigest()
+    assert observation['business_effect_verified'] is (fault == 'none')
+    assert final['residual_state']['sandbox'] == ('deleted' if fault == 'none' else 'quarantined')
+    if fault != 'none':
+        assert 'error' in observation and Path(final['residual_state']['quarantine_path']).is_dir()
+
+
 @pytest.mark.parametrize('mode,fault', [
     ('combined', 'none'), ('combined', 'missing-independent-root-created'), ('combined', 'unrelated-absence-error'),
     ('root-create-only', 'none'), ('root-create-only', 'missing-independent-root-created'),

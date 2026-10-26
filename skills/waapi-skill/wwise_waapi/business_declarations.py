@@ -236,21 +236,6 @@ class BoundObjectHandle:
     owned_identity: Mapping[str, Any] | None = None
 
 
-def require_bound_name_mutability(bound: BoundObjectHandle) -> None:
-    """Do not turn class-proven identity admission into unproved name authority.
-
-    The pinned 2025 PlaylistSlot example and native identity establish only its
-    empty name. Native rename semantics remain owned by #180; this guard does
-    not assert that Wwise itself prohibits renaming this class.
-    """
-    if (bound.context.wwise_version == "2025.1" and bound.object_type == "PluginInnerObject"
-            and bound.class_id in {5636096, 5570560}):
-        raise business_repair("OBJECT_NAME_MUTABILITY_UNPROVEN", field="new_name",
-            object_handle=bound.handle, object_type=bound.object_type, class_id=bound.class_id,
-            pending_issue="https://github.com/zcyh147/waapi-skill/issues/180",
-            action="Keep rename unresolved until matching native name-mutability evidence establishes its closed contract; other proven non-name outcomes remain available")
-
-
 @dataclass(frozen=True, slots=True)
 class LiveObjectIdentity:
     """Normalized identity fields shared by every Gateway-owned object seam."""
