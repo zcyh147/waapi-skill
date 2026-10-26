@@ -1,8 +1,10 @@
 # Conversion codec placement and configuration, #179
 
 This increment strengthens the existing 2024.1/2025.1
-`ak.wwise.core.audio.setConversionPlugin` Business Draft. It is program-tested,
-not native execution evidence. Build/conversion execution remains #183.
+`ak.wwise.core.audio.setConversionPlugin` Business Draft. Its setter path is
+program-tested; native placement remains blocked by ambiguous platform
+association. Older exact-GUID read/field effects below are separate evidence.
+Build/conversion execution remains #183.
 
 The public plan binds an exact Conversion Settings object, one live project
 platform and one installed Conversion Type Handle. The Gateway derives the
@@ -55,11 +57,11 @@ None of these project sources was opened in Wwise or modified.
 
 | Build | Codec declaration and placement | Current public selection/configuration |
 | --- | --- | --- |
-| 2021.1.14.8108 | ConversionPluginInfoList contains anonymous per-platform codec GUIDs; installed codec classes discovered as Conversion | Whole Conversion Settings copy retains donor settings through the existing object.copy lane; arbitrary codec replacement and owned-codec discovery/configuration remain unresolved |
-| 2022.1.19.8584 | Same persisted topology, independently inspected | Same unresolved replacement/configuration; object.set docs restrict classId selection to Effect/Source |
-| 2023.1.19.8928 | Same persisted topology, independently inspected | Same unresolved replacement/configuration; object.set docs restrict classId selection to Effect/Source |
-| 2024.1.13.9056 | Same topology plus reflected setter and documented ConversionPlugin getter example | Installed Type Handle selection, exact platform binding and independent attachment verifier; exact codec Field Handle configuration |
-| 2025.1.7.9143 | Same topology plus matching reflected setter/getter example | Same shared mechanism |
+| 2021.1.14.8108 | ConversionPluginInfoList contains anonymous per-platform codec GUIDs; installed codec classes discovered as Conversion | Exact-GUID read/metadata and one live-bound QualityFactor scalar change proven; arbitrary codec replacement/platform lookup unresolved |
+| 2022.1.19.8584 | Same persisted topology, independently inspected | Exact-GUID read/metadata proven; shared FieldHandle configuration program-tested; arbitrary replacement/platform lookup unresolved |
+| 2023.1.19.8928 | Same persisted topology, independently inspected | Exact-GUID read/metadata proven; shared FieldHandle configuration program-tested; arbitrary replacement/platform lookup unresolved |
+| 2024.1.13.9056 | Same topology plus reflected setter and documented ConversionPlugin getter example | Program-tested Type Handle/platform setter and codec Field Handles; native placement blocked |
+| 2025.1.7.9143 | Same topology plus matching reflected setter/getter example | Same program-tested mechanism; native placement blocked |
 
 `object.create` in 2021 has no classId field; a native `Conversion` ShareSet
 creation is distinct from choosing its embedded codec. Neither XML PluginID
@@ -70,7 +72,7 @@ scalar audio settings, not a codec reference/list for those older APIs.
 known donor Conversion's codec setup, but does not establish arbitrary codec
 replacement or platform isolation. Absence of the newer setter, missing getter
 examples or these source findings do not prove native impossibility. Earlier
-attachment/configuration remain assigned to #179 with #183 coordination.
+arbitrary attachment remains assigned to #179 with #183 coordination.
 The matching 2024/2025 `getProjectInfo` definitions expose the required
 `defaultConversion` reference (`id`, `name`), explicitly described as the
 Project's default Conversion Settings object. This supplies the ordinary
@@ -89,7 +91,7 @@ Live getTypes availability and field metadata remain authoritative.
 
 | Class | 2021/2022/2023 scalar names | 2024/2025 scalar names | Public route |
 | --- | --- | --- | --- |
-| ADPCM | FixLoopMethod | none | Existing exact codec Field Handles where codec identity is reachable; older reachability unresolved |
+| ADPCM | FixLoopMethod | none | Existing exact codec Field Handles on a chosen reachable GUID; no class replacement |
 | WEM Opus | Quality | Quality | Same shared field route |
 | PCM | none | MaxBitDepth | Same shared field route |
 | Vorbis | BitrateManagmentMode, QualityFactor, AverageBitrate, EnableMinimumBitrate, MinimumBitrate, EnableMaximumBitrate, MaximumBitrate, BitReservoirTime, ReservoirBiasFactor, AverageTrackSlewTime, EnableAdvancedSettings, SeekTableGranularity, RenderLineAlgo | Same except RenderLineAlgo is removed | Same shared field route; no per-codec field allowlist |
@@ -131,8 +133,8 @@ Program tests use the actual public Gateway and fake external native client.
 They prove closed mapping, installed class/platform drift refusal, a truthful
 failed business result after an empty native acknowledgement, other-platform
 preservation, and the separate exact-object field workflow. They do not prove
-native codec creatability, native accessor admission, Windows, build or Fresh
-behavior. #195 retains the stable combined Program/Non-live gates.
+native codec attachment, Windows, build or Fresh behavior. Separate older
+read/accessor and scalar evidence is scoped below. #195 retains the stable combined Program/Non-live gates.
 
 The selected native node is
 `test_gateway_workflow_transaction_matrix.py::test_conversion_plugin_placement_and_field_configuration`.
@@ -145,10 +147,9 @@ shapes stop before writes and persist the partial observations. Four fake
 producer/consumer cases exercise this actual collector, independent post-verify
 corruption, setup stop, unresolved default reference, and the existing
 two-phase finalizer through its persisted category-v3 writer. Main's selected
-native attempt is recorded below; setter and configuration effects remain
-unproved.
+native attempt is recorded below; modern attachment/configuration effects remain unproved.
 
-## Native2025 read-only setup failure and next probe
+## Retained native observations and current boundary
 
 Main's frozen144acba7 Console2025.1.7.9143 attempt ended in the original
 **FAIL**,14.60s, after three public read calls and before any transaction.
@@ -160,18 +161,27 @@ and the failed sandbox was quarantined. The original category and assessment
 remain under `.waapi-skill-state/full-coverage/conversion-179-2025-native-r1/`.
 DefaultConversion independently resolved to the named PCM Conversion GUID.
 
-Matching objectReturn/WAQL named-accessor definitions expose no explicit codec
-platform identity, and WObjects Conversion/DefaultConversions PCM sources do
-not declare a platform association. That source finding is not native absence:
-live object field/reference metadata remains the next authoritative discovery
-surface. The next prepared node is
-`test_gateway_workflow_transaction_matrix.py::test_conversion_platform_metadata_read_only_probe`.
-It preserves both actual candidate identities, reads their exact field lists
-and details, and reads only metadata-proven reference values. Its fixed command
-set contains status, query-object and metadata only; it cannot create a Draft,
-confirm or execute a transaction. Complete observations are diagnostic/blocked
-pending association review, never codec-placement PASS or mutation authority.
-Three fake consumer cases cover scalar metadata, an explicitly disclosed
-reference/value branch and failed required detail through the actual existing
-final category writer. Main owns any new native attempt; the original root is
-never replayed or regraded.
+The separate `conversion-179-2025-metadata-r1` diagnostic at `73f944c7` was
+**PASS, 5.58s**, zero writes/transactions; business category remains **blocked**.
+Both complete PCM inventories disclosed only scalar MaxBitDepth, no platform or
+reference field. Current wrapper refuses ambiguous owner results; this does not
+prove that the documented setter cannot set a codec. Verification depth remains
+a pending user choice; no modern setter effect has been accepted live.
+
+Older exact-GUID reads/QualityFactor metadata are now native-proven. Original
+read-r1 SKIPs remain: 2021 **9.26s**, 2022 **4.31s**; raw class 2818064/empty
+pluginName describe a generic wrapper, not concrete Vorbis. Pinned-wrapper
+metadata-r2 passed **5.94s/4.07s**; 2023 read-r1 passed **4.39s** with 262145/Vorbis.
+One 2021 FieldHandle scalar case at `a47152b7` passed **6.35s**, VERIFIED 3→4 with
+exact GUID/name/type/opaque path/owner/raw class/pluginName retained. After the
+shared opaque-identity correction (`73f944c7`), the existing object.setProperty
+route required no further production change. Source GUIDs are test oracles; ordinary changes require exact
+chosen live GUIDs and live FieldHandles. No replacement or platform lookup is
+credited. Sources/processes were preserved/cleaned; nonpasses stay frozen. Exact
+roots/receipts: [test inventory](../../tests/TEST_INVENTORY.md).
+
+Matching 2024.1.0 **WG-71956** introduces the named setter (and audio.convert).
+Matching 2024.1.13.9056 SDK CHM/member whatsnew_2024_1_0.html SHA-256:
+`aa6b467caae07c2363806adc1dadeed8df7a29c4bdf2d23fd629126208054364` / `bd674dcc2897bb519f01fe4029bd911f4e1ef765ae4073e88b93d6b53892dd18`.
+This dates the setter, not older read/property availability; #179 remains open.
+The 2021 Sink/Metadata direct-constructor decision is separately pending.

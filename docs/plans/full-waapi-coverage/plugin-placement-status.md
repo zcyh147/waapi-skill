@@ -1,19 +1,19 @@
 # Plugin placement checkpoint for #179
 
-This is an implementation checkpoint under #174, not completion or native
-execution evidence. The public seam is the existing Gateway Business Draft,
+This is a scoped checkpoint under #174, not completion. The public seam is the
+existing Gateway Business Draft,
 Type/Field Handles, immutable Preview, authorization, one execution and
-independent verification. No native process was launched for this increment.
+independent verification. Native scope and original verdicts are recorded below.
 
 ## Exact version and kind accounting
 
 | Pinned build | SourcePlugin | EffectPlugin | SinkPlugin | ConversionPlugin | MetadataPlugin |
 | --- | --- | --- | --- | --- | --- |
-| 2021.1.14.8108 | Discovery; constructor unresolved | Discovery; constructor unresolved | Discovery; constructor unresolved | Discovery; attachment alternative unresolved | Discovery; constructor unresolved |
-| 2022.1.19.8584 | Source child | Owner fixed slots / independent ShareSet | Independent AudioDevice ShareSet | Discovery; attachment alternative unresolved | Independent Metadata ShareSet |
-| 2023.1.19.8928 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Discovery; attachment alternative unresolved | Independent Metadata ShareSet |
-| 2024.1.13.9056 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Installed Type Handle / platform setter; exact codec Field Handles | Independent Metadata ShareSet |
-| 2025.1.7.9143 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Installed Type Handle / platform setter; exact codec Field Handles | Independent Metadata ShareSet |
+| 2021.1.14.8108 | Existing Source donor copy; new-class constructor boundary | Class-selected constructor introduced in 2022.1; older alternative unresolved | Discovery; constructor unresolved | Exact chosen-GUID read/fields; arbitrary attachment unresolved | Discovery; constructor unresolved |
+| 2022.1.19.8584 | Source child | Owner fixed slots / independent ShareSet | Independent AudioDevice ShareSet | Exact chosen-GUID read/fields; arbitrary attachment unresolved | Independent Metadata ShareSet |
+| 2023.1.19.8928 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Exact chosen-GUID read/fields; arbitrary attachment unresolved | Independent Metadata ShareSet |
+| 2024.1.13.9056 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Program-tested Type Handle/platform setter and codec Field Handles; native placement blocked | Independent Metadata ShareSet |
+| 2025.1.7.9143 | Source child | Owner EffectSlot append / independent ShareSet | Independent AudioDevice ShareSet | Program-tested Type Handle/platform setter and codec Field Handles; native placement blocked | Independent Metadata ShareSet |
 
 Creation rows describe implemented Gateway construction and model controls.
 They do not establish successful native creation or a host/build equivalence.
@@ -71,12 +71,14 @@ succeeds. No committed project was opened or modified.
 
 - **2021.1 alternative construction (#179):** object.create has no classId and
   object.set is absent from that lane. Determine legal native alternatives for
-  each kind using matching native evidence. Do not guess numeric object types,
+  Sink/Metadata; the user boundary decision remains pending. WG-39514 explicitly
+  introduces Source/Effect class-selected object.set creation in 2022.1. Existing
+  native-proven 2021 Source donor copy requires a compatible donor and does not
+  create an arbitrary installed class. Do not guess numeric object types,
   infer absence from one failed classic spelling, or bypass the Gateway.
-- **Owner metadata (#179):** native source exposes MetadataSlot and its Metadata
-  reference; creation/append, OverrideMetadata applicability, preservation and
-  native effects remain implementation and evidence work. An independent
-  Metadata ShareSet is not credit for this branch.
+- **Owner metadata:** [R89 selected 2025 flow](../../../tests/TEST_INVENTORY.md#2026-10-23-r89-condition-mapping-and-inner-policy-increment)
+  proved MetadataSlot identity/owner, ordered membership and local Metadata
+  reference. This is scoped native proof, not all-version/owner acceptance.
 - **Sink attachment (#179):** selection on a Bus is distinct from independent
   AudioDevice creation. Use the existing exact-object Reference Field Handle
   route where supported; complete applicability and effect proof separately.
@@ -90,9 +92,13 @@ succeeds. No committed project was opened or modified.
   no transactions. Exact platform association is unresolved; the setter remains
   fail-closed rather than choosing a row. The actual anonymous display path is
   now preserved by ConversionPlugin-only opaque identity semantics. A bounded
-  read-only candidate metadata/reference probe is prepared before any further
-  writes. Older arbitrary replacement/configuration remains unresolved;
-  whole-Conversion donor copy is a separate existing alternative. Matching
+  metadata diagnostic passed 5.58s with its business category blocked: only scalar
+  MaxBitDepth was disclosed. Older 2021/22/23 exact-GUID reads/QualityFactor metadata
+  are native-proven; 2021 exact chosen-GUID FieldHandle configuration independently
+  changed 3→4 while preserving the generic class 2818064/empty pluginName wrapper.
+  No concrete old codec class or automatic platform association is inferred.
+  WG-71956 introduces the named setter in 2024.1; arbitrary older replacement
+  remains unresolved. Whole-Conversion donor copy is a distinct alternative. Matching
   getProjectInfo.defaultConversion supplies the Project's default Conversion
   GUID without assuming the setter accepts Project GUIDs. See
   [the source and mapping note](../../research/conversion-plugin-placement-179.md).
@@ -102,14 +108,14 @@ succeeds. No committed project was opened or modified.
   scalar/default/reference-presence handling is reused here, not blanket-blocked
   on missing native receipts. Class Field Handle restrictions not yet admitted
   by discovery remain an implementation boundary rather than native absence.
-- **Staged provenance (#178/#179):** the durable verified-created-from selector
-  currently binds an object.create root. Created plugins and recursive/list
-  children need their own sealed identity continuation where required.
-- **Native acceptance:** sequential owned sandbox evidence on all pinned builds
-  must prove native creatability, actual host, applicable parent/platform,
-  class/property/reference effects, conflict/drift refusal and preservation.
-  License/setup failures remain blockers. No Fresh, Windows, full Program or
-  full Non-live acceptance is claimed by this checkpoint.
+- **Staged provenance:** [#178 verified-node continuation](../../../tests/TEST_INVENTORY.md#2026-10-26-178-playlist-construction-and-verified-node-continuation)
+  supports selected created nodes beyond the ordinary root, with drift refusal
+  and MetadataSlot compatibility; this adds no donor-copy/plugin binding claim.
+- **Native acceptance:** select representative mechanisms/host-version risks per
+  business acceptance while retaining complete option mapping. Both user decisions
+  (2021 Sink/Metadata direct-factory boundary and modern verification depth) remain
+  pending; no scope exception or #179 closure. No Fresh, Windows or combined full
+  Program/Non-live acceptance is claimed; #195 owns final mapping/gates.
 
 Exact worker test outcomes and candidate attribution are recorded in the
 handoff; generated coverage/source inventories remain integration-owner work.
