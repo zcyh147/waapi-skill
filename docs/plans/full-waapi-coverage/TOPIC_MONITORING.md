@@ -186,10 +186,21 @@ The distinct opt-in node `test_structure_changed_notes_filtered_diagnostic`
 uses both disclosed fields and their current digest through the existing
 closed row interface and producer/sandbox lifecycle. It retains a separate
 `structure-changed-notes-filtered-diagnostic.json` receipt. The default
-unfiltered diagnostic remains unchanged. Neither filtered native delivery nor
-Fresh execution was run for this implementation. Classic `object.notesChanged`
-remains a five-version monitoring alternative; it does not replace the 2025
-undo-batched `structureChanged` semantics.
+unfiltered diagnostic remains unchanged. The retained successor
+`e89d2f7f5a9c12cc76a9f6c3f38b800d40ad07df` then passed the exact filtered
+Console2025 case in 7.45s: one matching event carried the requested
+oldNotes/newNotes strings, unsubscribe succeeded, independent Notes readback
+and owned-object absence verified, source files were preserved and the sandbox
+was deleted. Its original receipt SHA-256 is
+`3591b63daeb13db92108a6be74c34ee1b8757d3f2c0741cf89688f3caeb61c8e`;
+final category SHA-256 is
+`38b02e7cb4f19859c02a27b034b3fc32ea3e9285ae07ad901f5dc27fcec7c2ea`.
+This is scoped Console delivery/filter/count/cleanup proof, not Authoring,
+other-version or generated-branch acceptance. The semantic resource's original
+requirements and native identities remain unchanged pending #195 reconciliation;
+the earlier failed attempt remains FAIL. No new Notes probe or Fresh run follows.
+Classic `object.notesChanged` remains a five-version monitoring alternative;
+it does not replace the 2025 undo-batched `structureChanged` semantics.
 
 ## Exact 2021 recursive SoundBank question
 
@@ -203,25 +214,23 @@ directly the SwitchContainer object described by the surrounding source text.
 The original raw pointer is retained here; the runtime implicit-property
 projection inserts its normal `properties` wrapper without changing native IDs.
 
-The newly reachable business rows cover the first SwitchContainers and Media
-levels. Recursive Children descent is still missing business construction,
-separate from the required native evidence. It remains owned by #187. Do not
-invent a reference correction or call the missing recursive predicate a native
-limitation.
+The closed business row walker now descends array-valued items and permits
+recursive schemas only with progress through another array level. The existing
+`--event-row` collection and indices carry every list position: a 2021
+Children step has two indices, while the independently pinned 2022–2025
+object-recursive Children step has one. The existing empty-row action can select
+an inner empty list. No reference, native source ID or publish schema is rewritten.
 
-The minimal future controlled probe uses an owned 2021 sandbox, one disposable
-SoundBank containing a nested SwitchContainer Event, two selected Switch/State
-levels and minimal media. #182's closed build/metadata configuration and the
-closed Switch-assignment workflow supply the actual fixture/trigger dependency.
-Subscribe through public `stream-topic` to `soundbank.generated` with bounded
-event count/duration and its disclosed metadata options, wait for `started`,
-then execute one separately previewed/authorized build. Compare the exact
-tracked bank/Event's `Children` elements: object, array, empty or omitted, and
-retain the reference-validation section/expected/actual type if the event is
-rejected. Inspect a complete small event diagnostic when available; larger
-packets require an explicit reviewed evidence-capture extension. Preserve
-unsubscribe, independent build artifact/business readback, source immutability
-and owned sandbox cleanup. No native build or event was run for this question.
+The catalog discloses the existing schema-depth ceiling 16 and array-item
+ceiling 256; only disclosed paths can be constructed. Unknown/deeper paths,
+wrong index arity, out-of-bound indices and unknown fields fail before monitoring.
+Public injected-client controls prove literal two-level 2021 array-of-arrays
+construction, modern object recursion, empty inner lists and rejection of the
+prose-intended direct-object 2021 shape. These are construction/validation and
+cleanup controls, not native publication proof or a claim of unrestricted depth.
+No native shape experiment is required by this code fix; later representative
+event evidence uses the existing owned build/subscription mechanism and current
+test-selection policy, without a per-recursion/shape quota.
 
 ## Remaining delivery obligations and dependencies
 
