@@ -323,15 +323,26 @@ def query_output_detail(version: str, name: str) -> dict[str, Any]:
     if name == "blend-tracks":
         return _blend_tracks_detail(version)
     if version == "2021.1" and name == "active-source":
+        graph = _definition_graph(version)
+        path = Path(__file__).resolve().parents[1] / 'references/semantic/2021.1/query-active-source-native-boundary.json'
+        with path.open('rb') as source:
+            raw = source.read(8193)
+        if len(raw) > 8192 or hashlib.sha256(raw).hexdigest() != '43754eeade75411f5fdbcbe6efc0ea8048bff0ed40f977a3461cea5dc6269f80':
+            raise ValueError('Pinned active-source native-boundary source changed')
+        boundary = json.loads(raw)
+        if (boundary['version'], boundary['wwise_build']) != (version, graph.wwise_build):
+            raise ValueError('Active-source native boundary differs from the selected version/build')
         return {
             "name": name, "output_field": "active_source", "available": True,
             "supported_versions": list(SUPPORTED_WWISE_VERSION_KEYS),
             "description": "Derive each file-backed Sound active source by its unique full original path in one explicit platform/language view.",
+            "support_scope": "file-backed Gateway derivation only",
             "native_definition": None,
+            "native_boundary": boundary,
             "result_schema": {"type": "object", "required": ["id", "name"],
                               "properties": {"id": {"type": "string"}, "name": {"type": "string"}}},
             "derivation": {
-                "source": "bounded closed business query, including predicates and relationships; advanced expressions remain unresolved",
+                "source": "bounded closed business query, including predicates and relationships; this derivation is not exposed for advanced expressions",
                 "non_sound_rows": "preserved with active_source in unavailable_fields; no invented null or source",
                 "view": "explicit platform and language, resolved once and shared by every read",
                 "proof": "complete class/parent/language-checked direct children; unique full-path match; repeated Sound and child observations",
@@ -340,7 +351,7 @@ def query_output_detail(version: str, name: str) -> dict[str, Any]:
                     "internal_owner_batch_ids": 64, "per_read_bytes": 1024 * 1024,
                     "aggregate_bytes": 40 * 1024 * 1024, "deadline": "existing Gateway invocation deadline"},
                 "unresolved": "missing/no-file/plugin/ambiguous paths never mean no active source",
-                "evidence_scope": "linked two-source SFX and explicit Voice observed; unlinked characterization still required under #181",
+                "applicability": "file-backed Sound selection in explicit SFX or Voice views; unlinked views remain uncharacterized and no general plugin/no-file selection rule is established",
                 "runtime_xml": False,
             },
         }

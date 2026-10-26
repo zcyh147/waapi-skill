@@ -227,3 +227,47 @@ def test_plugin_active_source_select_preserves_failed_evidence_without_retry(tmp
     if fault == 'rejection': assert packets[0]['ok'] is False and 'SELECT rejected' in packets[0]['message']
     elif fault == 'missing': assert packets[0]['result']['return'] == []
     else: assert packets[-1]['result']['return'][0]['name'] == 'Changed native source'
+
+
+def test_2021_active_source_schema_discloses_retained_select_rejection_without_removing_other_reads(tmp_path):
+    import hashlib
+    from tests.unit.test_object_query_result_pages import QueryTask
+    packet_path = Path(__file__).parents[1] / 'fixtures/query/active-source-2021-select-rejection.original.json'
+    raw = packet_path.read_bytes(); packet = json.loads(raw)
+    assert hashlib.sha256(raw).hexdigest() == 'b5f8cce96db45c06c6df8b56672c381c0973933499941fe03a057a8c6092a95e'
+    task = QueryTask(tmp_path, '2021.1')
+    code, schema = task.run('query-schema', '--output', 'active-source')
+    assert code == 0, schema
+    detail = schema['business_output']
+    assert detail['available'] is True and 'file-backed' in detail['description']
+    boundary = detail['native_boundary']
+    assert boundary['wwise_build'] == '2021.1.14.8108' and boundary['observed_host'] == 'wwise-console'
+    assert boundary['scope'] == 'SELECT activeSource on one linked plugin-backed Sound; not all source-selection mechanisms or hosts'
+    assert boundary['native_error_uri'] == packet['waapi_error_uri'] == 'ak.wwise.query.invalid_query'
+    assert boundary['native_error_details'] == packet['waapi_error_details']
+    assert boundary['native_packet_sha256'] == hashlib.sha256(raw).hexdigest()
+    assert boundary['documented_accessor'] is True and boundary['native_absence_proven'] is False
+    assert 'not executable in the observed Console build' in boundary['availability_reason']
+    for forbidden in ('#181', 'tests/', '.waapi-skill-state', 'candidate', 'quarantine',
+            '63E5A1E6-4265-463E-A5C5-322F742423E1'):
+        assert forbidden not in json.dumps(detail)
+    assert 'unlinked' in detail['derivation']['applicability']
+    assert 'evidence_scope' not in detail['derivation']
+    assert not task.calls
+    # Disclosure is not an advanced grammar ban or a fabricated no-source result.
+    task.row.pop('notes')
+    code, result = task.run('query-object', '--advanced-waql',
+        'from type Sound select activeSource', '--max-results', '2')
+    assert code == 0 and result['agent_result'] == [task.row], result
+    for version in ('2022.1','2025.1'):
+        folder = tmp_path / version; folder.mkdir()
+        modern = QueryTask(folder, version)
+        code, result = modern.run('query-schema', '--output', 'active-source')
+        assert code == 0 and result['business_output']['available'] is True
+        assert 'native_boundary' not in result['business_output'] and not modern.calls
+
+
+def test_failed_2021_plugin_select_positive_probe_is_explicitly_retired(workflow):
+    from tests.destructive import test_query_legacy_control_input as witness
+    marks = witness.test_legacy_plugin_active_source_uses_documented_select.pytestmark
+    assert any(mark.name == 'skip' and 'original query181-2021-active-source-r1 remains FAIL' in mark.kwargs['reason'] for mark in marks)

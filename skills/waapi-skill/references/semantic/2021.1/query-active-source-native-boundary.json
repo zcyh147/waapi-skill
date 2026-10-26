@@ -1,0 +1,30 @@
+{
+  "contract": "waapi-skill.query-active-source-native-boundary/v1",
+  "version": "2021.1",
+  "wwise_build": "2021.1.14.8108",
+  "observed_host": "wwise-console",
+  "uri": "ak.wwise.core.object.get",
+  "expression": "SELECT activeSource",
+  "scope": "SELECT activeSource on one linked plugin-backed Sound; not all source-selection mechanisms or hosts",
+  "status": "native_accessor_rejected",
+  "availability_reason": "The documented activeSource SELECT accessor is not executable in the observed Console build; file-backed selection uses the separate Gateway derivation",
+  "documented_accessor": true,
+  "definition_source": {
+    "member": "waql_reference.html",
+    "sha256": "87b10aecdd13083c0a2d75fb0659119fbe08ba54ea5bfa85f041576033074ac4",
+    "line": 457,
+    "description": "Returns the active source associated to a sound object.",
+    "example": "$ from type Sound select activeSource"
+  },
+  "native_error_uri": "ak.wwise.query.invalid_query",
+  "native_error_details": {
+    "message": "Unknown accessor activeSource (61)",
+    "details": {
+      "procedureUri": "ak.wwise.core.object.get"
+    }
+  },
+  "native_packet_sha256": "b5f8cce96db45c06c6df8b56672c381c0973933499941fe03a057a8c6092a95e",
+  "native_accessor_rejection_proven": true,
+  "native_absence_proven": false,
+  "alternatives": "The closed active-source output supports file-backed Sound selection by a unique full original-path match in one explicit platform/language view; bounded child and exact-ID reads remain discovery, not proof of active selection."
+}

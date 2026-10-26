@@ -237,6 +237,7 @@ def test_legacy_control_input_typed_reads_keep_exact_rtpc_and_lfo_scope(workflow
         assert bounded,'Finalized observation exceeded16MiB; no native PASS'
 
 
+@pytest.mark.skip(reason='Retired positive probe: observed 2021 Console rejected SELECT activeSource; original query181-2021-active-source-r1 remains FAIL, not PASS')
 def test_legacy_plugin_active_source_uses_documented_select(workflow_sandbox_runtime, monkeypatch):
     """One existing linked plugin choice, through SELECT rather than RETURN."""
     runtime = workflow_sandbox_runtime
