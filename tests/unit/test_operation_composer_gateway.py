@@ -340,13 +340,24 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Localized table final forms change only this all-five TSV disclosure.
+    assert canonical_sha256(non_object_set_digests) == "99ae222d9f424628d6bbd75387b136cdbbe84f70a4709eea7b75a23d32579cf0"
+    before_localized_table_final = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        for operation in ("audio.import", "audio.importTabDelimited"):
+            contract = operation_request_machine_contract(operation, version)
+            if operation == "audio.importTabDelimited":
+                assert contract["constraints"][-1] == 'localized typed Sound Voice owner-only rows support createNew/useExisting/replaceExisting with live metadata-proven fields; create/replace require explicit prerequisite columns and replacement retires the complete old GUID subtree, while existing useExisting may retain satisfied prerequisites and preserves Source identities and files; localized existing-owner regular or bounded inline WAV media binds the exact selected-language Source and preserves other Source files; combined owner-field/media rows retain the exact observed-host guard and table bytes are never rewritten'
+                contract["constraints"][-1] = 'localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows bind the intended language Source, verify planned media changes and preserve other Source files without rewriting the exact table'
+            before_localized_table_final[operation, version] = contract
+            non_object_set_digests[f"{operation}@{version}"] = canonical_sha256(contract)
     # The existing-Event/global-mode safety disclosure owns only the two
     # ordinary descriptions and one TSV constraint; preserve the combined seal.
     assert canonical_sha256(non_object_set_digests) == "e84f03b704cef2293600dc17e60e4962fd5d95b18c85d5c9a3aab2181c70ee81"
     before_dialogue_mode_boundary = {}
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
         for operation in ("audio.import", "audio.importTabDelimited"):
-            contract = operation_request_machine_contract(operation, version)
+            contract = deepcopy(before_localized_table_final[operation, version])
             if operation == "audio.import":
                 props = contract["argument_contract"]["properties"]
                 suffix = " Existing Events require useExisting; replace the Sound first without that directive, then bind the resulting Sound for a separately previewed existing-Event update."

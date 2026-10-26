@@ -3966,7 +3966,7 @@ def operation_request_machine_contract(name: str, version: str) -> dict[str, Any
         constraints.append("WwiseConsole 2025.1.7 build 9143 blocks GUID Object Path TSV cells before preview and execution: retained native evidence interpreted them as literal object names and created unintended objects; other host/version GUID semantics remain unproven pending scope decision")
         constraints.append("WwiseConsole 2025.1.7 build 9143 blocks combined localized existing-owner fields/media rows reusing an existing language Source: both shared and distinct Source-path native configurations added an extra Source despite correct fields and copied bytes; preparation and prewrite checks enforce this observed host boundary, not an API-absence claim or proven cause; owner-only, pure-media and other-host forms retain their existing boundaries")
     if name == "audio.importTabDelimited":
-        constraints.append("localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows bind the intended language Source, verify planned media changes and preserve other Source files without rewriting the exact table")
+        constraints.append("localized typed Sound Voice owner-only rows support createNew/useExisting/replaceExisting with live metadata-proven fields; create/replace require explicit prerequisite columns and replacement retires the complete old GUID subtree, while existing useExisting may retain satisfied prerequisites and preserves Source identities and files; localized existing-owner regular or bounded inline WAV media binds the exact selected-language Source and preserves other Source files; combined owner-field/media rows retain the exact observed-host guard and table bytes are never rewritten")
     return {
         "additional_properties": False,
         "argument_contract": _operation_argument_contract(
@@ -14312,7 +14312,8 @@ def _prepare_import_dynamic_fields(
                 for name in derived_properties
                 if name.casefold() not in explicitly_supplied
             )
-            if missing_activation_columns and target.get("localized_owner_only") is True:
+            if (missing_activation_columns and target.get("localized_owner_only") is True
+                    and dispatch_args.get("importOperation") == "useExisting"):
                 # The exact existing owner is resolved below. An unchanged TSV
                 # may omit activators only when its live state already satisfies
                 # them; validated_properties retains their prewrite/verify guard.
@@ -15583,11 +15584,8 @@ def _prepare_closed_import_plan(
                 "The closed createNew import requires every exact target path to be absent.",
                 details={"path": target_path, "rows": rows},
             )
-        if target.get("localized_owner_only") is True and (import_operation != "useExisting" or not rows):
-            raise OperationContractError("LOCALIZED_OWNER_ONLY_TSV_REQUIRES_EXISTING_VOICE",
-                "This owner-only localized TSV field slice requires an exact existing Sound Voice and useExisting.")
         missing_activation = [name for name in target.get("required_existing_activation", [])
-            if not any(spec["name"] == name and _typed_value_equal(_field_value(rows[0], "@" + name),
+            if not rows or not any(spec["name"] == name and _typed_value_equal(_field_value(rows[0], "@" + name),
                 spec["value"], spec["metadata_type"]) for spec in target.get("validated_properties", []))]
         if missing_activation:
             raise OperationContractError("TAB_REFERENCE_DEPENDENCY_REQUIRES_COLUMN",
@@ -15723,7 +15721,8 @@ def _prepare_closed_import_plan(
                 else:
                     _bind_localized_import_source(target, read=read,
                         preserve_media_version=request.version if (target.get("localized_owner_fields")
-                            or target.get("requested_switch_assignments") or target.get("requested_dialogue_events")) else None)
+                            or target.get("requested_switch_assignments") or target.get("requested_dialogue_events")
+                            or target.get("source_file", {}).get("kind") == "inline_base64") else None)
                     if target.get("localized_owner_fields"):
                         _seal_tab_owner_field_metadata(target, read=read)
             elif (source_operation == "audio.import" and import_operation == "useExisting"
@@ -15734,12 +15733,20 @@ def _prepare_closed_import_plan(
                 if target["expected_audio_file_source_result_path"] != expected_source_path:
                     allowed_result_paths.discard(str(expected_source_path).casefold())
                     allowed_result_paths.add(target["expected_audio_file_source_result_path"].casefold())
+            if target.get("localized_owner_only") is True and import_operation == "replaceExisting":
+                collision = ResolvedObject(identity=ObjectIdentity(path=target_path), object=existing_id,
+                    resolution="live-path", row=rows[0])
+                _reject_protected_replace_boundary(collision)
+                target["owner_only_replace_subtree"] = _capture_object_list_replace_subtrees([rows[0]], read=read)[0]
             roles[f"targets[{index}].existing"] = ResolvedObject(
                 identity=ObjectIdentity(path=target_path),
                 object=existing_id,
                 resolution="live-path",
                 row=rows[0],
             )
+        if target.get("localized_owner_only") is True and (import_operation != "useExisting" or not rows):
+            target["planned_owner_field_metadata"] = {"class_id": target["metadata_class_id"],
+                "fields": target.get("localized_owner_field_metadata", [])}
         if _is_explicit_import_source_target(target, source_operation):
             declared_owners = ([row for row in targets if row["canonical_target_path"] == target["canonical_parent_path"]]
                               if source_operation == "audio.importTabDelimited" else [])
@@ -15939,13 +15946,6 @@ def _prepare_closed_import_plan(
             additional_unsupported = [
                 field_name
                 for field_name, present in (
-                    ("audio_file_base64", (
-                        isinstance(target.get("source_file"), Mapping)
-                        and target["source_file"].get("kind") == "inline_base64"
-                        and source_operation != "audio.import"
-                        and not target.get("requested_switch_assignments")
-                        and not _is_tab_audio_file_source_target(target, source_operation)
-                    )),
                     ("import_location", "requested_import_location" in target),
                     ("properties", source_operation != "audio.import" and not _is_tab_audio_file_source_target(target, source_operation) and target.get("localized_owner_fields") is not True and bool(target.get("validated_properties"))),
                     ("references", source_operation != "audio.import" and not _is_tab_audio_file_source_target(target, source_operation) and target.get("localized_owner_fields") is not True and bool(target.get("validated_references"))),
@@ -16489,6 +16489,10 @@ def _prepare_closed_import_plan(
                                        if "localized_source_snapshot" in target],
         "source_owner_replace_subtrees": [{"owner": target["explicit_source_owner"], "rows": target["source_owner_replace_subtree"]}
             for target in targets if "source_owner_replace_subtree" in target],
+        "owner_only_replace_subtrees": [target["owner_only_replace_subtree"] for target in targets
+            if "owner_only_replace_subtree" in target],
+        "planned_owner_field_metadata": [target["planned_owner_field_metadata"] for target in targets
+            if "planned_owner_field_metadata" in target],
         "language_inventory": _json_mapping(language_inventory) if language_inventory is not None else None,
     }
     if wire_path_input_audit is not None:
@@ -19444,7 +19448,16 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             actual = _existing_sfx_source_snapshot(snapshot["owner_id"], version=snapshot["version"], read=read_call)
             assertions.append({"name": "existing SFX source identities and placement unchanged since preview",
                                "passed": actual == snapshot, "evidence": {"expected": snapshot, "actual": actual}})
+        for binding in import_guard.get("planned_owner_field_metadata", []):
+            for expected in binding["fields"]:
+                actual = _read_property_info(read_call, class_id=binding["class_id"], name=expected["name"]).as_dict()
+                assertions.append({"name": "planned localized owner field metadata unchanged since Preview",
+                    "passed": _native_snapshot_equal(actual, expected), "evidence": {"expected": expected, "actual": actual}})
         actual_source_snapshots: dict[tuple[str, str | None], dict[str, Any]] = {}
+        for snapshot in import_guard.get("owner_only_replace_subtrees", []):
+            actual = _capture_object_list_replace_subtrees([{"id": snapshot["root_id"]}], read=read_call)[0]
+            assertions.append({"name": "localized owner-only replacement subtree unchanged since Preview",
+                "passed": actual == snapshot, "evidence": {"expected": snapshot, "actual": actual}})
         for snapshot in import_guard.get("source_owner_replace_subtrees", []):
             if (not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("owner"), Mapping)
                     or not _valid_object_id(snapshot["owner"].get("id")) or not isinstance(snapshot["owner"].get("path"), str)
@@ -25091,7 +25104,7 @@ def verify_prepared_operation(
             explicit_source_target = _is_explicit_import_source_target(target, source_operation)
             localized_tab_owner = (source_operation == "audio.importTabDelimited" and not explicit_source_target
                                    and isinstance(target.get("localized_source_snapshot"), Mapping))
-            if localized_tab_owner:
+            if localized_tab_owner or target.get("localized_owner_fields") is True:
                 target_fields = _dedupe_fields([*target_fields, "@IsVoice"])
             target_rows = read_object(
                 path=target_path,
@@ -25226,7 +25239,7 @@ def verify_prepared_operation(
                     {"expected": expected_type, "actual": live_row.get("type"),
                         "expected_class": target.get("metadata_class_id"), "actual_class": live_row.get("classId")},
                 )
-                if target.get("localized_owner_only") is True:
+                if target.get("localized_owner_only") is True and existing_use_existing:
                     preserved_fields = (["sound:originalWavFilePath", "audioSource:language"] if version == "2021.1"
                         else ["activeSource", "originalFilePath", "sound:originalWavFilePath", "audioSource:language"])
                     before_owner = target["pre_state_rows"][0]
@@ -25235,7 +25248,7 @@ def verify_prepared_operation(
                               for field in preserved_fields),
                           {"before": {field: _field_value(before_owner, field) for field in preserved_fields},
                            "after": {field: _field_value(live_row, field) for field in preserved_fields}})
-                if localized_tab_owner:
+                if localized_tab_owner or target.get("localized_owner_fields") is True:
                     check(f"{label} localized TSV owner remains a Sound Voice",
                           _field_value(live_row, "@IsVoice") is True,
                           {"is_voice": _field_value(live_row, "@IsVoice")})
@@ -25282,7 +25295,7 @@ def verify_prepared_operation(
                         live_row.get("notes") == target.get("requested_notes"),
                         {"expected": target.get("requested_notes"), "actual": live_row.get("notes")},
                     )
-                elif target["pre_state_rows"]:
+                elif target["pre_state_rows"] and "owner_only_replace_subtree" not in target:
                     before_notes = target["pre_state_rows"][0].get("notes")
                     check(
                         f"{label} untouched notes remain unchanged",
@@ -25748,6 +25761,14 @@ def verify_prepared_operation(
                     _valid_object_id(live_id),
                     {"live_id": live_id},
                 )
+
+            if "owner_only_replace_subtree" in target:
+                retired_ids = [row["id"] for row in target["owner_only_replace_subtree"]["rows"]]
+                retirement_args = {"from": {"id": retired_ids}}
+                retirement_options = {"return": list(IDENTITY_RETURN_FIELDS)}
+                retirement = read_call(OBJECT_GET_URI, retirement_args, retirement_options)
+                readbacks.append({"uri": OBJECT_GET_URI, "args": retirement_args, "options": retirement_options, "result": retirement})
+                check(f"{label} owner-only replacement retires its complete old subtree", not _rows(retirement), retirement)
 
             verified_event_action_ids: set[str] = set()
             events = target.get("validated_events")
