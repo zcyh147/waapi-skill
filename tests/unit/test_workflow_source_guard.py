@@ -5718,10 +5718,19 @@ def test_compound_render_history_collector_keeps_native_metadata_and_complete_re
 
 
 @pytest.mark.parametrize('disposition', ['retained', 'absent-empty', 'absent-error',
-    'missing-result', 'ambiguous-result', 'unrelated-error', 'changed-curve'])
+    'missing-result', 'ambiguous-result', 'unrelated-error', 'changed-curve',
+    'native-packet', 'native-packet-wrong-guid', 'native-packet-wrong-version', 'native-packet-wrong-error'])
 def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path, workflow, monkeypatch, disposition):
     from copy import deepcopy
     runtime, commands, writes, task = _rtpc_graph_runtime(tmp_path / 'collector', workflow, '2022.1')
+    packet_case = disposition.startswith('native-packet')
+    recorded = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/owned-control-input-2022-disposition-absence.json').read_text())
+    native_call = recorded['recorded_call']
+    native_id = native_call['argv'][2]
+    if packet_case:
+        config = Path(task.env['WAAPI_SKILL_CONFIG_PATH'])
+        values = json.loads(config.read_text()); values['waapi_port'] = native_call['payload']['endpoint']['port']
+        config.write_text(json.dumps(values))  # Isolated fake-runtime configuration only.
     original, old_id = task.call, None
     def call(uri, args=None, options=None):
         nonlocal old_id
@@ -5732,7 +5741,7 @@ def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path,
             row = task.objects[args['object']]
             old_id = row['@ControlInput']['id']
             row['@ControlInput'] = {'id': args['value']}
-            if disposition.startswith('absent'):
+            if disposition.startswith('absent') or packet_case:
                 del task.objects[old_id]
             if disposition == 'changed-curve':
                 task.objects[row['@Curve']['id']]['points'][0]['y'] += 1
@@ -5742,20 +5751,44 @@ def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path,
             from tests.unit.test_waapi_gateway import WaapiRequestFailed
             raise WaapiRequestFailed('ak.wwise.query.invalid_query', {'details': {'procedureUri': uri},
                 'message': args['waql'] + (' - Object not found' if disposition == 'absent-error' else ' - Unsupported projection')})
-        return original(uri, args, options)
+        result = original(uri, args, options)
+        if packet_case and uri.endswith('object.set'):
+            # Reuse the actual packet's GUID in the fake constructor outcome;
+            # the retained public error packet's values remain exact.
+            for identity, row in list(task.objects.items()):
+                if row['type'] == 'ModulatorTime' and identity != native_id:
+                    task.objects.pop(identity); row['id'] = native_id; task.objects[native_id] = row
+                    task.objects[row['owner']['id']]['@ControlInput'] = {'id': native_id}
+                    def replace(value):
+                        if isinstance(value, dict):
+                            for key, item in value.items():
+                                if key == 'id' and item == identity: value[key] = native_id
+                                else: replace(item)
+                        elif isinstance(value, list):
+                            for item in value: replace(item)
+                    replace(result)
+        return result
     task.call = call
     original_raw = runtime.raw_gateway
     def raw(command):
         code, payload = original_raw(command)
         if old_id and command[:3] == ['query-object', '--exact-id', old_id] and '--detail' in command:
             payload = deepcopy(payload)
+            if packet_case:
+                assert old_id == native_id and command == native_call['argv']
+                code, payload = native_call['exit_code'], deepcopy(native_call['payload'])
+                if disposition == 'native-packet-wrong-guid':
+                    payload['semantic_preview']['envelope']['args']['waql'] = 'from object "{11111111-1111-1111-1111-111111111111}" take 2'
+                elif disposition == 'native-packet-wrong-version': payload['detected_version'] = '2025.1'
+                elif disposition == 'native-packet-wrong-error':
+                    payload['call']['waapi_error_details']['message'] = 'Unsupported projection'
             if disposition == 'missing-result': payload.pop('objects')
             elif disposition == 'ambiguous-result':
                 payload['objects'] *= 2
                 payload['count'] = 2
         return code, payload
     runtime.raw_gateway = raw
-    failed = disposition in {'missing-result', 'ambiguous-result', 'unrelated-error', 'changed-curve'}
+    failed = disposition in {'missing-result', 'ambiguous-result', 'unrelated-error', 'changed-curve'} or disposition.startswith('native-packet-wrong-')
     if failed:
         with pytest.raises(AssertionError):
             workflow._collect_owned_control_input_disposition(runtime, name='WAAPI_RTPC_TEST')
@@ -5764,12 +5797,16 @@ def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path,
         category = workflow._collect_owned_control_input_disposition(runtime, name='WAAPI_RTPC_TEST')
     receipt = json.loads(Path(category['observation_path']).read_text())
     assert category['status'] == ('FAIL' if failed else 'PASS') and receipt['complete'] is not failed
-    state = 'unobserved' if failed else 'absent' if disposition.startswith('absent') else 'retained'
+    state = 'unobserved' if failed else 'absent' if disposition.startswith('absent') or packet_case else 'retained'
     assert receipt['old_input_disposition']['state'] == state
     if failed: assert receipt['failure']['type'] == 'AssertionError'
     if disposition == 'changed-curve':
         assert receipt['after']['curve']['curve_points'] != receipt['before']['members'][0]['curve']['curve_points']
-    if disposition == 'absent-error': assert receipt['absence_normalization']['source'] == 'ak.wwise.query.invalid_query:object-not-found'
+    if disposition in {'absent-error', 'native-packet'}:
+        assert receipt['absence_normalization']['source'] == 'ak.wwise.query.invalid_query:object-not-found'
+    if disposition == 'native-packet':
+        assert receipt['calls'][-1] == native_call
+        assert receipt['absence_normalization']['original']['waapi_error_details'] == native_call['payload']['call']['waapi_error_details']
     assert receipt['owned_to_owned_acceptance'] is False
     assert receipt['observational_scope'] == 'owned_ControlInput_displaced_by_verified_shared_target_only'
     assert len(writes) == 4 and [cmd[0] for cmd in commands].count('execute') == 4

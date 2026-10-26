@@ -7244,8 +7244,11 @@ def _collect_owned_control_input_disposition(runtime: _WorkflowSandboxRuntime, *
             assert preview['envelope']['options'] == {'return': ['id', 'name', 'type', 'path', 'classId', 'owner', 'parent', 'notes']}, payload
             assert call['api'] == 'ak.wwise.core.object.get' and call['version'] == runtime.version, payload
             if call.get('waapi_error_uri') == 'ak.wwise.query.invalid_query':
-                assert call.get('waapi_error_details') == {'details': {'procedureUri': call['api']},
-                    'message': args['waql'] + ' - Object not found'}, payload
+                details = call.get('waapi_error_details')
+                assert isinstance(details, Mapping) and details.get('details') == {'procedureUri': call['api']}, payload
+            # Matching 2022 returns "Object not found (13)" rather than echoing
+            # the WAQL frame in its message. The bound frame above supplies
+            # identity authority; the existing normalizer owns error meaning.
             normalized = waapi_gateway.normalize_exact_object_absence(api=call['api'], args=args, result=call, exact_object_lookup=True)
             assert normalized.get('ok') is True and normalized.get('result') == {'return': []}, payload
             receipt['absence_normalization'] = normalized['normalization']
