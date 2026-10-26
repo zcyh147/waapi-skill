@@ -332,6 +332,26 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # #182 changes only import constraints: ordinary localized field admission
+    # and exact TSV version/Notes disclosure. Verify and invert those reviewed
+    # deltas before retaining every earlier schema seal below.
+    assert canonical_sha256(non_object_set_digests) == "05fa0904d8607b769b6614a2fa4d989763c0d31a2d87b5adf18d98d878ead741"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("audio.importTabDelimited", version)
+        assert contract["constraints"][:2] == [
+            "OriginalsSubFolder is a TSV column from Wwise 2023.1 (WG-60834); ordinary audio.import Originals placement remains separate",
+            "TSV Notes verifies target-object notes independently from Audio Source Notes; the exact user table is never rewritten",
+        ]
+        del contract["constraints"][:2]
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+        contract = operation_request_machine_contract("audio.import", version)
+        assert contract["constraints"][6] == (
+            "an ordinary audio.import live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight; Originals placement, one source notes field and a new Event retain ordinary import verification; other requested row fields are rejected"
+        )
+        contract["constraints"][6] = (
+            "a live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight and other requested row fields are rejected"
+        )
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
     # The representative PlaylistSlot native rejection adds one exact
     # constraint to the same five setName lanes. Preserve all earlier seals.
     assert canonical_sha256(non_object_set_digests) == "d1cf6cc2d1a3977c8cfbe4e7bf12f0396af64af5c27913f7cd4a0cbdb17f9257"
