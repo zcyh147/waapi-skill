@@ -675,16 +675,16 @@ def collect_localized_distinct_source_tsv_acceptance(runtime):
     return collect_localized_tsv_import_acceptance(runtime, witness_kind="distinct-owner-fields-media-tsv")
 
 
-def collect_switch_import_acceptance(runtime):
+def collect_switch_import_acceptance(runtime, *, tab_delimited=False):
     """Two imports under the sandbox's source-backed nonempty Switch graph."""
     from tests.destructive.test_gateway_workflow_transaction_matrix import (
         _start_business_draft, _update_business_draft, _bind_business_object,
         _complete_business_draft, _write_fixture_wav,
     )
     assert runtime.version == "2025.1", "This representative Switch witness is pinned to 2025.1"
-    output = runtime.state_dir / "switch-import-witness.json"
+    output = runtime.state_dir / ("switch-columns-tsv-witness.json" if tab_delimited else "switch-import-witness.json")
     assert not output.exists(), "Never overwrite original Switch observations"
-    category = {"category": "audio-import-switch-owner-media", "status": "FAIL", "transaction_ids": [],
+    category = {"category": "audio-import-switch-columns-tsv" if tab_delimited else "audio-import-switch-owner-media", "status": "FAIL", "transaction_ids": [],
         "verifier_strength": "public_verifier_plus_exact_group_pairs_source_media_and_subtree_preservation",
         "observation_path": str(output)}
     runtime.category_results.append(category)
@@ -797,6 +797,12 @@ def collect_switch_import_acceptance(runtime):
         assert (value["name"], value["type"], value["class_id"], value["path"], value["parent"]["id"]) == (
             "Snow", "Switch", 1310736, group["path"] + r"\Snow", group_id), value
         values = sorted(query(["--exact-id", group_id, "--relationship", "children"]), key=lambda row: row["id"])
+        metal_id = "{D457E7BF-4C4D-41A9-93F9-C127198EC739}"
+        if tab_delimited:
+            metal = exact(metal_id)
+            assert (metal["name"], metal["type"], metal["class_id"], metal["path"], metal["parent"]["id"]) == (
+                "Metal", "Switch", 1310736, group["path"] + r"\Metal", group_id), metal
+            assert all(any(row["id"] == identity for row in values) for identity in (value_id, metal_id)), values
         baseline = report["observations"]["baseline"] = {"container": container, "group": group, "values": values,
             "pairs": pairs(container_id), "subtree": subtree(container_id)}
         assert baseline["pairs"] and all(row["stateOrSwitch"] != value_id for row in baseline["pairs"]), baseline["pairs"]
@@ -822,13 +828,38 @@ def collect_switch_import_acceptance(runtime):
         assert len(before) == len(baseline["subtree"]) + 4 and len(spare_ids) == 2, before
         assert old_source["media"]["sha256"] == report["inputs"][str(first)]["sha256"]
         assert pairs(container_id) == baseline["pairs"]
-        replacement, created = audio(2, existing_name), audio(3, new_name)
-        draft = _start_business_draft(gateway, "audio.import")
-        owner = _bind_business_object(gateway, draft, object_id=existing["id"])
-        parent = _bind_business_object(gateway, draft, object_id=container_id)
-        _update_business_draft(gateway, draft, "draft-declare-import-batch", ["--row-order", "existing", "new",
-            "--existing-row", "existing", owner, "--field", "existing", "media_file", str(replacement), "--switch-value", "existing", "Snow",
-            "--new-row", "new", parent, new_name, "sound-sfx", "--field", "new", "media_file", str(created), "--switch-value", "new", "Snow"], live=False)
+        created = audio(3, new_name)
+        table = table_proof = None
+        if tab_delimited:
+            from wwise_waapi.platform_paths import adapt_cli_dispatch_paths
+            shown_setup = gateway.gateway(["transaction-show", report["setup"]["transaction_id"]], live=False)
+            media_path = str(created.resolve(strict=True))
+            uri = "ak.wwise.core.audio.importTabDelimited"
+            adapted = adapt_cli_dispatch_paths(uri=uri, args={"importFile": media_path}, options={},
+                io_audit={"uri": uri, "paths": [{"section": "args", "json_path": "$.args.importFile",
+                    "field": "importFile", "role": "read", "raw_path": media_path, "resolved_path": media_path}]},
+                project_guard=shown_setup["artifact"]["project_guard"])
+            native_media_path = adapted.args["importFile"]
+            assert proof(native_media_path) == report["inputs"][media_path]
+            report["media_cell_path_adaptation"] = adapted.proof
+            table = owned / "GatewaySwitchWitness/repeated-switch.tsv"
+            table.write_text("Object Path\tAudio File\tSwitch Assignation\tSwitch Assignation\n"
+                + f"<Sound SFX>{new_name}\t{native_media_path}\t<Switch Group:WAAPI_V2_Surface>Snow\t<Switch Group:WAAPI_V2_Surface>Metal\n",
+                encoding="utf-8", newline="\n")
+            table_proof = proof(str(table))
+            report["table"] = {**table_proof, "utf8": table.read_text(encoding="utf-8")}
+            draft = _start_business_draft(gateway, "audio.importTabDelimited")
+            parent = _bind_business_object(gateway, draft, role="import_location", object_id=container_id)
+            _update_business_draft(gateway, draft, "draft-declare-artifact-plan", ["--table-file", str(table),
+                "--location-handle", parent, "--language", "SFX", "--mode", "reimport"], live=False)
+        else:
+            replacement = audio(2, existing_name)
+            draft = _start_business_draft(gateway, "audio.import")
+            owner = _bind_business_object(gateway, draft, object_id=existing["id"])
+            parent = _bind_business_object(gateway, draft, object_id=container_id)
+            _update_business_draft(gateway, draft, "draft-declare-import-batch", ["--row-order", "existing", "new",
+                "--existing-row", "existing", owner, "--field", "existing", "media_file", str(replacement), "--switch-value", "existing", "Snow",
+                "--new-row", "new", parent, new_name, "sound-sfx", "--field", "new", "media_file", str(created), "--switch-value", "new", "Snow"], live=False)
         report["stage"] = "witness"
         _update_business_draft(gateway, draft, "draft-check", live=True)
         preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
@@ -836,15 +867,22 @@ def collect_switch_import_acceptance(runtime):
         witness.update(transaction_id=transaction, preview=preview); category["transaction_ids"].append(transaction)
         shown = gateway.gateway(["transaction-show", transaction], live=False)
         dispatch = witness["compiled_native_request"] = shown["artifact"]["prepared_operation"]["dispatch"]
-        assert dispatch["uri"] == "ak.wwise.core.audio.import" and dispatch["args"]["importOperation"] == "useExisting", dispatch
-        rows = dispatch["args"]["imports"]
-        owner_row, = [row for row in rows if row.get("switchAssignation") and existing_name in row["objectPath"]]
-        assert owner_row == {"objectPath": existing["path"], "objectType": "Sound SFX",
-            "switchAssignation": "<Switch Group:WAAPI_V2_Surface>Snow"}, owner_row
-        assert owner_row["switchAssignation"] == "<Switch Group:WAAPI_V2_Surface>Snow"
-        media_row, = [row for row in rows if row.get("importLocation") == old_source["object"]["id"]]
-        assert media_row["objectPath"] == "" and "switchAssignation" not in media_row and media_row["audioFile"] == str(replacement), media_row
-        assert sum("switchAssignation" in row for row in rows) == 2 and len(rows) <= 4, rows
+        if tab_delimited:
+            assert dispatch["uri"] == "ak.wwise.core.audio.importTabDelimited", dispatch
+            assert dispatch["args"]["importOperation"] == "useExisting" and dispatch["args"]["importFile"] == str(table), dispatch
+            assert "imports" not in dispatch["args"] and proof(str(table)) == table_proof, dispatch
+            target, = shown["artifact"]["prepared_operation"]["verification_plan"]["targets"]
+            assert target["switch_assignment_binding"]["value_ids"] == [value_id, metal_id], target
+        else:
+            assert dispatch["uri"] == "ak.wwise.core.audio.import" and dispatch["args"]["importOperation"] == "useExisting", dispatch
+            rows = dispatch["args"]["imports"]
+            owner_row, = [row for row in rows if row.get("switchAssignation") and existing_name in row["objectPath"]]
+            assert owner_row == {"objectPath": existing["path"], "objectType": "Sound SFX",
+                "switchAssignation": "<Switch Group:WAAPI_V2_Surface>Snow"}, owner_row
+            assert owner_row["switchAssignation"] == "<Switch Group:WAAPI_V2_Surface>Snow"
+            media_row, = [row for row in rows if row.get("importLocation") == old_source["object"]["id"]]
+            assert media_row["objectPath"] == "" and "switchAssignation" not in media_row and media_row["audioFile"] == str(replacement), media_row
+            assert sum("switchAssignation" in row for row in rows) == 2 and len(rows) <= 4, rows
         gateway.gateway(["confirm", transaction, "--confirmation-token", shown["confirmation"]["token"]], live=False)
         code, executed = gateway.raw_gateway(["execute", transaction]); witness.update(execute_exit_code=code, execute=executed); persist()
         if code != 0 or executed.get("state") != "executed_unverified":
@@ -863,16 +901,26 @@ def collect_switch_import_acceptance(runtime):
         assert all(after[key] == baseline[key] for key in ("container", "group", "values")), after
         assert all(after["subtree"][identity] == row for identity, row in baseline["subtree"].items())
         assert all(after["subtree"][identity] == before[identity] for identity in spare_ids)
-        assert after["subtree"][existing["id"]]["object"] == existing
-        current_source = after["subtree"][old_source["object"]["id"]]
-        assert current_source["object"] == old_source["object"]
-        assert current_source["media"]["sha256"] == report["inputs"][str(replacement)]["sha256"] != old_source["media"]["sha256"]
+        if tab_delimited:
+            assert all(after["subtree"][identity] == row for identity, row in before.items()), after
+            assert proof(str(table)) == table_proof
+        else:
+            assert after["subtree"][existing["id"]]["object"] == existing
+            current_source = after["subtree"][old_source["object"]["id"]]
+            assert current_source["object"] == old_source["object"]
+            assert current_source["media"]["sha256"] == report["inputs"][str(replacement)]["sha256"] != old_source["media"]["sha256"]
         new_owner, = [row["object"] for row in after["subtree"].values() if row["object"]["name"] == new_name and row["object"]["parent"]["id"] == container_id]
         new_source, = [row for row in after["subtree"].values() if row["object"]["type"] == "AudioFileSource" and row["object"]["parent"]["id"] == new_owner["id"]]
         assert new_owner["type"] == "Sound" and new_owner["class_id"] == 65552 and new_source["media"]["sha256"] == report["inputs"][str(created)]["sha256"]
+        if tab_delimited:
+            assert new_owner["path"] == container["path"] + "\\" + new_name and new_owner["parent"]["id"] == container_id, new_owner
+            assert (new_source["object"]["name"], new_source["object"]["path"], new_source["object"]["class_id"]) == (
+                new_name, new_owner["path"] + "\\" + new_name, 16), new_source
+
         assert set(after["subtree"]) == set(before) | {new_owner["id"], new_source["object"]["id"]}
-        expected = sorted([*baseline["pairs"], *({"child": identity.upper(), "stateOrSwitch": value_id} for identity in (existing["id"], new_owner["id"]))],
-            key=lambda row: (row["child"], row["stateOrSwitch"]))
+        requested_pairs = ([{"child": new_owner["id"].upper(), "stateOrSwitch": identity} for identity in (value_id, metal_id)]
+            if tab_delimited else [{"child": identity.upper(), "stateOrSwitch": value_id} for identity in (existing["id"], new_owner["id"])])
+        expected = sorted([*baseline["pairs"], *requested_pairs], key=lambda row: (row["child"], row["stateOrSwitch"]))
         assert after["pairs"] == expected, {"expected": expected, "actual": after["pairs"]}
         assert all(proof(path) == original for path, original in report["inputs"].items())
         assert len(witness["actual_verifications"]) == 1 and witness["actual_verifications"][0]["readbacks"]

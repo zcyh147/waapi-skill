@@ -1062,6 +1062,16 @@ def test_audio_import_switch_assignment_media_and_preservation(workflow_sandbox_
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_audio_import_exact_tsv_repeated_switch_columns_preserve_baseline(workflow_sandbox_runtime):
+    """One new SFX Sound requests Snow and Metal via exact repeated columns."""
+    if workflow_sandbox_runtime.version != "2025.1":
+        pytest.skip("Representative repeated Switch columns witness is pinned to 2025.1")
+    from tests.destructive.support.audio_import_acceptance import collect_switch_import_acceptance
+    collect_switch_import_acceptance(workflow_sandbox_runtime, tab_delimited=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_music_playlist_canonical_query_create_and_import_parent(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
