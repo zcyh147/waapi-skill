@@ -3642,7 +3642,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "switch_container must be a SwitchContainer",
             "child must be a direct child of switch_container",
             "state_or_switch must be a direct child of the group referenced by SwitchGroupOrStateGroup",
-            "the closed add policy rejects a child that already has any assignment",
+            "the exact child/state-or-switch pair must be absent; other pairs for that child are preserved",
         ),
         selection_guidance=_selection_guidance(
             use_when=("The user asks to add one Switch Container child assignment.",),
@@ -11791,6 +11791,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             from .project_setting_business_contracts import active_source_linkage_disclosure
             call_metadata["source_linkage"] = active_source_linkage_disclosure()
             warnings.append("Active-source selection uses existing source linkage and may affect other linked platforms; this operation does not unlink or establish platform isolation.")
+        if api == "ak.wwise.core.object.pasteProperties" and "inclusion" in call_args and "exclusion" in call_args:
+            call_metadata["paste_selection"] = {
+                "verification_strength": "result_schema_only", "business_state_verified": False,
+                "boundary": "Combined inclusion/exclusion effect remains unverified; no selection precedence or copied-field effect is promised.",
+            }
+            warnings.append(
+                "Paste submits both documented selection lists; the combined inclusion/exclusion effect remains unverified. "
+                "Verification checks the native result schema only, not selection precedence or copied field effects.")
         blend_plan = None
         if api == "ak.wwise.core.blendContainer.addAssignment":
             from .blend_assignment import prepare as prepare_blend, notice, materialize_index, BlendAssignmentError
@@ -17861,16 +17869,9 @@ def _prepare_switch_assignment(
     child_key = _identity_key(child.object)
     state_key = _identity_key(state.object)
     exact = [row for row in assignments if row["child_key"] == child_key and row["state_key"] == state_key]
-    same_child = [row for row in assignments if row["child_key"] == child_key]
     is_add = request.operation == "switchContainer.addAssignment"
     if is_add and exact:
         raise OperationContractError("NO_OP", "The exact Switch Container assignment already exists.", details={"assignment": exact})
-    if is_add and same_child:
-        raise OperationContractError(
-            "RELATIONSHIP_CONFLICT",
-            "The child already has an assignment to a different state or switch.",
-            details={"existing": same_child},
-        )
     if not is_add and not exact:
         raise OperationContractError(
             "NO_OP",

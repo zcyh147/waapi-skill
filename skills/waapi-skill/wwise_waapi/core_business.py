@@ -92,10 +92,11 @@ def _object_ids(
     *,
     field: str,
     role: str,
+    allow_empty: bool = False,
 ) -> list[str]:
     if (
         not isinstance(handles, list)
-        or not handles
+        or (not handles and not allow_empty)
         or len(handles) > 64
         or len(handles) != len(set(handles))
     ):
@@ -143,10 +144,11 @@ def _field_tokens(
     *,
     field: str,
     object_id: str,
+    allow_empty: bool = False,
 ) -> list[str]:
     if (
         not isinstance(handles, list)
-        or not handles
+        or (not handles and not allow_empty)
         or len(handles) > 64
         or len(handles) != len(set(handles))
     ):
@@ -400,6 +402,7 @@ def materialize_core_business_request(
                 plan["state_group_handles"],
                 field="state_group_handles",
                 role="state_group",
+                allow_empty=True,
             ),
         }
     elif operation == "ak.wwise.core.blendContainer.getAssignments":
@@ -530,6 +533,7 @@ def materialize_core_business_request(
                 plan["field_handles"],
                 field="field_handles",
                 object_id=object_id,
+                allow_empty=True,
             ),
         }
     elif operation == "ak.wwise.core.object.pasteProperties":
@@ -542,12 +546,6 @@ def materialize_core_business_request(
                 "list_mode",
             },
         )
-        if "include_field_handles" in plan and "exclude_field_handles" in plan:
-            raise business_repair(
-                "BUSINESS_FIELDS_CONFLICT",
-                field="include_field_handles",
-                action="choose inclusion or exclusion, not both",
-            )
         source_id = _object_id(
             session,
             plan["source_handle"],

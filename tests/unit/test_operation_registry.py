@@ -698,7 +698,7 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert "Do not query merely to translate" in specs[
         "switchContainer.addAssignment"
     ]["identity_contract"]["separate_query_object_rule"]
-    assert "rejects a child that already has any assignment" in specs["switchContainer.addAssignment"]["constraints"][-1]
+    assert "other pairs for that child are preserved" in specs["switchContainer.addAssignment"]["constraints"][-1]
     assert specs["object.set"]["implemented"] is True
     assert specs["object.set"]["supported_versions"] == ["2022.1", "2023.1", "2024.1", "2025.1"]
     create_plugin = specs["object.createPlugin"]

@@ -144,14 +144,11 @@ def test_add_and_remove_fail_closed_when_assignment_state_is_unknown_or_noop() -
     assert duplicate.value.error_code == SemanticErrorCode.DESTRUCTIVE_GATE_REQUIRED
     assert "no-op" in duplicate.value.message
 
-    with pytest.raises(SemanticValidationError) as assigned_elsewhere:
-        builder().add_assignment(
-            switch_container=CONTAINER_ID,
-            child=CHILD_ID,
-            state_or_switch=STATE_ID,
-            existing_assignments=[{"child": CHILD_ID, "stateOrSwitch": OTHER_STATE_ID}],
-        )
-    assert assigned_elsewhere.value.error_code == SemanticErrorCode.DESTRUCTIVE_GATE_REQUIRED
+    second_value = builder().add_assignment(
+        switch_container=CONTAINER_ID, child=CHILD_ID, state_or_switch=STATE_ID,
+        existing_assignments=[{"child": CHILD_ID, "stateOrSwitch": OTHER_STATE_ID}],
+    )
+    assert second_value.envelope.args == {"child": CHILD_ID, "stateOrSwitch": STATE_ID}
 
     with pytest.raises(SemanticValidationError) as missing_pair:
         builder().remove_assignment(

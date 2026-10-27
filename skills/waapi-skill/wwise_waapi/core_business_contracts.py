@@ -157,6 +157,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
     "ak.wwise.core.object.setStateGroups": {
         "versions": ("2023.1", "2024.1", "2025.1"),
         "roles": ("object", "state_group"),
+        "empty_collections": ("state_group_handles",),
         "required_fields": ("object_handle", "state_group_handles"),
         "optional_fields": (),
         "field_types": {
@@ -168,6 +169,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
     "ak.wwise.core.object.setStateProperties": {
         "versions": ("2023.1", "2024.1", "2025.1"),
         "roles": ("object",),
+        "empty_collections": ("field_handles",),
         "required_fields": ("object_handle", "field_handles"),
         "optional_fields": (),
         "field_types": {
@@ -507,6 +509,8 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
             for name, value_type in row["field_types"].items()
         }
     )
+    for field in row.get("empty_collections", ()):
+        input_forms[field] = {**input_forms[field], "empty": {"flag": "--empty", "arguments": [field]}}
     role_fields = []
     for role in row["roles"]:
         if read_declaration is not None:
@@ -526,7 +530,7 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
                 "role": role,
                 "field": field,
                 "cardinality": (
-                    "one_or_more"
+                    ("zero_or_more" if field in row.get("empty_collections", ()) else "one_or_more")
                     if public_field_types[field] == "bound_object_handle_list"
                     else "exactly_one"
                 ),

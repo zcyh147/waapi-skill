@@ -2867,6 +2867,10 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("BUSINESS_FIELD", "VALUE"),
     )
     draft_declare_core_plan.add_argument(
+        "--empty", action="append", default=[], metavar="BUSINESS_COLLECTION",
+        help="Explicit empty replacement for a collection disclosed by this operation",
+    )
+    draft_declare_core_plan.add_argument(
         "--item",
         action="append",
         nargs=2,
@@ -13400,6 +13404,12 @@ def dispatch_business_core_plan(
             raise GatewayInputError(
                 f"Core business field role {name!r} is not disclosed for this operation"
             )
+    for name in args.empty:
+        if "empty" not in contract["declaration"]["input_forms"].get(name, {}):
+            raise GatewayInputError(f"Core business collection {name!r} does not admit an empty replacement")
+        if name in plan:
+            raise GatewayInputError(f"Core business field {name!r} has conflicting or repeated forms")
+        plan[name] = []
     for name, raw in args.value:
         value_type = field_types.get(name)
         if value_type == "boolean":
@@ -32836,6 +32846,9 @@ def transaction_show_summary(
     owned_replacements = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("owned_control_input_replacements")
     if owned_replacements:
         derived_notice["owned_control_input_replacements"] = owned_replacements
+    paste_selection = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("paste_selection")
+    if isinstance(paste_selection, Mapping):
+        derived_notice["paste_selection"] = dict(paste_selection)
     source_linkage = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("source_linkage")
     blend_assignment = prepared.get("pre_state", {}).get("blend_assignment")
     conversion_plugin = prepared.get("pre_state", {}).get("conversion_plugin")

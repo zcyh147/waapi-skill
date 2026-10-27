@@ -343,7 +343,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # Custom Metadata owner placement adds one exact version-qualified constraint
     # to createPlugin. Retain its new seal and invert only this reviewed delta
     # before every historical inventory and independently reconstructed contract.
-    assert canonical_sha256(non_object_set_digests) == "bb0d07d6aeae586187a5420c4b7af2971f163298e9f0067b87982c195b74c32c"
+    assert canonical_sha256(non_object_set_digests) == "a258594257893545825465e00c8bd0da99fca888edfa9dc483e02f54edafadfb"
     def before_local_metadata_placement(operation, version):
         contract = operation_request_machine_contract(operation, version)
         if operation == "object.createPlugin":
@@ -354,6 +354,14 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
         non_object_set_digests[f"object.createPlugin@{version}"] = canonical_sha256(
             before_local_metadata_placement("object.createPlugin", version))
+    # Switch assignment completion changes only the same-child constraint in
+    # five lanes. Restore that reviewed field before the historical seals.
+    assert canonical_sha256(non_object_set_digests) == "f25c13b39acb59aca80661038db7858f9ea685e4c5268239cf9c2ef30f442d8a"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("switchContainer.addAssignment", version)
+        assert contract["constraints"][-1] == "the exact child/state-or-switch pair must be absent; other pairs for that child are preserved"
+        contract["constraints"][-1] = "the closed add policy rejects a child that already has any assignment"
+        non_object_set_digests[f"switchContainer.addAssignment@{version}"] = canonical_sha256(contract)
     # Definition completion changes exactly four constraints on four lanes.
     # Reverse those fields before all historical checks, including later
     # contracts rebuilt independently rather than using the current inventory.
