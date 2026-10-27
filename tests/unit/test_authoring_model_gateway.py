@@ -15,7 +15,7 @@ def test_window_creation_discloses_closed_owned_transaction(tmp_path, version):
     assert adapter['execution_shape'] == 'transaction'
     assert adapter['declaration']['schema']['additionalProperties'] is False
     assert adapter['resource_lifetime']['ownership'] == 'gateway_created_only'
-    assert adapter['effect_verification']['native_effect_evidence'] == 'required_unfinished'
+    assert adapter['effect_verification']['native_effect_evidence'] == 'not_independently_verified'
 
 from tests.unit.test_authoring_layout_mutation_gateway import LayoutClient
 from tests.support.gateway_config import set_gateway_config

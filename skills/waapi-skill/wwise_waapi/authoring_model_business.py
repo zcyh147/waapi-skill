@@ -103,7 +103,7 @@ def model_business_contract(operation: str, version: str) -> dict[str, Any]:
         'resource_lifetime': {'ownership': 'gateway_created_only',
             'ownership_recovery': ['authoring-resource', '<creation_transaction_id>'], 'scope': 'configuration_host_build_session_project',
             'cleanup': 'separately_previewed_owned_close_or_destroy', 'unknown_creation': 'never_retry'},
-        'effect_verification': {'native_effect_evidence': 'required_unfinished',
+        'effect_verification': {'native_effect_evidence': 'not_independently_verified',
             'window_effect': 'native_result_does_not_establish_visible_or_closed_window',
             'signal_delivery': 'emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission',
             'exact_topic_semantics': 'native accepts or rejects the selected URI; no availability is inferred from its spelling'},

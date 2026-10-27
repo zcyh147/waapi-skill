@@ -40,3 +40,9 @@ Complete only the exact branch scope and evidence owned by this ticket. A native
 Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
 
 Group native delivery cases by materially different trigger/host behavior, keeping each Topic's subscription, filtering, event-content and cleanup assertions separate. A single observed event may support multiple exact payload obligations; unobserved alternatives retain no native credit. Use code tests for malformed payloads, nonmatching events, count/idle/total timeout and cleanup-error handling. Reuse existing matching-host receipts where valid, and implement missing triggers through their linked dependencies. Branch counts are not a requested count of separate native or Fresh runs.
+
+## Lightweight acceptance reconciliation — 2026-10-27
+
+The five-version Topic contracts, recursive construction repair and shared monitoring controls, together with retained scoped event/Notes observations, satisfy the current lightweight acceptance method. The #189 UI dependency is reconciled through its owned resource/trigger contract and the existing subscription controls; no new click/toggle campaign is required. No additional ordinary input gap was identified in this reconciliation. This does not grant native delivery credit to unobserved payload alternatives.
+
+See [the closeout note](../AUTHORING_MODEL_TOPIC_CLOSEOUT.md) for exact scope, retained proof and limitations. This successor assessment supersedes earlier required-effect quotas for these lightweight wrappers without changing historical results. No native or Fresh run is authorized; #195 retains combined gates and inventory reconciliation.

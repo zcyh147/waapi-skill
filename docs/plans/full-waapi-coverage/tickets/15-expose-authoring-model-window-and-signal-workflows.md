@@ -45,3 +45,9 @@ that the model API is broken in normal mode, establish native absence, or grant
 a business-effect PASS. Preserve existing source/program facts and disclose
 frontend/schema and unobserved-effect limitations under the current lightweight
 acceptance policy; this paragraph does not complete #189.
+
+## Lightweight acceptance reconciliation — 2026-10-27
+
+The nine closed model/window/signal wrappers and their existing public Gateway controls satisfy the current lightweight acceptance method. No sourced ordinary native input or route omission was identified. Unobserved effects and the retained failed/blocked attempts remain explicit limitations; they are not native absence or business-effect PASS.
+
+See [the closeout note](../AUTHORING_MODEL_TOPIC_CLOSEOUT.md) for exact scope, retained proof and limitations. This successor assessment supersedes earlier required-effect quotas for these lightweight wrappers without changing historical results. No native or Fresh run is authorized; #195 retains combined gates and inventory reconciliation.
