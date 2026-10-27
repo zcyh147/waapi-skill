@@ -21,6 +21,8 @@ from tests.support.condition_source_resolution import reconcile_sources, _scope,
 REVIEW_PATH = 'tests/fixtures/metadata-conditions/condition-completion-review.json'
 PROOF_PATH = 'tests/fixtures/metadata-conditions/condition-completion-proof-inputs.json.gz'
 REVIEW_SHA256 = '56fe04bfe969fdafa404184a1166002a827c702561918dcc03a7948605acff84'
+SOURCE_RECONCILIATION_PATH = 'tests/fixtures/metadata-conditions/condition-source-reconciliation.json'
+SOURCE_RECONCILIATION_SHA256 = 'd1cfabad293db4bf1e36b5c4167b9dd8cab4dbd9a13ffe7068ef505d6b6ef6ef'
 
 
 def definition_mapping(root):
@@ -148,6 +150,31 @@ def definition_mapping(root):
         'occurrences': rows}
 
 
+def _current_sources(root, review):
+    """Admit only the pinned source successor, keeping original proof seals."""
+    raw = (root / SOURCE_RECONCILIATION_PATH).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != SOURCE_RECONCILIATION_SHA256:
+        raise ValueError('Exact condition source reconciliation differs')
+    successor = json.loads(raw)
+    if (set(successor) != {'contract', 'original_review_sha256', 'scope',
+            'source_changes', 'source_additions', 'review_provenance'}
+            or successor['contract'] != 'waapi-skill.condition-source-reconciliation/v1'
+            or successor['original_review_sha256'] != REVIEW_SHA256):
+        raise ValueError('Condition source reconciliation requires its exact original review')
+    changes, additions = successor['source_changes'], successor['source_additions']
+    sources = dict(review['current_sources'])
+    for path, change in changes.items():
+        if (sources.get(path) != change['before_sha256']
+                or change['before_sha256'] == change['current_sha256']):
+            raise ValueError('Condition source reconciliation predecessor differs')
+        sources[path] = change['current_sha256']
+    for path, addition in additions.items():
+        if path in sources or addition['before_sha256'] is not None:
+            raise ValueError('Condition source reconciliation addition has a predecessor')
+        sources[path] = addition['current_sha256']
+    return sources
+
+
 def _review(root):
     raw = (root / REVIEW_PATH).read_bytes()
     if hashlib.sha256(raw).hexdigest() != REVIEW_SHA256:
@@ -155,7 +182,7 @@ def _review(root):
     review = json.loads(raw)
     if hashlib.sha256((root / PROOF_PATH).read_bytes()).hexdigest() != review['proof_archive_sha256']:
         raise ValueError('Original condition proof archive changed')
-    sources = {**review['current_sources'],
+    sources = {**_current_sources(root, review),
         'docs/branch-coverage-condition-sources.json': review['source_manifest_sha256'],
         'tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz': review['source_snapshot_sha256']}
     if any(hashlib.sha256((root / p).read_bytes()).hexdigest() != h for p, h in sources.items()):
