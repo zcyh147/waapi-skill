@@ -1,0 +1,62 @@
+{
+  "contract": "waapi-skill.branch-bindings/v1",
+  "bindings": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/argsSchema": {
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/argsSchema",
+      "native_shape_sha256": "2b00b20b6f959da4dc80aa28e8c0d0c496c273bbafe56b99f9d2db580f891d08",
+      "public_route": "2025.1|function|ak.wwise.core.profiler.getBusses",
+      "public_route_sha256": "fc450b456c61028ff0d374528f7180ed04fe794dec805e970cc3dc7faf3b07ff",
+      "input": {
+        "gateway_argv": [
+          "core-call",
+          "ak.wwise.core.profiler.getBusses",
+          "--profiler-position",
+          "0",
+          "--result-view",
+          "diagnostics",
+          "--max-results",
+          "64"
+        ],
+        "selector": "/native_call/args",
+        "correspondence": {
+          "rule": "exact_versioned_closed_runtime_declaration_and_whole_result_preservation",
+          "native_pointer": "/argsSchema",
+          "original_mapping_index_sha256": "8b03d5ac006b840a0ef7a27044254a401a2483145f233ed6f8ddf30b8af29ccc"
+        }
+      },
+      "construction": {
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_inspection_business_request",
+        "selector": "/argsSchema"
+      },
+      "validation": {
+        "source": "skills/waapi-skill/wwise_waapi/builders/schema.py#validate_resolved_semantic_result",
+        "selector": "/argsSchema"
+      },
+      "verifier": {
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
+        "selector": "/argsSchema"
+      },
+      "evidence": {
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-4-program.json",
+          "sha256": "96286518baf53f50e55ff21962873c758c1a7472e023ec0bc7c5397cfd064d12"
+        }
+      },
+      "ordinary_test_run_attachment": true,
+      "relevant_sources": [
+        "skills/waapi-skill/scripts/gateway.py",
+        "skills/waapi-skill/scripts/run.py",
+        "skills/waapi-skill/wwise_waapi/builders/schema.py",
+        "skills/waapi-skill/wwise_waapi/builders/stable_reads.py",
+        "skills/waapi-skill/wwise_waapi/capabilities.py",
+        "skills/waapi-skill/wwise_waapi/dispatcher.py",
+        "skills/waapi-skill/wwise_waapi/io_policy.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_observations.py",
+        "tests/unit/test_fixed_runtime_read_branch_evidence.py"
+      ],
+      "representative_mechanism": "runtime195-fixed-v1"
+    }
+  }
+}

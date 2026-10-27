@@ -1,0 +1,117 @@
+{
+  "contract": "waapi-skill.ordinary-test-run-attachment/v1",
+  "scope_kind": "product",
+  "candidate_sha256": "26357edefcf81f42f18425ddd6f15967419559a21e995969fe0a3cd38ba323fd",
+  "original_candidate": "6ae8fea1877b342beabb2ab68650a04b9cc5ccc1",
+  "files": {
+    "plan": {
+      "artifact": "runtime-read-log-195-r1/ordinary/r2/run.plan.json",
+      "sha256": "95f5cc30ec1d3b3b9bc49cfaab454b369d3aa3f57c2e054212740a73e0d4d29f"
+    },
+    "result": {
+      "artifact": "runtime-read-log-195-r1/ordinary/r2/run.result.json",
+      "sha256": "1927171a83c5ce72ea0829cfd86fd0654d942714e750476996b7e43459f1c6a1"
+    },
+    "summary": {
+      "artifact": "runtime-read-log-195-r1/ordinary/r2/run.summary.json",
+      "sha256": "eaf5a44a78573b414e26415ca7c4d7f380130993677cdc76f565151fe4b2b4e3"
+    },
+    "log": {
+      "artifact": "runtime-read-log-195-r1/ordinary/r2/run.log",
+      "sha256": "ac1520fe97d29c92d6b2dc57ec96fa364f888625a5bf80b90553fe47a1decc0e"
+    },
+    "exit": {
+      "artifact": "runtime-read-log-195-r1/ordinary/r2/run.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    }
+  },
+  "original_sources": {
+    "ci/program-test-nodes.txt": "63610a61d6c1bc37e1a66abcdad7ce76fb720d592d920e8f74cf06b219b099e4",
+    "ci/run_program_tests.py": "967d38ff2f8e798b224932f3e8f56277368435537ddb837bc571215eba0f85d6",
+    "ci/test.sh": "8e0be6da25d33455452590767e4b1b5c22bffa353d7ac6ff275f9580e981b534",
+    "ci/test_driver.py": "269298151be54391cb9a06f84e82072b7657e815916193ba240576c0938ac56d",
+    "skills/waapi-skill/scripts/gateway.py": "84872d1415f0bce5c3d05eb05f4ec3e292d116c1fd7fed8d4017a4d0a1f4ac2d",
+    "skills/waapi-skill/scripts/run.py": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
+    "skills/waapi-skill/wwise_waapi/builders/schema.py": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2",
+    "skills/waapi-skill/wwise_waapi/builders/stable_reads.py": "ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8",
+    "skills/waapi-skill/wwise_waapi/capabilities.py": "1aaad4a488ce0c5999d529ee0bf9c4b8b9feff70d5af049f3f25059695101997",
+    "skills/waapi-skill/wwise_waapi/dispatcher.py": "78447706af99b8e96de0b9072f02b1741f50610f0ad5c3e723587bf1aa11ab56",
+    "skills/waapi-skill/wwise_waapi/io_policy.py": "6850462c23a407c3e831b8fd2f2836da9ef87a87a9d6e450c31c29a7b3ed5bd2",
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712",
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": "14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594",
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_observations.py": "49aeabef2d4ee22ff00887b74a0cf7fad6d572d6879c3b2892cf36fe2ae9750f",
+    "tests/unit/test_runtime_log_branch_evidence.py": "092da562011affaa332ce2dbe1051b8317a6e98f31df3a42558b659dbd43a151"
+  },
+  "review": {
+    "reason": "Runtime source-owned compiler and bounded result preservation reviewed against common448 packaged successor and original413 native maps in source-transition-review.json. Accounting/source admission changes leave the selected public request/result construction mechanism unchanged. Retain all original failures and verification strengths.",
+    "selection_reason": "Exact selected parametrized case was executed by the existing ordinary CI launcher; original complete phase JSON is retained. This adapter deliberately retains aggregate code strength and invents no Gateway/native observation.",
+    "sources": {
+      "skills/waapi-skill/scripts/gateway.py": {
+        "original_sha256": "84872d1415f0bce5c3d05eb05f4ec3e292d116c1fd7fed8d4017a4d0a1f4ac2d",
+        "current_sha256": "84872d1415f0bce5c3d05eb05f4ec3e292d116c1fd7fed8d4017a4d0a1f4ac2d",
+        "reviewed_reason": "Exact selected business source path. Runtime-family finite field/alias extensions preserve Gateway-owned construction; current immutable-source-cache/native-map changes affect evidence admission only. No later native or per-node observation asserted."
+      },
+      "skills/waapi-skill/scripts/run.py": {
+        "original_sha256": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
+        "current_sha256": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
+        "reviewed_reason": "Exact selected business source path. Runtime-family finite field/alias extensions preserve Gateway-owned construction; current immutable-source-cache/native-map changes affect evidence admission only. No later native or per-node observation asserted."
+      },
+      "skills/waapi-skill/wwise_waapi/builders/schema.py": {
+        "original_sha256": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2",
+        "current_sha256": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2",
+        "reviewed_reason": "Exact selected business source path. Runtime-family finite field/alias extensions preserve Gateway-owned construction; current immutable-source-cache/native-map changes affect evidence admission only. No later native or per-node observation asserted."
+      },
+      "skills/waapi-skill/wwise_waapi/builders/stable_reads.py": {
+        "original_sha256": "ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8",
+        "current_sha256": "ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8",
+        "reviewed_reason": "Exact selected business source path. Runtime-family finite field/alias extensions preserve Gateway-owned construction; current immutable-source-cache/native-map changes affect evidence admission only. No later native or per-node observation asserted."
+      },
+      "skills/waapi-skill/wwise_waapi/capabilities.py": {
+        "original_sha256": "1aaad4a488ce0c5999d529ee0bf9c4b8b9feff70d5af049f3f25059695101997",
+        "current_sha256": "1aaad4a488ce0c5999d529ee0bf9c4b8b9feff70d5af049f3f25059695101997",
+        "reviewed_reason": "Exact selected business source path. Runtime-family finite field/alias extensions preserve Gateway-owned construction; current immutable-source-cache/native-map changes affect evidence admission only. No later native or per-node observation asserted."
+      },
+      "skills/waapi-skill/wwise_waapi/dispatcher.py": {
+        "original_sha256": "78447706af99b8e96de0b9072f02b1741f50610f0ad5c3e723587bf1aa11ab56",
+        "current_sha256": "78447706af99b8e96de0b9072f02b1741f50610f0ad5c3e723587bf1aa11ab56",
+        "reviewed_reason": "Exact selected business source path. Runtime-family finite field/alias extensions preserve Gateway-owned construction; current immutable-source-cache/native-map changes affect evidence admission only. No later native or per-node observation asserted."
+      },
+      "skills/waapi-skill/wwise_waapi/io_policy.py": {
+        "original_sha256": "6850462c23a407c3e831b8fd2f2836da9ef87a87a9d6e450c31c29a7b3ed5bd2",
+        "current_sha256": "6850462c23a407c3e831b8fd2f2836da9ef87a87a9d6e450c31c29a7b3ed5bd2",
+        "reviewed_reason": "Exact selected business source path. Runtime-family finite field/alias extensions preserve Gateway-owned construction; current immutable-source-cache/native-map changes affect evidence admission only. No later native or per-node observation asserted."
+      },
+      "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
+        "original_sha256": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712",
+        "current_sha256": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712",
+        "reviewed_reason": "Exact selected business source path. Runtime-family finite field/alias extensions preserve Gateway-owned construction; current immutable-source-cache/native-map changes affect evidence admission only. No later native or per-node observation asserted."
+      },
+      "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
+        "original_sha256": "14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594",
+        "current_sha256": "14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594",
+        "reviewed_reason": "Exact selected business source path. Runtime-family finite field/alias extensions preserve Gateway-owned construction; current immutable-source-cache/native-map changes affect evidence admission only. No later native or per-node observation asserted."
+      },
+      "skills/waapi-skill/wwise_waapi/runtime_inspection_observations.py": {
+        "original_sha256": "49aeabef2d4ee22ff00887b74a0cf7fad6d572d6879c3b2892cf36fe2ae9750f",
+        "current_sha256": "49aeabef2d4ee22ff00887b74a0cf7fad6d572d6879c3b2892cf36fe2ae9750f",
+        "reviewed_reason": "Exact selected business source path. Runtime-family finite field/alias extensions preserve Gateway-owned construction; current immutable-source-cache/native-map changes affect evidence admission only. No later native or per-node observation asserted."
+      },
+      "tests/unit/test_runtime_log_branch_evidence.py": {
+        "original_sha256": "092da562011affaa332ce2dbe1051b8317a6e98f31df3a42558b659dbd43a151",
+        "current_sha256": "092da562011affaa332ce2dbe1051b8317a6e98f31df3a42558b659dbd43a151",
+        "reviewed_reason": "Exact selected business source path. Runtime-family finite field/alias extensions preserve Gateway-owned construction; current immutable-source-cache/native-map changes affect evidence admission only. No later native or per-node observation asserted."
+      }
+    },
+    "skip_attribution": {}
+  },
+  "mechanism": {
+    "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.get|/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+    "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.get",
+    "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+    "binding_semantics_sha256": "f9df3fa4e263b2fa52dd6b6382f3098ae2cc830a929dcc8c4b1bd6d964e41a6f",
+    "selected_tests": [
+      "tests/unit/test_runtime_log_branch_evidence.py::test_log_invalid_severity_counterexamples_keep_native_gates[authoring]"
+    ]
+  },
+  "skip_lines": []
+}

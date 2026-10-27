@@ -1,0 +1,74 @@
+{
+  "contract": "waapi-skill.branch-bindings/v1",
+  "bindings": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.get|/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string": {
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.get|/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+      "construction": {
+        "selector": "/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_inspection_business_request"
+      },
+      "input": {
+        "gateway_argv": [
+          "--state-dir",
+          "/private/tmp/waapi-r128-log-counter-green2/test_log_invalid_severity_coun1/counter-1/state",
+          "core-call",
+          "ak.wwise.core.log.get",
+          "--log-channel",
+          "general"
+        ],
+        "selector": "/native_calls/1/result/items/0/severity",
+        "correspondence": {
+          "rule": "exact_versioned_closed_runtime_declaration_and_whole_result_preservation",
+          "native_pointer": "/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+          "original_mapping_index_sha256": "6195b64a662b44757a954c902a8a745e57883e1dca530aae5828c5326a79dae4"
+        }
+      },
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "public_route": "2025.1|function|ak.wwise.core.log.get",
+      "public_route_sha256": "8e823379fd94043a6ecc21697fa33dbc9edecc02ee8dd571dcad235671701acb",
+      "validation": {
+        "selector": "/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+        "source": "skills/waapi-skill/wwise_waapi/builders/schema.py#validate_resolved_semantic_result"
+      },
+      "verifier": {
+        "selector": "/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result"
+      },
+      "evidence": {
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-12-program.json",
+          "sha256": "029d9d42d9b8b86c6e847dd85fb0d90456905cb53652090c33e5d81b927da504"
+        }
+      },
+      "ordinary_test_run_attachment": true,
+      "relevant_sources": [
+        "skills/waapi-skill/scripts/gateway.py",
+        "skills/waapi-skill/scripts/run.py",
+        "skills/waapi-skill/wwise_waapi/builders/schema.py",
+        "skills/waapi-skill/wwise_waapi/builders/stable_reads.py",
+        "skills/waapi-skill/wwise_waapi/capabilities.py",
+        "skills/waapi-skill/wwise_waapi/dispatcher.py",
+        "skills/waapi-skill/wwise_waapi/io_policy.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_observations.py",
+        "tests/unit/test_runtime_log_branch_evidence.py"
+      ],
+      "disposition": "schema_counterexample",
+      "empty_candidate": {
+        "contract": "waapi-skill.empty-candidate-classification/v1",
+        "status": "rejected",
+        "candidate": "",
+        "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.get",
+        "pointer": "/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+        "parent_pointer": "/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity",
+        "parent_schema_sha256": "f67365c1392c37c1dc87e92bb07d5f03eb6238ae948a42ad732c75a50b293145",
+        "context_sha256": "67c3432d4da4b0e96ac31018c2deaef6b203a288a0a5ead67e047abfdc6109c1",
+        "catalog_sha256": "411c83c1e9b0d8d1fcb0fa82242e1a47728525379dfca93d1c4c40a9325679b5",
+        "definitions_sha256": "5b84d51bcc827ec556297f06e60e7755fe29af1c9d8ac3fb729f3ef99225e8e3",
+        "owning_section_sha256": "a85bf388aad4b92a6f915789c1a0a77e68b38a186b78e7cb9bf6e8c4802d8c49",
+        "reason": "resolved schema rejects concrete candidate"
+      }
+    }
+  }
+}

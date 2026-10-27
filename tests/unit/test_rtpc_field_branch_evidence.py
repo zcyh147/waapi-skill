@@ -923,3 +923,24 @@ def test_rtpc_frontier_program_emits_after_actual_teardown(tmp_path, request, ve
     register_exact_evidence_finalizer(request.node, lambda phases: write_program_receipt(
         destination, receipt, dispatch, nodeid=request.node.nodeid, phase_reports=phases, source_context=context,
         native_reads=trace if mode.startswith('cursor-') else None))
+
+
+def test_retained_native_source_checks_original_map_separately_from_program(tmp_path, monkeypatch):
+    from tests.support import runtime_observation_evidence as runtime
+    original = {'skills/waapi-skill/original.py': '1' * 64}
+    program = {**original, 'skills/waapi-skill/later.py': '2' * 64}
+    monkeypatch.setattr(runtime, '_proof', lambda binding, base: {'relevant_sources': program})
+    monkeypatch.setattr(runtime, 'retained_runtime_native', lambda *args: {'sources': original})
+    requested = []
+    def historical(root, candidate, selected, cache):
+        requested.append(dict(selected))
+        return original
+    monkeypatch.setattr(completion, 'historical_source_seals', historical)
+    context = {'candidate': 'a' * 40}
+    binding = {'runtime_observation_attachment': True, 'native_only_base': 'packet'}
+    completion.validate_native_source(context, {}, {'id': 'owned'}, 'current', binding, tmp_path, tmp_path)
+    assert requested == [original]
+    monkeypatch.setattr(completion, 'historical_source_seals', lambda *args: {**original,
+        'skills/waapi-skill/original.py': '0' * 64})
+    with pytest.raises(ValueError, match='original native Git source map differs'):
+        completion.validate_native_source(context, {}, {'id': 'owned'}, 'current', binding, tmp_path, tmp_path)

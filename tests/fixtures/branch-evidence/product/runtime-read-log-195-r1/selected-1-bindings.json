@@ -1,0 +1,74 @@
+{
+  "contract": "waapi-skill.branch-bindings/v1",
+  "bindings": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema": {
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema",
+      "native_shape_sha256": "7a53ea2a5811a2b4ce5ee54c33f0d4888e97d86ca792924411114692c2669b38",
+      "public_route": "2025.1|function|ak.wwise.core.log.clear",
+      "public_route_sha256": "7ce150f846d5ddb4da59327dc1c37759662cabee2a114f760a35a2b2d2bfd2c3",
+      "input": {
+        "gateway_argv": [
+          "draft-start",
+          "ak.wwise.core.log.clear"
+        ],
+        "selector": "/native_call/args",
+        "declaration": "draft-declare-runtime-control-plan",
+        "correspondence": {
+          "rule": "exact_versioned_closed_runtime_declaration_and_whole_result_preservation",
+          "native_pointer": "/argsSchema",
+          "original_mapping_index_sha256": "63e7408d221933cfff673827d282bd913f98d8f52ac6b68ebe6e7438914af5e9"
+        },
+        "choices": {
+          "log-channel": [
+            "general",
+            "soundbank-generation",
+            "audio-conversion",
+            "platform-settings-copy",
+            "waapi",
+            "project-load",
+            "source-control",
+            "lua"
+          ]
+        }
+      },
+      "construction": {
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_inspection_business_request",
+        "selector": "/argsSchema"
+      },
+      "validation": {
+        "source": "skills/waapi-skill/wwise_waapi/builders/schema.py#validate_resolved_semantic_result",
+        "selector": "/argsSchema"
+      },
+      "verifier": {
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
+        "selector": "/argsSchema"
+      },
+      "evidence": {
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-1-program.json",
+          "sha256": "bd136c6ea93f5f3e2867419a1acbb3fea55d05d252864ad8beee27f0b3f1bdc3"
+        }
+      },
+      "ordinary_test_run_attachment": true,
+      "relevant_sources": [
+        "skills/waapi-skill/scripts/gateway.py",
+        "skills/waapi-skill/scripts/run.py",
+        "skills/waapi-skill/wwise_waapi/builders/schema.py",
+        "skills/waapi-skill/wwise_waapi/builders/stable_reads.py",
+        "skills/waapi-skill/wwise_waapi/capabilities.py",
+        "skills/waapi-skill/wwise_waapi/dispatcher.py",
+        "skills/waapi-skill/wwise_waapi/io_policy.py",
+        "skills/waapi-skill/wwise_waapi/operation_registry.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_observations.py",
+        "skills/waapi-skill/wwise_waapi/runtime_log_effects.py",
+        "skills/waapi-skill/wwise_waapi/transaction_cleanup.py",
+        "skills/waapi-skill/wwise_waapi/transaction_runtime.py",
+        "skills/waapi-skill/wwise_waapi/transactions.py",
+        "tests/unit/test_runtime_log_branch_evidence.py"
+      ],
+      "representative_mechanism": "runtime195-log-clear-v1"
+    }
+  }
+}

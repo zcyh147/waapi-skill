@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema": {
+      "native_shape_sha256": "a72c2746e480686dddc6c9e179b5752232730fa582a88e9c3f34fe96999636cc",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim",
+      "representative_mechanism": "runtime195-loaded-console-v1"
+    }
+  }
+}

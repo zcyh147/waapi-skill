@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema": {
+      "native_shape_sha256": "9a1a0e2d0262685cb4e8404bcc3aa0655ab415a4a04e8d07da2659f4a5361126",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 deterministic LoadedMedia request/field/collection preservation; conditional on exact actual9262 semantic anchor; no native codec/value occurrence claim",
+      "representative_mechanism": "runtime195-loaded-authoring-v1"
+    }
+  }
+}

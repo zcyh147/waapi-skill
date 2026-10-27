@@ -1,0 +1,381 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": "..",
+  "entries": [
+    {
+      "id": "runtime195-program-0",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-0-bindings.json",
+        "sha256": "1f3eb459203915c28c00bcfa836d5ae7425044fbfaa048f65a980dd7c0030b71"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-0-bindings.json",
+          "sha256": "1f3eb459203915c28c00bcfa836d5ae7425044fbfaa048f65a980dd7c0030b71"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-0-program.json",
+          "sha256": "69cbb95bcf4d8e56319aefdfa569ef40109a42bc5ac18b20923dd1ce0a106fde"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-0-requirements.json",
+          "sha256": "8bf4764ceb886afdf54620b32d1cf07f53029cd2207b5bcd43e96045e7102285"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-0-context.json",
+          "sha256": "4d681701073adfd279e98dd33d8074c0d8458ce293993264450e4efeae3e16cc"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-1",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-1-bindings.json",
+        "sha256": "d06cbf5b417407ded18c3ac7c66ed10f9e946afa52a37ea0197da4b57fa21bcd"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-1-bindings.json",
+          "sha256": "d06cbf5b417407ded18c3ac7c66ed10f9e946afa52a37ea0197da4b57fa21bcd"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-1-program.json",
+          "sha256": "bd136c6ea93f5f3e2867419a1acbb3fea55d05d252864ad8beee27f0b3f1bdc3"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-1-requirements.json",
+          "sha256": "090ba3ccf2e4f2070f6d2c1c65226515b234fb8d37f0138b8aaedcff82263301"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-1-context.json",
+          "sha256": "4d681701073adfd279e98dd33d8074c0d8458ce293993264450e4efeae3e16cc"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-2",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-2-bindings.json",
+        "sha256": "1858d9ff526edac4659ec3d6354e4f2ed9a954b4f485b50e8c0a8bde741aa2c5"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-2-bindings.json",
+          "sha256": "1858d9ff526edac4659ec3d6354e4f2ed9a954b4f485b50e8c0a8bde741aa2c5"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-2-program.json",
+          "sha256": "eb1f92a98c90b35b371369c90be8009dffd47dc9f606ab8b9e1162edc09b5dc5"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-2-requirements.json",
+          "sha256": "e911d4fbe14e9ad1730641121780f71b11d42a7f63798c52910484eb707aacfc"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-2-context.json",
+          "sha256": "cc7c70a26c5c50ec231fc4fcc03a9d6e1384df3a78ca4c29bef76577cd8bfa54"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-3",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-3-bindings.json",
+        "sha256": "ccb6fdcde62d81ac04ea248019345207a5cef0871a20bec9620b169fef2ba84a"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-3-bindings.json",
+          "sha256": "ccb6fdcde62d81ac04ea248019345207a5cef0871a20bec9620b169fef2ba84a"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-3-program.json",
+          "sha256": "9a19bd88f7d465fb1623be8d6cbdfcee0a75b79a1cd2f360995263f12c931199"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-3-requirements.json",
+          "sha256": "849095b8067eeaddb9a77b099763b52b8fbf9e04a148fe618aede7eabcb42f37"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-3-context.json",
+          "sha256": "4d681701073adfd279e98dd33d8074c0d8458ce293993264450e4efeae3e16cc"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-4",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-4-bindings.json",
+        "sha256": "30a3e7b072a0e7c08a84a1bc56bb68ee85817d0f07f986d1f2ca0c0affeca664"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-4-bindings.json",
+          "sha256": "30a3e7b072a0e7c08a84a1bc56bb68ee85817d0f07f986d1f2ca0c0affeca664"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-4-program.json",
+          "sha256": "96286518baf53f50e55ff21962873c758c1a7472e023ec0bc7c5397cfd064d12"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-4-requirements.json",
+          "sha256": "734db3b06bf130aa5a8038983e74cd78dbd12d15da4f23e5a10cf6212e3a22c8"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-4-context.json",
+          "sha256": "cc7c70a26c5c50ec231fc4fcc03a9d6e1384df3a78ca4c29bef76577cd8bfa54"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-5",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-5-bindings.json",
+        "sha256": "bad0f46e950f80fac2a98f78ef7ff8f991bceb0a63fb7f75cff37268a33fb039"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-5-bindings.json",
+          "sha256": "bad0f46e950f80fac2a98f78ef7ff8f991bceb0a63fb7f75cff37268a33fb039"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-5-program.json",
+          "sha256": "63acc4549117eb9ad4a7b67f50dda95e43f2a0cfbd3f25ed8e687d14d4cf8ad3"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-5-requirements.json",
+          "sha256": "a36526c27c54c6641b2f1202d931b8e1c15d7b329b3314b08c4a2b13b808ac32"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-5-context.json",
+          "sha256": "2e25199a9b640d88a52eaab520ccefa754ec8511fd7c766aa42f8cc106be795f"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-6",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-6-bindings.json",
+        "sha256": "cb2243359e2cab9191fbda65c6c3ba9c54963d0e858ad9a37e7a1e4ae9a667ad"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-6-bindings.json",
+          "sha256": "cb2243359e2cab9191fbda65c6c3ba9c54963d0e858ad9a37e7a1e4ae9a667ad"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-6-program.json",
+          "sha256": "4980456b40229f105aaa1c755808b6d861fd9c2e61f5d882154e555d77b3fa87"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-6-requirements.json",
+          "sha256": "b6e9a97e1f7171e819eda87ec3b70f8d6a51dcef4cf8d6491dec39b04e8589a3"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-6-context.json",
+          "sha256": "cc7c70a26c5c50ec231fc4fcc03a9d6e1384df3a78ca4c29bef76577cd8bfa54"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-7",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-7-bindings.json",
+        "sha256": "8d60bf2fc523af9c29363b70ee132ffb6ae7f5acdb1e9bd5e98c458fcd045c48"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-7-bindings.json",
+          "sha256": "8d60bf2fc523af9c29363b70ee132ffb6ae7f5acdb1e9bd5e98c458fcd045c48"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-7-program.json",
+          "sha256": "dec64cc36f750e1e4877422dd7d528252fb2126baa6bd06e9e7f108e9d956921"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-7-requirements.json",
+          "sha256": "4a4eec8c78432cdc793fb86b3eb828b928c66b5fe5ddb1c50ee6e012361af739"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-7-context.json",
+          "sha256": "cc7c70a26c5c50ec231fc4fcc03a9d6e1384df3a78ca4c29bef76577cd8bfa54"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-8",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-8-bindings.json",
+        "sha256": "e5bb74d37f87f13bbd717b3904443bfcf9f4709ebf950786ced3d52a46f52099"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-8-bindings.json",
+          "sha256": "e5bb74d37f87f13bbd717b3904443bfcf9f4709ebf950786ced3d52a46f52099"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-8-program.json",
+          "sha256": "f9281a89986d158465697adeddd75ac9ad896c8cc8a761fca6fc00dcff2b5f90"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-8-requirements.json",
+          "sha256": "dea72d3f5bbaf6c5a1ceb2d7e0fc976bde25c922289cab98230dacbeec124aa5"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-8-context.json",
+          "sha256": "4d681701073adfd279e98dd33d8074c0d8458ce293993264450e4efeae3e16cc"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-9",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-9-bindings.json",
+        "sha256": "3e3b0fae8de2ca4c2c89b24dc468f2bb4a72f49bbcde654cc623c90e6e7ac56d"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-9-bindings.json",
+          "sha256": "3e3b0fae8de2ca4c2c89b24dc468f2bb4a72f49bbcde654cc623c90e6e7ac56d"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-9-program.json",
+          "sha256": "048e80c8188fd972c96dd580348c31f89021bc79edaeec64f3a777b66bd4c6b6"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-9-requirements.json",
+          "sha256": "3b7ead7e35c1e48b9f65aa91a8f0a63773a9ec525aec30054aab2f941b489fdc"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-9-context.json",
+          "sha256": "cc7c70a26c5c50ec231fc4fcc03a9d6e1384df3a78ca4c29bef76577cd8bfa54"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-10",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-10-bindings.json",
+        "sha256": "115b7e72317b2f22b217b0b909fc2f48218324f4f1ddb903d974ebf16595bb38"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-10-bindings.json",
+          "sha256": "115b7e72317b2f22b217b0b909fc2f48218324f4f1ddb903d974ebf16595bb38"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-10-program.json",
+          "sha256": "83403d7f13bdfb010950a73f4282444585e2543048a158b3154e1dd57fee3049"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-10-requirements.json",
+          "sha256": "6d874b0716a79c7ab132258dfa8e533083ae1b66678f068eebd290ecd906f77b"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-10-context.json",
+          "sha256": "cc7c70a26c5c50ec231fc4fcc03a9d6e1384df3a78ca4c29bef76577cd8bfa54"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-11",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-11-bindings.json",
+        "sha256": "4ff2663e8961bca72fc33e725c0606a2465077d2eacb976225e657348c7fdee1"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-11-bindings.json",
+          "sha256": "4ff2663e8961bca72fc33e725c0606a2465077d2eacb976225e657348c7fdee1"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-11-program.json",
+          "sha256": "b8d0ca6eacdf9378ad93000b99dd63b5fa89b5e0d3fde3fe6038e60168f562d1"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-11-requirements.json",
+          "sha256": "d5b1c3e7b4084b356128dc9d865df4a30d8856e958a6fb7de860ae5d70ae9c20"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-11-context.json",
+          "sha256": "4d681701073adfd279e98dd33d8074c0d8458ce293993264450e4efeae3e16cc"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-12",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-12-bindings.json",
+        "sha256": "14293702b9b6e45c31654b3967e4d57652f06cced8f1b3ae7c3b6ad824fe8afd"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-12-bindings.json",
+          "sha256": "14293702b9b6e45c31654b3967e4d57652f06cced8f1b3ae7c3b6ad824fe8afd"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-12-program.json",
+          "sha256": "029d9d42d9b8b86c6e847dd85fb0d90456905cb53652090c33e5d81b927da504"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-12-requirements.json",
+          "sha256": "393afb1cfc1d9b545f665865476722f1fe34cff213a2b2d434d1af7e0e6f6251"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-12-context.json",
+          "sha256": "4d681701073adfd279e98dd33d8074c0d8458ce293993264450e4efeae3e16cc"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-13",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-13-bindings.json",
+        "sha256": "9a041ed41a21a6087b8f01e3489dac2063f1de75c16c967fdd366ff6fc1eb884"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-13-bindings.json",
+          "sha256": "9a041ed41a21a6087b8f01e3489dac2063f1de75c16c967fdd366ff6fc1eb884"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-13-program.json",
+          "sha256": "23e51eb58af1d8fc3ba70b07118c4b3603a032327b2c2644719894015492678e"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-13-requirements.json",
+          "sha256": "15c98e7921d3a7cfcc126e1a9ea5049125ab0e6a9e69267aa6e7f363eef4b2f2"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-13-context.json",
+          "sha256": "4d681701073adfd279e98dd33d8074c0d8458ce293993264450e4efeae3e16cc"
+        }
+      }
+    },
+    {
+      "id": "runtime195-program-14",
+      "bindings": {
+        "artifact": "runtime-read-log-195-r1/selected-14-bindings.json",
+        "sha256": "038f1101663d4f6c54f01bd281818d6546c87f1d6a3fcee7cb52cb151a5b8870"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "runtime-read-log-195-r1/selected-14-bindings.json",
+          "sha256": "038f1101663d4f6c54f01bd281818d6546c87f1d6a3fcee7cb52cb151a5b8870"
+        },
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-14-program.json",
+          "sha256": "a38a0c0d02eb2e25442a48d16ac13a72f912665d47691f0981c0fc197bbf5503"
+        },
+        "requirements": {
+          "artifact": "runtime-read-log-195-r1/selected-14-requirements.json",
+          "sha256": "18f3662fb1a858affc42e5caacade3226dfed1e0228ed3cf2228ef948a9baec2"
+        },
+        "capture": {
+          "artifact": "runtime-read-log-195-r1/selected-14-context.json",
+          "sha256": "4d681701073adfd279e98dd33d8074c0d8458ce293993264450e4efeae3e16cc"
+        }
+      }
+    }
+  ]
+}

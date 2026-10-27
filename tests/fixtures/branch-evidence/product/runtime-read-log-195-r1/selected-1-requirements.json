@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema": {
+      "native_shape_sha256": "7a53ea2a5811a2b4ce5ee54c33f0d4888e97d86ca792924411114692c2669b38",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime log_controls: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim",
+      "representative_mechanism": "runtime195-log-clear-v1"
+    }
+  }
+}

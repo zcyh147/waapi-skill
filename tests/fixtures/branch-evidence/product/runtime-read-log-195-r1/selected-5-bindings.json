@@ -1,0 +1,56 @@
+{
+  "contract": "waapi-skill.branch-bindings/v1",
+  "bindings": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getGameObjects|/argsSchema": {
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getGameObjects|/argsSchema",
+      "native_shape_sha256": "f92b937d841927b94bf088847ab09f79f1f26e99488634976408524e27c50d35",
+      "public_route": "2025.1|function|ak.wwise.core.profiler.getGameObjects",
+      "public_route_sha256": "4bdd42dd8c27a05bf1e413d5092784e26e366ab96bb1ec9299d74d1ebaa03d67",
+      "input": {
+        "gateway_argv": [
+          "profiler-game-objects",
+          "--capture",
+          "latest"
+        ],
+        "selector": "/native_call/args",
+        "correspondence": {
+          "rule": "exact_versioned_closed_runtime_declaration_and_whole_result_preservation",
+          "native_pointer": "/argsSchema",
+          "original_mapping_index_sha256": "8b03d5ac006b840a0ef7a27044254a401a2483145f233ed6f8ddf30b8af29ccc"
+        }
+      },
+      "construction": {
+        "source": "skills/waapi-skill/wwise_waapi/builders/stable_reads.py#build_profiler_game_objects_request",
+        "selector": "/argsSchema"
+      },
+      "validation": {
+        "source": "skills/waapi-skill/wwise_waapi/builders/schema.py#validate_semantic_result",
+        "selector": "/argsSchema"
+      },
+      "verifier": {
+        "source": "skills/waapi-skill/wwise_waapi/builders/stable_reads.py#normalize_profiler_game_objects_result",
+        "selector": "/argsSchema"
+      },
+      "evidence": {
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-5-program.json",
+          "sha256": "63acc4549117eb9ad4a7b67f50dda95e43f2a0cfbd3f25ed8e687d14d4cf8ad3"
+        }
+      },
+      "ordinary_test_run_attachment": true,
+      "relevant_sources": [
+        "skills/waapi-skill/scripts/gateway.py",
+        "skills/waapi-skill/scripts/run.py",
+        "skills/waapi-skill/wwise_waapi/builders/schema.py",
+        "skills/waapi-skill/wwise_waapi/builders/stable_reads.py",
+        "skills/waapi-skill/wwise_waapi/capabilities.py",
+        "skills/waapi-skill/wwise_waapi/dispatcher.py",
+        "skills/waapi-skill/wwise_waapi/io_policy.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py",
+        "tests/unit/test_stable_read_adapters.py"
+      ],
+      "representative_mechanism": "runtime195-fixed-v1"
+    }
+  }
+}

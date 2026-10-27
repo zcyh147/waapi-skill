@@ -1,0 +1,47 @@
+{
+  "contract": "waapi-skill.loaded-media-composite-source/v1",
+  "version": "2024.1",
+  "review": {
+    "artifact": "195-successor-composite-review.json",
+    "sha256": "31a554139d0b8301293637005d81d8ae428c090d0cbc7cb2c5ae342830b7cf6f"
+  },
+  "availability_archive": {
+    "artifact": "lm-composite-2024-r104-2024.1-original.json.gz",
+    "sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22"
+  },
+  "availability_context": {
+    "configuration": {
+      "config_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/owned/authoring-nodes/d87a1375cafae330c7be7f7f/setup-config.json",
+      "waapi_host": "127.0.0.1",
+      "waapi_port": 8080,
+      "wwise_version": "2024.1"
+    },
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 8080,
+      "url": "ws://127.0.0.1:8080/waapi"
+    },
+    "live": {
+      "processId": 192,
+      "sessionId": "{DFB17241-F150-4F33-ACCF-DC12A65D7A3B}",
+      "version": {
+        "build": 9056,
+        "displayName": "v2024.1.13",
+        "major": 1,
+        "minor": 13,
+        "nickname": "",
+        "schema": 123,
+        "year": 2024
+      }
+    },
+    "project": {
+      "filePath": null,
+      "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+      "path": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r104-capture-reads-native-2024-r1\\owned\\sandbox-root\\sample-project-77ad1986d8604c48a532c8f18ecbf897\\SampleProject.wproj"
+    }
+  },
+  "positive_review": {
+    "artifact": "195-successor-loaded-positive-review.json",
+    "sha256": "255a847fbce2faf50333718161b0a88760e2a44792f43675cfbb40273696f96b"
+  }
+}

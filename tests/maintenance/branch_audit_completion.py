@@ -1056,6 +1056,9 @@ def validate_native_source(context, descriptor, branch, candidate, binding, base
     elif binding.get('runtime_observation_attachment'):
         from tests.support.runtime_observation_evidence import _proof
         sources = _proof(binding, base)['relevant_sources']
+        if binding.get('native_only_base'):
+            from tests.support.runtime_observation_evidence import retained_runtime_native
+            sources = retained_runtime_native(binding, branch, root, base)['sources']
         if historical_source_seals(root, context['candidate'], sources, historical_sources) != sources:
             raise ValueError('Runtime original native Git source map differs')
     else:

@@ -178,7 +178,9 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
     original=retained(profile['provider'],base,root=root);uri=branch['route'].split('|')[-1]
     captured=completion.read_sealed_artifact(assessment['program_capture'],base);record=completion.read_sealed_artifact(descriptor,base)
     expected={'uri':uri,'args':original['requests'][uri]['args'],'options':original['requests'][uri]['options'],'result':original['results'][uri]}
-    if (assessment['archive']!=original['archive']or assessment['retained_facts']!=original['facts']or record!={'candidate_sha256':candidate,'scope_kind':'product',
+    member = runtime.retained_runtime_native(binding, branch, root, base)
+    evidence_candidate = member['native_evidence_candidate'] if member else candidate
+    if (assessment['archive']!=original['archive']or assessment['retained_facts']!=original['facts']or record!={'candidate_sha256':evidence_candidate,'scope_kind':'product',
             'evidence_kind':'qualified_retained_log_fact','branch_id':branch['id'],'native_shape_sha256':branch['shape_sha256'],
             'assessment_sha256':binding['qualified_runtime_read_attachment']['sha256'],'retained_facts':original['facts'],'relevant_sources':original['descriptor']['sources']}
             or (base/assessment['raw']['artifact']).read_bytes()!=original['read'](original['calls'][uri]['path'])

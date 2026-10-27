@@ -242,7 +242,15 @@ def validate_evidence(record,binding,branch,category,base,root,edges):
         else: runtime.validate_contribution_program(record,binding,branch,root,edges)
         return
     original=original_observation(version,key,base,root)
-    validate_source_review(proof.get('source_review', {}), original['sources'], branch, root, base)
+    retained = runtime.retained_runtime_native(binding, branch, root, base)
+    if retained:
+        if original['sources'] != retained['sources']:
+            raise ValueError('R125 retained original source map differs')
+        runtime.retained_runtime_sources(original['sources'], root)
+        if proof.get('source_review'):
+            runtime.retained_runtime_source_review(proof['source_review'], original['sources'], branch, root, base)
+    else:
+        validate_source_review(proof.get('source_review', {}), original['sources'], branch, root, base)
     pointer=reader['selectors'][branch['id']]['native_pointer'];expected_native='/observations/raw'+pointer
     if (proof['archive']!=original['archive'] or proof['native_run']!=record['native_runs'][0] or len(record['native_runs'])!=1
             or proof['capture_original_path']!=profile['report'] or proof['relevant_sources']!=original['sources']
