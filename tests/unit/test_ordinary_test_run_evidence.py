@@ -158,6 +158,23 @@ def test_debug_control_mapping_producer_covers_exact_finite_shapes_without_execu
     assert all(binding['evidence'] == {} for binding in bindings.values())
 
 
+def test_debug_result_mapping_distinguishes_terminal_boundary_from_mode_validation():
+    from tests.maintenance.branch_audit_mapping import debug_control_component, debug_control_bindings
+    from tests.maintenance.branch_coverage_audit import ROOT
+    bindings = debug_control_bindings(debug_control_component(ROOT))
+    terminal = [binding for key, binding in bindings.items() if '|/resultSchema' in key
+                and any(uri in key for uri in ('.restartWaapiServers|', '.testAssert|', '.testCrash|'))]
+    mode = [binding for key, binding in bindings.items() if '|/resultSchema' in key
+            and any(uri in key for uri in ('.enableAsserts|', '.enableAutomationMode|'))]
+    assert len(terminal) == 78 and len(mode) == 60
+    assert all(binding['validation']['source'] ==
+               'skills/waapi-skill/scripts/gateway.py#dispatch_host_control_transaction' for binding in terminal)
+    assert all(binding['input']['correspondence']['rule'] ==
+               'terminal_acknowledgement_or_indeterminate_without_result_validation' for binding in terminal)
+    assert all(binding['validation']['source'] ==
+               'skills/waapi-skill/wwise_waapi/builders/schema.py#validate_semantic_result' for binding in mode)
+
+
 @pytest.mark.parametrize('missing', ['boolean', 'version', 'route'])
 def test_debug_mapping_producer_rejects_missing_legal_choice_version_or_route(missing):
     from tests.maintenance.branch_audit_mapping import debug_control_component, debug_control_bindings

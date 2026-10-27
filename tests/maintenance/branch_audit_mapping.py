@@ -128,6 +128,7 @@ def debug_control_bindings(inventory):
                 else 'closed_boolean_envelope' if mode and section == 'argsSchema'
                 else 'empty_business_intent' if section == 'argsSchema'
                 else 'gateway_empty_options' if section == 'optionsSchema'
+                else 'terminal_acknowledgement_or_indeterminate_without_result_validation' if not mode
                 else 'empty_acknowledgement_without_effect_claim')}
             if mode and section == 'argsSchema':
                 correspondence['fields'] = {'enable': 'debug_intent.enabled'}
@@ -140,7 +141,8 @@ def debug_control_bindings(inventory):
                     'choices': ['--enable', '--disable'] if mode else [], 'correspondence': correspondence},
                 'construction': {'source': LIB + 'debug_business.py#materialize_debug_business_request'
                     if section == 'argsSchema' else LIB + 'operation_registry.py#' + prepare, 'selector': pointer},
-                'validation': {'source': LIB + 'builders/schema.py#' +
+                'validation': {'source': GATEWAY + '#dispatch_host_control_transaction'
+                    if section == 'resultSchema' and not mode else LIB + 'builders/schema.py#' +
                     ('validate_semantic_result' if section == 'resultSchema' else 'validate_semantic_payload'), 'selector': pointer},
                 'verifier': {'source': LIB + 'operation_registry.py#verify_prepared_operation' if mode
                     else GATEWAY + '#dispatch_host_control_transaction', 'selector': pointer}, 'evidence': {}}

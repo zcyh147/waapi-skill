@@ -8873,8 +8873,8 @@
     "internal-debug-controls-cba-aggregate-v1": {
       "contract": "waapi-skill.representative-branch-mechanism/v1",
       "scope_kind": "product",
-      "candidate_sha256": "cd1e380b3648f40a8279812a977cdf579e1f57fb5fa143b50524d1bf2c9a1cfb",
-      "reviewed_reason": "Finite Boolean identity/zero-intent envelope mapping, with four original selected mechanism functions in the finalized unfiltered cba Program run. Source-equivalence review debug-controls-cba4eefb-r1/source-review.json SHA256 07d812434067b871da919f78f615413eabbd22f191ca7034ade0aa656e011a34. No per-node or native effect claim.",
+      "candidate_sha256": "e6e818b5497b3e7e65ed83490fe96a298a62048fe9e712cd221754d47e87163c",
+      "reviewed_reason": "Finite Boolean identity/zero-intent envelope mapping, with four original selected mechanism functions in the finalized unfiltered cba Program run. Source-equivalence review debug-controls-cba4eefb-r1/source-review.json SHA256 07d812434067b871da919f78f615413eabbd22f191ca7034ade0aa656e011a34. No per-node or native effect claim. Exact78terminal-result-node correction: debug-controls-cba4eefb-r2/mapping-successor-review.json SHA256 ca04afd0a8e1f18cd59ef1c84440b03a7a6756384227629bf7ef87c8f6f375a8.",
       "sources": {
         "skills/waapi-skill/scripts/gateway.py": "84872d1415f0bce5c3d05eb05f4ec3e292d116c1fd7fed8d4017a4d0a1f4ac2d",
         "skills/waapi-skill/wwise_waapi/debug_business.py": "5b2595d7ba8a25c4b96850e5c78e854731e51c601e5a19dd13a128e3f0621148",
@@ -8900,7 +8900,7 @@
         "tests/unit/test_debug_lua_gateway_full_chain.py": "46482c8a21d83a8043a273c266debf0940033dd67aacb695f4cb3b1399888998",
         "tests/unit/test_transaction_gateway.py": "c9a05614f0a1ba2744c4f16d02213242c5c4a1ce38dac89a2d180e8f8b9dac53",
         "tests/support/gateway_config.py": "0958cead272816cf301248a8c024584765e2c28728ce57acad2374aaeff82b57",
-        "tests/maintenance/branch_audit_mapping.py": "2724ae6b7a9335b85f751f3885195500b1b1e359a86773f9b0132cdba0f87883"
+        "tests/maintenance/branch_audit_mapping.py": "e54e318b7df489799f6202f0ec90398f818c6e551bf04b255201e151c0a7d750"
       },
       "members": {
         "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.enableAsserts|/argsSchema": {
@@ -9046,17 +9046,17 @@
         "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testAssert|/resultSchema": {
           "native_route": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "13b6778af81f13490ae348b0f21fb2b9765ea8b3e18418e04ee886318ee4c2df"
+          "mapping_sha256": "9a0239f64825e1c751f0ec03dac4f887400ec9b3d9228fe8fa42e5ab454bd0ca"
         },
         "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testAssert|/resultSchema/additionalProperties": {
           "native_route": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "296b5b5ae0a783a61ae1e4f903a82901185b9c6cd78fbc732fca0aed5fb86278"
+          "mapping_sha256": "431b3404fd9390a39558a73080a5eab14e2ab436543c19ada57a654707371a3c"
         },
         "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testAssert|/resultSchema/@empty/object": {
           "native_route": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "53fcd7c29e67b8f9a571c5991423b7c16ae41d5650b1c977dd6180d6419c86b7"
+          "mapping_sha256": "718092577c8a1045d6bec9b6dd07088d0b7deb07b887ede139aa93468661caef"
         },
         "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testCrash|/argsSchema": {
           "native_route": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testCrash",
@@ -9091,17 +9091,17 @@
         "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testCrash|/resultSchema": {
           "native_route": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "683027bb08f45a41c121bed62339e624819c1f2019ffaae68aeebec72110bf2d"
+          "mapping_sha256": "a94d9dd403afc924f9ad62ffb0f22bd78d334e4fff3b2e49edca7219a878acb7"
         },
         "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testCrash|/resultSchema/additionalProperties": {
           "native_route": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "fb0f9ec536514312cecd9082d19c498d2d6ecc1a55c3536fa1ea0c3001de6af6"
+          "mapping_sha256": "45d3784f94220fa1a190a9aba3c024d5f07b00bd6b3a685f5701263c84800b36"
         },
         "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testCrash|/resultSchema/@empty/object": {
           "native_route": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "02eefe3d289aa39834322e3e3487b927029641870b027c438ccb5cc81d6f1a69"
+          "mapping_sha256": "bdd68b030dbdda47117284824cf473c1846b8dc18f051418ac8ac349e1c91940"
         },
         "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.enableAsserts|/argsSchema": {
           "native_route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.enableAsserts",
@@ -9246,17 +9246,17 @@
         "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testAssert|/resultSchema": {
           "native_route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "6ac061f500bed03147dc4a9e06025e76f1f52897bd5dcff1b77b40e7309402b0"
+          "mapping_sha256": "5ce370cb00dceea32913e19fd747cbe1c309f7075825278f55cc0a2e53367427"
         },
         "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testAssert|/resultSchema/additionalProperties": {
           "native_route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "6ce607eab395ff26be1efb4afe457913ad2b284236d6019c117f3f3f0c2fdbfd"
+          "mapping_sha256": "393a18aa26b382f378eea103caff6e885c5cb8a5c6092f32efba4036d0e26a47"
         },
         "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testAssert|/resultSchema/@empty/object": {
           "native_route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "ef190e9ef66af15920e3bbbaffcd2dd104b7068feeda815cc79e11c3cd7315b8"
+          "mapping_sha256": "04a85a8d7eda5ecedcf97dc20db138fb80025364396d49f44a4ccecbd8b215a0"
         },
         "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testCrash|/argsSchema": {
           "native_route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testCrash",
@@ -9291,17 +9291,17 @@
         "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testCrash|/resultSchema": {
           "native_route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "63ffeec5639e7176e95e6e845d60593e27213b8e6e68dddf858dd02e3b7733d0"
+          "mapping_sha256": "0573472f95952b97366ed92d78b9815b4460f0e25eb2ca0a702b6f2e9867490e"
         },
         "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testCrash|/resultSchema/additionalProperties": {
           "native_route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "f9c7d21e2d229a99cb03826d56b6a5ba3ffb52f7a17ddaab84550cab189b17e6"
+          "mapping_sha256": "afbe3941d00db3bcb024a4c861ec7e8220c7b90397e2412062353dd9876833ba"
         },
         "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testCrash|/resultSchema/@empty/object": {
           "native_route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "ea19ef3b432d32437d6a7a73b211307b757b0ce4622466734cd34f51b2505098"
+          "mapping_sha256": "83fad03b9cf76ac79fa2f601e91f37d1ea972f52de4103ec7831fdeca72a7ebe"
         },
         "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.enableAsserts|/argsSchema": {
           "native_route": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.enableAsserts",
@@ -9446,17 +9446,17 @@
         "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testAssert|/resultSchema": {
           "native_route": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "4f5637039b05e4ac09c27acfae2c8051ff5d47140f2b868e1076d763945a0eba"
+          "mapping_sha256": "28d7fa1aa999230e484c5cf880b72590b847f21e7e462eea0fc4afc40f21e268"
         },
         "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testAssert|/resultSchema/additionalProperties": {
           "native_route": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "c4c7ddbff3c07b36aa3049a6a4994ac3cccd587a9e6cf8157dc76e8d56302df8"
+          "mapping_sha256": "d43c5e48ce48bdd9b60883a655bde9dae989a0bafacb397d4d0aac057dc8eeb7"
         },
         "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testAssert|/resultSchema/@empty/object": {
           "native_route": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "577e6c7763feafa85210bbbbe7f552756801f6e0b5ef9cb16e32ece7d36f1a6a"
+          "mapping_sha256": "26434bda86c33792d8d3aa44d1389d8b5317b9a0fb5f8ce25f21c04e86f61016"
         },
         "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testCrash|/argsSchema": {
           "native_route": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testCrash",
@@ -9491,17 +9491,17 @@
         "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testCrash|/resultSchema": {
           "native_route": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "e46e556ff3346192bebe84d59736f37646790f116b10a4fffc5cb421c53c99ad"
+          "mapping_sha256": "06535fa8851ddc9b491c6c668356c02ee6663ebc4679ae9ad360ceac48a13453"
         },
         "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testCrash|/resultSchema/additionalProperties": {
           "native_route": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "3e01b517a98feae9e973e8f0a44a0df9acd6c5bff272dce3bd46bc9c96362f20"
+          "mapping_sha256": "b9fa3c0052dcfbe1cdbebd5191e4e15d47a4e070f52c7188c3d6eab0806b1c54"
         },
         "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testCrash|/resultSchema/@empty/object": {
           "native_route": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "3c4665b2ad19a4c34200bcba92276e10d1b54003bff0a4932b17f80e3c617954"
+          "mapping_sha256": "042966f33161a7e34b36f25d0c6aa36a4820c3cc4aeed8c48d0fc6119e2b181d"
         },
         "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.enableAsserts|/argsSchema": {
           "native_route": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.enableAsserts",
@@ -9646,17 +9646,17 @@
         "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testAssert|/resultSchema": {
           "native_route": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "d1895ae2670d334387252c41d9d453df722ac986cc0d9be9364628d8dcd1685a"
+          "mapping_sha256": "d6af235d00228d1103a8bf6b070209566c42a6e45df47c7b06ef33f93f405885"
         },
         "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testAssert|/resultSchema/additionalProperties": {
           "native_route": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "4aa3d68d70d8cffc8722439efb716dd1824f4414a695e250c08b78f5caac8925"
+          "mapping_sha256": "aea2a11bb18bfece8336b46910ec40c217825079e72dfca7f0e196ff7c7d5188"
         },
         "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testAssert|/resultSchema/@empty/object": {
           "native_route": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "1a11a7780edc302855ee53d7f1a857eb523fa61cdcfe3be12739ade23a9fa2a6"
+          "mapping_sha256": "877b9d4d49f682db2005f19ac3b38b0b94739fa815a1510affff6a37fc6027fb"
         },
         "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testCrash|/argsSchema": {
           "native_route": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testCrash",
@@ -9691,17 +9691,17 @@
         "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testCrash|/resultSchema": {
           "native_route": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "144191a4f5ac2d5a114441701372cef3994fa072779f89d75ff0a1e7feccb25e"
+          "mapping_sha256": "a9cacebf965b559e76ffe9d2b010b800463a9b44332399a4ff80d876b17efdc8"
         },
         "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testCrash|/resultSchema/additionalProperties": {
           "native_route": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "d4418b69b77c99082f125daf421709b11b981439b5f691914fce3779918ef425"
+          "mapping_sha256": "f8b5bf18eae15a336a4e0d3bdaf14fb42a8095c1680557f01c3ff1de92b85171"
         },
         "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testCrash|/resultSchema/@empty/object": {
           "native_route": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "e323bc4782b3cc2b23133da3a7b2efb933bbdef3b3db56edcbba083be3f6f842"
+          "mapping_sha256": "fc10cb56bbb0cda4438f4014930550cab1fb97219cb5dee2d7b4332928f4696f"
         },
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.enableAsserts|/argsSchema": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.enableAsserts",
@@ -9846,17 +9846,17 @@
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers|/resultSchema": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "3d5eef602abc3e44ed602256b42b5049dfe7f128c023ae08901fc8f63d76c8cd"
+          "mapping_sha256": "292c2c95417058c141c6d4ef0016dde75d0bf4a1c9e9ea8b14fcb62fa53652b0"
         },
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers|/resultSchema/additionalProperties": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "5e851dd73eb74a680a38d63f22767793f4d59c807d093469623625260609b677"
+          "mapping_sha256": "47b5014f58a32063ef045ff280007c3e77e64e71fbd02f6e9dfdaae49d9cfbdb"
         },
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers|/resultSchema/@empty/object": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "9b15c950e38ec388ba79e07b1cb1ab5a3a820c3157bb4aeea0b6457ba1080dae"
+          "mapping_sha256": "1d9df9a736e8971f16f14a08b5d22270c5b21dd3688af7a972bbf2fbe867d618"
         },
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testAssert|/argsSchema": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testAssert",
@@ -9891,17 +9891,17 @@
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testAssert|/resultSchema": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "9ba8c931bdc30207af172605c7229d9f83b687705c804b4445f8322fd6a75b56"
+          "mapping_sha256": "9847ef157a862a485ca19a5d22a859eb1b376f1731e596486305b29c2025b4b7"
         },
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testAssert|/resultSchema/additionalProperties": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "dcd6b6cc35f9cd87536b8b0f5622e7d88cb8396a11cecef99ecd9c9d240d7d8d"
+          "mapping_sha256": "f8137f771aab59aa1a3ee8ad476296dcb80bb186d9389d0f60373f7115244f72"
         },
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testAssert|/resultSchema/@empty/object": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "5414786520066d5350231a44eea777699ec1107bc89c3bbf791ad0b04d9a7791"
+          "mapping_sha256": "6f84c4dc469d774db83a0741d3b2f10daa2d9b50b06e3155d9629fb61ec66357"
         },
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testCrash|/argsSchema": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testCrash",
@@ -9936,17 +9936,17 @@
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testCrash|/resultSchema": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "b69e162d72e0fdd0d050c135e85f20aa7b2e16002b0d12883729fafadacc76a8"
+          "mapping_sha256": "7c2a17e0761a15bb384c0953e61897390129b11e672488836b1a215e6fc4d37c"
         },
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testCrash|/resultSchema/additionalProperties": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "ffeae7fd0237f55a7cbc10e485251bcb208fcc00d647e16997feb01c95e4b6f3"
+          "mapping_sha256": "19def633d11accb419d4af733879557c4df5cc863b7c411226b4b3b5182051f3"
         },
         "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testCrash|/resultSchema/@empty/object": {
           "native_route": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "fad853637cdeeb7e30e89125e5460e6610eb1cda829cb58d1bb4c816ba2e86ca"
+          "mapping_sha256": "900384361afdf0d0b7528faaeaf755142934aeaf65d4d0be3cd9c0213e87636f"
         },
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.enableAsserts|/argsSchema": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.enableAsserts",
@@ -10091,17 +10091,17 @@
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers|/resultSchema": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "5af0bad5ae71fac3261353fdfbda9a736e86f334eedb13a7a709f81da2e1cc1a"
+          "mapping_sha256": "37b096d27f934cadf1437318afbc96c2c37cb58e2d218c450047f3976858bf41"
         },
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers|/resultSchema/additionalProperties": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "7fbe832f0ee6865c7ba8e6156323547c00c376ad4ec472192855fd43758aa65a"
+          "mapping_sha256": "8c0a34f68393d88a7221fd1fcada85a01b5ff8d52d69a65be39c8cdc41c6ce97"
         },
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers|/resultSchema/@empty/object": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "7eee61b633dbd30794375963092e375ef208e63601d2156545c3ddd2e0811a49"
+          "mapping_sha256": "3645c7788c862c3cc5cafe380e43753e7bdb00b303e87bd4a9435415ad41a794"
         },
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testAssert|/argsSchema": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testAssert",
@@ -10136,17 +10136,17 @@
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testAssert|/resultSchema": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "a5ddc0462c1dd166434b8c7a6464d861bd77288003caa265ee9060f86e606840"
+          "mapping_sha256": "f80dc250025c89525ed9cf0432bca88141bb281a186519c5d25ea8f92fc93d48"
         },
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testAssert|/resultSchema/additionalProperties": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "141fd1940453670c111f2279327f29cf5d6bb9ecfbbfdfbd308cff5602e9be67"
+          "mapping_sha256": "b90f50f97319cb9cc4e906d163e0611443efe48bb3c7d440bcacd4e61d3695b2"
         },
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testAssert|/resultSchema/@empty/object": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "9063cb16d3f8024bcd9742739e0a32ddd859f8c59af04631c563021edcf74a22"
+          "mapping_sha256": "a4de6d13371c4739d895217d78305a2deac6e712b5925e24d03ec8a4434c124d"
         },
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testCrash|/argsSchema": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testCrash",
@@ -10181,17 +10181,17 @@
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testCrash|/resultSchema": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "212be017750e609a6700b73e301c53a33aaf24bfadea42a1deeb628c809a8233"
+          "mapping_sha256": "62542dabd3d03866b1288f23744d089c6afdb03aa6ec112cdf4b27aa04ace842"
         },
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testCrash|/resultSchema/additionalProperties": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "ab508824bfad4269550794c26650a44302734ae8c183ab3558c3cb7d8ed7ee35"
+          "mapping_sha256": "d59c44b42169423bf882e3b484dfece069a2f6910b2e7b13839f9df734f4d198"
         },
         "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testCrash|/resultSchema/@empty/object": {
           "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "2ed9aab80027bba459fc8cbaea0d3d70b3e291e4803537e7d476fe1fd2784af5"
+          "mapping_sha256": "33004930b33f39f8c24a9631ccd1881266421cee09640efd2a3f9d0c025ebb86"
         },
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.enableAsserts|/argsSchema": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.enableAsserts",
@@ -10336,17 +10336,17 @@
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers|/resultSchema": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "8decbca782217780768b20d47aeb72353aae2b08ec4aa19ce47b28076ea0e5c0"
+          "mapping_sha256": "2cb3b0b7e93ae6370035c324f7f413bf07d5bce134088e1d37a80ed914a3f38f"
         },
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers|/resultSchema/additionalProperties": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "30e9f54ed1d847212fa285a789f32916bc3de37a20b0de526d6cae7ae902d093"
+          "mapping_sha256": "d75f2468b62378f82f52a9322c84828cf9c985434b4ba539d68633a086d9dbd0"
         },
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers|/resultSchema/@empty/object": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "8c8c5e584bec705836d1578ecc84387d80e1e4c7653054d31a94f99792a06121"
+          "mapping_sha256": "45b010274485d2f1ad0eccc34242030bc3f6a29fb3718f48aa1a9f0a47168270"
         },
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testAssert|/argsSchema": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testAssert",
@@ -10381,17 +10381,17 @@
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testAssert|/resultSchema": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "ff1e4723eda0803815d1cbaf1838f76033da61242e3bd6a26069c644fde9cfbe"
+          "mapping_sha256": "9e5974b7f8bb4bab614146cf98218954725fa39ec452aa31e7b2f1f5c7ede9c2"
         },
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testAssert|/resultSchema/additionalProperties": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "1315b2936976627953ff4701f82fc37f4f1c71448c36e70257a51458676caa27"
+          "mapping_sha256": "7734731e3c8946bf563127b8a768cfb2f57bd022a99c821155444c2a2779d12e"
         },
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testAssert|/resultSchema/@empty/object": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "19a875f2f9328fd042e1a6355c04cbdc30a8ba070b06e135bfa26b7512307ec9"
+          "mapping_sha256": "a1231ae4c0aa45eedd44b40f77920120dc47eec099705e499607187c2d4c35a3"
         },
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testCrash|/argsSchema": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testCrash",
@@ -10426,17 +10426,17 @@
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testCrash|/resultSchema": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "fc3a6c17dd0854f3e701f200f082c7711b922fcfce49f8752654abd1cea0ff6d"
+          "mapping_sha256": "1bdf9d501bc4e8119b1d52951ad8ce79974d05513f61df95e9fcdb5f07890c8c"
         },
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testCrash|/resultSchema/additionalProperties": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "4cf85a3f85169709506049fb809371ea3441606e39d688233e61a5cb3689c6e3"
+          "mapping_sha256": "53fc02f37d43ca7643d235366fc5b6a799ce8134297794f37d2622cbc709c1a6"
         },
         "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testCrash|/resultSchema/@empty/object": {
           "native_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "a3fdf099e89b85e9a290e13b773e5873ccf737b7ec3d45d8cbcee2553092a2b3"
+          "mapping_sha256": "ceaac2e549154e2eb0686f36c9f66c82515dd59b158327046649e836478df0d2"
         },
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.enableAsserts|/argsSchema": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.enableAsserts",
@@ -10581,17 +10581,17 @@
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers|/resultSchema": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "d9248d664ef5edfa173976dea6b4c56cbf638974e36949cb1ef3ba16da7ba24c"
+          "mapping_sha256": "cbabd880eaf8f94a720650120535092efccc0871a84831d167d0da39d3feb0ad"
         },
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers|/resultSchema/additionalProperties": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "89934afafacde94f995b4ddeab41537a36f5228e9d6fc27b11063269a6d22d75"
+          "mapping_sha256": "9948589f304eabe1781c1cc99bc37822774441e36864733295cb8bdd052b14af"
         },
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers|/resultSchema/@empty/object": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "59b2ff136909f6fd4f01e0394d5b65098344535025a5fd7633ae28376184ba5e"
+          "mapping_sha256": "e65f371250b10fbb06350526bb374dabfb3a0b2b6e03447cfe035ce5e6e29e32"
         },
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testAssert|/argsSchema": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testAssert",
@@ -10626,17 +10626,17 @@
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testAssert|/resultSchema": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "cc248e064dcbff24b41c48538b9b4c8019fbe68578318134f13b2b11028f00f9"
+          "mapping_sha256": "92a25536148381f14c59751761bd1037df0854917c57bc7fac920f76ecec1c62"
         },
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testAssert|/resultSchema/additionalProperties": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "7776c32bba3adae2b13c800a79efa250affa2a06fdbdb5efd0593cc65b19507d"
+          "mapping_sha256": "08660e9628a39e5063c646fd2eb252f8d33e384afd84bef250e013bfb233eb20"
         },
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testAssert|/resultSchema/@empty/object": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "1995405517aee1ab74c572fe212ae5ccea9b7b246554aa834ddf3872313fa99a"
+          "mapping_sha256": "5c77e96a54a7ee21761755be425cab5d818aafe5f1c610d8023f68498eb0a3ce"
         },
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testCrash|/argsSchema": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testCrash",
@@ -10671,17 +10671,17 @@
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testCrash|/resultSchema": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "362c42c15aec3c8fe9e57c8c7b2dcf42ee0f11a6265b134245382b338dd8852b"
+          "mapping_sha256": "f067098cf02fc773c69ccbc5bdba0ece277927f584f5c25aef21d540cec31a1f"
         },
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testCrash|/resultSchema/additionalProperties": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "4657005a36309a910cbe0ec8afba7b85933a6718b9c71d1011e1d8809bf1dca0"
+          "mapping_sha256": "f807b1e84e2cdc1328147183e36c14569b7c2d75845ef9b5d31a8026fc1c058d"
         },
         "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testCrash|/resultSchema/@empty/object": {
           "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "6d99f07cea935dfc23e83ed2e04b458a4df37293ae5e4f582c4691064a03ea71"
+          "mapping_sha256": "18f0a85cbceafd1e679991358b7b2b9a36ccf4742877a7b92a5074ad55af6766"
         },
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.enableAsserts|/argsSchema": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.enableAsserts",
@@ -10826,17 +10826,17 @@
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers|/resultSchema": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "314165e805eff34bb6c3ab0ea3b49de449f27b4bf3826ddd12c9116331a2ada6"
+          "mapping_sha256": "82aed18584c43526cbcdfa7e6d1ec540fa2ebf0953907baf62d37c87b49369d8"
         },
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers|/resultSchema/additionalProperties": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "340da11f2a3a863bea8ae3eb557a885d36afeaf0603fa8c431a4db668f9448f7"
+          "mapping_sha256": "f27b0d13fa424d99a2951c382842cf85ce6b91e558e1af9695dd8dcbaa419698"
         },
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers|/resultSchema/@empty/object": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "3fbb8d8ac70b4549978d6c31ff9838de66158d59d4fc70c545f025ce1b990af8"
+          "mapping_sha256": "486e1bdb666d32f88d537ad5696ea4bc76bf99df65006e2d0c256b4ad45334d2"
         },
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testAssert|/argsSchema": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testAssert",
@@ -10871,17 +10871,17 @@
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testAssert|/resultSchema": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "f75de6273424ebcd4caaf725a65c5b93497b4385484222d484ebce868ccc5aea"
+          "mapping_sha256": "e480be09c7780086cd6d041ce24e6222c91a0617fad0da44f0a1382986ebb999"
         },
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testAssert|/resultSchema/additionalProperties": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "f65800d02d0495610a93db230087975fab575a2d6194d484dfb6b4c1fde1fa74"
+          "mapping_sha256": "9f52078522ea657a354b82a31bba38b8901882d5e198fde2d4c919c3f868f2ae"
         },
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testAssert|/resultSchema/@empty/object": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "6ce312234bf11920409e5ea2f4f39233e9ccf35bcf3fcf62f7d88059f713b789"
+          "mapping_sha256": "a63ec5451f30bedbde8756a3a3bb661ad537e8eac49615051d8983c90631bd1c"
         },
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testCrash|/argsSchema": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testCrash",
@@ -10916,17 +10916,17 @@
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testCrash|/resultSchema": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "6d1c4a629c8a9d9070c76c3417a5662cc2e3865dc0ca782da463fb9dd502923c"
+          "mapping_sha256": "9b6332bec13d6e7348a0e83168168d18190a51853931ff8e5da7616da3fc111a"
         },
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testCrash|/resultSchema/additionalProperties": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "f240489f7ce559d05806d6f29cbb3bed42f4b9e9f4b7c06b1a8314b82dec39e7"
+          "mapping_sha256": "68cd189fa94589023e67ef5f7e0fbeb9404b6e2598b9590f856779e77d391f0c"
         },
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testCrash|/resultSchema/@empty/object": {
           "native_route": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "46719836d9da5e56121403cc8335b1cc3bc80283bcd308038382dba77179fd61"
+          "mapping_sha256": "a7cb3a4f4ae971411dd84767da5af84298c6ed54545c0b4e3f5056a20bb11ab6"
         },
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.enableAsserts|/argsSchema": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.enableAsserts",
@@ -11071,17 +11071,17 @@
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers|/resultSchema": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "8856f71e030aea9014e41a9fc4530c06302d8362d667a0b21c98a14449648cd3"
+          "mapping_sha256": "c1a9113e71df13c1343aaf81a6f76a26885d24a2bf35aeb73a5a5e8b4f558ff4"
         },
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers|/resultSchema/additionalProperties": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "0d23db2b7ccacac49fecc1e64e581d609ff5af1f0c23c33f88250ec3f6c05206"
+          "mapping_sha256": "acaa8b87bb0b0ba2738522c203fef2ffc0e6669d0ec68ec3006a53c42f636500"
         },
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers|/resultSchema/@empty/object": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.restartWaapiServers",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "fe7b370a23cf46d54f3753a370e08b7f402e525c254387c78d8980e83bdfc7fe"
+          "mapping_sha256": "88f1fea6fd2624d47a560d50328500dac3d1bb449c1c38ea54c46571c613a921"
         },
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testAssert|/argsSchema": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testAssert",
@@ -11116,17 +11116,17 @@
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testAssert|/resultSchema": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "3a414322e0b50015f6c1497f55de1ad634c9813e7c71766dac7620f5e5511041"
+          "mapping_sha256": "3cc554a7a042c70f6986e41ff2c74b4f8e301716bdf79cd74221167e4a1bcc0d"
         },
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testAssert|/resultSchema/additionalProperties": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "747d6a3bea976774ec2e8b9c32c11239fb5f844e2d9e724c6105fcfaadef31df"
+          "mapping_sha256": "fb6d366cbe14dbc1a3575846bd94453e51ce459181a1cbca1e0d6d2fa5a36993"
         },
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testAssert|/resultSchema/@empty/object": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testAssert",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "c9b4202c5024484d5f9106100ace94d649948706b42d9de96ad6894190d35f42"
+          "mapping_sha256": "b8c0963e42734ae6a82230ee2da552ece0cde543810e46da078741655d9a807c"
         },
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testCrash|/argsSchema": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testCrash",
@@ -11161,17 +11161,17 @@
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testCrash|/resultSchema": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-          "mapping_sha256": "e0123d41d3d2fa7d9a905ec38cef4c10a1372905293e3c897237f77f6072a323"
+          "mapping_sha256": "33d061698ca81b1950aee658bb6f12599af1dfcf94ed97eacf863101e49e23f0"
         },
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testCrash|/resultSchema/additionalProperties": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
-          "mapping_sha256": "c0bb0d92257a22d0e22021fa3d7090bfea963c8bd7f9e4af7a63e460aec86303"
+          "mapping_sha256": "87cb1e9ce83661b55c659e50e2ae210b8357edb2affb1873f14052d8c4adb25f"
         },
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testCrash|/resultSchema/@empty/object": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.debug.testCrash",
           "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-          "mapping_sha256": "e4f4153b97ae3a6550304a5d22b264d03083ef7b72e1f15f8b35947530cd7c0b"
+          "mapping_sha256": "96cec1ab1b39914f6285389e9bd08d460992b6e48c2f57b6cb6be1f02728a79b"
         }
       },
       "selected_proofs": {

@@ -1028,27 +1028,27 @@
       }
     },
     {
-      "id": "debug-controls-cba4eefb-aggregate-r1",
+      "id": "debug-controls-cba4eefb-aggregate-r2",
       "bindings": {
-        "artifact": "debug-controls-cba4eefb-r1/selected.bindings.json",
-        "sha256": "1f40429708c6525672574b815017d23e17f41759c4cdd9d83cbbe48ea6ebf04a"
+        "artifact": "debug-controls-cba4eefb-r2/selected.bindings.json",
+        "sha256": "1e257410fbdac60812d6ea08f25080064285fada0b68767120f34c3d8d1468ac"
       },
       "origin": {
         "bindings": {
-          "artifact": "debug-controls-cba4eefb-r1/selected.bindings.original.json",
-          "sha256": "1f40429708c6525672574b815017d23e17f41759c4cdd9d83cbbe48ea6ebf04a"
+          "artifact": "debug-controls-cba4eefb-r2/selected.bindings.original.json",
+          "sha256": "1e257410fbdac60812d6ea08f25080064285fada0b68767120f34c3d8d1468ac"
         },
         "program": {
-          "artifact": "debug-controls-cba4eefb-r1/aggregate-program.json",
-          "sha256": "9dbe1468b01561d3fa1842a1a85f9ae915b7ca8b581954648df7074ba7ee54a3"
+          "artifact": "debug-controls-cba4eefb-r2/aggregate-program.json",
+          "sha256": "b0111b33cad677fe1648b3d1ccdca64c3409a4b8331bcf2bce01658f9f6764f1"
         },
         "requirements": {
-          "artifact": "debug-controls-cba4eefb-r1/selected.requirements.json",
+          "artifact": "debug-controls-cba4eefb-r2/selected.requirements.json",
           "sha256": "bd0664e06152e17776474dd145c6b9d9dcf9272a5ca57c7dd8b4f2045ed81ed3"
         },
         "capture": {
-          "artifact": "debug-controls-cba4eefb-r1/selected.review-context.json",
-          "sha256": "18082260750ce7566ad2dfca79710c628ba9200b8a8376f65cde27a78efa4d57"
+          "artifact": "debug-controls-cba4eefb-r2/selected.review-context.json",
+          "sha256": "f6bf09be05ae1b1a329d759a6ba6186462a26b7d29727c93eb536bb2201c1045"
         }
       }
     }
@@ -1341,8 +1341,8 @@
   ],
   "mapping_attachments": [
     {
-      "artifact": "debug-controls-cba4eefb-r1/mapping.json",
-      "sha256": "2ec2d1ce10b9fa85e757d7ee33ad8c733c3d3bcfdcd96e9aca4a19bcd5a662e2"
+      "artifact": "debug-controls-cba4eefb-r2/mapping.json",
+      "sha256": "971b59b658fd08a554b4c0cea6402ad3d6bdd481ac797db16916843db08a0000"
     }
   ]
 }
