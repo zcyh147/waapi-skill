@@ -556,6 +556,23 @@ def test_exact_reviewed_equivalence_reuses_unchanged_sources_and_rejects_stale_c
 
 
 
+def test_fresh_adapter_bytes_change_completion_candidate_identity(tmp_path):
+    from tests.maintenance.branch_audit_completion import candidate_identity
+    # Reuse the minimal source-root pattern: no inventory generation or archive run.
+    names = ('skills/waapi-skill/SKILL.md', 'tests/maintenance/branch_coverage_audit.py',
+        'tests/maintenance/branch_audit_completion.py', 'docs/branch-coverage-ownership.json',
+        'docs/branch-coverage-condition-sources.json', 'docs/branch-coverage-requirements.json',
+        'tests/support/fresh_branch_evidence.py')
+    for name in names:
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((audit.ROOT / name).read_bytes())
+    before = candidate_identity(tmp_path, {'sources': {}}, {}, digest=audit.digest)
+    adapter = tmp_path / names[-1]
+    adapter.write_bytes(adapter.read_bytes() + b'\n# changed Fresh acceptance semantics\n')
+    assert candidate_identity(tmp_path, {'sources': {}}, {}, digest=audit.digest) != before
+
+
 def test_fresh_label_without_formal_archive_bridge_has_no_credit(ping_scope, tmp_path):
     from tests.maintenance.branch_audit_completion import evidence_result
     _, _, inventory, original = ping_scope

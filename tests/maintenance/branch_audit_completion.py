@@ -166,7 +166,8 @@ def candidate_identity(root, inventory, catalogs, *, digest):
     # Source attachment producer/finalizer bytes are part of the current
     # program candidate. Historical trees without this adapter retain their
     # original source context; missing/changed current files change identity.
-    for name in ('tests/support/source_copy_branch_evidence.py', 'tests/support/exact_evidence_finalization.py',
+    for name in ('tests/support/fresh_branch_evidence.py',
+                 'tests/support/source_copy_branch_evidence.py', 'tests/support/exact_evidence_finalization.py',
                  'tests/unit/test_source_copy_branch_evidence.py', 'tests/support/source_copy_native_evidence.py',
                  'tests/unit/test_source_copy_capture.py',
                  'tests/support/runtime_observation_evidence.py',
