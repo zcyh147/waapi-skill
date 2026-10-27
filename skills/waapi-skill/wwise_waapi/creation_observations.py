@@ -96,6 +96,11 @@ def require_compound_creation_scope(calls):
     for child in prepared:
         plan, state = child.get('verification_plan', {}), child.get('pre_state', {})
         kind = plan.get('kind')
+        if kind in {'object-create-graph', 'object-set-batch'} and state.get('owned_result_stages', {}).get('lists'):
+            # Validate source ownership, but do not budget an unavailable optional
+            # history observer. Source node/List/field/plan limits still apply.
+            compound_source_creation_graphs(plan, state)
+            continue
         chains = state.get('effect_render_chains', [])
         covered = {}
         for chain in chains:

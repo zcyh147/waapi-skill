@@ -173,3 +173,25 @@ def test_group_list_retained_owner_remains_an_explicit_source_admission_gap(tmp_
     assert code == 2 and rejected['error_code'] == 'UNDO_GROUP_CHILD_OBSERVATION_REQUIRED', rejected
     assert 'retained/replacement source admission remains unfinished' in rejected['message']
     assert task.writes == []
+
+
+def test_source_only_group_over_history_budget_still_obeys_source_plan_bound(tmp_path):
+    # 64 new nodes + 62 reference fields + 3 retained parent/collision rows consumed
+    # 129 history observations. Their actual source plan exceeds 256 KiB.
+    task = group_list_task(tmp_path, slot_count=31, second_owner_slots=30)
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'UNDO_GROUP_PLAN_TOO_LARGE', checked
+    assert checked['details']['limit_bytes'] == 262144
+    assert checked['details']['size_bytes'] > 262144
+    assert task.writes == [] and not task.group_open
+
+
+def test_source_only_group_within_source_bounds_ignores_optional_history_budget(tmp_path, monkeypatch):
+    from wwise_waapi import edit_history_business
+    from wwise_waapi.canonical import canonical_json_bytes
+    monkeypatch.setattr(edit_history_business, 'MAX_OBSERVATIONS', 1)
+    task = group_list_task(tmp_path)
+    _, shown = task.preview()
+    plan = shown['artifact']['prepared_operation']['pre_state']['execution_plan']
+    assert len(canonical_json_bytes(plan)) <= 262144
+    assert task.writes == [] and not task.group_open

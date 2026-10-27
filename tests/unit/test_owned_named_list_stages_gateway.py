@@ -17,7 +17,7 @@ OLD_SLOT = '{88888888-8888-8888-8888-888888888888}'
 SECOND_SLOT = '{99999999-9999-9999-9999-999999999999}'
 
 
-def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, empty_replace_two=False, multiple_new=False, constructor_reference=True, constructor_target='valid', replace_existing_two=False, owner_collision=False, old_source_child=False, name_conflict='rename', retained_kind=('Sound', 65552), compound=False, new_owner_kind=('Sound', 65552)):
+def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, empty_replace_two=False, multiple_new=False, constructor_reference=True, constructor_target='valid', replace_existing_two=False, owner_collision=False, old_source_child=False, name_conflict='rename', retained_kind=('Sound', 65552), compound=False, new_owner_kind=('Sound', 65552), slot_count=1, second_owner_slots=0):
     task = OwnedGraphTask(tmp_path, '2025.1', 'object.set')
     if compound:
         from tests.unit.test_compound_undo_business_gateway import _start_parent_owned_graph_child
@@ -209,10 +209,19 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
         task.constructor_rejected = slot
         return task
     assert code == 0, slot
-    if empty_replace_two or multiple_new or replace_existing_two:
-        code, slot2 = task.step('draft-declare-new', '--declaration-id', 'slot2', '--parent-handle', retained_handle if retained else sound['draft']['declared_object']['result_handle'],
-            '--name', 'Second slot', '--kind', kinds['MetadataSlot'], '--field', 'object_list', list_field, *metadata_fields)
+    for slot_index in range(1, max(slot_count, 2 if empty_replace_two or multiple_new or replace_existing_two else 1)):
+        code, slot2 = task.step('draft-declare-new', '--declaration-id', f'slot{slot_index + 1}', '--parent-handle', retained_handle if retained else sound['draft']['declared_object']['result_handle'],
+            '--name', 'Second slot' if slot_index == 1 else f'Extra slot {slot_index}', '--kind', kinds['MetadataSlot'], '--field', 'object_list', list_field, *metadata_fields)
         assert code == 0, slot2
+    if second_owner_slots:
+        code, second_owner = task.step('draft-declare-new', '--declaration-id', 'sender-two',
+            '--parent-handle', parents[1], '--name', 'Second sender', '--kind', kinds[new_owner_kind[0]])
+        assert code == 0, second_owner
+        for index in range(second_owner_slots):
+            code, member = task.step('draft-declare-new', '--declaration-id', f'second-slot-{index}',
+                '--parent-handle', second_owner['draft']['declared_object']['result_handle'], '--name', f'Second owner slot {index}',
+                '--kind', kinds['MetadataSlot'], '--field', 'object_list', list_field, *metadata_fields)
+            assert code == 0, member
     return task
 
 
