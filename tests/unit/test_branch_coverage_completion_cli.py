@@ -412,6 +412,166 @@ def test_representative_proof_preserves_failed_direct_sibling_receipt(ping_scope
     assert 'representative_proof' not in row
 
 
+@pytest.fixture
+def evaluated_representative_rows():
+    """Tiny already-evaluated rows at the existing representative/gate seam."""
+    route = '2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.ping'
+    selected, member = (route + '|/resultSchema/' + name for name in ('selected', 'member'))
+    source = 'skills/waapi-skill/scripts/gateway.py'
+    native = {'candidate_sha256': 'a' * 64, 'obligations': [
+        {'id': key, 'route': route, 'shape_sha256': audit.digest(name),
+         'state': state, 'requirements': ['program'], 'reasons': [],
+         'evidence_results': {'program': {'outcome': outcome, 'reason': None}}}
+        for key, name, state, outcome in ((selected, 'selected', 'verified', 'passed'),
+                                         (member, 'member', 'implemented_unverified', 'missing'))]}
+    bindings = {row['id']: {'representative_mechanism': 'controlled-mechanism',
+        **{key: {'source': source + '#preflight_typed_zero_input', 'selector': row['id']}
+           for key in ('construction', 'validation', 'verifier')},
+        'evidence': {'program': {'selected': True}} if row['id'] == selected else {}}
+        for row in native['obligations']}
+    requirements = {'branches': {row['id']: {'representative_mechanism': 'controlled-mechanism',
+                        'categories': ['program']} for row in native['obligations']},
+        'representative_mechanisms': {'controlled-mechanism': {
+            'contract': 'waapi-skill.representative-branch-mechanism/v1',
+            'scope_kind': 'controlled', 'candidate_sha256': 'a' * 64,
+            'reviewed_reason': 'Controlled evaluated mapping/proof integration fixture only',
+            'sources': {source: hashlib.sha256((audit.ROOT / source).read_bytes()).hexdigest()},
+            'members': {row['id']: {'native_route': route,
+                'native_shape_sha256': row['shape_sha256'],
+                'mapping_sha256': audit.digest({k: v for k, v in bindings[row['id']].items() if k != 'evidence'})}
+                for row in native['obligations']},
+            'selected_proofs': {'program': [selected]}}}}
+    return native, bindings, requirements, selected, member
+
+
+@pytest.mark.parametrize('anchor_present', [False, True])
+def test_representative_completion_still_requires_direct_runtime_anchor(evaluated_representative_rows, anchor_present):
+    from tests.maintenance.branch_audit_completion import apply_representative_mechanisms
+    from tests.support.runtime_observation_evidence import apply_runtime_preservation_gates
+    native, bindings, requirements, selected, member = evaluated_representative_rows
+    apply_representative_mechanisms(native, bindings, requirements, audit.ROOT,
+        digest=audit.digest, scope_kind='controlled')
+    recipient = native['obligations'][1]
+    assert recipient['state'] == 'mapped_with_representative_proof'
+    indirect = deepcopy(recipient['representative_proof'])
+    anchor_id = recipient['route'] + '|/resultSchema/anchor'
+    if anchor_present:
+        anchor = {'id': anchor_id, 'route': recipient['route'], 'state': 'verified',
+                  'evidence_results': {'native': {'outcome': 'passed', 'reason': 'original native fact'}}}
+        native['obligations'].append(anchor)
+        requirements['branches'][anchor_id] = {'categories': ['native']}
+        original_anchor = deepcopy(anchor)
+    apply_runtime_preservation_gates(native['obligations'], requirements['branches'], {member: [anchor_id]})
+    assert recipient['state'] == ('mapped_with_representative_proof' if anchor_present else 'implemented_unverified')
+    assert recipient['runtime_native_anchor_status'] == ('passed' if anchor_present else 'missing')
+    assert recipient['representative_proof'] == indirect
+    assert native['obligations'][0]['evidence_results']['program']['outcome'] == 'passed'
+    if anchor_present:
+        assert anchor == original_anchor
+
+
+@pytest.mark.parametrize('category,retained_outcome', [
+    ('native', 'reviewed_mechanism_reuse'),
+    ('live_metadata', 'reviewed_class_metadata_and_object_scope_mechanism'),
+    ('native', 'missing')])
+def test_representative_program_support_preserves_existing_category_outcomes(evaluated_representative_rows, category, retained_outcome):
+    from tests.maintenance.branch_audit_completion import apply_representative_mechanisms
+    native, bindings, requirements, selected, member = evaluated_representative_rows
+    review = requirements['representative_mechanisms']['controlled-mechanism']
+    review['selected_proofs'][category] = [selected]
+    for row in native['obligations']:
+        row['requirements'].append(category)
+        requirements['branches'][row['id']]['categories'].append(category)
+        row['evidence_results'][category] = {'outcome': 'passed' if row['id'] == selected else retained_outcome,
+                                            'reason': 'retained original observation assessment'}
+        bindings[row['id']]['evidence'][category] = {'original_fact': row['id']}
+    recipient = native['obligations'][1]
+    original_result = deepcopy(recipient['evidence_results'][category])
+    original_fact = deepcopy(bindings[member]['evidence'][category])
+    apply_representative_mechanisms(native, bindings, requirements, audit.ROOT,
+        digest=audit.digest, scope_kind='controlled')
+    assert recipient['state'] == ('implemented_unverified' if retained_outcome == 'missing'
+                                 else 'mapped_with_representative_proof')
+    assert recipient['evidence_results'][category] == original_result
+    assert bindings[member]['evidence'][category] == original_fact
+    assert recipient['evidence_results']['program']['outcome'] == 'reviewed_representative_mechanism'
+    assert recipient['representative_proof']['reused_categories'] == ['program']
+
+
+@pytest.mark.parametrize('state', ['verified', 'mapped_with_representative_proof',
+    'source_definition_verified', 'proven_native_absence', 'approved_exclusion'])
+def test_missing_required_runtime_anchor_invalidates_every_complete_recipient(state):
+    from tests.support.runtime_observation_evidence import apply_runtime_preservation_gates
+    row = {'id': 'recipient', 'route': 'exact-route', 'state': state, 'reasons': []}
+    apply_runtime_preservation_gates([row], {}, {'recipient': ['missing-anchor']})
+    assert row['state'] == 'implemented_unverified'
+    assert row['runtime_native_anchor_status'] == 'missing'
+
+
+@pytest.mark.parametrize('native_outcome', ['passed', 'reviewed_mechanism_reuse', 'missing'])
+def test_runtime_anchor_keeps_direct_native_requirement_with_indirect_program_support(native_outcome):
+    from tests.support.runtime_observation_evidence import apply_runtime_preservation_gates
+    row = {'id': 'recipient', 'route': 'exact-route', 'state': 'mapped_with_representative_proof', 'reasons': []}
+    anchor = {'id': 'anchor', 'route': 'exact-route', 'state': 'mapped_with_representative_proof',
+              'evidence_results': {'native': {'outcome': native_outcome},
+                                  'program': {'outcome': 'reviewed_representative_mechanism'}}}
+    original = deepcopy(anchor)
+    apply_runtime_preservation_gates([row, anchor], {'anchor': {'categories': ['program', 'native']}},
+                                    {'recipient': ['anchor']})
+    assert row['state'] == ('mapped_with_representative_proof' if native_outcome == 'passed'
+                           else 'implemented_unverified')
+    assert anchor == original
+
+
+def test_product_representative_self_stamp_stabilizes_identity_and_keeps_semantic_seals(evaluated_representative_rows, tmp_path):
+    from tests.maintenance.branch_audit_completion import candidate_identity, apply_representative_mechanisms
+    native, bindings, requirements, selected, member = evaluated_representative_rows
+    # Exact small copied root; no catalog/inventory generation or external call.
+    for name in ('skills/waapi-skill/SKILL.md', 'skills/waapi-skill/scripts/gateway.py',
+                 'tests/maintenance/branch_coverage_audit.py', 'tests/maintenance/branch_audit_completion.py',
+                 'docs/branch-coverage-ownership.json', 'docs/branch-coverage-condition-sources.json'):
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((audit.ROOT / name).read_bytes())
+    review = requirements['representative_mechanisms']['controlled-mechanism']
+    review['scope_kind'] = 'product'
+    requirements['contract'] = 'waapi-skill.branch-evidence-requirements/v1'
+    canonical = tmp_path / 'docs/branch-coverage-requirements.json'
+    write_json(canonical, requirements)
+    candidate = candidate_identity(tmp_path, {'sources': {}}, {}, digest=audit.digest)
+    review['candidate_sha256'] = candidate
+    write_json(canonical, requirements)
+    assert candidate_identity(tmp_path, {'sources': {}}, {}, digest=audit.digest) == candidate
+    native['candidate_sha256'] = candidate
+    apply_representative_mechanisms(native, bindings, requirements, tmp_path,
+        digest=audit.digest, scope_kind='product')
+    assert native['obligations'][1]['state'] == 'mapped_with_representative_proof'
+    complete_digest = audit.digest(requirements)
+    wrong_stamp = deepcopy(requirements)
+    wrong_stamp['representative_mechanisms']['controlled-mechanism']['candidate_sha256'] = '0' * 64
+    write_json(canonical, wrong_stamp)
+    assert candidate_identity(tmp_path, {'sources': {}}, {}, digest=audit.digest) == candidate
+    assert audit.digest(wrong_stamp) != complete_digest  # Full requirements seal still retains the stamp.
+    with pytest.raises(ValueError, match='closed current representative mechanism review required'):
+        apply_representative_mechanisms(native, bindings, wrong_stamp, tmp_path,
+            digest=audit.digest, scope_kind='product')
+    for semantic in ('policy', 'mapping', 'source', 'selected-proof', 'reason'):
+        changed = deepcopy(requirements)
+        altered = changed['representative_mechanisms']['controlled-mechanism']
+        if semantic == 'policy':
+            changed['branches'][member]['categories'].append('native')
+        elif semantic == 'mapping':
+            altered['members'][member]['mapping_sha256'] = '0' * 64
+        elif semantic == 'source':
+            altered['sources'][next(iter(altered['sources']))] = '0' * 64
+        elif semantic == 'selected-proof':
+            altered['selected_proofs']['program'] = [member]
+        else:
+            altered['reviewed_reason'] = 'Different review decision'
+        write_json(canonical, changed)
+        assert candidate_identity(tmp_path, {'sources': {}}, {}, digest=audit.digest) != candidate, semantic
+
+
 def test_parent_pass_cannot_complete_descendant_branches(ping_scope, tmp_path, capsys):
     path, seal, _, evidence = ping_scope
     damaged = deepcopy(evidence)

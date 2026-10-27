@@ -10,6 +10,12 @@ from functools import lru_cache
 import sys
 
 
+COMPLETE_COVERAGE_STATES = frozenset({'verified', 'mapped_with_representative_proof',
+    'source_definition_verified', 'proven_native_absence', 'approved_exclusion'})
+ADMITTED_EVIDENCE_OUTCOMES = frozenset({'passed', 'reviewed_mechanism_reuse',
+    'reviewed_class_metadata_and_object_scope_mechanism'})
+
+
 def native_coverage(root, inventory, *, digest, schema_branches, load):
     sys.path.insert(0, str(root / 'skills/waapi-skill'))
     from wwise_waapi.native_catalog import load_native_catalog, NATIVE_HOSTS
@@ -160,7 +166,20 @@ def candidate_identity(root, inventory, catalogs, *, digest):
         sources[path] = digest((root / path).read_text(encoding='utf-8'))
     for name in ('branch-coverage-ownership.json', 'branch-coverage-condition-sources.json', 'branch-coverage-requirements.json'):
         path = 'docs/' + name
-        sources[path] = digest((root / path).read_text(encoding='utf-8'))
+        content = (root / path).read_text(encoding='utf-8')
+        if name == 'branch-coverage-requirements.json':
+            import json
+            document = json.loads(content)
+            mechanisms = document.get('representative_mechanisms', {})
+            if isinstance(mechanisms, dict) and mechanisms:
+                # Only self-attestation values are normalized. All policy,
+                # mapping, source and selected-proof semantics stay in identity;
+                # the final full requirements digest still includes each stamp.
+                for review in mechanisms.values():
+                    if isinstance(review, dict) and 'candidate_sha256' in review:
+                        review['candidate_sha256'] = 'waapi-skill.candidate-self-attestation/v1'
+                content = document
+        sources[path] = digest(content)
     for path in sorted((root / 'skills/waapi-skill/resources/metadata').glob('*/object-types.json')):
         sources[str(path.relative_to(root))] = digest(path.read_text(encoding='utf-8'))
     # Source attachment producer/finalizer bytes are part of the current
@@ -1905,7 +1924,7 @@ def apply_representative_mechanisms(native, bindings, requirements, root, *, dig
                     'review_sha256': digest(review), 'selected_proofs': review['selected_proofs'],
                     'reused_categories': reused, 'verification_strength': 'reviewed_shared_mechanism',
                     'direct_member_execution': 'not_observed'}
-                if all(result['outcome'] in {'passed', 'reviewed_representative_mechanism'}
+                if all(result['outcome'] in ADMITTED_EVIDENCE_OUTCOMES | {'reviewed_representative_mechanism'}
                        for result in row['evidence_results'].values()):
                     row['state'] = 'mapped_with_representative_proof'
     if linked != admitted or policy_linked != admitted:
@@ -2096,7 +2115,7 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
         if branch['evidence_results'].get('live_metadata', {}).get('outcome') == 'reviewed_class_metadata_and_object_scope_mechanism':
             branch['metadata_scope'] = 'object_type'
             branch['direct_recipient_instance_metadata'] = 'not_observed'
-        branch['state'] = 'verified' if outcomes <= {'passed', 'reviewed_mechanism_reuse', 'reviewed_class_metadata_and_object_scope_mechanism'} else 'environment_blocked' if 'blocked' in outcomes else 'implemented_unverified'
+        branch['state'] = 'verified' if outcomes <= ADMITTED_EVIDENCE_OUTCOMES else 'environment_blocked' if 'blocked' in outcomes else 'implemented_unverified'
     apply_representative_mechanisms(native, bindings, requirements_document, root,
         digest=digest, scope_kind=scope_kind)
     apply_runtime_preservation_gates(native['obligations'], policies, preservation_gates)
@@ -2118,7 +2137,7 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
                 _, profile, _ = console_branch(branch,root)
                 if branch['id'] == profile['gate']:
                     branch['representative_native_support'] = console_basis(profile)
-    complete_states = {'verified', 'mapped_with_representative_proof', 'source_definition_verified', 'proven_native_absence', 'approved_exclusion'}
+    complete_states = COMPLETE_COVERAGE_STATES
     counts = dict(sorted(Counter(r['state'] for r in native['obligations']).items()))
     if condition_reuse_reviews:
         native['condition_mechanism_reuse'] = {'original_witness_run_ids': sorted(condition_reuse_runs),

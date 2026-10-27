@@ -1933,7 +1933,7 @@ def apply_runtime_preservation_gates(obligations, policies, gates):
             witness = rows.get(anchor, {})
             if (witness.get('route') != row['route']
                     or 'native' not in policies.get(anchor, {}).get('categories', [])
-                    or witness.get('state') != 'verified'
+                    or witness.get('state') not in completion.COMPLETE_COVERAGE_STATES
                     or witness.get('evidence_results', {}).get('native', {}).get('outcome') != 'passed'):
                 failed.append(anchor)
         row['runtime_native_anchor_requirements'] = anchors
@@ -1941,7 +1941,7 @@ def apply_runtime_preservation_gates(obligations, policies, gates):
         if anchors is None or failed:
             if anchors is None and row['state'] != 'missing_implementation':
                 row['state'] = 'unresolved'
-            elif row['state'] == 'verified':
+            elif row['state'] in completion.COMPLETE_COVERAGE_STATES:
                 row['state'] = 'implemented_unverified'
             row['reasons'].append('Exact reviewed runtime preservation policy or native anchors missing: '
                 + (', '.join(failed) if anchors is not None else 'unreviewed successor'))
