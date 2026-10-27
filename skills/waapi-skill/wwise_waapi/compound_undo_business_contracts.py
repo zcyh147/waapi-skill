@@ -77,10 +77,12 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
             "eligible_child_operations": eligible,
             "child_observation_scope": {
                 "object.create": "complete_ordinary_new_fail_or_owned_native_rename_hierarchy_with_actual_node_identity_class_parent_notes_fields_and_membership",
-                **({"object.set": "existing_scalar_reference_or_null_name_notes_fields_and_owned_ordinary_native_rename_creation_graphs"}
+                **({"object.set": "existing_scalar_reference_or_null_name_notes_fields_and_owned_ordinary_native_rename_creation_graphs_plus_source_certified_new_owner_leaf_Lists"}
                     if version != "2021.1" else {}),
                 "render_effects": "explicit_and_induced_existing_fields_plus_complete_original_chain",
-                "graph_list_merge_replace_restoration": "remaining_same_parent_implementation_obligation;_typed_List_history_remains_implementation_obligation",
+                "source_list_admission": "complete_source_certified_leaf_Lists_of_new_ordinary_staged_fail_or_rename_owners;_retained_prefix_and_nonempty_replacement_admission_remain_unfinished",
+                "optional_history_expectation": "existing_supported_observers_only;_source_List_admission_does_not_certify_undo_redo_restoration_or_make_an_unsupported_expectation_receipt_eligible",
+                "graph_list_merge_replace_restoration": "unobserved_by_optional_history_observers;_not_required_for_source_admission",
                 "created_graph_ancestor_rename": "exact_intent_GUID_bound_ancestor_components_and_phase_reference_arguments;_owned_actual_GUID_names_and_deferred_reference_stages",
                 "history_receipt": "actual_parent_execution_phase_and_child_verification_range_hash_association",
             },

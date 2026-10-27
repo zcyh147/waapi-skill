@@ -11547,14 +11547,22 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
     kind = plan.get("kind")
     scopes = []
     if kind in {"object-create-graph", "object-set-batch"} and state.get("owned_result_stages"):
-        from .creation_observations import ordinary_staged_creation_graphs
+        from .creation_observations import compound_source_creation_graphs
         try:
-            groups = ordinary_staged_creation_graphs(plan, state)
+            groups = compound_source_creation_graphs(plan, state)
         except ValueError as exc:
             raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", str(exc)) from exc
         paths = state['owned_result_stages']['prospective_paths']
         from .owned_result_stages import preservation_rows
-        return [{"object_id": "path:" + paths[node['request_path']].casefold(),
+        def source_key(node):
+            path = paths[node['request_path']]
+            if path is not None:
+                return 'path:' + path.casefold()
+            owner_path = paths[node['parent_request_path']]
+            if not isinstance(owner_path, str) or node.get('collection') in {None, 'children'}:
+                raise OperationContractError('UNDO_GROUP_CHILD_OBSERVATION_REQUIRED', 'Owned List requires its exact ordinary source owner scope.')
+            return 'owned-list:' + owner_path.casefold() + ':' + node['collection']
+        return [{"object_id": source_key(node),
             "field": "presence", "kind": "all", "platform": None} for group in groups for node in group['nodes']] + [
             {'object_id': row['id'], 'field': 'notes', 'kind': 'all', 'platform': None}
             for row, _ in preservation_rows({'verification_plan': plan, 'pre_state': state})]
@@ -11688,6 +11696,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             )
         from .creation_observations import require_compound_creation_scope
         require_compound_creation_scope(prepared_children)
+        if any(child.get('prepared_operation', {}).get('pre_state', {}).get('owned_result_stages', {}).get('lists')
+                for child in prepared_children):
+            warnings.append("This group's verification checks its requested child changes. Undo/redo restoration for created List members remains unobserved; "
+                'this source does not provide a supported history expectation receipt. Cancellation is not proof of rollback.')
         from .object_graph_paths import prepare_compound_path_context
         try:
             compound_path_context = prepare_compound_path_context(prepared_children, read=read)

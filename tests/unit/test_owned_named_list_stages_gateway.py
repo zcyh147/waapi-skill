@@ -17,8 +17,11 @@ OLD_SLOT = '{88888888-8888-8888-8888-888888888888}'
 SECOND_SLOT = '{99999999-9999-9999-9999-999999999999}'
 
 
-def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, empty_replace_two=False, multiple_new=False, constructor_reference=True, constructor_target='valid', replace_existing_two=False, owner_collision=False, old_source_child=False, name_conflict='rename', retained_kind=('Sound', 65552)):
+def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, empty_replace_two=False, multiple_new=False, constructor_reference=True, constructor_target='valid', replace_existing_two=False, owner_collision=False, old_source_child=False, name_conflict='rename', retained_kind=('Sound', 65552), compound=False, new_owner_kind=('Sound', 65552)):
     task = OwnedGraphTask(tmp_path, '2025.1', 'object.set')
+    if compound:
+        from tests.unit.test_compound_undo_business_gateway import _start_parent_owned_graph_child
+        _start_parent_owned_graph_child(task, 'object.set')
     task.types = [{'classId': cid, 'name': name, 'type': 'Inner' if name == 'MetadataSlot' else 'WObject'} for name, cid in (
         ('WorkUnit', 1638416), ('Bus', 1376272), ('Sound', 65552), ('MetadataSlot', 5570560))]
     task.objects = {
@@ -35,6 +38,8 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
     if owner_collision:
         task.objects[ROOT]['name'] = 'Existing bus'
         task.objects[ROOT]['path'] = task.objects[PROJECT_GROUP]['path'] + r'\Existing bus'
+    if new_owner_kind[0] not in {row['name'] for row in task.types}:
+        task.types.append({'classId': new_owner_kind[1], 'name': new_owner_kind[0], 'type': 'WObject'})
     if retained_kind[0] not in {row['name'] for row in task.types}:
         task.types.append({'classId': retained_kind[1], 'name': retained_kind[0], 'type': 'WObject'})
     if retained or owner_collision:
@@ -73,7 +78,7 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
             results = []
             def create(node, parent, owned=False):
                 oid, actual, cid = {'Routing': (BUS, 'Routing19', 1376272),
-                    'Sender': (SOUND, 'Sender', 65552), 'Room slot': (SLOT, 'Room slot', 5570560),
+                    'Sender': (SOUND, 'Sender', new_owner_kind[1]), 'Room slot': (SLOT, 'Room slot', 5570560),
                     'Second slot': (SECOND_SLOT, 'Second slot', 5570560)}[node['name']]
                 previous = None
                 if node['name'] == 'Routing' and owner_collision:
@@ -89,7 +94,7 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
                     'classId': cid, 'notes': previous['notes'] if previous else '', 'path': (r'\opaque-slot-path' if owned else task.objects[parent]['path'] + '\\' + actual),
                     **({'owner': {'id': parent}, 'parent': None} if owned else {'parent': {'id': parent}})}
                 result = {'id': oid, 'name': actual, **({'type': 'PluginInnerObject'} if owned else {})}
-                if node['type'] == 'Sound':
+                if node['name'] == 'Sender':
                     task.objects[oid]['@Metadata'] = previous.get('@Metadata', []) if previous else []
                 for key, nodes in node.items():
                     if key == 'children' or key == '@Metadata' and isinstance(nodes, list):
@@ -168,12 +173,12 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
         code, configured = task.step('draft-business-configure', '--name-conflict', name_conflict, '--list-behavior', 'replace-all')
         assert code == 0, configured
     kinds = {}
-    for name in ('Bus', 'Sound', 'MetadataSlot'):
+    for name in dict.fromkeys(('Bus', new_owner_kind[0], 'MetadataSlot')):
         code, selected = task.step('draft-discover-types', '--role', 'object', '--meaning', name)
         assert code == 0, selected
         kinds[name] = selected['type_candidates'][0]['handle']
     retained_handle = task.bind(FIRST) if retained else None
-    owner_scope = ['--object-handle', retained_handle] if retained else ['--type-handle', kinds['Sound']]
+    owner_scope = ['--object-handle', retained_handle] if retained else ['--type-handle', kinds[new_owner_kind[0]]]
     code, fields = task.step('draft-discover-fields', *owner_scope, '--field-source', 'documented-lists', '--list')
     assert code == 0, fields
     selected = next(row for row in fields['agent_result']['items'] if row['name'] == 'Metadata')
@@ -190,7 +195,7 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
     if retained:
         code, sound = task.step('draft-declare-existing', '--declaration-id', 'sender', '--object-handle', retained_handle, *reference_fields)
     else:
-        code, sound = task.step('draft-declare-new', '--declaration-id', 'sender', '--parent-handle', parents[1], '--name', 'Sender', '--kind', kinds['Sound'], *reference_fields)
+        code, sound = task.step('draft-declare-new', '--declaration-id', 'sender', '--parent-handle', parents[1], '--name', 'Sender', '--kind', kinds[new_owner_kind[0]], *reference_fields)
     assert code == 0, sound
     metadata_fields = []
     if constructor_reference:

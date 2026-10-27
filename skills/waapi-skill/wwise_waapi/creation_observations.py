@@ -85,7 +85,7 @@ def ordinary_creation_graph(plan, state, *, parent, max_observations=128):
 
 
 def require_compound_creation_scope(calls):
-    """Fail before a graph write when its complete history algebra is unproved."""
+    """Bound complete source scopes independently of optional history eligibility."""
     from .operation_registry import OperationContractError
     from .edit_history_business import MAX_OBSERVATIONS
     prepared = [row.get('prepared_operation', {}) for row in calls]
@@ -106,7 +106,7 @@ def require_compound_creation_scope(calls):
                 key = (str(item['scope'].get('object_id')).upper(), chain.get('platform'))
                 covered.setdefault(key, set()).add(item['field'])
         if kind in {'object-create-graph', 'object-set-batch'} and state.get('owned_result_stages'):
-            groups = ordinary_staged_creation_graphs(plan, state)
+            groups = compound_source_creation_graphs(plan, state)
             graphs.append(True)
             from .owned_result_stages import preservation_rows
             known_count += sum(len(group['nodes']) + sum(len(ordinary_creation_fields(node))
@@ -188,6 +188,62 @@ def ordinary_staged_creation_graphs(plan, state):
     if visited != set(new) or len(visited) + sum(len(ordinary_creation_fields(node)) for node in new.values()) > 128:
         raise ValueError('Set creation history lacks a complete bounded new graph partition')
     return groups
+
+
+def compound_source_creation_graphs(plan, state):
+    """Project supported source groups without granting history-observer authority."""
+    try:
+        return ordinary_staged_creation_graphs(plan, state)
+    except ValueError:
+        pass
+    from copy import deepcopy
+    from .owned_result_stages import list_profiles
+
+    stage = state.get('owned_result_stages', {})
+    nodes = plan.get('nodes', [])
+    profiles = stage.get('lists', [])
+    if (plan.get('kind') != 'object-set-batch' or stage.get('uri') != 'ak.wwise.core.object.set'
+            or not profiles or stage.get('version') != plan.get('version')
+            or not nodes or len(nodes) > 128 or len({node['request_path'] for node in nodes}) != len(nodes)):
+        raise ValueError('Compound source needs a complete supported staged creation graph')
+    by_path = {node['request_path']: node for node in nodes}
+    members = set()
+    for profile in profiles:
+        owner = by_path.get(profile['owner'])
+        if (owner is None or owner.get('existing_target') is not False or owner.get('preexisting_id') is not None
+                or owner.get('collection') not in {None, 'children'} or profile.get('before') != []
+                or not profile.get('members')):
+            raise ValueError('Compound owned Lists currently require a new ordinary owner and empty original roster; retained/replacement source admission remains unfinished')
+        for path in profile['members']:
+            node = by_path.get(path)
+            fields = ordinary_creation_fields(node) if node is not None else None
+            if (path in members or node is None or node.get('parent_request_path') != profile['owner']
+                    or node.get('collection') != profile['name'] or node.get('existing_target') is not False
+                    or node.get('preexisting_id') is not None or fields is None
+                    or node.get('children_request_paths') or node.get('list_request_paths') or node.get('list_snapshots')
+                    or node.get('import_requested') or node.get('requested_language') or node.get('graph_plugin_native')
+                    or any('curve' in field or 'array' in field for field in fields)):
+                raise ValueError('Compound source List needs every fresh source-certified leaf occurrence')
+            members.add(path)
+    guards = [*state.get('documented_planned_list_guards', []), *state.get('documented_list_guards', [])]
+    if list_profiles(deepcopy(nodes), guards, plan['version']) != profiles:
+        raise ValueError('Compound source List differs from its exact producer-owned source and complete roster')
+    if {node['request_path'] for node in nodes if node.get('collection') not in {None, 'children'}} != members:
+        raise ValueError('Compound source contains an unowned List occurrence')
+    ordinary = []
+    for node in nodes:
+        if node['request_path'] in members:
+            continue
+        projected = dict(node)
+        projected['list_request_paths'], projected['list_snapshots'] = [], []
+        ordinary.append(projected)
+    groups = ordinary_staged_creation_graphs({**plan, 'nodes': ordinary}, state)
+    result = [{**group, 'nodes': [node for node in nodes if node['request_path'] == group['root']
+        or node['request_path'].startswith(group['root'] + '.')]} for group in groups]
+    if {node['request_path'] for group in result for node in group['nodes']} != {
+            node['request_path'] for node in nodes if node.get('existing_target') is False}:
+        raise ValueError('Compound source graph partition is incomplete')
+    return result
 
 
 def capture_created_field_metadata(node: Mapping[str, Any], object_id: str, *, read: Any) -> list[dict[str, Any]]:

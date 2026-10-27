@@ -4076,10 +4076,11 @@ def test_compound_discovery_exposes_exact_versioned_ordinary_children_and_proof_
     scope = declaration["child_observation_scope"]
     assert "ordinary_new_fail_or_owned_native_rename_hierarchy" in scope["object.create"]
     assert "actual_parent_execution_phase" in scope["history_receipt"]
-    assert "remaining_same_parent" in scope["graph_list_merge_replace_restoration"]
+    assert "not_required_for_source_admission" in scope["graph_list_merge_replace_restoration"]
     assert 'exact_intent_GUID_bound' in scope['created_graph_ancestor_rename']
     assert 'owned_actual_GUID_names_and_deferred_reference_stages' in scope['created_graph_ancestor_rename']
-    assert 'typed_List_history_remains_implementation_obligation' in scope['graph_list_merge_replace_restoration']
+    assert 'retained_prefix_and_nonempty_replacement_admission_remain_unfinished' in scope['source_list_admission']
+    assert 'does_not_certify_undo_redo_restoration' in scope['optional_history_expectation']
     assert declaration["native_request_input"] == "forbidden"
 
 
