@@ -14,7 +14,7 @@ from tests.semantic.support.codex_project_prelaunch_v3 import (
     normalize_project_copy, ProjectPrelaunchRequest, WWISE_2025_SOUNDBANK_AURO_PROFILE,
 )
 from tests.destructive.support import sandbox_fixture, exact_real_evidence
-from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
+from tests.semantic.support.codex_archive_paths import parse_archive_relative_path, archive_relative_from_absolute
 from tests.unit.test_console_project_alternatives_gateway import CliProjectTask, ConsoleProjectTask, saved_fixture_project, WaapiRequestFailed
 from tests.unit.test_object_graph_business_gateway import gateway as public_gateway
 
@@ -614,7 +614,7 @@ def test_migration_retains_remaining_work_units_when_indeterminate_project_disap
     manifest_path = Path(capture['manifest_path'])
     manifest = json.loads(manifest_path.read_text())
     assert capture['complete'] is True
-    relative = client.remaining_unit.relative_to(Path(manifest['target'])).as_posix()
+    relative = archive_relative_from_absolute(client.remaining_unit, manifest['target']).canonical
     row = next(row for row in manifest['files'] if row['path'] == relative)
     image = manifest_path.parent.joinpath(*parse_archive_relative_path(row['artifact_path']).parts)
     assert image.read_bytes() == client.remaining_bytes
