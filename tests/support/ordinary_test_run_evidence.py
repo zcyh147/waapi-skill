@@ -144,6 +144,9 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
             or any(token in line for line in lines for token in (('Interrupted', 'KeyboardInterrupt') if subset is not None else ('FAILURES', 'ERRORS', 'Interrupted', 'KeyboardInterrupt')))):
         raise ValueError('ordinary run complete successful pytest summary required')
     passed, skipped, seconds = (subset['passed'], subset['skipped'], subset['seconds']) if subset is not None else (int(terminal[1]), int(terminal[2] or 0), float(terminal[3]))
+    if subset is not None and (summary.get('failed') != subset['failed'] or type(summary.get('failed')) is not int
+            or summary.get('errors') != subset['errors'] or type(summary.get('errors')) is not int):
+        raise ValueError('focused subset effective summary failure/error counts differ')
     if (passed <= 0 or not math.isfinite(seconds) or seconds <= 0
             or summary.get('passed') != passed or type(summary.get('passed')) is not int
             or summary.get('skipped') != skipped or type(summary.get('skipped')) is not int
@@ -151,7 +154,7 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
             or not isinstance(result.get('duration_seconds'), (int, float))
             or not math.isfinite(result['duration_seconds']) or result['duration_seconds'] < seconds
             or any(name in result and (type(result[name]) is not int or result[name] != count)
-                   for name, count in (('passed', passed), ('skipped', skipped), ('failed', subset['failed'] if subset is not None else 0)))):
+                   for name, count in (('passed', passed), ('skipped', skipped), ('failed', subset['failed'] if subset is not None else 0), ('errors', subset['errors'] if subset is not None else 0)))):
         raise ValueError('ordinary run original counts/duration disagree')
     skip_lines = [line for line in lines if line.startswith('SKIPPED ')]
     skips = [SKIP.fullmatch(line) for line in skip_lines]

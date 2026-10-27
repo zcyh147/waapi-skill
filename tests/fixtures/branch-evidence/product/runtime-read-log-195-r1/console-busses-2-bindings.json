@@ -1,0 +1,51 @@
+{
+  "contract": "waapi-skill.branch-bindings/v1",
+  "bindings": {
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID": {
+      "branch_id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+      "native_shape_sha256": "6fd0804f960180c5c0a16ee40e5d27afb291d8ac1c2849ed0b7ec26201d27aad",
+      "public_route": "2021.1|function|ak.wwise.core.profiler.getBusses",
+      "public_route_sha256": "9fd657bb4bef2c5561b53c664bd2abe70596de2404bac34744578204977be96d",
+      "input": {
+        "gateway_argv": [
+          "core-call",
+          "ak.wwise.core.profiler.getBusses",
+          "--profiler-position",
+          "capture-latest",
+          "--result-view",
+          "diagnostics",
+          "--max-results",
+          "64"
+        ],
+        "selector": "/native_call/result/return/0/objectGUID",
+        "correspondence": {
+          "rule": "exact_versioned_closed_runtime_declaration_and_whole_result_preservation",
+          "native_pointer": "/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+          "original_mapping_index_sha256": "8b03d5ac006b840a0ef7a27044254a401a2483145f233ed6f8ddf30b8af29ccc"
+        }
+      },
+      "construction": {
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_inspection_business_request",
+        "selector": "/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID"
+      },
+      "validation": {
+        "source": "skills/waapi-skill/wwise_waapi/builders/schema.py#validate_resolved_semantic_result",
+        "selector": "/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID"
+      },
+      "verifier": {
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
+        "selector": "/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID"
+      },
+      "evidence": {},
+      "native_only_base": "runtime-read-log-195-r1/packets/console-2021-busses-original",
+      "dispatch_pointer": "/native_call",
+      "reference_chain": [
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/properties/return/items/$ref"
+      ],
+      "native_only_review": {
+        "artifact": "runtime-read-log-195-r1/source-successor.json",
+        "sha256": "70e7d120b48ada4ada5d3781a87eaefaccb3bc6c8584e429b1ee954074d79c6f"
+      }
+    }
+  }
+}

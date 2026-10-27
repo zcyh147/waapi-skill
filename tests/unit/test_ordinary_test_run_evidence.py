@@ -501,3 +501,14 @@ def test_focused_successful_subset_rejects_incomplete_or_failed_scope(ordinary_r
     else: context['run']['summary']['source_unchanged'] = False
     reseal_subset(context)
     assert read(context)[0] == 'missing'
+
+
+@pytest.mark.parametrize('damage', ('missing-failed', 'wrong-errors', 'wrong-result-errors'))
+def test_focused_subset_requires_exact_effective_failure_and_error_counts(ordinary_run, damage):
+    context = focused_failed_subset(ordinary_run)
+    context['subset_review'].pop('original_summary')
+    if damage == 'missing-failed': context['run']['summary'].pop('failed')
+    elif damage == 'wrong-errors': context['run']['summary']['errors'] = 0
+    else: context['run']['result']['errors'] = 0
+    reseal_subset(context)
+    assert read(context)[0] == 'missing'

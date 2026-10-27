@@ -454,7 +454,7 @@
       "native_only_base": "runtime-read-log-195-r1/packets/packet-48",
       "native_only_review": {
         "artifact": "runtime-read-log-195-r1/source-successor.json",
-        "sha256": "3a532484b4ae13fc823ca9b433388d50fc49135bdfd2eccd294ab78769b72410"
+        "sha256": "70e7d120b48ada4ada5d3781a87eaefaccb3bc6c8584e429b1ee954074d79c6f"
       }
     }
   }

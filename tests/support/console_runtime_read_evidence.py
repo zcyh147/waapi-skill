@@ -254,6 +254,10 @@ def validate_evidence(record,binding,branch,category,base,root,edges):
             or record['branch_assertions'][branch['id']]['checks']!=[{'pointer':expected_native,'equals':completion.pointer_value(original['raw'],pointer)}]
             or mapping['native_checks']!=record['branch_assertions'][branch['id']]['checks']):
         raise ValueError('R125 exact whole original packet/owned occurrence differs')
+    if runtime.retained_runtime_native(binding, branch, root, base):
+        # Native-only origins retain the actual archived capture. Current code
+        # support is selected separately; no current fake replay is reconstructed.
+        return
     expected={'uri':reader['uri'],'args':original['request']['args'],'options':original['request']['options'],'result':original['raw']['result']}
     if audit.digest(captured['native_call'])!=audit.digest(expected):
         raise ValueError('R125 complete original request/options/array must survive current public replay')

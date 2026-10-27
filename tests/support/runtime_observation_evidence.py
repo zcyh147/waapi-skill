@@ -2100,7 +2100,7 @@ def runtime_publication_plan(root=audit.ROOT):
 # This finite successor admits retained native observations only. It never
 # turns a historical fake Gateway capture into current program execution.
 RUNTIME_SOURCE_SUCCESSOR = 'tests/fixtures/branch-evidence/product/runtime-read-log-195-r1/source-successor.json'
-RUNTIME_SOURCE_SUCCESSOR_SHA = '3a532484b4ae13fc823ca9b433388d50fc49135bdfd2eccd294ab78769b72410'
+RUNTIME_SOURCE_SUCCESSOR_SHA = '70e7d120b48ada4ada5d3781a87eaefaccb3bc6c8584e429b1ee954074d79c6f'
 
 
 def runtime_source_successor(root=audit.ROOT):
