@@ -58,3 +58,22 @@ Complete only the exact branch scope and evidence owned by this ticket. A native
 Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
 
 First prove each changed public Gateway business path with code integration tests, including disclosure, discovery, binding, Preview and exact terminal results. Then propose only the Fresh cases needed to check Agent discovery/use of changed interfaces; obtain an exact separate Mac-only budget before launch. Reuse valid routing/harness evidence and attribute infrastructure failures before scheduling a rerun. Code integration and native Wwise cases are distinct from Fresh Agent acceptance.
+
+
+## Pending Fresh selection — 2026-10-27
+
+The user requested a concrete proposal for review and explicitly prohibited running it yet. Execution authorization remains **zero**. Static inspection used candidate `f7be160bb3c24ebf88d043cd40757d945395d2ac`; no Fresh, model probe, Wwise, fixture preparation or test was started for this proposal.
+
+Recommend the following existing cases, once each, sequentially on macOS using the 2022.1 lane:
+
+| Existing case / profile | User task and expected outcome | External effect |
+| --- | --- | --- |
+| `TYP22-GENERIC-OBJECT-QUERY` / `typed_input_cross_version_25` | Resolve an explicitly requested ambiguous Music type calibration using the disclosed first candidate. Then find CombatMix descendant Sounds with volume at most -6 dB, notes containing mix-review and project inclusion; return the requested fields in path order, at most 12. Expect exactly 8 matches, bus counts 5 and 3, and unchanged protected state. | Real Wwise sandbox; Agent reads only. Runner fixture preparation is separate. |
+| `OGB22-WEATHER-GRAPH` / `object_graph_business_1` | Preview a Weather Actor Mixer with Rain and Wind SFX, infinite looping and -4/-6 dB. Expect one immutable Preview with the exact graph and values, and no execution or misleading claim of creation. | Real Fresh Agent, production Gateway and authenticated Broker; simulated Wwise effects, no Wwise launch. |
+| `OMB22-ALARM-OUTPUT-BUS` / `object_metadata_business_1` | Preview changing Alarm_Main's Output Bus to SFX. Expect correct source/target identities, discovered scoped field handle and one exact immutable Preview; no execution. | Real Fresh Agent, production Gateway and authenticated Broker; simulated Wwise effects, no Wwise launch. |
+
+Proposed budget: **3 Fresh tasks, 3 user turns, 2 Previews, 0 Agent mutation executions**, at most one attempt per case and no automatic retries. Retain the existing profiles' `gpt-5.6-terra`, medium reasoning, default service tier and disabled memory. Use the existing formal campaign runner with one selected case per fresh root, not the full profiles or another harness. Freeze the candidate/options and check the affected deterministic prerequisites before any separately authorized launch.
+
+These cases sample three distinct Agent interactions: query/refinement, planned new objects and existing-object field/reference discovery. They do not establish five-version native execution, actual graph creation/rerouting, every conditional field, or fully unprompted type discovery. Five-version mappings/code validation and necessary combined gates remain under #195. Preserve raw verdicts; inspect final replies for material false completion claims, without treating harmless wording as a reason to rerun. Stop on systemic evidence/authorization/cleanup faults; otherwise finish the approved frozen batch before consolidating failures. Any further attempt needs a new cost decision.
+
+#179, #182 and #184 are closed under the user's accepted limits; earlier proposals listing them as pending are superseded. #195 can independently reconcile mappings and retained evidence while this proposal awaits review. Its final aggregate cannot claim Fresh acceptance before the selected runs and assessments exist.
