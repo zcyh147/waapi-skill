@@ -10452,5 +10452,11 @@
       "artifact": "runtime-read-log-195-r1/195-unique-selector-attachment-103.json",
       "sha256": "8f67ed581d508a245683769b7b7c39d7cfc61c56062de9c1bee7dd1f643cdcf7"
     }
+  ],
+  "condition_definition_attachments": [
+    {
+      "artifact": "condition-definitions-195-r1/product-attachment.json",
+      "sha256": "b46c3633775aa919a672d1f4abd8e8a975dc3497bc4011c8c56c3adb87ea3cf5"
+    }
   ]
 }
