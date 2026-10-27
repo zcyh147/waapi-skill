@@ -250,6 +250,7 @@ tests/unit/test_host_ui_debug_business_adapter.py
 
 tests/unit/test_plugin_shareset_gateway.py
 tests/unit/test_plugin_kind_placements_gateway.py
+tests/unit/test_metadata_local_plugin_gateway.py
 tests/unit/test_persistent_project_cleanup_gateway.py
 
 tests/unit/test_policy_recovery_gateway.py

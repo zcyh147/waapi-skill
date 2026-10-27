@@ -2666,7 +2666,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         OBJECT_SET_URI,
         "object-mutation",
         (
-            "Create one owner-local Source/Effect or independent Effect, Sink, or Metadata ShareSet through "
+            "Create one owner-local Source/Effect (or source-certified 2025 Metadata) or independent Effect, Sink, or Metadata ShareSet through "
             "the version-correct Wwise object topology with a live Type Handle."
         ),
         ("target", "plugin"),
@@ -2685,6 +2685,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "Source plug-ins are create-only children of Sound or Voice targets",
             "Wwise 2022.1 owner Effects use the first proven-empty @Effect0 through @Effect3 reference",
             "Wwise 2023.1 and later owner Effects append one EffectSlot and verify its @Effect reference",
+            "Wwise 2025.1 owner Metadata appends one source-certified MetadataSlot/custom reference; exact owner/class, ordered prior slots and references are revalidated and independently checked",
             "independent ShareSets verify parent/class/name/fields and sibling preservation; Effect placement additionally admits a fresh source-proven Folder beneath an Effects Work Unit, while Sink and Metadata require their matching Work Unit",
             "pre-existing plug-in identities are sealed before dispatch; replacement, raw replaceAll, and caller-authored object.set payloads are rejected",
             "the returned association and post-read id/name/type/classId/parent/owner must bind uniquely to the immutable plan",
@@ -5653,6 +5654,17 @@ def _read_plugin_prestate(
     if len(plugins) != 1:
         raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "The selected plug-in class and kind are no longer available.")
     plugin_type = plugins[0].as_dict()
+    if descriptor.kind == "metadata" and descriptor.placement == "owner":
+        if version != "2025.1":
+            raise OperationContractError("UNAVAILABLE_IN_VERSION", "Owner-local Metadata is packaged only for 2025.1; older direct-List ownership remains unmapped.")
+        from .metadata_plugin_placement import observe_metadata_placement
+        try:
+            snapshot = observe_metadata_placement(version, target_id, target_type, read=read)
+            if len(snapshot["guard"]["members"]) >= 128:
+                raise ValueError("Metadata append would exceed the complete 128-member observation bound")
+        except (ValueError, KeyError, TypeError) as exc:
+            raise OperationContractError("INVALID_METADATA_PLACEMENT", str(exc)) from exc
+        return {**snapshot, "plugin_type": plugin_type}
     if descriptor.placement == "shareset":
         args = {"from": {"id": [target_id]}, "transform": [{"select": ["children"]}]}
         options = {"return": ["id", "name", "type", "parent"]}
@@ -5989,6 +6001,8 @@ def _prepare_object_create_plugin(
         verification["new_object_default_evidence"] = default_evidence
     if "name_binding" in plugin_plan.verification:
         verification["name_binding"] = dict(plugin_plan.verification["name_binding"])
+    if plugin_prestate["kind"] == "metadata_slots":
+        verification["metadata_snapshot"] = plugin_prestate
     if plugin_prestate["kind"] == "shareset_children":
         verification["preexisting_children"] = list(plugin_prestate["rows"])
     if plugin_prestate["kind"] == "fixed_effect_references":
@@ -20427,12 +20441,13 @@ def _extract_plugin_result_binding(
         collection=collection,
     )
     expected_type = (
+        "MetadataSlot" if placement.get("kind") == "metadata_slot_append" else
         "EffectSlot"
         if placement.get("kind") == "effect_slot_append"
         else descriptor.object_type
     )
     result_type = created.get("type")
-    if result_type is not None and result_type != expected_type:
+    if result_type is not None and result_type != expected_type and not (expected_type == "MetadataSlot" and result_type == "PluginInnerObject"):
         raise OperationContractError(
             "PLUGIN_RESULT_TYPE_MISMATCH",
             "object.set returned a different created object type.",
@@ -20442,13 +20457,13 @@ def _extract_plugin_result_binding(
                 "created": created,
             },
         )
-    expected_name = "" if expected_type == "EffectSlot" else descriptor.name
+    expected_name = "" if expected_type in {"EffectSlot", "MetadataSlot"} else descriptor.name
     result_name = created.get("name")
     if result_name is not None:
         try:
-            if expected_type == "EffectSlot":
+            if expected_type in {"EffectSlot", "MetadataSlot"}:
                 if result_name != expected_name:
-                    raise PluginOperationContractError("PLUGIN_NAME_MISMATCH", "EffectSlot must remain unnamed.")
+                    raise PluginOperationContractError("PLUGIN_NAME_MISMATCH", "Created owned slot must remain unnamed.")
             else:
                 bind_plugin_name(descriptor, version=version, actual_name=result_name)
         except PluginOperationContractError as exc:
@@ -22105,6 +22120,10 @@ def verify_prepared_operation(
             placement_shape_matches = (
                 placement.get("collection") == "children"
             )
+        elif descriptor.kind == "metadata":
+            expected_plan_fields = base_plan_fields | {"metadata_snapshot"}
+            expected_placement_kind = "metadata_slot_append"
+            placement_shape_matches = version == "2025.1" and placement.get("collection") == "@Metadata"
         elif version == "2022.1":
             expected_plan_fields = base_plan_fields | {
                 "pre_effect_references"
@@ -22253,6 +22272,25 @@ def verify_prepared_operation(
             placement_evidence: dict[str, Any] = {
                 "kind": expected_placement_kind
             }
+        elif expected_placement_kind == "metadata_slot_append":
+            from .metadata_plugin_placement import appended_metadata_binding, observe_metadata_placement
+            try:
+                before = plan["metadata_snapshot"]
+                def metadata_read(uri, args, options):
+                    result = read_call(uri, args, options)
+                    readbacks.append({"role": "custom-metadata-placement", "uri": uri,
+                        "args": dict(args), "options": dict(options), "result": result})
+                    return result
+                after = observe_metadata_placement(version, target_id, target_type, read=metadata_read)
+                plugin_id = appended_metadata_binding(before, after, created_id, result_binding["created"])
+            except (OperationContractError, ValueError, KeyError, TypeError) as exc:
+                check("custom Metadata appends one source-owned slot and preserves prior ordered membership/references", False,
+                    exc.as_dict() if isinstance(exc, OperationContractError) else {"error": str(exc)})
+                return _verification(operation, assertions, readbacks)
+            check("custom Metadata appends one source-owned slot and preserves prior ordered membership/references", True,
+                {"before": before, "after": after})
+            expected_parent_id = created_id
+            placement_evidence = {"kind": "metadata_slot_append", "slot_id": created_id, "target_id": target_id}
         elif expected_placement_kind == "fixed_effect_reference":
             target_rows = read_object(
                 object_id=target_id,

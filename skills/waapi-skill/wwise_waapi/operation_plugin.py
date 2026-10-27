@@ -394,9 +394,9 @@ def normalize_plugin_creation(payload: Any) -> PluginCreationDescriptor:
     placement = payload.get("placement", "owner")
     if (placement not in {"owner", "shareset"}
             or placement == "shareset" and kind not in PLUGIN_SHARESET_HIERARCHIES
-            or placement == "owner" and kind in {"sink", "metadata"}):
+            or placement == "owner" and kind == "sink"):
         raise PluginOperationContractError(
-            "INVALID_PLUGIN_PLACEMENT", "Source uses owner placement; Effects use owner or shareset; Sink and Metadata use shareset placement."
+            "INVALID_PLUGIN_PLACEMENT", "Source uses owner placement; Effects use owner or shareset; Sink uses shareset; Metadata additionally supports source-certified owner placement in 2025.1."
         )
     properties = _normalize_properties(payload.get("properties", []))
     raw_references = payload.get("references", [])
@@ -559,6 +559,10 @@ def validate_plugin_target(
                  if descriptor.kind == "effect" else f"This plug-in ShareSet requires a Work Unit beneath the {hierarchy} hierarchy."),
                 details={"target_type": target_type, "target_path": target_path},
             )
+    elif descriptor.kind == "metadata":
+        from .documented_list_fields import METADATA_INNER_OWNERS
+        if target_type not in METADATA_INNER_OWNERS.values():
+            raise PluginOperationContractError("INVALID_METADATA_TARGET", "Local Metadata requires a source-certified audio owner.")
     elif descriptor.kind == "effect" and target_type not in EFFECT_TARGET_TYPES:
         raise PluginOperationContractError(
             "INVALID_EFFECT_TARGET", "Owner-local Effects require a compatible audio object; use shareset placement for an Effects Work Unit.",
@@ -635,6 +639,17 @@ def build_plugin_creation_plan(
             "replace_existing_allowed": False,
         }
         expected_parent: dict[str, Any] = {"kind": "id", "value": target_id}
+    elif descriptor.kind == "metadata":
+        if version != "2025.1":
+            raise PluginOperationContractError("UNAVAILABLE_IN_VERSION", "Owner-local Metadata is packaged only for 2025.1; older direct-List ownership remains unmapped.")
+        if effect_slots_2022 is not None:
+            raise PluginOperationContractError("UNEXPECTED_EFFECT_SLOT_SNAPSHOT", "Metadata does not accept Effect-slot evidence.")
+        object_spec = {"object": target_id, "listMode": "append", "@Metadata": [
+            {"type": "MetadataSlot", "name": "", "@Metadata": plugin_object}]}
+        placement = {"kind": "metadata_slot_append", "collection": "@Metadata", "list_mode": "append",
+            "slot_type": "MetadataSlot", "create_only": True, "raw_replace_all_allowed": False,
+            "replace_existing_allowed": False}
+        expected_parent = {"kind": "created_metadata_slot"}
     elif version == "2022.1":
         selected_slot = select_free_2022_effect_field(effect_slots_2022)
         object_spec = {
@@ -695,6 +710,8 @@ def build_plugin_creation_plan(
     }
     if descriptor.placement == "shareset":
         expected_plugin.pop("owner")
+    elif descriptor.kind == "metadata":
+        expected_plugin["owner"] = expected_parent
     if descriptor.notes is not None:
         expected_plugin["notes"] = descriptor.notes
     if descriptor.language is not None:
@@ -809,7 +826,10 @@ def verify_created_plugin_row(
     expected_fields = plugin_verification_fields(descriptor)
     actual_fields = tuple(row)
     shareset = descriptor.placement == "shareset"
-    effect_owner_only = descriptor.kind == "effect" and not shareset and "parent" not in row
+    embedded_owner_only = not shareset and (
+        descriptor.kind == "effect" and "parent" not in row
+        or descriptor.kind == "metadata" and row.get("parent") is None
+    )
     allowed_missing_fields = (
         set() if shareset else {"owner"} if descriptor.kind == "source" else {"parent"}
     )
@@ -830,7 +850,7 @@ def verify_created_plugin_row(
 
     plugin_id = _require_guid(row.get("id"), field="plugin.id")
     parent_id = _closed_object_reference_id(
-        row.get("owner") if effect_owner_only else row.get("parent"),
+        row.get("owner") if embedded_owner_only else row.get("parent"),
         field="plugin.parent",
     )
     owner_id = None if shareset else _closed_object_reference_id(
@@ -865,13 +885,13 @@ def verify_created_plugin_row(
         expected_owner_id=expected_owner_id,
         placement_evidence=placement_evidence,
     )
-    # Effects can be embedded values with an immediate owner, not hierarchy
+    # Effects and custom Metadata can be embedded values with an immediate owner, not hierarchy
     # children. Placement above independently proves slot -> target (or the
     # 2022 fixed target reference); the effect must point back to that slot.
     expected_plugin_owner = (
-        expected_parent_id if effect_owner_only else expected_owner_id
+        expected_parent_id if embedded_owner_only or (descriptor.kind == "metadata" and not shareset) else expected_owner_id
     )
-    if effect_owner_only:
+    if embedded_owner_only:
         placement["ownership_readback"] = "immediate_owner_without_hierarchy_parent"
     expected = {
         "name": descriptor.name,
@@ -1146,6 +1166,13 @@ def _verify_plugin_placement(
             )
         return {"kind": "source_child"}
 
+    if descriptor.kind == "metadata":
+        _require_exact_mapping_fields(placement_evidence, frozenset({"kind", "slot_id", "target_id"}), field="placement_evidence")
+        if (version != "2025.1" or placement_evidence.get("kind") != "metadata_slot_append"
+                or not _same_guid(placement_evidence.get("slot_id"), expected_parent_id)
+                or not _same_guid(placement_evidence.get("target_id"), expected_owner_id)):
+            raise PluginOperationContractError("PLUGIN_PLACEMENT_MISMATCH", "Metadata requires its exact source-owned custom slot.")
+        return dict(placement_evidence)
     if version == "2022.1":
         return _verify_2022_effect_placement(
             plugin_id=plugin_id,

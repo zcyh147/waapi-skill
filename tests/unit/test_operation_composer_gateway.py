@@ -340,12 +340,26 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Custom Metadata owner placement adds one exact version-qualified constraint
+    # to createPlugin. Retain its new seal and invert only this reviewed delta
+    # before every historical inventory and independently reconstructed contract.
+    assert canonical_sha256(non_object_set_digests) == "bb0d07d6aeae586187a5420c4b7af2971f163298e9f0067b87982c195b74c32c"
+    def before_local_metadata_placement(operation, version):
+        contract = operation_request_machine_contract(operation, version)
+        if operation == "object.createPlugin":
+            assert contract["constraints"].pop(6) == (
+                "Wwise 2025.1 owner Metadata appends one source-certified MetadataSlot/custom reference; exact owner/class, ordered prior slots and references are revalidated and independently checked"
+            )
+        return contract
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.createPlugin@{version}"] = canonical_sha256(
+            before_local_metadata_placement("object.createPlugin", version))
     # Definition completion changes exactly four constraints on four lanes.
     # Reverse those fields before all historical checks, including later
     # contracts rebuilt independently rather than using the current inventory.
     assert canonical_sha256(non_object_set_digests) == "03eb91bf7009108273d838047a3cc5d12af2073527cfc3263661155e5da0be5c"
     def before_definition_completion(operation, version):
-        contract = operation_request_machine_contract(operation, version)
+        contract = before_local_metadata_placement(operation, version)
         if operation == "soundbank.processDefinitionFiles":
             changes = {
                 0: ("SoundBank names and ordered inclusion/exclusion rows are derived only from hashed UTF-8 tab-delimited files within the declared owned I/O root",
