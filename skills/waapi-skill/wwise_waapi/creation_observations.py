@@ -96,7 +96,9 @@ def require_compound_creation_scope(calls):
     for child in prepared:
         plan, state = child.get('verification_plan', {}), child.get('pre_state', {})
         kind = plan.get('kind')
-        if kind in {'object-create-graph', 'object-set-batch'} and state.get('owned_result_stages', {}).get('lists'):
+        stage = state.get('owned_result_stages', {})
+        if kind in {'object-create-graph', 'object-set-batch'} and (stage.get('lists')
+                or any('targets' in field for field in stage.get('deferred', []))):
             # Validate source ownership, but do not budget an unavailable optional
             # history observer. Source node/List/field/plan limits still apply.
             compound_source_creation_graphs(plan, state)
@@ -207,11 +209,30 @@ def compound_source_creation_graphs(plan, state):
     stage = state.get('owned_result_stages', {})
     nodes = plan.get('nodes', [])
     profiles = stage.get('lists', [])
+    arrays = [{'source': node['request_path'], 'field': field['name'], 'targets': field['target_results'],
+        'list_mode': field['list_mode'], 'binding': field['list_binding'],
+        'platform': node.get('platform', stage.get('creation_args', {}).get('platform'))}
+        for node in nodes for field in node.get('references', []) if 'target_results' in field]
     if (plan.get('kind') != 'object-set-batch' or stage.get('uri') != 'ak.wwise.core.object.set'
-            or not profiles or stage.get('version') != plan.get('version')
+            or not (profiles or arrays) or stage.get('version') != plan.get('version')
             or not nodes or len(nodes) > 128 or len({node['request_path'] for node in nodes}) != len(nodes)):
         raise ValueError('Compound source needs a complete supported staged creation graph')
     by_path = {node['request_path']: node for node in nodes}
+    if arrays != [field for field in stage.get('deferred', []) if 'targets' in field]:
+        raise ValueError('Compound reference Lists differ from their complete producer-owned declarations')
+    from .documented_list_fields import legacy_playlist_authority
+    for field in arrays:
+        owner, binding = by_path[field['source']], field['binding']
+        if (owner.get('existing_target') is not False or owner.get('preexisting_id') is not None
+                or legacy_playlist_authority(binding) is None or binding.get('version') != plan['version']
+                or binding.get('planned_owner', {}).get('request_path') != owner['request_path']
+                or binding.get('scope', {}).get('class_id') != owner['class_id']
+                or not field['targets'] or any(set(target) != {'request_path'}
+                    or target['request_path'] not in by_path
+                    or by_path[target['request_path']].get('parent_request_path') != owner['request_path']
+                    or by_path[target['request_path']].get('collection') != 'children'
+                    for target in field['targets'])):
+            raise ValueError('Compound reference List needs its exact source-certified new owner and direct-child targets')
     members = set()
     for profile in profiles:
         owner = by_path.get(profile['owner'])
@@ -245,7 +266,8 @@ def compound_source_creation_graphs(plan, state):
     new_paths = {node['request_path'] for node in nodes if node.get('existing_target') is False}
     ordinary = []
     for node in nodes:
-        fields = ordinary_creation_fields(node)
+        fields = ordinary_creation_fields({**node,
+            'references': [field for field in node.get('references', []) if 'target_results' not in field]})
         if (fields is None or any('curve' in field or 'array' in field for field in fields)
                 or any('target_request_path' in field and field['target_request_path'] not in new_paths for field in fields)):
             raise ValueError('Compound source requires every field and shared new-node reference target')

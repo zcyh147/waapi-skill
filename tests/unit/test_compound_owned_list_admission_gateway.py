@@ -9,8 +9,8 @@ from tests.unit.test_owned_named_list_stages_gateway import (
 )
 
 
-def group_list_task(tmp_path, *, companion=None, creation_first=True, **kwargs):
-    task = named_list_task(tmp_path, compound=True, **kwargs)
+def group_list_task(tmp_path, *, companion=None, creation_first=True, task_factory=named_list_task, **kwargs):
+    task = task_factory(tmp_path, compound=True, **kwargs)
     if companion and companion[0] == 'object.setReference':
         task.objects[companion[1]]['@OutputBus'] = {'id': companion[2]}
     assert task.step('draft-check')[0] == 0
@@ -303,6 +303,52 @@ def test_owner_conflict_prewrite_drift_cancels_without_constructing_owner_or_ret
     assert failed.get('rollback_verified', False) is False
     assert task.run('execute', tx)[0] == 2 and len(task.writes) == 1
     assert not task.group_open
+
+
+@pytest.mark.parametrize('version,mode', [('2023.1', 'replace-all'), ('2024.1', 'append')])
+def test_group_admits_planned_legacy_playlist_references_with_exact_order_and_repeats(tmp_path, version, mode):
+    from tests.unit.test_legacy_playlist_planned_targets_gateway import planned_playlist_task, CHILD
+    task = group_list_task(tmp_path, task_factory=planned_playlist_task, version=version, mode=mode)
+    tx, shown = task.preview()
+    assert any('Undo/redo restoration' in warning for warning in shown['artifact']['prepared_operation']['warnings'])
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    expected = [CHILD, ROOT, CHILD] if mode == 'replace-all' else [ROOT, CHILD, ROOT, CHILD]
+    assert task.objects[FIRST]['@Playlist'] == [{'id': oid} for oid in expected]
+    assert task.objects[ROOT]['notes'] == 'Keep One' and task.objects[CHILD]['notes'] == 'Keep Two'
+    assert len(task.writes) == 2 and task.run('execute', tx)[0] == 2
+    assert not task.group_open
+
+
+def test_group_playlist_incomplete_actual_children_cancel_before_reference_array_without_retry(tmp_path):
+    from tests.unit.test_legacy_playlist_planned_targets_gateway import planned_playlist_task
+    task = group_list_task(tmp_path, task_factory=planned_playlist_task)
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == SET and len(task.writes) == 1:
+            result['objects'][0]['children'][0]['children'].pop()
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, failed = task.run('execute', tx)
+    assert code == 2 and failed.get('verified') is not True and failed['automatic_retry'] is False, failed
+    assert failed.get('rollback_verified', False) is False
+    assert len(task.writes) == 1
+    assert [uri for uri, _, _ in task.calls if uri.startswith('ak.wwise.core.undo.')] == [
+        'ak.wwise.core.undo.beginGroup', 'ak.wwise.core.undo.cancelGroup']
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 1
+    assert not task.group_open
+
+
+def test_group_playlist_source_within_bounds_ignores_optional_history_budget(tmp_path, monkeypatch):
+    from tests.unit.test_legacy_playlist_planned_targets_gateway import planned_playlist_task
+    from wwise_waapi import edit_history_business
+    monkeypatch.setattr(edit_history_business, 'MAX_OBSERVATIONS', 1)
+    task = group_list_task(tmp_path, task_factory=planned_playlist_task)
+    task.preview()
+    assert task.writes == [] and not task.group_open
 
 
 def test_retained_list_prefix_drift_after_preview_stops_before_begin(tmp_path):

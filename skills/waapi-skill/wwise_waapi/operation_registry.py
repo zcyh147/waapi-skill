@@ -11728,8 +11728,9 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             )
         from .creation_observations import require_compound_creation_scope
         require_compound_creation_scope(prepared_children)
-        if any(child.get('prepared_operation', {}).get('pre_state', {}).get('owned_result_stages', {}).get('lists')
-                for child in prepared_children):
+        if any(stage.get('lists') or any('targets' in field for field in stage.get('deferred', []))
+                for child in prepared_children
+                for stage in [child.get('prepared_operation', {}).get('pre_state', {}).get('owned_result_stages', {})]):
             warnings.append("This group's verification checks its requested child changes. Undo/redo restoration for created List members remains unobserved; "
                 'this source does not provide a supported history expectation receipt. Cancellation is not proof of rollback.')
         from .object_graph_paths import prepare_compound_path_context
