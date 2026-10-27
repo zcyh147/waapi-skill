@@ -340,6 +340,14 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Switch assignment completion changes only the same-child constraint in
+    # five lanes. Restore that reviewed field before the historical seals.
+    assert canonical_sha256(non_object_set_digests) == "f25c13b39acb59aca80661038db7858f9ea685e4c5268239cf9c2ef30f442d8a"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("switchContainer.addAssignment", version)
+        assert contract["constraints"][-1] == "the exact child/state-or-switch pair must be absent; other pairs for that child are preserved"
+        contract["constraints"][-1] = "the closed add policy rejects a child that already has any assignment"
+        non_object_set_digests[f"switchContainer.addAssignment@{version}"] = canonical_sha256(contract)
     # Definition completion changes exactly four constraints on four lanes.
     # Reverse those fields before all historical checks, including later
     # contracts rebuilt independently rather than using the current inventory.
