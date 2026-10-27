@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 from pathlib import PureWindowsPath
@@ -728,6 +729,46 @@ def test_local_wine_cli_dispatch_uses_z_for_paths_outside_account_home(
     assert adapted.args["output"] == expected_z
     assert [row["drive"] for row in adapted.proof["path_bindings"]] == ["Y", "Z"]
     assert adapted.proof["mapping"]["anchor_drive"] == "Y"
+
+
+def test_wafm_file_uses_current_z_anchor_with_isolated_wine_home(tmp_path: Path, monkeypatch) -> None:
+    home = tmp_path / "login-home"
+    private_home = tmp_path / "private-home"
+    private_home.mkdir()
+    monkeypatch.setenv("HOME", str(private_home))
+    project = home / "case" / "SampleProject.wproj"
+    project.parent.mkdir(parents=True)
+    project.write_text("<Project/>", encoding="utf-8")
+    wafm = home / "state" / "Owned.wafm"
+    wafm.parent.mkdir()
+    frozen_bytes = b'{"Owned":{"Type":"Dialog","Version":1}}\n'
+    wafm.write_bytes(frozen_bytes)
+    uri = "ak.wwise.ui.model.registerWafm"
+    args = {"wafm": str(wafm)}
+    guard = _wine_project_guard(home, project)
+    guard["project"]["filePath"] = str(PureWindowsPath("Z:/", *project.resolve().parts[1:]))
+
+    adapted = adapt_cli_dispatch_paths(
+        uri=uri, args=args, options={},
+        io_audit=_io_audit(uri, [("args", "$.args.wafm", str(wafm), str(wafm.resolve()))]),
+        project_guard=guard, host_os_name="posix", account_home=home,
+    )
+
+    expected_wire = str(PureWindowsPath("Z:/", *wafm.resolve().parts[1:]))
+    assert adapted.args == {"wafm": expected_wire}
+    # The owned runtime maps Y to private HOME; only Z names the frozen file.
+    wire = PureWindowsPath(adapted.args["wafm"])
+    runtime_roots = {"Y:": private_home, "Z:": Path("/")}
+    assert runtime_roots[wire.drive].joinpath(*wire.parts[1:]).resolve() == wafm.resolve()
+    assert args == {"wafm": str(wafm)}
+    assert wafm.read_bytes() == frozen_bytes
+    assert adapted.proof["mapping"]["anchor_drive"] == "Z"
+    assert adapted.proof["path_bindings"] == [{
+        "section": "args", "json_path": "$.args.wafm", "mode": "translated", "drive": "Z",
+        "host_path_sha256": hashlib.sha256(str(wafm.resolve()).encode("utf-8")).hexdigest(),
+        "wire_path_sha256": hashlib.sha256(expected_wire.encode("utf-8")).hexdigest(),
+        "round_trip_verified": True,
+    }]
 
 
 def test_local_wine_cli_dispatch_rejects_audit_drift_and_remote_windows(tmp_path: Path) -> None:
