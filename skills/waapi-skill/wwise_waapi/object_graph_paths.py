@@ -180,6 +180,9 @@ def prepare_compound_path_context(calls, *, read):
     graphs = [call['prepared_operation'] for call in calls
         if call.get('prepared_operation', {}).get('verification_plan', {}).get('kind') == 'object-create-graph'
         or call.get('prepared_operation', {}).get('pre_state', {}).get('owned_result_stages')]
+    from .creation_observations import compound_source_removed_ids
+    removed = {object_id.casefold() for child in graphs
+        for object_id in compound_source_removed_ids(child['verification_plan'], child['pre_state'])}
     def affected(row):
         return isinstance(row, dict) and isinstance(row.get('path'), str) and any(
             row['path'] == node['pre_state']['path'] or row['path'].startswith(node['pre_state']['path'] + '\\')
@@ -202,7 +205,7 @@ def prepare_compound_path_context(calls, *, read):
             # Owned List members retain their opaque path/owner proof in the
             # complete Render model, not an invented ordinary parent chain.
             if (all(isinstance(value.get(key), str) for key in ('id', 'name', 'type', 'path'))
-                    and _GUID.fullmatch(value['id']) and value['id'].casefold() not in owned_members):
+                    and _GUID.fullmatch(value['id']) and value['id'].casefold() not in owned_members | removed):
                 if any(value['path'] == node['pre_state']['path'] or value['path'].startswith(node['pre_state']['path'] + '\\') for node in edits):
                     key = value['id'].casefold()
                     if key in identities and any(identities[key][field] != value[field] for field in ('id', 'name', 'type', 'path')):
@@ -375,6 +378,9 @@ def compound_created_child_roots(calls, phases):
                 raise ValueError('Staged created root lacks successful actual native acknowledgements')
             actual = validate_owned_stages(child, result, context={'edits': compound_rename_edits(calls[:index])})
             for group in compound_source_creation_graphs(plan, child['pre_state']):
+                root = next(node for node in group['nodes'] if node['request_path'] == group['root'])
+                if root.get('collection') not in {None, 'children'}:
+                    continue  # Owned List occurrences are not ordinary sibling roots.
                 roots.append({'child_index': index, 'request_path': group['root'],
                     'parent_id': group['parent_id'].upper(), 'object_id': actual[group['root']]['id'].upper()})
             continue

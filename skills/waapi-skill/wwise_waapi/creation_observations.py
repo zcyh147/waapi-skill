@@ -96,7 +96,9 @@ def require_compound_creation_scope(calls):
     for child in prepared:
         plan, state = child.get('verification_plan', {}), child.get('pre_state', {})
         kind = plan.get('kind')
-        if kind in {'object-create-graph', 'object-set-batch'} and state.get('owned_result_stages', {}).get('lists'):
+        stage = state.get('owned_result_stages', {})
+        if kind in {'object-create-graph', 'object-set-batch'} and (stage.get('lists')
+                or any('targets' in field for field in stage.get('deferred', []))):
             # Validate source ownership, but do not budget an unavailable optional
             # history observer. Source node/List/field/plan limits still apply.
             compound_source_creation_graphs(plan, state)
@@ -207,48 +209,106 @@ def compound_source_creation_graphs(plan, state):
     stage = state.get('owned_result_stages', {})
     nodes = plan.get('nodes', [])
     profiles = stage.get('lists', [])
+    arrays = [{'source': node['request_path'], 'field': field['name'], 'targets': field['target_results'],
+        'list_mode': field['list_mode'], 'binding': field['list_binding'],
+        'platform': node.get('platform', stage.get('creation_args', {}).get('platform'))}
+        for node in nodes for field in node.get('references', []) if 'target_results' in field]
     if (plan.get('kind') != 'object-set-batch' or stage.get('uri') != 'ak.wwise.core.object.set'
-            or not profiles or stage.get('version') != plan.get('version')
+            or not (profiles or arrays) or stage.get('version') != plan.get('version')
             or not nodes or len(nodes) > 128 or len({node['request_path'] for node in nodes}) != len(nodes)):
         raise ValueError('Compound source needs a complete supported staged creation graph')
     by_path = {node['request_path']: node for node in nodes}
+    if arrays != [field for field in stage.get('deferred', []) if 'targets' in field]:
+        raise ValueError('Compound reference Lists differ from their complete producer-owned declarations')
+    from .documented_list_fields import legacy_playlist_authority
+    for field in arrays:
+        owner, binding = by_path[field['source']], field['binding']
+        if (owner.get('existing_target') is not False or owner.get('preexisting_id') is not None
+                or legacy_playlist_authority(binding) is None or binding.get('version') != plan['version']
+                or binding.get('planned_owner', {}).get('request_path') != owner['request_path']
+                or binding.get('scope', {}).get('class_id') != owner['class_id']
+                or not field['targets'] or any(set(target) != {'request_path'}
+                    or target['request_path'] not in by_path
+                    or by_path[target['request_path']].get('parent_request_path') != owner['request_path']
+                    or by_path[target['request_path']].get('collection') != 'children'
+                    for target in field['targets'])):
+            raise ValueError('Compound reference List needs its exact source-certified new owner and direct-child targets')
     members = set()
+    declared_members = {path for profile in profiles for path in profile['members']}
     for profile in profiles:
         owner = by_path.get(profile['owner'])
-        if (owner is None or owner.get('existing_target') is not False or owner.get('preexisting_id') is not None
-                or owner.get('collection') not in {None, 'children'} or profile.get('before') != []
+        if (owner is None or type(owner.get('existing_target')) is not bool
+                or owner.get('preexisting_id') is not None and owner.get('on_name_conflict') != 'merge'
+                or owner.get('collection') not in {None, 'children'} and owner['request_path'] not in declared_members
                 or not profile.get('members')):
-            raise ValueError('Compound owned Lists currently require a new ordinary owner and empty original roster; retained/replacement source admission remains unfinished')
+            raise ValueError('Compound owned Lists require an exact ordinary new or retained source owner')
         for path in profile['members']:
             node = by_path.get(path)
             fields = ordinary_creation_fields(node) if node is not None else None
             if (path in members or node is None or node.get('parent_request_path') != profile['owner']
                     or node.get('collection') != profile['name'] or node.get('existing_target') is not False
                     or node.get('preexisting_id') is not None or fields is None
-                    or node.get('children_request_paths') or node.get('list_request_paths') or node.get('list_snapshots')
                     or node.get('import_requested') or node.get('requested_language') or node.get('graph_plugin_native')
                     or any('curve' in field or 'array' in field for field in fields)):
-                raise ValueError('Compound source List needs every fresh source-certified leaf occurrence')
+                raise ValueError('Compound source List needs every fresh source-certified occurrence')
             members.add(path)
     guards = [*state.get('documented_planned_list_guards', []), *state.get('documented_list_guards', [])]
     if list_profiles(deepcopy(nodes), guards, plan['version']) != profiles:
         raise ValueError('Compound source List differs from its exact producer-owned source and complete roster')
     if {node['request_path'] for node in nodes if node.get('collection') not in {None, 'children'}} != members:
         raise ValueError('Compound source contains an unowned List occurrence')
+    replaced = {str(row['id']).upper() for profile in profiles if profile.get('mode') == 'replaceAll'
+        for row in profile['before']}
+    if {str(row['id']).upper() for row in plan.get('replaced_list_subtree_rows', [])} != replaced:
+        raise ValueError('Compound source List replacement needs its complete source-certified leaf roster')
+    if plan.get('replaced_subtree_rows', []) != [row for scope in stage.get('replacements', []) for row in scope['rows']]:
+        raise ValueError('Compound source replacement differs from its exact producer-owned original subtree')
+    new_paths = {node['request_path'] for node in nodes if node.get('existing_target') is False}
     ordinary = []
     for node in nodes:
-        if node['request_path'] in members:
-            continue
+        fields = ordinary_creation_fields({**node,
+            'references': [field for field in node.get('references', []) if 'target_results' not in field]})
+        if (fields is None or any('curve' in field or 'array' in field for field in fields)
+                or any('target_request_path' in field and field['target_request_path'] not in new_paths for field in fields)):
+            raise ValueError('Compound source requires every field and shared new-node reference target')
         projected = dict(node)
         projected['list_request_paths'], projected['list_snapshots'] = [], []
+        # Only the request-path partition is shared with ordinary creation.
+        # Actual List ownership, membership and replacement remain in the exact
+        # source profiles and original nodes returned below, never native paths.
+        if node['request_path'] in members:
+            projected['collection'] = 'children'
+        if node.get('existing_target'):
+            if (node.get('requested_name') != node.get('original_name') or node.get('notes_supplied')
+                    or node.get('properties') or any('target_request_path' not in field
+                        for field in node.get('references', []))):
+                raise ValueError('Compound staged source retains existing owners except its closed result references and Lists')
+        if node.get('preexisting_id') is not None:
+            if node['request_path'] not in {profile['owner'] for profile in profiles} or node.get('on_name_conflict') != 'merge':
+                raise ValueError('Compound merged source requires its exact producer-owned List owner')
+            projected.update(existing_target=True, target_id=node['preexisting_id'], preexisting_id=None,
+                original_name=node['pre_state']['name'], notes_supplied=False)
+        # Source fields have their own producer bounds; do not count them again
+        # against the optional ordinary history observer's combined budget.
+        projected['properties'], projected['references'] = [], []
         ordinary.append(projected)
-    groups = ordinary_staged_creation_graphs({**plan, 'nodes': ordinary}, state)
+    groups = ordinary_staged_creation_graphs({**plan, 'nodes': ordinary,
+        'on_name_conflict': 'fail' if plan.get('on_name_conflict') in {'merge', 'replace'} else plan.get('on_name_conflict'),
+        'replaced_subtree_rows': [], 'replaced_list_subtree_rows': []}, state)
     result = [{**group, 'nodes': [node for node in nodes if node['request_path'] == group['root']
         or node['request_path'].startswith(group['root'] + '.')]} for group in groups]
     if {node['request_path'] for group in result for node in group['nodes']} != {
-            node['request_path'] for node in nodes if node.get('existing_target') is False}:
+            node['request_path'] for node in nodes if node.get('existing_target') is False and node.get('preexisting_id') is None}:
         raise ValueError('Compound source graph partition is incomplete')
     return result
+
+
+def compound_source_removed_ids(plan, state):
+    """Exact source-owned removals, never inferred from prospective native paths."""
+    stage = state.get('owned_result_stages', {})
+    return {str(row['id']).upper() for scope in stage.get('replacements', []) for row in scope['rows']} | {
+        str(row['id']).upper() for profile in stage.get('lists', []) if profile.get('mode') == 'replaceAll'
+        for row in profile['before']}
 
 
 def capture_created_field_metadata(node: Mapping[str, Any], object_id: str, *, read: Any) -> list[dict[str, Any]]:

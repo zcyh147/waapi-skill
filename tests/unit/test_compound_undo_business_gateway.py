@@ -4079,7 +4079,11 @@ def test_compound_discovery_exposes_exact_versioned_ordinary_children_and_proof_
     assert "not_required_for_source_admission" in scope["graph_list_merge_replace_restoration"]
     assert 'exact_intent_GUID_bound' in scope['created_graph_ancestor_rename']
     assert 'owned_actual_GUID_names_and_deferred_reference_stages' in scope['created_graph_ancestor_rename']
-    assert 'retained_prefix_and_nonempty_replacement_admission_remain_unfinished' in scope['source_list_admission']
+    assert 'retained_ordinary_owners_with_exact_prefix' in scope['source_list_admission']
+    assert 'source_certified_leaf_Inner_replaceAll' in scope['source_list_admission']
+    assert 'source_owned_merge_or_replaced_owner_subtrees' in scope['source_list_admission']
+    assert 'complete_nested_profile_rosters_reserved_under_their_ordinary_root' in scope['source_list_admission']
+    assert 'complete_producer_owned_array_order_repetitions' in scope['source_reference_list_admission']
     assert 'does_not_certify_undo_redo_restoration' in scope['optional_history_expectation']
     assert declaration["native_request_input"] == "forbidden"
 

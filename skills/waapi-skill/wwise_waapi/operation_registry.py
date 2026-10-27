@@ -11590,10 +11590,36 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
             if not isinstance(owner_path, str) or node.get('collection') in {None, 'children'}:
                 raise OperationContractError('UNDO_GROUP_CHILD_OBSERVATION_REQUIRED', 'Owned List requires its exact ordinary source owner scope.')
             return 'owned-list:' + owner_path.casefold() + ':' + node['collection']
-        return [{"object_id": source_key(node),
-            "field": "presence", "kind": "all", "platform": None} for group in groups for node in group['nodes']] + [
+        # The complete fresh tree belongs to its ordinary root (or retained
+        # owner's List). Nested opaque members need no invented path scopes.
+        scopes = [{"object_id": source_key(node),
+            "field": "presence", "kind": "all", "platform": None} for group in groups
+            for node in group['nodes'] if node['request_path'] == group['root']] + [
             {'object_id': row['id'], 'field': 'notes', 'kind': 'all', 'platform': None}
             for row, _ in preservation_rows({'verification_plan': plan, 'pre_state': state})]
+        for node in plan['nodes']:
+            if node.get('existing_target') or node.get('preexisting_id'):
+                for kind, fields in (('same-guid-reference', node.get('references', [])),
+                        ('same-guid-property', node.get('properties', []))):
+                    for field in fields:
+                        child = replace(prepared, verification_plan={'kind': kind,
+                            'object_id': node.get('preexisting_id') or node['target_id'],
+                            'field': field['name'], 'platform': node.get('platform')})
+                        scopes.append(_compound_field_outcome_scope(child, version=version, read=read, evidence=evidence))
+        by_path = {node['request_path']: node for node in plan['nodes']}
+        for profile in state['owned_result_stages'].get('lists', []):
+            owner = by_path[profile['owner']]
+            if owner.get('existing_target') or owner.get('preexisting_id'):
+                scopes.append({'object_id': owner.get('preexisting_id') or owner['target_id'],
+                    'field': profile['name'], 'kind': 'all', 'platform': None})
+            # Append preserves these exact rows; replacement requires their
+            # absence. Neither may compose with a child changing those objects.
+            scopes.extend({'object_id': row['id'], 'field': field, 'kind': 'all', 'platform': None}
+                for row in profile['before'] for field in ('name', 'notes'))
+        from .creation_observations import compound_source_removed_ids
+        scopes.extend({'object_id': object_id, 'field': '*', 'kind': 'all', 'platform': None}
+            for object_id in sorted(compound_source_removed_ids(plan, state)))
+        return scopes
     if kind == "object-create-graph":
         _require_compound_ordinary_creation(prepared)
         from .creation_observations import ordinary_creation_graph
@@ -11687,12 +11713,21 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 prepared_children.append(dict(child_plan))
                 continue
             child_prepared = prepare_operation(child_request, read_call=read, compound_child=True)
-            for scope in _compound_outcome_scopes(child_prepared, version=request.version, read=read, evidence=metadata):
+            child_scopes = _compound_outcome_scopes(child_prepared, version=request.version, read=read, evidence=metadata)
+            child_scopes.extend({'object_id': object_id, 'field': 'presence', 'kind': 'identity-read', 'platform': None}
+                for object_id in sorted({role['row']['id'] for role in child_prepared.resolved_roles.values()}))
+            for scope in child_scopes:
                 field_key = (_identity_key(scope["object_id"]), str(scope["field"]))
                 previous_scopes = platform_outcomes.setdefault(field_key, [])
-                for previous_index, previous_scope in previous_scopes:
+                matching_scopes = [row for key, rows in platform_outcomes.items()
+                    if key[0] == field_key[0] and (key[1] == field_key[1] or '*' in {key[1], field_key[1]})
+                    for row in rows]
+                for previous_index, previous_scope in matching_scopes:
                     if previous_index == index:
                         continue  # Explicit and induced writes within one sealed child are one outcome.
+                    if ('identity-read' in {scope['kind'], previous_scope['kind']}
+                            and '*' not in {scope['field'], previous_scope['field']}):
+                        continue  # Shared exact identities conflict only with their removal.
                     same_platform = (_same_identity(scope["platform"], previous_scope["platform"])
                         if _compound_platform_guid(scope["platform"]) and _compound_platform_guid(previous_scope["platform"])
                         else scope["platform"] == previous_scope["platform"])
@@ -11724,8 +11759,9 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             )
         from .creation_observations import require_compound_creation_scope
         require_compound_creation_scope(prepared_children)
-        if any(child.get('prepared_operation', {}).get('pre_state', {}).get('owned_result_stages', {}).get('lists')
-                for child in prepared_children):
+        if any(stage.get('lists') or any('targets' in field for field in stage.get('deferred', []))
+                for child in prepared_children
+                for stage in [child.get('prepared_operation', {}).get('pre_state', {}).get('owned_result_stages', {})]):
             warnings.append("This group's verification checks its requested child changes. Undo/redo restoration for created List members remains unobserved; "
                 'this source does not provide a supported history expectation receipt. Cancellation is not proof of rollback.')
         from .object_graph_paths import prepare_compound_path_context

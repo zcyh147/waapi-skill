@@ -9,8 +9,11 @@ from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, F
 SET = 'ak.wwise.core.object.set'
 
 
-def planned_playlist_task(tmp_path, version='2023.1', mode='replace-all', wrong_parent=False):
+def planned_playlist_task(tmp_path, version='2023.1', mode='replace-all', wrong_parent=False, compound=False):
     task = OwnedGraphTask(tmp_path, version, 'object.set')
+    if compound:
+        from tests.unit.test_compound_undo_business_gateway import _start_parent_owned_graph_child
+        _start_parent_owned_graph_child(task, 'object.set')
     task.objects = {SECOND: {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'classId': 1638416,
         'path': r'\Actor-Mixer Hierarchy\Default Work Unit', 'parent': None, 'notes': 'Keep parent'}}
     task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for cid, name in
