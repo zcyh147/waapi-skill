@@ -1539,3 +1539,209 @@ def test_blend_assignment_materializes_documented_clamp_in_immutable_native_enve
     assert code == 0, json.dumps({key: verified.get(key) for key in ("error_code", "message", "details", "verification")})
     assert verified["verification"]["business_state_verified"] is True
     assert len(received) == 1 and received[0]["index"] == effective
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_blend_automatic_neighbor_geometry_remains_disclosed_partial_observation(tmp_path, version):
+    task = _BlendAssignmentTask(tmp_path, version)
+    task.assignments[1]["edges"][1].update(
+        fadeMode="Automatic", edgePosition=15, fadePosition=20,
+    )
+    preview = task.preview()
+    scope = preview["preview_summary"]["blend_assignment"]["verification_scope"]
+    assert "automatic_non_target_edge_geometry" in scope["unobserved"]
+    assert task.execute()[0] == 0
+    # R90 retained fact: appending can adjust the preceding Automatic right edge.
+    task.assignments[1]["edges"][1].update(edgePosition=25, fadePosition=30)
+    result = task.run("verify", task.tx)["verification"]
+    assert result["status"] == "result_schema_checked"
+    assert result["business_state_verified"] is False
+    assert result["verification_strength"] == "blend_assignment_partial_observation"
+
+
+@pytest.mark.parametrize("damage", ["mode", "shape", "opposite-manual", "unrelated-automatic"])
+def test_blend_automatic_neighbor_does_not_waive_stable_or_unrelated_fields(tmp_path, damage):
+    task = _BlendAssignmentTask(tmp_path, "2024.1")
+    task.assignments[1]["edges"][1]["fadeMode"] = "Automatic"
+    task.assignments[1]["edges"][0].update(fadeMode="Manual", fadePosition=12)
+    task.assignments[0]["edges"][1]["fadeMode"] = "Automatic"
+    task.preview()
+    assert task.execute()[0] == 0
+    if damage == "mode":
+        task.assignments[1]["edges"][1]["fadeMode"] = "None"
+    elif damage == "shape":
+        task.assignments[1]["edges"][1]["fadeShape"] = "Sine"
+    elif damage == "opposite-manual":
+        task.assignments[1]["edges"][0]["fadePosition"] = 13
+    else:
+        task.assignments[0]["edges"][1]["edgePosition"] = 6
+    code, result = task.raw("verify", task.tx)
+    assert code == 2 and result["verified"] is False, result
+    assert result["verification"]["business_state_verified"] is False
+
+
+class _StateReplacementTask:
+    """Public Core mutation flow with one external object and result-only setter."""
+    def __init__(self, tmp_path, version, suffix):
+        self.uri = "ak.wwise.core.object." + suffix
+        self.env = _env(tmp_path)
+        set_gateway_config(self.env, wwise_version=version)
+        self.info = _info()
+        self.info["version"]["year"] = int(version[:4])
+        self.project = _project(tmp_path)
+        self.object = {"id": SOURCE_ID, "name": "Alarm", "type": "Sound",
+                       "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Alarm"}
+        self.calls = []
+        self.prefix = ["--state-dir", str(tmp_path / "state")]
+        started = self.run("draft-start", self.uri)
+        self.draft = started["draft"]
+        self.binding = [self.draft["draft_id"], "--task-authority", started["task_authority"]]
+        self.handle = self.step("draft-bind-object", "--role", "object", "--object-id", SOURCE_ID)["bound_object"]["handle"]
+
+    def call(self, uri, args=None, options=None):
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.getInfo":
+            return self.info
+        if uri == "ak.wwise.core.getProjectInfo":
+            return self.project
+        if uri == "ak.wwise.core.object.get":
+            return {"return": [dict(self.object)]}
+        if uri == self.uri:
+            return {}
+        raise AssertionError((uri, args, options))
+
+    disconnect = _BlendAssignmentTask.disconnect
+    raw = _BlendAssignmentTask.raw
+    run = _BlendAssignmentTask.run
+    step = _BlendAssignmentTask.step
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize(("suffix", "field", "native"), [
+    ("setStateGroups", "state_group_handles", "stateGroups"),
+    ("setStateProperties", "field_handles", "stateProperties"),
+])
+def test_state_replacement_explicit_empty_is_callable_and_result_only(tmp_path, version, suffix, field, native):
+    task = _StateReplacementTask(tmp_path, version, suffix)
+    schema = task.run("request-schema", task.uri)["business_adapter"]["declaration"]
+    assert schema["input_forms"][field]["empty"] == {"flag": "--empty", "arguments": [field]}
+    task.step("draft-declare-core-plan", "--role", "object_handle", task.handle, "--empty", field)
+    task.step("draft-check")
+    preview = task.step("preview-from-draft")
+    task.tx = preview["transaction_id"]
+    task.shown = task.run("transaction-show", task.tx)
+    assert task.shown["artifact"]["prepared_operation"]["dispatch"]["args"] == {"object": SOURCE_ID, native: []}
+    task.run("confirm", task.tx, "--confirmation-token", task.shown["confirmation"]["token"])
+    task.run("execute", task.tx)
+    verified = task.run("verify", task.tx)["verification"]
+    assert verified["status"] == "result_schema_checked"
+    assert verified["business_state_verified"] is False
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("kind", ["mixed-items", "repeated-empty", "wrong-field"])
+def test_state_empty_declaration_rejects_conflicts_atomically(tmp_path, kind):
+    task = _StateReplacementTask(tmp_path, "2025.1", "setStateGroups")
+    extra = {
+        "mixed-items": ["--role", "state_group_handles", task.handle],
+        "repeated-empty": ["--empty", "state_group_handles"],
+        "wrong-field": ["--empty", "object_handle"],
+    }[kind]
+    code, result = task.raw("draft-declare-core-plan", *task.binding,
+        "--expected-revision", str(task.draft["revision"]),
+        "--role", "object_handle", task.handle, "--empty", "state_group_handles", *extra)
+    assert code == 2, result
+    # The unchanged revision remains usable after invalid input.
+    task.step("draft-declare-core-plan", "--role", "object_handle", task.handle,
+              "--empty", "state_group_handles")
+    task.step("draft-check")
+    assert all(uri != task.uri for uri, _, _ in task.calls)
+
+
+class _PasteSelectionTask:
+    uri = "ak.wwise.core.object.pasteProperties"
+
+    def __init__(self, tmp_path, version):
+        self.env = _env(tmp_path)
+        set_gateway_config(self.env, wwise_version=version)
+        self.info = _info()
+        self.info["version"]["year"] = int(version[:4])
+        self.project = _project(tmp_path)
+        self.objects = {identity: {"id": identity, "name": name, "type": "Sound",
+                        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\" + name}
+                        for identity, name in ((SOURCE_ID, "Source"), (TARGET_ID, "Target"))}
+        self.calls = []
+        self.prefix = ["--state-dir", str(tmp_path / "state")]
+        started = self.run("draft-start", self.uri)
+        self.draft = started["draft"]
+        self.binding = [self.draft["draft_id"], "--task-authority", started["task_authority"]]
+        self.source = self.step("draft-bind-object", "--role", "source", "--object-id", SOURCE_ID)["bound_object"]["handle"]
+        self.target = self.step("draft-bind-object", "--role", "target", "--object-id", TARGET_ID)["bound_object"]["handle"]
+        self.fields = self.discover(self.source)
+
+    def discover(self, handle):
+        discovered = self.step("draft-discover-fields", "--object-handle", handle,
+                               "--meaning", "volume", "--meaning", "pitch")
+        return {row["label"]: row["handle"] for row in discovered["field_candidates"]}
+
+    def call(self, uri, args=None, options=None):
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.getInfo":
+            return self.info
+        if uri == "ak.wwise.core.getProjectInfo":
+            return self.project
+        if uri == "ak.wwise.core.object.get":
+            return {"return": [dict(self.objects[identity]) for identity in args["from"]["id"]]}
+        if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+            return {"return": ["Volume", "Pitch"]}
+        if uri == "ak.wwise.core.object.getPropertyInfo":
+            name = args["property"]
+            return {"name": name, "type": "Real32", "display": {"name": name, "group": "General"},
+                    "restriction": {"type": "range", "min": -96, "max": 96}}
+        if uri == self.uri:
+            return {}
+        raise AssertionError((uri, args, options))
+
+    disconnect = _BlendAssignmentTask.disconnect
+    raw = _BlendAssignmentTask.raw
+    run = _BlendAssignmentTask.run
+    step = _BlendAssignmentTask.step
+
+    def declare(self, fields=None):
+        fields = self.fields if fields is None else fields
+        return self.step("draft-declare-core-plan", "--role", "source_handle", self.source,
+            "--role", "target_handles", self.target,
+            "--field", "include_field_handles", fields["Volume"],
+            "--field", "exclude_field_handles", fields["Pitch"])
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_paste_accepts_both_documented_lists_without_claiming_combined_effect(tmp_path, version):
+    task = _PasteSelectionTask(tmp_path, version)
+    task.declare()
+    task.step("draft-check")
+    preview = task.step("preview-from-draft")
+    assert "combined inclusion/exclusion effect remains unverified" in json.dumps(preview).lower()
+    transaction = preview["transaction_id"]
+    shown = task.run("transaction-show", transaction)
+    assert shown["artifact"]["prepared_operation"]["dispatch"]["args"] == {
+        "source": SOURCE_ID, "targets": [TARGET_ID], "inclusion": ["Volume"], "exclusion": ["Pitch"],
+    }
+    task.run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])
+    task.run("execute", transaction)
+    verified = task.run("verify", transaction)["verification"]
+    assert verified["status"] == "result_schema_checked" and verified["business_state_verified"] is False
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+def test_paste_combined_selection_still_requires_source_scoped_fields(tmp_path):
+    task = _PasteSelectionTask(tmp_path, "2025.1")
+    foreign_fields = task.discover(task.target)
+    code, result = task.raw("draft-declare-core-plan", *task.binding,
+        "--expected-revision", str(task.draft["revision"]),
+        "--role", "source_handle", task.source, "--role", "target_handles", task.target,
+        "--field", "include_field_handles", task.fields["Volume"],
+        "--field", "exclude_field_handles", foreign_fields["Pitch"])
+    assert code == 2 and result["error_code"] == "FIELD_HANDLE_SCOPE_MISMATCH", result
+    task.declare()
+    assert all(uri != task.uri for uri, _, _ in task.calls)
