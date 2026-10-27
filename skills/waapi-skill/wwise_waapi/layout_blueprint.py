@@ -373,11 +373,21 @@ def _optional_type_mismatch(expected: Mapping[str, Any], actual: Any, path: str)
     return kind is not None and actual['@type'] != kind
 
 
+def _root_stack_readback(expected: Mapping[str, Any], actual: Any, path: str) -> Any:
+    # Layout.StackPanel fixes the structural kind in both pinned definitions;
+    # its @type is optional and matching native serializers omit only this root
+    # tag. Keep explicit conflicts and every other declared field observable.
+    if (path == '/Layout/StackPanel' and expected.get('@type') == 'StackPanel'
+            and isinstance(actual, Mapping) and '@type' not in actual):
+        return {**actual, '@type': 'StackPanel'}
+    return actual
+
+
 def declared_layout_matches(expected: Any, actual: Any, *, _path: str = '') -> bool:
     """Native default fields may be added; declared fields/order must be retained."""
     if isinstance(expected, Mapping):
         if _optional_type_mismatch(expected, actual, _path): return False
-        actual = _preferred_height_readback(expected, actual, _path)
+        actual = _root_stack_readback(expected, _preferred_height_readback(expected, actual, _path), _path)
         return isinstance(actual, Mapping) and all(key in actual and declared_layout_matches(value, actual[key],
             _path=_path + '/' + key.replace('~', '~0').replace('/', '~1'))
             for key, value in expected.items())
@@ -397,7 +407,7 @@ def declared_layout_mismatches(expected: Any, actual: Any) -> list[dict[str, str
             if _optional_type_mismatch(left, right, path):
                 mismatches.append({'path': path + '/@type', 'reason': 'explicit type conflicts with the declared element kind'})
                 return
-            right = _preferred_height_readback(left, right, path)
+            right = _root_stack_readback(left, _preferred_height_readback(left, right, path), path)
             if not isinstance(right, Mapping):
                 mismatches.append({'path': path, 'reason': 'expected object'})
                 return

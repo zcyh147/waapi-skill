@@ -18,6 +18,73 @@ def _blueprint():
 
 
 @pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_registered_root_stack_kind_uses_fixed_schema_wrapper_when_native_omits_optional_tag(tmp_path, version):
+    env, state, client, preview = switch_preview(tmp_path, version=version, operation='setLayout',
+        fields=('--new-layout-name', 'RootTagWorkspace', '--blueprint', json.dumps(_blueprint())))
+    original = client.call
+    def serialize_root(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'setLayout':
+            del client.layouts['RootTagWorkspace']['Layout']['StackPanel']['@type']
+        return result
+    client.call = serialize_root
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+
+
+@pytest.mark.parametrize('damage,expected_path', [
+    ('wrong_root_tag', '/Layout/StackPanel/@type'),
+    ('nested_stack_tag', '/Layout/StackPanel/@Children/1/@type'),
+    ('nested_view_tag', '/Layout/StackPanel/@Children/0/@type'),
+    ('floating_stack_tag', '/Layout/Undocked/0/StackPanel/@type'),
+    ('orientation', '/Layout/StackPanel/Orientation'),
+    ('preferred_identity', '/Layout/StackPanel/@Children/2/PreferredHeights/0/PluginId'),
+    ('missing_sidebar', '/Layout/StackPanel/@Children/2/SideBar'),
+    ('missing_history', '/Layout/LastPositions'),
+    ('normal_rectangle', '/Layout/Undocked/0/WindowPlacement_NormalPos_Left')])
+def test_root_tag_omission_never_masks_other_declared_kind_or_state_changes(tmp_path, damage, expected_path):
+    blueprint = _blueprint()
+    blueprint['nodes'][0]['children'].append('panel')
+    blueprint['nodes'].extend([
+        {'key': 'panel', 'kind': 'object_panel', 'label': 'Editors',
+            'preferred_heights': [{'view_identifier': 'AttenuationEditor', 'plugin_identifier': '4294967295',
+                'effect_index': '0', 'height': '621.4757'}], 'sidebar': {'width': '400', 'collapse_state': '0'}},
+        {'key': 'floating', 'kind': 'stack', 'label': 'Floating', 'orientation': 'vertical', 'children': []}])
+    blueprint['floating_windows'] = [{'root': 'floating', 'placement': {**_placement(), 'state': 'normal'}}]
+    blueprint['position_history'] = {'last_positions': [{'view_name': 'ProjectExplorer', 'placement': _placement()}]}
+    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
+        fields=('--new-layout-name', 'StrictRootWorkspace', '--blueprint', json.dumps(blueprint)))
+    original = client.call
+    def changed_state(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'setLayout':
+            layout = client.layouts['StrictRootWorkspace']['Layout']
+            root = layout['StackPanel']
+            del root['@type']
+            if damage == 'wrong_root_tag': root['@type'] = 'ObjectPanel'
+            elif damage == 'nested_stack_tag': del root['@Children'][1]['@type']
+            elif damage == 'nested_view_tag': del root['@Children'][0]['@type']
+            elif damage == 'floating_stack_tag': del layout['Undocked'][0]['StackPanel']['@type']
+            elif damage == 'orientation': root['Orientation'] = 'Vertical'
+            elif damage == 'preferred_identity':
+                row = root['@Children'][2]['PreferredHeights'][0]
+                row['EditorUniqueViewId'] = row.pop('UniqueViewId')
+                row['EditorEffectIndex'] = row.pop('EffectIndex')
+                del row['PluginId']
+                row['EditorPluginId'] = '0'
+            elif damage == 'missing_sidebar': del root['@Children'][2]['SideBar']
+            elif damage == 'missing_history': del layout['LastPositions']
+            else: layout['Undocked'][0]['WindowPlacement_NormalPos_Left'] = '21'
+        return result
+    client.call = changed_state
+    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=True)
+    assert verified['verification']['business_state_verified'] is False
+    assertion = next(row for row in verified['verification']['assertions']
+        if row['name'] == 'Registered layout retains every declared nested field and child order')
+    assert [row['path'] for row in assertion['evidence']['mismatches']] == [expected_path]
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
 def test_object_editor_and_tab_panels_keep_explicit_state_and_empty_editor_lists(tmp_path, version):
     blueprint = _blueprint()
     blueprint['nodes'][0]['children'] = ['panel', 'tabs']
