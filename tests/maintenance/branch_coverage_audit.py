@@ -227,8 +227,12 @@ def build_inventory(root=ROOT, *, surface=None, native_policy=None):
                      digest=digest)
     from tests.maintenance.branch_audit_completion import native_coverage
     inventory["native_coverage"] = native_coverage(root, inventory, digest=digest, schema_branches=schema_branches, load=load)
-    from tests.maintenance.branch_audit_completion import evaluate_coverage
-    inventory["native_coverage"] = evaluate_coverage(root, inventory, {"contract": "waapi-skill.branch-bindings/v1", "bindings": {}}, digest=digest)
+    # Structural construction must precede product binding import, including
+    # Source continuations. Canonical representative policies cannot be checked
+    # against a deliberately empty binding stub. main owns the full evaluation.
+    for branch in inventory['native_coverage']['obligations']:
+        branch.update(requirements=[], reasons=[], evidence_results={})
+    inventory['native_coverage']['completion'].update(complete=False, evaluated=False)
     return inventory
 
 
@@ -350,10 +354,10 @@ def portable_binding_inputs(index_path, requirements):
     from tests.maintenance.branch_audit_completion import read_sealed_artifact
     raw = index_path.read_bytes()
     index = json.loads(raw)
-    if (not {'contract', 'base', 'entries'} <= set(index) or set(index) - {'contract', 'base', 'entries', 'metadata_attachments', 'source_attachments', 'source_native_attachments', 'runtime_observation_attachments', 'qualified_runtime_read_attachments', 'condition_mechanism_attachments', 'condition_definition_attachments'}
+    if (not {'contract', 'base', 'entries'} <= set(index) or set(index) - {'contract', 'base', 'entries', 'metadata_attachments', 'source_attachments', 'source_native_attachments', 'runtime_observation_attachments', 'qualified_runtime_read_attachments', 'condition_mechanism_attachments', 'condition_definition_attachments', 'mapping_attachments'}
             or index['contract'] != 'waapi-skill.branch-evidence-index/v1'
             or not isinstance(index['base'], str) or Path(index['base']).is_absolute()
-            or not isinstance(index['entries'], list) or (not index['entries'] and not index.get('condition_definition_attachments'))):
+            or not isinstance(index['entries'], list) or (not index['entries'] and not index.get('condition_definition_attachments') and not index.get('mapping_attachments'))):
         raise ValueError('invalid portable evidence index')
     boundary = ROOT.resolve() if index_path.resolve().is_relative_to(ROOT.resolve()) else index_path.parent.resolve()
     base = (index_path.parent / index['base']).resolve(strict=True)
@@ -378,7 +382,13 @@ def portable_binding_inputs(index_path, requirements):
         if risk_review is None:
             risk_review = runtime_risk_review(ROOT)
         return runtime_successor_policy_matches(risk_review, identity, original, proposed)
+    from tests.maintenance.branch_audit_mapping import read_mapping_attachments, apply_mapping_attachments
+    mapping_inputs = read_mapping_attachments(index.get('mapping_attachments', []), requirements, read, ROOT)
+    def accepts_mapping_successor(identity, original):
+        predecessor = mapping_inputs['predecessors'].get(identity)
+        return predecessor is not None and predecessor['policy_sha256'] == digest(original)
     attachment_requirements = deepcopy(requirements)
+    original_policies = {}
     bindings, names = {}, set()
     source_capture_origins = {}
     for entry in index['entries']:
@@ -417,11 +427,13 @@ def portable_binding_inputs(index_path, requirements):
                 or set(policy['branches']) != set(expected['bindings'])
                 or any(key in requirements['branches'] and requirements['branches'][key] != value
                        and not accepts_runtime_successor(key, value, requirements['branches'][key])
+                       and not accepts_mapping_successor(key, value)
                        for key, value in policy['branches'].items())):
             raise ValueError('portable requirement differs from reviewed exact branch policy')
         # Attachments validate original native facts against original requirements.
         # Successor requirements change the downstream proof method, never history.
         attachment_requirements['branches'].update(policy['branches'])
+        original_policies.update(policy['branches'])
         bindings.update(projected['bindings'])
         for identity in projected['bindings']:
             source_capture_origins[identity] = originals['capture']
@@ -444,7 +456,7 @@ def portable_binding_inputs(index_path, requirements):
             eligible = set(collection_plan(identity.split('|',1)[0])['eligible_branch_ids'])
             if identity.split('|',1)[0] != '2025.1':
                 eligible.update(collection_plan(identity.split('|',1)[0],cohort='r55')['eligible_branch_ids'])
-        policy = requirements['branches'].get(identity, {})
+        policy = attachment_requirements['branches'].get(identity, {})
         if (identity in attached or identity not in bindings
                 or identity not in eligible
                 or policy.get('categories') != ['program','live_metadata']
@@ -569,7 +581,9 @@ def portable_binding_inputs(index_path, requirements):
     if 'condition_definition_attachments' in index:
         from tests.support.condition_completion_mapping import attach_definition_mappings
         condition_definitions = attach_definition_mappings(index['condition_definition_attachments'], bindings, base, ROOT)
+    apply_mapping_attachments(mapping_inputs, bindings, original_policies)
     return {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': bindings}, base, {
+        **({'mapping_attachments': index['mapping_attachments']} if index.get('mapping_attachments') else {}),
         **({'source_business_facts': source_business_facts} if source_business_facts else {}),
         **({'condition_mechanism_reuse': condition_mechanism_reuse} if condition_mechanism_reuse else {}),
         **({'condition_source_definitions': condition_definitions} if condition_definitions else {}),
@@ -580,7 +594,8 @@ def portable_binding_inputs(index_path, requirements):
             **({'runtime_observation_attachments':index['runtime_observation_attachments']} if 'runtime_observation_attachments' in index else {}),
             **({'qualified_runtime_read_attachments':index['qualified_runtime_read_attachments']} if 'qualified_runtime_read_attachments' in index else {}),
             **({'condition_mechanism_attachments':index['condition_mechanism_attachments']} if 'condition_mechanism_attachments' in index else {}),
-            **({'condition_definition_attachments':index['condition_definition_attachments']} if 'condition_definition_attachments' in index else {})}) if index.get('source_attachments') or index.get('source_native_attachments') or index.get('runtime_observation_attachments') or index.get('qualified_runtime_read_attachments') or index.get('condition_mechanism_attachments') or index.get('condition_definition_attachments') else
+            **({'condition_definition_attachments':index['condition_definition_attachments']} if 'condition_definition_attachments' in index else {}),
+            **({'mapping_attachments':index['mapping_attachments']} if 'mapping_attachments' in index else {})}) if index.get('source_attachments') or index.get('source_native_attachments') or index.get('runtime_observation_attachments') or index.get('qualified_runtime_read_attachments') or index.get('condition_mechanism_attachments') or index.get('condition_definition_attachments') or index.get('mapping_attachments') else
             digest({'entries':index['entries'],'metadata_attachments':attachments}) if attachments else digest(index['entries'])}
 
 

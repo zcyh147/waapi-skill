@@ -19,11 +19,11 @@ from tests.maintenance import branch_coverage_audit as audit
 from tests.maintenance.branch_audit_completion import evaluate_coverage
 
 
-def evaluate_snapshot(ping_scope, bindings, *, scope=None, requirements=None):
+def evaluate_snapshot(ping_scope, bindings, *, scope=None, requirements=None, evidence_base=None):
     path, _, inventory, _ = ping_scope
     scope = json.loads((path / "scope.json").read_text()) if scope is None else scope
     kwargs = {} if requirements is None else {"requirements_document": requirements}
-    return evaluate_coverage(audit.ROOT, inventory, bindings, digest=audit.digest, scope=scope, evidence_base=path, **kwargs)
+    return evaluate_coverage(audit.ROOT, inventory, bindings, digest=audit.digest, scope=scope, evidence_base=evidence_base or path, **kwargs)
 
 
 def write_json(path, data):
@@ -570,6 +570,244 @@ def test_product_representative_self_stamp_stabilizes_identity_and_keeps_semanti
             altered['reviewed_reason'] = 'Different review decision'
         write_json(canonical, changed)
         assert candidate_identity(tmp_path, {'sources': {}}, {}, digest=audit.digest) != candidate, semantic
+
+
+def test_structural_build_defers_populated_canonical_representative_policy(evaluated_representative_rows, monkeypatch):
+    _, _, requirements, _, _ = evaluated_representative_rows
+    requirements['contract'] = 'waapi-skill.branch-evidence-requirements/v1'
+    requirements = json.loads(json.dumps(requirements).replace('/resultSchema/selected',
+        '/resultSchema/properties/isAvailable/@boolean/true').replace('/resultSchema/member',
+        '/resultSchema/properties/isAvailable/@boolean/false'))
+    requirements['representative_mechanisms']['controlled-mechanism']['scope_kind'] = 'product'
+    canonical = audit.ROOT / 'docs/branch-coverage-requirements.json'
+    original_read = Path.read_text
+    monkeypatch.setattr(Path, 'read_text', lambda path, *args, **kwargs:
+        json.dumps(requirements) if path == canonical else original_read(path, *args, **kwargs))
+    inventory = audit.build_inventory()
+    assert inventory['native_coverage']['completion']['complete'] is False
+    assert inventory['native_coverage']['completion']['evaluated'] is False
+    assert inventory['native_coverage']['obligations']
+
+
+@pytest.fixture
+def portable_representative_case(ping_scope, tmp_path):
+    bindings, requirements = representative_ping_inputs(ping_scope)
+    base = tmp_path / 'evidence'
+    base.mkdir()
+    def emit(name, body):
+        return {'artifact': name, 'sha256': write_json(base / name, body)}
+    entries, predecessors, historical, origins = [], {}, {}, {}
+    for number, review in enumerate(requirements['representative_mechanisms'].values()):
+        selected = review['selected_proofs']['program'][0]
+        original_binding = deepcopy(ping_scope[3]['bindings'][selected])
+        program = json.loads(Path(original_binding['evidence']['program']['artifact']).read_bytes())
+        program.pop('artifacts')  # Closed program transport; the public/native reply stays exact.
+        program_descriptor = emit(f'{number}-program.json', program)
+        original_binding['evidence']['program'].update(artifact='/old-host/program.json', sha256=program_descriptor['sha256'])
+        original_binding['original_proof_context'] = {'identity': f'original-{number}'}
+        original = {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': {selected: original_binding}}
+        projected = deepcopy(original)
+        projected['bindings'][selected]['evidence']['program']['artifact'] = program_descriptor['artifact']
+        prior_policy = deepcopy(requirements['branches'][selected])
+        prior_policy.pop('representative_mechanism')
+        prior_policy['reason'] = 'Original selected controlled program policy'
+        prior_requirements = {'contract': 'waapi-skill.branch-evidence-requirements/v1',
+                              'branches': {selected: prior_policy}}
+        origin = {'bindings': emit(f'{number}-original.json', original),
+                  'program': program_descriptor, 'requirements': emit(f'{number}-requirements.json', prior_requirements),
+                  'capture': emit(f'{number}-capture.json', {'controlled_fixture': True})}
+        entries.append({'id': f'original-{number}', 'origin': origin,
+                        'bindings': emit(f'{number}-projected.json', projected)})
+        prior = projected['bindings'][selected]
+        historical[selected] = deepcopy(prior)
+        predecessors[selected] = {'binding_sha256': audit.digest(prior), 'policy_sha256': audit.digest(prior_policy)}
+        bindings['bindings'][selected]['original_proof_context'] = deepcopy(original_binding['original_proof_context'])
+        review['members'][selected]['mapping_sha256'] = audit.digest(
+            {key: value for key, value in bindings['bindings'][selected].items() if key != 'evidence'})
+    for identity, binding in bindings['bindings'].items():
+        binding['evidence'] = {}
+        predecessors.setdefault(identity, None)
+    attachment = {'contract': 'waapi-skill.branch-mapping-attachment/v1',
+        'scope_kind': 'controlled', 'requirements_sha256': audit.digest(requirements),
+        'mechanisms': sorted(requirements['representative_mechanisms']),
+        'bindings': bindings['bindings'], 'predecessors': predecessors}
+    descriptor = emit('mapping.json', attachment)
+    index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': 'evidence',
+             'entries': entries, 'mapping_attachments': [descriptor]}
+    index_path = tmp_path / 'index.json'
+    write_json(index_path, index)
+    for entry in entries:
+        for source in [*entry['origin'].values(), entry['bindings']]:
+            origins[source['artifact']] = (base / source['artifact']).read_bytes()
+    return {'index_path': index_path, 'index': index, 'base': base, 'requirements': requirements,
+            'attachment': attachment, 'historical': historical, 'origins': origins}
+
+
+def test_portable_mapping_overlay_reaches_completion_without_sibling_receipts(ping_scope, portable_representative_case):
+    case = portable_representative_case
+    document, base, inputs = audit.portable_binding_inputs(case['index_path'], case['requirements'])
+    result = evaluate_snapshot(ping_scope, document, requirements=case['requirements'], evidence_base=base)
+    assert result['completion']['complete'] is True, {row['id']: row['evidence_results'] for row in result['obligations']}
+    assert result['completion']['states'] == {'mapped_with_representative_proof': 40, 'verified': 4}
+    assert 'mapping_attachments' in inputs
+    for identity, original in case['historical'].items():
+        assert document['bindings'][identity]['evidence'] == original['evidence']
+        assert document['bindings'][identity]['original_proof_context'] == original['original_proof_context']
+    assert all((case['base'] / name).read_bytes() == raw for name, raw in case['origins'].items())
+    assert sum(bool(binding['evidence']) for binding in document['bindings'].values()) == 4
+
+
+def test_mapping_attachment_rejects_non_reflected_member(evaluated_representative_rows):
+    from tests.maintenance.branch_audit_mapping import read_mapping_attachments
+    native, bindings, requirements, selected, member = evaluated_representative_rows
+    review = requirements['representative_mechanisms']['controlled-mechanism']
+    for row in native['obligations']:
+        binding = bindings[row['id']]
+        binding.update(branch_id=row['id'], native_shape_sha256=row['shape_sha256'],
+                       public_route='2025.1|function|ak.wwise.core.ping', evidence={})
+        requirements['branches'][row['id']]['native_shape_sha256'] = row['shape_sha256']
+        review['members'][row['id']]['mapping_sha256'] = audit.digest(
+            {key: value for key, value in binding.items() if key != 'evidence'})
+    review['members'][member]['native_route'] = None
+    attachment = {'contract': 'waapi-skill.branch-mapping-attachment/v1',
+        'scope_kind': 'controlled', 'requirements_sha256': audit.digest(requirements),
+        'mechanisms': ['controlled-mechanism'], 'bindings': bindings,
+        'predecessors': {key: None for key in bindings}}
+    with pytest.raises(ValueError, match='exact reflected route'):
+        read_mapping_attachments([{'fixture_only': True}], requirements, lambda _: attachment, audit.ROOT)
+
+
+def test_legacy_portable_projection_keeps_original_policy_and_seal_without_overlay(portable_representative_case):
+    case = portable_representative_case
+    case['index'].pop('mapping_attachments')
+    write_json(case['index_path'], case['index'])
+    policies = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    for entry in case['index']['entries']:
+        original = json.loads((case['base'] / entry['origin']['requirements']['artifact']).read_bytes())
+        policies['branches'].update(original['branches'])
+    document, _, inputs = audit.portable_binding_inputs(case['index_path'], policies)
+    assert document['bindings'] == case['historical']
+    assert inputs['selected_documents_sha256'] == audit.digest(case['index']['entries'])
+    assert 'mapping_attachments' not in inputs
+
+
+@pytest.mark.parametrize('damage', ['artifact-seal', 'requirements-seal', 'source-seal',
+    'scope', 'version', 'route', 'missing-choice', 'conflict', 'undeclared-overwrite',
+    'predecessor-binding', 'predecessor-policy', 'proof-metadata', 'evidence-injection',
+    'missing-selected-proof', 'candidate', 'mapping-seal', 'open-attachment'])
+def test_portable_mapping_overlay_rejects_unreviewed_inputs(ping_scope, portable_representative_case, damage):
+    case = portable_representative_case
+    attachment, requirements, index = case['attachment'], case['requirements'], case['index']
+    selected = next(iter(case['historical']))
+    review = requirements['representative_mechanisms'][attachment['bindings'][selected]['representative_mechanism']]
+    if damage == 'artifact-seal':
+        (case['base'] / 'mapping.json').write_bytes(b'{}')
+    else:
+        if damage == 'requirements-seal':
+            attachment['requirements_sha256'] = '0' * 64
+        elif damage == 'source-seal':
+            review['sources'][next(iter(review['sources']))] = '0' * 64
+        elif damage == 'scope':
+            attachment['scope_kind'] = 'product'
+        elif damage == 'version':
+            review['members'][selected]['native_route'] = review['members'][selected]['native_route'].replace('2024.1', '2021.1')
+        elif damage == 'route':
+            attachment['bindings'][selected]['public_route'] = '2025.1|function|ak.wwise.core.getInfo'
+        elif damage == 'missing-choice':
+            sibling = next(key for key in attachment['bindings'] if key not in case['historical'])
+            del attachment['bindings'][sibling]
+            del attachment['predecessors'][sibling]
+        elif damage == 'conflict':
+            index['mapping_attachments'].append(deepcopy(index['mapping_attachments'][0]))
+        elif damage == 'undeclared-overwrite':
+            attachment['predecessors'][selected] = None
+        elif damage == 'predecessor-binding':
+            attachment['predecessors'][selected]['binding_sha256'] = '0' * 64
+        elif damage == 'predecessor-policy':
+            attachment['predecessors'][selected]['policy_sha256'] = '0' * 64
+        elif damage == 'proof-metadata':
+            attachment['bindings'][selected].pop('original_proof_context')
+            review['members'][selected]['mapping_sha256'] = audit.digest(
+                {key: value for key, value in attachment['bindings'][selected].items() if key != 'evidence'})
+        elif damage == 'evidence-injection':
+            attachment['bindings'][selected]['evidence'] = {'native': {'status': 'PASS'}}
+        elif damage == 'missing-selected-proof':
+            index['entries'].pop(0)
+            attachment['predecessors'][selected] = None
+            attachment['bindings'][selected].pop('original_proof_context')
+            review['members'][selected]['mapping_sha256'] = audit.digest(
+                {key: value for key, value in attachment['bindings'][selected].items() if key != 'evidence'})
+        elif damage == 'candidate':
+            for mechanism in requirements['representative_mechanisms'].values():
+                mechanism['candidate_sha256'] = '0' * 64
+        elif damage == 'mapping-seal':
+            review['members'][selected]['mapping_sha256'] = '0' * 64
+        else:
+            attachment['approve_everything'] = True
+        if damage != 'requirements-seal':
+            attachment['requirements_sha256'] = audit.digest(requirements)
+        descriptor = {'artifact': 'mapping.json', 'sha256': write_json(case['base'] / 'mapping.json', attachment)}
+        index['mapping_attachments'] = [descriptor] * len(index['mapping_attachments'])
+        write_json(case['index_path'], index)
+    try:
+        document, base, _ = audit.portable_binding_inputs(case['index_path'], requirements)
+        result = evaluate_snapshot(ping_scope, document, requirements=requirements, evidence_base=base)
+    except (ValueError, OSError):
+        return
+    assert result['completion']['complete'] is False
+    if damage == 'missing-selected-proof':
+        row = next(row for row in result['obligations'] if row['id'] == selected)
+        assert row['evidence_results']['program']['outcome'] == 'missing'
+
+
+def test_mapping_overlay_merge_is_atomic_and_retains_original_native_facts(portable_representative_case):
+    from tests.maintenance.branch_audit_mapping import read_mapping_attachments, apply_mapping_attachments
+    case = portable_representative_case
+    reviewed = read_mapping_attachments(case['index']['mapping_attachments'], case['requirements'],
+        lambda descriptor: json.loads((case['base'] / descriptor['artifact']).read_bytes()), audit.ROOT)
+    bindings = deepcopy(case['historical'])
+    policies = {identity: {'categories': ['program', 'native']} for identity in bindings}
+    first, last = next(iter(bindings)), list(bindings)[-1]
+    bindings[first]['evidence']['native'] = {'artifact': 'fixture-only-original-native.json', 'sha256': 'a' * 64}
+    for identity, binding in bindings.items():
+        reviewed['predecessors'][identity] = {'binding_sha256': audit.digest(binding),
+                                            'policy_sha256': audit.digest(policies[identity])}
+    original, original_policies = deepcopy(bindings), deepcopy(policies)
+    reviewed['predecessors'][last]['binding_sha256'] = '0' * 64
+    with pytest.raises(ValueError, match='exact original binding/policy'):
+        apply_mapping_attachments(reviewed, bindings, policies)
+    assert bindings == original and policies == original_policies
+    reviewed['predecessors'][last]['binding_sha256'] = audit.digest(bindings[last])
+    apply_mapping_attachments(reviewed, bindings, policies)
+    assert bindings[first]['evidence'] == original[first]['evidence']
+    assert policies == original_policies
+
+
+@pytest.mark.parametrize('missing_source', [False, True])
+def test_product_main_loads_full_source_index_and_performs_final_evaluation(ping_scope, portable_representative_case, monkeypatch, capsys, missing_source):
+    case = portable_representative_case
+    scope = json.loads((ping_scope[0] / 'scope.json').read_bytes())
+    original = ping_scope[2]
+    # Only replace the expensive catalog producer. main's real index loader,
+    # Source consumer, final evaluator and publication decision remain active.
+    native = {key: value for key, value in original['native_coverage'].items() if key not in {'routes', 'obligations', 'completion'}}
+    native.update(routes=[row for row in original['native_coverage']['routes'] if row['id'] in scope['route_ids']],
+        obligations=[row for row in original['native_coverage']['obligations'] if row['id'] in scope['obligation_ids']],
+        completion={'complete': True})  # Must never be trusted as product completion.
+    inventory = {'routes': original['routes'], 'sources': original['sources'], 'summary': {}, 'native_coverage': native}
+    monkeypatch.setattr(audit, 'build_inventory', lambda: inventory)
+    if missing_source:
+        case['index']['source_attachments'] = [{'artifact': 'missing-source.json', 'sha256': '0' * 64}]
+        write_json(case['index_path'], case['index'])
+    policy_path = case['index_path'].with_name('requirements.json')
+    write_json(policy_path, case['requirements'])
+    output = case['index_path'].with_name('ledger.json')
+    assert audit.main(['--binding-index', str(case['index_path']), '--requirements', str(policy_path),
+                       '--output', str(output), '--require-complete']) == 1
+    error = json.loads(capsys.readouterr().out)
+    assert error['structural_check'] == 'invalid'
+    assert ('missing-source.json' if missing_source else 'closed current representative mechanism') in error['errors'][0]
+    assert not output.exists()
 
 
 def test_parent_pass_cannot_complete_descendant_branches(ping_scope, tmp_path, capsys):

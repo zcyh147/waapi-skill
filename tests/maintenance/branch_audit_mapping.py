@@ -13,6 +13,97 @@ LIB = "skills/waapi-skill/wwise_waapi/"
 POLICY = "skills/waapi-skill/resources/native_surface_policy.json"
 GATEWAY = "skills/waapi-skill/scripts/gateway.py"
 
+MAPPING_FIELDS = frozenset({'branch_id', 'native_shape_sha256', 'public_route',
+    'public_route_sha256', 'input', 'construction', 'validation', 'verifier',
+    'representative_mechanism'})
+
+
+def read_mapping_attachments(descriptors, requirements, read, root):
+    """Read sealed mapping successors without altering any original evidence."""
+    from tests.maintenance.branch_coverage_audit import digest
+    from tests.maintenance.branch_audit_completion import apply_representative_mechanisms
+    if not isinstance(descriptors, list):
+        raise ValueError('closed mapping attachment list required')
+    pending, predecessors = {}, {}
+    for descriptor in descriptors:
+        attachment = read(descriptor)
+        if (not isinstance(attachment, dict)
+                or set(attachment) != {'contract', 'scope_kind', 'requirements_sha256',
+                                      'mechanisms', 'bindings', 'predecessors'}
+                or attachment['contract'] != 'waapi-skill.branch-mapping-attachment/v1'
+                or attachment['scope_kind'] not in {'product', 'controlled'}
+                or attachment['requirements_sha256'] != digest(requirements)
+                or not isinstance(attachment['mechanisms'], list) or not attachment['mechanisms']
+                or len(set(attachment['mechanisms'])) != len(attachment['mechanisms'])
+                or not isinstance(attachment['bindings'], dict) or not attachment['bindings']
+                or not isinstance(attachment['predecessors'], dict)
+                or set(attachment['bindings']) != set(attachment['predecessors'])):
+            raise ValueError('closed reviewed mapping attachment required')
+        reviews = {key: requirements.get('representative_mechanisms', {}).get(key)
+                   for key in attachment['mechanisms']}
+        if any(not isinstance(review, dict) for review in reviews.values()):
+            raise ValueError('mapping attachment names an unreviewed mechanism')
+        members = {key: value for review in reviews.values() for key, value in review['members'].items()}
+        if set(members) != set(attachment['bindings']) or pending.keys() & members.keys():
+            raise ValueError('mapping attachment has missing or conflicting members')
+        rows = []
+        for identity, member in members.items():
+            binding = attachment['bindings'][identity]
+            predecessor = attachment['predecessors'][identity]
+            route = member['native_route']
+            if not isinstance(route, str):
+                raise ValueError('mapping attachment requires an exact reflected route')
+            parts = route.split('|')
+            if (not isinstance(binding, dict) or binding.get('evidence') != {}
+                    or binding.get('branch_id') != identity or not identity.startswith(route + '|')
+                    or len(parts) != 5 or binding.get('public_route') != '|'.join((parts[0], parts[3], parts[4]))
+                    or (predecessor is not None and (not isinstance(predecessor, dict)
+                        or set(predecessor) != {'binding_sha256', 'policy_sha256'}))):
+                raise ValueError('exact evidence-free mapping or predecessor required')
+            policy = requirements['branches'].get(identity, {})
+            if policy.get('native_shape_sha256') != member['native_shape_sha256']:
+                raise ValueError('mapping attachment policy shape differs')
+            rows.append({'id': identity, 'route': route, 'shape_sha256': member['native_shape_sha256'],
+                'state': 'unresolved', 'requirements': policy.get('categories', []), 'evidence_results': {}})
+        # Existing relation validation checks exact mappings and current sources.
+        # Unresolved staging rows give no execution credit: ordinary evaluation
+        # still checks actual catalog mappings and selected receipts afterward.
+        stage = {'candidate_sha256': next(iter(reviews.values()))['candidate_sha256'], 'obligations': rows}
+        apply_representative_mechanisms(stage, attachment['bindings'],
+            {'branches': {key: requirements['branches'][key] for key in members},
+             'representative_mechanisms': reviews}, root, digest=digest, scope_kind=attachment['scope_kind'])
+        pending.update(attachment['bindings'])
+        predecessors.update(attachment['predecessors'])
+    return {'bindings': pending, 'predecessors': predecessors}
+
+
+def apply_mapping_attachments(reviewed, bindings, original_policies):
+    """Atomically merge declared mapping changes, retaining proof metadata."""
+    from copy import deepcopy
+    from tests.maintenance.branch_coverage_audit import digest
+    pending = {}
+    for identity, proposed in reviewed['bindings'].items():
+        old = bindings.get(identity)
+        predecessor = reviewed['predecessors'][identity]
+        if old is None:
+            if predecessor is not None or set(proposed) - MAPPING_FIELDS - {'evidence'}:
+                raise ValueError('new mapping cannot overwrite or invent original proof metadata')
+        else:
+            policy = original_policies.get(identity)
+            if (predecessor is None or policy is None
+                    or predecessor['binding_sha256'] != digest(old)
+                    or predecessor['policy_sha256'] != digest(policy)):
+                raise ValueError('mapping successor lacks its exact original binding/policy')
+            protected = {key: value for key, value in old.items() if key not in MAPPING_FIELDS | {'evidence'}}
+            replacement = {key: value for key, value in proposed.items() if key not in MAPPING_FIELDS | {'evidence'}}
+            if protected != replacement:
+                raise ValueError('mapping successor changed original proof metadata')
+        merged = deepcopy(proposed)
+        if old is not None:
+            merged['evidence'] = deepcopy(old['evidence'])
+        pending[identity] = merged
+    bindings.update(pending)
+
 # These are reviewed family entrypoints, not claims about each enum alternative.
 FAMILY_MODULES = {
     "authoring-layout-partial": "authoring_layout.py",
