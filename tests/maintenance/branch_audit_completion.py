@@ -1052,6 +1052,12 @@ def validate_native_source(context, descriptor, branch, candidate, binding, base
             sources = historical_source_seals(root, context['candidate'], selected, historical_sources)
         else:
             sources = {name: sources[name] for name in selected}
+    if binding.get('native_only_base'):
+        from tests.support.runtime_observation_evidence import retained_runtime_native
+        member = retained_runtime_native(binding, branch, root, base)
+        if sources != member['sources']:
+            raise ValueError('Retained native original candidate/source map differs')
+        return
     proof = binding.get('native_equivalence', {})
     if 'artifact' not in proof:
         proof = proof.get(descriptor['sha256'], {})
@@ -1597,6 +1603,26 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         from tests.support.fresh_branch_evidence import fresh_evidence_result
         return fresh_evidence_result(descriptor, branch, candidate, scope_kind, base, binding or {}, root)
     try:
+        retained_member = None
+        if category == 'native' and (binding or {}).get('native_only_base'):
+            from tests.support.runtime_observation_evidence import retained_runtime_native
+            retained_member = retained_runtime_native(binding, branch, root, base)
+            if descriptor.get('sha256') != retained_member['native_evidence_sha256']:
+                raise ValueError('Retained native evidence is outside the sealed selected original')
+            packet = (base / retained_member['base']).resolve()
+            if not packet.is_relative_to(base.resolve()):
+                raise ValueError('Retained native packet escapes its portable base')
+            def local(item):
+                if not item: return item
+                target = (base / item['artifact']).resolve()
+                if not target.is_relative_to(packet):
+                    raise ValueError('Retained native descriptor leaves its original packet')
+                return {**item, 'artifact': target.relative_to(packet).as_posix()}
+            descriptor = local(descriptor)
+            binding = dict(binding)
+            for key in ('runtime_observation_attachment', 'qualified_runtime_read_attachment'):
+                if binding.get(key): binding[key] = local(binding[key])
+            base = packet
         if (binding or {}).get('condition_source_mapping_attachment'):
             from tests.support.condition_completion_mapping import mapping_evidence_result
             return mapping_evidence_result(descriptor, branch, category, scope_kind, base, binding, root)
@@ -1655,7 +1681,7 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         if (binding or {}).get('runtime_observation_attachment'):
             from tests.support.runtime_observation_evidence import validate_runtime_evidence
             validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges)
-        if record.get('candidate_sha256') != candidate:
+        if record.get('candidate_sha256') != candidate and retained_member is None:
             validate_equivalence((binding or {}).get('equivalence', {}), descriptor, record, branch, candidate, binding or {}, base, root)
         if record.get('scope_kind', 'product') != scope_kind:
             raise ValueError('controlled evidence cannot grant product credit')
@@ -1985,14 +2011,18 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
     if not isinstance(policies, dict) or set(policies) - ids:
         raise ValueError('requirements must name exact in-scope branches')
     from tests.support.runtime_observation_evidence import runtime_preservation_gates, apply_runtime_preservation_gates
-    preservation_gates = runtime_preservation_gates(root, policies, native['obligations']) if scope is None else {}
+    # Representative linkage is validated independently below. Preserve exact
+    # original business policy equality for every safety/anchor dependency.
+    preservation_policies = {key: {field: value for field, value in policy.items()
+        if field != 'representative_mechanism'} for key, policy in policies.items()}
+    preservation_gates = runtime_preservation_gates(root, preservation_policies, native['obligations']) if scope is None else {}
     if scope is None:
         from tests.support.runtime_remaining_evidence import preservation_gates as remaining_gates
-        preservation_gates.update(remaining_gates(root,policies,native['obligations']))
+        preservation_gates.update(remaining_gates(root,preservation_policies,native['obligations']))
         from tests.support.loaded_media_runtime_evidence import preservation_gates as loaded_media_gates
-        preservation_gates.update(loaded_media_gates(root, policies, native['obligations']))
+        preservation_gates.update(loaded_media_gates(root, preservation_policies, native['obligations']))
         from tests.support.loaded_media_runtime_evidence import composite_preservation_gates
-        preservation_gates.update(composite_preservation_gates(root, policies, native['obligations']))
+        preservation_gates.update(composite_preservation_gates(root, preservation_policies, native['obligations']))
     public = {r['id']: r for r in inventory['routes']}
     routes = {r['id']: r for r in native['routes']}
     symbols = {}

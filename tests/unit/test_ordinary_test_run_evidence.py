@@ -337,3 +337,60 @@ def test_direct_skip_requires_reviewed_original_consumer_linkage(ordinary_run, d
     reseal(context)
     outcome, reason = read(context)
     assert outcome == 'missing' and 'skip' in reason
+
+
+def test_runtime_native_successor_requires_exact_scope_mapping_capture_and_current_sources(tmp_path, monkeypatch):
+    """A retained native origin is separate from current program execution."""
+    from tests.support import runtime_observation_evidence as runtime
+    code = 'skills/waapi-skill/example.py'
+    (tmp_path / code).parent.mkdir(parents=True)
+    (tmp_path / code).write_text('retained behavior\n')
+    sources = {code: runtime.sha((tmp_path / code).read_bytes())}
+    branch = {'id': '2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.log.get|/resultSchema',
+        'route': '2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.log.get',
+        'shape_sha256': 'a' * 64}
+    binding = {'branch_id': branch['id'], 'native_shape_sha256': branch['shape_sha256'],
+        'input': {'gateway_argv': ['core-call', 'ak.wwise.core.log.get'], 'selector': '/native_call/result'}}
+    capture = {'historical_capture': True}
+    program = {'candidate_sha256': 'f' * 64, 'runtime_read_program': capture}
+    review = {'contract': 'waapi-skill.runtime-read-source-successor/v1',
+        'packaged_sources': sources, 'historical_packaged_sources': [sources],
+        'members': {branch['id']: {'mapping_sha256': digest(binding),
+            'program_sha256': digest(program), 'capture_sha256': digest(capture),
+            'source_reviews': [], 'sources': sources}},
+        'scope_ids': [branch['id']], 'selected_program_ids': ['selected-code-mechanism']}
+    descriptor = write_json(tmp_path / 'successor.json', review)
+    monkeypatch.setattr(runtime, 'RUNTIME_SOURCE_SUCCESSOR', 'successor.json', raising=False)
+    monkeypatch.setattr(runtime, 'RUNTIME_SOURCE_SUCCESSOR_SHA', descriptor['sha256'], raising=False)
+    monkeypatch.setattr(runtime, 'program_source_context', lambda root, **kwargs: {'packaged': sources})
+    assert runtime.retained_runtime_origin(binding, branch['id'], program, capture, tmp_path)
+    for damage in ('scope', 'mapping', 'capture', 'source', 'selected'):
+        changed = deepcopy(review)
+        if damage == 'scope': changed['scope_ids'] = []
+        if damage == 'mapping': changed['members'][branch['id']]['mapping_sha256'] = '0' * 64
+        if damage == 'capture': changed['members'][branch['id']]['capture_sha256'] = '0' * 64
+        if damage == 'source': changed['packaged_sources'] = {code: '0' * 64}
+        if damage == 'selected': changed['selected_program_ids'] = []
+        updated = write_json(tmp_path / 'successor.json', changed)
+        monkeypatch.setattr(runtime, 'RUNTIME_SOURCE_SUCCESSOR_SHA', updated['sha256'])
+        with pytest.raises(ValueError):
+            runtime.retained_runtime_origin(binding, branch['id'], program, capture, tmp_path)
+
+
+def test_ordinary_focused_nonlive_run_keeps_aggregate_strength_and_exact_selection(ordinary_run):
+    context = ordinary_run
+    selected = context['attachment']['mechanism']['selected_tests'][0] + '[owned-case]'
+    context['attachment']['mechanism']['selected_tests'] = [selected]
+    argv = ['ci/test.sh', '--mode', 'nonlive', '--', '-q', '-ra', selected]
+    context['run']['plan']['argv'] = context['run']['result']['argv'] = argv
+    context['run']['log'] = context['run']['log'].replace('mode:         program', 'mode:         nonlive').replace(
+        'pytest args:  -q -ra', 'pytest args:  -q -ra ' + selected)
+    reseal(context)
+    assert read(context) == (OUTCOME, None)
+    for altered in (argv + ['-k', 'selected'], argv[:-1] + ['tests/unit/test_code.py'],
+                    argv[:-1] + [selected.replace('[owned-case]', '[wrong-case]')],
+                    argv[:-1] + ['tests/unit/../test_code.py::test_selected_mechanism[owned-case]'],
+                    argv[:-1] + ['tests/unit/test_code.py::test_unselected']):
+        context['run']['plan']['argv'] = context['run']['result']['argv'] = altered
+        reseal(context)
+        assert read(context)[0] == 'missing'

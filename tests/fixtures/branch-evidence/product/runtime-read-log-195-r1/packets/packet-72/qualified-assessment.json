@@ -1,0 +1,119 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-assessment/v1",
+  "version": "2023.1",
+  "category": "r104-audio-objects-observation",
+  "original_candidate": "a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8",
+  "original_workflow_outcome": "BLOCKED",
+  "original_finalization": "BLOCKED",
+  "successful_finalization": false,
+  "qualified_read_fact": "PASS",
+  "lifecycle_obligations": [],
+  "archive": {
+    "artifact": "qualified-original.json.gz",
+    "sha256": "47a7cc6bb531e7c1d35d167e47b2794a6f809a2ce0ca80306ba5bf1164999e8b"
+  },
+  "program_capture": {
+    "artifact": "program-capture.json",
+    "sha256": "4f5df5fca840c932b17db7e186b87f96a6603dcc613fbb8d6028a8fee0f90791"
+  },
+  "source_changes": {
+    "skills/waapi-skill/wwise_waapi/business_declarations.py": {
+      "before": "aee2a6cc97e5ccb0340a0f99f520969571e5e2dcf4d48695a396fca29dbeb7b3",
+      "after": "9f196a80ac7e2d82daf7fe0cb452735c9f50b2da825ba7ac2dafae02da700070"
+    },
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
+      "before": "69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4",
+      "after": "f93e41345477d0e3346230c12ebc056511b4c348ee253cb3df33c91d8bd4658d"
+    },
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
+      "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
+      "after": "06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d"
+    },
+    "skills/waapi-skill/scripts/gateway.py": {
+      "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
+      "after": "0affca686b01dada6262345aa42cb0aadc7062257d2a050435c1aa7c9752a827"
+    },
+    "skills/waapi-skill/wwise_waapi/builders/stable_reads.py": {
+      "before": "74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d",
+      "after": "ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8"
+    },
+    "skills/waapi-skill/wwise_waapi/builders/schema.py": {
+      "before": "4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d",
+      "after": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2"
+    },
+    "skills/waapi-skill/wwise_waapi/operation_registry.py": {
+      "before": "f96a2233a98e03dd62de261a24b3f81876284af28f0973758cf1f8a805b5dd5a",
+      "after": "3b298a11c9326d47b968783e536d09d290a8fff4a5a7080b5f5f99d5e7c2734d"
+    },
+    "skills/waapi-skill/wwise_waapi/runtime_log_effects.py": {
+      "before": "62c28fc9bb92ccd8e8efb3ccbfe5b187d6df1d3086c2def79e1d11dbc81ddfe8",
+      "after": "1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00"
+    }
+  },
+  "changed_symbols": {
+    "skills/waapi-skill/wwise_waapi/business_declarations.py": [
+      "BusinessHandleRegistry._require_context: exact UTF-8 byte comparison; no normalization"
+    ],
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": [
+      "field ceiling",
+      "profiler_result_field_choices",
+      "three fixed row declarations",
+      "runtime_inspection_business_contract_data",
+      "runtime_transport_requires_authoring",
+      "runtime_inspection_business_catalog_rows: exact registered-version Console transport admission and metadata-only finalization",
+      "runtime_log_observation_support/CONSOLE_LOG_ADD_OBSERVER; runtime_inspection_business_catalog_rows/runtime_inspection_business_contract_data: exact log metadata only"
+    ],
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": [
+      "module import: builders.query.STRUCTURED_GUID_PATTERN",
+      "_validate_rtpc_rows",
+      "normalize_runtime_inspection_result",
+      "rtpc_validated_name_compatibility",
+      "Sequence/field-contract imports",
+      "materialize_runtime_inspection_business_request"
+    ],
+    "skills/waapi-skill/scripts/gateway.py": [
+      "module import: builders.schema.validate_resolved_semantic_result",
+      "module import: runtime_inspection_business.rtpc_validated_name_compatibility",
+      "module import: builders.stable_reads.MAX_GAME_OBJECT_ROWS/MAX_STABLE_STRING_BYTES",
+      "build_parser",
+      "dispatch_command",
+      "resolve_profiler_voice_path",
+      "dispatch_profiler_voice_contributions_request",
+      "runtime_authoring_host_required_payload",
+      "dispatch_offline_command",
+      "dispatch_business_runtime_control_plan",
+      "dispatch_runtime_inspection_business_read",
+      "preflight_stable_read_input",
+      "fixed_command_route_payload",
+      "preflight_core_business_input",
+      "runtime_log_observation_support import; live_log_topic_boundary; dispatch_command/dispatch_topic_stream: exact log Topic guard",
+      "dispatch_offline_command/dispatch_runtime_inspection_business_read: exact log disclosure only",
+      "_dispatch_transaction_command_with_execution_lease: exact log observation-plan drift/event selection only"
+    ],
+    "skills/waapi-skill/wwise_waapi/builders/stable_reads.py": [
+      "normalize_profiler_game_objects_result: accept actual registerTime/unregisterTime and reflected registrationTime/unregistrationTime; preserve ID/name/time values"
+    ],
+    "skills/waapi-skill/wwise_waapi/builders/schema.py": [
+      "validate_resolved_semantic_result",
+      "_validate_resolved_sections",
+      "_runtime_result_reference_schema"
+    ],
+    "skills/waapi-skill/wwise_waapi/operation_registry.py": [
+      "prepare_operation/verify_prepared_operation: exact log observation plan, verifier selection and message only"
+    ],
+    "skills/waapi-skill/wwise_waapi/runtime_log_effects.py": [
+      "compare_channel: exact Console log observation guard only"
+    ]
+  },
+  "retained_facts": {
+    "original_workflow_outcome": "BLOCKED",
+    "original_finalization": "BLOCKED",
+    "original_public_exit_code": 0,
+    "physical_cleanup_complete": true,
+    "post_terminal_port_8080_bindable": true,
+    "post_terminal_owned_processes": [],
+    "cleanup_credit_transferred": false,
+    "original_read_outcome": "PASS",
+    "qualified_scope": "owned Soundcaster/runtime Bus association; no Cars mixing-Bus effect"
+  }
+}

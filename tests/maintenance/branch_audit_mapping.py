@@ -509,3 +509,91 @@ def enrich_inventory(inventory, root, public, schemas, policy, *, digest):
                      residual_groups=residuals)
     inventory["summary"].update(declared_selector_dispositions=declared, mapping_relations=dict(counts),
                                 residual_groups=len(residuals), current_registry_contracts=len(contract_index))
+
+
+def runtime_read_log_component(root):
+    """Expand only the sealed ten-URI roster, with current versioned definitions."""
+    import json
+    from copy import deepcopy
+    from tests.maintenance.branch_coverage_audit import digest, schema_branches
+    from tests.maintenance.branch_audit_completion import candidate_identity
+    from wwise_waapi.native_catalog import load_native_catalog
+    from wwise_waapi.schema_inventory import DefinitionGraph, resolve_schema_reference
+    base = root / 'tests/fixtures/branch-evidence/product/runtime-read-log-195-r1'
+    roster = json.loads((base / 'source-roster.json').read_bytes())
+    expected = roster['entries']
+    wanted = {entry['route'] for entry in expected.values()}
+    if len(expected) != 11366 or len(wanted) != 86 or len({i.split('|')[4] for i in wanted}) != 10:
+        raise ValueError('Runtime exact finite source roster differs')
+    snapshot = json.loads((root / 'docs/branch-coverage-inventory.json').read_bytes())
+    public_ids = {'|'.join((i.split('|')[0], 'function', i.split('|')[4])) for i in wanted}
+    public = [deepcopy(row) for row in snapshot['routes'] if row['id'] in public_ids]
+    if {row['id'] for row in public} != public_ids:
+        raise ValueError('Runtime current public version/route missing')
+    routes, rows, catalogs = [], [], {}
+    for version, host in sorted({tuple(i.split('|')[:2]) for i in wanted}):
+        catalog = load_native_catalog(version, host, root=root / 'skills/waapi-skill/resources/native-catalog')
+        build = catalog['provenance']['build']
+        catalogs[f'{version}|{host}|{build}'] = catalog['content_sha256']
+        definitions = catalog['definitions']
+        graph = DefinitionGraph(**{k: definitions[k] for k in ('contract', 'version', 'wwise_build', 'source_file_names', 'documents', 'inventory_sha256')})
+        for uri in catalog['functions']:
+            route = f'{version}|{host}|{build}|function|{uri}'
+            if route not in wanted: continue
+            routes.append({'id': route, 'version': version, 'host': host, 'build': build,
+                'kind': 'function', 'uri': uri, 'native_schema_sha256': digest(catalog['schemas'][uri]),
+                'public_route': f'{version}|function|{uri}'})
+            for section in ('argsSchema', 'optionsSchema', 'resultSchema'):
+                schema = catalog['schemas'][uri][section]; visited = set()
+                def visit(value, pointer, context, document, active):
+                    for item in schema_branches(value, pointer):
+                        identity = route + '|' + item['pointer']
+                        old = expected.get(identity)
+                        if old is None or old.get('native_shape_sha256', old.get('shape_sha256')) != digest(item['value']) or old['kind'] != item['kind']:
+                            raise ValueError('Unhandled runtime native field/choice/definition')
+                        row = {'id': identity, 'route': route, 'pointer': item['pointer'], 'kind': item['kind'],
+                            'shape_sha256': digest(item['value']), 'owner_issue': old['owner_issue'],
+                            'parent_issue': old['parent_issue'], 'blocks_issue': old['blocks_issue'], 'state': 'unresolved'}
+                        if item['kind'] != 'schema': row['value'] = item['value']
+                        rows.append(row)
+                        if item['kind'] == 'reference':
+                            target = resolve_schema_reference(item['value'], root_schema=context, graph=graph)
+                            doc = document if target.document_name == '<schema>' else target.document_name
+                            key = (doc, target.pointer)
+                            ptr = '/' + section + '/@definition/' + doc + target.pointer
+                            row['reference'] = {'target': route + '|' + ptr, 'recursive': key in active,
+                                'document': doc, 'target_sha256': digest(target.target)}
+                            if key not in visited:
+                                visited.add(key)
+                                visit(target.target, ptr, context if target.document_name == '<schema>' else graph.documents[doc], doc, active | {key})
+                visit(schema, '/' + section, schema, '<schema>', set())
+    if {row['id'] for row in rows} != set(expected) or len(rows) != len(expected):
+        raise ValueError('Runtime source roster has missing/duplicate field choices')
+    # Reuse the established compact component source inputs and candidate function.
+    debug = debug_control_component(root)
+    result = {'component': 'runtime-read-log-195-r1', 'routes': public, 'sources': debug['sources'],
+        'native_coverage': {'routes': routes, 'catalogs': catalogs, 'obligations': rows}}
+    result['native_coverage']['candidate_sha256'] = candidate_identity(root, result, catalogs, digest=digest)
+    return result
+
+
+def runtime_read_log_bindings(root, inventory):
+    """Join finite reviewed rules at exact native pointers, never emit receipts."""
+    import json
+    from copy import deepcopy
+    from tests.maintenance.branch_coverage_audit import digest
+    base = root / 'tests/fixtures/branch-evidence/product/runtime-read-log-195-r1'
+    rules = json.loads((base / 'mapping-rules.json').read_bytes())['bindings']
+    rows = {row['id']: row for row in inventory['native_coverage']['obligations']}
+    if set(rules) != set(rows):
+        raise ValueError('Runtime mapping omits or adds a native branch')
+    public = {row['id']: row for row in inventory['routes']}
+    bindings = deepcopy(rules)
+    for identity, binding in bindings.items():
+        row = rows[identity]
+        if (binding['branch_id'] != identity or binding['native_shape_sha256'] != row['shape_sha256']
+                or binding['public_route_sha256'] != digest(public[binding['public_route']])
+                or binding.get('evidence') != {}
+                or any(binding[field]['selector'] != row['pointer'] for field in ('construction', 'validation', 'verifier'))):
+            raise ValueError('Runtime current closed public/native correspondence differs')
+    return bindings

@@ -700,6 +700,10 @@ REVIEWED_SYMBOLS['wwise_waapi/runtime_inspection_business_contracts.py'] += runt
 
 
 def validate_source_review(descriptor, historical, branch, root, base):
+    try:
+        return runtime.retained_runtime_source_review(descriptor, historical, branch, root, base)
+    except (ValueError, FileNotFoundError):
+        pass
     review = completion.read_sealed_artifact(descriptor, base)
     version, host, build, _, uri = branch['route'].split('|')
     profile = native_profile(branch)
@@ -809,7 +813,7 @@ def write_fixed_bundle(output, program_path, originals, *, inventory, selected=N
             'observation_sha256': [descriptor('original-capture.json')['sha256'], descriptor('original-raw.json')['sha256']]}
         source_review = write('source-review.json', {'contract': 'waapi-skill.fixed-row-source-review/v1',
             'historical_candidate': profile['candidate'], 'historical_sources': historical, 'current_sources': sources,
-            'changed_files': profile['changes'], 'changed_symbols': profile['symbols'], 'category': category,
+            'changed_files': runtime.runtime_reviewed_changes(historical, audit.ROOT), 'changed_symbols': profile['symbols'], 'category': category,
             'archive': descriptor(profile['archive_file']), 'program_replay': descriptor('program-capture.json')})
         native = {'candidate_sha256': candidate, 'scope_kind': 'product', 'evidence_kind': 'native_execution',
             'relevant_sources': historical, 'invocation': original['context']['record']['invocation'], 'native_runs': [native_run],

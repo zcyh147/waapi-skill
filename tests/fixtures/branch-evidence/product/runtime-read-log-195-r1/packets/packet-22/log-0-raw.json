@@ -1,0 +1,14 @@
+{
+  "api": "ak.wwise.core.log.clear",
+  "category": "core.log",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1/owned/authoring-nodes/d87a1375cafae330c7be7f7f/native-evidence/1792789046978267000-ea94254338ee43879a2070168a6fb561-ak_wwise_core_log_clear.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {},
+  "risk_level": "medium",
+  "timeout": 29.71143237501383,
+  "version": "2023.1"
+}

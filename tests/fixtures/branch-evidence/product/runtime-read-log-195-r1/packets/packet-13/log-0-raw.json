@@ -1,0 +1,14 @@
+{
+  "api": "ak.wwise.core.log.addItem",
+  "category": "core.log",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r98-console-log-diagnostic-native-2023-r2/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792781360470891000-163dc5205e504fcaa46baf68b908f217-ak_wwise_core_log_addItem.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {},
+  "risk_level": "medium",
+  "timeout": 29.939033750037197,
+  "version": "2023.1"
+}

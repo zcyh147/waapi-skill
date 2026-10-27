@@ -415,6 +415,10 @@ def portable_binding_inputs(index_path, requirements):
         for branch_id, binding in expected['bindings'].items():
             if branch_id in bindings:
                 raise ValueError('duplicate exact branch binding in portable evidence index')
+            if not binding.get('evidence') and binding.get('native_only_base'):
+                from tests.support.runtime_observation_evidence import retained_runtime_origin
+                retained_runtime_origin(binding, branch_id, program, originals['capture'], ROOT)
+                continue
             if (set(binding.get('evidence', {})) != {'program'}
                     or binding.get('equivalence') or binding.get('native_equivalence')
                     or binding['evidence']['program']['sha256'] != origin['program']['sha256']):

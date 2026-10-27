@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+  "proof": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-41/r125-proof-1.json",
+    "sha256": "7b8f7f4af3052bab7762acb961e06fcb02dabe6ebe0e34ea4fad37b4c15143c3"
+  },
+  "evidence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-41/r125-native.json",
+    "sha256": "97d253a5507bce6b7acd2a33bf30a904f18a619c00c59252bed8e88cc411cc83",
+    "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_runtime_read_batch"
+  },
+  "native_equivalence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-41/r125-equivalence-1.json",
+    "sha256": "81fca18ae61732c95aa6cb5891ec961f30cc76b6e34f4391259f4b9fb2107390"
+  }
+}

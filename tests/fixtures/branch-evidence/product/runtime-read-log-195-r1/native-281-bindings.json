@@ -1,0 +1,47 @@
+{
+  "contract": "waapi-skill.branch-bindings/v1",
+  "bindings": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id": {
+      "branch_id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id",
+      "native_shape_sha256": "a9ff36f1c0aec517b112fa7ce8053f4a4b83b55154119ce68df693a541a2762f",
+      "public_route": "2023.1|function|ak.wwise.core.profiler.getRTPCs",
+      "public_route_sha256": "05ed1a2edb2c2a653e74b2fe2f76658320c1a6c40cddea196107ec61ff8342b6",
+      "input": {
+        "gateway_argv": [
+          "core-call",
+          "ak.wwise.core.profiler.getRTPCs",
+          "--profiler-position",
+          "23637",
+          "--max-results",
+          "64"
+        ],
+        "selector": "/native_call/result/return/1/id",
+        "correspondence": {
+          "rule": "exact_versioned_closed_runtime_declaration_and_whole_result_preservation",
+          "native_pointer": "/resultSchema/properties/return/items/properties/id",
+          "original_mapping_index_sha256": "c9c76267a960d5db4d198e2868cf156d22a68550db7a8b187e6124f79cc1dd9d"
+        }
+      },
+      "construction": {
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_inspection_business_request",
+        "selector": "/resultSchema/properties/return/items/properties/id"
+      },
+      "validation": {
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
+        "selector": "/resultSchema/properties/return/items/properties/id"
+      },
+      "verifier": {
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
+        "selector": "/resultSchema/properties/return/items/properties/id"
+      },
+      "evidence": {},
+      "native_only_base": "runtime-read-log-195-r1/packets/original-qualified-2023.1-profiler-rtpcs-observation",
+      "observation_pointer": "/native_call/result/return/7/id",
+      "reference_chain": [],
+      "native_only_review": {
+        "artifact": "runtime-read-log-195-r1/source-successor.json",
+        "sha256": "8c7e5128c7a4ab1261298b7f6f113b7b3274d95e62d83a7f4292303245ecefa3"
+      }
+    }
+  }
+}

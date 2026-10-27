@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-attachment/v1",
+  "branch_id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+  "assessment": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-72/qualified-assessment.json",
+    "sha256": "a05ac71e05bc1c62ef9cd3261b345f193914ecdef947ce7d51cd14a8980bb99e"
+  },
+  "evidence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-72/qualified-native-0.json",
+    "sha256": "b62a3afee57e2777d7ea9e5c6207b913911986f27a09f648cf05deeb996df1ca"
+  }
+}

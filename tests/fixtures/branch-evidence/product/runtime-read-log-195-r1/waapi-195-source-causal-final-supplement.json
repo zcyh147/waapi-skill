@@ -1,0 +1,134 @@
+{
+  "contract": "waapi-skill.source-copy-causal-final-supplement/v1",
+  "date": "2026-10-27",
+  "scope": "Only exact frozen8e922d19 to224df389 three-file delta; no63-path reaudit",
+  "base": "8e922d19d3330eb7f8d8611e1370f84a275e0736",
+  "candidate": "224df3892363b3dce9f809986747b6f333a4d753",
+  "worktree": "/tmp/waapi-195-representative-proof",
+  "changed_sources": [
+    {
+      "path": "tests/maintenance/branch_audit_completion.py",
+      "before_sha256": "20c8f5eb64c1c346cb79af2b95e08ebc4c3c6a37a5ae7a783b7bd63088e7d58d",
+      "after_sha256": "d83616684dbf182d42bf348dff576797e35b3974399d30097e0d5d5058c7165d"
+    },
+    {
+      "path": "tests/support/runtime_observation_evidence.py",
+      "before_sha256": "c9d79648590aa611e072b472f6dcd9dd9175ef21712cb4f8dc2947822be45c1a",
+      "after_sha256": "76cf10cae4a1bfba1359da1df564a81d2b6a32d620b2ae155cad15c199c0375c"
+    },
+    {
+      "path": "tests/unit/test_branch_coverage_completion_cli.py",
+      "before_sha256": "aa8f5d90c0d584c260d935d417f4b75d05d2d0147a80895aaff6bbe5a6daeab6",
+      "after_sha256": "064e8590bccaf9749940f247a46a103a85f696953acfd4cc89eb9c535c77abbb"
+    }
+  ],
+  "conclusion": "Source original producer/direct-reader/oracle/publisher bodies and packaged runtime unchanged. Retain654 relevant-source members, original5 native facts/26shapes and same5 pending fake product captures. Final candidate fingerprint and evaluator capture seal must advance after Main promotion/review.",
+  "static_evidence": {
+    "packaged_tree_both_commits": "02204f84351a5f880d1a3a675d2626a3afbafcbb",
+    "evaluator_changed_definitions": [
+      "candidate_identity",
+      "apply_representative_mechanisms",
+      "evaluate_coverage"
+    ],
+    "direct_reader_unchanged_AST": [
+      "evidence_result",
+      "validate_equivalence",
+      "binding_semantics"
+    ],
+    "runtime_helper_changed_definition": "apply_runtime_preservation_gates",
+    "runtime_helper_change": "Exactly two state comparisons; direct native outcome still must equal passed, same route and native requirement retained",
+    "runtime_gate_scope": "runtime_preservation_gates returns only closed RUNTIME_RISK_URIS Profiler roster; Source object.copy is outside it",
+    "retained_artifacts": "All14 supplied log/XML byte sizes andSHA256 independently verified; no tests run here"
+  },
+  "native_closure": {
+    "retained_original": 619,
+    "prior_new_package_additions": 35,
+    "final_members": 654,
+    "additional_members_this_delta": 0,
+    "all_three_changed_paths_outside619": true,
+    "requirements_txt": "unchanged explicit preexisting exclusion",
+    "native_facts": 5,
+    "native_shapes": 26,
+    "new_native_required": false
+  },
+  "capture_and_candidate": {
+    "tests/maintenance/branch_audit_completion.py": {
+      "capture_sources": "explicit exact-byte member; update to final d83616684dbf182d42bf348dff576797e35b3974399d30097e0d5d5058c7165d",
+      "candidate_identity": "existing explicit evaluator source; final current fingerprint changes"
+    },
+    "tests/support/runtime_observation_evidence.py": {
+      "capture_sources": "Not an explicit capture_sources or build_inventory.sources member; do not invent a raw capture-map entry as though it already existed",
+      "candidate_identity": "Existing explicit support-source member; final76cf10cae4a1bfba1359da1df564a81d2b6a32d620b2ae155cad15c199c0375c participates in current candidate identity",
+      "selected_Source_effect": "No Source receipt/reader/oracle path change; generic runtime postprocessing stays separate"
+    },
+    "tests/unit/test_branch_coverage_completion_cli.py": {
+      "capture_sources": "Not selected Source dependency; own retained component-test attribution only",
+      "candidate_identity": "Not in explicit candidate roster; current source hash064e8590bccaf9749940f247a46a103a85f696953acfd4cc89eb9c535c77abbb"
+    },
+    "canonical_requirements": "Only representative review candidate_sha256 values normalized for candidate semantic identity. Entire policy/member/mapping/source/selected-proof/reason remains hashed; full requirements descriptor and exact capture_sources bytes retain actual stamp. No Source original seal is normalized.",
+    "freeze_order": "After Main re-review/promotion and product mappings settle, persist reviewed requirements stamps, finalize successor review/pin, then freeze actual clean candidate and raw capture_sources before running five captures. Any later change requires exact affected refresh, not old-context relabelling."
+  },
+  "proof_subset": {
+    "retained_final_review_fix_controls": {
+      "passed": 16,
+      "seconds": 1.55,
+      "exit_code": 0,
+      "selectors": [
+        "tests/unit/test_branch_coverage_completion_cli.py::test_representative_completion_still_requires_direct_runtime_anchor",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_representative_program_support_preserves_existing_category_outcomes",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_missing_required_runtime_anchor_invalidates_every_complete_recipient",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_runtime_anchor_keeps_direct_native_requirement_with_indirect_program_support",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_product_representative_self_stamp_stabilizes_identity_and_keeps_semantic_seals",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_fresh_adapter_bytes_change_completion_candidate_identity",
+        "tests/unit/test_source_copy_branch_evidence.py::test_source_producer_changes_current_candidate_identity"
+      ]
+    },
+    "new_Source_test_nodes_for_this_delta": 0,
+    "existing_pending_current_Source_nodes": [
+      "tests/unit/test_source_copy_repeated_fixture.py::test_repeated_collector_gates_copy_on_actual_baseline_serialization",
+      "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_preserves_original_graph_through_four_transactions[2022.1]",
+      "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_preserves_original_graph_through_four_transactions[2023.1]",
+      "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_preserves_original_graph_through_four_transactions[2024.1]",
+      "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_2025_preserves_native_crlf_and_direct_rtpc_through_four_transactions"
+    ],
+    "prior_successor_pin_controls_remain": [
+      "tests/unit/test_source_copy_capture.py::test_source_successor_producer_preserves_original_native_descriptors",
+      "tests/unit/test_source_copy_capture.py::test_source_successor_rejects_new_dependency_bytes"
+    ],
+    "no_repeats": "No55-second CLI rerun, all63 audit, extra native/Fresh, whole Source capture-file rerun or repeat of retained16 controls justified solely by this supplement"
+  },
+  "next_step": "Wait for Main re-review/promotion. Do not create/publish successor review or captures now; then continue bounded mapping/654-source reconciliation and final five fake product captures with after-teardown finalization.",
+  "pending_scope_questions": [
+    {
+      "issue": 179,
+      "scope": "2021 plug-in constructor",
+      "status": "user decision pending; not approved exclusion"
+    },
+    {
+      "issue": 182,
+      "scope": "nonDefault Work Unit group directives and 2021/2022 DialogueContainer alias",
+      "status": "user decision pending; these are the two explicit cases"
+    },
+    {
+      "issue": 184,
+      "scope": "migration Soundcaster loss / audition acceptance",
+      "status": "user decision pending; CREATE lightweight decision does not decide this"
+    },
+    {
+      "issue": 192,
+      "scope": "advanced compound groups 2–5",
+      "status": "user decision pending; simple undo/redo lightweight policy does not decide this"
+    }
+  ],
+  "not_performed": [
+    "tests",
+    "generators",
+    "new successor review",
+    "Source capture/publishing",
+    "native Wwise",
+    "Fresh",
+    "archive replay",
+    "repository/fixture/evidence edits",
+    "scope decisions"
+  ]
+}

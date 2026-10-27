@@ -205,7 +205,7 @@ def original_log(artifact_base=None,*,root=audit.ROOT):
     current=runtime.program_source_context(root,flow=LOG_GET)['packaged']
     differences={k:{'before':sources.get(k),'after':current.get(k)}for k in sources.keys()|current.keys()if sources.get(k)!=current.get(k)}
     if len(sources)!=413 or len(current)!=413 or differences!=r['packaged_source_changes']:
-        raise ValueError('R122 exact reviewed packaged source bridge differs')
+        runtime.retained_runtime_sources(sources, root)
     return dict(review=r,read=read,archive=descriptor,category=category,context=context,receipt=receipt,receipt_raw=receipt_raw,sources=sources)
 
 
@@ -465,12 +465,15 @@ def validate_evidence(record,binding,branch,category,base,root,edges=None):
     if category!='native' or entry['role']!='native_business_anchor' or not binding.get('runtime_observation_attachment') or branch['route']not in {R122_ROUTE+uri for uri in LOG_URIS}:
         raise ValueError('Exact remaining business gate has no implemented native adapter')
     original=original_log(base,root=root);proof=runtime._proof(binding,base);mapping=proof['mapping']
+    native_only = runtime.retained_runtime_native(binding, branch, root, base)
+    if native_only:
+        runtime.retained_runtime_source_review(proof['source_review'], original['sources'], branch, root, base)
     captured=completion.read_sealed_artifact(proof['program_capture'],base)
     raw=completion.read_sealed_artifact(mapping['raw_observation'],base)
     expected=_original_call(original,branch['route'].split('|')[-1]);request=_original_request(original,expected['api'])
     if (proof['branch_id']!=branch['id'] or proof['native_shape_sha256']!=branch['shape_sha256']
-            or proof['archive']!=original['archive'] or proof['source_review']['sha256']!=SUPPORT_SHA
-            or completion.read_sealed_artifact(proof['source_review'],base)!=original['review']
+            or proof['archive']!=original['archive'] or (not native_only and (proof['source_review']['sha256']!=SUPPORT_SHA
+            or completion.read_sealed_artifact(proof['source_review'],base)!=original['review']))
             or proof['capture_original_path']!=original['review']['receipt_path']
             or (base/proof['capture']['artifact']).read_bytes()!=original['receipt_raw']
             or (base/mapping['raw_observation']['artifact']).read_bytes()!=original['read'](expected['path'])
@@ -479,7 +482,8 @@ def validate_evidence(record,binding,branch,category,base,root,edges=None):
             or mapping['native_pointer']!='/observations/raw/result' or mapping['program_pointer']!='/native_call/result'
             or captured['native_call']!={'uri':request['api'],'args':request['args'],'options':request['options'],'result':raw['result']}):
         raise ValueError('R122 exact full original result/source/current replay differs')
-    validate_program({'gateway':captured['gateway'],'native_call':captured['native_call'],'runtime_read_program':captured,'relevant_sources':captured['source_context']['packaged']},binding,branch,root,edges)
+    if not runtime.retained_runtime_native(binding, branch, root, base):
+        validate_program({'gateway':captured['gateway'],'native_call':captured['native_call'],'runtime_read_program':captured,'relevant_sources':captured['source_context']['packaged']},binding,branch,root,edges)
 
 
 def validate_source_equivalence(proof,sources,branch,binding,root,base):

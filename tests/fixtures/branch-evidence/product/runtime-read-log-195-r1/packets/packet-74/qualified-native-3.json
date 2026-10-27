@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-fact/v1",
+  "assessment_sha256": "8ba417df73a417adea1b3affd69cbed6be1d2a047a179feb84a6f7f2a8772536",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+  "native_shape_sha256": "41c4130c258ad44f5b78854ed444b75ef0b259e28a2af0f0f5e03777f841997f",
+  "native_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects",
+  "program_pointer": "/native_call/result/return/0/gameObjectID",
+  "reference_chain": [
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/properties/return/items/$ref"
+  ],
+  "observed": 18446744073709551614
+}

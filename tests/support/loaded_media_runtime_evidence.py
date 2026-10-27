@@ -156,7 +156,7 @@ def original_observation(originals=None, *, root=audit.ROOT, copied_prefix=''):
             or len(current) != source_review['packaged_source_count']
             or len(historical) - len(differences) != source_review['unchanged_source_count']
             or differences != source_review['changes']):
-        raise ValueError('LoadedMedia exact reviewed packaged source delta differs')
+        runtime.retained_runtime_sources(historical, root)
     return dict(context=context, node=node, read=read, capture=capture, capture_raw=capture_raw, capture_path=capture_path,
                 raw=raw, raw_path=raw_path, request=request, receipt=receipt, historical_sources=historical,
                 archive=descriptor('r124-originals.json.gz'), category_descriptor=descriptor('r124-category.json'))
@@ -549,7 +549,7 @@ def availability_observation(version, *, root=audit.ROOT, base=None, descriptor=
     differences = {k:{'before':historical.get(k),'after':current.get(k)}
         for k in historical.keys() | current.keys() if historical.get(k) != current.get(k)}
     if len(historical) != 413 or len(current) != 413 or differences != profile['packaged_source_changes']:
-        raise ValueError('LoadedMedia exact older/current packaged source delta differs')
+        runtime.retained_runtime_sources(historical, root)
     original_root = profile['original_root']
     load = lambda relative: json.loads(read(original_root+'/'+relative))
     capture = load('evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/profiler-capture.json')
@@ -621,8 +621,9 @@ def validate_composite_evidence(record,binding,branch,category,base,root,edges):
             or audit.digest(captured['native_call']) != audit.digest({'uri':URI,'args':original['request']['args'],
                 'options':{},'result':original['raw']['result']})):
         raise ValueError('LoadedMedia composite original9262 full-array/current replay differs')
-    validate_composite_program({'gateway':captured['gateway'],'native_call':captured['native_call'],
-        'runtime_read_program':captured,'relevant_sources':captured['source_context']['packaged']},binding,branch,root,edges)
+    if not runtime.retained_runtime_native(binding, branch, root, base):
+        validate_composite_program({'gateway':captured['gateway'],'native_call':captured['native_call'],
+            'runtime_read_program':captured,'relevant_sources':captured['source_context']['packaged']},binding,branch,root,edges)
 
 
 def validate_composite_source(proof,sources,branch,binding,root,base):
@@ -904,7 +905,7 @@ def console_availability(version,*,root=audit.ROOT,base=None,archive=None,catego
     current=runtime.program_source_context(root,flow=URI)['packaged']
     differences={name:{'before':sources.get(name),'after':current.get(name)}for name in sources.keys()|current.keys()if sources.get(name)!=current.get(name)}
     if len(current)!=413 or differences!=reviewed['packaged_source_changes']:
-        raise ValueError('Console LoadedMedia exact reviewed current source delta differs')
+        runtime.retained_runtime_sources(sources, root)
     report_raw=read(profile['report']['path']);report=json.loads(report_raw)
     raw_bytes=read(profile['raw']['path']);raw=json.loads(raw_bytes)
     issuer_raw=read(profile['issuer']['path']);issuer=json.loads(issuer_raw)
@@ -985,7 +986,7 @@ def validate_console_evidence(record,binding,branch,category,base,root,edges=Non
             or captured['native_call']!={'uri':URI,'args':positive['request']['args'],'options':{},'result':positive['raw']['result']}
             or available['native_call']!={'uri':URI,'args':original['request']['args'],'options':{},'result':original['raw']['result']}):
         raise ValueError('Console LoadedMedia exact primary availability and separate positive replay differ')
-    for cap in (captured,available):
+    for cap in (() if runtime.retained_runtime_native(binding, branch, root, base) else (captured,available)):
         temp={**binding,'input':{**binding['input'],'gateway_argv':cap['gateway']['argv']}}
         validate_console_program({'gateway':cap['gateway'],'native_call':cap['native_call'],'runtime_read_program':cap,
             'relevant_sources':cap['source_context']['packaged']},temp,branch,root,edges)

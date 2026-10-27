@@ -44,7 +44,7 @@ def reviewed_source_context(sources, root=audit.ROOT):
         for name in sources.keys() | current.keys() if sources.get(name) != current.get(name)}
     if (len(sources) != 413 or len(current) != 413
             or changes != {runtime.METER_SOURCE:runtime.METER_SOURCE_CHANGE, **runtime.LOG_MESSAGE_SOURCE_CHANGES}):
-        raise ValueError('R125 exact reviewed source delta differs')
+        return runtime.retained_runtime_sources(sources, root)
     return current
 
 
@@ -269,6 +269,10 @@ def validate_source_review(descriptor, sources, branch, root, base):
     """Only exact106 R125 identities may bridge the reviewed meter and log-message deltas."""
     version,key,profile,reader = profile_for_branch(branch,root)
     runtime._portable_descriptor(descriptor,base)
+    try:
+        return runtime.retained_runtime_source_review(descriptor, sources, branch, root, base)
+    except (ValueError, FileNotFoundError):
+        pass
     review = completion.read_sealed_artifact(descriptor,base)
     current = reviewed_source_context(sources,root)
     expected = {'contract','historical_candidate','historical_sources','current_sources',

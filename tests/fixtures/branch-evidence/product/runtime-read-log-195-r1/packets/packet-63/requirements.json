@@ -1,0 +1,61 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/baseVolume": {
+      "native_shape_sha256": "deba236434624538d27cdb5bddb20d81ef910959abe008da1fc61c2f2178f88c",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/gameObjectID": {
+      "native_shape_sha256": "14b1060ae875d681d6ff27da0505dbb90d1f18ae1990292334a783744c705172",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isForcedVirtual": {
+      "native_shape_sha256": "093f4ed1139c3246c308c7140ce84ca2a7045f8fe54871b066a7848464cab99c",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isStarted": {
+      "native_shape_sha256": "44571d11ebbdee9e310bfa0144bf4e552bd632ae186e7fdbaeee5cecbac5a2ac",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isVirtual": {
+      "native_shape_sha256": "99420836e2715c0664846c4f408cb7772261275849e585cbab1c814979407413",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/objectGUID": {
+      "native_shape_sha256": "f10a807704d0e4b99cc7554fabcd39e0af416667535b06db2da926ea2e5212a3",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/pipelineID": {
+      "native_shape_sha256": "3e6ff2ba71c315f2b2a157f24401a4639de23edce88407a0be7f8c99bb4adf02",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    }
+  }
+}

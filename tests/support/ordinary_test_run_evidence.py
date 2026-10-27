@@ -114,7 +114,12 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
     raw = {name: _bytes(item, base) for name, item in files.items()}
     plan, result, summary = (json.loads(raw[name]) for name in ('plan', 'result', 'summary'))
     original = record['original_candidate']
-    if (plan.get('candidate') != original or plan.get('argv') != PROGRAM_ARGV
+    argv = plan.get('argv', [])
+    focused = (isinstance(argv, list) and 7 <= len(argv) <= 22
+        and argv[:6] == ['ci/test.sh', '--mode', 'nonlive', '--', '-q', '-ra']
+        and len(set(argv[6:])) == len(argv[6:])
+        and all(isinstance(node, str) and re.fullmatch(r'tests/unit/test_[A-Za-z0-9_]+\.py::test_\w+(?:\[[^\s\]]+\])?', node) for node in argv[6:]))
+    if (plan.get('candidate') != original or (argv != PROGRAM_ARGV and not focused)
             or any(result.get(key) != value for key, value in plan.items())
             or result.get('head_after') != original or result.get('candidate_unchanged') is not True
             or result.get('exit_code') != 0 or type(result.get('exit_code')) is not int
@@ -132,7 +137,8 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
     lines = raw['log'].decode('utf-8').splitlines()
     terminal = SUMMARY.fullmatch(lines[-1]) if lines else None
     if (terminal is None or sum(bool(SUMMARY.fullmatch(line)) for line in lines) != 1
-            or 'mode:         program' not in lines or 'pytest args:  -q -ra' not in lines
+            or ('mode:         nonlive' if focused else 'mode:         program') not in lines
+            or ('pytest args:  ' + ' '.join(argv[4:]) if focused else 'pytest args:  -q -ra') not in lines
             or any(token in line for line in lines for token in ('FAILURES', 'ERRORS', 'Interrupted', 'KeyboardInterrupt'))):
         raise ValueError('ordinary run complete successful pytest summary required')
     passed, skipped, seconds = int(terminal[1]), int(terminal[2] or 0), float(terminal[3])
@@ -163,7 +169,7 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
         raise ValueError('ordinary run exact reviewed direct skip attribution required')
     selected = mechanism['selected_tests']
     if (not isinstance(selected, list) or not selected or len(set(selected)) != len(selected)
-            or any(not isinstance(node, str) or not re.fullmatch(r'tests/unit/[^\s:\[\]]+\.py::test_\w+', node)
+            or any(not isinstance(node, str) or not re.fullmatch(r'tests/unit/[^\s:\[\]]+\.py::test_\w+(?:\[[^\s\]]+\])?', node)
                    for node in selected)):
         raise ValueError('ordinary run exact selected test functions required')
     selected_paths = {node.split('::')[0] for node in selected}
@@ -187,9 +193,12 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
             raise ValueError('ordinary run reviewed current relevant source changed')
     manifest = {line for line in original_text['ci/program-test-nodes.txt'].splitlines()
                 if line and not line.startswith('#')}
+    if focused and not set(selected) <= set(argv[6:]):
+        raise ValueError('ordinary focused run does not select the reviewed mechanism')
     for node in selected:
         name, function = node.split('::')
-        if node not in manifest and name not in manifest:
+        function = function.split('[', 1)[0]
+        if not focused and node not in manifest and name not in manifest:
             raise ValueError('ordinary run selected test absent from original manifest')
         tree = ast.parse(original_text[name])
         if not any(isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == function

@@ -1,0 +1,37 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID": {
+      "native_shape_sha256": "ef55c7e77a02953ad781cdd1d465b434331be77367bcd6f908880d1e7a1422fa",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID": {
+      "native_shape_sha256": "7518127ea1795c14ac8da59e381bdacf88597cb09100f208a75fdb3b827fb048",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID": {
+      "native_shape_sha256": "8a956a30fc5355ae489e2dd384a8e5a9e1962ee57bbdcbbed3062ef59c8cb6ae",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID": {
+      "native_shape_sha256": "41c4130c258ad44f5b78854ed444b75ef0b259e28a2af0f0f5e03777f841997f",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    }
+  }
+}

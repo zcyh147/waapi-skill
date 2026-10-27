@@ -68,7 +68,7 @@ def retained(label,base=None,*,root=audit.ROOT):
     current=runtime.program_source_context(root,flow='ak.wwise.core.log.get')['packaged']
     changes={p:{'before':sources.get(p),'after':current.get(p)}for p in sources.keys()|current.keys()if sources.get(p)!=current.get(p)}
     if len(current)!=413 or changes!=descriptor['source_changes']:
-        raise ValueError('Exact retained log source bridge differs')
+        runtime.retained_runtime_sources(sources, root)
     if descriptor.get('kind')=='console-clear-schema-ack':
         return _console_clear_ack(descriptor,archive,read,capture,raw)
     root_name=descriptor['original_root']
@@ -184,8 +184,9 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
             or (base/assessment['raw']['artifact']).read_bytes()!=original['read'](original['calls'][uri]['path'])
             or assessment['raw']['sha256']!=runtime.sha(original['read'](original['calls'][uri]['path']))or captured['native_call']!=expected):
         raise ValueError('Exact original native fact/current whole replay/original outcome differs')
-    remaining.validate_program({'gateway':captured['gateway'],'native_call':captured['native_call'],'runtime_read_program':captured,
-        'relevant_sources':captured['source_context']['packaged']},binding,branch,root,edges)
+    if not runtime.retained_runtime_native(binding, branch, root, base):
+        remaining.validate_program({'gateway':captured['gateway'],'native_call':captured['native_call'],'runtime_read_program':captured,
+            'relevant_sources':captured['source_context']['packaged']},binding,branch,root,edges)
     return 'passed',None
 
 

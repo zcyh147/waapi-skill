@@ -445,10 +445,15 @@ def attach_qualified_reads(descriptors, bindings, read, requirements, captures):
             raise ValueError('Closed qualified retained read attachment required')
         identity = item['branch_id']; binding = bindings[identity]
         assessment = read(item['assessment'])
-        if (identity in attached or set(binding['evidence']) != {'program'}
+        native_only = bool(binding.get('native_only_base'))
+        if (identity in attached
                 or requirements['branches'][identity]['categories'] != ['program', 'native']
-                or captures[identity] != read(assessment['program_capture'])):
+                or (not native_only and (set(binding['evidence']) != {'program'}
+                    or captures[identity] != read(assessment['program_capture'])))
+                or (native_only and binding['evidence'])):
             raise ValueError('Qualified retained read needs exact existing program/native policy and capture')
+        if native_only:
+            runtime.retained_runtime_native(binding, {'id': identity, 'shape_sha256': binding['native_shape_sha256']}, audit.ROOT, audit.ROOT)
         attached.add(identity)
         binding['qualified_runtime_read_attachment'] = item['assessment']
         binding['evidence']['native'] = item['evidence']
@@ -508,6 +513,24 @@ def qualified_read_result(descriptor, branch, candidate, scope_kind, base, bindi
     if completion.historical_source_seals(root, original_candidate, sources, historical_sources) != sources:
         raise ValueError('Original full 616-file candidate source map differs')
     before = {key: value for key, value in sources.items() if key.startswith('skills/waapi-skill/')}
+    native_only = runtime.retained_runtime_native(binding, branch, root, base)
+    if native_only:
+        if before != native_only['sources']:
+            raise ValueError('Qualified retained native original source scope differs')
+        record = completion.read_sealed_artifact(descriptor, base)
+        pointer = binding['observation_pointer']
+        value = completion.pointer_value(retained['raw'], pointer.removeprefix('/native_call'))
+        expected_record = {'contract': 'waapi-skill.qualified-retained-read-fact/v1',
+            'assessment_sha256': binding['qualified_runtime_read_attachment']['sha256'],
+            'branch_id': branch['id'], 'native_shape_sha256': branch['shape_sha256'],
+            'native_route': branch['route'], 'program_pointer': pointer,
+            'reference_chain': binding.get('reference_chain', []), 'observed': value}
+        completion.exact_observation_pointer(branch, binding, '/native_call', 'result', edges)
+        check = ({'pointer': pointer, 'cardinality': branch['value']} if branch['kind'] == 'collection_cardinality'
+                 else {'pointer': pointer, 'equals': value})
+        if record != expected_record or not completion.proves_alternative(check, branch):
+            raise ValueError('Qualified retained native exact pointer/value differs')
+        return 'passed', None
     current = runtime.program_source_context(root, flow=uri)['packaged']
     changes = {key: {'before': before.get(key), 'after': current.get(key)}
                for key in before.keys() | current.keys() if before.get(key) != current.get(key)}

@@ -1,0 +1,29 @@
+{
+  "api": "ak.wwise.core.profiler.getRTPCs",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792830641403932000-473367e625a148b890a6e319672aa6d2-ak_wwise_core_profiler_getRTPCs.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      {
+        "gameObjectId": 18446744073709551614,
+        "id": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+        "name": "RPM",
+        "value": 1000.0
+      },
+      {
+        "gameObjectId": 18446744073709551614,
+        "id": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+        "name": "Engine_Load",
+        "value": 1.0
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 9.990293834009208,
+  "version": "2021.1"
+}

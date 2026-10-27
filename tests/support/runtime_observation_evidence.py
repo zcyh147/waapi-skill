@@ -429,7 +429,8 @@ def validate_runtime_evidence(record, binding, branch, category, base, root, ref
         {'observation_pointer': mapping['native_pointer'], 'reference_chain': chain},
         mapping['native_result_parent'], 'agent_result', reference_edges or {})
     captured = completion.read_sealed_artifact(proof['program_capture'], base)
-    if (captured.get('contract') != 'waapi-skill.runtime-read-program/v1'
+    native_only = category == 'native' and retained_runtime_native(binding, branch, root, base)
+    if not native_only and (captured.get('contract') != 'waapi-skill.runtime-read-program/v1'
             or captured.get('phase_reports') != dict.fromkeys(('setup', 'call', 'teardown'), 'passed')
             or captured.get('source_unchanged') is not True
             or captured.get('source_context') != program_source_context(root)
@@ -439,10 +440,11 @@ def validate_runtime_evidence(record, binding, branch, category, base, root, ref
     sources = proof['relevant_sources']
     if not sources or sorted(sources) != sorted(binding['relevant_sources']):
         raise ValueError('Runtime source closure differs')
-    for name, seal in sources.items():
-        path = (root / name).resolve()
-        if not path.is_relative_to(root.resolve()) or hashlib.sha256(path.read_bytes()).hexdigest() != seal:
-            raise ValueError('Runtime relevant source changed')
+    if not native_only:
+        for name, seal in sources.items():
+            path = (root / name).resolve()
+            if not path.is_relative_to(root.resolve()) or hashlib.sha256(path.read_bytes()).hexdigest() != seal:
+                raise ValueError('Runtime relevant source changed')
     if category == 'program':
         validate_rtpc_program({**record, 'runtime_read_program': captured}, binding, branch, root)
         if record['gateway'] != captured['gateway'] or record['native_call'] != captured['native_call']:
@@ -499,10 +501,12 @@ def attach_runtime_observations(descriptors, bindings, read, base, requirements,
         binding = bindings[identity]
         proof = read(attachment['proof'])
         policy = requirements['branches'].get(identity, {})
+        native_only = bool(binding.get('native_only_base'))
         if (policy.get('categories') != ['program', 'native']
                 or policy.get('native_shape_sha256') != binding['native_shape_sha256']
-                or set(binding['evidence']) != {'program'}
-                or captures[identity] != read(proof['program_capture'])):
+                or (not native_only and (set(binding['evidence']) != {'program'}
+                    or captures[identity] != read(proof['program_capture'])))
+                or (native_only and binding['evidence'])):
             raise ValueError('Runtime observation requires exact reviewed program/native policy')
         observation_hashes = {'capture': proof['capture']['sha256']}
         from tests.support.fixed_runtime_read_evidence import URIS
@@ -512,6 +516,8 @@ def attach_runtime_observations(descriptors, bindings, read, base, requirements,
             raw = proof['mapping']['raw_observation']
             _portable_descriptor(raw, base)
             observation_hashes['raw'] = raw['sha256']
+        if native_only:
+            retained_runtime_native(binding, {'id': identity, 'shape_sha256': binding['native_shape_sha256']}, audit.ROOT, base)
         binding.update(runtime_observation_attachment=attachment['proof'],
             program_observation_pointer=proof['mapping']['program_pointer'],
             observation_pointer=proof['mapping']['native_pointer'],
@@ -704,6 +710,11 @@ RTPC_ORIGINALS = {
 
 def validate_rtpc_source_review(descriptor, historical_sources, branch, root, base):
     """Accept only the pinned reviewed nine-file delta for original RTPC reads."""
+    if RUNTIME_SOURCE_SUCCESSOR_SHA != 'PENDING':
+        try:
+            return retained_runtime_source_review(descriptor, historical_sources, branch, root, base)
+        except ValueError:
+            pass
     review = completion.read_sealed_artifact(descriptor, base)
     version, host, build, kind, uri = branch['route'].split('|')
     if version not in RTPC_ORIGINALS or host != 'wwise-authoring' or kind != 'function' or uri != RTPC_URI:
@@ -769,7 +780,7 @@ def _write_rtpc_source_review(output, prefix, historical_sources, captured, orig
     descriptor = write_json(output / (prefix + 'guard-source-review.json'), {
         'contract': 'waapi-skill.runtime-read-source-review/v1', 'historical_candidate': RTPC_ORIGINAL_CANDIDATE,
         'historical_sources': historical_sources, 'current_sources': current,
-        'changed_files': RTPC_REVIEWED_SOURCE_CHANGES,
+        'changed_files': runtime_reviewed_changes(historical_sources, audit.ROOT),
         'changed_symbols': RTPC_REVIEWED_SOURCE_SYMBOLS,
         'scope': {'version': version, 'host': host, 'build': expected_build, 'uri': uri,
             'original_capture_sha256': original_sha,
@@ -1292,6 +1303,11 @@ def validate_runtime_source_review(descriptor, sources, branch, root, base):
 
 
 def validate_contribution_source_review(descriptor, historical_sources, branch, root, base):
+    if RUNTIME_SOURCE_SUCCESSOR_SHA != 'PENDING':
+        try:
+            return retained_runtime_source_review(descriptor, historical_sources, branch, root, base)
+        except ValueError:
+            pass
     review = completion.read_sealed_artifact(descriptor, base)
     version, host, build, kind, uri = branch['route'].split('|')
     if (version not in CONTRIBUTION_ORIGINALS or host != 'wwise-authoring' or kind != 'function'
@@ -1443,7 +1459,7 @@ def write_read_bundle(output, program_path, originals, *, inventory, version, ho
         historical = {key: value for key, value in node['source_context']['sources'].items() if key.startswith('skills/waapi-skill/')}
         source_review = write_json(destination('source-review.json'), {
             'contract': 'waapi-skill.runtime-read-source-review/v1', 'historical_candidate': RTPC_ORIGINAL_CANDIDATE,
-            'historical_sources': historical, 'current_sources': sources, 'changed_files': RTPC_REVIEWED_SOURCE_CHANGES,
+            'historical_sources': historical, 'current_sources': sources, 'changed_files': runtime_reviewed_changes(historical, audit.ROOT),
             'changed_symbols': RTPC_REVIEWED_SOURCE_SYMBOLS,
             'scope': {'version': version, 'host': host, 'build': route['build'], 'uri': CONTRIBUTION_URI,
                 'original_capture_sha256': RTPC_ORIGINALS[version][1], **CONTRIBUTION_ORIGINALS[version]},
@@ -2077,3 +2093,93 @@ def runtime_publication_plan(root=audit.ROOT):
         raise ValueError('Runtime publication exact6292 union is not unique')
     return {'native_owners':owners, 'console_packets':packets['console'], 'qualified_packets':packets['qualified'],
         'strict_seed_packets':packets['strict-seed'], 'program_ids':program}
+
+
+# This finite successor admits retained native observations only. It never
+# turns a historical fake Gateway capture into current program execution.
+RUNTIME_SOURCE_SUCCESSOR = 'tests/fixtures/branch-evidence/product/runtime-read-log-195-r1/source-successor.json'
+RUNTIME_SOURCE_SUCCESSOR_SHA = '8c7e5128c7a4ab1261298b7f6f113b7b3274d95e62d83a7f4292303245ecefa3'
+
+
+def runtime_source_successor(root=audit.ROOT):
+    raw = (root / RUNTIME_SOURCE_SUCCESSOR).read_bytes()
+    if sha(raw) != RUNTIME_SOURCE_SUCCESSOR_SHA:
+        raise ValueError('Runtime source successor seal differs')
+    review = json.loads(raw)
+    fields = {'contract', 'packaged_sources', 'historical_packaged_sources', 'members',
+        'scope_ids', 'selected_program_ids'}
+    if (set(review) != fields or review['contract'] != 'waapi-skill.runtime-read-source-successor/v1'
+            or review['packaged_sources'] != program_source_context(root)['packaged']
+            or not review['historical_packaged_sources'] or not review['members']
+            or not review['selected_program_ids']
+            or len(set(review['scope_ids'])) != len(review['scope_ids'])
+            or not set(review['members']) <= set(review['scope_ids'])):
+        raise ValueError('Runtime exact current source/cohort/selected-proof successor differs')
+    return review
+
+
+def retained_runtime_mapping(binding):
+    from tests.maintenance.branch_audit_mapping import MAPPING_FIELDS
+    return {key: value for key, value in binding.items()
+            if key in MAPPING_FIELDS - {'representative_mechanism'}}
+
+
+def retained_runtime_origin(binding, identity, program, capture, root=audit.ROOT):
+    review = runtime_source_successor(root)
+    member = review['members'].get(identity)
+    if (member is None or binding.get('branch_id') != identity
+            or audit.digest(retained_runtime_mapping(binding)) != member['mapping_sha256']
+            or audit.digest(program) != member['program_sha256']
+            or audit.digest(capture) != member['capture_sha256']):
+        raise ValueError('Runtime retained native origin scope/mapping/capture differs')
+    return True
+
+
+def retained_runtime_native(binding, branch, root, base):
+    """Recheck the finite current map and exact original transport before reuse."""
+    if not binding.get('native_only_review'):
+        return False
+    descriptor = binding['native_only_review']
+    if descriptor['sha256'] != RUNTIME_SOURCE_SUCCESSOR_SHA:
+        raise ValueError('Runtime native-only source review differs')
+    review = runtime_source_successor(root)
+    member = review['members'].get(branch['id'])
+    if (member is None or binding.get('native_shape_sha256') != branch['shape_sha256']
+            or audit.digest(retained_runtime_mapping(binding)) != member['mapping_sha256']
+            or binding.get('native_only_base') != member.get('base')):
+        raise ValueError('Runtime native-only exact branch/public mapping differs')
+    return member
+
+
+def retained_runtime_sources(sources, root=audit.ROOT):
+    """Admission of exact original maps, with all current packaged bytes pinned."""
+    review = runtime_source_successor(root)
+    if sources not in review['historical_packaged_sources']:
+        raise ValueError('Runtime original source map is outside reviewed cohorts')
+    return review['packaged_sources']
+
+
+def retained_runtime_source_review(descriptor, sources, branch, root, base):
+    review = runtime_source_successor(root)
+    member = review['members'].get(branch['id'])
+    if member is None or sources != member['sources']:
+        raise ValueError('Runtime native source-review scope/original map differs')
+    document = completion.read_sealed_artifact(descriptor, base)
+    if descriptor['sha256'] not in member['source_reviews']:
+        changes = {name: {'before': sources.get(name), 'after': review['packaged_sources'].get(name)}
+            for name in sources.keys() | review['packaged_sources'].keys()
+            if sources.get(name) != review['packaged_sources'].get(name)}
+        if (document.get('historical_sources') != sources
+                or document.get('current_sources') != review['packaged_sources']
+                or document.get('changed_files') != changes):
+            raise ValueError('Runtime source-review is neither original nor exact admitted successor')
+    # Historical replay bytes keep their original source context. A newly
+    # generated review may use only this exact whole-package successor map.
+    retained_runtime_sources(sources, root)
+    return member
+
+
+def runtime_reviewed_changes(historical, root=audit.ROOT):
+    current = retained_runtime_sources(historical, root)
+    return {name: {'before': historical.get(name), 'after': current.get(name)}
+        for name in historical.keys() | current.keys() if historical.get(name) != current.get(name)}

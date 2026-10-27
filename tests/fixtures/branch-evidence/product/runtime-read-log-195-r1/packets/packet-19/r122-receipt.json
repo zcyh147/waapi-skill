@@ -1,0 +1,2717 @@
+{
+  "candidate": "1f32f9f223cebe11076ca07f168f29fad99adfab",
+  "version": "2025.1",
+  "expected": {
+    "channel": "general",
+    "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+    "severity": "Message"
+  },
+  "transaction": {
+    "phase": "verify",
+    "draft-check": {
+      "contract": "waapi-skill.gateway-result/v1",
+      "ok": true,
+      "status": "editable",
+      "command": "draft-check",
+      "offline": false,
+      "draft": {
+        "contract": "waapi-skill.operation-draft/v1",
+        "draft_id": "od1-e1673843912c48b9ac6ccff5b44321a2",
+        "lifecycle_state": "editable",
+        "revision": 3,
+        "binding": {
+          "operation": "ak.wwise.core.log.addItem",
+          "version": "2025.1",
+          "schema_digest": "b26e8caba92381f38c8f2ec721130b60ac01abc5cb8955e0ab026282ce923931"
+        },
+        "created_at": "2026-10-24T05:57:42.479591Z",
+        "updated_at": "2026-10-24T05:57:42.653287Z",
+        "expires_at": "2026-10-25T05:57:42.479591Z",
+        "business_revision": 1,
+        "declarations": [],
+        "preview": null,
+        "detail_available": false,
+        "missing_fields": [],
+        "missing_fields_status": "complete",
+        "allowed_actions": [
+          "declare-runtime-control-plan"
+        ],
+        "check": {
+          "status": "passed",
+          "checked_at": "2026-10-24T05:57:42.653287Z",
+          "source_revision": 2,
+          "request_digest": "01fde9361dd2cdfade97d0394322f6479ad1f45f7f1c14f0c25f4e6ea91e2df1"
+        },
+        "seal": null,
+        "allowed_lifecycle_commands": [
+          "draft-inspect",
+          "draft-cancel",
+          "draft-check",
+          "preview-from-draft"
+        ],
+        "construction_state": {
+          "draft_complete": true,
+          "preview_created": false,
+          "required_next_phase": "preview-from-draft",
+          "sole_continuation_source": "/next_command"
+        }
+      },
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 32743,
+        "url": "ws://127.0.0.1:32743/waapi"
+      },
+      "detected_version": "2025.1",
+      "is_command_line": true,
+      "project_call": {
+        "api": "ak.wwise.core.getProjectInfo",
+        "item_type": "function",
+        "category": "core",
+        "version": "2025.1",
+        "ok": true,
+        "dry_run": false,
+        "risk_level": "low",
+        "error_code": null,
+        "message": "ok",
+        "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792821462595129000-4a498f7012a746cf9833002e1bc163b4-ak_wwise_core_getProjectInfo.json",
+        "timeout": 29.966880000021774
+      },
+      "next_command": {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": "preview-from-draft",
+        "gateway_argv": [
+          "preview-from-draft",
+          "od1-e1673843912c48b9ac6ccff5b44321a2",
+          "--task-authority",
+          "da1-4e06aa4f99a61bee1b9f8af7d656e6a0e721c57d",
+          "--expected-revision",
+          "3"
+        ],
+        "full_argv": [
+          "python",
+          "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+          "gateway.py",
+          "--state-dir",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+          "preview-from-draft",
+          "od1-e1673843912c48b9ac6ccff5b44321a2",
+          "--task-authority",
+          "da1-4e06aa4f99a61bee1b9f8af7d656e6a0e721c57d",
+          "--expected-revision",
+          "3"
+        ],
+        "copy_exactly": true,
+        "shell_tool_timeout_ms": 30000,
+        "shell_family": "posix-sh",
+        "copy_instruction": {
+          "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+          "source_field": "shell_command",
+          "action": "execute_verbatim_as_one_shell_tool_call",
+          "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field"
+          ]
+        },
+        "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state preview-from-draft od1-e1673843912c48b9ac6ccff5b44321a2 --task-authority da1-4e06aa4f99a61bee1b9f8af7d656e6a0e721c57d --expected-revision 3"
+      }
+    },
+    "preview": {
+      "ok": true,
+      "status": "awaiting_confirmation",
+      "contract": "waapi-skill.gateway-result/v1",
+      "command": "preview-from-draft",
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 32743,
+        "url": "ws://127.0.0.1:32743/waapi"
+      },
+      "detected_version": "2025.1",
+      "is_command_line": true,
+      "transaction_id": "tx1-dwge49xwejdd0qezf0e9",
+      "state": "awaiting_confirmation",
+      "artifact_hash": "593817a1e566c5e2c8fff5f419e41d3c271d91e495e81d6fcb8f6f3d4142abe2",
+      "summary_only": true,
+      "preview_summary": {
+        "contract": "waapi-skill.transaction-preview/v2",
+        "request": {
+          "contract": "waapi-skill.operation-request/v1",
+          "version": "2025.1",
+          "operation": "waapi.call",
+          "arguments": {
+            "api": "ak.wwise.core.log.addItem",
+            "args": {
+              "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+              "channel": "general",
+              "severity": "Message"
+            },
+            "options": {}
+          }
+        },
+        "dispatch": {
+          "uri": "ak.wwise.core.log.addItem",
+          "args": {
+            "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+            "channel": "general",
+            "severity": "Message"
+          },
+          "options": {}
+        },
+        "resolved_roles": {},
+        "pre_state": {
+          "log_channel_before": {
+            "outcome": "complete",
+            "items": [],
+            "item_count": 0
+          },
+          "execution_contract": {
+            "contract": "waapi-skill.public-execution-contract/v2",
+            "version": "2025.1",
+            "uri": "ak.wwise.core.log.addItem",
+            "item_type": "function",
+            "route": "managed_transaction",
+            "effect": "runtime_mutation",
+            "gateway_commands": [
+              "request-schema"
+            ],
+            "timeout_seconds": 30.0,
+            "result_limit_bytes": 1048576,
+            "verification_strategy": "result_schema",
+            "requires_authorization": true,
+            "accepted_authorization_modes": [
+              "explicit_confirmation",
+              "policy_authorization"
+            ],
+            "program_case": "managed_transaction-result-schema",
+            "lifecycle_strategy": "single_guarded_runtime_call",
+            "companion_uris": [],
+            "project_guard_mode": "invariant",
+            "post_execution_project_guard_policy": "revalidate",
+            "executable": true,
+            "excluded_reason": null,
+            "request_validation": {
+              "uri": "ak.wwise.core.log.addItem",
+              "version": "2025.1",
+              "required_fields": [
+                "message"
+              ],
+              "required_families": [],
+              "section": "request",
+              "validated_nodes": 5,
+              "unresolved_refs": [
+                "waapi_definitions.json#/definitions/logCentralChannel",
+                "waapi_definitions.json#/definitions/logCentralSeverity"
+              ]
+            },
+            "request_validation_strength": "partial_reflected_schema",
+            "io_audit": null
+          }
+        },
+        "verification_plan": {
+          "kind": "log-channel-effect",
+          "uri": "ak.wwise.core.log.addItem",
+          "version": "2025.1",
+          "strategy": "operation_specific_readback",
+          "base_result_strategy": "result_schema",
+          "channel": "general",
+          "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+          "severity": "Message",
+          "console": true,
+          "native_observation_support": {
+            "state": "supported",
+            "is_command_line": true,
+            "observed_version": {
+              "year": 2025,
+              "major": 1,
+              "minor": 7,
+              "build": 9143
+            },
+            "native_change": "WG-80630",
+            "console_minimum_version": "2025.1.4"
+          },
+          "console_add_observer": {
+            "topic": "ak.wwise.core.log.itemAdded",
+            "ordering": "subscribe_before_one_add; unsubscribe_before_execute_returns",
+            "wait_seconds": 5.0,
+            "maximum_events": 64,
+            "maximum_event_bytes": 65536,
+            "matching": "exact_sealed_channel_message_severity",
+            "boundary": "One matching addition event; no exclusive writer, continuing channel contents, entry identity, or prior-state restoration proof."
+          }
+        },
+        "cleanup": {
+          "spec": {
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "api": "ak.wwise.core.log.addItem",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47"
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47",
+            "api": "ak.wwise.core.log.addItem",
+            "phase": "preview",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "project_guard_fingerprint": "b85a45b2d371b6912c7f439e731fbe59e96b4659d6c5856a3f1ebb042507d5e3",
+        "runtime_guard_fingerprint": "b85ceb7a93330098d25227f39626a47cf3c66628b3dc1db66b0930333e014774",
+        "expires_at": "2026-10-24T06:27:42.742271Z"
+      },
+      "event_count": 2,
+      "events": [
+        {
+          "sequence": 1,
+          "event_type": "preview_created",
+          "to_state": "draft",
+          "event_hash": "31829cabc34ea9ef94f3d491672fe45ddebef9c5901e7ac99cd898dbb9fba67b"
+        },
+        {
+          "sequence": 2,
+          "event_type": "confirmation_requested",
+          "from_state": "draft",
+          "to_state": "awaiting_confirmation",
+          "event_hash": "f31003e64737810b4e11abedebfc448de499a17204cf65209e5a83a9ca47f8e0"
+        }
+      ],
+      "project_call": {
+        "api": "ak.wwise.core.getProjectInfo",
+        "item_type": "function",
+        "category": "core",
+        "version": "2025.1",
+        "ok": true,
+        "dry_run": false,
+        "risk_level": "low",
+        "error_code": null,
+        "message": "ok",
+        "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792821462710624000-f391b52f1aea4a8db8e02ae1e8725f5e-ak_wwise_core_getProjectInfo.json",
+        "timeout": 29.972579624969512
+      },
+      "executed": false,
+      "verified": false,
+      "change_requested": true,
+      "authorization": {
+        "mode": "explicit_confirmation",
+        "policy": "ask_before_changes",
+        "explicit_confirmation": false,
+        "notice_required": true,
+        "requires_later_user_message": true
+      },
+      "cleanup": {
+        "spec": {
+          "contract": "waapi-skill.transaction-cleanup-spec/v1",
+          "api": "ak.wwise.core.log.addItem",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "cleanup_requirement": "not_required",
+          "companion_request": null,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "warnings": [],
+          "automatic_cleanup": false,
+          "automatic_retry": false,
+          "spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47"
+        },
+        "status": "not_required",
+        "projection": {
+          "contract": "waapi-skill.transaction-cleanup-projection/v1",
+          "cleanup_spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47",
+          "api": "ak.wwise.core.log.addItem",
+          "phase": "preview",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "cleanup_requirement": "not_required",
+          "status": "not_required",
+          "companion_request": null,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "warnings": [],
+          "automatic_cleanup": false,
+          "automatic_retry": false
+        }
+      },
+      "session_context": {
+        "contract": "waapi-skill.session-context/v2",
+        "available": true,
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 32743,
+          "url": "ws://127.0.0.1:32743/waapi"
+        },
+        "adapter_version": "2025.1",
+        "adapter_version_source": "live_detection",
+        "project_modification_policy": "ask_before_changes",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ],
+        "one_time_introduction": {
+          "contract": "waapi-skill.session-introduction/v2",
+          "emit_condition": "visible_conversation_intro_absent",
+          "emit_timing": "first_agent_message_after_gateway_result",
+          "atomic": true,
+          "style": "natural_prose_in_user_language",
+          "facts": {
+            "skill_name": "waapi-skill",
+            "endpoint_url": "ws://127.0.0.1:32743/waapi",
+            "adapter_version": "2025.1",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ]
+          },
+          "machine_readable_result_policy": "separate_progress_message"
+        }
+      },
+      "next_command": {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": "transaction-show",
+        "gateway_argv": [
+          "transaction-show",
+          "tx1-dwge49xwejdd0qezf0e9",
+          "--summary-only"
+        ],
+        "full_argv": [
+          "python",
+          "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+          "gateway.py",
+          "--state-dir",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+          "transaction-show",
+          "tx1-dwge49xwejdd0qezf0e9",
+          "--summary-only"
+        ],
+        "copy_exactly": true,
+        "shell_tool_timeout_ms": 30000,
+        "requires_later_user_message": true,
+        "shell_family": "posix-sh",
+        "copy_instruction": {
+          "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+          "source_field": "shell_command",
+          "action": "execute_verbatim_as_one_shell_tool_call",
+          "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field"
+          ]
+        },
+        "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state transaction-show tx1-dwge49xwejdd0qezf0e9 --summary-only"
+      },
+      "agent_result": {
+        "operation": "waapi.call",
+        "transaction_id": "tx1-dwge49xwejdd0qezf0e9",
+        "artifact_hash": "593817a1e566c5e2c8fff5f419e41d3c271d91e495e81d6fcb8f6f3d4142abe2",
+        "state": "awaiting_confirmation",
+        "executed": false,
+        "request": {
+          "contract": "waapi-skill.operation-request/v1",
+          "version": "2025.1",
+          "operation": "waapi.call",
+          "arguments": {
+            "api": "ak.wwise.core.log.addItem",
+            "args": {
+              "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+              "channel": "general",
+              "severity": "Message"
+            },
+            "options": {}
+          }
+        },
+        "authorization": {
+          "mode": "explicit_confirmation",
+          "policy": "ask_before_changes",
+          "explicit_confirmation": false,
+          "notice_required": true,
+          "requires_later_user_message": true
+        },
+        "cleanup": {
+          "spec": {
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "api": "ak.wwise.core.log.addItem",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47"
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47",
+            "api": "ak.wwise.core.log.addItem",
+            "phase": "preview",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "next_command": {
+          "contract": "waapi-skill.gateway-next-command/v2",
+          "command": "transaction-show",
+          "gateway_argv": [
+            "transaction-show",
+            "tx1-dwge49xwejdd0qezf0e9",
+            "--summary-only"
+          ],
+          "full_argv": [
+            "python",
+            "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+            "gateway.py",
+            "--state-dir",
+            "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+            "transaction-show",
+            "tx1-dwge49xwejdd0qezf0e9",
+            "--summary-only"
+          ],
+          "copy_exactly": true,
+          "shell_tool_timeout_ms": 30000,
+          "requires_later_user_message": true,
+          "shell_family": "posix-sh",
+          "copy_instruction": {
+            "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+            "source_field": "shell_command",
+            "action": "execute_verbatim_as_one_shell_tool_call",
+            "forbidden_transformations": [
+              "reconstruct",
+              "shorten",
+              "normalize",
+              "substitute_path_segments",
+              "select_another_field"
+            ]
+          },
+          "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state transaction-show tx1-dwge49xwejdd0qezf0e9 --summary-only"
+        }
+      }
+    },
+    "transaction_id": "tx1-dwge49xwejdd0qezf0e9",
+    "transaction-show": {
+      "contract": "waapi-skill.gateway-result/v1",
+      "ok": true,
+      "status": "ok",
+      "command": "transaction-show",
+      "offline": true,
+      "transaction_id": "tx1-dwge49xwejdd0qezf0e9",
+      "state": "awaiting_confirmation",
+      "artifact_hash": "593817a1e566c5e2c8fff5f419e41d3c271d91e495e81d6fcb8f6f3d4142abe2",
+      "summary_only": true,
+      "preview_summary": {
+        "contract": "waapi-skill.transaction-preview/v2",
+        "request": {
+          "arguments": {
+            "api": "ak.wwise.core.log.addItem",
+            "args": {
+              "channel": "general",
+              "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+              "severity": "Message"
+            },
+            "options": {}
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "waapi.call",
+          "version": "2025.1"
+        },
+        "dispatch": {
+          "args": {
+            "channel": "general",
+            "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+            "severity": "Message"
+          },
+          "options": {},
+          "uri": "ak.wwise.core.log.addItem"
+        },
+        "resolved_roles": {},
+        "pre_state": {
+          "execution_contract": {
+            "accepted_authorization_modes": [
+              "explicit_confirmation",
+              "policy_authorization"
+            ],
+            "companion_uris": [],
+            "contract": "waapi-skill.public-execution-contract/v2",
+            "effect": "runtime_mutation",
+            "excluded_reason": null,
+            "executable": true,
+            "gateway_commands": [
+              "request-schema"
+            ],
+            "io_audit": null,
+            "item_type": "function",
+            "lifecycle_strategy": "single_guarded_runtime_call",
+            "post_execution_project_guard_policy": "revalidate",
+            "program_case": "managed_transaction-result-schema",
+            "project_guard_mode": "invariant",
+            "request_validation": {
+              "required_families": [],
+              "required_fields": [
+                "message"
+              ],
+              "section": "request",
+              "unresolved_refs": [
+                "waapi_definitions.json#/definitions/logCentralChannel",
+                "waapi_definitions.json#/definitions/logCentralSeverity"
+              ],
+              "uri": "ak.wwise.core.log.addItem",
+              "validated_nodes": 5,
+              "version": "2025.1"
+            },
+            "request_validation_strength": "partial_reflected_schema",
+            "requires_authorization": true,
+            "result_limit_bytes": 1048576,
+            "route": "managed_transaction",
+            "timeout_seconds": 30.0,
+            "uri": "ak.wwise.core.log.addItem",
+            "verification_strategy": "result_schema",
+            "version": "2025.1"
+          },
+          "log_channel_before": {
+            "item_count": 0,
+            "items": [],
+            "outcome": "complete"
+          }
+        },
+        "verification_plan": {
+          "base_result_strategy": "result_schema",
+          "channel": "general",
+          "console": true,
+          "console_add_observer": {
+            "boundary": "One matching addition event; no exclusive writer, continuing channel contents, entry identity, or prior-state restoration proof.",
+            "matching": "exact_sealed_channel_message_severity",
+            "maximum_event_bytes": 65536,
+            "maximum_events": 64,
+            "ordering": "subscribe_before_one_add; unsubscribe_before_execute_returns",
+            "topic": "ak.wwise.core.log.itemAdded",
+            "wait_seconds": 5.0
+          },
+          "kind": "log-channel-effect",
+          "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+          "native_observation_support": {
+            "console_minimum_version": "2025.1.4",
+            "is_command_line": true,
+            "native_change": "WG-80630",
+            "observed_version": {
+              "build": 9143,
+              "major": 1,
+              "minor": 7,
+              "year": 2025
+            },
+            "state": "supported"
+          },
+          "severity": "Message",
+          "strategy": "operation_specific_readback",
+          "uri": "ak.wwise.core.log.addItem",
+          "version": "2025.1"
+        },
+        "cleanup": {
+          "spec": {
+            "api": "ak.wwise.core.log.addItem",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47",
+            "warnings": []
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47",
+            "api": "ak.wwise.core.log.addItem",
+            "phase": "preview",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "project_guard_fingerprint": "b85a45b2d371b6912c7f439e731fbe59e96b4659d6c5856a3f1ebb042507d5e3",
+        "runtime_guard_fingerprint": "b85ceb7a93330098d25227f39626a47cf3c66628b3dc1db66b0930333e014774",
+        "expires_at": "2026-10-24T06:27:42.742271Z"
+      },
+      "event_count": 2,
+      "events": [
+        {
+          "sequence": 1,
+          "event_type": "preview_created",
+          "to_state": "draft",
+          "event_hash": "31829cabc34ea9ef94f3d491672fe45ddebef9c5901e7ac99cd898dbb9fba67b"
+        },
+        {
+          "sequence": 2,
+          "event_type": "confirmation_requested",
+          "from_state": "draft",
+          "to_state": "awaiting_confirmation",
+          "event_hash": "f31003e64737810b4e11abedebfc448de499a17204cf65209e5a83a9ca47f8e0"
+        }
+      ],
+      "confirmation": {
+        "contract": "waapi-skill.confirmation-binding/v1",
+        "token": "ct1-s5nsyvk0zsyfxm9xs1p2d95s",
+        "binding": {
+          "material_contract": "waapi-skill.confirmation-token-material/v1",
+          "transaction_id": "tx1-dwge49xwejdd0qezf0e9",
+          "artifact_hash": "593817a1e566c5e2c8fff5f419e41d3c271d91e495e81d6fcb8f6f3d4142abe2",
+          "state": "awaiting_confirmation",
+          "event_sequence": 2,
+          "last_event_hash": "f31003e64737810b4e11abedebfc448de499a17204cf65209e5a83a9ca47f8e0"
+        }
+      },
+      "next_command": {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": "confirm",
+        "gateway_argv": [
+          "confirm",
+          "tx1-dwge49xwejdd0qezf0e9",
+          "--confirmation-token",
+          "ct1-s5nsyvk0zsyfxm9xs1p2d95s"
+        ],
+        "full_argv": [
+          "python",
+          "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+          "gateway.py",
+          "--state-dir",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+          "confirm",
+          "tx1-dwge49xwejdd0qezf0e9",
+          "--confirmation-token",
+          "ct1-s5nsyvk0zsyfxm9xs1p2d95s"
+        ],
+        "copy_exactly": true,
+        "shell_tool_timeout_ms": 30000,
+        "requires_explicit_user_confirmation": true,
+        "shell_family": "posix-sh",
+        "copy_instruction": {
+          "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+          "source_field": "shell_command",
+          "action": "execute_verbatim_as_one_shell_tool_call",
+          "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field"
+          ]
+        },
+        "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state confirm tx1-dwge49xwejdd0qezf0e9 --confirmation-token ct1-s5nsyvk0zsyfxm9xs1p2d95s"
+      }
+    },
+    "transaction-show_exit_code": 0,
+    "confirm": {
+      "contract": "waapi-skill.gateway-result/v1",
+      "ok": true,
+      "status": "confirmed",
+      "command": "confirm",
+      "offline": true,
+      "transaction_id": "tx1-dwge49xwejdd0qezf0e9",
+      "state": "confirmed",
+      "artifact_hash": "593817a1e566c5e2c8fff5f419e41d3c271d91e495e81d6fcb8f6f3d4142abe2",
+      "session_context": {
+        "contract": "waapi-skill.session-context/v2",
+        "available": true,
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 32743,
+          "url": "ws://127.0.0.1:32743/waapi"
+        },
+        "adapter_version": "2025.1",
+        "adapter_version_source": "configured",
+        "project_modification_policy": "ask_before_changes",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ],
+        "one_time_introduction": {
+          "contract": "waapi-skill.session-introduction/v2",
+          "emit_condition": "visible_conversation_intro_absent",
+          "emit_timing": "first_agent_message_after_gateway_result",
+          "atomic": true,
+          "style": "natural_prose_in_user_language",
+          "facts": {
+            "skill_name": "waapi-skill",
+            "endpoint_url": "ws://127.0.0.1:32743/waapi",
+            "adapter_version": "2025.1",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ]
+          },
+          "machine_readable_result_policy": "separate_progress_message"
+        }
+      },
+      "next_command": {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": "execute",
+        "gateway_argv": [
+          "execute",
+          "tx1-dwge49xwejdd0qezf0e9"
+        ],
+        "full_argv": [
+          "python",
+          "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+          "gateway.py",
+          "--state-dir",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+          "execute",
+          "tx1-dwge49xwejdd0qezf0e9"
+        ],
+        "copy_exactly": true,
+        "shell_tool_timeout_ms": 30000,
+        "shell_family": "posix-sh",
+        "copy_instruction": {
+          "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+          "source_field": "shell_command",
+          "action": "execute_verbatim_as_one_shell_tool_call",
+          "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field"
+          ]
+        },
+        "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state execute tx1-dwge49xwejdd0qezf0e9"
+      }
+    },
+    "confirm_exit_code": 0,
+    "execute": {
+      "ok": true,
+      "status": "executed_unverified",
+      "contract": "waapi-skill.gateway-result/v1",
+      "command": "execute",
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 32743,
+        "url": "ws://127.0.0.1:32743/waapi"
+      },
+      "detected_version": "2025.1",
+      "is_command_line": true,
+      "transaction_id": "tx1-dwge49xwejdd0qezf0e9",
+      "state": "executed_unverified",
+      "artifact_hash": "593817a1e566c5e2c8fff5f419e41d3c271d91e495e81d6fcb8f6f3d4142abe2",
+      "dispatch_result": {
+        "ok": true,
+        "api": "ak.wwise.core.log.addItem",
+        "version": "2025.1",
+        "item_type": "function",
+        "category": "core.log",
+        "risk_level": "medium",
+        "timeout": 29.93610929197166,
+        "dry_run": false,
+        "result": {},
+        "error_code": null,
+        "message": "ok",
+        "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792821462865343000-a250ecebc3414447a768644b10e1c8ba-ak_wwise_core_log_addItem.json",
+        "log_item_observation": {
+          "contract": "waapi-skill.console-log-add-observation/v1",
+          "topic": "ak.wwise.core.log.itemAdded",
+          "subscribed": true,
+          "outcome": "matched",
+          "events_observed": 1,
+          "cleanup": {
+            "status": "unsubscribed"
+          },
+          "event": {
+            "channel": "general",
+            "item": {
+              "severity": "Message",
+              "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+              "time": 1792821462,
+              "messageId": ""
+            }
+          }
+        }
+      },
+      "schema_validation": {
+        "uri": "ak.wwise.core.log.addItem",
+        "version": "2025.1",
+        "required_fields": [
+          "message"
+        ],
+        "required_families": [],
+        "section": "request",
+        "validated_nodes": 5,
+        "unresolved_refs": [
+          "waapi_definitions.json#/definitions/logCentralChannel",
+          "waapi_definitions.json#/definitions/logCentralSeverity"
+        ]
+      },
+      "role_validation": {
+        "summary_contract": "waapi-skill.transaction-role-validation-summary/v1",
+        "contract": "waapi-skill.role-validation/v1",
+        "operation": "waapi.call",
+        "ok": true,
+        "status": "valid",
+        "assertion_count": 1,
+        "passed_assertion_count": 1,
+        "assertions_canonical_sha256": "17b59b8db1f221578abff54b1371f614b382509cb59f805654868d86ccf373c9",
+        "readback_count": 0,
+        "readbacks_canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "full_evidence_in_stdout": false
+      },
+      "guard_validation": {
+        "ok": true,
+        "status": "valid",
+        "project_guard_mode": "invariant",
+        "project_guard_phase": "pre_execution",
+        "project_transition": null,
+        "project_guard_fingerprint": "b85a45b2d371b6912c7f439e731fbe59e96b4659d6c5856a3f1ebb042507d5e3",
+        "runtime_guard_fingerprint": "b85ceb7a93330098d25227f39626a47cf3c66628b3dc1db66b0930333e014774",
+        "expires_at": "2026-10-24T06:27:42.742271Z"
+      },
+      "project_call": {
+        "api": "ak.wwise.core.getProjectInfo",
+        "item_type": "function",
+        "category": "core",
+        "version": "2025.1",
+        "ok": true,
+        "dry_run": false,
+        "risk_level": "low",
+        "error_code": null,
+        "message": "ok",
+        "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792821462812303000-0fa9fc21227847e5adcb9e449e2a4b03-ak_wwise_core_getProjectInfo.json",
+        "timeout": 29.9902529999963
+      },
+      "transport_binding_validation": null,
+      "game_object_binding_validation": null,
+      "playing_binding_validation": null,
+      "game_object_collection_validation": null,
+      "executed": true,
+      "verified": false,
+      "cleanup": {
+        "spec": {
+          "api": "ak.wwise.core.log.addItem",
+          "automatic_cleanup": false,
+          "automatic_retry": false,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "cleanup_requirement": "not_required",
+          "companion_request": null,
+          "contract": "waapi-skill.transaction-cleanup-spec/v1",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47",
+          "warnings": []
+        },
+        "status": "not_required",
+        "projection": {
+          "contract": "waapi-skill.transaction-cleanup-projection/v1",
+          "cleanup_spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47",
+          "api": "ak.wwise.core.log.addItem",
+          "phase": "executed",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "cleanup_requirement": "not_required",
+          "status": "not_required",
+          "companion_request": null,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "warnings": [],
+          "automatic_cleanup": false,
+          "automatic_retry": false
+        }
+      },
+      "soundengine_authority_revocation": null,
+      "automatic_retry": false,
+      "agent_control": {
+        "terminal": false,
+        "required_outcome_before_reply": "verified_or_structured_verification_failure",
+        "next": "execute next_command.copy_instruction.source_field in same turn",
+        "reply_before_next_command": "invalid"
+      },
+      "stdout_projection": {
+        "contract": "waapi-skill.transaction-execute-success-summary/v1",
+        "detail_level": "full-dispatch-result",
+        "fixed_projection_limit_bytes": 22528,
+        "stdout_budget_bytes": 24576,
+        "session_context_reserve_bytes": 2048,
+        "projected_payload_bytes": 7097,
+        "full_dispatch_result_in_stdout": true,
+        "full_role_validation_in_stdout": false,
+        "full_execution_evidence_persisted": true,
+        "journal_event": "execution_completed",
+        "truncated": false
+      },
+      "recovery": {
+        "contract": "waapi-skill.recovery/v1",
+        "stage": "known_write_outcome",
+        "project_write_outcome": "executed_not_business_verified",
+        "modification_policy": "ask_before_changes",
+        "read_only_continuation_allowed": true,
+        "cleanup_complete": true,
+        "additional_read_permission_required": false,
+        "scope": "existing_authorized_task_only",
+        "actions": [
+          "inspect_transaction",
+          "independent_read_only_diagnosis",
+          "follow_returned_verification"
+        ],
+        "max_reconnect_attempts": 1,
+        "service_start_requires_existing_task_authorization": true,
+        "original_write_replay_allowed": false,
+        "next_change": "preview_then_explicit_confirmation"
+      },
+      "session_context": {
+        "contract": "waapi-skill.session-context/v2",
+        "available": true,
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 32743,
+          "url": "ws://127.0.0.1:32743/waapi"
+        },
+        "adapter_version": "2025.1",
+        "adapter_version_source": "live_detection",
+        "project_modification_policy": "ask_before_changes",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ],
+        "one_time_introduction": {
+          "contract": "waapi-skill.session-introduction/v2",
+          "emit_condition": "visible_conversation_intro_absent",
+          "emit_timing": "first_agent_message_after_gateway_result",
+          "atomic": true,
+          "style": "natural_prose_in_user_language",
+          "facts": {
+            "skill_name": "waapi-skill",
+            "endpoint_url": "ws://127.0.0.1:32743/waapi",
+            "adapter_version": "2025.1",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ]
+          },
+          "machine_readable_result_policy": "separate_progress_message"
+        }
+      },
+      "next_command": {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": "verify",
+        "gateway_argv": [
+          "verify",
+          "tx1-dwge49xwejdd0qezf0e9"
+        ],
+        "full_argv": [
+          "python",
+          "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+          "gateway.py",
+          "--state-dir",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+          "verify",
+          "tx1-dwge49xwejdd0qezf0e9"
+        ],
+        "copy_exactly": true,
+        "shell_tool_timeout_ms": 30000,
+        "shell_family": "posix-sh",
+        "copy_instruction": {
+          "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+          "source_field": "shell_command",
+          "action": "execute_verbatim_as_one_shell_tool_call",
+          "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field"
+          ]
+        },
+        "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state verify tx1-dwge49xwejdd0qezf0e9"
+      }
+    },
+    "execute_exit_code": 0,
+    "verify": {
+      "ok": true,
+      "status": "verified",
+      "contract": "waapi-skill.gateway-result/v1",
+      "command": "verify",
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 32743,
+        "url": "ws://127.0.0.1:32743/waapi"
+      },
+      "detected_version": "2025.1",
+      "is_command_line": true,
+      "transaction_id": "tx1-dwge49xwejdd0qezf0e9",
+      "state": "verified",
+      "artifact_hash": "593817a1e566c5e2c8fff5f419e41d3c271d91e495e81d6fcb8f6f3d4142abe2",
+      "verification": {
+        "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+        "contract": "waapi-skill.operation-verification/v1",
+        "operation": "waapi.call",
+        "status": "verified",
+        "ok": true,
+        "verification_strength": "bounded_execute_time_log_event",
+        "business_state_verified": true,
+        "assertion_count": 2,
+        "passed_assertion_count": 2,
+        "failed_assertion_count": 0,
+        "assertions_canonical_sha256": "84cf3a3915df8f69a3e232a88961eac41b0e4785065348cac8e6e5b0577aca61",
+        "readback_count": 1,
+        "readbacks_canonical_sha256": "ed0f6d3b4d80c7338ab8c84124c0d3600a3e829fd37ff0f3b2964f0b3d70fa4d",
+        "canonical_sha256": "446c2195abea563d48fdabf59e429cc941db374c45195c113b2077d2d54c2fa7",
+        "full_evidence_in_stdout": false,
+        "verification_scope": {
+          "log_observation": {
+            "kind": "log-channel-observation",
+            "channel": "general",
+            "exclusive_causation_verified": false,
+            "continuing_channel_state_verified": false,
+            "entry_identity_verified": false,
+            "effect_observed": true,
+            "outcome": "matching_item_event",
+            "execution_observation": {
+              "cleanup": {
+                "status": "unsubscribed"
+              },
+              "contract": "waapi-skill.console-log-add-observation/v1",
+              "event": {
+                "channel": "general",
+                "item": {
+                  "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+                  "messageId": "",
+                  "severity": "Message",
+                  "time": 1792821462
+                }
+              },
+              "events_observed": 1,
+              "outcome": "matched",
+              "subscribed": true,
+              "topic": "ak.wwise.core.log.itemAdded"
+            }
+          },
+          "unrelated_channels": "not requested by the compiled native call; not independently observed"
+        }
+      },
+      "guard_validation": {
+        "ok": true,
+        "status": "valid",
+        "project_guard_mode": "invariant",
+        "project_guard_phase": "post_verification",
+        "project_transition": null,
+        "project_guard_fingerprint": "b85a45b2d371b6912c7f439e731fbe59e96b4659d6c5856a3f1ebb042507d5e3",
+        "runtime_guard_fingerprint": "b85ceb7a93330098d25227f39626a47cf3c66628b3dc1db66b0930333e014774",
+        "expires_at": "2026-10-24T06:27:42.742271Z"
+      },
+      "project_call": {
+        "api": "ak.wwise.core.getProjectInfo",
+        "item_type": "function",
+        "category": "core",
+        "version": "2025.1",
+        "ok": true,
+        "dry_run": false,
+        "risk_level": "low",
+        "error_code": null,
+        "message": "ok",
+        "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792821462909600000-bd65e26be37c45f0b06813f698256a0c-ak_wwise_core_getProjectInfo.json",
+        "timeout": 29.977441833005287
+      },
+      "executed": true,
+      "verified": true,
+      "result_schema_checked": false,
+      "verification_strength": "bounded_execute_time_log_event",
+      "cleanup": {
+        "spec": {
+          "api": "ak.wwise.core.log.addItem",
+          "automatic_cleanup": false,
+          "automatic_retry": false,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "cleanup_requirement": "not_required",
+          "companion_request": null,
+          "contract": "waapi-skill.transaction-cleanup-spec/v1",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47",
+          "warnings": []
+        },
+        "status": "not_required",
+        "projection": {
+          "contract": "waapi-skill.transaction-cleanup-projection/v1",
+          "cleanup_spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47",
+          "api": "ak.wwise.core.log.addItem",
+          "phase": "verified",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "cleanup_requirement": "not_required",
+          "status": "not_required",
+          "companion_request": null,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "warnings": [],
+          "automatic_cleanup": false,
+          "automatic_retry": false
+        }
+      },
+      "automatic_retry": false,
+      "stdout_projection": {
+        "contract": "waapi-skill.transaction-verify-success-summary/v1",
+        "detail_level": "digest-verification-evidence",
+        "fixed_projection_limit_bytes": 22528,
+        "stdout_budget_bytes": 24576,
+        "session_context_reserve_bytes": 2048,
+        "projected_payload_bytes": 7365,
+        "verification_canonical_sha256": "446c2195abea563d48fdabf59e429cc941db374c45195c113b2077d2d54c2fa7",
+        "assertion_count": 2,
+        "passed_assertion_count": 2,
+        "readback_count": 1,
+        "full_verification_evidence_in_stdout": false,
+        "full_verification_evidence_persisted": true,
+        "journal_event": "verification_recorded",
+        "agent_result_exact": true,
+        "cleanup_exact": true,
+        "truncated": false
+      },
+      "recovery": {
+        "contract": "waapi-skill.recovery/v1",
+        "stage": "known_write_outcome",
+        "project_write_outcome": "verified",
+        "modification_policy": "ask_before_changes",
+        "read_only_continuation_allowed": true,
+        "cleanup_complete": true,
+        "additional_read_permission_required": false,
+        "scope": "existing_authorized_task_only",
+        "actions": [
+          "inspect_transaction",
+          "independent_read_only_diagnosis"
+        ],
+        "max_reconnect_attempts": 1,
+        "service_start_requires_existing_task_authorization": true,
+        "original_write_replay_allowed": false,
+        "next_change": "preview_then_explicit_confirmation"
+      },
+      "session_context": {
+        "contract": "waapi-skill.session-context/v2",
+        "available": true,
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 32743,
+          "url": "ws://127.0.0.1:32743/waapi"
+        },
+        "adapter_version": "2025.1",
+        "adapter_version_source": "live_detection",
+        "project_modification_policy": "ask_before_changes",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ],
+        "one_time_introduction": {
+          "contract": "waapi-skill.session-introduction/v2",
+          "emit_condition": "visible_conversation_intro_absent",
+          "emit_timing": "first_agent_message_after_gateway_result",
+          "atomic": true,
+          "style": "natural_prose_in_user_language",
+          "facts": {
+            "skill_name": "waapi-skill",
+            "endpoint_url": "ws://127.0.0.1:32743/waapi",
+            "adapter_version": "2025.1",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ]
+          },
+          "machine_readable_result_policy": "separate_progress_message"
+        }
+      },
+      "agent_result": {
+        "operation": "waapi.call",
+        "transaction_id": "tx1-dwge49xwejdd0qezf0e9",
+        "artifact_hash": "593817a1e566c5e2c8fff5f419e41d3c271d91e495e81d6fcb8f6f3d4142abe2",
+        "state": "verified",
+        "executed": true,
+        "request": {
+          "arguments": {
+            "api": "ak.wwise.core.log.addItem",
+            "args": {
+              "channel": "general",
+              "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+              "severity": "Message"
+            },
+            "options": {}
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "waapi.call",
+          "version": "2025.1"
+        },
+        "verified": true,
+        "cleanup": {
+          "spec": {
+            "api": "ak.wwise.core.log.addItem",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47",
+            "warnings": []
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "de38d2df7ce1a3e5483f4395c53a761c341162168748aecaa001be556b62ba47",
+            "api": "ak.wwise.core.log.addItem",
+            "phase": "verified",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "result": {}
+      }
+    },
+    "verify_exit_code": 0
+  },
+  "host": {
+    "apiVersion": 1,
+    "displayName": "WwiseConsole",
+    "isCommandLine": true,
+    "processId": 296,
+    "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+    "sessionId": "{CB88EF5E-7103-463A-9F2F-1A566E146CDC}",
+    "version": {
+      "displayName": "v2025.1.7",
+      "year": 2025,
+      "major": 1,
+      "minor": 7,
+      "build": 9143,
+      "nickname": "",
+      "schema": 133
+    }
+  },
+  "getter_workflow": {
+    "receipt_bytes": 3145728,
+    "post_add": {
+      "channel": "general",
+      "items": [
+        {
+          "severity": "Message",
+          "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+          "time": 1792821462,
+          "messageId": ""
+        }
+      ],
+      "returned_count": 1,
+      "truncated": false
+    },
+    "clear_prestate": {
+      "item_count": 1,
+      "items": [
+        {
+          "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+          "messageId": "",
+          "severity": "Message",
+          "time": 1792821462
+        }
+      ],
+      "outcome": "complete"
+    },
+    "post_clear": {
+      "outcome": "complete",
+      "items": [],
+      "item_count": 0
+    }
+  },
+  "durable_observation": {
+    "cleanup": {
+      "status": "unsubscribed"
+    },
+    "contract": "waapi-skill.console-log-add-observation/v1",
+    "event": {
+      "channel": "general",
+      "item": {
+        "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+        "messageId": "",
+        "severity": "Message",
+        "time": 1792821462
+      }
+    },
+    "events_observed": 1,
+    "outcome": "matched",
+    "subscribed": true,
+    "topic": "ak.wwise.core.log.itemAdded"
+  },
+  "clear_transaction": {
+    "phase": "verify",
+    "draft-check": {
+      "contract": "waapi-skill.gateway-result/v1",
+      "ok": true,
+      "status": "editable",
+      "command": "draft-check",
+      "offline": false,
+      "draft": {
+        "contract": "waapi-skill.operation-draft/v1",
+        "draft_id": "od1-7952b689a2adbc85cf83ec2ad5d9fa79",
+        "lifecycle_state": "editable",
+        "revision": 3,
+        "binding": {
+          "operation": "ak.wwise.core.log.clear",
+          "version": "2025.1",
+          "schema_digest": "695512349a856b7d1103a04230b0a18cbb4c2154fb2cd23bb0b14fb3f282399a"
+        },
+        "created_at": "2026-10-24T05:57:42.997185Z",
+        "updated_at": "2026-10-24T05:57:43.162964Z",
+        "expires_at": "2026-10-25T05:57:42.997185Z",
+        "business_revision": 1,
+        "declarations": [],
+        "preview": null,
+        "detail_available": false,
+        "missing_fields": [],
+        "missing_fields_status": "complete",
+        "allowed_actions": [
+          "declare-runtime-control-plan"
+        ],
+        "check": {
+          "status": "passed",
+          "checked_at": "2026-10-24T05:57:43.162964Z",
+          "source_revision": 2,
+          "request_digest": "bb9b1d111388ce2318f00ce5b412baa4b1788aa8bc4efa24874da12100c17a2c"
+        },
+        "seal": null,
+        "allowed_lifecycle_commands": [
+          "draft-inspect",
+          "draft-cancel",
+          "draft-check",
+          "preview-from-draft"
+        ],
+        "construction_state": {
+          "draft_complete": true,
+          "preview_created": false,
+          "required_next_phase": "preview-from-draft",
+          "sole_continuation_source": "/next_command"
+        }
+      },
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 32743,
+        "url": "ws://127.0.0.1:32743/waapi"
+      },
+      "detected_version": "2025.1",
+      "is_command_line": true,
+      "project_call": {
+        "api": "ak.wwise.core.getProjectInfo",
+        "item_type": "function",
+        "category": "core",
+        "version": "2025.1",
+        "ok": true,
+        "dry_run": false,
+        "risk_level": "low",
+        "error_code": null,
+        "message": "ok",
+        "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792821463123928000-cbb21841b3de445598451755d951da85-ak_wwise_core_getProjectInfo.json",
+        "timeout": 29.967983249982353
+      },
+      "next_command": {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": "preview-from-draft",
+        "gateway_argv": [
+          "preview-from-draft",
+          "od1-7952b689a2adbc85cf83ec2ad5d9fa79",
+          "--task-authority",
+          "da1-4bd72e65399f18bccd7fa3c9010a862030557546",
+          "--expected-revision",
+          "3"
+        ],
+        "full_argv": [
+          "python",
+          "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+          "gateway.py",
+          "--state-dir",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+          "preview-from-draft",
+          "od1-7952b689a2adbc85cf83ec2ad5d9fa79",
+          "--task-authority",
+          "da1-4bd72e65399f18bccd7fa3c9010a862030557546",
+          "--expected-revision",
+          "3"
+        ],
+        "copy_exactly": true,
+        "shell_tool_timeout_ms": 30000,
+        "shell_family": "posix-sh",
+        "copy_instruction": {
+          "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+          "source_field": "shell_command",
+          "action": "execute_verbatim_as_one_shell_tool_call",
+          "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field"
+          ]
+        },
+        "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state preview-from-draft od1-7952b689a2adbc85cf83ec2ad5d9fa79 --task-authority da1-4bd72e65399f18bccd7fa3c9010a862030557546 --expected-revision 3"
+      }
+    },
+    "preview": {
+      "ok": true,
+      "status": "awaiting_confirmation",
+      "contract": "waapi-skill.gateway-result/v1",
+      "command": "preview-from-draft",
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 32743,
+        "url": "ws://127.0.0.1:32743/waapi"
+      },
+      "detected_version": "2025.1",
+      "is_command_line": true,
+      "transaction_id": "tx1-2857d53tmkcmxqmzj3gs",
+      "state": "awaiting_confirmation",
+      "artifact_hash": "1220d621bb8f8c6ba80c92abc70283f05e2941bf74f9112ad1f90e09c833de7a",
+      "summary_only": true,
+      "preview_summary": {
+        "contract": "waapi-skill.transaction-preview/v2",
+        "request": {
+          "contract": "waapi-skill.operation-request/v1",
+          "version": "2025.1",
+          "operation": "waapi.call",
+          "arguments": {
+            "api": "ak.wwise.core.log.clear",
+            "args": {
+              "channel": "general"
+            },
+            "options": {}
+          }
+        },
+        "dispatch": {
+          "uri": "ak.wwise.core.log.clear",
+          "args": {
+            "channel": "general"
+          },
+          "options": {}
+        },
+        "resolved_roles": {},
+        "pre_state": {
+          "log_channel_before": {
+            "outcome": "complete",
+            "items": [
+              {
+                "severity": "Message",
+                "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+                "time": 1792821462,
+                "messageId": ""
+              }
+            ],
+            "item_count": 1
+          },
+          "execution_contract": {
+            "contract": "waapi-skill.public-execution-contract/v2",
+            "version": "2025.1",
+            "uri": "ak.wwise.core.log.clear",
+            "item_type": "function",
+            "route": "managed_transaction",
+            "effect": "runtime_mutation",
+            "gateway_commands": [
+              "request-schema"
+            ],
+            "timeout_seconds": 30.0,
+            "result_limit_bytes": 1048576,
+            "verification_strategy": "result_schema",
+            "requires_authorization": true,
+            "accepted_authorization_modes": [
+              "explicit_confirmation",
+              "policy_authorization"
+            ],
+            "program_case": "managed_transaction-result-schema",
+            "lifecycle_strategy": "single_guarded_runtime_call",
+            "companion_uris": [],
+            "project_guard_mode": "invariant",
+            "post_execution_project_guard_policy": "revalidate",
+            "executable": true,
+            "excluded_reason": null,
+            "request_validation": {
+              "uri": "ak.wwise.core.log.clear",
+              "version": "2025.1",
+              "required_fields": [],
+              "required_families": [],
+              "section": "request",
+              "validated_nodes": 3,
+              "unresolved_refs": [
+                "waapi_definitions.json#/definitions/logCentralChannel"
+              ]
+            },
+            "request_validation_strength": "partial_reflected_schema",
+            "io_audit": null
+          }
+        },
+        "verification_plan": {
+          "kind": "log-channel-effect",
+          "uri": "ak.wwise.core.log.clear",
+          "version": "2025.1",
+          "strategy": "operation_specific_readback",
+          "base_result_strategy": "result_schema",
+          "channel": "general",
+          "console": true,
+          "native_observation_support": {
+            "state": "supported",
+            "is_command_line": true,
+            "observed_version": {
+              "year": 2025,
+              "major": 1,
+              "minor": 7,
+              "build": 9143
+            },
+            "native_change": "WG-80630",
+            "console_minimum_version": "2025.1.4"
+          }
+        },
+        "cleanup": {
+          "spec": {
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "api": "ak.wwise.core.log.clear",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336"
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336",
+            "api": "ak.wwise.core.log.clear",
+            "phase": "preview",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "project_guard_fingerprint": "b85a45b2d371b6912c7f439e731fbe59e96b4659d6c5856a3f1ebb042507d5e3",
+        "runtime_guard_fingerprint": "b85ceb7a93330098d25227f39626a47cf3c66628b3dc1db66b0930333e014774",
+        "expires_at": "2026-10-24T06:27:43.251475Z"
+      },
+      "event_count": 2,
+      "events": [
+        {
+          "sequence": 1,
+          "event_type": "preview_created",
+          "to_state": "draft",
+          "event_hash": "225e5eb72b1c7b687f276027b1c596b6761ae3f20a05855c07d8bb777ef71614"
+        },
+        {
+          "sequence": 2,
+          "event_type": "confirmation_requested",
+          "from_state": "draft",
+          "to_state": "awaiting_confirmation",
+          "event_hash": "7ac2da2c8740518c8b4d7be6c74e714ab3a846cc7df05767c864304e6207e8bc"
+        }
+      ],
+      "project_call": {
+        "api": "ak.wwise.core.getProjectInfo",
+        "item_type": "function",
+        "category": "core",
+        "version": "2025.1",
+        "ok": true,
+        "dry_run": false,
+        "risk_level": "low",
+        "error_code": null,
+        "message": "ok",
+        "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792821463219088000-9a2b9361f0a64d59ae571e53b7984614-ak_wwise_core_getProjectInfo.json",
+        "timeout": 29.97322154196445
+      },
+      "executed": false,
+      "verified": false,
+      "change_requested": true,
+      "authorization": {
+        "mode": "explicit_confirmation",
+        "policy": "ask_before_changes",
+        "explicit_confirmation": false,
+        "notice_required": true,
+        "requires_later_user_message": true
+      },
+      "cleanup": {
+        "spec": {
+          "contract": "waapi-skill.transaction-cleanup-spec/v1",
+          "api": "ak.wwise.core.log.clear",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "cleanup_requirement": "not_required",
+          "companion_request": null,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "warnings": [],
+          "automatic_cleanup": false,
+          "automatic_retry": false,
+          "spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336"
+        },
+        "status": "not_required",
+        "projection": {
+          "contract": "waapi-skill.transaction-cleanup-projection/v1",
+          "cleanup_spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336",
+          "api": "ak.wwise.core.log.clear",
+          "phase": "preview",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "cleanup_requirement": "not_required",
+          "status": "not_required",
+          "companion_request": null,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "warnings": [],
+          "automatic_cleanup": false,
+          "automatic_retry": false
+        }
+      },
+      "session_context": {
+        "contract": "waapi-skill.session-context/v2",
+        "available": true,
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 32743,
+          "url": "ws://127.0.0.1:32743/waapi"
+        },
+        "adapter_version": "2025.1",
+        "adapter_version_source": "live_detection",
+        "project_modification_policy": "ask_before_changes",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ],
+        "one_time_introduction": {
+          "contract": "waapi-skill.session-introduction/v2",
+          "emit_condition": "visible_conversation_intro_absent",
+          "emit_timing": "first_agent_message_after_gateway_result",
+          "atomic": true,
+          "style": "natural_prose_in_user_language",
+          "facts": {
+            "skill_name": "waapi-skill",
+            "endpoint_url": "ws://127.0.0.1:32743/waapi",
+            "adapter_version": "2025.1",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ]
+          },
+          "machine_readable_result_policy": "separate_progress_message"
+        }
+      },
+      "next_command": {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": "transaction-show",
+        "gateway_argv": [
+          "transaction-show",
+          "tx1-2857d53tmkcmxqmzj3gs",
+          "--summary-only"
+        ],
+        "full_argv": [
+          "python",
+          "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+          "gateway.py",
+          "--state-dir",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+          "transaction-show",
+          "tx1-2857d53tmkcmxqmzj3gs",
+          "--summary-only"
+        ],
+        "copy_exactly": true,
+        "shell_tool_timeout_ms": 30000,
+        "requires_later_user_message": true,
+        "shell_family": "posix-sh",
+        "copy_instruction": {
+          "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+          "source_field": "shell_command",
+          "action": "execute_verbatim_as_one_shell_tool_call",
+          "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field"
+          ]
+        },
+        "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state transaction-show tx1-2857d53tmkcmxqmzj3gs --summary-only"
+      },
+      "agent_result": {
+        "operation": "waapi.call",
+        "transaction_id": "tx1-2857d53tmkcmxqmzj3gs",
+        "artifact_hash": "1220d621bb8f8c6ba80c92abc70283f05e2941bf74f9112ad1f90e09c833de7a",
+        "state": "awaiting_confirmation",
+        "executed": false,
+        "request": {
+          "contract": "waapi-skill.operation-request/v1",
+          "version": "2025.1",
+          "operation": "waapi.call",
+          "arguments": {
+            "api": "ak.wwise.core.log.clear",
+            "args": {
+              "channel": "general"
+            },
+            "options": {}
+          }
+        },
+        "authorization": {
+          "mode": "explicit_confirmation",
+          "policy": "ask_before_changes",
+          "explicit_confirmation": false,
+          "notice_required": true,
+          "requires_later_user_message": true
+        },
+        "cleanup": {
+          "spec": {
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "api": "ak.wwise.core.log.clear",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336"
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336",
+            "api": "ak.wwise.core.log.clear",
+            "phase": "preview",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "next_command": {
+          "contract": "waapi-skill.gateway-next-command/v2",
+          "command": "transaction-show",
+          "gateway_argv": [
+            "transaction-show",
+            "tx1-2857d53tmkcmxqmzj3gs",
+            "--summary-only"
+          ],
+          "full_argv": [
+            "python",
+            "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+            "gateway.py",
+            "--state-dir",
+            "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+            "transaction-show",
+            "tx1-2857d53tmkcmxqmzj3gs",
+            "--summary-only"
+          ],
+          "copy_exactly": true,
+          "shell_tool_timeout_ms": 30000,
+          "requires_later_user_message": true,
+          "shell_family": "posix-sh",
+          "copy_instruction": {
+            "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+            "source_field": "shell_command",
+            "action": "execute_verbatim_as_one_shell_tool_call",
+            "forbidden_transformations": [
+              "reconstruct",
+              "shorten",
+              "normalize",
+              "substitute_path_segments",
+              "select_another_field"
+            ]
+          },
+          "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state transaction-show tx1-2857d53tmkcmxqmzj3gs --summary-only"
+        }
+      }
+    },
+    "transaction_id": "tx1-2857d53tmkcmxqmzj3gs",
+    "transaction-show": {
+      "contract": "waapi-skill.gateway-result/v1",
+      "ok": true,
+      "status": "ok",
+      "command": "transaction-show",
+      "offline": true,
+      "transaction_id": "tx1-2857d53tmkcmxqmzj3gs",
+      "state": "awaiting_confirmation",
+      "artifact_hash": "1220d621bb8f8c6ba80c92abc70283f05e2941bf74f9112ad1f90e09c833de7a",
+      "summary_only": true,
+      "preview_summary": {
+        "contract": "waapi-skill.transaction-preview/v2",
+        "request": {
+          "arguments": {
+            "api": "ak.wwise.core.log.clear",
+            "args": {
+              "channel": "general"
+            },
+            "options": {}
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "waapi.call",
+          "version": "2025.1"
+        },
+        "dispatch": {
+          "args": {
+            "channel": "general"
+          },
+          "options": {},
+          "uri": "ak.wwise.core.log.clear"
+        },
+        "resolved_roles": {},
+        "pre_state": {
+          "execution_contract": {
+            "accepted_authorization_modes": [
+              "explicit_confirmation",
+              "policy_authorization"
+            ],
+            "companion_uris": [],
+            "contract": "waapi-skill.public-execution-contract/v2",
+            "effect": "runtime_mutation",
+            "excluded_reason": null,
+            "executable": true,
+            "gateway_commands": [
+              "request-schema"
+            ],
+            "io_audit": null,
+            "item_type": "function",
+            "lifecycle_strategy": "single_guarded_runtime_call",
+            "post_execution_project_guard_policy": "revalidate",
+            "program_case": "managed_transaction-result-schema",
+            "project_guard_mode": "invariant",
+            "request_validation": {
+              "required_families": [],
+              "required_fields": [],
+              "section": "request",
+              "unresolved_refs": [
+                "waapi_definitions.json#/definitions/logCentralChannel"
+              ],
+              "uri": "ak.wwise.core.log.clear",
+              "validated_nodes": 3,
+              "version": "2025.1"
+            },
+            "request_validation_strength": "partial_reflected_schema",
+            "requires_authorization": true,
+            "result_limit_bytes": 1048576,
+            "route": "managed_transaction",
+            "timeout_seconds": 30.0,
+            "uri": "ak.wwise.core.log.clear",
+            "verification_strategy": "result_schema",
+            "version": "2025.1"
+          },
+          "log_channel_before": {
+            "item_count": 1,
+            "items": [
+              {
+                "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+                "messageId": "",
+                "severity": "Message",
+                "time": 1792821462
+              }
+            ],
+            "outcome": "complete"
+          }
+        },
+        "verification_plan": {
+          "base_result_strategy": "result_schema",
+          "channel": "general",
+          "console": true,
+          "kind": "log-channel-effect",
+          "native_observation_support": {
+            "console_minimum_version": "2025.1.4",
+            "is_command_line": true,
+            "native_change": "WG-80630",
+            "observed_version": {
+              "build": 9143,
+              "major": 1,
+              "minor": 7,
+              "year": 2025
+            },
+            "state": "supported"
+          },
+          "strategy": "operation_specific_readback",
+          "uri": "ak.wwise.core.log.clear",
+          "version": "2025.1"
+        },
+        "cleanup": {
+          "spec": {
+            "api": "ak.wwise.core.log.clear",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336",
+            "warnings": []
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336",
+            "api": "ak.wwise.core.log.clear",
+            "phase": "preview",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "project_guard_fingerprint": "b85a45b2d371b6912c7f439e731fbe59e96b4659d6c5856a3f1ebb042507d5e3",
+        "runtime_guard_fingerprint": "b85ceb7a93330098d25227f39626a47cf3c66628b3dc1db66b0930333e014774",
+        "expires_at": "2026-10-24T06:27:43.251475Z"
+      },
+      "event_count": 2,
+      "events": [
+        {
+          "sequence": 1,
+          "event_type": "preview_created",
+          "to_state": "draft",
+          "event_hash": "225e5eb72b1c7b687f276027b1c596b6761ae3f20a05855c07d8bb777ef71614"
+        },
+        {
+          "sequence": 2,
+          "event_type": "confirmation_requested",
+          "from_state": "draft",
+          "to_state": "awaiting_confirmation",
+          "event_hash": "7ac2da2c8740518c8b4d7be6c74e714ab3a846cc7df05767c864304e6207e8bc"
+        }
+      ],
+      "confirmation": {
+        "contract": "waapi-skill.confirmation-binding/v1",
+        "token": "ct1-thqccys7yv9gm3kj810507f4",
+        "binding": {
+          "material_contract": "waapi-skill.confirmation-token-material/v1",
+          "transaction_id": "tx1-2857d53tmkcmxqmzj3gs",
+          "artifact_hash": "1220d621bb8f8c6ba80c92abc70283f05e2941bf74f9112ad1f90e09c833de7a",
+          "state": "awaiting_confirmation",
+          "event_sequence": 2,
+          "last_event_hash": "7ac2da2c8740518c8b4d7be6c74e714ab3a846cc7df05767c864304e6207e8bc"
+        }
+      },
+      "next_command": {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": "confirm",
+        "gateway_argv": [
+          "confirm",
+          "tx1-2857d53tmkcmxqmzj3gs",
+          "--confirmation-token",
+          "ct1-thqccys7yv9gm3kj810507f4"
+        ],
+        "full_argv": [
+          "python",
+          "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+          "gateway.py",
+          "--state-dir",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+          "confirm",
+          "tx1-2857d53tmkcmxqmzj3gs",
+          "--confirmation-token",
+          "ct1-thqccys7yv9gm3kj810507f4"
+        ],
+        "copy_exactly": true,
+        "shell_tool_timeout_ms": 30000,
+        "requires_explicit_user_confirmation": true,
+        "shell_family": "posix-sh",
+        "copy_instruction": {
+          "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+          "source_field": "shell_command",
+          "action": "execute_verbatim_as_one_shell_tool_call",
+          "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field"
+          ]
+        },
+        "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state confirm tx1-2857d53tmkcmxqmzj3gs --confirmation-token ct1-thqccys7yv9gm3kj810507f4"
+      }
+    },
+    "transaction-show_exit_code": 0,
+    "confirm": {
+      "contract": "waapi-skill.gateway-result/v1",
+      "ok": true,
+      "status": "confirmed",
+      "command": "confirm",
+      "offline": true,
+      "transaction_id": "tx1-2857d53tmkcmxqmzj3gs",
+      "state": "confirmed",
+      "artifact_hash": "1220d621bb8f8c6ba80c92abc70283f05e2941bf74f9112ad1f90e09c833de7a",
+      "session_context": {
+        "contract": "waapi-skill.session-context/v2",
+        "available": true,
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 32743,
+          "url": "ws://127.0.0.1:32743/waapi"
+        },
+        "adapter_version": "2025.1",
+        "adapter_version_source": "configured",
+        "project_modification_policy": "ask_before_changes",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ],
+        "one_time_introduction": {
+          "contract": "waapi-skill.session-introduction/v2",
+          "emit_condition": "visible_conversation_intro_absent",
+          "emit_timing": "first_agent_message_after_gateway_result",
+          "atomic": true,
+          "style": "natural_prose_in_user_language",
+          "facts": {
+            "skill_name": "waapi-skill",
+            "endpoint_url": "ws://127.0.0.1:32743/waapi",
+            "adapter_version": "2025.1",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ]
+          },
+          "machine_readable_result_policy": "separate_progress_message"
+        }
+      },
+      "next_command": {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": "execute",
+        "gateway_argv": [
+          "execute",
+          "tx1-2857d53tmkcmxqmzj3gs"
+        ],
+        "full_argv": [
+          "python",
+          "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+          "gateway.py",
+          "--state-dir",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+          "execute",
+          "tx1-2857d53tmkcmxqmzj3gs"
+        ],
+        "copy_exactly": true,
+        "shell_tool_timeout_ms": 30000,
+        "shell_family": "posix-sh",
+        "copy_instruction": {
+          "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+          "source_field": "shell_command",
+          "action": "execute_verbatim_as_one_shell_tool_call",
+          "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field"
+          ]
+        },
+        "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state execute tx1-2857d53tmkcmxqmzj3gs"
+      }
+    },
+    "confirm_exit_code": 0,
+    "execute": {
+      "ok": true,
+      "status": "executed_unverified",
+      "contract": "waapi-skill.gateway-result/v1",
+      "command": "execute",
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 32743,
+        "url": "ws://127.0.0.1:32743/waapi"
+      },
+      "detected_version": "2025.1",
+      "is_command_line": true,
+      "transaction_id": "tx1-2857d53tmkcmxqmzj3gs",
+      "state": "executed_unverified",
+      "artifact_hash": "1220d621bb8f8c6ba80c92abc70283f05e2941bf74f9112ad1f90e09c833de7a",
+      "dispatch_result": {
+        "ok": true,
+        "api": "ak.wwise.core.log.clear",
+        "version": "2025.1",
+        "item_type": "function",
+        "category": "core.log",
+        "risk_level": "medium",
+        "timeout": 29.93812266702298,
+        "dry_run": false,
+        "result": {},
+        "error_code": null,
+        "message": "ok",
+        "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792821463379546000-6826a778227b4c5eb7aa8daf9943f072-ak_wwise_core_log_clear.json"
+      },
+      "schema_validation": {
+        "uri": "ak.wwise.core.log.clear",
+        "version": "2025.1",
+        "required_fields": [],
+        "required_families": [],
+        "section": "request",
+        "validated_nodes": 3,
+        "unresolved_refs": [
+          "waapi_definitions.json#/definitions/logCentralChannel"
+        ]
+      },
+      "role_validation": {
+        "summary_contract": "waapi-skill.transaction-role-validation-summary/v1",
+        "contract": "waapi-skill.role-validation/v1",
+        "operation": "waapi.call",
+        "ok": true,
+        "status": "valid",
+        "assertion_count": 1,
+        "passed_assertion_count": 1,
+        "assertions_canonical_sha256": "3ce804a35ede43d7e1550b197c6a94b57e9da40e407a453905118604446c3097",
+        "readback_count": 0,
+        "readbacks_canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "full_evidence_in_stdout": false
+      },
+      "guard_validation": {
+        "ok": true,
+        "status": "valid",
+        "project_guard_mode": "invariant",
+        "project_guard_phase": "pre_execution",
+        "project_transition": null,
+        "project_guard_fingerprint": "b85a45b2d371b6912c7f439e731fbe59e96b4659d6c5856a3f1ebb042507d5e3",
+        "runtime_guard_fingerprint": "b85ceb7a93330098d25227f39626a47cf3c66628b3dc1db66b0930333e014774",
+        "expires_at": "2026-10-24T06:27:43.251475Z"
+      },
+      "project_call": {
+        "api": "ak.wwise.core.getProjectInfo",
+        "item_type": "function",
+        "category": "core",
+        "version": "2025.1",
+        "ok": true,
+        "dry_run": false,
+        "risk_level": "low",
+        "error_code": null,
+        "message": "ok",
+        "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792821463329606000-52d0345ef26041e48e7290f1bddca8c9-ak_wwise_core_getProjectInfo.json",
+        "timeout": 29.989783000026364
+      },
+      "transport_binding_validation": null,
+      "game_object_binding_validation": null,
+      "playing_binding_validation": null,
+      "game_object_collection_validation": null,
+      "executed": true,
+      "verified": false,
+      "cleanup": {
+        "spec": {
+          "api": "ak.wwise.core.log.clear",
+          "automatic_cleanup": false,
+          "automatic_retry": false,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "cleanup_requirement": "not_required",
+          "companion_request": null,
+          "contract": "waapi-skill.transaction-cleanup-spec/v1",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336",
+          "warnings": []
+        },
+        "status": "not_required",
+        "projection": {
+          "contract": "waapi-skill.transaction-cleanup-projection/v1",
+          "cleanup_spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336",
+          "api": "ak.wwise.core.log.clear",
+          "phase": "executed",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "cleanup_requirement": "not_required",
+          "status": "not_required",
+          "companion_request": null,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "warnings": [],
+          "automatic_cleanup": false,
+          "automatic_retry": false
+        }
+      },
+      "soundengine_authority_revocation": null,
+      "automatic_retry": false,
+      "agent_control": {
+        "terminal": false,
+        "required_outcome_before_reply": "verified_or_structured_verification_failure",
+        "next": "execute next_command.copy_instruction.source_field in same turn",
+        "reply_before_next_command": "invalid"
+      },
+      "stdout_projection": {
+        "contract": "waapi-skill.transaction-execute-success-summary/v1",
+        "detail_level": "full-dispatch-result",
+        "fixed_projection_limit_bytes": 22528,
+        "stdout_budget_bytes": 24576,
+        "session_context_reserve_bytes": 2048,
+        "projected_payload_bytes": 6456,
+        "full_dispatch_result_in_stdout": true,
+        "full_role_validation_in_stdout": false,
+        "full_execution_evidence_persisted": true,
+        "journal_event": "execution_completed",
+        "truncated": false
+      },
+      "recovery": {
+        "contract": "waapi-skill.recovery/v1",
+        "stage": "known_write_outcome",
+        "project_write_outcome": "executed_not_business_verified",
+        "modification_policy": "ask_before_changes",
+        "read_only_continuation_allowed": true,
+        "cleanup_complete": true,
+        "additional_read_permission_required": false,
+        "scope": "existing_authorized_task_only",
+        "actions": [
+          "inspect_transaction",
+          "independent_read_only_diagnosis",
+          "follow_returned_verification"
+        ],
+        "max_reconnect_attempts": 1,
+        "service_start_requires_existing_task_authorization": true,
+        "original_write_replay_allowed": false,
+        "next_change": "preview_then_explicit_confirmation"
+      },
+      "session_context": {
+        "contract": "waapi-skill.session-context/v2",
+        "available": true,
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 32743,
+          "url": "ws://127.0.0.1:32743/waapi"
+        },
+        "adapter_version": "2025.1",
+        "adapter_version_source": "live_detection",
+        "project_modification_policy": "ask_before_changes",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ],
+        "one_time_introduction": {
+          "contract": "waapi-skill.session-introduction/v2",
+          "emit_condition": "visible_conversation_intro_absent",
+          "emit_timing": "first_agent_message_after_gateway_result",
+          "atomic": true,
+          "style": "natural_prose_in_user_language",
+          "facts": {
+            "skill_name": "waapi-skill",
+            "endpoint_url": "ws://127.0.0.1:32743/waapi",
+            "adapter_version": "2025.1",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ]
+          },
+          "machine_readable_result_policy": "separate_progress_message"
+        }
+      },
+      "next_command": {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": "verify",
+        "gateway_argv": [
+          "verify",
+          "tx1-2857d53tmkcmxqmzj3gs"
+        ],
+        "full_argv": [
+          "python",
+          "/private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py",
+          "gateway.py",
+          "--state-dir",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state",
+          "verify",
+          "tx1-2857d53tmkcmxqmzj3gs"
+        ],
+        "copy_exactly": true,
+        "shell_tool_timeout_ms": 30000,
+        "shell_family": "posix-sh",
+        "copy_instruction": {
+          "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+          "source_field": "shell_command",
+          "action": "execute_verbatim_as_one_shell_tool_call",
+          "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field"
+          ]
+        },
+        "shell_command": "python /private/tmp/waapi-r122-console-log-version/skills/waapi-skill/scripts/run.py gateway.py --state-dir /Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/state verify tx1-2857d53tmkcmxqmzj3gs"
+      }
+    },
+    "execute_exit_code": 0,
+    "verify": {
+      "ok": true,
+      "status": "verified",
+      "contract": "waapi-skill.gateway-result/v1",
+      "command": "verify",
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 32743,
+        "url": "ws://127.0.0.1:32743/waapi"
+      },
+      "detected_version": "2025.1",
+      "is_command_line": true,
+      "transaction_id": "tx1-2857d53tmkcmxqmzj3gs",
+      "state": "verified",
+      "artifact_hash": "1220d621bb8f8c6ba80c92abc70283f05e2941bf74f9112ad1f90e09c833de7a",
+      "verification": {
+        "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+        "contract": "waapi-skill.operation-verification/v1",
+        "operation": "waapi.call",
+        "status": "verified",
+        "ok": true,
+        "verification_strength": "bounded_log_channel_observation",
+        "business_state_verified": true,
+        "assertion_count": 1,
+        "passed_assertion_count": 1,
+        "failed_assertion_count": 0,
+        "assertions_canonical_sha256": "ab9fb261434e55d5367375c6c005de4ec84c58ef3aa1ed309f545e5e03d078a9",
+        "readback_count": 1,
+        "readbacks_canonical_sha256": "04d1efc5bebf84510b8716bb459611094bbee90869552e6b546835ad1100ae92",
+        "canonical_sha256": "4232fd9d427bee148ec93af350e33dfe18d1063008c580d7806ddd0b3527ccff",
+        "full_evidence_in_stdout": false,
+        "verification_scope": {
+          "log_observation": {
+            "kind": "log-channel-observation",
+            "channel": "general",
+            "before_items": 1,
+            "after_items": 0,
+            "exclusive_causation_verified": false,
+            "continuing_channel_state_verified": false,
+            "entry_identity_verified": false,
+            "outcome": "prior_contents_absent",
+            "indistinguishable_prior_items_after": 0,
+            "post_channel_empty": true,
+            "competing_items_after": 0,
+            "effect_observed": true,
+            "post_channel": {
+              "outcome": "complete",
+              "items": [],
+              "item_count": 0
+            }
+          },
+          "unrelated_channels": "not requested by the compiled native call; not independently observed"
+        }
+      },
+      "guard_validation": {
+        "ok": true,
+        "status": "valid",
+        "project_guard_mode": "invariant",
+        "project_guard_phase": "post_verification",
+        "project_transition": null,
+        "project_guard_fingerprint": "b85a45b2d371b6912c7f439e731fbe59e96b4659d6c5856a3f1ebb042507d5e3",
+        "runtime_guard_fingerprint": "b85ceb7a93330098d25227f39626a47cf3c66628b3dc1db66b0930333e014774",
+        "expires_at": "2026-10-24T06:27:43.251475Z"
+      },
+      "project_call": {
+        "api": "ak.wwise.core.getProjectInfo",
+        "item_type": "function",
+        "category": "core",
+        "version": "2025.1",
+        "ok": true,
+        "dry_run": false,
+        "risk_level": "low",
+        "error_code": null,
+        "message": "ok",
+        "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792821463416768000-5ddba71c342349529c8ced0ed892707b-ak_wwise_core_getProjectInfo.json",
+        "timeout": 29.978167209017556
+      },
+      "executed": true,
+      "verified": true,
+      "result_schema_checked": false,
+      "verification_strength": "bounded_log_channel_observation",
+      "cleanup": {
+        "spec": {
+          "api": "ak.wwise.core.log.clear",
+          "automatic_cleanup": false,
+          "automatic_retry": false,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "cleanup_requirement": "not_required",
+          "companion_request": null,
+          "contract": "waapi-skill.transaction-cleanup-spec/v1",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336",
+          "warnings": []
+        },
+        "status": "not_required",
+        "projection": {
+          "contract": "waapi-skill.transaction-cleanup-projection/v1",
+          "cleanup_spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336",
+          "api": "ak.wwise.core.log.clear",
+          "phase": "verified",
+          "lifecycle_action": "none",
+          "lifecycle_strategy": "not_required",
+          "cleanup_requirement": "not_required",
+          "status": "not_required",
+          "companion_request": null,
+          "binding": {
+            "kind": "none",
+            "materialized": true
+          },
+          "warnings": [],
+          "automatic_cleanup": false,
+          "automatic_retry": false
+        }
+      },
+      "automatic_retry": false,
+      "stdout_projection": {
+        "contract": "waapi-skill.transaction-verify-success-summary/v1",
+        "detail_level": "digest-verification-evidence",
+        "fixed_projection_limit_bytes": 22528,
+        "stdout_budget_bytes": 24576,
+        "session_context_reserve_bytes": 2048,
+        "projected_payload_bytes": 6909,
+        "verification_canonical_sha256": "4232fd9d427bee148ec93af350e33dfe18d1063008c580d7806ddd0b3527ccff",
+        "assertion_count": 1,
+        "passed_assertion_count": 1,
+        "readback_count": 1,
+        "full_verification_evidence_in_stdout": false,
+        "full_verification_evidence_persisted": true,
+        "journal_event": "verification_recorded",
+        "agent_result_exact": true,
+        "cleanup_exact": true,
+        "truncated": false
+      },
+      "recovery": {
+        "contract": "waapi-skill.recovery/v1",
+        "stage": "known_write_outcome",
+        "project_write_outcome": "verified",
+        "modification_policy": "ask_before_changes",
+        "read_only_continuation_allowed": true,
+        "cleanup_complete": true,
+        "additional_read_permission_required": false,
+        "scope": "existing_authorized_task_only",
+        "actions": [
+          "inspect_transaction",
+          "independent_read_only_diagnosis"
+        ],
+        "max_reconnect_attempts": 1,
+        "service_start_requires_existing_task_authorization": true,
+        "original_write_replay_allowed": false,
+        "next_change": "preview_then_explicit_confirmation"
+      },
+      "session_context": {
+        "contract": "waapi-skill.session-context/v2",
+        "available": true,
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 32743,
+          "url": "ws://127.0.0.1:32743/waapi"
+        },
+        "adapter_version": "2025.1",
+        "adapter_version_source": "live_detection",
+        "project_modification_policy": "ask_before_changes",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ],
+        "one_time_introduction": {
+          "contract": "waapi-skill.session-introduction/v2",
+          "emit_condition": "visible_conversation_intro_absent",
+          "emit_timing": "first_agent_message_after_gateway_result",
+          "atomic": true,
+          "style": "natural_prose_in_user_language",
+          "facts": {
+            "skill_name": "waapi-skill",
+            "endpoint_url": "ws://127.0.0.1:32743/waapi",
+            "adapter_version": "2025.1",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ]
+          },
+          "machine_readable_result_policy": "separate_progress_message"
+        }
+      },
+      "agent_result": {
+        "operation": "waapi.call",
+        "transaction_id": "tx1-2857d53tmkcmxqmzj3gs",
+        "artifact_hash": "1220d621bb8f8c6ba80c92abc70283f05e2941bf74f9112ad1f90e09c833de7a",
+        "state": "verified",
+        "executed": true,
+        "request": {
+          "arguments": {
+            "api": "ak.wwise.core.log.clear",
+            "args": {
+              "channel": "general"
+            },
+            "options": {}
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "waapi.call",
+          "version": "2025.1"
+        },
+        "verified": true,
+        "cleanup": {
+          "spec": {
+            "api": "ak.wwise.core.log.clear",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336",
+            "warnings": []
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "6d76caec56fcdbb5ea40bd00cddb9eb55cffcd576432638202453521486a0336",
+            "api": "ak.wwise.core.log.clear",
+            "phase": "verified",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "result": {}
+      }
+    },
+    "verify_exit_code": 0
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/pipelineID": {
+      "native_shape_sha256": "d98a93947a4d5df1ab13e1dabf02bb75dadda5c3fee17418b824dc08f4a0db22",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    }
+  }
+}

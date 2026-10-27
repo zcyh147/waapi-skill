@@ -1,0 +1,16 @@
+{
+  "api": "ak.wwise.core.profiler.getLoadedMedia",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r127-console-additional-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792837069499320000-622e00ed6b924cdea8b8eb7c96b5fd3a-ak_wwise_core_profiler_getLoadedMedia.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": []
+  },
+  "risk_level": "low",
+  "timeout": 9.982826541992836,
+  "version": "2025.1"
+}
