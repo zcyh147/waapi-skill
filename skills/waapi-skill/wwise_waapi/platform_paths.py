@@ -208,7 +208,7 @@ def adapt_cli_dispatch_paths(
         )
     home = _account_home(account_home)
     if isinstance(project_wire_path, str):
-        drive, _, anchor_host = _prove_wire_mapping(
+        drive, mapping_root, anchor_host = _prove_wire_mapping(
             project_wire_path,
             account_home=home,
         )
@@ -391,10 +391,15 @@ def adapt_cli_dispatch_paths(
                 "An audited host path has no absolute resolved path.",
                 details={"section": section, "json_path": json_path},
             )
-        path_drive, path_mapping_root = _mapping_for_host_path(
-            resolved_host_path,
-            account_home=home,
-        )
+        if anchor_source == "current_project" and resolved_host_path.resolve(strict=False).is_relative_to(mapping_root):
+            # Preserve the live anchor's mapping rather than switching a Z:
+            # path to an assumed Y: login-home mapping in an isolated runtime.
+            path_drive, path_mapping_root = drive, mapping_root
+        else:
+            path_drive, path_mapping_root = _mapping_for_host_path(
+                resolved_host_path,
+                account_home=home,
+            )
         wire_path = _host_to_wire_path(
             resolved_host_path,
             drive=path_drive,

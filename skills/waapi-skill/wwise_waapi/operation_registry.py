@@ -26592,7 +26592,7 @@ def _verification(
         message = (
             "The returned WAAPI payload matches the packaged reflected result schema."
             if passed
-            else "The returned WAAPI payload does not match the packaged reflected result schema."
+            else "The WAAPI result schema or an operation-specific verification assertion failed."
         )
     elif readbacks:
         message = (

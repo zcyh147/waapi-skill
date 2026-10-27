@@ -364,6 +364,10 @@ def test_rejected_registration_never_recovers_a_usable_template(tmp_path):
     assert code == 0, executed
     code, rejected = gateway.execute_gateway([*state, 'verify', tx], env=env, client_factory=lambda _: client)
     assert code != 0 and rejected['verified'] is False, rejected
+    assert [row['passed'] for row in rejected['verification']['assertions']] == [True, False]
+    assert rejected['verification']['message'] == (
+        'The WAAPI result schema or an operation-specific verification assertion failed.'
+    )
     code, recovered = gateway.execute_gateway([*state, 'authoring-resource', tx], env=env, client_factory=lambda _: client)
     assert code != 0, recovered
     assert 'Rejected template registration' in recovered['message']
