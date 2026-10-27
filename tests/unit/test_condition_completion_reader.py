@@ -27,13 +27,8 @@ def test_current_class_route_rejects_a_generic_catalog_alias():
 
 
 def test_changed_original_witness_is_rejected_even_after_a_cached_read(tmp_path):
-    from tests.support.condition_completion_mapping import _proofs, _review, REVIEW_PATH, PROOF_PATH, REVIEW_SHA256
-    review = json.loads((ROOT / REVIEW_PATH).read_bytes())
-    names = {REVIEW_PATH, PROOF_PATH, 'docs/branch-coverage-condition-sources.json',
-        'tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz', *review['current_sources']}
-    for name in names:
-        target = tmp_path / name; target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(ROOT / name, target)
+    from tests.support.condition_completion_mapping import _proofs, _review, PROOF_PATH, REVIEW_SHA256
+    _copy_review_inputs(tmp_path)
     _proofs(str(tmp_path), REVIEW_SHA256)
     archive = tmp_path / PROOF_PATH
     archive.write_bytes(archive.read_bytes() + b'changed-original-witness')
@@ -142,3 +137,53 @@ def test_source_mapping_changes_cannot_borrow_a_recipe(bundle, tmp_path, damage)
     else: mapping['owner_issue'] = 195
     with pytest.raises(ValueError, match='exact source definition'):
         validate_mapping_attachment(exported['attachment'], base, ROOT, selected_mapping=mapping)
+
+
+def test_reconciled_sources_retain_original_program_authority(bundle):
+    """The portable attachment keeps original proof while admitting reviewed source changes."""
+    base, exported = bundle
+    context = validate_mapping_attachment(exported['attachment'], base, ROOT)
+    current_program = json.loads(context['files']['current-program.json'])
+    source = 'skills/waapi-skill/wwise_waapi/operation_registry.py'
+    assert context['review']['current_sources'][source] == current_program['sources'][source]
+    assert context['review']['current_sources'][source] == '2d8c26f100194adc7081c27aa04d8207c654f420c6a77e1bb29206a2c5e53023'
+    assert len(context['members']) == 7297
+    assert sum(len(row['members']) for row in context['mapping']['occurrences'] if row['dependencies']) == 285
+    assert context['review']['source_definition_policy']['new_native_runs'] == 0
+
+
+def _copy_review_inputs(destination):
+    from tests.support.condition_completion_mapping import (
+        REVIEW_PATH, PROOF_PATH, SOURCE_RECONCILIATION_PATH)
+    review = json.loads((ROOT / REVIEW_PATH).read_bytes())
+    successor = json.loads((ROOT / SOURCE_RECONCILIATION_PATH).read_bytes())
+    names = {REVIEW_PATH, PROOF_PATH, SOURCE_RECONCILIATION_PATH,
+        'docs/branch-coverage-condition-sources.json',
+        'tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz',
+        *review['current_sources'], *successor['source_additions']}
+    for name in names:
+        target = destination / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / name, target)
+
+
+@pytest.mark.parametrize('damage, error', [
+    ('current', 'Reviewed current public condition mechanism source changed'),
+    ('original', 'Exact reviewed condition completion proof differs'),
+    ('added-resource', 'Reviewed current public condition mechanism source changed'),
+    ('reconciliation', 'Exact condition source reconciliation differs'),
+])
+def test_condition_source_successor_rejects_changed_inputs(tmp_path, damage, error):
+    from tests.support.condition_completion_mapping import REVIEW_PATH, SOURCE_RECONCILIATION_PATH
+    root = tmp_path / 'isolated-root'
+    _copy_review_inputs(root)
+    names = {
+        'current': 'skills/waapi-skill/wwise_waapi/operation_registry.py',
+        'original': REVIEW_PATH,
+        'added-resource': 'skills/waapi-skill/resources/metadata/reference-master-sink-capabilities.json',
+        'reconciliation': SOURCE_RECONCILIATION_PATH,
+    }
+    target = root / names[damage]
+    target.write_bytes(target.read_bytes() + b'changed-evidence')
+    with pytest.raises(ValueError, match=error):
+        export_mapping(root, tmp_path / 'rejected-export')
