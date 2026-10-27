@@ -215,7 +215,8 @@ def compound_source_creation_graphs(plan, state):
     members = set()
     for profile in profiles:
         owner = by_path.get(profile['owner'])
-        if (owner is None or type(owner.get('existing_target')) is not bool or owner.get('preexisting_id') is not None
+        if (owner is None or type(owner.get('existing_target')) is not bool
+                or owner.get('preexisting_id') is not None and owner.get('on_name_conflict') != 'merge'
                 or owner.get('collection') not in {None, 'children'}
                 or not profile.get('members')):
             raise ValueError('Compound owned Lists require an exact ordinary new or retained source owner')
@@ -239,6 +240,8 @@ def compound_source_creation_graphs(plan, state):
         for row in profile['before']}
     if {str(row['id']).upper() for row in plan.get('replaced_list_subtree_rows', [])} != replaced:
         raise ValueError('Compound source List replacement needs its complete source-certified leaf roster')
+    if plan.get('replaced_subtree_rows', []) != [row for scope in stage.get('replacements', []) for row in scope['rows']]:
+        raise ValueError('Compound source replacement differs from its exact producer-owned original subtree')
     new_paths = {node['request_path'] for node in nodes if node.get('existing_target') is False}
     ordinary = []
     for node in nodes:
@@ -258,17 +261,32 @@ def compound_source_creation_graphs(plan, state):
                     or node.get('properties') or any('target_request_path' not in field
                         for field in node.get('references', []))):
                 raise ValueError('Compound staged source retains existing owners except its closed result references and Lists')
+        if node.get('preexisting_id') is not None:
+            if node['request_path'] not in {profile['owner'] for profile in profiles} or node.get('on_name_conflict') != 'merge':
+                raise ValueError('Compound merged source requires its exact producer-owned List owner')
+            projected.update(existing_target=True, target_id=node['preexisting_id'], preexisting_id=None,
+                original_name=node['pre_state']['name'], notes_supplied=False)
         # Source fields have their own producer bounds; do not count them again
         # against the optional ordinary history observer's combined budget.
         projected['properties'], projected['references'] = [], []
         ordinary.append(projected)
-    groups = ordinary_staged_creation_graphs({**plan, 'nodes': ordinary, 'replaced_list_subtree_rows': []}, state)
+    groups = ordinary_staged_creation_graphs({**plan, 'nodes': ordinary,
+        'on_name_conflict': 'fail' if plan.get('on_name_conflict') in {'merge', 'replace'} else plan.get('on_name_conflict'),
+        'replaced_subtree_rows': [], 'replaced_list_subtree_rows': []}, state)
     result = [{**group, 'nodes': [node for node in nodes if node['request_path'] == group['root']
         or node['request_path'].startswith(group['root'] + '.')]} for group in groups]
     if {node['request_path'] for group in result for node in group['nodes']} != {
-            node['request_path'] for node in nodes if node.get('existing_target') is False}:
+            node['request_path'] for node in nodes if node.get('existing_target') is False and node.get('preexisting_id') is None}:
         raise ValueError('Compound source graph partition is incomplete')
     return result
+
+
+def compound_source_removed_ids(plan, state):
+    """Exact source-owned removals, never inferred from prospective native paths."""
+    stage = state.get('owned_result_stages', {})
+    return {str(row['id']).upper() for scope in stage.get('replacements', []) for row in scope['rows']} | {
+        str(row['id']).upper() for profile in stage.get('lists', []) if profile.get('mode') == 'replaceAll'
+        for row in profile['before']}
 
 
 def capture_created_field_metadata(node: Mapping[str, Any], object_id: str, *, read: Any) -> list[dict[str, Any]]:

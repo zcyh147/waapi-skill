@@ -4081,6 +4081,7 @@ def test_compound_discovery_exposes_exact_versioned_ordinary_children_and_proof_
     assert 'owned_actual_GUID_names_and_deferred_reference_stages' in scope['created_graph_ancestor_rename']
     assert 'retained_ordinary_owners_with_exact_prefix' in scope['source_list_admission']
     assert 'source_certified_leaf_Inner_replaceAll' in scope['source_list_admission']
+    assert 'source_owned_merge_or_replaced_owner_subtrees' in scope['source_list_admission']
     assert 'does_not_certify_undo_redo_restoration' in scope['optional_history_expectation']
     assert declaration["native_request_input"] == "forbidden"
 

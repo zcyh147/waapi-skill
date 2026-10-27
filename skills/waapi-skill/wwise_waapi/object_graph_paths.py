@@ -180,6 +180,9 @@ def prepare_compound_path_context(calls, *, read):
     graphs = [call['prepared_operation'] for call in calls
         if call.get('prepared_operation', {}).get('verification_plan', {}).get('kind') == 'object-create-graph'
         or call.get('prepared_operation', {}).get('pre_state', {}).get('owned_result_stages')]
+    from .creation_observations import compound_source_removed_ids
+    removed = {object_id.casefold() for child in graphs
+        for object_id in compound_source_removed_ids(child['verification_plan'], child['pre_state'])}
     def affected(row):
         return isinstance(row, dict) and isinstance(row.get('path'), str) and any(
             row['path'] == node['pre_state']['path'] or row['path'].startswith(node['pre_state']['path'] + '\\')
@@ -202,7 +205,7 @@ def prepare_compound_path_context(calls, *, read):
             # Owned List members retain their opaque path/owner proof in the
             # complete Render model, not an invented ordinary parent chain.
             if (all(isinstance(value.get(key), str) for key in ('id', 'name', 'type', 'path'))
-                    and _GUID.fullmatch(value['id']) and value['id'].casefold() not in owned_members):
+                    and _GUID.fullmatch(value['id']) and value['id'].casefold() not in owned_members | removed):
                 if any(value['path'] == node['pre_state']['path'] or value['path'].startswith(node['pre_state']['path'] + '\\') for node in edits):
                     key = value['id'].casefold()
                     if key in identities and any(identities[key][field] != value[field] for field in ('id', 'name', 'type', 'path')):

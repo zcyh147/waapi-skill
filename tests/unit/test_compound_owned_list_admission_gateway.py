@@ -9,7 +9,7 @@ from tests.unit.test_owned_named_list_stages_gateway import (
 )
 
 
-def group_list_task(tmp_path, *, companion=None, **kwargs):
+def group_list_task(tmp_path, *, companion=None, creation_first=True, **kwargs):
     task = named_list_task(tmp_path, compound=True, **kwargs)
     if companion and companion[0] == 'object.setReference':
         task.objects[companion[1]]['@OutputBus'] = {'id': companion[2]}
@@ -36,6 +36,8 @@ def group_list_task(tmp_path, *, companion=None, **kwargs):
         code, checked = task.step('draft-check')
         assert code == 0, checked
         children.extend([task.draft, task.authority])
+        if not creation_first:
+            children = children[2:] + children[:2]
     task.draft, task.authority, task.revision = task.compound_parent
     code, declared = task.step('draft-declare-undo-plan', '--display-name', 'Metadata routing',
         *[token for index in range(0, len(children), 2) for token in ('--child-draft', *children[index:index + 2])])
@@ -221,6 +223,86 @@ def test_group_list_retained_owner_nonempty_replacement_verifies_each_fragment(t
     assert first['objects'][0].get('listMode', first['listMode']) == 'replaceAll'
     assert second['objects'][0]['listMode'] == 'append'
     assert task.run('execute', tx)[0] == 2 and len(task.writes) == 4
+
+
+@pytest.mark.parametrize('replace_list', [False, True])
+def test_group_list_merge_owner_preserves_original_guid_and_complete_source(tmp_path, replace_list):
+    from tests.unit.test_owned_named_list_stages_gateway import SECOND_SLOT
+    task = group_list_task(tmp_path, multiple_new=True, owner_collision=True, name_conflict='merge',
+        old_source_child=True, replace_existing_two=replace_list)
+    before = deepcopy(task.objects)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert SOUND not in task.objects
+    assert task.objects[FIRST]['@Metadata'] == ([] if replace_list else [{'id': OLD_SLOT}]) + [{'id': SLOT}, {'id': SECOND_SLOT}]
+    assert task.objects[FIRST]['@OutputBus'] == {'id': BUS}
+    assert all(task.objects[oid] == row for oid, row in before.items() if oid != FIRST and not (replace_list and oid == OLD_SLOT))
+    assert (OLD_SLOT not in task.objects) is replace_list
+    assert len(task.writes) == 5
+    assert all(write['objects'][0]['object'] == FIRST for write in task.writes[2:])
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 5
+
+
+def test_group_list_replaced_owner_binds_new_guid_and_removes_original_scope(tmp_path):
+    from tests.unit.test_owned_named_list_stages_gateway import SECOND_SLOT
+    task = group_list_task(tmp_path, multiple_new=True, owner_collision=True, name_conflict='replace')
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert FIRST not in task.objects and OLD_SLOT not in task.objects
+    assert task.objects[SOUND]['@Metadata'] == [{'id': SLOT}, {'id': SECOND_SLOT}]
+    assert task.objects[SOUND]['@OutputBus'] == {'id': BUS}
+    assert len(task.writes) == 5
+    assert all(write['objects'][0]['object'] == SOUND for write in task.writes[2:])
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 5
+
+
+@pytest.mark.parametrize('creation_first', [False, True])
+def test_replaced_owner_rejects_sibling_field_write_before_begin_in_either_order(tmp_path, creation_first):
+    task = group_list_task(tmp_path, multiple_new=True, owner_collision=True, name_conflict='replace',
+        companion=('object.setReference', FIRST, ROOT), creation_first=creation_first)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'UNDO_GROUP_OVERLAPPING_OUTCOME', rejected
+    assert task.writes == [] and not task.group_open
+
+
+@pytest.mark.parametrize('policy', ['merge', 'replace', 'merge-replace-list'])
+def test_group_list_owner_conflict_and_ancestor_rename_verify_exact_source(tmp_path, policy):
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+    task = group_list_task(tmp_path, multiple_new=True, owner_collision=True,
+        name_conflict='merge' if policy == 'merge-replace-list' else policy, replace_existing_two=policy == 'merge-replace-list',
+        companion=('object.setName', SECOND, 'Renamed parent'))
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    owner = SOUND if policy == 'replace' else FIRST
+    assert task.objects[owner]['path'].endswith('\\Renamed parent\\Sender')
+    assert task.objects[owner]['@OutputBus'] == {'id': BUS}
+    assert task.objects[SLOT]['owner'] == {'id': owner}
+    assert task.objects[SLOT]['path'] == '\\opaque-slot-path'
+
+
+def test_merged_owner_original_hierarchy_overlap_stops_before_begin(tmp_path):
+    child = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+    task = group_list_task(tmp_path, multiple_new=True, owner_collision=True, name_conflict='merge', old_source_child=True,
+        companion=('object.setNotes', child, 'Conflicting original take'))
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'UNDO_GROUP_OVERLAPPING_OUTCOME', rejected
+    assert task.writes == [] and not task.group_open
+
+
+@pytest.mark.parametrize('policy', ['merge', 'replace'])
+def test_owner_conflict_prewrite_drift_cancels_without_constructing_owner_or_retry(tmp_path, policy):
+    task = group_list_task(tmp_path, multiple_new=True, owner_collision=True, name_conflict=policy, fault='changed-merge-root')
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, failed = task.run('execute', tx)
+    assert code == 2 and failed.get('verified') is not True and failed['automatic_retry'] is False, failed
+    assert len(task.writes) == 1 and SLOT not in task.objects
+    assert failed.get('rollback_verified', False) is False
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 1
+    assert not task.group_open
 
 
 def test_retained_list_prefix_drift_after_preview_stops_before_begin(tmp_path):
