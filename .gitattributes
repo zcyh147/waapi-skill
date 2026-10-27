@@ -13,6 +13,8 @@ tests/semantic/data/** -text
 # Portable branch evidence includes hash-named native payloads without extensions.
 # Preserve their sealed bytes on hosts with core.autocrlf enabled.
 tests/fixtures/branch-evidence/** -text
+# Sealed test logs retain original whitespace as part of their provenance.
+tests/fixtures/branch-evidence/**/*.log -whitespace
 
 # Runtime source witnesses also retain their original hash-bound bytes.
 tests/fixtures/runtime/** -text
