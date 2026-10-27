@@ -10,12 +10,26 @@ Status: approved for implementation on 2026-10-17. Published as [14: Expose comp
 
 Users can inspect and manipulate the reflected ordinary Authoring layouts and views through controlled Gateway operations on the correct Wwise host.
 
+## Current acceptance method — user-approved 2026-10-27
+
+Layout UI is low priority. Use lightweight development: reuse existing
+source/code and matching native facts, complete accurate versioned closed
+wrapping and code controls, and stop further vendor QA. Preserve known height,
+sidebar, frontend and schema limitations explicitly rather than guessing native
+behavior. This supersedes earlier native write/resource-lifetime proof
+requirements and historical remaining-work lists only as acceptance depth;
+missing supported inputs and wrapper defects remain owned here. Existing
+observations retain only their actual facts; failure to observe an effect does
+not establish native absence. Disclose any weaker verification before authorization. Keep
+configuration/policy/Preview/execute-once controls and existing observers. This
+decision does not complete #188 or authorize a native/Fresh run.
+
 ## Acceptance criteria
 
 - [ ] Cover the applicable layout/view reflection set, including names/current layout, layout contents, element rectangles, view types/instances/handles, create-or-get, switch/set/remove, dock/undock/splitter movement and version-specific close/reset variants.
 - [ ] Expose closed business choices and scoped instance identities; distinguish discovered availability from a historical catalog snapshot and keep host detection automatic.
 - [ ] Implement valid nested/optional layout and view alternatives with Preview/authorization where changes occur; preserve unrelated user state and use owned test layouts/views.
-- [ ] Verify actual layout/view state and resource lifetime using native observations appropriate to each operation. A returned handle alone is not proof of every requested arrangement.
+- [ ] Apply the current lightweight acceptance method to layout/view state and resource lifetime: retain available observations and code controls, disclose unproved arrangements and known limitations, and do not require further vendor QA. A returned handle alone is not proof of every requested arrangement.
 - [ ] Test native version absence, wrong host, stale view/layout handles, invalid nesting and cleanup. Ordinary layout switching remains in scope rather than being excluded as custom UI complexity.
 - [ ] Account explicitly for Wwise 2021.1, 2022.1, 2023.1, 2024.1 and 2025.1, with exact host/build provenance and applicable native shapes. A current packaged boundary is not proof of native absence.
 - [ ] Maintain exact owned branch IDs, public input/routing, construction, result/verification alternatives and required evidence, including reachable shared definitions and newly discovered variants. In-scope omissions must be implemented here or split into linked same-parent implementation children; they never leave the overall scope.

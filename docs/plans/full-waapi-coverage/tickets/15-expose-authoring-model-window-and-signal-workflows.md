@@ -35,3 +35,13 @@ Complete only the exact branch scope and evidence owned by this ticket. A native
 The public `request-schema` → `draft-declare-model-plan` → immutable Preview → authorized execute-once → verification path now constructs the nine captured 2024.1/2025.1 model/window/signal functions. The closed constructors cover typed widget/state values, versioned widget/layout definitions, single and named template collections, inline registration and Gateway-generated frozen WAFM files. Owned window/template/frontend receipts bind configuration, host, build, process session and project. Frontends retain their window/template parents; pending creation ownership blocks premature window cleanup. Atomic immutable receipt/tombstone publication uses the existing execution lease. `authoring-resource` recovers cleanup authority from a single sealed successful creation result independently of business-effect verification; rejected registration does not become an owned template.
 
 This is program implementation, not ticket completion. Captured 2021.1–2023.1 Authoring catalogs do not list these exact nine URIs; that fixed-route absence does not establish business absence, and no equivalent custom frontend route has been proved. Exact independent native catalogs remain the schema/provenance authority. No new Authoring/native/Fresh run was started. Independent model state effects, visible/presented/closed window effects, signal delivery after an already-started owned observer, registration/file acceptance, and final native cleanup remain owned unfinished evidence under #189 (observation integration also #187). There is no reflected template unregister route: its cleanup boundary is the owning Authoring session. Neither window result validation nor a successful emit result proves its business effect.
+
+## Single normal-mode comparison boundary — 2026-10-27
+
+The user-approved single 2025.1 normal-mode model comparison ended startup
+BLOCKED after 60 seconds, with zero transactions and no recognized GUI window.
+Do not retry or expand that comparison. This startup observation does not prove
+that the model API is broken in normal mode, establish native absence, or grant
+a business-effect PASS. Preserve existing source/program facts and disclose
+frontend/schema and unobserved-effect limitations under the current lightweight
+acceptance policy; this paragraph does not complete #189.

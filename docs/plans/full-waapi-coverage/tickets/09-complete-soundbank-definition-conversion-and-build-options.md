@@ -18,12 +18,25 @@ Definition-file imports use the user-approved lightweight table policy: complete
 
 CRUD, queries and compound changes retain appropriate identity, policy, execute-once, outcome and cleanup checks. A known Wwise defect or native absence is recorded as an explicit source-supported boundary, not Wwise repair/QA work. Unsupported normal-user functionality remains assigned. This method supersedes stronger proof quotas in earlier execution notes without rewriting their original results. #194 owns Fresh with current budget zero; #195 coordinates required stable-candidate full Program/Non-live gates, not per-ticket sweeps.
 
+## Current conversion association boundary — user-approved 2026-10-27
+
+Existing conversion-getter attempts are sufficient; stop further platform/codec
+QA and research. Their ambiguous results cannot independently prove which codec
+belongs to a platform. Correctly wrap the setter through the pinned closed
+contract and code tests; the setter code adjustment remains required. Disclose
+the independent platform-association verification limit before authorization,
+without guessing codec IDs or asserting a stronger verified effect. Reuse
+existing observations only for their actual facts; ambiguity is not native
+absence. Preserve configuration, policies, immutable Preview, execute-once and
+truthful uncertainty. This acceptance boundary does not close #179 or #183,
+and does not remove other plugin placement or conversion/build input work.
+
 ## Acceptance criteria
 
 - [ ] Map native SoundBank definition/inclusion alternatives, external-source conversion forms and Core/CLI build options, including nested/repeated bank, platform and language selections.
 - [ ] Preserve default omission versus explicit choices and version-specific names/identities; resolve older nested schema forms using native evidence rather than dropping unfamiliar children.
 - [ ] Keep output roots and referenced input files within declared owned I/O scope; disclose every requested generation/conversion effect in Preview.
-- [ ] Verify actual expected artifacts, inclusion state and relevant metadata independently; a successful process exit or empty result alone is not output verification.
+- [ ] Verify actual expected artifacts, inclusion state and relevant metadata under the applicable acceptance method, including the code-only Definition import policy and explicit conversion platform-association limit. A successful process exit or empty result alone is not output verification.
 - [ ] Exercise partial build failures, unavailable licensed plugins, incompatible native options, wrong paths and output preservation. Existing source projects must remain unchanged in native tests.
 - [ ] Account explicitly for Wwise 2021.1, 2022.1, 2023.1, 2024.1 and 2025.1, with exact host/build provenance and applicable native shapes. A current packaged boundary is not proof of native absence.
 - [ ] Maintain exact owned native-to-public branch/field/option mappings, including reachable shared definitions and newly discovered variants. Map them to the selected representative mechanism tests and required business proof; do not demand a separate execution or evidence receipt per reflected leaf. In-scope omissions must be implemented here or split into linked same-parent implementation children; they never leave the overall scope.

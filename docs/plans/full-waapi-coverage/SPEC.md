@@ -372,3 +372,42 @@ or exclusion behavior: disclose any weaker result-only verification before
 authorization and never assert an unobserved business effect. Fresh budget
 remains zero. This approval does not close #182/#183/#174 or waive #195's
 required code gates.
+
+## User-approved lightweight wrapper acceptance — 2026-10-27
+
+For ordinary lightweight APIs, accurate closed versioned wrapping, callability
+and representative code controls suffice. Reuse existing source/code and
+matching native facts; do not turn wrapper completion into vendor QA of every
+value or effect. Important CRUD and query input gaps remain implementation work.
+Keep complete documented choices, public routing, configuration binding, the
+three modification policies, immutable Preview, one execution, drift checks,
+bounded outcomes and truthful uncertainty. An explicitly accepted weaker verifier
+must disclose its actual strength before authorization; an unobserved native
+effect is neither a verified effect nor proof of native absence. This successor
+policy changes current acceptance depth without rewriting historical evidence.
+
+Layout UI is low priority: complete it through lightweight development using
+existing source/code and native facts, with no further vendor QA. Preserve known
+height, sidebar, frontend and schema limitations honestly. For project CREATE,
+a correct wrapper and passing code tests suffice; stop native crash
+investigation. This does not decide the separate migration data-loss or audition
+acceptance questions.
+
+Existing conversion-getter attempts suffice: stop further QA/research into
+ambiguous platform-to-codec results. Correctly wrap the setter and explicitly
+disclose that independent platform association cannot currently be proved. Do
+not guess codec IDs or claim verified platform association. The setter code
+adjustment remains required, and #179/#183 remain open.
+
+Simple undo/redo use lightweight wrappers, callability and code tests. All
+available pinned native argument, option and result schemas are closed empty
+objects (`{}`). The public `expectation_receipt` is optional; the basic
+`latest_project_history` path already exists with result-schema-only
+verification. Stop optional complex graph-restoration observer expansion and
+remove it from current required acceptance; retain existing supported observers
+and disclose their limits. Real UndoGroup staged-list admission restrictions
+and source-control provider work remain separate unfinished #192 obligations.
+
+No additional native or Fresh attempt follows from this decision. The already
+approved code-only table-import policy remains unchanged. No whole ticket is
+completed by these acceptance decisions.
