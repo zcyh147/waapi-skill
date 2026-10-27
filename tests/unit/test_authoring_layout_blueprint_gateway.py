@@ -89,6 +89,36 @@ def test_floating_only_workspace_and_position_histories_preserve_optional_forms(
     assert layout['LastPositions'][1]['WindowPlacement_ShowCmd'] == 'Minimized'
 
 
+@pytest.mark.parametrize('mechanism', ['floating', 'history', 'empty_floating', 'empty_history'])
+@pytest.mark.parametrize('tamper', [False, True])
+def test_rootless_layout_verification_checks_declared_windows_histories_and_explicit_empty_forms(tmp_path, mechanism, tamper):
+    blueprint = {'contract': 'waapi-skill.layout-blueprint/v1', 'nodes': []}
+    if mechanism in {'floating', 'empty_floating'}:
+        blueprint['floating_windows'] = [{'placement': _placement()}] if mechanism == 'floating' else []
+    else:
+        blueprint['position_history'] = {'last_positions': [{'view_name': 'ProjectExplorer', 'placement': _placement()}]
+            if mechanism == 'history' else []}
+    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
+        fields=('--new-layout-name', 'RootlessWorkspace', '--blueprint', json.dumps(blueprint)))
+    original = client.call
+    def changed_state(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'setLayout' and tamper:
+            layout = client.layouts['RootlessWorkspace']['Layout']
+            if mechanism == 'floating': layout['Undocked'][0]['WindowPlacement_NormalPos_Left'] = '21'
+            elif mechanism == 'history': layout['LastPositions'][0]['Name'] = 'DifferentView'
+            elif mechanism == 'empty_floating': del layout['Undocked']
+            else: del layout['LastPositions']
+        return result
+    client.call = changed_state
+    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=tamper)
+    assert verified['verification']['business_state_verified'] is not tamper
+    if tamper:
+        assertion = next(row for row in verified['verification']['assertions']
+            if row['name'] == 'Registered layout retains every declared nested field and child order')
+        assert assertion['evidence']['mismatches']
+
+
 @pytest.mark.parametrize('variant', ['splitter', 'tab_children', 'sidebars'])
 def test_retained_read_shapes_do_not_establish_unresolved_layout_input_legality(tmp_path, variant):
     blueprint = _blueprint()

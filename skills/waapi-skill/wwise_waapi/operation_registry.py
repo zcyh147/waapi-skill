@@ -21202,7 +21202,7 @@ def verify_prepared_operation(
                 and registered.get('Layout', {}).get('Name') == expected_layout.get('Layout', {}).get('Name'),
                 {'expected_name': expected_layout.get('Layout', {}).get('Name') if isinstance(expected_layout, Mapping) else None,
                  'actual_name': registered.get('Layout', {}).get('Name')})
-            if isinstance(expected_layout, Mapping) and 'StackPanel' in expected_layout.get('Layout', {}):
+            if isinstance(expected_layout, Mapping) and set(expected_layout.get('Layout', {})) - {'Name'}:
                 check('Registered layout retains every declared nested field and child order',
                     declared_layout_matches(expected_layout, registered),
                     {'mismatches': declared_layout_mismatches(expected_layout, registered),
