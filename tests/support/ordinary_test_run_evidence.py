@@ -58,6 +58,35 @@ def _original_source(root, candidate, name, seal):
     return result.stdout.decode('utf-8')
 
 
+def _validate_direct_skip(row, attribution, original_text, manifest):
+    """Only a reviewed, collected test's own static marker owns its skip.
+
+    A body/helper/fixture skip can affect arbitrary consumers in another file.
+    Quiet output cannot resolve those consumers, so such origins stay blocked.
+    """
+    if (int(row[1]) != 1 or not isinstance(attribution, dict)
+            or set(attribution) != {'collected_test', 'reviewed_reason'}
+            or not isinstance(attribution['reviewed_reason'], str) or not attribution['reviewed_reason'].strip()):
+        raise ValueError('ordinary run exact reviewed direct skip consumer required')
+    node = attribution['collected_test']
+    if (not isinstance(node, str) or not re.fullmatch(r'tests/unit/test_[^\s:\[\]]+\.py::test_\w+', node)):
+        raise ValueError('ordinary run exact reviewed direct skip consumer required')
+    name, function = node.split('::')
+    if name != row[2] or (node not in manifest and name not in manifest):
+        raise ValueError('ordinary run skip consumer absent from original collection')
+    definitions = [item for item in ast.parse(original_text[name]).body
+                   if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == function]
+    if len(definitions) != 1 or len(definitions[0].decorator_list) != 1:
+        raise ValueError('ordinary run skip origin is not a reviewed direct collected test marker')
+    marker = definitions[0].decorator_list[0]
+    reason = (next((keyword.value for keyword in marker.keywords if keyword.arg == 'reason'), None)
+              if isinstance(marker, ast.Call) else None)
+    if (not isinstance(marker, ast.Call) or marker.lineno != int(row[3])
+            or ast.unparse(marker.func) not in {'pytest.mark.skip', 'pytest.mark.skipif'}
+            or not isinstance(reason, ast.Constant) or reason.value != row[4]):
+        raise ValueError('ordinary run skip origin is not a reviewed direct collected test marker')
+
+
 def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, base, binding, root):
     """Return reviewed aggregate support, never an inferred individual PASS."""
     from tests.maintenance.branch_audit_completion import binding_semantics
@@ -123,12 +152,15 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
         raise ValueError('ordinary run exact original skip attribution required')
 
     review = record['review']
-    if (set(review) != {'reason', 'selection_reason', 'sources'}
+    if (set(review) != {'reason', 'selection_reason', 'sources', 'skip_attribution'}
             or not isinstance(review['reason'], str) or not review['reason'].strip()
             or not isinstance(review['selection_reason'], str) or not review['selection_reason'].strip()
             or not isinstance(review['sources'], dict) or not review['sources']
             or set(review['sources']) != set(binding.get('relevant_sources', []))):
         raise ValueError('ordinary run explicit relevant-source/selection review required')
+    if (not isinstance(review['skip_attribution'], dict) or set(review['skip_attribution']) != set(skip_lines)
+            or len(skip_lines) != len(set(skip_lines))):
+        raise ValueError('ordinary run exact reviewed direct skip attribution required')
     selected = mechanism['selected_tests']
     if (not isinstance(selected, list) or not selected or len(set(selected)) != len(selected)
             or any(not isinstance(node, str) or not re.fullmatch(r'tests/unit/[^\s:\[\]]+\.py::test_\w+', node)
@@ -163,10 +195,11 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
         if not any(isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == function
                    for item in tree.body):
             raise ValueError('ordinary run selected test absent from original source')
+    consumers = []
     for row in skips:
-        source_lines = original_text[row[2]].splitlines()
-        line = int(row[3])
-        if (line < 1 or line > len(source_lines) or 'skip' not in source_lines[line - 1]
-                or row[4] not in source_lines[line - 1]):
-            raise ValueError('ordinary run skip differs from original source')
+        attribution = review['skip_attribution'][row[0]]
+        _validate_direct_skip(row, attribution, original_text, manifest)
+        consumers.append(attribution['collected_test'])
+    if len(consumers) != len(set(consumers)):
+        raise ValueError('ordinary run skip has unknown or duplicate affected consumers')
     return OUTCOME, None
