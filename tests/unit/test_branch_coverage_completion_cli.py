@@ -567,7 +567,7 @@ def test_fresh_label_without_formal_archive_bridge_has_no_credit(ping_scope, tmp
     descriptor = {'artifact': str(target), 'sha256': write_json(target, record), 'nodeid': 'test_ping_public_gateway'}
     mapped = dict(binding, observation_pointer='/native_call/args')
     outcome, reason = evidence_result(descriptor, branch, record['candidate_sha256'], 'fresh', 'controlled', tmp_path, mapped)
-    assert outcome == 'missing' and '#194' in reason
+    assert outcome == 'missing' and 'closed original formal Fresh archive reference' in reason
 
 
 def test_exact_console_ui_boundary_completes_without_native_dispatch(ping_scope, tmp_path):
