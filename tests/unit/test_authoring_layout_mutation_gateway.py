@@ -122,7 +122,7 @@ def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', o
         assert code != 0, declared
         assert URI + operation not in [row[0] for row in client.calls]
         return env, state, client, declared
-    assert code == 0, declared
+    assert code == 0, (declared.get('error_code'), declared.get('message'), declared.get('details'))
     code, checked = gateway.execute_gateway([*state, 'draft-check', draft['draft_id'],
         '--task-authority', authority, '--expected-revision', str(declared['draft']['revision'])],
         env=env, client_factory=lambda _: client)

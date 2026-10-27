@@ -365,7 +365,13 @@ class BusinessDeclarationSession:
         # validated depth/node grammar. Other fields keep the ordinary guard.
         from .authoring_model_business import MODEL_OPERATIONS
         binding = self.settings.get("authoring_model_binding")
-        if (set(self.settings) == {"authoring_model_plan", "authoring_model_binding"}
+        if (set(self.settings) == {'authoring_layout_plan', 'authoring_layout_binding'}
+                and isinstance(self.settings.get('authoring_layout_plan'), Mapping)
+                and 'blueprint' in self.settings['authoring_layout_plan']):
+            settings = _layout_constructor_settings(self.settings, self.context.wwise_version)
+            normalized = strict_json_copy({**payload, 'settings': {}})
+            normalized['settings'] = settings
+        elif (set(self.settings) == {"authoring_model_plan", "authoring_model_binding"}
                 and isinstance(binding, Mapping) and binding.get("operation") in MODEL_OPERATIONS):
             settings = _normalize_fields(self.settings, authoring_model_version=self.context.wwise_version)
             normalized = strict_json_copy({**payload, "settings": {}})
@@ -737,6 +743,24 @@ def _validate_target(
     )
 
 
+def _layout_constructor_settings(fields: Mapping[str, Any], version: str) -> dict[str, Any]:
+    """Only the closed, sealed layout constructor may exceed ordinary fact depth."""
+    from .authoring_layout import LAYOUT_VERSIONS
+    from .authoring_layout_business import validate_layout_binding, validate_new_layout_name
+    from .layout_blueprint import validate_blueprint
+    plan = fields['authoring_layout_plan']
+    binding = validate_layout_binding(fields['authoring_layout_binding'])
+    if (version not in LAYOUT_VERSIONS or not isinstance(plan, Mapping)
+            or set(plan) != {'layout_handle', 'new_layout_name', 'blueprint'}
+            or set(binding) != {'handle', 'context', 'layout_name', 'role', 'native_id', 'expires_at',
+                'observation_sha256', 'binding_sha256', 'registration_name', 'layout_blueprint', 'blueprint_node_ids'}
+            or plan['layout_handle'] != binding['handle']
+            or validate_new_layout_name(plan['new_layout_name']) != binding['registration_name']
+            or validate_blueprint(plan['blueprint']) != binding['layout_blueprint']):
+        raise ValueError('Layout constructor settings require the exact closed declaration and sealed binding')
+    return strict_json_copy(dict(fields), maximum_depth=64)
+
+
 def _normalize_fields(
     fields: Any,
     *,
@@ -751,6 +775,9 @@ def _normalize_fields(
             draft_revision=draft_revision,
             action="provide one bounded object of stable business fields",
         )
+    if (authoring_model_version is not None and set(fields) == {'authoring_layout_plan', 'authoring_layout_binding'}
+            and isinstance(fields.get('authoring_layout_plan'), Mapping) and 'blueprint' in fields['authoring_layout_plan']):
+        return _layout_constructor_settings(fields, authoring_model_version)
     if authoring_model_version is not None and set(fields) == {"authoring_model_plan", "authoring_model_binding"}:
         from .authoring_model_business import MODEL_OPERATIONS, validate_model_plan, model_resource_roles
         binding = fields["authoring_model_binding"]

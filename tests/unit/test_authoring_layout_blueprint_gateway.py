@@ -18,6 +18,197 @@ def _blueprint():
 
 
 @pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_object_editor_and_tab_panels_keep_explicit_state_and_empty_editor_lists(tmp_path, version):
+    blueprint = _blueprint()
+    blueprint['nodes'][0]['children'] = ['panel', 'tabs']
+    blueprint['nodes'][1:] = [
+        {'key': 'panel', 'kind': 'object_panel', 'label': 'Object editor',
+         'editor_state': 'maximized', 'bottom_editor_state': 'minimized',
+         'editor_priority': [], 'preferred_heights': [],
+         'sidebar': {'width': '210', 'collapse_state': ''}},
+        {'key': 'tabs', 'kind': 'object_tabs', 'label': 'Object tabs', 'height': '480'}]
+    env, state, client, preview = switch_preview(tmp_path, version=version, operation='setLayout',
+        fields=('--new-layout-name', 'EditorWorkspace', '--blueprint', json.dumps(blueprint)))
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    panel, tabs = client.layouts['EditorWorkspace']['Layout']['StackPanel']['@Children']
+    assert panel == {'@type': 'ObjectPanel', 'ID': panel['ID'], 'Name': 'Object editor',
+        'EditorState': 'Maximized', 'BottomEditorState': 'Minimized', 'EditorPriority': [],
+        'PreferredHeights': [], 'SideBar': {'@type': 'SideBar', 'Width': '210', 'CollapseState': ''}}
+    assert tabs == {'@type': 'ObjectTabPanel', 'ID': tabs['ID'], 'Name': 'Object tabs', 'Height': '480'}
+
+
+def test_editor_preferences_keep_order_repeats_and_optional_editor_tags(tmp_path):
+    blueprint = _blueprint()
+    blueprint['nodes'][2] = {'key': 'editors', 'kind': 'object_panel', 'label': 'Editors',
+        'editor_priority': [
+            {'view_identifier': 'PropertyEditor', 'plugin_identifier': '', 'effect_index': '0'},
+            {'view_identifier': 'PropertyEditor', 'plugin_identifier': '', 'effect_index': '0', 'include_type': True}],
+        'preferred_heights': [{'view_identifier': 'EffectEditor', 'plugin_identifier': '1058', 'effect_index': '2', 'height': '320'}]}
+    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
+        fields=('--new-layout-name', 'EditorPreferences', '--blueprint', json.dumps(blueprint)))
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    panel = client.layouts['EditorPreferences']['Layout']['StackPanel']['@Children'][1]
+    assert panel['EditorPriority'] == [
+        {'UniqueViewId': 'PropertyEditor', 'PluginId': '', 'EffectIndex': '0'},
+        {'UniqueViewId': 'PropertyEditor', 'PluginId': '', 'EffectIndex': '0', '@type': 'EditorId'}]
+    assert panel['PreferredHeights'] == [{'@type': 'PreferredHeight', 'UniqueViewId': 'EffectEditor',
+        'PluginId': '1058', 'EffectIndex': '2', 'Height': '320'}]
+    assert 'EditorState' not in panel and 'SideBar' not in panel
+
+
+def _placement():
+    return {'flags': '0', 'minimum_x': '-1', 'minimum_y': '-1', 'maximum_x': '0', 'maximum_y': '0',
+        'left': '20', 'top': '30', 'right': '420', 'bottom': '530'}
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_floating_only_workspace_and_position_histories_preserve_optional_forms(tmp_path, version):
+    blueprint = {'contract': 'waapi-skill.layout-blueprint/v1', 'workspace_name': '', 'nodes': [
+        {'key': 'floating', 'kind': 'stack', 'label': 'Floating', 'orientation': 'vertical', 'children': ['tools']},
+        {'key': 'tools', 'kind': 'view', 'view_type': 'ProjectExplorer', 'selection_channel': ''}],
+        'floating_windows': [{'root': 'floating', 'placement': {**_placement(), 'state': 'normal'}}, {'placement': _placement()}],
+        'position_history': {'audio_devices': [], 'effects': [], 'fallback': [],
+            'last_positions': [{'view_name': 'ProjectExplorer', 'placement': _placement()},
+                               {'view_name': 'ProjectExplorer', 'placement': {**_placement(), 'state': 'minimized'}}],
+            'metadata': [], 'object_types': [], 'plugin_inner_objects': [], 'source_plugins': []}}
+    env, state, client, preview = switch_preview(tmp_path, version=version, operation='setLayout',
+        fields=('--new-layout-name', 'FloatingWorkspace', '--blueprint', json.dumps(blueprint)))
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    layout = client.layouts['FloatingWorkspace']['Layout']
+    assert layout['Name'] == '' and 'StackPanel' not in layout
+    window, empty_window = layout['Undocked']
+    assert window['@type'] == 'ViewHolder' and window['StackPanel']['Name'] == 'Floating'
+    assert window['WindowPlacement_NormalPos_Left'] == '20' and window['WindowPlacement_ShowCmd'] == 'Normal'
+    assert 'StackPanel' not in empty_window and 'WindowPlacement_ShowCmd' not in empty_window
+    assert layout['AudioDeviceLastTabPositions'] == [] and layout['SourcePluginLastTabPositions'] == []
+    assert layout['LastPositions'][0]['Name'] == 'ProjectExplorer'
+    assert 'WindowPlacement_ShowCmd' not in layout['LastPositions'][0]
+    assert layout['LastPositions'][1]['WindowPlacement_ShowCmd'] == 'Minimized'
+
+
+@pytest.mark.parametrize('variant', ['splitter', 'tab_children', 'sidebars'])
+def test_retained_read_shapes_do_not_establish_unresolved_layout_input_legality(tmp_path, variant):
+    blueprint = _blueprint()
+    if variant == 'splitter': blueprint['nodes'][2] = {'key': 'editors', 'kind': 'splitter'}
+    elif variant == 'tab_children': blueprint['nodes'][2] = {'key': 'editors', 'kind': 'object_tabs', 'label': 'Tabs', 'children': []}
+    else: blueprint['nodes'][2] = {'key': 'editors', 'kind': 'object_panel', 'label': 'Editor',
+        'sidebar_left': {'width': '400', 'collapse_state': '0', 'visible': False}}
+    _, _, _, rejected = switch_preview(tmp_path, operation='setLayout',
+        fields=('--new-layout-name', 'NeverWritten', '--blueprint', json.dumps(blueprint)), expect_declaration_error=True)
+    assert 'input remains unresolved' in rejected['message']
+
+
+@pytest.mark.parametrize('empty', [False, True])
+def test_view_data_is_built_from_typed_entries_with_nested_values_and_no_raw_map(tmp_path, empty):
+    blueprint = _blueprint()
+    blueprint['nodes'][1]['data_entries'] = [] if empty else [
+        {'name': 'selection', 'value': {'kind': 'object', 'entries': [
+            {'name': 'enabled', 'value': {'kind': 'boolean', 'value': False}},
+            {'name': 'positions', 'value': {'kind': 'array', 'items': [
+                {'kind': 'integer', 'value': 0}, {'kind': 'number', 'value': 1.25},
+                {'kind': 'string', 'value': ''}, {'kind': 'null'}]}}]}}]
+    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
+        fields=('--new-layout-name', 'ViewDataWorkspace', '--blueprint', json.dumps(blueprint)))
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    view = client.layouts['ViewDataWorkspace']['Layout']['StackPanel']['@Children'][0]
+    assert view['ViewData'] == ({} if empty else {'selection': {'enabled': False, 'positions': [0, 1.25, '', None]}})
+
+
+@pytest.mark.parametrize('tamper', [False, True])
+def test_preferred_height_readback_understands_retained_editor_field_names_without_ignoring_values(tmp_path, tamper):
+    blueprint = _blueprint()
+    blueprint['nodes'][2] = {'key': 'editors', 'kind': 'object_panel', 'label': 'Editors',
+        'preferred_heights': [{'view_identifier': 'AttenuationEditor', 'plugin_identifier': '4294967295',
+            'effect_index': '0', 'height': '621.4757'}]}
+    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
+        fields=('--new-layout-name', 'EditorHeightWorkspace', '--blueprint', json.dumps(blueprint)))
+    original = client.call
+    def observed_names(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'setLayout':
+            row = client.layouts['EditorHeightWorkspace']['Layout']['StackPanel']['@Children'][1]['PreferredHeights'][0]
+            row['EditorUniqueViewId'] = row.pop('UniqueViewId')
+            row['EditorPluginId'] = row.pop('PluginId')
+            row['EditorEffectIndex'] = row.pop('EffectIndex')
+            if tamper: row['EditorEffectIndex'] = '1'
+        return result
+    client.call = observed_names
+    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=tamper)
+    assert verified['verification']['business_state_verified'] is not tamper
+
+
+@pytest.mark.parametrize('tamper', ['binding_digest', 'declaration', 'non_layout_fields'])
+def test_deep_constructor_settings_never_grant_capacity_to_forged_or_mismatched_facts(tmp_path, tamper):
+    from copy import deepcopy
+    from wwise_waapi.business_declaration_state import BusinessDeclarationSession
+    from tests.unit.test_business_declaration_state import _context
+    blueprint = _blueprint()
+    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
+        fields=('--new-layout-name', 'BoundWorkspace', '--blueprint', json.dumps(blueprint)))
+    request = TransactionStore(Path(state[1])).load_preview(preview['transaction_id']).artifact['request']
+    binding = deepcopy(request['arguments']['layout_binding'])
+    settings = {'authoring_layout_plan': {'layout_handle': binding['handle'], 'new_layout_name': 'BoundWorkspace', 'blueprint': blueprint},
+        'authoring_layout_binding': binding}
+    if tamper == 'binding_digest': binding['binding_sha256'] = '0' * 64
+    elif tamper == 'declaration': settings['authoring_layout_plan']['blueprint']['nodes'][0]['label'] = 'Different requested workspace'
+    else:
+        deep = 'leaf'
+        for _ in range(13): deep = {'child': deep}
+        settings['ordinary'] = deep
+    with pytest.raises(ValueError):
+        BusinessDeclarationSession.create(_context(version='2025.1')).with_settings(settings)
+
+
+@pytest.mark.parametrize('node_kind', ['stack', 'view'])
+def test_optional_element_type_omission_remains_distinct_from_explicit_type(tmp_path, node_kind):
+    blueprint = _blueprint()
+    blueprint['nodes'][0 if node_kind == 'stack' else 1]['include_type'] = False
+    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
+        fields=('--new-layout-name', 'OptionalTypeWorkspace', '--blueprint', json.dumps(blueprint)))
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    root = client.layouts['OptionalTypeWorkspace']['Layout']['StackPanel']
+    selected = root if node_kind == 'stack' else root['@Children'][0]
+    assert '@type' not in selected
+
+
+def test_omitted_optional_type_does_not_verify_an_explicitly_different_element_kind(tmp_path):
+    blueprint = _blueprint()
+    blueprint['nodes'][1]['include_type'] = False
+    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
+        fields=('--new-layout-name', 'WrongElementKind', '--blueprint', json.dumps(blueprint)))
+    original = client.call
+    def wrong_kind(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'setLayout':
+            client.layouts['WrongElementKind']['Layout']['StackPanel']['@Children'][0]['@type'] = 'ObjectPanel'
+        return result
+    client.call = wrong_kind
+    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=True)
+    assert verified['verification']['business_state_verified'] is False
+
+
+@pytest.mark.parametrize('risk', ['duplicate_data_key', 'wrong_scalar_type', 'shared_floating_root', 'unknown_placement_field', 'native_editor_field'])
+def test_closed_nested_settings_reject_ambiguous_identity_data_and_native_fields(tmp_path, risk):
+    blueprint = _blueprint()
+    if risk in {'duplicate_data_key', 'wrong_scalar_type'}:
+        entry = {'name': 'visible', 'value': {'kind': 'boolean', 'value': False}}
+        blueprint['nodes'][1]['data_entries'] = [entry, entry] if risk == 'duplicate_data_key' else [
+            {'name': 'visible', 'value': {'kind': 'boolean', 'value': 'false'}}]
+    elif risk == 'shared_floating_root': blueprint['floating_windows'] = [{'root': 'main', 'placement': _placement()}]
+    elif risk == 'unknown_placement_field': blueprint['floating_windows'] = [{'placement': {**_placement(), 'WindowPlacement_ShowCmd': 'Normal'}}]
+    else: blueprint['nodes'][2] = {'key': 'editors', 'kind': 'object_panel', 'label': 'Editor',
+        'editor_priority': [{'UniqueViewId': 'EffectEditor', 'plugin_identifier': '1058', 'effect_index': '0'}]}
+    _, _, _, rejected = switch_preview(tmp_path, operation='setLayout',
+        fields=('--new-layout-name', 'NeverWritten', '--blueprint', json.dumps(blueprint)), expect_declaration_error=True)
+    assert 'blueprint' in rejected['message'].lower()
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
 def test_nested_blueprint_owns_stable_ids_and_verifies_declared_stack_and_view_state(tmp_path, version):
     env = gateway_env(tmp_path)
     set_gateway_config(env, wwise_version=version)
