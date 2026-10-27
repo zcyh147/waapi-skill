@@ -419,6 +419,13 @@ def collect_console_project_acceptance(runtime, case):
         finally:
             if phase.get('transaction_id'):
                 category['transaction_ids'].append(phase['transaction_id'])
+    def retain_migration_target(phase):
+        root = runtime.state_dir / 'console184-migration-target' / phase
+        root.mkdir(parents=True, exist_ok=False)
+        link = {'requested_project_exists': migration_project.is_file()}
+        receipt['target_tree_' + phase] = link
+        retain_created_target_tree(migration_project, root, runtime.sandbox.sandbox_root, link)
+        assert link['complete'], 'Migration target tree was not completely retained'
     def immutable_source_observations():
         return {name: {'project': str(project),
             'full_tree_hash': list(_hash_mutation_bearing_project_files(project.parent)),
@@ -513,7 +520,7 @@ def collect_console_project_acceptance(runtime, case):
                 'host_ready_duration_seconds': metadata.ready_duration_seconds,
                 'created_after_host_readiness': True, 'source_copy_sha256': secondary.metadata.source_hash.digest,
                 'copied_payload_matches_source': True}
-            receipt['target_tree_before'] = file_inventory(project.parent)
+            retain_migration_target('before')
             receipt['project_before'] = saved_project(project)
             assert receipt['project_before']['wwise_version'].startswith('v2024.1.')
             receipt['model_before'] = retain_model(project, runtime.state_dir / 'console184-model-images', 'before')
@@ -607,7 +614,7 @@ def collect_console_project_acceptance(runtime, case):
             try:
                 try:
                     if migration_project is not None:
-                        receipt['target_tree_after'] = file_inventory(migration_project.parent)
+                        retain_migration_target('after')
                 finally:
                     receipt['immutable_sources_after'] = immutable_source_observations()
                     receipt['immutable_sources_verified'] = receipt['immutable_sources_before'] == receipt['immutable_sources_after']

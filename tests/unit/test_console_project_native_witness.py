@@ -112,6 +112,15 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
                         else:
                             raise AssertionError('The authentic old fixture must contain a Sound for the preservation fault')
                 self.terminal = True
+                if case == 'migrate-committed-2024' and fault in {'archive-file', 'archive-directory'}:
+                    bad = target.parent / 'nonportable:entry'
+                    if fault == 'archive-file': bad.write_bytes(b'nonportable filename')
+                    else: bad.mkdir()
+                if case == 'migrate-committed-2024' and fault == 'missing-project':
+                    self.remaining_unit = sorted(target.parent.rglob('*.wwu'))[-1]
+                    self.remaining_bytes = self.remaining_unit.read_bytes()
+                    target.unlink()
+                    raise TimeoutError('Migration outcome unknown; target project is absent')
                 return {'result': 0}
             if uri == 'ak.wwise.cli.addNewPlatform':
                 self.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -579,3 +588,56 @@ def test_committed_2024_migration_uses_separate_target_after_host_ready_and_fina
     assert receipt['phases'][0]['verify']['state'] == ('verification_failed' if fault else 'verified')
     assert not runtime.sandbox.sandbox_root.exists()
     assert Path(receipt['model_after']['index_path']).is_file()
+    for phase in ('before', 'after'):
+        capture = receipt['target_tree_' + phase]
+        assert capture['complete'] is True and capture['requested_project_exists'] is True
+        manifest = json.loads(Path(capture['manifest_path']).read_text())
+        for row in manifest['files']:
+            assert parse_archive_relative_path(row['path']).canonical == row['path']
+            assert parse_archive_relative_path(row['artifact_path']).canonical == row['artifact_path']
+
+
+def test_migration_retains_remaining_work_units_when_indeterminate_project_disappears(tmp_path, monkeypatch):
+    workflow, runtime, client, proof = _collector_runtime(tmp_path, monkeypatch, 'migrate-committed-2024', fault='missing-project')
+    with pytest.raises(AssertionError) as failure:
+        workflow.test_console_project_migrate_committed_2024_fixture_acceptance(runtime)
+    final = _finalize(tmp_path, monkeypatch, workflow, runtime, proof, failure=failure.value,
+        node='test_console_project_migrate_committed_2024_fixture_acceptance')
+    receipt = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    assert final['categories'][0]['status'] == 'FAIL'
+    assert final['transactions'][0]['state'] == 'indeterminate'
+    assert receipt['immutable_sources_verified'] is True
+    assert not runtime.sandbox.sandbox_root.exists()
+    capture = receipt['target_tree_after']
+    assert isinstance(capture, dict), 'Migration must retain raw target-tree bytes after the project disappears'
+    assert capture['requested_project_exists'] is False
+    manifest_path = Path(capture['manifest_path'])
+    manifest = json.loads(manifest_path.read_text())
+    assert capture['complete'] is True
+    relative = client.remaining_unit.relative_to(Path(manifest['target'])).as_posix()
+    row = next(row for row in manifest['files'] if row['path'] == relative)
+    image = manifest_path.parent.joinpath(*parse_archive_relative_path(row['artifact_path']).parts)
+    assert image.read_bytes() == client.remaining_bytes
+    assert receipt['after_capture_error']
+    assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.cli.migrate']) == 1
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='Windows cannot create the physical nonportable POSIX names under test')
+@pytest.mark.parametrize('fault', ['archive-file', 'archive-directory'])
+def test_migration_capture_rejects_nonportable_target_archive_identities(tmp_path, monkeypatch, fault):
+    workflow, runtime, client, proof = _collector_runtime(tmp_path, monkeypatch, 'migrate-committed-2024', fault=fault)
+    with pytest.raises(AssertionError) as failure:
+        workflow.test_console_project_migrate_committed_2024_fixture_acceptance(runtime)
+    final = _finalize(tmp_path, monkeypatch, workflow, runtime, proof, failure=failure.value,
+        node='test_console_project_migrate_committed_2024_fixture_acceptance')
+    receipt = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    assert final['categories'][0]['status'] == 'FAIL'
+    assert receipt['complete'] is False and receipt['immutable_sources_verified'] is True
+    capture = receipt['target_tree_after']
+    manifest = json.loads(Path(capture['manifest_path']).read_text())
+    assert capture['complete'] is False and receipt['migration_preservation_error']
+    assert manifest['errors'][0]['code'] == 'ArchiveRelativePathError'
+    assert not any(':' in row['path'] for row in manifest['files'])
+    assert not any(':' in row for row in manifest['directories'])
+    assert not runtime.sandbox.sandbox_root.exists()
+    assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.cli.migrate']) == 1
