@@ -18,6 +18,135 @@ MAPPING_FIELDS = frozenset({'branch_id', 'native_shape_sha256', 'public_route',
     'representative_mechanism'})
 
 
+def debug_control_component(root):
+    """Read only the five accepted internal controls, never execute Debug APIs."""
+    import json
+    from copy import deepcopy
+    from tests.maintenance.branch_coverage_audit import digest, schema_branches
+    from tests.maintenance.branch_audit_completion import candidate_identity
+    from wwise_waapi.debug_business_contracts import DEBUG_BUSINESS_LANES
+    from wwise_waapi.operation_registry import OPERATION_SPECS, operation_business_contract
+    from wwise_waapi.native_catalog import load_native_catalog
+    operations = {OPERATION_SPECS[name].uri: name for name in DEBUG_BUSINESS_LANES}
+    expected = {f'{version}|function|{uri}' for uri, operation in operations.items()
+                for version in DEBUG_BUSINESS_LANES[operation]}
+    snapshot = json.loads((root / 'docs/branch-coverage-inventory.json').read_bytes())
+    public = {row['id']: deepcopy(row) for row in snapshot['routes'] if row['id'] in expected}
+    if set(public) != expected:
+        raise ValueError('Debug component public version/route roster differs')
+    surface = json.loads((root / 'skills/waapi-skill/resources/manifest/typed-request-surface.json').read_bytes())
+    packaged = {f"{row['version']}|{row['item_type']}|{row['uri']}": row for row in surface['lanes']}
+    for key, row in public.items():
+        version, _, uri = key.split('|')
+        operation = operations[uri]
+        contract = digest(operation_business_contract(operation, version))
+        if (row['public_contracts'] != [contract]
+                or row['named_operations'] != [{'name': operation, 'contract': contract}]
+                or row['execution_policy'] != packaged[key]['execution_policy']):
+            raise ValueError('Debug public snapshot no longer matches its current closed contract')
+    owners = json.loads((root / 'docs/branch-coverage-ownership.json').read_bytes())['routes']
+    routes, branches, catalogs = [], [], {}
+    for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'):
+        wanted = {uri for uri, operation in operations.items() if version in DEBUG_BUSINESS_LANES[operation]}
+        for host in ('wwise-console', 'wwise-authoring'):
+            catalog = load_native_catalog(version, host, root=root / 'skills/waapi-skill/resources/native-catalog')
+            build = catalog['provenance']['build']
+            catalogs[f'{version}|{host}|{build}'] = catalog['content_sha256']
+            if set(operations) & set(catalog['functions']) != wanted:
+                raise ValueError('Debug native version/host roster differs')
+            for uri in sorted(wanted):
+                identity = f'{version}|{host}|{build}|function|{uri}'
+                schema = catalog['schemas'][uri]
+                routes.append({'id': identity, 'version': version, 'host': host, 'build': build,
+                    'kind': 'function', 'uri': uri, 'native_schema_sha256': digest(schema),
+                    'public_route': f'{version}|function|{uri}'})
+                for section in ('argsSchema', 'optionsSchema', 'resultSchema'):
+                    for item in schema_branches(schema[section], '/' + section):
+                        branch = {'id': identity + '|' + item['pointer'], 'route': identity,
+                            'pointer': item['pointer'], 'kind': item['kind'], 'shape_sha256': digest(item['value']),
+                            'owner_issue': owners['function|' + uri]['owner_issue'], 'parent_issue': 174,
+                            'blocks_issue': 195, 'state': 'unresolved'}
+                        if item['kind'] != 'schema':
+                            branch['value'] = item['value']
+                        branches.append(branch)
+    # candidate_identity replaces every packaged source with its own complete
+    # packaged-tree seal. Retain the same non-packaged source inputs that the
+    # normal enrich_inventory path adds, without expanding unrelated branches.
+    names = {'docs/branch-coverage-current-business.json', 'docs/interface-depth-review-policy.json',
+        'tests/maintenance/interface_depth_inventory.py', 'tests/maintenance/source_identity.py',
+        'tests/maintenance/branch_audit_mapping.py', 'tests/maintenance/branch_coverage_audit.py'}
+    business = json.loads((root / 'docs/branch-coverage-current-business.json').read_bytes())['rows']
+    for row in business:
+        for field in ('public_contract', 'compiler', 'preflight', 'verifier', 'program_definition'):
+            if field in row:
+                name = row[field].partition('#')[0]
+                if not name.startswith('skills/waapi-skill/'):
+                    names.add(name)
+    sources = {name: digest((root / name).read_text(encoding='utf-8')) for name in names}
+    sources['docs/interface-depth-inventory.json'] = digest(json.loads((root / 'docs/interface-depth-inventory.json').read_bytes()))
+    inventory = {'routes': list(public.values()), 'sources': sources,
+        'component': 'five-retained-internal-debug-controls',
+        'native_coverage': {'catalogs': catalogs, 'routes': routes, 'obligations': branches}}
+    inventory['native_coverage']['candidate_sha256'] = candidate_identity(root, inventory, catalogs, digest=digest)
+    return inventory
+
+
+def debug_control_bindings(inventory):
+    """Expand Boolean identity and fixed empty-envelope rules at exact pointers."""
+    from tests.maintenance.branch_coverage_audit import digest
+    from wwise_waapi.debug_business_contracts import DEBUG_BUSINESS_LANES
+    from wwise_waapi.operation_registry import OPERATION_SPECS
+    contexts = [key.split('|') for key in inventory['native_coverage']['catalogs']]
+    expected = {f'{version}|{host}|{build}|function|{OPERATION_SPECS[operation].uri}'
+                for version, host, build in contexts for operation, versions in DEBUG_BUSINESS_LANES.items()
+                if version in versions}
+    if ({row['id'] for row in inventory['native_coverage']['routes']} != expected
+            or len(inventory['native_coverage']['routes']) != 46
+            or {(version, host) for version, host, _ in contexts} != {
+                (version, host) for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
+                for host in ('wwise-console', 'wwise-authoring')}):
+        raise ValueError('Debug component exact version/host/route roster differs')
+    basic = {'/' + section + suffix for section in ('argsSchema', 'optionsSchema', 'resultSchema')
+             for suffix in ('', '/additionalProperties', '/@empty/object')}
+    boolean = (basic - {'/argsSchema/@empty/object'}) | {'/argsSchema/properties/enable',
+        '/argsSchema/properties/enable/@boolean/false', '/argsSchema/properties/enable/@boolean/true'}
+    public = {row['id']: row for row in inventory['routes']}
+    result = {}
+    for route in inventory['native_coverage']['routes']:
+        mode = route['uri'].endswith(('.enableAsserts', '.enableAutomationMode'))
+        members = [row for row in inventory['native_coverage']['obligations'] if row['route'] == route['id']]
+        if ({row['pointer'] for row in members} != (boolean if mode else basic)
+                or len(members) != (11 if mode else 9)):
+            raise ValueError('Unhandled or missing exact reflected Debug field/choice')
+        lane = public[route['public_route']]
+        operation = lane['named_operations'][0]['name']
+        prepare = '_prepare_debug_mode_change' if mode else '_prepare_debug_host_control'
+        for row in members:
+            pointer = row['pointer']
+            section = pointer.split('/')[1]
+            correspondence = {'rule': ('boolean_identity' if '/properties/enable' in pointer
+                else 'closed_boolean_envelope' if mode and section == 'argsSchema'
+                else 'empty_business_intent' if section == 'argsSchema'
+                else 'gateway_empty_options' if section == 'optionsSchema'
+                else 'empty_acknowledgement_without_effect_claim')}
+            if mode and section == 'argsSchema':
+                correspondence['fields'] = {'enable': 'debug_intent.enabled'}
+            if '/@boolean/' in pointer:
+                correspondence['value'] = row['value']
+            result[row['id']] = {'branch_id': row['id'], 'native_shape_sha256': row['shape_sha256'],
+                'public_route': route['public_route'], 'public_route_sha256': digest(lane),
+                'input': {'gateway_argv': ['draft-start', operation], 'selector': pointer,
+                    'declaration': 'draft-declare-debug-intent',
+                    'choices': ['--enable', '--disable'] if mode else [], 'correspondence': correspondence},
+                'construction': {'source': LIB + 'debug_business.py#materialize_debug_business_request'
+                    if section == 'argsSchema' else LIB + 'operation_registry.py#' + prepare, 'selector': pointer},
+                'validation': {'source': LIB + 'builders/schema.py#' +
+                    ('validate_semantic_result' if section == 'resultSchema' else 'validate_semantic_payload'), 'selector': pointer},
+                'verifier': {'source': LIB + 'operation_registry.py#verify_prepared_operation' if mode
+                    else GATEWAY + '#dispatch_host_control_transaction', 'selector': pointer}, 'evidence': {}}
+    return result
+
+
 def read_mapping_attachments(descriptors, requirements, read, root):
     """Read sealed mapping successors without altering any original evidence."""
     from tests.maintenance.branch_coverage_audit import digest

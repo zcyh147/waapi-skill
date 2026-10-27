@@ -142,6 +142,49 @@ def test_ordinary_run_reader_to_existing_completion_and_selected_mechanism(ordin
     assert 'node_outcomes' not in context['attachment'] and 'gateway' not in context['attachment']
 
 
+def test_debug_control_mapping_producer_covers_exact_finite_shapes_without_execution():
+    from tests.maintenance.branch_audit_mapping import debug_control_component, debug_control_bindings
+    from tests.maintenance.branch_coverage_audit import ROOT
+    inventory = debug_control_component(ROOT)
+    bindings = debug_control_bindings(inventory)
+    assert len(inventory['routes']) == 23
+    assert len(inventory['native_coverage']['routes']) == 46
+    assert len(bindings) == len(inventory['native_coverage']['obligations']) == 454
+    booleans = [binding for key, binding in bindings.items() if '/@boolean/' in key]
+    assert len(booleans) == 40
+    assert {binding['input']['correspondence']['value'] for binding in booleans} == {False, True}
+    assert all(binding['input']['correspondence']['rule'] == 'boolean_identity' for binding in booleans)
+    assert all(binding['input']['correspondence']['fields'] == {'enable': 'debug_intent.enabled'} for binding in booleans)
+    assert all(binding['evidence'] == {} for binding in bindings.values())
+
+
+@pytest.mark.parametrize('missing', ['boolean', 'version', 'route'])
+def test_debug_mapping_producer_rejects_missing_legal_choice_version_or_route(missing):
+    from tests.maintenance.branch_audit_mapping import debug_control_component, debug_control_bindings
+    from tests.maintenance.branch_coverage_audit import ROOT
+    inventory = debug_control_component(ROOT)
+    native = inventory['native_coverage']
+    if missing == 'boolean':
+        removed = next(row for row in native['obligations'] if row['pointer'].endswith('/@boolean/false'))
+        native['obligations'].remove(removed)
+    else:
+        ids = {row['id'] for row in native['routes'] if row['version'] == '2021.1'} if missing == 'version' else {native['routes'][0]['id']}
+        native['routes'] = [row for row in native['routes'] if row['id'] not in ids]
+        native['obligations'] = [row for row in native['obligations'] if row['route'] not in ids]
+    with pytest.raises(ValueError, match='Debug.*(roster|field|choice)'):
+        debug_control_bindings(inventory)
+
+
+def test_aggregate_selected_mechanism_cannot_complete_without_original_proof(ordinary_run):
+    context = ordinary_run
+    representative_review(context)
+    context['binding']['evidence'] = {}
+    ledger = completion.evaluate_coverage(context['root'], context['inventory'], context['bindings'], digest=digest,
+        scope=context['scope'], evidence_base=context['base'], requirements_document=context['requirements'])
+    assert ledger['completion']['complete'] is False
+    assert all(row['state'] == 'implemented_unverified' for row in ledger['obligations'])
+
+
 @pytest.mark.parametrize('damage', ['tampered-log', 'log-count', 'wrong-original-candidate', 'wrong-current-candidate',
     'original-source', 'current-source', 'unselected-test', 'affected-skip', 'skip-report', 'skip-source',
     'failed', 'partial', 'candidate-drift', 'unsealed', 'relabel-node-pass', 'relabel-gateway', 'scope', 'filtered'])

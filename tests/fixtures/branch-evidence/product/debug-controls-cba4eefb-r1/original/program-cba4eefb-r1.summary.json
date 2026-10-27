@@ -1,0 +1,13 @@
+{
+  "candidate": "cba4eefb80c9895b7b2f15988ad089762a5d6d30",
+  "status": "PASS",
+  "passed": 9866,
+  "skipped": 3,
+  "skip_reason": "native Windows shell/runner/NTFS junction proof",
+  "pytest_seconds": 2478.13,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "owned_processes_remaining": [],
+  "original_receipt": "program-cba4eefb-r1.result.json",
+  "log_sha256": "a9b4484c5392531f84283133b0543727c7399134e2ff87d373f4b45e92cd2e83"
+}

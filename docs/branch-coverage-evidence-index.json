@@ -1026,6 +1026,31 @@
           "sha256": "a44917a7fa45fdb7b669598d6a2895fd9a3fbfdaafdefd1fe090cab716b6439c"
         }
       }
+    },
+    {
+      "id": "debug-controls-cba4eefb-aggregate-r1",
+      "bindings": {
+        "artifact": "debug-controls-cba4eefb-r1/selected.bindings.json",
+        "sha256": "1f40429708c6525672574b815017d23e17f41759c4cdd9d83cbbe48ea6ebf04a"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "debug-controls-cba4eefb-r1/selected.bindings.original.json",
+          "sha256": "1f40429708c6525672574b815017d23e17f41759c4cdd9d83cbbe48ea6ebf04a"
+        },
+        "program": {
+          "artifact": "debug-controls-cba4eefb-r1/aggregate-program.json",
+          "sha256": "9dbe1468b01561d3fa1842a1a85f9ae915b7ca8b581954648df7074ba7ee54a3"
+        },
+        "requirements": {
+          "artifact": "debug-controls-cba4eefb-r1/selected.requirements.json",
+          "sha256": "bd0664e06152e17776474dd145c6b9d9dcf9272a5ca57c7dd8b4f2045ed81ed3"
+        },
+        "capture": {
+          "artifact": "debug-controls-cba4eefb-r1/selected.review-context.json",
+          "sha256": "18082260750ce7566ad2dfca79710c628ba9200b8a8376f65cde27a78efa4d57"
+        }
+      }
     }
   ],
   "metadata_attachments": [
@@ -1312,6 +1337,12 @@
     {
       "artifact": "source-r92-final-29b34d4c-2025.1/portable/native-successor.json",
       "sha256": "4061cb4baff942ccb8c11d3bd04d8b9adeb8ba25cf1460831f2322c69fb8ee17"
+    }
+  ],
+  "mapping_attachments": [
+    {
+      "artifact": "debug-controls-cba4eefb-r1/mapping.json",
+      "sha256": "2ec2d1ce10b9fa85e757d7ee33ad8c733c3d3bcfdcd96e9aca4a19bcd5a662e2"
     }
   ]
 }
