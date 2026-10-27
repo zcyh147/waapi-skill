@@ -8,16 +8,16 @@
     "collection_basis": "0586b6d467bdf1461b6adc3c92f4dd253d35d187",
     "run_candidate": "2fbae96c9524f853b2ce277a68e96c7eeb8941f6",
     "sources": {
-      "tests/unit/test_contribution_branch_evidence.py": "53214ba1c1b5478353a2f4c4c62715b218d57bbc43bd5dbeb014505e54d58de9",
-      "ci/test.sh": "8e0be6da25d33455452590767e4b1b5c22bffa353d7ac6ff275f9580e981b534",
-      "pyproject.toml": "c6b4c3708b11ad7d8215ca961df70531d21db960bd6434a77def49becff622b6",
-      "tests/unit/test_loaded_media_composite_evidence.py": "95a4d5495254a3ba2d6683c3604da5818eb91bc9cbc3f6d92cb671a7506f74c7",
-      "tests/unit/test_rtpc_field_branch_evidence.py": "659e649bf5747044e1396c07f930a117e7c34a33fac343504298b679f9dbc381",
-      "ci/test_driver.py": "269298151be54391cb9a06f84e82072b7657e815916193ba240576c0938ac56d",
-      "tests/unit/test_runtime_log_branch_evidence.py": "092da562011affaa332ce2dbe1051b8317a6e98f31df3a42558b659dbd43a151",
-      "tests/unit/test_console_loaded_media_evidence.py": "07866271c3e5e2ac33b193d2175af65591ecdc9ba85674f33b10328c3743f296",
       "tests/conftest.py": "c9f13bdfb2450c025726c606b4f5d43b51d23cd165f5becc11a533bb5b561655",
-      "tests/unit/test_fixed_runtime_read_branch_evidence.py": "9d860e9db6f39d227e09d28d7e88da18dac6b51fd83ebec5f58b0ce691a82bfe"
+      "pyproject.toml": "c6b4c3708b11ad7d8215ca961df70531d21db960bd6434a77def49becff622b6",
+      "ci/test.sh": "8e0be6da25d33455452590767e4b1b5c22bffa353d7ac6ff275f9580e981b534",
+      "ci/test_driver.py": "269298151be54391cb9a06f84e82072b7657e815916193ba240576c0938ac56d",
+      "tests/unit/test_loaded_media_composite_evidence.py": "95a4d5495254a3ba2d6683c3604da5818eb91bc9cbc3f6d92cb671a7506f74c7",
+      "tests/unit/test_console_loaded_media_evidence.py": "07866271c3e5e2ac33b193d2175af65591ecdc9ba85674f33b10328c3743f296",
+      "tests/unit/test_rtpc_field_branch_evidence.py": "659e649bf5747044e1396c07f930a117e7c34a33fac343504298b679f9dbc381",
+      "tests/unit/test_contribution_branch_evidence.py": "53214ba1c1b5478353a2f4c4c62715b218d57bbc43bd5dbeb014505e54d58de9",
+      "tests/unit/test_fixed_runtime_read_branch_evidence.py": "9d860e9db6f39d227e09d28d7e88da18dac6b51fd83ebec5f58b0ce691a82bfe",
+      "tests/unit/test_runtime_log_branch_evidence.py": "092da562011affaa332ce2dbe1051b8317a6e98f31df3a42558b659dbd43a151"
     },
     "reviewed_reason": "Exact eight collected case IDs retained. All selected test definitions, conftest, pytest configuration and CI dispatch sources are byte-identical between collection basis and frozen run; collection itself did not stamp a Git candidate."
   },

@@ -40,13 +40,13 @@
         "selector": "/argsSchema"
       },
       "verifier": {
-        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_control_business_request",
         "selector": "/argsSchema"
       },
       "evidence": {
         "program": {
           "artifact": "runtime-read-log-195-r1/selected-1-program.json",
-          "sha256": "bd136c6ea93f5f3e2867419a1acbb3fea55d05d252864ad8beee27f0b3f1bdc3"
+          "sha256": "d793cce6899e7ea47fa92d0968849187d3d5755e69f30002daed023967101162"
         }
       },
       "ordinary_test_run_attachment": true,
@@ -58,15 +58,9 @@
         "skills/waapi-skill/wwise_waapi/capabilities.py",
         "skills/waapi-skill/wwise_waapi/dispatcher.py",
         "skills/waapi-skill/wwise_waapi/io_policy.py",
-        "skills/waapi-skill/wwise_waapi/operation_registry.py",
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py",
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py",
-        "skills/waapi-skill/wwise_waapi/runtime_inspection_observations.py",
-        "skills/waapi-skill/wwise_waapi/runtime_log_effects.py",
-        "skills/waapi-skill/wwise_waapi/transaction_cleanup.py",
-        "skills/waapi-skill/wwise_waapi/transaction_runtime.py",
-        "skills/waapi-skill/wwise_waapi/transactions.py",
-        "tests/unit/test_runtime_log_branch_evidence.py"
+        "tests/unit/test_runtime_business_gateway.py"
       ],
       "representative_mechanism": "runtime195-log-clear-v1"
     }

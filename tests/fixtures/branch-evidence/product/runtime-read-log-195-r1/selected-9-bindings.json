@@ -39,7 +39,7 @@
       "evidence": {
         "program": {
           "artifact": "runtime-read-log-195-r1/selected-9-program.json",
-          "sha256": "048e80c8188fd972c96dd580348c31f89021bc79edaeec64f3a777b66bd4c6b6"
+          "sha256": "333861ff15e150a771ff5dfeedd636653d69a2a3af663826eda00619b380005a"
         }
       },
       "ordinary_test_run_attachment": true,

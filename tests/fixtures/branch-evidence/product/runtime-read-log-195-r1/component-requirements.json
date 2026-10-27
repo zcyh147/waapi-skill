@@ -91286,7 +91286,7 @@
     "runtime195-rtpc-v1": {
       "contract": "waapi-skill.representative-branch-mechanism/v1",
       "scope_kind": "product",
-      "candidate_sha256": "26357edefcf81f42f18425ddd6f15967419559a21e995969fe0a3cd38ba323fd",
+      "candidate_sha256": "9d988f3254f30610d130f8fdc5ea45dc8d59526c8885170ef862622a7a77379a",
       "reviewed_reason": "Finite exact source roster and pointer-specific Gateway construction/validation/whole-result rules. Selected meaningful code mechanisms only; all required same-route original native roots remain direct. No sibling execution/effect, new native outcome, older LoadedMedia nonempty execution or Console clear business effect is asserted.",
       "sources": {
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
@@ -93344,7 +93344,7 @@
     "runtime195-contribution-v1": {
       "contract": "waapi-skill.representative-branch-mechanism/v1",
       "scope_kind": "product",
-      "candidate_sha256": "26357edefcf81f42f18425ddd6f15967419559a21e995969fe0a3cd38ba323fd",
+      "candidate_sha256": "9d988f3254f30610d130f8fdc5ea45dc8d59526c8885170ef862622a7a77379a",
       "reviewed_reason": "Finite exact source roster and pointer-specific Gateway construction/validation/whole-result rules. Selected meaningful code mechanisms only; all required same-route original native roots remain direct. No sibling execution/effect, new native outcome, older LoadedMedia nonempty execution or Console clear business effect is asserted.",
       "sources": {
         "skills/waapi-skill/wwise_waapi/builders/schema.py": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2",
@@ -98835,7 +98835,7 @@
     "runtime195-fixed-v1": {
       "contract": "waapi-skill.representative-branch-mechanism/v1",
       "scope_kind": "product",
-      "candidate_sha256": "26357edefcf81f42f18425ddd6f15967419559a21e995969fe0a3cd38ba323fd",
+      "candidate_sha256": "9d988f3254f30610d130f8fdc5ea45dc8d59526c8885170ef862622a7a77379a",
       "reviewed_reason": "Finite exact source roster and pointer-specific Gateway construction/validation/whole-result rules. Selected meaningful code mechanisms only; all required same-route original native roots remain direct. No sibling execution/effect, new native outcome, older LoadedMedia nonempty execution or Console clear business effect is asserted.",
       "sources": {
         "skills/waapi-skill/wwise_waapi/builders/schema.py": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2",
@@ -123078,7 +123078,7 @@
     "runtime195-log-get-v1": {
       "contract": "waapi-skill.representative-branch-mechanism/v1",
       "scope_kind": "product",
-      "candidate_sha256": "26357edefcf81f42f18425ddd6f15967419559a21e995969fe0a3cd38ba323fd",
+      "candidate_sha256": "9d988f3254f30610d130f8fdc5ea45dc8d59526c8885170ef862622a7a77379a",
       "reviewed_reason": "Finite exact source roster and pointer-specific Gateway construction/validation/whole-result rules. Selected meaningful code mechanisms only; all required same-route original native roots remain direct. No sibling execution/effect, new native outcome, older LoadedMedia nonempty execution or Console clear business effect is asserted.",
       "sources": {
         "skills/waapi-skill/wwise_waapi/builders/schema.py": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2",
@@ -145867,7 +145867,7 @@
     "runtime195-log-add-v1": {
       "contract": "waapi-skill.representative-branch-mechanism/v1",
       "scope_kind": "product",
-      "candidate_sha256": "26357edefcf81f42f18425ddd6f15967419559a21e995969fe0a3cd38ba323fd",
+      "candidate_sha256": "9d988f3254f30610d130f8fdc5ea45dc8d59526c8885170ef862622a7a77379a",
       "reviewed_reason": "Finite exact source roster and pointer-specific Gateway construction/validation/whole-result rules. Selected meaningful code mechanisms only; all required same-route original native roots remain direct. No sibling execution/effect, new native outcome, older LoadedMedia nonempty execution or Console clear business effect is asserted.",
       "sources": {
         "skills/waapi-skill/wwise_waapi/builders/schema.py": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2",
@@ -146894,7 +146894,7 @@
     "runtime195-log-clear-v1": {
       "contract": "waapi-skill.representative-branch-mechanism/v1",
       "scope_kind": "product",
-      "candidate_sha256": "26357edefcf81f42f18425ddd6f15967419559a21e995969fe0a3cd38ba323fd",
+      "candidate_sha256": "9d988f3254f30610d130f8fdc5ea45dc8d59526c8885170ef862622a7a77379a",
       "reviewed_reason": "Finite exact source roster and pointer-specific Gateway construction/validation/whole-result rules. Selected meaningful code mechanisms only; all required same-route original native roots remain direct. No sibling execution/effect, new native outcome, older LoadedMedia nonempty execution or Console clear business effect is asserted.",
       "sources": {
         "skills/waapi-skill/wwise_waapi/builders/schema.py": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2",
@@ -147344,7 +147344,7 @@
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear",
           "native_shape_sha256": "7a53ea2a5811a2b4ce5ee54c33f0d4888e97d86ca792924411114692c2669b38",
-          "mapping_sha256": "bfe0b1512feb0e20f8b2bcc12637c66f9ff2b5762438d5f11156f7e565a88ce2"
+          "mapping_sha256": "a1e83634e3c6a5076ce618c5e6d656b97d26d6a6fe37e13817299ad5564ed8a5"
         },
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/@definition/waapi_definitions.json/definitions/logCentralChannel": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear",
@@ -147404,7 +147404,7 @@
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear",
           "native_shape_sha256": "e2e8a97ef62ea8634f4e4d53cd075850c151c5c0878005d3926238b4bf7cc9e8",
-          "mapping_sha256": "d124b982e6688b202e3fcdd9573190fd101930caa7ef18f435f8381719e73c82"
+          "mapping_sha256": "a22c53d7b1152d4ce9e90857c06e55f1964d05581a958a6749952c6e3c911734"
         },
         "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/$ref": {
           "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear",
@@ -147564,7 +147564,8 @@
       },
       "selected_proofs": {
         "program": [
-          "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema"
+          "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema",
+          "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel"
         ],
         "native": [
           "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.log.clear|/resultSchema",
@@ -147579,7 +147580,7 @@
     "runtime195-loaded-authoring-v1": {
       "contract": "waapi-skill.representative-branch-mechanism/v1",
       "scope_kind": "product",
-      "candidate_sha256": "26357edefcf81f42f18425ddd6f15967419559a21e995969fe0a3cd38ba323fd",
+      "candidate_sha256": "9d988f3254f30610d130f8fdc5ea45dc8d59526c8885170ef862622a7a77379a",
       "reviewed_reason": "Finite exact source roster and pointer-specific Gateway construction/validation/whole-result rules. Selected meaningful code mechanisms only; all required same-route original native roots remain direct. No sibling execution/effect, new native outcome, older LoadedMedia nonempty execution or Console clear business effect is asserted.",
       "sources": {
         "skills/waapi-skill/wwise_waapi/builders/schema.py": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2",
@@ -148066,7 +148067,7 @@
     "runtime195-loaded-console-v1": {
       "contract": "waapi-skill.representative-branch-mechanism/v1",
       "scope_kind": "product",
-      "candidate_sha256": "26357edefcf81f42f18425ddd6f15967419559a21e995969fe0a3cd38ba323fd",
+      "candidate_sha256": "9d988f3254f30610d130f8fdc5ea45dc8d59526c8885170ef862622a7a77379a",
       "reviewed_reason": "Finite exact source roster and pointer-specific Gateway construction/validation/whole-result rules. Selected meaningful code mechanisms only; all required same-route original native roots remain direct. No sibling execution/effect, new native outcome, older LoadedMedia nonempty execution or Console clear business effect is asserted.",
       "sources": {
         "skills/waapi-skill/wwise_waapi/builders/schema.py": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2",

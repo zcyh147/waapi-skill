@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.ordinary-test-run-attachment/v1",
   "scope_kind": "product",
-  "candidate_sha256": "26357edefcf81f42f18425ddd6f15967419559a21e995969fe0a3cd38ba323fd",
+  "candidate_sha256": "9d988f3254f30610d130f8fdc5ea45dc8d59526c8885170ef862622a7a77379a",
   "original_candidate": "6ae8fea1877b342beabb2ab68650a04b9cc5ccc1",
   "files": {
     "plan": {

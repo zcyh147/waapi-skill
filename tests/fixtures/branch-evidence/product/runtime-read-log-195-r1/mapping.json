@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.branch-mapping-attachment/v1",
   "scope_kind": "product",
-  "requirements_sha256": "1ca4df20336414a15cf1f2604222364940d04bdc5bc5eab94e77454be9910f3b",
+  "requirements_sha256": "4af53103684dc3192ba6a2fb7bea9db529f035e195bd02dde6ed17c4680e0228",
   "mechanisms": [
     "runtime195-rtpc-v1",
     "runtime195-contribution-v1",
@@ -131739,7 +131739,7 @@
         "selector": "/argsSchema"
       },
       "verifier": {
-        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_control_business_request",
         "selector": "/argsSchema"
       },
       "evidence": {},
@@ -131752,15 +131752,9 @@
         "skills/waapi-skill/wwise_waapi/capabilities.py",
         "skills/waapi-skill/wwise_waapi/dispatcher.py",
         "skills/waapi-skill/wwise_waapi/io_policy.py",
-        "skills/waapi-skill/wwise_waapi/operation_registry.py",
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py",
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py",
-        "skills/waapi-skill/wwise_waapi/runtime_inspection_observations.py",
-        "skills/waapi-skill/wwise_waapi/runtime_log_effects.py",
-        "skills/waapi-skill/wwise_waapi/transaction_cleanup.py",
-        "skills/waapi-skill/wwise_waapi/transaction_runtime.py",
-        "skills/waapi-skill/wwise_waapi/transactions.py",
-        "tests/unit/test_runtime_log_branch_evidence.py"
+        "tests/unit/test_runtime_business_gateway.py"
       ],
       "representative_mechanism": "runtime195-log-clear-v1"
     },
@@ -132216,6 +132210,70 @@
         "tests/unit/test_console_loaded_media_evidence.py"
       ],
       "representative_mechanism": "runtime195-loaded-console-v1"
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel": {
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel",
+      "native_shape_sha256": "e2e8a97ef62ea8634f4e4d53cd075850c151c5c0878005d3926238b4bf7cc9e8",
+      "public_route": "2025.1|function|ak.wwise.core.log.clear",
+      "public_route_sha256": "7ce150f846d5ddb4da59327dc1c37759662cabee2a114f760a35a2b2d2bfd2c3",
+      "input": {
+        "gateway_argv": [
+          "draft-start",
+          "ak.wwise.core.log.clear"
+        ],
+        "selector": "/native_call/args/channel",
+        "declaration": "draft-declare-runtime-control-plan",
+        "correspondence": {
+          "rule": "exact_versioned_closed_runtime_declaration_and_whole_result_preservation",
+          "native_pointer": "/argsSchema/properties/channel",
+          "original_mapping_index_sha256": "63e7408d221933cfff673827d282bd913f98d8f52ac6b68ebe6e7438914af5e9"
+        },
+        "choices": {
+          "log-channel": [
+            "general",
+            "soundbank-generation",
+            "audio-conversion",
+            "platform-settings-copy",
+            "waapi",
+            "project-load",
+            "source-control",
+            "lua"
+          ]
+        }
+      },
+      "construction": {
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_inspection_business_request",
+        "selector": "/argsSchema/properties/channel"
+      },
+      "validation": {
+        "source": "skills/waapi-skill/wwise_waapi/builders/schema.py#validate_resolved_semantic_result",
+        "selector": "/argsSchema/properties/channel"
+      },
+      "verifier": {
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
+        "selector": "/argsSchema/properties/channel"
+      },
+      "evidence": {},
+      "ordinary_test_run_attachment": true,
+      "relevant_sources": [
+        "skills/waapi-skill/scripts/gateway.py",
+        "skills/waapi-skill/scripts/run.py",
+        "skills/waapi-skill/wwise_waapi/builders/schema.py",
+        "skills/waapi-skill/wwise_waapi/builders/stable_reads.py",
+        "skills/waapi-skill/wwise_waapi/capabilities.py",
+        "skills/waapi-skill/wwise_waapi/dispatcher.py",
+        "skills/waapi-skill/wwise_waapi/io_policy.py",
+        "skills/waapi-skill/wwise_waapi/operation_registry.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_observations.py",
+        "skills/waapi-skill/wwise_waapi/runtime_log_effects.py",
+        "skills/waapi-skill/wwise_waapi/transaction_cleanup.py",
+        "skills/waapi-skill/wwise_waapi/transaction_runtime.py",
+        "skills/waapi-skill/wwise_waapi/transactions.py",
+        "tests/unit/test_runtime_log_branch_evidence.py"
+      ],
+      "representative_mechanism": "runtime195-log-clear-v1"
     },
     "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema": {
       "branch_id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema",
@@ -489746,51 +489804,6 @@
       "evidence": {},
       "representative_mechanism": "runtime195-log-clear-v1"
     },
-    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel": {
-      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel",
-      "native_shape_sha256": "e2e8a97ef62ea8634f4e4d53cd075850c151c5c0878005d3926238b4bf7cc9e8",
-      "public_route": "2025.1|function|ak.wwise.core.log.clear",
-      "public_route_sha256": "7ce150f846d5ddb4da59327dc1c37759662cabee2a114f760a35a2b2d2bfd2c3",
-      "input": {
-        "gateway_argv": [
-          "draft-start",
-          "ak.wwise.core.log.clear"
-        ],
-        "selector": "/native_call/args/channel",
-        "declaration": "draft-declare-runtime-control-plan",
-        "correspondence": {
-          "rule": "exact_versioned_closed_runtime_declaration_and_whole_result_preservation",
-          "native_pointer": "/argsSchema/properties/channel",
-          "original_mapping_index_sha256": "63e7408d221933cfff673827d282bd913f98d8f52ac6b68ebe6e7438914af5e9"
-        },
-        "choices": {
-          "log-channel": [
-            "general",
-            "soundbank-generation",
-            "audio-conversion",
-            "platform-settings-copy",
-            "waapi",
-            "project-load",
-            "source-control",
-            "lua"
-          ]
-        }
-      },
-      "construction": {
-        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_inspection_business_request",
-        "selector": "/argsSchema/properties/channel"
-      },
-      "validation": {
-        "source": "skills/waapi-skill/wwise_waapi/builders/schema.py#validate_resolved_semantic_result",
-        "selector": "/argsSchema/properties/channel"
-      },
-      "verifier": {
-        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
-        "selector": "/argsSchema/properties/channel"
-      },
-      "evidence": {},
-      "representative_mechanism": "runtime195-log-clear-v1"
-    },
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/$ref": {
       "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/$ref",
       "native_shape_sha256": "f8a7452ec99bf90590d77f0ea16dcc406fcae1ae0aba2782d1f2acb05ed82289",
@@ -546679,48 +546692,52 @@
       "policy_sha256": "9ed10681fc5f9c38efac8ef7ac790a76381bd5904cc2e8e92ca69243596adbe6"
     },
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.addItem|/argsSchema": {
-      "binding_sha256": "398e184c0263148186ff0ba736cc0ec8259443758986eacac51620e3ab33f977",
+      "binding_sha256": "92dd0ed3abf625110619b46d24e53f76b72146d2ab6d04547e14107badf58e56",
       "policy_sha256": "77e9516be8316cdd8c4331521146cac8fdc898ce627905beb943be2836d3d21c"
     },
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema": {
-      "binding_sha256": "593c7ec8abd48d7781d7a004be81c84231ae47257397590face9b42fcd7e0842",
+      "binding_sha256": "a704d78505e9081650046a5dbb612ebd87cdb6b70dd9fe169b001ea958d88449",
       "policy_sha256": "7803afddfe020c2a19e2aff74eff34ac82b6954b8e397b8d05f83e1183eb92f6"
     },
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.get|/argsSchema": {
-      "binding_sha256": "73ccc08205befb72c26f6ec921957d6c9610f4cb20e146af865d52f164b1a8cd",
+      "binding_sha256": "9c23d78e7ebbdbaa5298afdf112a97a8b3a35dbe61849d95fdb2496bb3f39252",
       "policy_sha256": "7195fa526b15270427bdcacfaf3ac5af687737ad577f26d20c32c8c9a23c8a3b"
     },
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema": {
-      "binding_sha256": "f1fd46330c39eccf2343d8fe5c5a8eaf19a8134114b27ef27c8a7009621993c4",
+      "binding_sha256": "d27ac4356e7a430df27aafbce5ce92f007c2dbcf9b2e97a6d5efa48200d821e4",
       "policy_sha256": "5e7d2386bf2c367fc994ad1b15c2c0f642e7d46720ec84d73a00544735317f89"
     },
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/argsSchema": {
-      "binding_sha256": "ca0553c1137f29e6cfea05470738b8603daf021403642f5b1ca610d9cff1f7a1",
+      "binding_sha256": "a8043f62baac2645093e75af8ede4d36bb147836e5c8fa07b1d9dbc100b7492e",
       "policy_sha256": "2e18fa8b9de9de0c6eaaa34afcfdd44cede961beb35a7e8cc18ef51693e4fae3"
     },
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getGameObjects|/argsSchema": {
-      "binding_sha256": "524897471508b5a8091c3817ca0c8a9a787d6a7c96fa8b9f4f0e9bff77bc6f17",
+      "binding_sha256": "101eb6840e0733e13c7c90241f5e7b95c5e4afe48c3fdfd0468a4a72c435167d",
       "policy_sha256": "a2fb83e2da14a760b7fb27594b16e4585182cda4c46203f05ba8e63a76213512"
     },
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema": {
-      "binding_sha256": "81a2f7124117636296c207d6cc731700022e1d3945d030a2cf66d097cda1d665",
+      "binding_sha256": "0e715c5d861e84e577d66d5300d89f488a3c14d34407f50d0bfecdf4cf216619",
       "policy_sha256": "ccdbbddf08923eccfe444d923164820f7b135c5957d888c6fad1f3ec6760911c"
     },
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/argsSchema": {
-      "binding_sha256": "8ad6a4d20f3f911bd9d670c361698daa96482e7e8e55db3eb2a6cd86688a5dd7",
+      "binding_sha256": "84b4c42465594c4409c946831113748c634f2f4f02957d8da07915d5f0abff2a",
       "policy_sha256": "0b8fbcae80f056c6fef22495199b4c9256dc3adf9bc7895fb508034b2f694f58"
     },
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema": {
-      "binding_sha256": "62451dbc4f5e7f8b659a5c8685915676f53b1b1b0b52e60895c0a7118c486ed5",
+      "binding_sha256": "164b174a3824b9a372d3aa8f02ad35bc425877e15e20dbf0c5dddc316c74a0f0",
       "policy_sha256": "6dedc4799484934618989482a91f727c201b81d5ebb763a0a8a9d6959b31f264"
     },
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/argsSchema": {
-      "binding_sha256": "8e3e08e9d68203ff956bc649ced922e301b03f008fe31092ee6b5c3150f1373c",
+      "binding_sha256": "2638a42474b5da3e29e2c1bb674505163e240f0d34b5138a5b66c348284e42d8",
       "policy_sha256": "34df0b25bc45222e118f516a78dced8f8e8bd8209ae596971dc8da692910295d"
     },
     "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema": {
-      "binding_sha256": "e7b44c79b113c13f1e384f0f2c89eff17c06144fa271e9af350a787c2988b47e",
+      "binding_sha256": "c990cfbc734da09acc1c1129633316182aa68b62516c817f1b69c6347108aac7",
       "policy_sha256": "0a1643f708dc8bd95d0a229849267825f1db4e02b62eb65891eb5f7c48df78dd"
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel": {
+      "binding_sha256": "8b3e4e0bdfb43933fefe98956b078ea02fc634f811b44daf7fb14d0f480f61e6",
+      "policy_sha256": "3fe470683a772a5ed686f2ddf48ea561a9fef52112f024c0b4022166895a1e95"
     },
     "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema": null,
     "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime": null,
@@ -556248,7 +556265,6 @@
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/@definition/waapi_definitions.json/definitions/logCentralChannel/enum/7": null,
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/@empty/object": null,
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/additionalProperties": null,
-    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel": null,
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/$ref": null,
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/@presence/absent": null,
     "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/@presence/present": null,
