@@ -49,9 +49,20 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
                 tree.find('./ProjectInfo/Project').set('Name', self.created_file.stem)
                 if case == 'cli-create' and fault is True:
                     tree.find('./ProjectInfo/Project/Platforms/Platform').set('ReferencePlatform', 'Mac')
+                platforms = tree.find('./ProjectInfo/Project/Platforms')
+                platforms[:] = sorted(platforms, key=lambda row: row.get('Name'))
                 if fault == 'missing-default':
-                    properties = tree.find('./ProjectInfo/Project/PropertyList')
+                    tree.find('./ProjectInfo/Project/PropertyList/Property[@Name="DefaultLanguage"]').attrib.pop('Value')
+                elif case == 'create-close':
+                    project = tree.find('./ProjectInfo/Project'); properties = project.find('PropertyList')
                     properties.remove(properties.find('./Property[@Name="DefaultLanguage"]'))
+                    backing = ET.SubElement(ET.SubElement(ET.SubElement(project, 'SharedValues'), 'SharedPropertyList'), 'PropertyList')
+                    field = ET.SubElement(backing, 'Property', Name='DefaultLanguage', Type='string')
+                    ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value').text = 'English(US)'
+                    languages = project.find('LanguageList')
+                    ET.SubElement(languages, 'Language', Name='External', ID='{C5B109DA-F3FD-485F-833F-8FB61F6FF042}')
+                    ET.SubElement(languages, 'Language', Name='Mixed', ID='{2B5DFEAD-36EC-4AE6-900D-8DD49E09E25A}')
+                    languages[:] = sorted(languages, key=lambda row: row.get('Name'))
                 tree.write(self.created_file)
                 if uri == 'ak.wwise.console.project.create': self.active_file = self.created_file
                 self.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -235,7 +246,7 @@ def test_cli_create_collector_reaches_existing_final_writer_and_retains_created_
     if not fault:
         assert receipt['created_fixture']['manifest_sha256']
         assert Path(receipt['created_fixture']['manifest']).is_file()
-        assert receipt['created_project']['platforms'] == [['Windows', 'Windows'], ['Mac', 'Mac']]
+        assert receipt['created_project']['platforms'] == [['Mac', 'Mac'], ['Windows', 'Windows']]
     assert len([uri for uri, _, _ in client.calls if uri.startswith('ak.wwise.cli.')]) == 1
 
 
@@ -253,6 +264,8 @@ def test_console_create_close_collector_uses_two_authorized_transitions_and_fina
     assert len(final['transactions']) == 2
     receipt = json.loads(Path(final['categories'][0]['observation_path']).read_text())
     assert receipt['complete'] is (not fault)
+    assert receipt['created_project']['languages'] == ['English(US)', 'External', 'Japanese', 'Mixed', 'SFX']
+    assert receipt['created_default_language']['value'] == 'English(US)'
     assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.console.project.create']) == 1
     assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.console.project.close']) == 1
 

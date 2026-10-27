@@ -419,7 +419,8 @@ def collect_console_project_acceptance(runtime, case):
             complete('ak.wwise.cli.createNewProject', ['--value', 'project_file', str(project),
                 '--item', 'platforms', 'Windows', '--item', 'platforms', 'Mac'])
             observed = saved_project(project)
-            assert observed['name'] == 'Blank2024' and observed['platforms'] == [['Windows', 'Windows'], ['Mac', 'Mac']]
+            assert observed['name'] == 'Blank2024'
+            assert len(observed['platforms']) == 2 and {tuple(row) for row in observed['platforms']} == {('Windows', 'Windows'), ('Mac', 'Mac')}
             receipt['created_project'] = observed
             receipt['created_fixture'] = export_created_fixture(project, runtime.state_dir / 'console184-created-donor',
                 runtime=runtime, transaction=category['transaction_ids'][0])
@@ -431,8 +432,24 @@ def collect_console_project_acceptance(runtime, case):
                 '--item', 'languages', 'English(US)', '--item', 'languages', 'Japanese'])
             observed = saved_project(project)
             assert observed['name'] == 'ConsoleCreated'
-            assert observed['platforms'] == [['Windows_Studio', 'Windows'], ['Mac', 'Mac']]
-            assert [language for language in observed['languages'] if language != 'SFX'] == ['English(US)', 'Japanese']
+            assert len(observed['platforms']) == 2 and {tuple(row) for row in observed['platforms']} == {('Windows_Studio', 'Windows'), ('Mac', 'Mac')}
+            requested_languages = {'English(US)', 'Japanese'}
+            # Native empty creation includes these implicit names in the exact
+            # retained2025 project; order of saved rows is not a requested effect.
+            assert len(observed['languages']) == len(set(observed['languages']))
+            assert requested_languages <= set(observed['languages']) <= requested_languages | {'External', 'Mixed', 'SFX'}
+            document, _ = _read_xml_artifact(str(project), str(project.parent))
+            fields = document.findall('./ProjectInfo/Project/PropertyList/Property[@Name="DefaultLanguage"]')
+            default = {'value': fields[0].get('Value'), 'representation': 'explicit'} if fields else None
+            if default is None:
+                source = Path(__file__).resolve().parents[3] / 'skills/waapi-skill/resources/semantic/2025.1/project_default_language.json'
+                proof = capture_file_proof(source, field='Project default language source', io_root=source.parent, max_bytes=16384)
+                definition = json.loads(source.read_bytes())
+                assert definition['version'] == runtime.version and definition['property'] == 'DefaultLanguage'
+                assert definition['class'] == {'Name': 'Project', 'CompanyID': '1', 'PluginID': '3'}
+                default = {'value': definition['default'], 'representation': 'default_elided', 'source_proof': proof}
+            assert default['value'] == 'English(US)'
+            receipt['created_default_language'] = default
             receipt['created_project'] = observed
             schema = gateway.gateway(['request-schema', 'ak.wwise.console.project.close'], live=False)
             assert schema['input_shape'] == 'zero'
