@@ -28,14 +28,13 @@ def construction_blueprint():
             'width': '300', 'height': '400', 'data_entries': []},
         {'key': 'editor', 'kind': 'object_panel', 'label': 'ObjectPanel', 'bottom_editor_state': 'normal',
             'editor_priority': [{'view_identifier': 'AttenuationEditor', 'plugin_identifier': '4294967295',
-                'effect_index': '0', 'include_type': True}],
-            'preferred_heights': [{'view_identifier': 'AttenuationEditor', 'plugin_identifier': '4294967295',
-                'effect_index': '0', 'height': '621.4757'}], 'sidebar': {'width': '400', 'collapse_state': '0'}},
+                'effect_index': '0', 'include_type': True}]},
         {'key': 'tabs', 'kind': 'object_tabs', 'label': 'ObjectTabPanel'},
         {'key': 'floating', 'kind': 'stack', 'label': 'Floating', 'orientation': 'vertical', 'children': ['transport']},
         {'key': 'transport', 'kind': 'view', 'view_type': 'Transport', 'selection_channel': '1'}],
-        'floating_windows': [{'root': 'floating', 'placement': placement}],
-        'position_history': {'last_positions': [{'view_name': 'Transport', 'placement': placement}], 'effects': []}}
+        'floating_windows': [{'root': 'floating',
+            'placement': {**placement, 'maximum_x': '-1', 'maximum_y': '-1'}}],
+        'position_history': {'last_positions': [{'view_name': 'Transport', 'placement': placement}]}}
 
 
 def _snapshot(call, name):

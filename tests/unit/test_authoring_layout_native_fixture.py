@@ -115,6 +115,31 @@ def _layout_cohort_host(tmp_path, monkeypatch, owner, *, damage=None):
     return client
 
 
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_owned_layout_representative_request_selects_supported_preferences_and_preserves_normal_placement(tmp_path, version):
+    from tests.destructive.support.layout_workflows import construction_blueprint
+    from tests.unit.test_authoring_layout_mutation_gateway import switch_preview, confirm_execute_verify
+    env, state, client, preview = switch_preview(tmp_path, version=version, operation='setLayout',
+        fields=('--new-layout-name', 'SelectedRepresentative', '--blueprint', json.dumps(construction_blueprint())),
+        client_setup=lambda client: client.responses[URI + 'getViewTypes'].update(viewTypes=[
+            {'viewName': name, 'viewDisplayName': name} for name in ('ProjectExplorer', 'Transport')]))
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    layout = next(args['layout']['Layout'] for uri, args, _ in client.calls if uri == URI + 'setLayout')
+    editor = layout['StackPanel']['@Children'][1]
+    assert not {'PreferredHeights', 'SideBar'} & set(editor)
+    assert 'EffectLastTabPositions' not in layout
+    assert layout['StackPanel']['@type'] == 'StackPanel'
+    assert editor['EditorPriority'] == [{'@type': 'EditorId', 'UniqueViewId': 'AttenuationEditor',
+        'PluginId': '4294967295', 'EffectIndex': '0'}]
+    window = layout['Undocked'][0]
+    assert (window['WindowPlacement_MaxPos_X'], window['WindowPlacement_MaxPos_Y']) == ('-1', '-1')
+    assert [window['WindowPlacement_NormalPos_' + edge] for edge in ('Left', 'Top', 'Right', 'Bottom')] == ['100', '120', '500', '420']
+    assert window['WindowPlacement_ShowCmd'] == 'Normal'
+    assert len(layout['LastPositions']) == 1 and layout['LastPositions'][0]['Name'] == 'Transport'
+    assert layout['LastPositions'][0]['WindowPlacement_MaxPos_X'] == '0'
+
+
 @pytest.mark.parametrize('owned_authoring', ['2024.1'], indirect=True)
 def test_owned_layout_common_cohort_reaches_final_writer_with_nine_scoped_transactions(owned_authoring, tmp_path, monkeypatch):
     from types import SimpleNamespace
