@@ -461,3 +461,25 @@ and the final combined gates remain #195; separately approved Fresh remains
 #194. The two #182 special-import limitations are still pending, and #174 is
 not complete. Configuration binding, modification policies, immutable Preview,
 execute-once behavior and truthful uncertainty remain unchanged.
+
+## User-approved import boundaries — 2026-10-27
+
+The user accepted both remaining #182 limits and requested closeout. This
+supersedes the pending import decision above:
+
+- Import-time Switch/State group descriptors remain limited to groups under
+  Default Work Unit. Nondefault Work Unit group binding through these import
+  descriptors is not supported. This does not restrict ordinary audio import,
+  general Object Path destinations or supported DialogueEvent destinations.
+- On 2021.1/2022.1, retain the guard when MultiSwitchEntry.AudioNode metadata
+  spells a target `Container` and the selected target is RandomSequenceContainer.
+  That field-specific spelling relationship remains unresolved; canonical
+  spelling and the implemented 2023.1–2025.1 mapping retain their existing
+  behavior. This is not a general prohibition on creating containers.
+
+These are accepted Skill boundaries, not claims of native impossibility. Keep
+the guards, original failures and exact-host import limitations unchanged; do
+not infer a broader version exclusion. No further grammar research, native
+probe or compatibility implementation is required for these two exceptions.
+Close #182 under this scope. #194 and #195 still own the remaining acceptance
+and final coverage work; #174 remains incomplete.

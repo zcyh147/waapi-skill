@@ -59,3 +59,18 @@ closed wrappers and passing code tests suffice; no additional native cases,
 probes or native functional gate. Documented inputs/version mapping and safety
 remain required. Preserve raw evidence and the known exact-host guard; ordinary
 import's planned named-Source native case and Fresh-zero policy are unchanged.
+
+## Accepted closeout — 2026-10-27
+
+The user accepted the two remaining limits: import-time Switch/State group
+descriptors outside Default Work Unit, and the unresolved 2021.1/2022.1
+MultiSwitchEntry.AudioNode `Container` spelling for a RandomSequenceContainer
+target. Preserve their existing guards. They are Skill limitations, not native
+absence or a general inability to create a container.
+
+Ordinary and table import implementations and retained representative evidence
+remain valid at their stated scopes. Keep exact-host guards, original failures
+and weaker decision-sequence verification unchanged. Close #182 under the
+[accepted import boundaries](../SPEC.md#user-approved-import-boundaries--2026-10-27).
+No new native/Fresh run or runtime change is required by this closeout; final
+coverage reconciliation and combined gates remain #195, and Fresh remains #194.
