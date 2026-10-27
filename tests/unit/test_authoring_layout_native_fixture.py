@@ -70,7 +70,13 @@ def _layout_cohort_host(tmp_path, monkeypatch, owner, *, damage=None):
                 self.calls.append((uri, args, options))
                 raise TimeoutError('Native reset outcome is unknown')
             result = super().call(uri, args, options)
+            if uri == URI + 'undockView' and damage == 'undock_lost_other':
+                self.views[args['name']] = [row for row in self.views[args['name']] if row['viewName'] != 'EventViewer']
+            if uri == URI + 'switchLayout' and damage == 'activated_placement' and args['name'].startswith('WAAPI_Skill_Owned_'):
+                self.layouts[args['name']]['Layout']['Undocked'][0]['WindowPlacement_NormalPos_Left'] = '101'
             if uri == URI + 'setLayout':
+                if damage == 'same_id_state':
+                    self.layouts['Profiler']['Layout']['StackPanel']['Orientation'] = 'Vertical'
                 rows = self.views[args['name']]
                 def views(value, docked):
                     if isinstance(value, dict):
@@ -122,6 +128,14 @@ def test_owned_layout_common_cohort_reaches_final_writer_with_nine_scoped_transa
     batch = authoring_batch.AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=[nodeid])
     call = batch.node_gateway(nodeid)
     native.test_authoring_layout_2024_construction_arrangement((batch, call))
+    report = json.loads((batch.node_runtimes[nodeid].owned_root / 'native-evidence/layout-workflow-observations.json').read_text())
+    activated = report['activated_floating']
+    assert activated['observed_holder_placement']['WindowPlacement_NormalPos_Left'] == '100'
+    assert activated['observed_holder_placement']['WindowPlacement_NormalPos_Top'] == '120'
+    assert activated['element_rectangle'] == {'left': 100, 'top': 120, 'right': 500, 'bottom': 420}
+    assert activated['view_is_docked'] is False and activated['frontend_count'] == 1
+    assert report['undock_views']['before'] == report['undock_views']['after']
+    assert {row['view_type'] for row in report['undock_views']['after']} == {'ProjectExplorer', 'Transport', 'EventViewer'}
     item = SimpleNamespace(nodeid=nodeid, _waapi_phase_reports={'setup': 'passed', 'call': 'passed'})
     batch.prepare_stop([item])
     item._waapi_phase_reports['teardown'] = 'passed'
@@ -170,7 +184,7 @@ def test_owned_2025_close_and_selected_reset_keep_independent_business_and_diagn
 
 
 @pytest.mark.parametrize('owned_authoring,damage', [('2024.1', 'preservation'), ('2025.1', 'reset_absent'),
-    ('2025.1', 'reset_ambiguous')], indirect=['owned_authoring'])
+    ('2025.1', 'reset_ambiguous'), ('2024.1', 'same_id_state'), ('2024.1', 'activated_placement'), ('2024.1', 'undock_lost_other')], indirect=['owned_authoring'])
 def test_layout_cohort_failures_stop_writes_and_retain_owned_evidence_without_blind_cleanup(owned_authoring, tmp_path, monkeypatch, damage):
     from types import SimpleNamespace
     from tests.destructive.support import authoring_batch
@@ -179,18 +193,40 @@ def test_layout_cohort_failures_stop_writes_and_retain_owned_evidence_without_bl
     for key in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'): monkeypatch.setenv(key, '1')
     native = importlib.import_module('tests.destructive.test_authoring_ui_business_live')
     client = _layout_cohort_host(tmp_path, monkeypatch, owned_authoring, damage=damage)
-    nodeid = COMMON_NODE if damage == 'preservation' else CLOSE_NODE
+    common = owned_authoring.runtime.version == '2024.1'
+    nodeid = COMMON_NODE if common else CLOSE_NODE
     target = tmp_path / 'layout-category.jsonl'
     monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
     batch = authoring_batch.AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=[nodeid])
     call = batch.node_gateway(nodeid)
-    run = native.test_authoring_layout_2024_construction_arrangement if damage == 'preservation' else native.test_authoring_layout_2025_construction_close_reset
-    with pytest.raises(CaseBoundaryError): run((batch, call))
+    run = native.test_authoring_layout_2024_construction_arrangement if common else native.test_authoring_layout_2025_construction_close_reset
+    failure = AssertionError if damage in {'same_id_state', 'activated_placement', 'undock_lost_other'} else CaseBoundaryError
+    message = {'same_id_state': 'Unrelated layout contents', 'activated_placement': 'Activated floating holder placement',
+        'undock_lost_other': 'Undocking changed other owned view identities/types'}.get(damage)
+    with pytest.raises(failure, match=message): run((batch, call))
     report = json.loads((batch.node_runtimes[nodeid].owned_root / 'native-evidence/layout-workflow-observations.json').read_text())
     assert report['complete'] is False and report['cleanup'] == {}
     assert URI + 'removeLayout' not in [uri for uri, _, _ in client.calls]
-    assert [args for uri, args, _ in client.calls if uri == URI + 'switchLayout'] == [{'name': report['owned_layout_name']}]
-    if damage == 'preservation':
+    assert [args for uri, args, _ in client.calls if uri == URI + 'switchLayout'] == ([] if damage == 'same_id_state' else [{'name': report['owned_layout_name']}])
+    if damage == 'same_id_state':
+        assert client.layouts['Profiler']['Layout']['StackPanel']['Orientation'] == 'Vertical'
+        assert client.views['Profiler'][0]['viewID'] == '{44444444-4444-4444-4444-444444444444}'
+        assert URI + 'getOrCreateView' not in [uri for uri, _, _ in client.calls]
+    elif damage == 'activated_placement':
+        registration = next(args['layout'] for uri, args, _ in client.calls if uri == URI + 'setLayout')
+        assert registration['Layout']['Undocked'][0]['WindowPlacement_NormalPos_Left'] == '100'
+        assert client.layouts[report['owned_layout_name']]['Layout']['Undocked'][0]['WindowPlacement_NormalPos_Left'] == '101'
+        assert URI + 'getOrCreateView' not in [uri for uri, _, _ in client.calls]
+    elif damage == 'undock_lost_other':
+        assert [row['viewName'] for row in client.views[report['owned_layout_name']]] == ['ProjectExplorer', 'Transport']
+        assert len([uri for uri, _, _ in client.calls if uri == URI + 'undockView']) == 1
+        assert {row['view_type'] for row in report['undock_views']['before']} == {'ProjectExplorer', 'Transport', 'EventViewer'}
+        assert {row['view_type'] for row in report['undock_views']['after']} == {'ProjectExplorer', 'Transport'}
+        tx = report['effects'][-1]['transaction_id']
+        assert report['effects'][-1]['operation'] == URI + 'undockView'
+        assert any(row['argv'] == ['verify', tx] and row['payload']['verification']['business_state_verified'] is True
+            for row in batch.receipts[nodeid])
+    elif damage == 'preservation':
         assert URI + 'moveSplitter' not in [uri for uri, _, _ in client.calls]
     else:
         assert report['reset']['post_reset_layout_survived'] is None

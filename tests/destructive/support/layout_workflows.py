@@ -6,7 +6,9 @@ from pathlib import Path
 import uuid
 
 from wwise_waapi.canonical import canonical_sha256
-from wwise_waapi.authoring_layout_business import layout_view_identities
+from wwise_waapi.authoring_layout import layout_identity_rows
+from wwise_waapi.authoring_layout_business import layout_view_identities, require_layout_rectangle
+from wwise_waapi.layout_blueprint import PLACEMENT_FIELDS
 
 URI = 'ak.wwise.ui.layout.'
 COMMON_NODE = 'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_2024_construction_arrangement'
@@ -46,8 +48,11 @@ def _snapshot(call, name):
 def _unchanged(call, baseline):
     for name, before in baseline.items():
         after = _snapshot(call, name)
-        assert (after['workspace_name'], after['views']) == (before['workspace_name'], before['views']), \
-            'Unrelated layout name or canonical view identities/types changed'
+        # No cohort operation targets these layouts. Compare their complete
+        # canonical serialization: topology/order, preferences, data and stored
+        # placement are meaningful state; no source-proven volatile exception
+        # is discarded. JSON object-key order alone is immaterial.
+        assert after == before, 'Unrelated layout contents or canonical view identities/types changed'
 
 
 def _view(inspected, name):
@@ -98,7 +103,7 @@ def collect_layout_workflow(batch, call, *, nodeid, strong_effect):
     assert nodeid in NODES and batch.runtime.version == NODES[nodeid]
     report = {'contract': CONTRACT, 'nodeid': nodeid, 'version': batch.runtime.version, 'candidate': batch.candidate,
         'complete': False, 'effects': [], 'reset': None, 'cleanup': {},
-        'preservation_scope': 'layout names and canonical view identities/types; document digests retained; other private/global settings not certified'}
+        'preservation_scope': 'complete canonical original/sentinel layout contents and canonical view identities/types; other private/global settings not certified'}
     destination = Path(batch.node_runtimes[nodeid].runner_environment['WWISE_EVIDENCE_DIR']) / FILENAME
     destination.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -121,13 +126,41 @@ def collect_layout_workflow(batch, call, *, nodeid, strong_effect):
             return observed
         def inspect(): return call(['layout-inspect', '--layout-name', name])
         anchor = call(['layout-inspect', '--layout-name', original])
-        effect('setLayout', anchor['layout_handle'], ['--new-layout-name', name, '--blueprint', json.dumps(construction_blueprint())])
+        blueprint = construction_blueprint()
+        effect('setLayout', anchor['layout_handle'], ['--new-layout-name', name, '--blueprint', json.dumps(blueprint)])
         report['registered'] = _snapshot(call, name)
         effect('switchLayout', inspect()['layout_handle'])
         assert call(['layout-read', 'current'])['result']['name'] == name
         owned = inspect()
         explorer, transport = _view(owned, 'ProjectExplorer'), _view(owned, 'Transport')
-        assert call(['layout-read', 'frontend', '--view-handle', transport['handle']])['result'], 'Owned frontend was not instantiated'
+        # Observe activation before another operation can change floating state.
+        # WindowPlacement describes the holder's normal WINDOW coordinates;
+        # getElementRectangle describes the allocated ELEMENT. No source proves
+        # frame/content offsets, so these independent observations stay separate.
+        document = call(['layout-read', 'contents', '--layout-name', name])['result']
+        instances = call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances']
+        floating = [row for row in instances if row.get('viewName') == 'Transport']
+        assert len(floating) == 1 and floating[0].get('viewIsDocked') is False, 'Activated Transport is not independently floating'
+        elements, _ = layout_identity_rows(document, {'viewInstances': instances})
+        observed = [row for row in elements if row['native_id'].upper() == floating[0]['viewID'].upper()]
+        assert len(observed) == 1 and observed[0]['location'].startswith('/Layout/Undocked/0/StackPanel/'), 'Activated Transport is outside its owned floating holder'
+        windows = document['Layout'].get('Undocked', [])
+        assert len(windows) == 1, 'Activated layout lacks its one declared floating holder'
+        placement = blueprint['floating_windows'][0]['placement']
+        expected = {native: placement[field] for field, native in PLACEMENT_FIELDS.items()}
+        expected['WindowPlacement_ShowCmd'] = 'Normal'
+        actual = {field: windows[0].get(field) for field in expected}
+        report['activated_floating'] = {'view_id': floating[0]['viewID'], 'view_is_docked': False,
+            'expected_holder_placement': expected, 'observed_holder_placement': actual,
+            'placement_scope': 'same native WindowPlacement fields after activation; no frame/element conversion'}
+        assert actual == expected, 'Activated floating holder placement differs from its declaration'
+        allocated = [row for row in owned['elements'] if row['location'] == observed[0]['location']]
+        assert len(allocated) == 1
+        rectangle = require_layout_rectangle(call(['layout-read', 'rectangle', '--element-handle', allocated[0]['handle']])['result'])
+        frontend = call(['layout-read', 'frontend', '--view-handle', transport['handle']])['result']
+        report['activated_floating'].update(element_rectangle=rectangle, element_scope='positive live allocation only',
+            frontend_count=len(frontend))
+        assert frontend, 'Owned frontend was not instantiated'
         effect('getOrCreateView', owned['layout_handle'], ['--view-type', 'EventViewer', '--initial-x', '17', '--initial-y', '29'])
         event_id = _view_id(call, name, 'EventViewer')
         if nodeid == COMMON_NODE:
@@ -154,7 +187,11 @@ def collect_layout_workflow(batch, call, *, nodeid, strong_effect):
             report['selected_splitter_location'] = selected['location']
             effect('moveSplitter', owned['layout_handle'], ['--splitter-handle', selected['handle'], '--pixel-delta', '5'])
             owned = inspect()
+            before_undock = _snapshot(call, name)['views']
             effect('undockView', owned['layout_handle'], ['--view-handle', _view(owned, 'Transport')['handle'], '--position-x', '260', '--position-y', '180'])
+            after_undock = _snapshot(call, name)['views']
+            report['undock_views'] = {'before': before_undock, 'after': after_undock}
+            assert after_undock == before_undock, 'Undocking changed other owned view identities/types'
         else:
             owned = inspect()
             effect('closeView', owned['layout_handle'], ['--view-handle', _view(owned, 'EventViewer')['handle']])
