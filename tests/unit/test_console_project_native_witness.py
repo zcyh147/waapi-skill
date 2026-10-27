@@ -14,7 +14,7 @@ from tests.semantic.support.codex_project_prelaunch_v3 import (
     normalize_project_copy, ProjectPrelaunchRequest, WWISE_2025_SOUNDBANK_AURO_PROFILE,
 )
 from tests.destructive.support import sandbox_fixture, exact_real_evidence
-from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
+from tests.semantic.support.codex_archive_paths import parse_archive_relative_path, archive_relative_from_absolute
 from tests.unit.test_console_project_alternatives_gateway import CliProjectTask, ConsoleProjectTask, saved_fixture_project, WaapiRequestFailed
 from tests.unit.test_object_graph_business_gateway import gateway as public_gateway
 
@@ -49,9 +49,20 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
                 tree.find('./ProjectInfo/Project').set('Name', self.created_file.stem)
                 if case == 'cli-create' and fault is True:
                     tree.find('./ProjectInfo/Project/Platforms/Platform').set('ReferencePlatform', 'Mac')
+                platforms = tree.find('./ProjectInfo/Project/Platforms')
+                platforms[:] = sorted(platforms, key=lambda row: row.get('Name'))
                 if fault == 'missing-default':
-                    properties = tree.find('./ProjectInfo/Project/PropertyList')
+                    tree.find('./ProjectInfo/Project/PropertyList/Property[@Name="DefaultLanguage"]').attrib.pop('Value')
+                elif case == 'create-close':
+                    project = tree.find('./ProjectInfo/Project'); properties = project.find('PropertyList')
                     properties.remove(properties.find('./Property[@Name="DefaultLanguage"]'))
+                    backing = ET.SubElement(ET.SubElement(ET.SubElement(project, 'SharedValues'), 'SharedPropertyList'), 'PropertyList')
+                    field = ET.SubElement(backing, 'Property', Name='DefaultLanguage', Type='string')
+                    ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value').text = 'English(US)'
+                    languages = project.find('LanguageList')
+                    ET.SubElement(languages, 'Language', Name='External', ID='{C5B109DA-F3FD-485F-833F-8FB61F6FF042}')
+                    ET.SubElement(languages, 'Language', Name='Mixed', ID='{2B5DFEAD-36EC-4AE6-900D-8DD49E09E25A}')
+                    languages[:] = sorted(languages, key=lambda row: row.get('Name'))
                 tree.write(self.created_file)
                 if uri == 'ak.wwise.console.project.create': self.active_file = self.created_file
                 self.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -83,9 +94,33 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
                 return {}
             if uri == 'ak.wwise.cli.migrate':
                 self.calls.append((uri, deepcopy(args), deepcopy(options)))
-                if not fault:
-                    tree = ET.parse(self.project_file); tree.getroot().set('WwiseVersion', 'v2025.1.7'); tree.write(self.project_file)
+                target = Path(args['project'])
+                if case == 'migrate-committed-2024':
+                    assert target != self.project_file
+                    assert ET.parse(target).getroot().get('WwiseVersion') == 'v2024.1.0'
+                    assert ET.parse(self.project_file).getroot().get('WwiseVersion') == 'v2025.1.7'
+                if fault != 'wrong-version' and (not fault or case == 'migrate-committed-2024'):
+                    tree = ET.parse(target); tree.getroot().set('WwiseVersion', 'v2025.1.7')
+                    if case == 'migrate-committed-2024':
+                        tree.getroot().set('WwiseBuild', '9143'); tree.getroot().set('SchemaVersion', '133')
+                    tree.write(target)
+                    if case == 'migrate-committed-2024' and fault == 'preservation':
+                        for unit in sorted((target.parent / 'Actor-Mixer Hierarchy').glob('*.wwu')):
+                            tree = ET.parse(unit); sound = tree.find('.//Sound')
+                            if sound is not None:
+                                sound.set('Name', 'Unexpected migration rename'); tree.write(unit); break
+                        else:
+                            raise AssertionError('The authentic old fixture must contain a Sound for the preservation fault')
                 self.terminal = True
+                if case == 'migrate-committed-2024' and fault in {'archive-file', 'archive-directory'}:
+                    bad = target.parent / 'nonportable:entry'
+                    if fault == 'archive-file': bad.write_bytes(b'nonportable filename')
+                    else: bad.mkdir()
+                if case == 'migrate-committed-2024' and fault == 'missing-project':
+                    self.remaining_unit = sorted(target.parent.rglob('*.wwu'))[-1]
+                    self.remaining_bytes = self.remaining_unit.read_bytes()
+                    target.unlink()
+                    raise TimeoutError('Migration outcome unknown; target project is absent')
                 return {'result': 0}
             if uri == 'ak.wwise.cli.addNewPlatform':
                 self.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -158,17 +193,21 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
         ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value', Platform='Windows').text = 'keep-sound-scope'
         tree.write(client.unit)
     prelaunch = None
-    if case in {'media-back', 'media-refresh'}:
+    if case in {'media-back', 'media-refresh', 'migrate-committed-2024'}:
         from tests.destructive.support.console_project_acceptance import stage_media_storage_fixture
         owned = client.project_file.parent
         shutil.rmtree(owned)
+        if case == 'migrate-committed-2024':
+            owned = tmp_path / 'case-owned' / 'host-2025'
         shutil.copytree(Path(__file__).resolve().parents[1] / '_org/2025.1', owned)
         client.project_file = owned / 'SampleProject.wproj'
-        io = tmp_path / 'normalization'; io.mkdir()
-        normalize_project_copy(client.project_file, io_root=io, owned_root=tmp_path,
+        owner = owned.parent if case == 'migrate-committed-2024' else tmp_path
+        io = owner / 'normalization'; io.mkdir()
+        normalize_project_copy(client.project_file, io_root=io, owned_root=owner,
             request=ProjectPrelaunchRequest(scenario_id='gateway-workflow-transaction-matrix',
                 auro_isolation_profile=WWISE_2025_SOUNDBANK_AURO_PROFILE))
-        prelaunch = stage_media_storage_fixture(client.project_file, central=True)
+        if case != 'migrate-committed-2024':
+            prelaunch = stage_media_storage_fixture(client.project_file, central=True)
     if donor is not None:
         owned = client.project_file.parent
         shutil.rmtree(owned); shutil.copytree(donor.parent, owned)
@@ -183,7 +222,7 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
     metadata = sandbox_fixture.SandboxMetadata(str(source_project), str(source), str(owned), str(client.project_file),
         version, 0, proof, sandbox_fixture.hash_project(owned), source_project.stat().st_mtime,
         process_cleanup_result='cleaned', process_cleanup_details={'residual_processes': []})
-    sandbox = sandbox_fixture.SandboxProject(source_project, source, owned, owned, client.project_file, metadata)
+    sandbox = sandbox_fixture.SandboxProject(source_project, source, owned.parent if case == 'migrate-committed-2024' else owned, owned, client.project_file, metadata)
     execute = public_gateway.execute_gateway
     monkeypatch.setattr(workflow.waapi_gateway, 'execute_gateway',
         lambda argv, **kwargs: execute(argv, **kwargs, client_factory=lambda _: client))
@@ -191,6 +230,15 @@ def _collector_runtime(tmp_path, monkeypatch, case, *, fault=False, donor=None):
         SimpleNamespace(host='127.0.0.1', port=31337, waapi_url='ws://127.0.0.1:31337/waapi'),
         tmp_path / 'collector-state', client.env, workflow.exact_git_candidate(workflow.REPO_ROOT), [])
     runtime.console_project_prelaunch = prelaunch
+    if case == 'migrate-committed-2024':
+        metadata.launch_project_path = str(client.project_file)
+        metadata.ready_duration_seconds = 0.01
+        metadata.get_info_version = {'year': 2025, 'major': 1, 'minor': 7, 'build': 9143}
+        console = tmp_path / 'not-launched-console'; console.write_bytes(b'never executed')
+        config = tmp_path / 'copy-environment.json'
+        config.write_text(json.dumps({'versions': {'2025.1': {'wwise_console': str(console), 'sample_project': str(source_project)}}}))
+        runtime.env.update(WWISE_LIVE='1', WWISE_DESTRUCTIVE='1', WWISE_VERSION='2025.1', WWISE_TEST_CONFIG=str(config), WWISE_CONSOLE=str(console))
+        runtime.env['WAAPI_CONSOLE184_CREATED_MANIFEST'] = str(tmp_path / 'must-not-read-failed-A.json')
     return workflow, runtime, client, proof
 
 
@@ -235,7 +283,7 @@ def test_cli_create_collector_reaches_existing_final_writer_and_retains_created_
     if not fault:
         assert receipt['created_fixture']['manifest_sha256']
         assert Path(receipt['created_fixture']['manifest']).is_file()
-        assert receipt['created_project']['platforms'] == [['Windows', 'Windows'], ['Mac', 'Mac']]
+        assert receipt['created_project']['platforms'] == [['Mac', 'Mac'], ['Windows', 'Windows']]
     assert len([uri for uri, _, _ in client.calls if uri.startswith('ak.wwise.cli.')]) == 1
 
 
@@ -253,6 +301,8 @@ def test_console_create_close_collector_uses_two_authorized_transitions_and_fina
     assert len(final['transactions']) == 2
     receipt = json.loads(Path(final['categories'][0]['observation_path']).read_text())
     assert receipt['complete'] is (not fault)
+    assert receipt['created_project']['languages'] == ['English(US)', 'External', 'Japanese', 'Mixed', 'SFX']
+    assert receipt['created_default_language']['value'] == 'English(US)'
     assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.console.project.create']) == 1
     assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.console.project.close']) == 1
 
@@ -500,3 +550,94 @@ def test_creation_capture_rejects_nonportable_physical_archive_identities(tmp_pa
     final = _finalize(tmp_path, monkeypatch, workflow, runtime, proof, failure=failure.value,
         node='test_console_project_cli_create_acceptance')
     assert final['transactions'][0]['state'] == 'indeterminate' and manifest_path.is_file()
+
+
+@pytest.mark.parametrize('fault', [False, 'wrong-version', 'preservation'])
+def test_committed_2024_migration_uses_separate_target_after_host_ready_and_final_writer(tmp_path, monkeypatch, fault):
+    workflow, runtime, client, proof = _collector_runtime(tmp_path, monkeypatch, 'migrate-committed-2024', fault=fault)
+    host_bytes = runtime.sandbox.sandbox_project.read_bytes()
+    assert not (runtime.sandbox.sandbox_root / 'migration-committed-2024').exists()
+    failure = None
+    try:
+        workflow.test_console_project_migrate_committed_2024_fixture_acceptance(runtime)
+    except Exception as exc:
+        failure = exc
+    assert (failure is not None) is bool(fault), failure
+    assert runtime.sandbox.sandbox_project.read_bytes() == host_bytes
+    targets = [(args, options) for uri, args, options in client.calls if uri == 'ak.wwise.cli.migrate']
+    assert len(targets) == 1
+    args, options = targets[0]
+    assert options == {} and set(args) == {'project'}
+    target = Path(args['project'])
+    assert target != runtime.sandbox.sandbox_project and not target.is_relative_to(runtime.sandbox.sandbox_path)
+    assert not any(uri in {'ak.wwise.core.project.save', 'ak.wwise.console.project.open', 'ak.wwise.console.project.create',
+        'ak.wwise.cli.createNewProject'} for uri, _, _ in client.calls)
+    final = _finalize(tmp_path, monkeypatch, workflow, runtime, proof, failure=failure,
+        node='test_console_project_migrate_committed_2024_fixture_acceptance')
+    assert len(final['transactions']) == 1
+    assert final['categories'][0]['status'] == ('FAIL' if fault else 'PASS')
+    receipt = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    assert receipt['case'] == 'migrate-committed-2024'
+    assert receipt['migration_fixture']['authority'] == 'committed-tests-org-2024.1'
+    assert receipt['migration_fixture']['created_after_host_readiness'] is True
+    assert receipt['project_before']['wwise_version'] == 'v2024.1.0'
+    assert receipt['model_before']['complete'] is receipt['model_after']['complete'] is True
+    assert receipt['immutable_sources_before'] == receipt['immutable_sources_after']
+    assert receipt['immutable_sources_verified'] is True
+    assert set(receipt['immutable_sources_before']) == {'host', 'migration'}
+    assert receipt['phases'][0]['verify']['state'] == ('verification_failed' if fault else 'verified')
+    assert not runtime.sandbox.sandbox_root.exists()
+    assert Path(receipt['model_after']['index_path']).is_file()
+    for phase in ('before', 'after'):
+        capture = receipt['target_tree_' + phase]
+        assert capture['complete'] is True and capture['requested_project_exists'] is True
+        manifest = json.loads(Path(capture['manifest_path']).read_text())
+        for row in manifest['files']:
+            assert parse_archive_relative_path(row['path']).canonical == row['path']
+            assert parse_archive_relative_path(row['artifact_path']).canonical == row['artifact_path']
+
+
+def test_migration_retains_remaining_work_units_when_indeterminate_project_disappears(tmp_path, monkeypatch):
+    workflow, runtime, client, proof = _collector_runtime(tmp_path, monkeypatch, 'migrate-committed-2024', fault='missing-project')
+    with pytest.raises(AssertionError) as failure:
+        workflow.test_console_project_migrate_committed_2024_fixture_acceptance(runtime)
+    final = _finalize(tmp_path, monkeypatch, workflow, runtime, proof, failure=failure.value,
+        node='test_console_project_migrate_committed_2024_fixture_acceptance')
+    receipt = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    assert final['categories'][0]['status'] == 'FAIL'
+    assert final['transactions'][0]['state'] == 'indeterminate'
+    assert receipt['immutable_sources_verified'] is True
+    assert not runtime.sandbox.sandbox_root.exists()
+    capture = receipt['target_tree_after']
+    assert isinstance(capture, dict), 'Migration must retain raw target-tree bytes after the project disappears'
+    assert capture['requested_project_exists'] is False
+    manifest_path = Path(capture['manifest_path'])
+    manifest = json.loads(manifest_path.read_text())
+    assert capture['complete'] is True
+    relative = archive_relative_from_absolute(client.remaining_unit, manifest['target']).canonical
+    row = next(row for row in manifest['files'] if row['path'] == relative)
+    image = manifest_path.parent.joinpath(*parse_archive_relative_path(row['artifact_path']).parts)
+    assert image.read_bytes() == client.remaining_bytes
+    assert receipt['after_capture_error']
+    assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.cli.migrate']) == 1
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='Windows cannot create the physical nonportable POSIX names under test')
+@pytest.mark.parametrize('fault', ['archive-file', 'archive-directory'])
+def test_migration_capture_rejects_nonportable_target_archive_identities(tmp_path, monkeypatch, fault):
+    workflow, runtime, client, proof = _collector_runtime(tmp_path, monkeypatch, 'migrate-committed-2024', fault=fault)
+    with pytest.raises(AssertionError) as failure:
+        workflow.test_console_project_migrate_committed_2024_fixture_acceptance(runtime)
+    final = _finalize(tmp_path, monkeypatch, workflow, runtime, proof, failure=failure.value,
+        node='test_console_project_migrate_committed_2024_fixture_acceptance')
+    receipt = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    assert final['categories'][0]['status'] == 'FAIL'
+    assert receipt['complete'] is False and receipt['immutable_sources_verified'] is True
+    capture = receipt['target_tree_after']
+    manifest = json.loads(Path(capture['manifest_path']).read_text())
+    assert capture['complete'] is False and receipt['migration_preservation_error']
+    assert manifest['errors'][0]['code'] == 'ArchiveRelativePathError'
+    assert not any(':' in row['path'] for row in manifest['files'])
+    assert not any(':' in row for row in manifest['directories'])
+    assert not runtime.sandbox.sandbox_root.exists()
+    assert len([uri for uri, _, _ in client.calls if uri == 'ak.wwise.cli.migrate']) == 1

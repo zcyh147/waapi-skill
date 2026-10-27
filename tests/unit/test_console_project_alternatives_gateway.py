@@ -2743,3 +2743,57 @@ def test_cli_dump_artifact_errors_preserve_malformed_and_resource_distinction(tm
     code, repeated = task.run('execute', tx)
     assert code != 0 and repeated.get('automatic_retry') is not True, repeated
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+def test_create_resolves_only_source_proven_elided_default_language(tmp_path, version):
+    task = (CliCreateEffectTask(tmp_path, version) if version in ('2021.1', '2022.1')
+        else ConsoleProjectTask(tmp_path, version))
+    extra = (('--item', 'platforms', 'Windows', '--item', 'platforms', 'Android') if version in ('2021.1', '2022.1') else ('--item', 'languages', 'English(US)', '--item', 'languages', 'Japanese'))
+    tx, code, payload = execute_console_creation(task, *extra)
+    assert code == 0, payload
+    tree = ET.parse(task.created_file)
+    project = tree.find('./ProjectInfo/Project')
+    properties = project.find('PropertyList')
+    properties.remove(properties.find('./Property[@Name="DefaultLanguage"]'))
+    backing = ET.SubElement(ET.SubElement(ET.SubElement(project, 'SharedValues'), 'SharedPropertyList'), 'PropertyList')
+    field = ET.SubElement(backing, 'Property', Name='DefaultLanguage', Type='string')
+    ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value').text = 'English(US)'
+    tree.write(task.created_file)
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    event = next(row for row in shown['events'] if row['event_type'] == 'verification_recorded')
+    observed = next(row for row in event['details']['verification']['readbacks'] if 'default_language' in row)
+    assert observed['default_language'] == 'English(US)'
+    proof = observed['default_language_observation']
+    assert proof['representation'] == 'default_elided' and proof['property_present'] is False
+    assert proof['source']['version'] == version and proof['source']['class']['Name'] == 'Project'
+
+
+@pytest.mark.parametrize('fault', ['duplicate', 'wrong-type', 'empty-value', 'dual-encoding', 'missing-property-list', 'wrong-first-elided'])
+def test_console_create_keeps_invalid_or_conflicting_default_language_unverified(tmp_path, fault):
+    task = ConsoleProjectTask(tmp_path, '2025.1')
+    extra = ('--item', 'languages', 'French', '--item', 'languages', 'Japanese') if fault == 'wrong-first-elided' else ()
+    tx, code, payload = execute_console_creation(task, *extra)
+    assert code == 0, payload
+    tree = ET.parse(task.created_file)
+    project = tree.find('./ProjectInfo/Project'); properties = project.find('PropertyList')
+    field = properties.find('./Property[@Name="DefaultLanguage"]')
+    if fault == 'duplicate': properties.append(deepcopy(field))
+    elif fault == 'wrong-type': field.set('Type', 'bool')
+    elif fault == 'empty-value': field.set('Value', '')
+    elif fault == 'dual-encoding': ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value').text = 'English(US)'
+    elif fault == 'missing-property-list': project.remove(properties)
+    elif fault == 'wrong-first-elided':
+        properties.remove(field)
+        backing = ET.SubElement(ET.SubElement(ET.SubElement(project, 'SharedValues'), 'SharedPropertyList'), 'PropertyList')
+        ET.SubElement(backing, 'Property', Name='DefaultLanguage', Type='string', Value='French')
+    tree.write(task.created_file)
+    retained = task.created_file.read_bytes()
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed' and payload['verified'] is False, payload
+    assert task.created_file.read_bytes() == retained
+    code, payload = task.run('execute', tx)
+    assert code != 0 and len([row for row in task.calls if row[0] == CREATE]) == 1

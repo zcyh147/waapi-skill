@@ -249,11 +249,48 @@ def validate_console_project_open(plan, args, audit, version):
         raise SoundBankContractError('FILE_CHANGED', 'Selected project input identity or bytes changed after Preview')
 
 
+def _project_default_language(project, version):
+    """Read the direct scalar or this lane's exact declared Project default."""
+    if len(project.findall('PropertyList')) != 1:
+        raise ValueError('Saved project lacks one unambiguous active PropertyList')
+    fields = project.findall("./PropertyList/Property[@Name='DefaultLanguage']")
+    if fields:
+        if (len(fields) != 1 or fields[0].get('Type') != 'string'
+                or not fields[0].get('Value') or len(fields[0])):
+            raise ValueError('Saved project has a malformed or duplicate active DefaultLanguage')
+        return {'value': fields[0].get('Value'), 'representation': 'explicit', 'property_present': True}
+    import hashlib
+    import json
+    from pathlib import Path
+    from xml.etree import ElementTree as ET
+    if version not in {'2021.1', '2022.1', '2023.1', '2024.1', '2025.1'}:
+        raise ValueError('Project default language source is not pinned for this lane')
+    path = Path(__file__).resolve().parents[1] / 'resources/semantic' / version / 'project_default_language.json'
+    raw = path.read_bytes()
+    if len(raw) > 16384:
+        raise ValueError('Project default language source exceeds its bound')
+    source = json.loads(raw)
+    fragment = source['property_xml']
+    field = ET.fromstring(fragment)
+    if (source['contract'] != 'waapi-skill.project-default-language-source/v1'
+            or source['version'] != version or not source['installed_build'].startswith(version + '.')
+            or source['class'] != {'Name': 'Project', 'CompanyID': '1', 'PluginID': '3'}
+            or source['property'] != 'DefaultLanguage' or source['type'] != 'string' or source['default'] != 'English(US)'
+            or hashlib.sha256(fragment.encode()).hexdigest() != source['property_xml_sha256']
+            or field.tag != 'Property' or field.get('Name') != source['property'] or field.get('Type') != source['type']
+            or field.findtext('DefaultValue') != source['default']):
+        raise ValueError('Project default language does not match its pinned source')
+    return {'value': source['default'], 'representation': 'default_elided', 'property_present': False,
+        'source': {key: source[key] for key in ('version', 'installed_build', 'source_member',
+            'source_member_sha256', 'class', 'property', 'type', 'default', 'property_xml_sha256')}}
+
+
 def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
     """Read the bounded saved project; no endpoint calls or inferred native classes.
 
     ProjectInfo/Project, Platforms, LanguageList and DefaultLanguage are the
-    explicit format in the matching five-lane packaged SDK project samples.
+    saved format in the matching five-lane packaged SDK project samples. An
+    absent active DefaultLanguage uses only the pinned Project definition.
     Source-format evidence is separate from native execution/effect evidence.
     """
     import re
@@ -291,9 +328,7 @@ def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
             return rows
         platforms = records('Platforms', 'Platform', ('ID', 'Name', 'ReferencePlatform'))
         languages = records('LanguageList', 'Language', ('ID', 'Name'))
-        defaults = project.findall("./PropertyList/Property[@Name='DefaultLanguage']")
-        if len(defaults) != 1 or defaults[0].get('Type') != 'string' or not defaults[0].get('Value'):
-            raise ValueError('Saved project lacks one explicit string DefaultLanguage')
+        default_language = _project_default_language(project, plan['version'])
     except SoundBankContractError:
         raise
     except (UnicodeError, ValueError, ET.ParseError) as exc:
@@ -318,7 +353,7 @@ def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
     platform_matches = platform_matches and not remaining
     expected_languages = args.get('languages', ['English(US)'])
     language_matches = all(name in {row['Name'] for row in languages} for name in expected_languages)
-    default_matches = not expected_languages or defaults[0].get('Value') == expected_languages[0]
+    default_matches = not expected_languages or default_language['value'] == expected_languages[0]
     unresolved = []
     # The schema permits an empty list but does not state whether the native
     # implementation creates implicit defaults. Preserve construction while
@@ -328,7 +363,8 @@ def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
             unresolved.append(f'{field}_explicit_empty_native_semantics')
     return {'kind': 'authoring-created-project-artifact' if plan.get('uri') == AUTHORING_CREATE_URI else 'console-created-project-artifact', 'file_proof': proof,
         'project': {'id': project.get('ID'), 'name': project.get('Name')},
-        'platforms': platforms, 'languages': languages, 'default_language': defaults[0].get('Value'),
+        'platforms': platforms, 'languages': languages, 'default_language': default_language['value'],
+        **({'default_language_observation': default_language} if default_language['representation'] == 'default_elided' else {}),
         'platforms_match': platform_matches if expected_platforms else True,
         'languages_match': language_matches, 'default_language_matches': default_matches,
         'unresolved': unresolved}
