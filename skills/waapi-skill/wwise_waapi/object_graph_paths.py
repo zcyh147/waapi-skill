@@ -375,6 +375,9 @@ def compound_created_child_roots(calls, phases):
                 raise ValueError('Staged created root lacks successful actual native acknowledgements')
             actual = validate_owned_stages(child, result, context={'edits': compound_rename_edits(calls[:index])})
             for group in compound_source_creation_graphs(plan, child['pre_state']):
+                root = next(node for node in group['nodes'] if node['request_path'] == group['root'])
+                if root.get('collection') not in {None, 'children'}:
+                    continue  # Owned List occurrences are not ordinary sibling roots.
                 roots.append({'child_index': index, 'request_path': group['root'],
                     'parent_id': group['parent_id'].upper(), 'object_id': actual[group['root']]['id'].upper()})
             continue

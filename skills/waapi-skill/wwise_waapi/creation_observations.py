@@ -215,10 +215,10 @@ def compound_source_creation_graphs(plan, state):
     members = set()
     for profile in profiles:
         owner = by_path.get(profile['owner'])
-        if (owner is None or owner.get('existing_target') is not False or owner.get('preexisting_id') is not None
-                or owner.get('collection') not in {None, 'children'} or profile.get('before') != []
+        if (owner is None or type(owner.get('existing_target')) is not bool or owner.get('preexisting_id') is not None
+                or owner.get('collection') not in {None, 'children'}
                 or not profile.get('members')):
-            raise ValueError('Compound owned Lists currently require a new ordinary owner and empty original roster; retained/replacement source admission remains unfinished')
+            raise ValueError('Compound owned Lists require an exact ordinary new or retained source owner')
         for path in profile['members']:
             node = by_path.get(path)
             fields = ordinary_creation_fields(node) if node is not None else None
@@ -235,14 +235,34 @@ def compound_source_creation_graphs(plan, state):
         raise ValueError('Compound source List differs from its exact producer-owned source and complete roster')
     if {node['request_path'] for node in nodes if node.get('collection') not in {None, 'children'}} != members:
         raise ValueError('Compound source contains an unowned List occurrence')
+    replaced = {str(row['id']).upper() for profile in profiles if profile.get('mode') == 'replaceAll'
+        for row in profile['before']}
+    if {str(row['id']).upper() for row in plan.get('replaced_list_subtree_rows', [])} != replaced:
+        raise ValueError('Compound source List replacement needs its complete source-certified leaf roster')
+    new_paths = {node['request_path'] for node in nodes if node.get('existing_target') is False}
     ordinary = []
     for node in nodes:
-        if node['request_path'] in members:
-            continue
+        fields = ordinary_creation_fields(node)
+        if (fields is None or any('curve' in field or 'array' in field for field in fields)
+                or any('target_request_path' in field and field['target_request_path'] not in new_paths for field in fields)):
+            raise ValueError('Compound source requires every field and shared new-node reference target')
         projected = dict(node)
         projected['list_request_paths'], projected['list_snapshots'] = [], []
+        # Only the request-path partition is shared with ordinary creation.
+        # Actual List ownership, membership and replacement remain in the exact
+        # source profiles and original nodes returned below, never native paths.
+        if node['request_path'] in members:
+            projected['collection'] = 'children'
+        if node.get('existing_target'):
+            if (node.get('requested_name') != node.get('original_name') or node.get('notes_supplied')
+                    or node.get('properties') or any('target_request_path' not in field
+                        for field in node.get('references', []))):
+                raise ValueError('Compound staged source retains existing owners except its closed result references and Lists')
+        # Source fields have their own producer bounds; do not count them again
+        # against the optional ordinary history observer's combined budget.
+        projected['properties'], projected['references'] = [], []
         ordinary.append(projected)
-    groups = ordinary_staged_creation_graphs({**plan, 'nodes': ordinary}, state)
+    groups = ordinary_staged_creation_graphs({**plan, 'nodes': ordinary, 'replaced_list_subtree_rows': []}, state)
     result = [{**group, 'nodes': [node for node in nodes if node['request_path'] == group['root']
         or node['request_path'].startswith(group['root'] + '.')]} for group in groups]
     if {node['request_path'] for group in result for node in group['nodes']} != {

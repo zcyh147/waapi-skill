@@ -11562,10 +11562,26 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
             if not isinstance(owner_path, str) or node.get('collection') in {None, 'children'}:
                 raise OperationContractError('UNDO_GROUP_CHILD_OBSERVATION_REQUIRED', 'Owned List requires its exact ordinary source owner scope.')
             return 'owned-list:' + owner_path.casefold() + ':' + node['collection']
-        return [{"object_id": source_key(node),
+        scopes = [{"object_id": source_key(node),
             "field": "presence", "kind": "all", "platform": None} for group in groups for node in group['nodes']] + [
             {'object_id': row['id'], 'field': 'notes', 'kind': 'all', 'platform': None}
             for row, _ in preservation_rows({'verification_plan': plan, 'pre_state': state})]
+        for node in plan['nodes']:
+            if node.get('existing_target'):
+                for field in node.get('references', []):
+                    child = replace(prepared, verification_plan={'kind': 'same-guid-reference',
+                        'object_id': node['target_id'], 'field': field['name'], 'platform': node.get('platform')})
+                    scopes.append(_compound_field_outcome_scope(child, version=version, read=read, evidence=evidence))
+        by_path = {node['request_path']: node for node in plan['nodes']}
+        for profile in state['owned_result_stages'].get('lists', []):
+            owner = by_path[profile['owner']]
+            if owner.get('existing_target'):
+                scopes.append({'object_id': owner['target_id'], 'field': profile['name'], 'kind': 'all', 'platform': None})
+            # Append preserves these exact rows; replacement requires their
+            # absence. Neither may compose with a child changing those objects.
+            scopes.extend({'object_id': row['id'], 'field': field, 'kind': 'all', 'platform': None}
+                for row in profile['before'] for field in ('name', 'notes'))
+        return scopes
     if kind == "object-create-graph":
         _require_compound_ordinary_creation(prepared)
         from .creation_observations import ordinary_creation_graph
