@@ -2,8 +2,8 @@
 
 The existing `request-schema ak.wwise.ui.layout.setLayout` → layout Draft →
 Preview/authorization/execute/verify path now constructs the reflected editor,
-floating-window and position-history fields. This is code evidence, not native
-write acceptance or #188 completion. No raw `args`, `options`, native document,
+floating-window and position-history fields. This is code evidence. Current bounded functional acceptance follows the
+2026-10-27 lightweight policy below; no native write PASS is inferred. No raw `args`, `options`, native document,
 expression or code input was added.
 
 The exact Authoring request sources are the `ak.wwise.ui.layout.setLayout`
@@ -53,27 +53,49 @@ relabeled as write evidence.
 | `Splitter` requires `@Children` but declares no such property and forbids extras; reads show only `@type`/`ID`. | An unresolved request-definition contradiction, still assigned to #188. The Gateway discloses it and does not invent a child grammar or infer an admitted childless setter from reads. |
 | Reads add `ObjectTabPanel.@Children` and `ObjectPanel.SideBarLeft`/`SideBarRight`/`Visibility`; request properties omit them. | Output-only/source discrepancies, not established missing legal setter fields. The reflected tab leaf and singular sidebar are supported; extra setters are not inferred. |
 | Preferred-height reads use `EditorUniqueViewId`, `EditorPluginId`, `EditorEffectIndex`; request definition uses unprefixed keys. | Requests use reflected keys. Verification recognizes those three aliases only within actual preferred-height rows, compares every requested value, and rejects conflicts. Arbitrary ViewData is never normalized this way. Alias request legality remains unproved. |
-| Capital `Element.OneOf`, 2024 scalar sidebar enum and `ViewHolder.allOf` | Preserved exactly in source. Local closed constructors use the explicit named fields/tags; no global schema rewrite or native-absence claim follows. Matching native input/effect acceptance remains required. |
+| Capital `Element.OneOf`, 2024 scalar sidebar enum and `ViewHolder.allOf` | Preserved exactly in source. Local closed constructors use the explicit named fields/tags; no global schema rewrite or native-absence claim follows. Native input/effect acceptance is not inferred; further vendor QA is not a current lightweight acceptance requirement. |
 
-## Proportional remaining acceptance
+## Bounded functional closeout — 2026-10-27
 
-Reuse matching original reflection/read observations. Extend the existing owned
-layout fixture with a representative closed editor/preferences/typed-data and
-floating/history construction, inspect requested state, switch/arrange where
-relevant, and restore/remove owned resources. Select matching versions for actual
-source/host risk; common mechanisms need no per-value, return-shape or list-size
-native receipt. Independently retain materially different 2025 close/reset
-behavior, including default-state/preservation proof or a supported weaker
-native observation boundary. Current reset code already preserves omission,
-empty and ordered selections; it does not certify default-state effects.
+Under the latest SPEC lightweight policy, Main accepts the existing disclosed
+bounded Gateway interface as the delivery scope. This is not a claim that the
+user individually selected its numeric caps, or that Wwise has these limits.
+The named documented inputs and closed choices are wrapped: seven reads and
+seven mutations on 2024.1, with close/reset added on 2025.1 (30 URI/version
+rows). The matching 2021.1–2023.1 catalogs contain none of these layout URIs;
+that fixed-route fact does not establish universal business absence.
 
-If a reflected input fails or serializes differently, retain the exact bounded
-request/result and stop to classify that discrepancy. Do not synthesize a raw
-request, repair Wwise, or add read-only fields to setters without supporting
-input evidence. The Splitter contradiction remains a precise unresolved input
-question; the other output differences alone are not new implementation scope.
+The accepted interface retains 32 selected reset entries; 128 constructor
+nodes/collection entries; tree depth 14; 112 KiB business/compiled layout bytes;
+and per-view typed-data depth 8/4,096 values. Published string, readback and
+terminal bounds also remain. These are Gateway capacity limits, not native
+capacity limits or unlimited native-input parity. No cap, validator or dispatch
+behavior changes for closeout. Larger construction capacity is not a new #188
+completion requirement under this accepted bounded scope.
 
-The larger-reply Broker/archive boundary stays with #194. Fresh budget is zero.
-#195 owns the stable combined Program/Non-live gates and normal generated source
-inventory reconciliation. This batch changes neither those gates nor any
-coverage-completion count.
+Existing code proof covers the table above, optional/empty/repeated forms,
+version/host gates, scoped identity, policies, Preview, drift, one execution and
+truthful bounded results. The rootless repair `3a20b0dd` checks every declared
+Layout field; `57438a10` recognizes an omitted tag only at the fixed root
+StackPanel reference. Component `e26a48f0`/integration `ca06efd8` and their
+independent reviews cover the closed constructors. The selected ordinary
+witness at `bf607638` separates the independent frontend read; its existing
+fake cohort verifies nine transactions, restore/remove and final cleanup
+without dispatching `getViewHandle`. No new run is claimed here.
+
+Known preferred-height binding and sidebar/default observations, explicit-empty
+history/inactive-position serialization, frontend missing response, arrangement
+effects and reset default-state uncertainty remain disclosed. Reset still says
+`business_state_verified=false` with result-schema-only strength. The original
+R1/R2 FAILs remain FAILs; selected ordinary code proof grants no frontend or
+native-effect PASS. Further native construction/window/arrangement/reset QA is
+not required. The unsatisfiable pinned Splitter request definition remains an
+explicit source boundary; do not invent a grammar or infer native absence.
+Output-only tab children, left/right sidebars and prefixed preference aliases
+are not newly admitted setter fields.
+
+#189 remains separate. #194 retains the larger-reply Broker/archive boundary
+and Fresh budget zero. #195 owns the stable combined Program/Non-live gates
+and generated inventory reconciliation. These shared gates and important
+CRUD/query input obligations are unchanged; no full-gate or native coverage
+count is claimed by this closeout note.

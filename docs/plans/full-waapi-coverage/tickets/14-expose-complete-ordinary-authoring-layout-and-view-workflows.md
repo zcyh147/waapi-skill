@@ -152,9 +152,11 @@ The closed setLayout blueprint alone may use a bounded 280 KiB verify envelope
 small constructors retain 24 KiB. Every admitted request must fit its terminal
 request allowance before writes, preserving exact immutable request/agent_result
 and raw journal readback. The current 112 KiB business/compiled constructor
-ceilings and 14-level tree depth are Gateway resource gaps, not native absence.
-Larger legitimate native constructions, downstream Broker/Fresh reply acceptance
-and complete editor/sidebar/window/history/reset semantics stay owned here.
+ceilings and 14-level tree depth are Gateway capacity limits, not native absence.
+Under the later bounded lightweight acceptance below, larger native-input
+capacity is not a new #188 completion requirement. The separate downstream
+Broker/archive boundary remains with #194; historical native questions do not
+create another vendor-QA quota.
 
 Immediate identity repair keeps accepted divergent workspace constructions
 inspectable/reusable: the public reply separates lookup layout_name from observed
@@ -168,3 +170,42 @@ Omitted native Layout is separately unavailable for identity issuance: inspectio
 requires an observed Layout object and string workspace Name before creating any
 handle. This guard does not equate lookup/workspace names. Public versioned
 negative controls prove a deliberate structured error and zero new handle files.
+
+## Bounded functional closeout recommendation — 2026-10-27
+
+Ready for bounded functional closeout review under the latest SPEC policy. Main
+applies the user's low-priority/lightweight layout decision to the existing
+disclosed Gateway interface; this does not attribute a separate numeric-cap
+choice to the user. No missing named documented input mechanism or public route
+was found in the current source review. The [construction acceptance note](../LAYOUT_CONSTRUCTION.md#bounded-functional-closeout--2026-10-27) records the mapping and exact limits.
+
+The scope is 30 URI/version rows: seven reads/seven mutations for
+2024.1.13.9056; seven reads/nine mutations for 2025.1.7.9143. The exact layout
+URIs are absent from the captured 2021.1.14.8108, 2022.1.19.8584 and
+2023.1.19.8928 Authoring catalogs, without a broader business-absence claim.
+Closed constructors now cover documented editor/tab/sidebar/preferences, typed
+ViewData, floating placement and all eight histories, including optional, empty
+and ordered repeated alternatives. Existing public code controls cover these
+mechanisms, geometry choices, stale/wrong-host identities, policies, Preview,
+drift, execute-once and bounded failure/verification states.
+
+The constructor component `e26a48f0`/`ca06efd8`, rootless verification repair
+`3a20b0dd`, root-tag repair `57438a10` and selected ordinary witness
+`bf607638` have retained focused code evidence and independent reviews. The
+last selection verifies nine fake ordinary transactions with restore/remove and
+cleanup and no independent frontend dispatch. Historical stronger remaining-work
+lists above are milestones, superseded only as current acceptance depth. They
+do not require new native window/arrangement/reset matrices.
+
+Retain Gateway limits of 32 reset selections; 128 constructor nodes/collection
+entries; depth 14; 112 KiB business/compiled bytes; typed-data depth 8/4,096
+values; and existing string/result/terminal bounds. These are neither native
+capacity limits nor unlimited input parity. Known height/sidebar/frontend,
+empty-history/inactive-position and reset-default limitations remain honest
+boundaries. Original R1/R2 failures are unchanged. The contradictory Splitter
+request is an explicit source boundary, not native absence; discovered splitter
+movement remains wrapped. No unobserved effect receives a PASS.
+
+This recommendation does not close the GitHub issue, claim a new test/native
+run, or change #189, #194's Broker/archive/Fresh scope or #195's final combined
+gates. Important CRUD/query input gaps elsewhere remain required.

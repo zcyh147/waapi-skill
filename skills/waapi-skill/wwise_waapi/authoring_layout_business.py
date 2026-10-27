@@ -67,7 +67,7 @@ def layout_business_contract_data(operation: str, version: str) -> dict[str, Any
         result['selection_semantics'] = {'native_omission': 'omit native layouts', 'empty_selection': 'send native layouts: []',
             'selected_layouts': 'send exact discovered names in supplied order, preserving repeats',
             'unspecified_native_scope': 'Matching native schema/docs do not define the omission/empty scope; neither is labelled all or none.',
-            'resource_boundary': 'at most 32 selected handle entries; larger native lists remain an implementation obligation'}
+            'resource_boundary': 'Gateway capacity limit: at most 32 selected handle entries; this is not a native capacity limit or a claim of unlimited native-input parity'}
         result['selection_discovery'] = {'gateway_argv': ['layout-read', 'names'],
             'catalog_scope': 'factory layout names; this is not an enumeration of all temporary layouts',
             'certify_each_choice': ['layout-inspect', '--layout-name', '<observed-layout-name>'],
