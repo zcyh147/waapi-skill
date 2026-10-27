@@ -1,6 +1,6 @@
 # 18: Complete source-control and compound edit-history workflows
 
-Status: approved for implementation on 2026-10-17. Published as [18: Complete source-control and compound edit-history workflows](https://github.com/zcyh147/waapi-skill/issues/192).
+Status: closed under the user-approved scope decision on 2026-10-27; originally approved for implementation on 2026-10-17. Published as [18: Complete source-control and compound edit-history workflows](https://github.com/zcyh147/waapi-skill/issues/192).
 
 ## Parent
 
@@ -27,7 +27,35 @@ real UndoGroup staged-list admission restriction, provider-dependent work or
 compound safety obligations. #192 remains open; no native absence or whole-ticket
 completion follows from accepting simple undo/redo.
 
-## Acceptance criteria
+## Current compound/provider acceptance — user-approved 2026-10-27
+
+The user accepted stopping advanced compound expansion while retaining supported
+combinations and standalone API coverage. [#192 is closed under this
+scope](https://github.com/zcyh147/waapi-skill/issues/192#issuecomment-6436635148).
+This successor decision supersedes the earlier open/unfinished assessment above;
+the original criteria below remain historical requirements, not a claim that
+every advanced composition was implemented.
+
+Retain delivered source-owned combinations: retained-owner append,
+source-certified leaf replacement, owned-List merged/replaced owners, planned
+legacy Playlist arrays, complete nested producer List trees and fresh root-List
+CREATE. The provider component is accepted at its disclosed boundary; no further
+provider implementation, setup or tests are owed by this closeout. Native
+provider effects remain unproved.
+
+Stop further compound admission of existing-only Lists/field unions, ordinary
+collision merge/replacement, retained field edits combined with creation, and
+special import/language/plugin/RTPC/curve/array/ownership unions. These accepted
+composition boundaries establish neither implementation nor native absence.
+Supported standalone operations and single-API coverage for all five Wwise lanes
+remain required. Simple undo/redo and existing observers keep their disclosed
+verification strength; no additional observer, native or Fresh expansion is a
+closeout prerequisite. Identity, authorization, immutable Preview, one execution,
+drift, bounded outcomes and cleanup controls remain intact. #179's 2021.1 plugin,
+#182's special-import and #184's migration questions are unchanged; #195 retains
+combined gates and inventory reconciliation, and #174 remains open.
+
+## Original acceptance criteria
 
 - [ ] Map all permitted source-control commands, object/file scopes, provider-dependent choices and undo-group/compound operation alternatives to exact public inputs.
 - [ ] Keep filesystem/source-control scope explicit and resolve live provider availability without treating a missing local provider as native impossibility.

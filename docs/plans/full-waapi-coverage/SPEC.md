@@ -411,3 +411,28 @@ and source-control provider work remain separate unfinished #192 obligations.
 No additional native or Fresh attempt follows from this decision. The already
 approved code-only table-import policy remains unchanged. No whole ticket is
 completed by these acceptance decisions.
+
+## User-approved compound scope stop — 2026-10-27
+
+The user accepted stopping advanced compound expansion and retaining supported
+combinations and standalone API coverage. [#192 is closed under that accepted
+scope](https://github.com/zcyh147/waapi-skill/issues/192#issuecomment-6436635148).
+This successor decision supersedes the earlier unfinished #192 assessment above;
+it does not rewrite original requirements or evidence.
+
+Retain the delivered source-owned compound families, including fresh root-List
+CREATE, and the accepted provider component. Further compound admission of
+existing-only Lists/field unions, ordinary collision merge/replacement, retained
+field edits combined with creation, and special import/language/plugin/RTPC/
+curve/array/ownership unions is outside current required acceptance. These are
+accepted composition boundaries, not claims that those combinations were
+implemented or are natively unavailable. Their supported standalone contracts
+and single-API coverage across Wwise 2021.1–2025.1 remain in scope.
+
+Simple undo/redo and existing optional observers retain their disclosed limits.
+No further observer, provider, native or Fresh expansion is required by this
+closeout. Existing identity, policy, immutable Preview, execute-once, drift,
+verification-strength and cleanup controls remain required. The separate pending
+questions for #179's 2021.1 plugin work, #182's special imports and #184's
+migration acceptance remain unchanged. #195 retains combined gates and exact
+coverage reconciliation; #192 closure does not close #174.
