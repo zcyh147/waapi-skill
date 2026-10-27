@@ -278,6 +278,140 @@ def test_cli_completes_sealed_controlled_scope_from_public_gateway_receipts(ping
     assert report['product_coverage'] == 'not_evaluated'
 
 
+def representative_ping_inputs(ping_scope):
+    """One selected public receipt per host/build; every legal mapping stays exact."""
+    path, _, inventory, original = ping_scope
+    bindings = deepcopy(original)
+    native = inventory['native_coverage']
+    scope = json.loads((path / 'scope.json').read_bytes())
+    branches = {row['id']: row for row in native['obligations']
+                if row['route'] in scope['route_ids']}
+    requirements = {'contract': 'waapi-skill.branch-evidence-requirements/v1',
+                    'branches': {}, 'representative_mechanisms': {}}
+    for route in scope['route_ids']:
+        members = {key: binding for key, binding in bindings['bindings'].items()
+                   if branches[key]['route'] == route}
+        selected = next(key for key in members if key.endswith('/@boolean/true'))
+        mechanism = 'ping:' + route
+        for key, binding in members.items():
+            binding['representative_mechanism'] = mechanism
+            if key != selected:
+                binding['evidence'] = {}
+            requirements['branches'][key] = {
+                'native_shape_sha256': branches[key]['shape_sha256'],
+                'categories': ['program'], 'reason': 'Controlled shared zero-input mechanism',
+                'representative_mechanism': mechanism}
+        sources = {binding[key]['source'].split('#')[0]
+                   for binding in members.values() for key in ('construction', 'validation', 'verifier')}
+        requirements['representative_mechanisms'][mechanism] = {
+            'contract': 'waapi-skill.representative-branch-mechanism/v1',
+            'scope_kind': 'controlled', 'candidate_sha256': native['candidate_sha256'],
+            'reviewed_reason': 'Same zero-input construction and bounded Boolean transport; sibling values are mapped, not observed.',
+            'sources': {source: hashlib.sha256((audit.ROOT / source).read_bytes()).hexdigest()
+                        for source in sources},
+            'members': {key: {'native_route': route,
+                'native_shape_sha256': branches[key]['shape_sha256'],
+                'mapping_sha256': audit.digest({k: v for k, v in binding.items() if k != 'evidence'})}
+                for key, binding in members.items()},
+            'selected_proofs': {'program': [selected]}}
+    return bindings, requirements
+
+
+def test_cli_accepts_exact_mapped_unexecuted_siblings_with_selected_mechanism_proof(ping_scope, tmp_path, capsys):
+    path, seal, _, _ = ping_scope
+    bindings, requirements = representative_ping_inputs(ping_scope)
+    write_json(tmp_path / 'bindings.json', bindings)
+    write_json(tmp_path / 'requirements.json', requirements)
+    output = tmp_path / 'ledger.json'
+    assert audit.main(['--output', str(output), '--controlled-scope', str(path / 'scope.json'),
+        '--scope-sha256', seal, '--bindings', str(tmp_path / 'bindings.json'),
+        '--requirements', str(tmp_path / 'requirements.json'), '--require-complete']) == 0
+    assert json.loads(capsys.readouterr().out)['product_coverage'] == 'not_evaluated'
+    ledger = audit.load(output)['native_coverage']
+    assert ledger['completion']['complete'] is True
+    direct = [row for row in ledger['obligations'] if row['id'].endswith('/@boolean/true')]
+    reused = [row for row in ledger['obligations'] if row not in direct]
+    assert len(direct) == 4 and len(reused) == 40
+    assert all(row['evidence_results']['program']['outcome'] == 'passed' for row in direct)
+    assert all(row['evidence_results']['program']['outcome'] == 'reviewed_representative_mechanism' for row in reused)
+    assert all(row['representative_proof']['direct_member_execution'] == 'not_observed'
+               and row['representative_proof']['verification_strength'] == 'reviewed_shared_mechanism'
+               and row['state'] == 'mapped_with_representative_proof'
+               for row in reused)
+    assert all(not bindings['bindings'][row['id']]['evidence'] for row in reused)
+
+
+@pytest.mark.parametrize('damage', [
+    'missing-legal-choice', 'missing-route', 'missing-version', 'missing-mapping',
+    'unsupported-ordinary-function', 'false-native-absence', 'missing-selected-proof',
+    'stale-source', 'stale-candidate', 'wrong-shape', 'wrong-member-version',
+    'unreviewed-member', 'conflicting-link', 'open-review'])
+def test_representative_proof_keeps_mapping_and_selected_evidence_fail_closed(ping_scope, monkeypatch, damage):
+    path, _, inventory, _ = ping_scope
+    bindings, requirements = representative_ping_inputs(ping_scope)
+    mechanism = next(iter(requirements['representative_mechanisms']))
+    review = requirements['representative_mechanisms'][mechanism]
+    selected = review['selected_proofs']['program'][0]
+    sibling = next(key for key in review['members'] if key.endswith('/@boolean/false'))
+    scope = json.loads((path / 'scope.json').read_bytes())
+    if damage == 'missing-legal-choice':
+        del bindings['bindings'][sibling]
+    elif damage == 'missing-route':
+        del bindings['bindings'][sibling]['public_route']
+    elif damage == 'missing-version':
+        scope['route_ids'] = [route for route in scope['route_ids'] if not route.startswith('2025.1|')]
+    elif damage == 'missing-mapping':
+        del bindings['bindings'][sibling]['validation']
+        # Re-sign the proposed review so the ordinary mapping validator, not
+        # merely a stale outer digest, must still refuse implementation credit.
+        review['members'][sibling]['mapping_sha256'] = audit.digest(
+            {k: v for k, v in bindings['bindings'][sibling].items() if k != 'evidence'})
+    elif damage == 'unsupported-ordinary-function':
+        route = next(route for route in inventory['native_coverage']['routes']
+                     if route['id'] == review['members'][sibling]['native_route'])
+        monkeypatch.setitem(route, 'public_route', None)
+    elif damage == 'false-native-absence':
+        bindings['bindings'][sibling]['disposition'] = 'native_absence'
+        bindings['bindings'][sibling]['alternatives_considered'] = ['claimed absence']
+    elif damage == 'missing-selected-proof':
+        bindings['bindings'][selected]['evidence'] = {}
+    elif damage == 'stale-source':
+        review['sources'][next(iter(review['sources']))] = '0' * 64
+    elif damage == 'stale-candidate':
+        review['candidate_sha256'] = '0' * 64
+    elif damage == 'wrong-shape':
+        review['members'][sibling]['native_shape_sha256'] = '0' * 64
+    elif damage == 'wrong-member-version':
+        review['members'][sibling]['native_route'] = '2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.ping'
+    elif damage == 'unreviewed-member':
+        del review['members'][sibling]
+    elif damage == 'conflicting-link':
+        requirements['branches'][sibling]['representative_mechanism'] = 'unreviewed'
+    else:
+        review['ignore_missing_evidence'] = True
+    try:
+        result = evaluate_snapshot(ping_scope, bindings, scope=scope, requirements=requirements)
+    except ValueError:
+        return  # Structural corruption is an invalid ledger, never completion.
+    assert result['completion']['complete'] is False
+
+
+def test_representative_proof_preserves_failed_direct_sibling_receipt(ping_scope):
+    bindings, requirements = representative_ping_inputs(ping_scope)
+    review = next(iter(requirements['representative_mechanisms'].values()))
+    selected = review['selected_proofs']['program'][0]
+    sibling = next(key for key in review['members'] if key.endswith('/@boolean/false'))
+    # The selected true receipt cannot prove false. Its failed direct assertion
+    # must remain a failure rather than falling back to representative credit.
+    bindings['bindings'][sibling]['evidence'] = deepcopy(bindings['bindings'][selected]['evidence'])
+    result = evaluate_snapshot(ping_scope, bindings, requirements=requirements)
+    row = next(row for row in result['obligations'] if row['id'] == sibling)
+    assert result['completion']['complete'] is False
+    assert row['state'] == 'implemented_unverified'
+    assert row['evidence_results']['program']['outcome'] == 'missing'
+    assert 'representative_proof' not in row
+
+
 def test_parent_pass_cannot_complete_descendant_branches(ping_scope, tmp_path, capsys):
     path, seal, _, evidence = ping_scope
     damaged = deepcopy(evidence)

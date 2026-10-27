@@ -1819,6 +1819,99 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         return 'missing', str(exc)
 
 
+def apply_representative_mechanisms(native, bindings, requirements, root, *, digest, scope_kind):
+    """Admit reviewed mapping siblings, never manufacture their execution facts.
+
+    Requirements are the existing review authority. Each optional mechanism seals
+    exact member mappings and current sources; selected evidence still passes the
+    ordinary reader. Existing (even failed) member evidence is never replaced.
+    """
+    import hashlib
+    from pathlib import Path
+    mechanisms = requirements.get('representative_mechanisms', {})
+    if not isinstance(mechanisms, dict):
+        raise ValueError('representative mechanisms must be an exact review map')
+    rows = {row['id']: row for row in native['obligations']}
+    policies = requirements['branches']
+    linked = {key for key, binding in bindings.items() if 'representative_mechanism' in binding}
+    policy_linked = {key for key, policy in policies.items() if 'representative_mechanism' in policy}
+    admitted = set()
+    fields = {'contract', 'scope_kind', 'candidate_sha256', 'reviewed_reason',
+              'sources', 'members', 'selected_proofs'}
+    for mechanism_id, review in mechanisms.items():
+        if (not isinstance(mechanism_id, str) or not mechanism_id
+                or not isinstance(review, dict) or set(review) != fields
+                or review['contract'] != 'waapi-skill.representative-branch-mechanism/v1'
+                or review['scope_kind'] != scope_kind
+                or review['candidate_sha256'] != native['candidate_sha256']
+                or not isinstance(review['reviewed_reason'], str) or not review['reviewed_reason'].strip()
+                or not isinstance(review['members'], dict) or not review['members']
+                or not isinstance(review['sources'], dict) or not review['sources']
+                or not isinstance(review['selected_proofs'], dict) or not review['selected_proofs']):
+            raise ValueError('closed current representative mechanism review required')
+        members = review['members']
+        if set(members) - rows.keys() or admitted.intersection(members):
+            raise ValueError('unknown or duplicate representative member')
+        source_names = set()
+        for identity, member in members.items():
+            row, binding, policy = rows[identity], bindings.get(identity, {}), policies.get(identity, {})
+            if (not isinstance(member, dict)
+                    or set(member) != {'native_route', 'native_shape_sha256', 'mapping_sha256'}
+                    or row['route'] is None or member['native_route'] != row['route']
+                    or member['native_shape_sha256'] != row['shape_sha256']
+                    or binding.get('representative_mechanism') != mechanism_id
+                    or policy.get('representative_mechanism') != mechanism_id
+                    or binding.get('disposition', 'implemented') != 'implemented'
+                    or member['mapping_sha256'] != digest({k: v for k, v in binding.items() if k != 'evidence'})):
+                raise ValueError('exact representative member mapping/shape/route differs')
+            for key in ('construction', 'validation', 'verifier'):
+                source_names.add(binding.get(key, {}).get('source', '').partition('#')[0])
+        if not source_names <= review['sources'].keys():
+            raise ValueError('representative mapping source closure is incomplete')
+        for name, seal in review['sources'].items():
+            path = Path(name)
+            source = root / path
+            if (path.is_absolute() or path.as_posix() != name or '..' in path.parts
+                    or source.is_symlink() or not source.resolve().is_relative_to(root.resolve())
+                    or hashlib.sha256(source.read_bytes()).hexdigest() != seal):
+                raise ValueError('representative reviewed source changed')
+        categories = {category for identity in members for category in rows[identity]['requirements']}
+        if (set(review['selected_proofs']) != categories
+                or any(category not in {'program', 'native', 'live_metadata', 'fresh'} for category in categories)):
+            raise ValueError('representative selected proof categories differ')
+        for category, selected in review['selected_proofs'].items():
+            if (not isinstance(selected, list) or not selected or len(set(selected)) != len(selected)
+                    or any(identity not in members or category not in rows[identity]['requirements'] for identity in selected)):
+                raise ValueError('representative selected proof is not an exact required member')
+        admitted.update(members)
+        # Failed/missing mapping, absence or boundary claims cannot gain coverage
+        # from a sibling. Selected proofs must be direct ordinary-reader passes,
+        # not another representative relation or a cycle.
+        ready = (all(rows[key]['state'] in {'verified', 'implemented_unverified'} for key in members)
+                 and all(rows[key]['evidence_results'].get(category, {}).get('outcome') == 'passed'
+                         for category, selected in review['selected_proofs'].items() for key in selected))
+        if not ready:
+            continue
+        for identity in members:
+            row, binding = rows[identity], bindings[identity]
+            reused = []
+            for category in row['requirements']:
+                if category not in binding.get('evidence', {}):
+                    row['evidence_results'][category] = {'outcome': 'reviewed_representative_mechanism',
+                        'reason': mechanism_id + '; member execution/effect not observed'}
+                    reused.append(category)
+            if reused:
+                row['representative_proof'] = {'mechanism_id': mechanism_id,
+                    'review_sha256': digest(review), 'selected_proofs': review['selected_proofs'],
+                    'reused_categories': reused, 'verification_strength': 'reviewed_shared_mechanism',
+                    'direct_member_execution': 'not_observed'}
+                if all(result['outcome'] in {'passed', 'reviewed_representative_mechanism'}
+                       for result in row['evidence_results'].values()):
+                    row['state'] = 'mapped_with_representative_proof'
+    if linked != admitted or policy_linked != admitted:
+        raise ValueError('representative member linkage is missing or conflicting')
+
+
 def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None, evidence_base=None, requirements_document=None):
     """Evaluate exact obligations; structural reproducibility remains separate."""
     import ast
@@ -2004,6 +2097,8 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
             branch['metadata_scope'] = 'object_type'
             branch['direct_recipient_instance_metadata'] = 'not_observed'
         branch['state'] = 'verified' if outcomes <= {'passed', 'reviewed_mechanism_reuse', 'reviewed_class_metadata_and_object_scope_mechanism'} else 'environment_blocked' if 'blocked' in outcomes else 'implemented_unverified'
+    apply_representative_mechanisms(native, bindings, requirements_document, root,
+        digest=digest, scope_kind=scope_kind)
     apply_runtime_preservation_gates(native['obligations'], policies, preservation_gates)
     for branch in native['obligations']:
         if (branch['evidence_results'].get('native', {}).get('outcome') == 'passed'
@@ -2023,7 +2118,7 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
                 _, profile, _ = console_branch(branch,root)
                 if branch['id'] == profile['gate']:
                     branch['representative_native_support'] = console_basis(profile)
-    complete_states = {'verified', 'source_definition_verified', 'proven_native_absence', 'approved_exclusion'}
+    complete_states = {'verified', 'mapped_with_representative_proof', 'source_definition_verified', 'proven_native_absence', 'approved_exclusion'}
     counts = dict(sorted(Counter(r['state'] for r in native['obligations']).items()))
     if condition_reuse_reviews:
         native['condition_mechanism_reuse'] = {'original_witness_run_ids': sorted(condition_reuse_runs),
