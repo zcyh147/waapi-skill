@@ -1,4 +1,4 @@
-"""2025 custom Metadata placement on the existing source-owned Metadata List.
+"""Versioned Metadata construction through its exact source-certified List.
 
 The matching WObjects member pinned by constructor_inputs.SOURCE declares
 MetadataSlot.Metadata with SupportCustom=true. Both custom references and
@@ -14,7 +14,7 @@ from uuid import UUID
 from .constructor_inputs import authority, local_reference_value
 from .documented_list_fields import (
     METADATA_INNER_OWNERS, observe_list_binding, owned_inner_identity,
-    resolve_live_list_evidence,
+    resolve_live_list_evidence, resolve_class_list_evidence, load_catalog,
 )
 
 
@@ -32,13 +32,84 @@ def _guid(value):
     return "{" + str(parsed).upper() + "}"
 
 
+DIRECT_METADATA_VERSIONS = frozenset({"2022.1", "2023.1", "2024.1"})
+DIRECT_METADATA_VERIFICATION = {
+    "mode": "direct_metadata_list_association_and_fields",
+    "verified_scope": "new_GUID_installed_class_name_requested_fields_and_ordered_List_preservation",
+    "intrinsic_ownership": "observed_key_presence_and_value_only",
+    "unverified": "local_vs_shared_intrinsic_ownership_and_unobserved_audio_effect",
+}
+
+
+def direct_metadata_list_authority(evidence):
+    """Certify only the pinned older direct Metadata declaration, never a token."""
+    if (not isinstance(evidence, Mapping) or evidence.get("version") not in DIRECT_METADATA_VERSIONS
+            or evidence.get("scope", {}).get("scope_kind") != "object"
+            or evidence.get("declaration", {}).get("name") != "Metadata"):
+        return False
+    _guid(evidence["scope"]["scope_value"])
+    expected = resolve_class_list_evidence(evidence["version"], evidence["scope"]["class_id"], "Metadata")
+    return (expected["declaration"]["element_classes"] == [{"name": "Metadata", "class_id": 5308432}]
+        and not expected["declaration"]["unresolved_element_types"]
+        and all(evidence.get(key) == expected[key] for key in
+            ("kind", "version", "catalog_sha256", "source_member", "source_sha256", "declaration")))
+
+
+def _observe_direct_metadata(version, target_id, target_type, source, *, read):
+    from .operation_registry import _read_object_list_rows_with_evidence, _ordinary_object_type_matches
+    from .builders.metadata import parse_get_types_result
+    owner_rows = [row for row in load_catalog(version)["classes"] if row["class_id"] == source["scope"]["class_id"]]
+    if (len(owner_rows) != 1 or not _ordinary_object_type_matches(target_type, {"canonical_type": owner_rows[0]["name"]})
+            or source["scope"]["owner"]["type"] != target_type
+            or source["declaration"]["element_classes"] != [{"name": "Metadata", "class_id": 5308432}]
+            or source["declaration"]["unresolved_element_types"]):
+        raise ValueError("Direct Metadata construction needs its exact owner/type List authority")
+    catalog = parse_get_types_result(read("ak.wwise.core.object.getTypes", {}, {}))
+    plugin_types = sorted((row.as_dict() for row in catalog if row.type.casefold() == "metadata"), key=lambda row: row["classId"])
+    classes = {5308432, *(row["classId"] for row in plugin_types)}
+    fields = ("id", "name", "type", "classId", "parent", "owner", "notes")
+    members, _packets = _read_object_list_rows_with_evidence(target_id, "Metadata", fields=fields,
+        read=read, context="direct-metadata", version=version, documented_list=source)
+    if len(members) > 128:
+        raise ValueError("Direct Metadata exceeds its complete member observation bound")
+    for row in members:
+        _guid(row["id"])
+        if (row.get("type") not in {"Metadata", "MetadataPlugin"}
+                or type(row.get("classId")) is not int or row["classId"] not in classes
+                or not isinstance(row.get("name"), str)):
+            raise ValueError("Direct Metadata member has no exact base/installed kind authority")
+        for field in ("owner", "parent"):
+            value = row.get(field)
+            identity = value.get("id") if isinstance(value, Mapping) else value
+            if identity not in (None, "{00000000-0000-0000-0000-000000000000}"):
+                _guid(value)
+    return {"kind": "metadata_members", "authority": {"list": source, "installed_metadata_types": plugin_types,
+        "constructor": "recursive_object_set_Metadata_definition", "ownership": DIRECT_METADATA_VERIFICATION},
+        "guard": {"evidence": source, "members": members},
+        "preexisting_plugin_ids": [_guid(row["id"]) for row in members]}
+
+
+def appended_direct_metadata_binding(before, after, created_id):
+    identity = _guid(created_id)
+    old, members = before["guard"]["members"], after["guard"]["members"]
+    if (before["authority"] != after["authority"] or len(members) != len(old) + 1
+            or members[:-1] != old or _guid(members[-1]["id"]) != identity
+            or identity in before["preexisting_plugin_ids"]
+            or identity == _guid(after["authority"]["list"]["scope"]["scope_value"])):
+        raise ValueError("Direct Metadata must append its one fresh exact result and preserve all prior ordered members")
+    return identity
+
+
 def observe_metadata_placement(version, target_id, target_type, *, read):
-    """Seal the source, actual owner, ordered slots and every local reference."""
-    if version != "2025.1":
-        raise ValueError("Owner-local Metadata construction is packaged only for 2025.1; older direct-List ownership remains unmapped")
+    """Seal the source, actual owner, and versioned ordered List member state."""
+    if version not in {"2025.1", *DIRECT_METADATA_VERSIONS}:
+        raise ValueError("This version has no packaged selected-class Metadata List constructor")
     source = resolve_live_list_evidence(version, target_id, "Metadata", read=read)
+    if version in DIRECT_METADATA_VERSIONS:
+        return _observe_direct_metadata(version, target_id, target_type, source, read=read)
     owner_class = source["scope"]["class_id"]
-    if METADATA_INNER_OWNERS.get(owner_class) != target_type:
+    from .operation_registry import _ordinary_object_type_matches
+    if not _ordinary_object_type_matches(target_type, {"canonical_type": METADATA_INNER_OWNERS.get(owner_class)}):
         raise ValueError("Metadata placement requires its exact source-certified audio owner class")
     inner = owned_inner_identity(source, 5570560)
     spec = {"class_id": 5570560, "collection": "Metadata"}

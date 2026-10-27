@@ -433,10 +433,12 @@ def prove_source_owned_empty_list(evidence, owner_row, *, read, platform=None):
     scope = evidence.get("scope", {})
     name = evidence.get("declaration", {}).get("name")
     owner = scope.get("scope_value")
+    from .metadata_plugin_placement import direct_metadata_list_authority
+    direct_metadata = direct_metadata_list_authority(evidence)
     if (evidence.get("kind") != "documented-list" or scope.get("scope_kind") != "object"
             or (name not in {"RTPC", "Effects"} and owned_inner_identity(evidence, 5570560) is None
                 and owned_inner_identity(evidence, 5636096) is None and not is_manual_marker_list_source(evidence)
-                and legacy_playlist_authority(evidence) is None)
+                and legacy_playlist_authority(evidence) is None and not direct_metadata)
             or not isinstance(owner_row, Mapping)
             or set(owner_row) != {"id"} or owner_row.get("id", "").upper() != owner
             or not isinstance(evidence.get("source_sha256"), str)):

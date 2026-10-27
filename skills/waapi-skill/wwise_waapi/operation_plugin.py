@@ -288,7 +288,7 @@ class PluginVerificationEvidence:
     name: str
     type: str
     class_id: int
-    parent_id: str
+    parent_id: str | None
     owner_id: str | None
     readback_view: Mapping[str, Any]
     requested_state: Mapping[str, Any]
@@ -396,7 +396,7 @@ def normalize_plugin_creation(payload: Any) -> PluginCreationDescriptor:
             or placement == "shareset" and kind not in PLUGIN_SHARESET_HIERARCHIES
             or placement == "owner" and kind == "sink"):
         raise PluginOperationContractError(
-            "INVALID_PLUGIN_PLACEMENT", "Source uses owner placement; Effects use owner or shareset; Sink uses shareset; Metadata additionally supports source-certified owner placement in 2025.1."
+            "INVALID_PLUGIN_PLACEMENT", "Source uses owner placement; Effects use owner or shareset; Sink uses shareset; Metadata uses a version-correct source-certified owner List or ShareSet placement."
         )
     properties = _normalize_properties(payload.get("properties", []))
     raw_references = payload.get("references", [])
@@ -561,7 +561,7 @@ def validate_plugin_target(
             )
     elif descriptor.kind == "metadata":
         from .documented_list_fields import METADATA_INNER_OWNERS
-        if target_type not in METADATA_INNER_OWNERS.values():
+        if target_type not in {*METADATA_INNER_OWNERS.values(), "ActorMixer"}:
             raise PluginOperationContractError("INVALID_METADATA_TARGET", "Local Metadata requires a source-certified audio owner.")
     elif descriptor.kind == "effect" and target_type not in EFFECT_TARGET_TYPES:
         raise PluginOperationContractError(
@@ -640,14 +640,13 @@ def build_plugin_creation_plan(
         }
         expected_parent: dict[str, Any] = {"kind": "id", "value": target_id}
     elif descriptor.kind == "metadata":
-        if version != "2025.1":
-            raise PluginOperationContractError("UNAVAILABLE_IN_VERSION", "Owner-local Metadata is packaged only for 2025.1; older direct-List ownership remains unmapped.")
         if effect_slots_2022 is not None:
             raise PluginOperationContractError("UNEXPECTED_EFFECT_SLOT_SNAPSHOT", "Metadata does not accept Effect-slot evidence.")
-        object_spec = {"object": target_id, "listMode": "append", "@Metadata": [
-            {"type": "MetadataSlot", "name": "", "@Metadata": plugin_object}]}
-        placement = {"kind": "metadata_slot_append", "collection": "@Metadata", "list_mode": "append",
-            "slot_type": "MetadataSlot", "create_only": True, "raw_replace_all_allowed": False,
+        direct = version != "2025.1"
+        member = plugin_object if direct else {"type": "MetadataSlot", "name": "", "@Metadata": plugin_object}
+        object_spec = {"object": target_id, "listMode": "append", "@Metadata": [member]}
+        placement = {"kind": "metadata_list_append" if direct else "metadata_slot_append", "collection": "@Metadata", "list_mode": "append",
+            **({"member_type": "Metadata"} if direct else {"slot_type": "MetadataSlot"}), "create_only": True, "raw_replace_all_allowed": False,
             "replace_existing_allowed": False}
         expected_parent = {"kind": "created_metadata_slot"}
     elif version == "2022.1":
@@ -711,7 +710,12 @@ def build_plugin_creation_plan(
     if descriptor.placement == "shareset":
         expected_plugin.pop("owner")
     elif descriptor.kind == "metadata":
-        expected_plugin["owner"] = expected_parent
+        if version == "2025.1":
+            expected_plugin["owner"] = expected_parent
+        else:
+            expected_plugin.pop("owner")
+            expected_plugin.pop("parent")
+            expected_plugin["List_association"] = {"owner": target_id, "collection": "Metadata"}
     if descriptor.notes is not None:
         expected_plugin["notes"] = descriptor.notes
     if descriptor.language is not None:
@@ -826,12 +830,13 @@ def verify_created_plugin_row(
     expected_fields = plugin_verification_fields(descriptor)
     actual_fields = tuple(row)
     shareset = descriptor.placement == "shareset"
+    direct_metadata = descriptor.kind == "metadata" and not shareset and version != "2025.1"
     embedded_owner_only = not shareset and (
         descriptor.kind == "effect" and "parent" not in row
         or descriptor.kind == "metadata" and row.get("parent") is None
     )
     allowed_missing_fields = (
-        set() if shareset else {"owner"} if descriptor.kind == "source" else {"parent"}
+        {"parent", "owner"} if direct_metadata else set() if shareset else {"owner"} if descriptor.kind == "source" else {"parent"}
     )
     if (
         set(actual_fields) - set(expected_fields)
@@ -850,12 +855,12 @@ def verify_created_plugin_row(
 
     plugin_id = _require_guid(row.get("id"), field="plugin.id")
     parent_id = _closed_object_reference_id(
-        row.get("owner") if embedded_owner_only else row.get("parent"),
-        field="plugin.parent",
+        row.get("parent") if direct_metadata else row.get("owner") if embedded_owner_only else row.get("parent"),
+        field="plugin.parent", allow_none=direct_metadata,
     )
     owner_id = None if shareset else _closed_object_reference_id(
-        row.get("owner", row.get("parent")),
-        field="plugin.owner",
+        row.get("owner") if direct_metadata else row.get("owner", row.get("parent")),
+        field="plugin.owner", allow_none=direct_metadata,
     )
     expected_parent_id = _require_guid(
         expected_parent_id,
@@ -891,7 +896,9 @@ def verify_created_plugin_row(
     expected_plugin_owner = (
         expected_parent_id if embedded_owner_only or (descriptor.kind == "metadata" and not shareset) else expected_owner_id
     )
-    if embedded_owner_only:
+    if direct_metadata:
+        placement["ownership_observation"] = {field: row[field] for field in ("owner", "parent") if field in row}
+    elif embedded_owner_only:
         placement["ownership_readback"] = "immediate_owner_without_hierarchy_parent"
     expected = {
         "name": descriptor.name,
@@ -927,8 +934,8 @@ def verify_created_plugin_row(
         actual["type"] == expected["type"]
         and type(actual["classId"]) is int
         and actual["classId"] == expected["classId"]
-        and _same_guid(parent_id, expected_parent_id)
-        and (shareset or _same_guid(owner_id, expected_plugin_owner))
+        and (direct_metadata or _same_guid(parent_id, expected_parent_id))
+        and (shareset or direct_metadata or _same_guid(owner_id, expected_plugin_owner))
     )
     if not matches:
         raise PluginOperationContractError(
@@ -1167,6 +1174,12 @@ def _verify_plugin_placement(
         return {"kind": "source_child"}
 
     if descriptor.kind == "metadata":
+        if version != "2025.1":
+            _require_exact_mapping_fields(placement_evidence, frozenset({"kind", "target_id"}), field="placement_evidence")
+            if (placement_evidence.get("kind") != "metadata_list_append"
+                    or not _same_guid(placement_evidence.get("target_id"), expected_owner_id)):
+                raise PluginOperationContractError("PLUGIN_PLACEMENT_MISMATCH", "Metadata requires its exact direct List association.")
+            return {**dict(placement_evidence), "intrinsic_ownership_verified": False}
         _require_exact_mapping_fields(placement_evidence, frozenset({"kind", "slot_id", "target_id"}), field="placement_evidence")
         if (version != "2025.1" or placement_evidence.get("kind") != "metadata_slot_append"
                 or not _same_guid(placement_evidence.get("slot_id"), expected_parent_id)
