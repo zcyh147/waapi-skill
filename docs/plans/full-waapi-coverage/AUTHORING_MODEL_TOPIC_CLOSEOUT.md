@@ -33,6 +33,9 @@ returned `success:true`, with result-schema-only evidence. The single approved
 60 seconds, with zero model transactions; it remains BLOCKED and the attempt is
 consumed. It establishes neither an API defect nor a mode-effect conclusion.
 Source/process cleanup does not prove earlier native resource retirement.
+The [user reaffirmed retaining the custom-window scope with no additional native
+attempt](https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116);
+the consumed normal-startup BLOCKED result and disclosed limits remain unchanged.
 
 The bounded review reused the existing readiness, official-source and R2 triage
 packets; it ran no tests or native actions. The only runtime edit is the public
