@@ -158,7 +158,8 @@ def test_owned_layout_common_cohort_reaches_final_writer_with_nine_scoped_transa
     assert activated['observed_holder_placement']['WindowPlacement_NormalPos_Left'] == '100'
     assert activated['observed_holder_placement']['WindowPlacement_NormalPos_Top'] == '120'
     assert activated['element_rectangle'] == {'left': 100, 'top': 120, 'right': 500, 'bottom': 420}
-    assert activated['view_is_docked'] is False and activated['frontend_count'] == 1
+    assert activated['view_is_docked'] is False
+    assert URI + 'getViewHandle' not in [uri for uri, _, _ in client.calls]
     assert report['undock_views']['before'] == report['undock_views']['after']
     assert {row['view_type'] for row in report['undock_views']['after']} == {'ProjectExplorer', 'Transport', 'EventViewer'}
     item = SimpleNamespace(nodeid=nodeid, _waapi_phase_reports={'setup': 'passed', 'call': 'passed'})

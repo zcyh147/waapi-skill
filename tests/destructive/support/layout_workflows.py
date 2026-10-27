@@ -156,10 +156,9 @@ def collect_layout_workflow(batch, call, *, nodeid, strong_effect):
         allocated = [row for row in owned['elements'] if row['location'] == observed[0]['location']]
         assert len(allocated) == 1
         rectangle = require_layout_rectangle(call(['layout-read', 'rectangle', '--element-handle', allocated[0]['handle']])['result'])
-        frontend = call(['layout-read', 'frontend', '--view-handle', transport['handle']])['result']
-        report['activated_floating'].update(element_rectangle=rectangle, element_scope='positive live allocation only',
-            frontend_count=len(frontend))
-        assert frontend, 'Owned frontend was not instantiated'
+        report['activated_floating'].update(element_rectangle=rectangle, element_scope='positive live allocation only')
+        # Layout operations use the discovered view/element identities, not a
+        # frontend GUID. getViewHandle remains a separate unfinished API under #188.
         effect('getOrCreateView', owned['layout_handle'], ['--view-type', 'EventViewer', '--initial-x', '17', '--initial-y', '29'])
         event_id = _view_id(call, name, 'EventViewer')
         if nodeid == COMMON_NODE:
