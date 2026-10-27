@@ -436,3 +436,28 @@ verification-strength and cleanup controls remain required. The separate pending
 questions for #179's 2021.1 plugin work, #182's special imports and #184's
 migration acceptance remain unchanged. #195 retains combined gates and exact
 coverage reconciliation; #192 closure does not close #174.
+
+## User-approved plugin and migration boundaries — 2026-10-27
+
+The user accepted the remaining #179 and #184 limitations and requested their
+closeout. This supersedes the pending decisions above, without changing the
+original results or implying native absence.
+
+For #179, retain the disclosed 2021.1 limitation on donor-free creation of a
+selected AudioDevice or Metadata plugin class. The implemented 2022.1–2025.1
+placements remain supported at their stated verification strengths. No further
+2021 constructor investigation is required for this accepted boundary.
+
+For #184, accept the observed migration limitation: the retained migration
+dropped Soundcaster audition-state references while the inspected core objects,
+media and old backups survived. This is not a promise that arbitrary settings
+survive migration. Preserve the original FAIL and the conservative production
+verification result; do not relabel them PASS or claim that a narrower migration
+verifier has been implemented. Further native migration QA is not required to
+close this ticket under the accepted limitation.
+
+These decisions permit functional-ticket closure. Exact coverage reconciliation
+and the final combined gates remain #195; separately approved Fresh remains
+#194. The two #182 special-import limitations are still pending, and #174 is
+not complete. Configuration binding, modification policies, immutable Preview,
+execute-once behavior and truthful uncertainty remain unchanged.

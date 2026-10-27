@@ -44,3 +44,13 @@ and does not remove other plugin placement or conversion/build input work.
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Accepted closeout — 2026-10-27
+
+The user accepted the disclosed 2021.1 donor-free selected-class AudioDevice and
+Metadata constructor limitation. It remains a Skill boundary, not a claim that
+all native alternatives are impossible. The reviewed modern placements,
+including the 2022.1–2024.1 direct Metadata List and distinct 2025.1 MetadataSlot,
+are delivered. Their original verification-strength limits remain unchanged.
+Close #179 under this explicit exception; retain historical failures. Final
+inventory reconciliation and combined gates stay with #195, and Fresh with #194.

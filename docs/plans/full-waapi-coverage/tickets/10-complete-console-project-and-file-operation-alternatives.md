@@ -39,3 +39,15 @@ input gaps, or complete #184. Other branches retain their applicable acceptance.
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Accepted closeout — 2026-10-27
+
+The user accepted the remaining migration limitation: the observed migration
+drops Soundcaster audition-state references. Retain the core-object/media/backup
+observations at their exact scope, the original migration FAIL and the current
+conservative verification result. Do not claim lossless migration or a newly
+implemented narrower verifier. The previously accepted lightweight CREATE
+boundary and retained project/file-operation proof remain in force.
+Close #184 under these explicit limits without further native migration QA.
+Final inventory reconciliation and combined gates stay with #195; Fresh stays
+with #194. Existing safety controls and historical evidence remain unchanged.
