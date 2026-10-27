@@ -11562,8 +11562,11 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
             if not isinstance(owner_path, str) or node.get('collection') in {None, 'children'}:
                 raise OperationContractError('UNDO_GROUP_CHILD_OBSERVATION_REQUIRED', 'Owned List requires its exact ordinary source owner scope.')
             return 'owned-list:' + owner_path.casefold() + ':' + node['collection']
+        # The complete fresh tree belongs to its ordinary root (or retained
+        # owner's List). Nested opaque members need no invented path scopes.
         scopes = [{"object_id": source_key(node),
-            "field": "presence", "kind": "all", "platform": None} for group in groups for node in group['nodes']] + [
+            "field": "presence", "kind": "all", "platform": None} for group in groups
+            for node in group['nodes'] if node['request_path'] == group['root']] + [
             {'object_id': row['id'], 'field': 'notes', 'kind': 'all', 'platform': None}
             for row, _ in preservation_rows({'verification_plan': plan, 'pre_state': state})]
         for node in plan['nodes']:

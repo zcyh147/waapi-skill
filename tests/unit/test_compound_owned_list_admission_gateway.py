@@ -23,7 +23,13 @@ def group_list_task(tmp_path, *, companion=None, creation_first=True, task_facto
         assert code == 0, started
         task.draft, task.authority, task.revision = started['draft']['draft_id'], started['task_authority'], started['draft']['revision']
         owner = task.bind(object_id)
-        if operation == 'object.setReference':
+        if operation == 'object.create':
+            code, kind = task.step('draft-discover-types', '--role', 'object', '--meaning', 'MusicSwitchContainer')
+            assert code == 0, kind
+            code, declared = task.step('draft-declare-new', '--declaration-id', 'music-overlap', '--parent-handle', owner,
+                '--kind', kind['type_candidates'][0]['handle'], '--name', value)
+            assert code == 0, declared
+        elif operation == 'object.setReference':
             target = task.bind(value)
             code, field = task.step('draft-discover-fields', '--object-handle', owner, '--meaning', 'OutputBus')
             assert code == 0, field
@@ -348,6 +354,60 @@ def test_group_playlist_source_within_bounds_ignores_optional_history_budget(tmp
     monkeypatch.setattr(edit_history_business, 'MAX_OBSERVATIONS', 1)
     task = group_list_task(tmp_path, task_factory=planned_playlist_task)
     task.preview()
+    assert task.writes == [] and not task.group_open
+
+
+def test_group_admits_complete_nested_music_lists_with_ancestor_rename(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import nested_music_list_task, SECOND
+    task = group_list_task(tmp_path, task_factory=lambda path, **kw: nested_music_list_task(path, **kw)[0],
+        companion=('object.setName', SECOND, 'Renamed music'))
+    before = deepcopy(task.objects)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(task.writes) == 1
+    assert task.objects[ROOT]['path'].endswith('\\Renamed music\\Music')
+    path_id = '{99999999-9999-9999-9999-999999999999}'
+    entry_id = '{88888888-8888-8888-8888-888888888888}'
+    assert task.objects[entry_id]['@EntryPath'] == [{'id': path_id}]
+    assert task.objects[path_id]['owner'] == {'id': entry_id}
+    for oid in ('{55555555-5555-5555-5555-555555555555}', '{66666666-6666-6666-6666-666666666666}'):
+        assert task.objects[oid] == before[oid]
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 1
+
+
+@pytest.mark.parametrize('fault', ['wrong-retained-root', 'missing-inner-membership'])
+def test_group_nested_music_invalid_actual_source_stops_before_later_rename_without_retry(tmp_path, fault):
+    from tests.unit.test_object_graph_owned_choices_gateway import nested_music_list_task, SECOND
+    task = group_list_task(tmp_path, task_factory=lambda path, **kw: nested_music_list_task(path,
+        fault=None if fault == 'wrong-retained-root' else fault, **kw)[0],
+        companion=('object.setName', SECOND, 'Renamed music'))
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == SET and fault == 'wrong-retained-root':
+            result['objects'][0]['id'] = FIRST
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, failed = task.run('execute', tx)
+    assert code == 2 and failed.get('verified') is not True and failed['automatic_retry'] is False, failed
+    assert len(task.writes) == 1 and task.objects[SECOND]['name'] == 'Default Work Unit'
+    assert failed.get('rollback_verified', False) is False
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 1
+    assert [uri for uri, _, _ in task.calls if uri.startswith('ak.wwise.core.undo.')] == [
+        'ak.wwise.core.undo.beginGroup', 'ak.wwise.core.undo.cancelGroup']
+    assert not task.group_open
+
+
+@pytest.mark.parametrize('creation_first', [False, True])
+def test_group_nested_music_complete_root_overlap_stops_before_begin(tmp_path, creation_first):
+    from tests.unit.test_object_graph_owned_choices_gateway import nested_music_list_task, SECOND
+    task = group_list_task(tmp_path, task_factory=lambda path, **kw: nested_music_list_task(path, **kw)[0],
+        companion=('object.create', SECOND, 'Music'), creation_first=creation_first)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'UNDO_GROUP_OVERLAPPING_OUTCOME', rejected
     assert task.writes == [] and not task.group_open
 
 

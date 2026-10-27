@@ -234,11 +234,12 @@ def compound_source_creation_graphs(plan, state):
                     for target in field['targets'])):
             raise ValueError('Compound reference List needs its exact source-certified new owner and direct-child targets')
     members = set()
+    declared_members = {path for profile in profiles for path in profile['members']}
     for profile in profiles:
         owner = by_path.get(profile['owner'])
         if (owner is None or type(owner.get('existing_target')) is not bool
                 or owner.get('preexisting_id') is not None and owner.get('on_name_conflict') != 'merge'
-                or owner.get('collection') not in {None, 'children'}
+                or owner.get('collection') not in {None, 'children'} and owner['request_path'] not in declared_members
                 or not profile.get('members')):
             raise ValueError('Compound owned Lists require an exact ordinary new or retained source owner')
         for path in profile['members']:
@@ -247,10 +248,9 @@ def compound_source_creation_graphs(plan, state):
             if (path in members or node is None or node.get('parent_request_path') != profile['owner']
                     or node.get('collection') != profile['name'] or node.get('existing_target') is not False
                     or node.get('preexisting_id') is not None or fields is None
-                    or node.get('children_request_paths') or node.get('list_request_paths') or node.get('list_snapshots')
                     or node.get('import_requested') or node.get('requested_language') or node.get('graph_plugin_native')
                     or any('curve' in field or 'array' in field for field in fields)):
-                raise ValueError('Compound source List needs every fresh source-certified leaf occurrence')
+                raise ValueError('Compound source List needs every fresh source-certified occurrence')
             members.add(path)
     guards = [*state.get('documented_planned_list_guards', []), *state.get('documented_list_guards', [])]
     if list_profiles(deepcopy(nodes), guards, plan['version']) != profiles:

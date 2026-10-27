@@ -451,9 +451,11 @@ def test_documented_list_class_handle_builds_slot_under_planned_owner_in_same_tr
         assert old_slot not in task.objects
 
 
-@pytest.mark.parametrize("fault", (None, "wrong-inner-class", "wrong-inner-owner", "missing-inner-membership", "changed-slot-reference", "changed-reference-notes", "missing-inner-result"))
-def test_documented_nested_lists_and_inline_slot_references_share_one_planned_graph(tmp_path, fault):
+def nested_music_list_task(tmp_path, fault=None, *, compound=False):
     task, _ = _documented_metadata_clear_case(tmp_path, clear=False)
+    if compound:
+        from tests.unit.test_compound_undo_business_gateway import _start_parent_owned_graph_child
+        _start_parent_owned_graph_child(task, 'object.set')
     task.objects[SECOND]["path"] = r"\Interactive Music Hierarchy\Default Work Unit"
     task.objects[FIRST]["parent"] = {"id": PROJECT_GROUP}
     task.types.extend({"classId": class_id, "name": name, "type": "WObject"} for name, class_id in (
@@ -466,6 +468,7 @@ def test_documented_nested_lists_and_inline_slot_references_share_one_planned_gr
         "path": task.objects[group_id]["path"] + r"\Wood", "notes": "Keep value", "parent": {"id": group_id}}
     parent, group, value = task.bind(SECOND), task.bind(group_id), task.bind(value_id)
     preserved = deepcopy(task.objects)
+    task.writes = []
     original = task.call
     fields = {5832704: ("Argument", "Argument", ["SwitchGroup", "StateGroup"]),
         5767168: ("EntryPathObject", "EntryPath Object", ["SwitchGroup", "Switch", "StateGroup", "State"])}
@@ -480,6 +483,7 @@ def test_documented_nested_lists_and_inline_slot_references_share_one_planned_gr
                 "restriction": {"type": "reference", "restrictions": [{"type": spec[2]}, "notNull"]}}
         if uri == "ak.wwise.core.object.set":
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.writes.append(deepcopy(args))
             assert args["objects"] == [{"object": SECOND, "children": [{"type": "MusicSwitchContainer", "name": "Music",
                 "@Arguments": [{"type": "MusicArgumentsSlot", "name": "Surface argument", "@Argument": group_id}],
                 "@Entries": [{"type": "MultiSwitchEntry", "name": "Wood entry",
@@ -538,6 +542,12 @@ def test_documented_nested_lists_and_inline_slot_references_share_one_planned_gr
             "--name", name, "--kind", kinds[kind], *extra)
         assert code == 0, declared
         handles[declaration_id] = declared["draft"]["declared_object"]["result_handle"]
+    return task, preserved, group_id, value_id
+
+
+@pytest.mark.parametrize("fault", (None, "wrong-inner-class", "wrong-inner-owner", "missing-inner-membership", "changed-slot-reference", "changed-reference-notes", "missing-inner-result"))
+def test_documented_nested_lists_and_inline_slot_references_share_one_planned_graph(tmp_path, fault):
+    task, preserved, group_id, value_id = nested_music_list_task(tmp_path, fault)
     tx, shown = task.preview()
     assert len(shown["artifact"]["prepared_operation"]["pre_state"]["documented_planned_list_guards"]) == 3
     code, verified = task.finish(tx, shown)
