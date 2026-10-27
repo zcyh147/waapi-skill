@@ -1565,6 +1565,9 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
     """Read preserved run records. A declaration/test filename has no PASS credit."""
     from pathlib import Path
     root = source_root or Path(__file__).resolve().parents[2]
+    if category == 'fresh':
+        from tests.support.fresh_branch_evidence import fresh_evidence_result
+        return fresh_evidence_result(descriptor, branch, candidate, scope_kind, base, binding or {}, root)
     try:
         if (binding or {}).get('condition_source_mapping_attachment'):
             from tests.support.condition_completion_mapping import mapping_evidence_result
@@ -1810,8 +1813,6 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             validate_native_absence_observations(record, binding, checks, required_hosts)
             if record.get('native_status') != 'absent' or not record.get('alternatives_considered'):
                 raise ValueError('native absence needs exact observation and alternative analysis')
-        if category == 'fresh':
-            raise ValueError('formal Fresh archive bridge requires #194; labels alone grant no credit')
         return 'passed', None
     except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
         return 'missing', str(exc)
