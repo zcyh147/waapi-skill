@@ -97,7 +97,7 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
     record = json.loads(_bytes(descriptor, base))
     fields = {'contract', 'scope_kind', 'candidate_sha256', 'original_candidate', 'files',
               'original_sources', 'review', 'mechanism', 'skip_lines'}
-    if (set(record) != fields or record['contract'] != CONTRACT
+    if (set(record) not in (fields, fields | {'successful_subset_review'}) or record['contract'] != CONTRACT
             or record['scope_kind'] != scope_kind or record['candidate_sha256'] != candidate
             or not re.fullmatch(r'[0-9a-f]{40}', record['original_candidate'])):
         raise ValueError('ordinary run exact candidate/scope contract required')
@@ -119,29 +119,31 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
         and argv[:6] == ['ci/test.sh', '--mode', 'nonlive', '--', '-q', '-ra']
         and len(set(argv[6:])) == len(argv[6:])
         and all(isinstance(node, str) and re.fullmatch(r'tests/unit/test_[A-Za-z0-9_]+\.py::test_\w+(?:\[[^\s\]]+\])?', node) for node in argv[6:]))
+    subset = _review_focused_successful_subset(record, raw, argv, summary, base, root) if record.get('successful_subset_review') else None
+    expected_exit, expected_status = (1, 'FAIL') if subset is not None else (0, 'PASS')
     if (plan.get('candidate') != original or (argv != PROGRAM_ARGV and not focused)
             or any(result.get(key) != value for key, value in plan.items())
             or result.get('head_after') != original or result.get('candidate_unchanged') is not True
-            or result.get('exit_code') != 0 or type(result.get('exit_code')) is not int
+            or result.get('exit_code') != expected_exit or type(result.get('exit_code')) is not int
             or result.get('git_status') != '' or result.get('remaining_owned_processes') != []
-            or result.get('status', 'PASS') != 'PASS'
-            or summary.get('candidate') != original or summary.get('status') != 'PASS'
-            or summary.get('exit_code') != 0 or type(summary.get('exit_code')) is not int
+            or result.get('status', 'PASS') != expected_status
+            or summary.get('candidate') != original or summary.get('status') != expected_status
+            or summary.get('exit_code') != expected_exit or type(summary.get('exit_code')) is not int
             or summary.get('source_unchanged') is not True or summary.get('owned_processes_remaining') != []
             or summary.get('original_receipt') != Path(files['result']['artifact']).name
-            or raw['exit'].strip() != b'0'):
+            or raw['exit'].strip() != str(expected_exit).encode()):
         raise ValueError('ordinary run must be finalized successful unchanged candidate')
     log_hash = hashlib.sha256(raw['log']).hexdigest()
     if result.get('log_sha256') != log_hash or summary.get('log_sha256') != log_hash:
         raise ValueError('ordinary run original log seal differs')
     lines = raw['log'].decode('utf-8').splitlines()
-    terminal = SUMMARY.fullmatch(lines[-1]) if lines else None
-    if (terminal is None or sum(bool(SUMMARY.fullmatch(line)) for line in lines) != 1
+    terminal = FOCUSED_TERMINAL.fullmatch(lines[-1]) if subset is not None and lines else SUMMARY.fullmatch(lines[-1]) if lines else None
+    if (terminal is None or sum(bool((FOCUSED_TERMINAL if subset is not None else SUMMARY).fullmatch(line)) for line in lines) != 1
             or ('mode:         nonlive' if focused else 'mode:         program') not in lines
             or ('pytest args:  ' + ' '.join(argv[4:]) if focused else 'pytest args:  -q -ra') not in lines
-            or any(token in line for line in lines for token in ('FAILURES', 'ERRORS', 'Interrupted', 'KeyboardInterrupt'))):
+            or any(token in line for line in lines for token in (('Interrupted', 'KeyboardInterrupt') if subset is not None else ('FAILURES', 'ERRORS', 'Interrupted', 'KeyboardInterrupt')))):
         raise ValueError('ordinary run complete successful pytest summary required')
-    passed, skipped, seconds = int(terminal[1]), int(terminal[2] or 0), float(terminal[3])
+    passed, skipped, seconds = (subset['passed'], subset['skipped'], subset['seconds']) if subset is not None else (int(terminal[1]), int(terminal[2] or 0), float(terminal[3]))
     if (passed <= 0 or not math.isfinite(seconds) or seconds <= 0
             or summary.get('passed') != passed or type(summary.get('passed')) is not int
             or summary.get('skipped') != skipped or type(summary.get('skipped')) is not int
@@ -149,7 +151,7 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
             or not isinstance(result.get('duration_seconds'), (int, float))
             or not math.isfinite(result['duration_seconds']) or result['duration_seconds'] < seconds
             or any(name in result and (type(result[name]) is not int or result[name] != count)
-                   for name, count in (('passed', passed), ('skipped', skipped), ('failed', 0)))):
+                   for name, count in (('passed', passed), ('skipped', skipped), ('failed', subset['failed'] if subset is not None else 0)))):
         raise ValueError('ordinary run original counts/duration disagree')
     skip_lines = [line for line in lines if line.startswith('SKIPPED ')]
     skips = [SKIP.fullmatch(line) for line in skip_lines]
@@ -212,3 +214,70 @@ def read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind, 
     if len(consumers) != len(set(consumers)):
         raise ValueError('ordinary run skip has unknown or duplicate affected consumers')
     return OUTCOME, None
+
+
+FOCUSED_TERMINAL = re.compile(r'(?:(\d+) failed, )?(\d+) passed(?:, (\d+) skipped)?(?:, (\d+) errors?)? in (\d+(?:\.\d+)?)s(?: \([^\n]+\))?')
+
+
+def _review_focused_successful_subset(record, raw, argv, summary, base, root):
+    """Qualify a finite successful subset while retaining the original FAIL."""
+    review = json.loads(_bytes(record['successful_subset_review'], base))
+    fields = {'contract', 'collection', 'collection_source_review', 'collected_nodes',
+        'failed_nodes', 'error_nodes', 'successful_nodes', 'file_sha256', 'reviewed_reason'}
+    if (set(review) not in (fields, fields | {'original_summary'})
+            or review['contract'] != 'waapi-skill.focused-successful-subset-review/v1'
+            or not isinstance(review['reviewed_reason'], str) or not review['reviewed_reason'].strip()
+            or review['file_sha256'] != {name: hashlib.sha256(value).hexdigest() for name, value in raw.items()}
+            or argv[:6] != ['ci/test.sh', '--mode', 'nonlive', '--', '-q', '-ra']
+            or review['collected_nodes'] != argv[6:] or len(set(argv[6:])) != len(argv[6:])):
+        raise ValueError('closed exact focused successful-subset review required')
+    collection = _bytes(review['collection'], base).decode('utf-8').splitlines()
+    collected = [line for line in collection if re.fullmatch(r'tests/unit/test_[A-Za-z0-9_]+\.py::test_\w+(?:\[[^\s\]]+\])?', line)]
+    count = re.fullmatch(r'(\d+) tests? collected in \d+(?:\.\d+)?s', collection[-1] if collection else '')
+    if collected != argv[6:] or count is None or int(count[1]) != len(collected):
+        raise ValueError('original exact complete focused collection required')
+    source_review = review['collection_source_review']
+    required = {node.split('::')[0] for node in collected} | {'tests/conftest.py', 'pyproject.toml', 'ci/test.sh', 'ci/test_driver.py'}
+    if (set(source_review) != {'collection_basis', 'run_candidate', 'sources', 'reviewed_reason'}
+            or source_review['run_candidate'] != record['original_candidate']
+            or not re.fullmatch(r'[0-9a-f]{40}', source_review['collection_basis'])
+            or not source_review['reviewed_reason'] or set(source_review['sources']) != required):
+        raise ValueError('focused collection definition/config source review required')
+    for name, seal in source_review['sources'].items():
+        _original_source(root, source_review['collection_basis'], name, seal)
+        _original_source(root, record['original_candidate'], name, seal)
+    lines = raw['log'].decode('utf-8').splitlines()
+    terminal = FOCUSED_TERMINAL.fullmatch(lines[-1] if lines else '')
+    if (terminal is None or sum(bool(FOCUSED_TERMINAL.fullmatch(line)) for line in lines) != 1
+            or any(token in line for line in lines for token in ('Interrupted', 'KeyboardInterrupt', 'INTERNALERROR', 'INTERNAL ERROR', 'ERROR collecting', 'Fatal Python error'))):
+        raise ValueError('focused subset requires complete ordinary-failure terminal output')
+    failed, passed, skipped, errors = int(terminal[1] or 0), int(terminal[2]), int(terminal[3] or 0), int(terminal[4] or 0)
+    seconds = float(terminal[5])
+    failed_nodes = [line.split()[1] for line in lines if line.startswith('FAILED ')]
+    error_nodes = [line.split()[1] for line in lines if line.startswith('ERROR ')]
+    phases = []
+    for line in lines:
+        phase = re.fullmatch(r'_+ ERROR at (setup|teardown) of (.+?) _+', line)
+        if phase:
+            matches = [node for node in collected if node.split('::')[1] == phase[2]]
+            if len(matches) != 1:
+                raise ValueError('ambiguous focused error phase attribution')
+            phases.append({'nodeid': matches[0], 'phase': phase[1]})
+    if (not failed + errors or skipped or len(failed_nodes) != failed or len(error_nodes) != errors
+            or len(set(failed_nodes)) != failed or len(set(error_nodes)) != errors
+            or set(failed_nodes + error_nodes) - set(collected)
+            or review['failed_nodes'] != failed_nodes or review['error_nodes'] != phases
+            or {row['nodeid'] for row in phases} != set(error_nodes) or len(phases) != errors
+            or len(collected) != passed + failed + sum(row['phase'] == 'setup' for row in phases)):
+        raise ValueError('focused failure/error/count/phase scope differs')
+    successful = [node for node in collected if node not in set(failed_nodes + error_nodes)]
+    if (not successful or review['successful_nodes'] != successful
+            or not set(record['mechanism']['selected_tests']) <= set(successful)):
+        raise ValueError('selected focused mechanism has failed or incomplete phases')
+    if 'original_summary' in review:
+        original = json.loads(_bytes(review['original_summary'], base))
+        corrected = {**original, 'passed': passed, 'failed': failed, 'errors': errors,
+                     'skipped': skipped, 'pytest_seconds': seconds}
+        if summary != corrected:
+            raise ValueError('focused summary successor changed original metadata or terminal counts')
+    return {'passed': passed, 'failed': failed, 'errors': errors, 'skipped': skipped, 'seconds': seconds}

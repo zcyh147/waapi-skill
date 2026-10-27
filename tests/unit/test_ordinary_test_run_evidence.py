@@ -394,3 +394,110 @@ def test_ordinary_focused_nonlive_run_keeps_aggregate_strength_and_exact_selecti
         context['run']['plan']['argv'] = context['run']['result']['argv'] = altered
         reseal(context)
         assert read(context)[0] == 'missing'
+
+
+def test_immutable_git_source_cache_never_hides_current_source_or_wrong_expected_seal(ordinary_run, monkeypatch):
+    context = ordinary_run
+    name = next(key for key in context['attachment']['original_sources'] if key.endswith('example.py'))
+    original = context['attachment']['original_candidate']
+    expected = {name: context['attachment']['original_sources'][name]}
+    calls = []
+    run = subprocess.run
+    def observed(argv, **kwargs):
+        if argv[0] == 'git' and 'show' in argv:
+            calls.append(tuple(argv))
+        return run(argv, **kwargs)
+    monkeypatch.setattr(subprocess, 'run', observed)
+    assert completion.historical_source_seals(context['root'], original, expected) == expected
+    assert completion.historical_source_seals(context['root'], original, expected) == expected
+    assert len(calls) == 1
+    assert '--no-replace-objects' in calls[0]
+    assert completion.historical_source_seals(context['root'], original, {name: '0' * 64}) != {name: '0' * 64}
+    (context['root'] / name).write_text('changed mutable current source\n')
+    assert completion.historical_source_seals(context['root'], original, expected) == expected
+    assert read(context)[0] == 'missing'
+
+
+def focused_failed_subset(context):
+    root, base = context['root'], context['base']
+    for name in ('tests/conftest.py', 'pyproject.toml'):
+        (root / name).write_text('# Controlled collection configuration\n')
+    subprocess.run(['git', 'add', '.'], cwd=root, check=True, capture_output=True)
+    subprocess.run(['git', '-c', 'user.name=Reader Fixture', '-c', 'user.email=reader@example.invalid',
+        '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Controlled collection configuration'], cwd=root, check=True, capture_output=True)
+    original = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
+    attachment, run = context['attachment'], context['run']
+    attachment['original_candidate'] = original
+    for name in ('plan', 'result', 'summary'): run[name]['candidate'] = original
+    run['result']['head_after'] = original
+    selected = 'tests/unit/test_code.py::test_selected_mechanism[kept]'
+    nodes = [selected, 'tests/unit/test_code.py::test_unselected[failed]',
+        'tests/unit/test_code.py::test_unselected[teardown]', 'tests/unit/test_code.py::test_unselected[kept]']
+    argv = ['ci/test.sh', '--mode', 'nonlive', '--', '-q', '-ra', *nodes]
+    run['plan']['argv'] = run['result']['argv'] = argv
+    run['result'].update(status='FAIL', exit_code=1)
+    run['summary'].update(status='FAIL', exit_code=1, passed=0, skipped=0, pytest_seconds=0.31)
+    run['exit'] = '1\n'
+    original_summary = write_json(base / 'original-failed-summary.json', deepcopy(run['summary']))
+    run['summary'].update(passed=3, failed=1, errors=1, pytest_seconds=0.3)
+    run['log'] = '\n'.join(['mode:         nonlive', 'pytest args:  ' + ' '.join(argv[4:]),
+        '_ ERROR at teardown of test_unselected[teardown] _',
+        'FAILED ' + nodes[1], 'ERROR ' + nodes[2], '1 failed, 3 passed, 1 error in 0.3s'])
+    attachment['skip_lines'] = []
+    attachment['review']['skip_attribution'] = {}
+    attachment['mechanism']['selected_tests'] = [selected]
+    attachment['original_sources'] = {name: seal for name, seal in attachment['original_sources'].items()
+        if name not in ('tests/unit/test_windows.py', 'tests/unit/test_junction.py')}
+    collection = base / 'collection.log'
+    collection.write_text('\n'.join([*nodes, '4 tests collected in 0.01s']))
+    required = {'tests/unit/test_code.py', 'tests/conftest.py', 'pyproject.toml', 'ci/test.sh', 'ci/test_driver.py'}
+    review = {'contract': 'waapi-skill.focused-successful-subset-review/v1', 'collection': sealed(collection),
+        'collection_source_review': {'collection_basis': original, 'run_candidate': original,
+            'sources': {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in required},
+            'reviewed_reason': 'Controlled identical test definitions and collection configuration.'},
+        'collected_nodes': nodes, 'failed_nodes': [nodes[1]],
+        'error_nodes': [{'nodeid': nodes[2], 'phase': 'teardown'}], 'successful_nodes': [nodes[0], nodes[3]],
+        'file_sha256': {}, 'reviewed_reason': 'Controlled aggregate subset; original whole run stays FAIL.',
+        'original_summary': original_summary}
+    original_summary_data = json.loads((base / 'original-failed-summary.json').read_bytes())
+    original_summary_data['log_sha256'] = hashlib.sha256(run['log'].encode()).hexdigest()
+    review['original_summary'] = write_json(base / 'original-failed-summary.json', original_summary_data)
+    context['subset_review'] = review
+    reseal_subset(context)
+    return context
+
+
+def reseal_subset(context):
+    reseal(context)
+    review = context['subset_review']
+    review['file_sha256'] = {name: descriptor['sha256'] for name, descriptor in context['attachment']['files'].items()}
+    context['attachment']['successful_subset_review'] = write_json(context['base'] / 'subset-review.json', review)
+    context['descriptor'] = write_json(context['base'] / 'attachment.json', context['attachment'])
+    context['binding']['evidence']['program'] = context['descriptor']
+
+
+def test_focused_successful_subset_preserves_original_failure_and_summary_correction(ordinary_run):
+    context = focused_failed_subset(ordinary_run)
+    assert read(context) == (OUTCOME, None)
+    assert context['run']['result']['status'] == 'FAIL'
+    assert context['run']['exit'] == '1\n'
+    assert json.loads((context['base'] / 'original-failed-summary.json').read_bytes())['passed'] == 0
+
+
+@pytest.mark.parametrize('damage', ('missing-error', 'unknown-error', 'selected-teardown', 'counts',
+    'cleanup', 'interrupted', 'collection', 'param', 'summary-metadata'))
+def test_focused_successful_subset_rejects_incomplete_or_failed_scope(ordinary_run, damage):
+    context = focused_failed_subset(ordinary_run)
+    review = context['subset_review']; nodes = review['collected_nodes']
+    if damage == 'missing-error': review['error_nodes'] = []
+    elif damage == 'unknown-error': context['run']['log'] = context['run']['log'].replace('ERROR ' + nodes[2], 'ERROR tests/unit/test_code.py::test_unselected[unknown]')
+    elif damage == 'selected-teardown': context['attachment']['mechanism']['selected_tests'] = [nodes[2]]
+    elif damage == 'counts': context['run']['summary']['passed'] = 4
+    elif damage == 'cleanup': context['run']['result']['remaining_owned_processes'] = ['unclosed-owned-worker']
+    elif damage == 'interrupted': context['run']['log'] = context['run']['log'].replace('FAILED ', 'KeyboardInterrupt\nFAILED ')
+    elif damage == 'collection':
+        path = context['base'] / 'collection.log'; path.write_text('\n'.join(nodes[:-1] + ['3 tests collected in 0.01s'])); review['collection'] = sealed(path)
+    elif damage == 'param': context['attachment']['mechanism']['selected_tests'] = [nodes[0].replace('[kept]', '[unknown]')]
+    else: context['run']['summary']['source_unchanged'] = False
+    reseal_subset(context)
+    assert read(context)[0] == 'missing'

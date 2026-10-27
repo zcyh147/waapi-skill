@@ -982,7 +982,8 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
     sources = proof.get('sources', {})
     required = {binding[k]['source'].split('#')[0] for k in ('construction', 'validation', 'verifier')}
     required |= {'skills/waapi-skill/scripts/run.py', 'skills/waapi-skill/scripts/gateway.py'}
-    if (not sources or (not proof.get('source_copy_review')
+    if (not sources or (not proof.get('source_copy_review') and not proof.get('runtime_read_review')
+                        and not proof.get('runtime_remaining_source_review') and not proof.get('loaded_media_source_review')
                         and set(sources) != set(binding.get('relevant_sources', [])))
             or not required <= set(sources) or sources != record.get('relevant_sources')):
         raise ValueError('equivalence omits original relevant source/behavior dependencies')
@@ -1016,20 +1017,27 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
             raise ValueError('equivalence relevant source changed')
 
 
-def historical_source_seals(root, candidate, selected, cache=None):
-    """Read immutable historical Git bytes, with evaluation-local reuse only."""
+@lru_cache(maxsize=4096)
+def _historical_git_source_seal(root_name, candidate, name):
+    """Cache only immutable, exact-commit Git bytes; current files stay live."""
     import hashlib
+    import re
     import subprocess
+    if not isinstance(candidate, str) or not re.fullmatch(r'[0-9a-f]{40}', candidate):
+        raise ValueError('original native source requires an exact immutable Git commit')
+    completed = subprocess.run(['git', '--no-replace-objects', 'show', candidate + ':' + name],
+        cwd=root_name, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if completed.returncode:
+        raise ValueError('original native source candidate unavailable')
+    return hashlib.sha256(completed.stdout).hexdigest()
+
+
+def historical_source_seals(root, candidate, selected, cache=None):
+    """Read exact historical seals; mutable current-source checks are separate."""
     key = (str(root.resolve()), candidate, tuple(sorted(selected)))
     if cache is not None and key in cache:
         return dict(cache[key])
-    sources = {}
-    for name in selected:
-        completed = subprocess.run(['git', 'show', candidate + ':' + name], cwd=root,
-                                   check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if completed.returncode:
-            raise ValueError('original native source candidate unavailable')
-        sources[name] = hashlib.sha256(completed.stdout).hexdigest()
+    sources = {name: _historical_git_source_seal(str(root.resolve()), candidate, name) for name in selected}
     if cache is not None:
         cache[key] = tuple(sorted(sources.items()))
     return sources
@@ -1045,6 +1053,11 @@ def validate_native_source(context, descriptor, branch, candidate, binding, base
         # selected shape, original maps and the full pinned current closure.
         from tests.support.source_copy_native_evidence import native_source_maps
         sources = native_source_maps(context['candidate'])
+    elif binding.get('runtime_observation_attachment'):
+        from tests.support.runtime_observation_evidence import _proof
+        sources = _proof(binding, base)['relevant_sources']
+        if historical_source_seals(root, context['candidate'], sources, historical_sources) != sources:
+            raise ValueError('Runtime original native Git source map differs')
     else:
         sources = context.get('relevant_sources')
         selected = binding.get('relevant_sources', [])

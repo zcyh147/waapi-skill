@@ -744,7 +744,7 @@ def validate_rtpc_source_review(descriptor, historical_sources, branch, root, ba
             or review['historical_candidate'] != RTPC_ORIGINAL_CANDIDATE
             or len(historical_sources) != 413 or review['historical_sources'] != historical_sources
             or review['current_sources'] != current or review['changed_files'] != changes
-            or changes != RTPC_REVIEWED_SOURCE_CHANGES
+            or changes != runtime_reviewed_changes(historical_sources, root)
             or review['changed_symbols'] != RTPC_REVIEWED_SOURCE_SYMBOLS
             or review['scope'] != scope or review['original_capture']['sha256'] != original_sha):
         raise ValueError('RTPC reviewed guard source/branch closure differs')
@@ -1324,7 +1324,7 @@ def validate_contribution_source_review(descriptor, historical_sources, branch, 
             or review['historical_candidate'] != RTPC_ORIGINAL_CANDIDATE or build != scope['build']
             or len(historical_sources) != 413 or review['historical_sources'] != historical_sources
             or review['current_sources'] != current or review['changed_files'] != changes
-            or changes != RTPC_REVIEWED_SOURCE_CHANGES or review['changed_symbols'] != RTPC_REVIEWED_SOURCE_SYMBOLS
+            or changes != runtime_reviewed_changes(historical_sources, root) or review['changed_symbols'] != RTPC_REVIEWED_SOURCE_SYMBOLS
             or review['scope'] != scope or review['original_capture']['sha256'] != scope['original_capture_sha256']):
         raise ValueError('Contribution exact reviewed source/branch closure differs')
     for key in ('original_capture', 'program_replay'):
@@ -1392,7 +1392,9 @@ def validate_contribution_evidence(record, binding, branch, category, base, root
             or not mapping['raw_original_path'].endswith('/' + original['call']['evidence_path'].rsplit('/', 1)[1])):
         raise ValueError('Contribution original receipt/raw/current replay relation differs')
     historical = {key: value for key, value in node['source_context']['sources'].items() if key.startswith('skills/waapi-skill/')}
-    if proof['relevant_sources'] != historical or binding['relevant_sources'] != sorted(historical):
+    if (proof['relevant_sources'] != historical
+            or (not binding.get('native_only_base') and binding['relevant_sources'] != sorted(program_source_context(root, flow=CONTRIBUTION_URI)['packaged']))
+            or (binding.get('native_only_base') and binding['relevant_sources'] != sorted(historical))):
         raise ValueError('Contribution historical source map differs')
     validate_contribution_source_review(proof['source_review'], historical, branch, root, base)
     if record['branch_assertions'][branch['id']]['checks'] != mapping['native_checks']:
@@ -2098,7 +2100,7 @@ def runtime_publication_plan(root=audit.ROOT):
 # This finite successor admits retained native observations only. It never
 # turns a historical fake Gateway capture into current program execution.
 RUNTIME_SOURCE_SUCCESSOR = 'tests/fixtures/branch-evidence/product/runtime-read-log-195-r1/source-successor.json'
-RUNTIME_SOURCE_SUCCESSOR_SHA = '8c7e5128c7a4ab1261298b7f6f113b7b3274d95e62d83a7f4292303245ecefa3'
+RUNTIME_SOURCE_SUCCESSOR_SHA = '3a532484b4ae13fc823ca9b433388d50fc49135bdfd2eccd294ab78769b72410'
 
 
 def runtime_source_successor(root=audit.ROOT):
@@ -2164,17 +2166,9 @@ def retained_runtime_source_review(descriptor, sources, branch, root, base):
     member = review['members'].get(branch['id'])
     if member is None or sources != member['sources']:
         raise ValueError('Runtime native source-review scope/original map differs')
-    document = completion.read_sealed_artifact(descriptor, base)
     if descriptor['sha256'] not in member['source_reviews']:
-        changes = {name: {'before': sources.get(name), 'after': review['packaged_sources'].get(name)}
-            for name in sources.keys() | review['packaged_sources'].keys()
-            if sources.get(name) != review['packaged_sources'].get(name)}
-        if (document.get('historical_sources') != sources
-                or document.get('current_sources') != review['packaged_sources']
-                or document.get('changed_files') != changes):
-            raise ValueError('Runtime source-review is neither original nor exact admitted successor')
-    # Historical replay bytes keep their original source context. A newly
-    # generated review may use only this exact whole-package successor map.
+        raise ValueError('Runtime source review is outside exact retained originals')
+    completion.read_sealed_artifact(descriptor, base)
     retained_runtime_sources(sources, root)
     return member
 

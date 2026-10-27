@@ -270,7 +270,7 @@ def native_field_bundle(tmp_path_factory, inventory):
         guard_replay=original_array_program(root / 'replay', '2022.1'))
 
 
-def test_historical_git_map_reuse_is_local_to_one_evaluation(native_field_bundle, inventory, monkeypatch):
+def test_historical_git_map_reuse_keeps_exact_immutable_source_identity(native_field_bundle, inventory, monkeypatch):
     import subprocess
     policy = json.loads((native_field_bundle.parent / 'requirements.json').read_bytes())
     document, base, _ = audit.portable_binding_inputs(native_field_bundle, policy)
@@ -278,10 +278,11 @@ def test_historical_git_map_reuse_is_local_to_one_evaluation(native_field_bundle
         if key.endswith('/items/properties/id') or key.endswith('/items/properties/name')}
     assert len(selected) == 2
     document['bindings'] = selected
+    completion._historical_git_source_seal.cache_clear()
     actual = subprocess.run
     git_calls = []
     def observed(command, *args, **kwargs):
-        if command[:2] == ['git', 'show']:
+        if command[:3] == ['git', '--no-replace-objects', 'show']:
             git_calls.append(command)
         return actual(command, *args, **kwargs)
     monkeypatch.setattr(subprocess, 'run', observed)
@@ -289,7 +290,7 @@ def test_historical_git_map_reuse_is_local_to_one_evaluation(native_field_bundle
         result = completion.evaluate_coverage(audit.ROOT, inventory, document,
             digest=audit.digest, evidence_base=base, requirements_document=policy)
         assert all(row['state'] == 'verified' for row in result['obligations'] if row['id'] in selected)
-        assert len(git_calls) == 413 * evaluation
+        assert len(git_calls) == 413
 
 
 def test_historical_git_map_key_keeps_exact_source_selection(tmp_path, monkeypatch):
@@ -325,12 +326,12 @@ def test_historical_git_map_key_keeps_exact_source_selection(tmp_path, monkeypat
     actual = subprocess.run
     calls = []
     def observed(command, *args, **kwargs):
-        if command[:2] == ['git', 'show']:
+        if command[:3] == ['git', '--no-replace-objects', 'show']:
             calls.append(command)
         return actual(command, *args, **kwargs)
     monkeypatch.setattr(subprocess, 'run', observed)
     cache = {}
-    for selected, expected in [(files[:2], 2), (files[:2], 2), (files, 5)]:
+    for selected, expected in [(files[:2], 2), (files[:2], 2), (files, 3)]:
         sources = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in selected}
         binding = {'relevant_sources': selected, **{key: {'source': files[1] + '#execute_gateway'}
             for key in ('construction', 'validation', 'verifier')}}
@@ -346,16 +347,16 @@ def test_historical_git_map_key_keeps_exact_source_selection(tmp_path, monkeypat
         assert len(calls) == expected
 
     original = completion.historical_source_seals(root, original_candidate, files[:2], cache)
-    assert len(calls) == 7
+    assert len(calls) == 5
     assert original[files[1]] == hashlib.sha256(original_gateway).hexdigest()
     assert original[files[1]] != sources[files[1]]
     assert completion.historical_source_seals(root, original_candidate, files[:2], cache) == original
-    assert len(calls) == 7
+    assert len(calls) == 5
     other_root = tmp_path / 'not-the-fixture-repo'
     other_root.mkdir()
     with pytest.raises(ValueError, match='original native source candidate unavailable'):
         completion.historical_source_seals(other_root, context['candidate'], files[:2], cache)
-    assert len(calls) == 8
+    assert len(calls) == 6
 
 
 @pytest.mark.parametrize('damage,reason', [

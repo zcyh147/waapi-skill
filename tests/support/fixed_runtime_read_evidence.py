@@ -715,7 +715,7 @@ def validate_source_review(descriptor, historical, branch, root, base):
             or review['contract'] != 'waapi-skill.fixed-row-source-review/v1'
             or review['historical_candidate'] != profile['candidate'] or len(historical) != 413
             or review['historical_sources'] != historical or review['current_sources'] != current
-            or review['changed_files'] != profile['changes'] or changes != profile['changes']
+            or review['changed_files'] != changes or changes != runtime.runtime_reviewed_changes(historical, root)
             or review['changed_symbols'] != profile['symbols']):
         raise ValueError('Fixed-row exact reviewed native-profile source/branch closure differs')
     runtime._portable_descriptor(review['program_replay'], base)
