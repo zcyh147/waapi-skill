@@ -13,7 +13,7 @@ import sys
 COMPLETE_COVERAGE_STATES = frozenset({'verified', 'mapped_with_representative_proof',
     'source_definition_verified', 'proven_native_absence', 'approved_exclusion'})
 ADMITTED_EVIDENCE_OUTCOMES = frozenset({'passed', 'reviewed_mechanism_reuse',
-    'reviewed_class_metadata_and_object_scope_mechanism'})
+    'reviewed_class_metadata_and_object_scope_mechanism', 'reviewed_aggregate_code_mechanism'})
 
 
 def native_coverage(root, inventory, *, digest, schema_branches, load):
@@ -186,6 +186,7 @@ def candidate_identity(root, inventory, catalogs, *, digest):
     # program candidate. Historical trees without this adapter retain their
     # original source context; missing/changed current files change identity.
     for name in ('tests/support/fresh_branch_evidence.py',
+                 'tests/support/ordinary_test_run_evidence.py',
                  'tests/support/source_copy_branch_evidence.py', 'tests/support/exact_evidence_finalization.py',
                  'tests/unit/test_source_copy_branch_evidence.py', 'tests/support/source_copy_native_evidence.py',
                  'tests/unit/test_source_copy_capture.py',
@@ -1585,6 +1586,13 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
     """Read preserved run records. A declaration/test filename has no PASS credit."""
     from pathlib import Path
     root = source_root or Path(__file__).resolve().parents[2]
+    if category == 'program' and (binding or {}).get('ordinary_test_run_attachment'):
+        from tests.support.ordinary_test_run_evidence import read_ordinary_test_run
+        try:
+            return read_ordinary_test_run(descriptor, branch, candidate, category, scope_kind,
+                                          base, binding, root)
+        except (OSError, ValueError, KeyError, TypeError, IndexError, SyntaxError) as exc:
+            return 'missing', str(exc)
     if category == 'fresh':
         from tests.support.fresh_branch_evidence import fresh_evidence_result
         return fresh_evidence_result(descriptor, branch, candidate, scope_kind, base, binding or {}, root)
@@ -1904,10 +1912,12 @@ def apply_representative_mechanisms(native, bindings, requirements, root, *, dig
                 raise ValueError('representative selected proof is not an exact required member')
         admitted.update(members)
         # Failed/missing mapping, absence or boundary claims cannot gain coverage
-        # from a sibling. Selected proofs must be direct ordinary-reader passes,
-        # not another representative relation or a cycle.
+        # from a sibling. Selected proofs must be direct ordinary-reader support
+        # (including explicitly scoped aggregate program proof), not another
+        # representative relation or a cycle.
         ready = (all(rows[key]['state'] in {'verified', 'implemented_unverified'} for key in members)
-                 and all(rows[key]['evidence_results'].get(category, {}).get('outcome') == 'passed'
+                 and all(rows[key]['evidence_results'].get(category, {}).get('outcome') in (
+                             {'passed', 'reviewed_aggregate_code_mechanism'} if category == 'program' else {'passed'})
                          for category, selected in review['selected_proofs'].items() for key in selected))
         if not ready:
             continue
@@ -2105,6 +2115,9 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
                 native['candidate_sha256'], required, scope_kind, evidence_base or root, binding, root, reference_edges,
                 historical_sources=historical_sources)
             branch['evidence_results'][required] = {'outcome': outcome, 'reason': reason}
+            if required == 'program' and outcome == 'reviewed_aggregate_code_mechanism':
+                from tests.support.ordinary_test_run_evidence import PROOF_SCOPE
+                branch['evidence_results'][required].update(PROOF_SCOPE)
         outcomes = {r['outcome'] for r in branch['evidence_results'].values()}
         if branch['evidence_results'].get('native', {}).get('outcome') == 'reviewed_mechanism_reuse':
             from tests.support.condition_mechanism_reuse import load_review

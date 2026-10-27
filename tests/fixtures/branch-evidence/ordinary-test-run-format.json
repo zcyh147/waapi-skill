@@ -1,0 +1,31 @@
+{
+  "description": "Controlled reader fixture, modeled on the retained ordinary plan/result/summary/log/exit format. These are format controls, not executed product evidence. The test supplies an isolated Git source candidate.",
+  "plan": {
+    "candidate": "CONTROLLED_GIT_CANDIDATE",
+    "argv": ["ci/test.sh", "--mode", "program", "--", "-q", "-ra"],
+    "cwd": "/controlled/source",
+    "started_at": "2026-10-17T16:55:27+00:00",
+    "scope": "controlled ordinary Program report format"
+  },
+  "result": {
+    "exit_code": 0,
+    "duration_seconds": 3.5,
+    "head_after": "CONTROLLED_GIT_CANDIDATE",
+    "git_status": "",
+    "remaining_owned_processes": [],
+    "candidate_unchanged": true
+  },
+  "summary": {
+    "candidate": "CONTROLLED_GIT_CANDIDATE",
+    "status": "PASS",
+    "passed": 2,
+    "skipped": 3,
+    "pytest_seconds": 3.0,
+    "exit_code": 0,
+    "source_unchanged": true,
+    "owned_processes_remaining": [],
+    "original_receipt": "run.result.json"
+  },
+  "log": "== Test Context ==\nmode:         program\npytest args:  -q -ra\n..sss [100%]\n=========================== short test summary info ============================\nSKIPPED [1] tests/unit/test_windows.py:1: native Windows shell proof\nSKIPPED [1] tests/unit/test_windows.py:3: native Python runner locator\nSKIPPED [1] tests/unit/test_junction.py:1: NTFS junction behavior requires Windows\n2 passed, 3 skipped in 3.00s\n",
+  "exit": "0\n"
+}
