@@ -9,7 +9,7 @@ from tests.unit.test_owned_named_list_stages_gateway import (
 )
 
 
-def group_list_task(tmp_path, *, companion=None, creation_first=True, task_factory=named_list_task, **kwargs):
+def group_list_task(tmp_path, *, companion=None, companion_builder=None, creation_first=True, task_factory=named_list_task, **kwargs):
     task = task_factory(tmp_path, compound=True, **kwargs)
     if companion and companion[0] == 'object.setReference':
         task.objects[companion[1]]['@OutputBus'] = {'id': companion[2]}
@@ -23,7 +23,9 @@ def group_list_task(tmp_path, *, companion=None, creation_first=True, task_facto
         assert code == 0, started
         task.draft, task.authority, task.revision = started['draft']['draft_id'], started['task_authority'], started['draft']['revision']
         owner = task.bind(object_id)
-        if operation == 'object.create':
+        if companion_builder is not None:
+            companion_builder(task, owner)
+        elif operation == 'object.create':
             code, kind = task.step('draft-discover-types', '--role', 'object', '--meaning', 'MusicSwitchContainer')
             assert code == 0, kind
             code, declared = task.step('draft-declare-new', '--declaration-id', 'music-overlap', '--parent-handle', owner,
@@ -408,6 +410,81 @@ def test_group_nested_music_complete_root_overlap_stops_before_begin(tmp_path, c
         companion=('object.create', SECOND, 'Music'), creation_first=creation_first)
     code, rejected = task.step('draft-check')
     assert code == 2 and rejected['error_code'] == 'UNDO_GROUP_OVERLAPPING_OUTCOME', rejected
+    assert task.writes == [] and not task.group_open
+
+
+def test_group_admits_root_list_create_with_plain_source_result_and_exact_owner(tmp_path):
+    from tests.unit.test_owned_named_list_stages_gateway import playlist_creation_task, SECOND_SLOT
+    task = group_list_task(tmp_path, task_factory=playlist_creation_task, operation='object.create')
+    before = deepcopy(task.objects)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert verified['verification']['business_state_verified'] is True
+    assert task.objects[ROOT]['@Playlist'] == [{'id': OLD_SLOT}, {'id': SECOND_SLOT}, {'id': SLOT}]
+    assert task.objects[SLOT]['owner'] == {'id': ROOT}
+    assert task.objects[SLOT]['PlaylistObject'] == {'id': FIRST}
+    assert all(task.objects[oid] == row for oid, row in before.items() if oid != ROOT)
+    assert len(task.writes) == 1 and task.writes[0]['list'] == 'Playlist'
+    assert [uri for uri, _, _ in task.calls if uri.startswith('ak.wwise.core.undo.')] == [
+        'ak.wwise.core.undo.beginGroup', 'ak.wwise.core.undo.endGroup']
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 1
+    assert not task.group_open
+
+
+@pytest.mark.parametrize('fault', ['wrong-owner', 'retained-result-guid'])
+def test_group_root_list_create_does_not_certify_wrong_owner_or_retained_result(tmp_path, fault):
+    from tests.unit.test_owned_named_list_stages_gateway import playlist_creation_task
+    task = group_list_task(tmp_path, task_factory=playlist_creation_task, operation='object.create')
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.object.create' and fault == 'retained-result-guid':
+            result['id'] = OLD_SLOT
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    if fault == 'wrong-owner':
+        task.objects[SLOT]['owner'] = {'id': FIRST}
+    code, failed = task.run('verify', tx)
+    assert code == 2 and failed.get('verified') is not True, failed
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 1
+    assert not task.group_open
+
+
+def test_group_root_list_create_prefix_drift_stops_before_begin(tmp_path):
+    from tests.unit.test_owned_named_list_stages_gateway import playlist_creation_task
+    task = group_list_task(tmp_path, task_factory=playlist_creation_task, operation='object.create')
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    task.objects[ROOT]['@Playlist'].reverse()
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and rejected.get('executed') is not True, rejected
+    assert task.writes == []
+    assert not any(uri.startswith('ak.wwise.core.undo.') for uri, _, _ in task.calls)
+
+
+def test_group_root_list_create_conflicting_list_outcome_stops_before_begin(tmp_path):
+    from tests.unit.test_owned_named_list_stages_gateway import playlist_creation_task, declare_playlist_member
+    task = group_list_task(tmp_path, task_factory=playlist_creation_task, operation='object.create',
+        companion=('object.create', ROOT, 'second occurrence'),
+        companion_builder=lambda child, owner: declare_playlist_member(child, owner, child.bind(FIRST), declaration_id='second-slot'))
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'UNDO_GROUP_OVERLAPPING_OUTCOME', rejected
+    assert rejected['details']['field'] == 'Playlist'
+    assert task.writes == [] and not task.group_open
+
+
+def test_group_root_list_create_does_not_require_optional_history_budget(tmp_path, monkeypatch):
+    from tests.unit.test_owned_named_list_stages_gateway import playlist_creation_task
+    from wwise_waapi import edit_history_business
+    monkeypatch.setattr(edit_history_business, 'MAX_OBSERVATIONS', 1)
+    task = group_list_task(tmp_path, task_factory=playlist_creation_task, operation='object.create')
+    _, shown = task.preview()
+    assert any('Undo/redo restoration' in warning for warning in shown['artifact']['prepared_operation']['warnings'])
     assert task.writes == [] and not task.group_open
 
 

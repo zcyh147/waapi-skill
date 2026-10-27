@@ -4084,6 +4084,7 @@ def test_compound_discovery_exposes_exact_versioned_ordinary_children_and_proof_
     assert 'source_owned_merge_or_replaced_owner_subtrees' in scope['source_list_admission']
     assert 'complete_nested_profile_rosters_reserved_under_their_ordinary_root' in scope['source_list_admission']
     assert 'complete_producer_owned_array_order_repetitions' in scope['source_reference_list_admission']
+    assert 'one_fresh_CREATE_leaf_with_exact_documented_owner_List_source' in scope['source_root_list_admission']
     assert 'does_not_certify_undo_redo_restoration' in scope['optional_history_expectation']
     assert declaration["native_request_input"] == "forbidden"
 

@@ -11574,6 +11574,16 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
     plan, state = prepared.verification_plan, prepared.pre_state
     kind = plan.get("kind")
     scopes = []
+    if kind == 'object-create-graph' and plan.get('list') is not None:
+        from .creation_observations import compound_root_list_creation_scope
+        try:
+            guard = compound_root_list_creation_scope(plan, state)
+        except ValueError as exc:
+            raise OperationContractError('UNDO_GROUP_CHILD_OBSERVATION_REQUIRED', str(exc)) from exc
+        return [{'object_id': plan['parent_id'], 'field': plan['list'], 'kind': 'all', 'platform': None},
+            {'object_id': plan['parent_id'], 'field': 'notes', 'kind': 'all', 'platform': None},
+            *({'object_id': row['id'], 'field': field, 'kind': 'all', 'platform': None}
+                for row in guard['members'] for field in ('name', 'notes'))]
     if kind in {"object-create-graph", "object-set-batch"} and state.get("owned_result_stages"):
         from .creation_observations import compound_source_creation_graphs
         try:
@@ -11760,6 +11770,8 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         from .creation_observations import require_compound_creation_scope
         require_compound_creation_scope(prepared_children)
         if any(stage.get('lists') or any('targets' in field for field in stage.get('deferred', []))
+                or (child.get('prepared_operation', {}).get('verification_plan', {}).get('kind') == 'object-create-graph'
+                    and child['prepared_operation']['verification_plan'].get('list') is not None)
                 for child in prepared_children
                 for stage in [child.get('prepared_operation', {}).get('pre_state', {}).get('owned_result_stages', {})]):
             warnings.append("This group's verification checks its requested child changes. Undo/redo restoration for created List members remains unobserved; "
