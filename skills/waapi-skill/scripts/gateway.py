@@ -32921,6 +32921,10 @@ def transaction_show_summary(
             "identity": "actual_GUID_exact_class_owner_and_ordered_List",
             "notice": "The supplied name labels the declaration; Wwise returns an unnamed owned member."}
 
+    if (isinstance(plugin_verification_plan, Mapping)
+            and plugin_verification_plan.get("verification_scope", {}).get("mode") == "direct_metadata_list_association_and_fields"):
+        derived_notice["metadata_placement_verification"] = dict(plugin_verification_plan["verification_scope"])
+
     plugin_name_binding = (plugin_verification_plan.get("name_binding")
         if isinstance(plugin_verification_plan, Mapping) else None)
     if isinstance(plugin_name_binding, Mapping):

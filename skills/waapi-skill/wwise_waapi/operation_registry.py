@@ -2666,7 +2666,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         OBJECT_SET_URI,
         "object-mutation",
         (
-            "Create one owner-local Source/Effect (or source-certified 2025 Metadata) or independent Effect, Sink, or Metadata ShareSet through "
+            "Create one owner-local Source/Effect, source-certified Metadata List instance, or independent Effect, Sink, or Metadata ShareSet through "
             "the version-correct Wwise object topology with a live Type Handle."
         ),
         ("target", "plugin"),
@@ -2686,6 +2686,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "Wwise 2022.1 owner Effects use the first proven-empty @Effect0 through @Effect3 reference",
             "Wwise 2023.1 and later owner Effects append one EffectSlot and verify its @Effect reference",
             "Wwise 2025.1 owner Metadata appends one source-certified MetadataSlot/custom reference; exact owner/class, ordered prior slots and references are revalidated and independently checked",
+            "Wwise 2022.1-2024.1 Metadata appends one selected-class direct List member with exact ordered preservation and field checks; intrinsic owner/parent readback remains observation-only and is disclosed before authorization",
             "independent ShareSets verify parent/class/name/fields and sibling preservation; Effect placement additionally admits a fresh source-proven Folder beneath an Effects Work Unit, while Sink and Metadata require their matching Work Unit",
             "pre-existing plug-in identities are sealed before dispatch; replacement, raw replaceAll, and caller-authored object.set payloads are rejected",
             "the returned association and post-read id/name/type/classId/parent/owner must bind uniquely to the immutable plan",
@@ -5655,8 +5656,6 @@ def _read_plugin_prestate(
         raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "The selected plug-in class and kind are no longer available.")
     plugin_type = plugins[0].as_dict()
     if descriptor.kind == "metadata" and descriptor.placement == "owner":
-        if version != "2025.1":
-            raise OperationContractError("UNAVAILABLE_IN_VERSION", "Owner-local Metadata is packaged only for 2025.1; older direct-List ownership remains unmapped.")
         from .metadata_plugin_placement import observe_metadata_placement
         try:
             snapshot = observe_metadata_placement(version, target_id, target_type, read=read)
@@ -6001,8 +6000,11 @@ def _prepare_object_create_plugin(
         verification["new_object_default_evidence"] = default_evidence
     if "name_binding" in plugin_plan.verification:
         verification["name_binding"] = dict(plugin_plan.verification["name_binding"])
-    if plugin_prestate["kind"] == "metadata_slots":
+    if plugin_prestate["kind"] in {"metadata_slots", "metadata_members"}:
         verification["metadata_snapshot"] = plugin_prestate
+        if plugin_prestate["kind"] == "metadata_members":
+            from .metadata_plugin_placement import DIRECT_METADATA_VERIFICATION
+            verification["verification_scope"] = dict(DIRECT_METADATA_VERIFICATION)
     if plugin_prestate["kind"] == "shareset_children":
         verification["preexisting_children"] = list(plugin_prestate["rows"])
     if plugin_prestate["kind"] == "fixed_effect_references":
@@ -10890,6 +10892,10 @@ def _prove_omitted_object_list_empty(
         and documented_list.get("scope", {}).get("scope_kind") == "object"
         and documented_list["scope"].get("scope_value") == object_id
         and legacy_playlist_authority(documented_list) is not None)
+    from .metadata_plugin_placement import direct_metadata_list_authority
+    certified_direct_metadata = (list_name == "Metadata" and isinstance(documented_list, Mapping)
+        and documented_list.get("scope", {}).get("scope_value") == object_id
+        and direct_metadata_list_authority(documented_list))
     certified_metadata = (list_name in {"Metadata", "Playlist"} and isinstance(documented_list, Mapping)
         and documented_list.get("scope", {}).get("scope_kind") == "object"
         and documented_list["scope"].get("scope_value") == object_id
@@ -10898,7 +10904,7 @@ def _prove_omitted_object_list_empty(
         and documented_list.get("scope", {}).get("scope_value") == object_id
         and is_manual_marker_list_source(documented_list))
     if (
-        (list_name not in {"RTPC", "Effects"} and not certified_metadata and not certified_marker and not certified_legacy_playlist)
+        (list_name not in {"RTPC", "Effects"} and not certified_metadata and not certified_direct_metadata and not certified_marker and not certified_legacy_playlist)
         or not isinstance(object_id, str)
         or not _PLUGIN_GUID.fullmatch(object_id)
     ):
@@ -10933,6 +10939,7 @@ def _read_object_list_rows_with_evidence(
     context: str,
     allow_missing_empty: bool = False,
     version: str | None = None,
+    documented_list: Mapping[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Resolve one object list without using an invalid transform selector.
 
@@ -10979,7 +10986,14 @@ def _read_object_list_rows_with_evidence(
     owner_row = owner_rows[0]
     compatibility_normalization: dict[str, Any] | None = None
     if list_field not in owner_row:
-        if (version in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"} and canonical_name in {"RTPC", "Effects"}
+        if canonical_name == "Metadata" and documented_list is not None:
+            from .documented_list_fields import prove_source_owned_empty_list
+            try:
+                compatibility_normalization = prove_source_owned_empty_list(documented_list, owner_row, read=read, platform=platform)
+            except (ValueError, KeyError, TypeError) as exc:
+                raise OperationContractError("INVALID_READBACK", str(exc)) from exc
+            raw_references = []
+        elif (version in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"} and canonical_name in {"RTPC", "Effects"}
                 or version in {"2023.1", "2024.1", "2025.1"} and canonical_name == "Markers"
                 or version == "2025.1" and canonical_name == "Playlist"):
             from .documented_list_fields import resolve_live_list_evidence, prove_source_owned_empty_list
@@ -22123,8 +22137,16 @@ def verify_prepared_operation(
             )
         elif descriptor.kind == "metadata":
             expected_plan_fields = base_plan_fields | {"metadata_snapshot"}
-            expected_placement_kind = "metadata_slot_append"
-            placement_shape_matches = version == "2025.1" and placement.get("collection") == "@Metadata"
+            expected_placement_kind = "metadata_slot_append" if version == "2025.1" else "metadata_list_append"
+            placement_shape_matches = placement.get("collection") == "@Metadata"
+            if version != "2025.1":
+                from .metadata_plugin_placement import DIRECT_METADATA_VERIFICATION
+                expected_plan_fields.add("verification_scope")
+                if plan.get("verification_scope") != DIRECT_METADATA_VERIFICATION:
+                    raise OperationContractError("INVALID_PREVIEW", "Direct Metadata must disclose its exact observed ownership scope.")
+                verification_strength = "direct_metadata_list_and_plugin_fields"
+                business_state_verified = False
+                success_status = "result_schema_checked"
         elif version == "2022.1":
             expected_plan_fields = base_plan_fields | {
                 "pre_effect_references"
@@ -22273,6 +22295,23 @@ def verify_prepared_operation(
             placement_evidence: dict[str, Any] = {
                 "kind": expected_placement_kind
             }
+        elif expected_placement_kind == "metadata_list_append":
+            from .metadata_plugin_placement import appended_direct_metadata_binding, observe_metadata_placement
+            try:
+                def metadata_read(uri, args, options):
+                    result = read_call(uri, args, options)
+                    readbacks.append({"role": "direct-metadata-placement", "uri": uri,
+                        "args": dict(args), "options": dict(options), "result": result})
+                    return result
+                after = observe_metadata_placement(version, target_id, target_type, read=metadata_read)
+                plugin_id = appended_direct_metadata_binding(plan["metadata_snapshot"], after, created_id)
+            except (OperationContractError, ValueError, KeyError, TypeError) as exc:
+                check("direct Metadata appends its exact new member and preserves prior order/state", False,
+                    exc.as_dict() if isinstance(exc, OperationContractError) else {"error": str(exc)})
+                return _verification(operation, assertions, readbacks)
+            check("direct Metadata appends its exact new member and preserves prior order/state", True,
+                {"before": plan["metadata_snapshot"], "after": after})
+            placement_evidence = {"kind": "metadata_list_append", "target_id": target_id}
         elif expected_placement_kind == "metadata_slot_append":
             from .metadata_plugin_placement import appended_metadata_binding, observe_metadata_placement
             try:
@@ -26395,9 +26434,13 @@ def verify_prepared_operation(
         success_status=success_status,
         verification_strength=verification_strength,
         business_state_verified=business_state_verified,
-        verification_scope=plan.get("verification_scope") if plan.get("source_copy_live_fields") is True or kind in {"blend-assignment", "soundbank-definition-exact"} else None,
+        verification_scope=plan.get("verification_scope") if plan.get("source_copy_live_fields") is True or kind in {"blend-assignment", "soundbank-definition-exact", "object-plugin-created"} else None,
     )
 
+    if kind == "object-plugin-created" and plan.get("verification_scope", {}).get("mode") == "direct_metadata_list_association_and_fields":
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
+            "The new Metadata GUID/class/fields and ordered direct List association were checked; intrinsic owner/parent values are observations, not proof of local ownership. Do not replay the executed constructor.",
+            outcome.verification_strength, False, plan["verification_scope"])
     if kind == "soundbank-definition-exact" and plan.get("verification_scope", {}).get("mode") == "result_schema_only":
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
             "The bounded native result and input/control safety checks were checked. Definition merge, inclusion preservation/removal and GameSync exclusion effects remain unverified. Do not replay the executed import.",

@@ -340,12 +340,25 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Older Metadata uses the matching direct List constructor rather than the
+    # newer Inner slot. Preserve this exact disclosure before earlier seals.
+    assert canonical_sha256(non_object_set_digests) == "4ef502f260478a80dd07e5ee7f3c57fa9fa02f711b363947bfae32240f8de923"
+    def before_direct_metadata_placement(operation, version):
+        contract = operation_request_machine_contract(operation, version)
+        if operation == "object.createPlugin":
+            assert contract["constraints"].pop(7) == (
+                "Wwise 2022.1-2024.1 Metadata appends one selected-class direct List member with exact ordered preservation and field checks; intrinsic owner/parent readback remains observation-only and is disclosed before authorization"
+            )
+        return contract
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.createPlugin@{version}"] = canonical_sha256(
+            before_direct_metadata_placement("object.createPlugin", version))
     # Custom Metadata owner placement adds one exact version-qualified constraint
     # to createPlugin. Retain its new seal and invert only this reviewed delta
     # before every historical inventory and independently reconstructed contract.
     assert canonical_sha256(non_object_set_digests) == "a258594257893545825465e00c8bd0da99fca888edfa9dc483e02f54edafadfb"
     def before_local_metadata_placement(operation, version):
-        contract = operation_request_machine_contract(operation, version)
+        contract = before_direct_metadata_placement(operation, version)
         if operation == "object.createPlugin":
             assert contract["constraints"].pop(6) == (
                 "Wwise 2025.1 owner Metadata appends one source-certified MetadataSlot/custom reference; exact owner/class, ordered prior slots and references are revalidated and independently checked"
