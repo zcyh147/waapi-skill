@@ -669,10 +669,13 @@ def test_metadata_local_relation_is_strict_in_final_graph_verification(tmp_path,
     assert task.run('execute', tx)[0] == 2 and len(task.writes) == 3
 
 
-def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', fixture_ids=None, list_behavior='append'):
+def playlist_creation_task(tmp_path, *, reference=True, operation='object.set', fixture_ids=None, list_behavior='append', compound=False):
     from tests.unit.test_playlist_reference_gateway import FACTS
     owner_id, target_id, old_slot_id, peer_id, new_slot_id = fixture_ids or (ROOT, FIRST, OLD_SLOT, SECOND_SLOT, SLOT)
     task = OwnedGraphTask(tmp_path, '2025.1', operation)
+    if compound:
+        from tests.unit.test_compound_undo_business_gateway import _start_parent_owned_graph_child
+        _start_parent_owned_graph_child(task, operation)
     base = r'\Containers\Default Work Unit\Numbers'
     task.types = [{'classId': cid, 'name': name, 'type': category} for cid, name, category in (
         (589840, 'RandomSequenceContainer', 'WObject'), (65552, 'Sound', 'WObject'), (5636096, 'PlaylistSlot', 'Inner'))]

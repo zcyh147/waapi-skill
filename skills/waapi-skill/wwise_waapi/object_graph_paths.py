@@ -386,6 +386,8 @@ def compound_created_child_roots(calls, phases):
             continue
         if child.get('operation') != 'object.create' or plan.get('kind') != 'object-create-graph':
             continue
+        if plan.get('list') is not None:
+            continue  # This root is an owned List occurrence, never an ordinary sibling.
         phase = phases[index + 1]
         result = phase.get('dispatch_result', {})
         if (phase.get('phase') != 'inner' or type(phase.get('index')) is not int or phase['index'] != index

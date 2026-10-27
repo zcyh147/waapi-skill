@@ -96,6 +96,9 @@ def require_compound_creation_scope(calls):
     for child in prepared:
         plan, state = child.get('verification_plan', {}), child.get('pre_state', {})
         kind = plan.get('kind')
+        if kind == 'object-create-graph' and plan.get('list') is not None:
+            compound_root_list_creation_scope(plan, state)
+            continue  # Source-owned leaf placement does not grant history eligibility.
         stage = state.get('owned_result_stages', {})
         if kind in {'object-create-graph', 'object-set-batch'} and (stage.get('lists')
                 or any('targets' in field for field in stage.get('deferred', []))):
@@ -309,6 +312,45 @@ def compound_source_removed_ids(plan, state):
     return {str(row['id']).upper() for scope in stage.get('replacements', []) for row in scope['rows']} | {
         str(row['id']).upper() for profile in stage.get('lists', []) if profile.get('mode') == 'replaceAll'
         for row in profile['before']}
+
+
+def compound_root_list_creation_scope(plan, state):
+    """Reuse the source's exact owner/List proof for one fresh CREATE occurrence."""
+    from .documented_list_fields import resolve_class_list_evidence
+    nodes = plan.get('nodes', [])
+    if (plan.get('kind') != 'object-create-graph' or not isinstance(plan.get('list'), str)
+            or len(nodes) != 1 or state.get('owned_result_stages') or plan.get('preexisting_root_rows')
+            or plan.get('replaced_subtree_rows')):
+        raise ValueError('Compound root List CREATE needs its complete fresh source-owned leaf placement')
+    node = nodes[0]
+    fields = ordinary_creation_fields(node)
+    if (node.get('request_path') != '$' or node.get('parent_request_path') is not None
+            or node.get('collection') != plan['list'] or node.get('existing_target') is not False
+            or node.get('preexisting_id') is not None or fields is None
+            or node.get('children_request_paths') or node.get('list_request_paths') or node.get('list_snapshots')
+            or node.get('import_requested') or node.get('requested_language') or node.get('graph_plugin_native')
+            or node.get('source_plugin') or node.get('rtpc_binding') or node.get('owned_control_input')
+            or any('curve' in field or 'array' in field or 'target_request_path' in field
+                or field['kind'] == 'scalar' and not isinstance(field.get('value'), (str, bool, int, float))
+                for field in fields)):
+        raise ValueError('Compound root List CREATE requires its complete closed source leaf and bound existing references')
+    matches = [guard for guard in state.get('documented_list_guards', [])
+        if guard.get('evidence', {}).get('declaration', {}).get('name') == plan['list']
+        and str(guard.get('evidence', {}).get('scope', {}).get('scope_value')).upper() == str(plan.get('parent_id')).upper()]
+    if len(matches) != 1:
+        raise ValueError('Compound root List CREATE lacks its exact producer-owned owner/List observation')
+    guard = matches[0]
+    binding = guard['evidence']
+    source = resolve_class_list_evidence(plan['version'], binding['scope']['class_id'], plan['list'])
+    if (binding['scope'].get('scope_kind') != 'object'
+            or any(binding.get(key) != source[key] for key in ('kind', 'version', 'catalog_sha256',
+                'source_member', 'source_sha256', 'declaration'))
+            or node.get('documented_list_element_class') != node.get('class_id')
+            or node.get('class_id') not in {row['class_id'] for row in source['declaration']['element_classes']}
+            or source['declaration']['unresolved_element_types']
+            or [row['id'].upper() for row in plan.get('list_before', [])] != [row['id'].upper() for row in guard['members']]):
+        raise ValueError('Compound root List CREATE differs from its exact source class or complete original roster')
+    return guard
 
 
 def capture_created_field_metadata(node: Mapping[str, Any], object_id: str, *, read: Any) -> list[dict[str, Any]]:
