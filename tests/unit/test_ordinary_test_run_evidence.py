@@ -31,7 +31,7 @@ def ordinary_run(tmp_path):
     sources = {name: '# Controlled historical runner source, never executed\n' for name in RUNNER_SOURCES}
     sources.update({code: 'def build(): pass\ndef validate(): pass\ndef verify(): pass\n',
         test: 'def test_selected_mechanism(): pass\ndef test_unselected(): pass\n',
-        'ci/program-test-nodes.txt': selected + '\n',
+        'ci/program-test-nodes.txt': selected + '\ntests/unit/test_windows.py\ntests/unit/test_junction.py\n',
         'tests/unit/test_windows.py': '@pytest.mark.skipif(True, reason="native Windows shell proof")\ndef test_shell(): pass\n@pytest.mark.skipif(True, reason="native Python runner locator")\ndef test_locator(): pass\n',
         'tests/unit/test_junction.py': '@pytest.mark.skipif(True, reason="NTFS junction behavior requires Windows")\ndef test_junction(): pass\n'})
     for name, text in sources.items():
@@ -71,6 +71,11 @@ def ordinary_run(tmp_path):
         'original_candidate': original, 'files': {}, 'original_sources': original_hashes,
         'review': {'reason': 'Controlled aggregate evidence admission, no original node outcomes.',
             'selection_reason': 'Pinned original runner/manifest supplies the selected test without filters.',
+            'skip_attribution': {line: {'collected_test': node,
+                'reviewed_reason': 'Original direct test marker and collection are unrelated to the selected mechanism.'}
+                for line, node in zip((line for line in run['log'].splitlines() if line.startswith('SKIPPED ')),
+                    ('tests/unit/test_windows.py::test_shell', 'tests/unit/test_windows.py::test_locator',
+                     'tests/unit/test_junction.py::test_junction'))},
             'sources': {name: {'original_sha256': original_hashes[name], 'current_sha256': original_hashes[name],
                               'reviewed_reason': 'Identical relevant source bytes.'} for name in (code, test)}},
         'mechanism': {'branch_id': branches[0]['id'], 'native_route': route,
@@ -219,3 +224,56 @@ def test_ordinary_reader_bytes_participate_in_existing_candidate_identity(tmp_pa
     helper = tmp_path / names[-1]
     helper.write_bytes(helper.read_bytes() + b'\n# Changed aggregate proof acceptance\n')
     assert completion.candidate_identity(tmp_path, {'sources': {}}, {}, digest=digest) != before
+
+
+def test_cross_file_fixture_skip_cannot_certify_selected_mechanism(ordinary_run):
+    context = ordinary_run;record = context['attachment'];root = context['root']
+    selected_source = root / 'tests/unit/test_code.py'
+    selected_source.write_text('from tests.unit.test_support import unavailable\n\ndef test_selected_mechanism(unavailable): pass\n')
+    helper = root / 'tests/unit/test_support.py'
+    helper.write_text('import pytest\n\n@pytest.fixture\ndef unavailable():\n    pytest.skip("dependency missing")\n')
+    subprocess.check_call(['git', 'add', '.'], cwd=root)
+    subprocess.check_call(['git', '-c', 'user.name=Reader Fixture', '-c', 'user.email=reader@example.invalid',
+        '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Cross-file fixture skip source control'], cwd=root)
+    original = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
+    record['original_candidate'] = original
+    for name in ('plan', 'result', 'summary'):
+        context['run'][name]['candidate'] = original
+    context['run']['result']['head_after'] = original
+    record['original_sources']['tests/unit/test_support.py'] = hashlib.sha256(helper.read_bytes()).hexdigest()
+    record['original_sources']['tests/unit/test_code.py'] = hashlib.sha256(selected_source.read_bytes()).hexdigest()
+    source_review = record['review']['sources']['tests/unit/test_code.py']
+    source_review['original_sha256'] = source_review['current_sha256'] = record['original_sources']['tests/unit/test_code.py']
+    context['run']['log'] = context['run']['log'].replace(
+        'tests/unit/test_windows.py:1: native Windows shell proof', 'tests/unit/test_support.py:5: dependency missing')
+    record['skip_lines'] = [line for line in context['run']['log'].splitlines() if line.startswith('SKIPPED ')]
+    attributions = record['review']['skip_attribution']
+    original_line = next(line for line in attributions if ':1: native Windows shell proof' in line)
+    attributions.pop(original_line)
+    attributions['SKIPPED [1] tests/unit/test_support.py:5: dependency missing'] = {
+        'collected_test': 'tests/unit/test_code.py::test_selected_mechanism',
+        'reviewed_reason': 'The reported fixture is consumed by the selected mechanism.'}
+    reseal(context)
+    outcome, reason = read(context)
+    assert outcome == 'missing' and 'skip' in reason
+
+
+@pytest.mark.parametrize('damage', ['missing-review', 'empty-review', 'wrong-consumer', 'multiple-consumers', 'malformed-marker'])
+def test_direct_skip_requires_reviewed_original_consumer_linkage(ordinary_run, damage):
+    context = ordinary_run;record = context['attachment']
+    row = record['skip_lines'][0]
+    attributions = record['review']['skip_attribution']
+    if damage == 'missing-review': attributions.pop(row)
+    elif damage == 'empty-review': attributions[row]['reviewed_reason'] = ''
+    elif damage == 'wrong-consumer': attributions[row]['collected_test'] = 'tests/unit/test_windows.py::test_locator'
+    elif damage == 'multiple-consumers':
+        context['run']['log'] = context['run']['log'].replace('SKIPPED [1] tests/unit/test_windows.py:1:',
+            'SKIPPED [2] tests/unit/test_windows.py:1:').replace('3 skipped', '4 skipped')
+        context['run']['summary']['skipped'] = 4
+        changed_row = row.replace('SKIPPED [1]', 'SKIPPED [2]')
+        attributions[changed_row] = attributions.pop(row)
+        record['skip_lines'][0] = changed_row
+    elif damage == 'malformed-marker': attributions[row]['collected_test'] = 'tests/unit/test_windows.py::test_shell[unknown]'
+    reseal(context)
+    outcome, reason = read(context)
+    assert outcome == 'missing' and 'skip' in reason
