@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.maintenance.branch_audit_completion import evidence_result
+from tests.maintenance.branch_audit_completion import evidence_result as _evidence_result
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic import test_run_codex_skill_campaign_heavy_v3 as fixture
 
@@ -51,6 +51,16 @@ def _sealed_archive(tmp_path, *, status="PASS", identity_fault=None):
     path = tmp_path / "fresh-reference.json"
     path.write_text(json.dumps(record))
     descriptor = {"artifact": path.name, "sha256": campaign.sha256_file(path)}
+    import shutil
+    shutil.copytree(options.skill_source, tmp_path / 'current/skills/waapi-skill')
+    requirement = {'contract': 'waapi-skill.formal-fresh-requirement/v1',
+        'branch_id': branch['id'], 'native_shape_sha256': branch['shape_sha256'],
+        'native_route': branch['route'], 'archive_reference_sha256': descriptor['sha256'],
+        'profile': options.profile, 'effective_sha256': effective_hash,
+        'unit_id': record['unit_id'], 'version': record['version'],
+        'mechanism': 'bounded query discovery and exact continuation',
+        'reviewed_reason': 'synthetic selected interaction requirement'}
+    (tmp_path / 'reviewed-binding.json').write_text(json.dumps({'fresh_requirement': requirement}))
     return descriptor, branch, options, matrix_root
 
 
@@ -63,12 +73,24 @@ def test_current_formal_archive_reaches_completion_without_pytest_receipt(tmp_pa
     assert evidence_result(descriptor, branch, "c" * 64, "fresh", "controlled", tmp_path) == ("passed", None)
 
 
-def _rewrite_reference(tmp_path, descriptor, **changes):
+def evidence_result(descriptor, branch, candidate, category, scope, base, binding=None, source_root=None):
+    reviewed = json.loads((base / 'reviewed-binding.json').read_text())
+    reviewed.update(binding or {})
+    return _evidence_result(descriptor, branch, candidate, category, scope, base, reviewed,
+                            source_root or base / 'current')
+
+
+def _rewrite_reference(tmp_path, descriptor, *, reviewed=False, **changes):
     path = tmp_path / descriptor['artifact']
     record = json.loads(path.read_text())
     record.update(changes)
     path.write_text(json.dumps(record))
     descriptor['sha256'] = campaign.sha256_file(path)
+    if reviewed:
+        binding_path = tmp_path / 'reviewed-binding.json'
+        binding = json.loads(binding_path.read_text())
+        binding['fresh_requirement']['archive_reference_sha256'] = descriptor['sha256']
+        binding_path.write_text(json.dumps(binding))
 
 
 @pytest.mark.parametrize('fault', ['missing', 'tamper', 'config', 'effective', 'unit', 'version', 'scope', 'branch', 'candidate', 'relabel'])
@@ -150,7 +172,7 @@ def test_separate_business_assessment_never_rewrites_original_fail(tmp_path):
         'version': record['version'], 'original_verdict': 'FAIL'}
     path.write_text(json.dumps(assessment_value))
     assessment = {'artifact': str(path), 'sha256': campaign.sha256_file(path)}
-    _rewrite_reference(tmp_path, descriptor, business_assessment=assessment)
+    _rewrite_reference(tmp_path, descriptor, reviewed=True, business_assessment=assessment)
     record = json.loads((tmp_path / descriptor['artifact']).read_text())
     proof = read_fresh_proof(record)
     assert proof['original_verdict'] == 'FAIL'
@@ -159,19 +181,24 @@ def test_separate_business_assessment_never_rewrites_original_fail(tmp_path):
         'missing', 'original formal Fresh verdict: FAIL')
     assessment_value['unit_id'] = 'other'
     path.write_text(json.dumps(assessment_value))
-    _rewrite_reference(tmp_path, descriptor, business_assessment={
+    _rewrite_reference(tmp_path, descriptor, reviewed=True, business_assessment={
         'artifact': str(path), 'sha256': campaign.sha256_file(path)})
     assert evidence_result(descriptor, branch, 'c' * 64, 'fresh', 'controlled', tmp_path)[0] == 'missing'
 
 
-def test_historical_candidate_requires_exact_existing_reviewed_equivalence(tmp_path):
+@pytest.mark.parametrize('changed_relevant', [False, True])
+def test_historical_candidate_requires_exact_existing_reviewed_equivalence(tmp_path, changed_relevant):
     from tests.maintenance.branch_audit_completion import binding_semantics
-    descriptor, branch, _, _ = _sealed_archive(tmp_path)
-    source_root = Path(__file__).resolve().parents[2]
+    descriptor, branch, options, _ = _sealed_archive(tmp_path)
+    source_root = tmp_path / 'current'
+    (source_root / 'skills/waapi-skill/unrelated.md').write_text('unrelated source delta')
+    if changed_relevant:
+        (source_root / 'skills/waapi-skill/scripts/gateway.py').write_text('# changed relevant source')
     sources = {name: campaign.sha256_file(source_root / name) for name in (
         'skills/waapi-skill/scripts/run.py', 'skills/waapi-skill/scripts/gateway.py')}
-    _rewrite_reference(tmp_path, descriptor, relevant_sources=sources)
-    binding = {'relevant_sources': list(sources), **{key: {
+    _rewrite_reference(tmp_path, descriptor, reviewed=True, relevant_sources=sources)
+    binding = {**json.loads((tmp_path / 'reviewed-binding.json').read_text()),
+        'relevant_sources': list(sources), **{key: {
         'source': 'skills/waapi-skill/scripts/gateway.py#main'} for key in
         ('construction', 'validation', 'verifier')}}
     proof = {'contract': 'waapi-skill.branch-evidence-equivalence/v1',
@@ -183,11 +210,40 @@ def test_historical_candidate_requires_exact_existing_reviewed_equivalence(tmp_p
     path = tmp_path / 'equivalence.json'
     path.write_text(json.dumps(proof))
     binding['equivalence'] = {'artifact': str(path), 'sha256': campaign.sha256_file(path)}
-    assert evidence_result(descriptor, branch, 'd' * 64, 'fresh', 'controlled', tmp_path,
-                           binding, source_root) == ('passed', None)
+    result = evidence_result(descriptor, branch, 'd' * 64, 'fresh', 'controlled', tmp_path,
+                             binding, source_root)
+    if changed_relevant:
+        assert result[0] == 'missing' and 'original source hashes' in result[1]
+        return
+    assert result == ('passed', None)
     proof['branch_id'] = 'unrelated'
     path.write_text(json.dumps(proof))
     binding['equivalence']['sha256'] = campaign.sha256_file(path)
     outcome, reason = evidence_result(descriptor, branch, 'd' * 64, 'fresh', 'controlled',
                                     tmp_path, binding, source_root)
     assert outcome == 'missing' and 'equivalence' in reason
+
+
+def test_valid_archive_cannot_be_relabelled_as_different_current_skill(tmp_path):
+    import shutil
+    descriptor, branch, options, _ = _sealed_archive(tmp_path)
+    current = tmp_path / 'different-current'
+    shutil.copytree(options.skill_source, current / 'skills/waapi-skill')
+    (current / 'skills/waapi-skill/scripts/gateway.py').write_text('# different current implementation\n')
+    # Same claimed label in both reference and caller used to skip equivalence.
+    _rewrite_reference(tmp_path, descriptor, reviewed=True, candidate_sha256='d' * 64)
+    outcome, reason = evidence_result(descriptor, branch, 'd' * 64, 'fresh', 'controlled',
+                                    tmp_path, source_root=current)
+    assert outcome == 'missing' and 'original source hashes' in reason
+
+
+
+def test_query_archive_cannot_claim_an_unreviewed_mutation_scope(tmp_path):
+    descriptor, branch, _, _ = _sealed_archive(tmp_path)
+    mutation = {**branch, 'id': 'mutation-interaction',
+                'route': branch['route'].replace('object.get', 'object.delete')}
+    # Even a newly sealed reference must match the separately reviewed unit/mechanism scope.
+    _rewrite_reference(tmp_path, descriptor, reviewed=True, branch_id=mutation['id'],
+                       native_route=mutation['route'])
+    outcome, reason = evidence_result(descriptor, mutation, 'c' * 64, 'fresh', 'controlled', tmp_path)
+    assert outcome == 'missing' and 'reviewed Fresh interaction requirement' in reason

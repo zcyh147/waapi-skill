@@ -146,7 +146,46 @@ def fresh_evidence_result(descriptor, branch, candidate, scope_kind, base, bindi
                 or record['native_shape_sha256'] != branch['shape_sha256']
                 or record['native_route'] != branch['route']):
             raise ValueError('Fresh completion scope/branch identity mismatch')
-        if record['candidate_sha256'] != candidate:
+        requirement = binding.get('fresh_requirement', {})
+        expected_requirement = {'contract': 'waapi-skill.formal-fresh-requirement/v1',
+            'branch_id': branch['id'], 'native_shape_sha256': branch['shape_sha256'],
+            'native_route': branch['route'], 'archive_reference_sha256': descriptor['sha256'],
+            'profile': proof['options']['profile'], 'effective_sha256': proof['effective_sha256'],
+            'unit_id': proof['unit_id'], 'version': proof['version']}
+        if (not isinstance(requirement, dict)
+                or set(requirement) != set(expected_requirement) | {'mechanism', 'reviewed_reason'}
+                or any(requirement.get(key) != value for key, value in expected_requirement.items())
+                or not all(isinstance(requirement.get(key), str) and requirement[key].strip()
+                           for key in ('mechanism', 'reviewed_reason'))):
+            raise ValueError('exact reviewed Fresh interaction requirement missing or mismatched')
+        current_skill = Path(root) / 'skills/waapi-skill'
+        same_source = stable_tree_sha256(current_skill,
+            exclude_names=proof['candidate']['excluded_names']) == proof['candidate']['tree_sha256']
+        if record['candidate_sha256'] != candidate or not same_source:
+            # A claimed candidate label cannot substitute for original source bytes.
+            # Only hashes derived from the already verified original Skill or
+            # current-compatible original harness can enter reviewed equivalence.
+            original_sources = {}
+            skill_root = Path(proof['candidate']['path'])
+            for name in binding.get('relevant_sources', []):
+                relative = Path(name)
+                if relative.is_absolute() or '..' in relative.parts:
+                    raise ValueError('Fresh equivalence source path escaped original source')
+                if relative.is_relative_to('skills/waapi-skill'):
+                    source_boundary = skill_root
+                    original = skill_root / relative.relative_to('skills/waapi-skill')
+                elif any(relative.is_relative_to(prefix) for prefix in ('tests/semantic', 'tests/destructive/support')):
+                    prefix = next(prefix for prefix in ('tests/semantic', 'tests/destructive/support')
+                                  if relative.is_relative_to(prefix))
+                    source_boundary = campaign.REPO_ROOT / prefix
+                    original = campaign.REPO_ROOT / relative
+                else:
+                    raise ValueError('Fresh equivalence source is not bound by original sealed trees')
+                if not original.resolve().is_relative_to(source_boundary.resolve()):
+                    raise ValueError('Fresh equivalence source escaped original sealed tree')
+                original_sources[name] = sha256_file(original)
+            if not original_sources or record.get('relevant_sources') != original_sources:
+                raise ValueError('Fresh equivalence original source hashes missing or mismatched')
             validate_equivalence(binding.get('equivalence', {}), descriptor, record,
                                  branch, candidate, binding, base, root)
         verdict = proof['original_verdict']
