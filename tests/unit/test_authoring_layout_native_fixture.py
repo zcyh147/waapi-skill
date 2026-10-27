@@ -11,6 +11,212 @@ from tests.unit.test_waapi_gateway import gateway_env, waapi_gateway as gateway
 from tests.unit.test_authoring_batch_adapter import owned_authoring, _install_public_gateway
 
 
+def _layout_cohort_host(tmp_path, monkeypatch, owner, *, damage=None):
+    """A native boundary fake with view allocation and one ordinary dock layout."""
+    from copy import deepcopy
+    from tests.destructive.support import authoring_batch
+    from tests.semantic.support import codex_scenario_lifecycle_v3 as lifecycle
+    from wwise_waapi.headless import CleanupReport, HeadlessLifecycle
+    from tests.semantic.support.codex_expansion_case_helpers import CaseBoundaryError
+    version = owner.runtime.version
+    owner.runtime.lifecycle.ready_result['version']['schema'] = 152
+    owner.runtime.lifecycle.ready_result['version']['displayName'] = '.'.join(
+        str(owner.runtime.lifecycle.ready_result['version'][key]) for key in ('year', 'major', 'minor', 'build'))
+    root = tmp_path / 'native-client'
+    root.mkdir()
+    class Client(LayoutClient):
+        splitter_id = '{33333333-3333-3333-3333-333333333333}'
+        def __init__(self):
+            super().__init__(root, version=version)
+            self.responses['ak.wwise.core.getInfo'].update(deepcopy(owner.runtime.lifecycle.ready_result))
+            self.responses['ak.wwise.core.getProjectInfo']['path'] = str(owner.runtime.sandbox.sandbox_project)
+            self.responses['ak.wwise.core.getProjectInfo']['name'] = 'SampleProject'
+            self.responses[URI + 'getViewTypes']['viewTypes'] = [
+                {'viewName': name, 'viewDisplayName': name} for name in ('ProjectExplorer', 'Transport', 'EventViewer')]
+            self.views['Profiler'] = [{'viewID': '{44444444-4444-4444-4444-444444444444}',
+                'viewName': 'Meter', 'viewDisplayName': 'Meter', 'viewIsDocked': True}]
+        def call(self, uri, args=None, options=None):
+            if uri == URI + 'getViewHandle':
+                self.calls.append((uri, args, options))
+                return ['{55555555-5555-5555-5555-555555555555}']
+            if uri == URI + 'dockView':
+                self.calls.append((uri, args, options))
+                layout = self.layouts[args['name']]['Layout']
+                floating = layout['Undocked'][0]['StackPanel']['@Children'].pop()
+                assert floating['ID'] == args['viewID']
+                children = layout['StackPanel']['@Children']
+                assert children[0]['ID'] == args['targetID'] and args['side'] == 'right'
+                children[1:1] = [{'@type': 'Splitter', 'ID': self.splitter_id}, floating]
+                if version == '2024.1':
+                    extra_id = '{66666666-6666-6666-6666-666666666666}'
+                    children.insert(3, {'@type': 'Splitter', 'ID': extra_id})
+                    self.rectangles[extra_id] = {'left': 605, 'top': 0, 'right': 610, 'bottom': 400}
+                next(row for row in self.views[args['name']] if row['viewID'] == args['viewID'])['viewIsDocked'] = True
+                self.rectangles[args['targetID']] = {'left': 0, 'top': 0, 'right': 300, 'bottom': 400}
+                self.rectangles[args['viewID']] = {'left': 305, 'top': 0, 'right': 605, 'bottom': 400}
+                self.rectangles[self.splitter_id] = {'left': 300, 'top': 0, 'right': 305, 'bottom': 400}
+                if damage == 'preservation': self.views[args['name']].pop(0)
+                return {}
+            if uri == URI + 'moveSplitter':
+                self.calls.append((uri, args, options))
+                for edge in ('left', 'right'): self.rectangles[args['id']][edge] += args['delta']
+                return {}
+            if uri == URI + 'resetLayouts' and damage == 'reset_absent':
+                self.calls.append((uri, args, options))
+                self.layouts.pop(args['layouts'][0])
+                self.views.pop(args['layouts'][0])
+                return {}
+            if uri == URI + 'resetLayouts' and damage == 'reset_ambiguous':
+                self.calls.append((uri, args, options))
+                raise TimeoutError('Native reset outcome is unknown')
+            result = super().call(uri, args, options)
+            if uri == URI + 'setLayout':
+                rows = self.views[args['name']]
+                def views(value, docked):
+                    if isinstance(value, dict):
+                        if value.get('@type') == 'View':
+                            rows.append({'viewID': value['ID'], 'viewName': value['Name'],
+                                'viewDisplayName': value['Name'], 'viewIsDocked': docked})
+                            self.rectangles[value['ID']] = {'left': 100 if not docked else 0,
+                                'top': 120 if not docked else 0, 'right': 500 if not docked else 300,
+                                'bottom': 420 if not docked else 400}
+                        for child in value.values(): views(child, docked)
+                    elif isinstance(value, list):
+                        for child in value: views(child, docked)
+                views(args['layout']['Layout'].get('StackPanel', {}), True)
+                views(args['layout']['Layout'].get('Undocked', []), False)
+            return result
+    client = Client()
+    def factory(*, skill_source, runtime, version, receipts):
+        env = gateway_env(runtime.owned_root)
+        env['WAAPI_SKILL_CONFIG_PATH'] = str(runtime.owned_root / 'setup-config.json')
+        def call(argv, **kwargs):
+            code, payload = gateway.execute_gateway(['--state-dir', str(runtime.owned_root / 'setup-state'), *argv],
+                env=env, client_factory=lambda _: client)
+            receipts.append({'argv': list(argv), 'exit_code': code, 'payload': payload})
+            if code or payload.get('ok') is not True: raise CaseBoundaryError(str(payload))
+            return payload
+        return call
+    monkeypatch.setattr(authoring_batch, 'fixture_gateway', factory)
+    def shutdown(process, sandbox, **kwargs):
+        process.process = None
+        process.cleanup_report = CleanupReport(launch_pid=1234, wine_prefix=None, process_exited=True)
+        sandbox.metadata.process_cleanup_result = 'cleaned'
+        sandbox.metadata.process_cleanup_details = {'residual_processes': []}
+    monkeypatch.setattr(lifecycle, 'shutdown_sandboxed_wwise', shutdown)
+    monkeypatch.setattr(authoring_batch, 'wait_for_port_release', lambda *_: None)
+    monkeypatch.setattr(HeadlessLifecycle, '_process_rows', lambda *_, **__: [(12345, 'fake pytest process')])
+    return client
+
+
+@pytest.mark.parametrize('owned_authoring', ['2024.1'], indirect=True)
+def test_owned_layout_common_cohort_reaches_final_writer_with_nine_scoped_transactions(owned_authoring, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from tests.destructive.support import authoring_batch
+    for key in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'): monkeypatch.setenv(key, '1')
+    native = importlib.import_module('tests.destructive.test_authoring_ui_business_live')
+    client = _layout_cohort_host(tmp_path, monkeypatch, owned_authoring)
+    nodeid = 'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_2024_construction_arrangement'
+    target = tmp_path / 'layout-category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    batch = authoring_batch.AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=[nodeid])
+    call = batch.node_gateway(nodeid)
+    native.test_authoring_layout_2024_construction_arrangement((batch, call))
+    item = SimpleNamespace(nodeid=nodeid, _waapi_phase_reports={'setup': 'passed', 'call': 'passed'})
+    batch.prepare_stop([item])
+    item._waapi_phase_reports['teardown'] = 'passed'
+    assert batch.finalize([item])['outcome'] == 'PASS'
+    final = json.loads(target.read_text().splitlines()[-1])
+    assert final['categories'][0]['category'] == 'authoring-layout-construction-arrangement'
+    assert final['categories'][0]['status'] == 'PASS'
+    assert len(final['transactions']) == 9
+    assert client.current == 'Designer' and set(client.layouts) == {'Designer', 'Profiler'}
+    changes = [uri.removeprefix(URI) for uri, _, _ in client.calls if uri in {
+        URI + suffix for suffix in ('setLayout', 'switchLayout', 'getOrCreateView', 'dockView', 'moveSplitter', 'undockView', 'removeLayout')}]
+    assert changes == ['setLayout', 'switchLayout', 'getOrCreateView', 'getOrCreateView', 'dockView',
+        'moveSplitter', 'undockView', 'switchLayout', 'removeLayout']
+
+
+def test_owned_2025_close_and_selected_reset_keep_independent_business_and_diagnostic_credit(owned_authoring, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from tests.destructive.support import authoring_batch
+    for key in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'): monkeypatch.setenv(key, '1')
+    native = importlib.import_module('tests.destructive.test_authoring_ui_business_live')
+    client = _layout_cohort_host(tmp_path, monkeypatch, owned_authoring)
+    nodeid = 'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_2025_construction_close_reset'
+    target = tmp_path / 'layout-category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    batch = authoring_batch.AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=[nodeid])
+    call = batch.node_gateway(nodeid)
+    native.test_authoring_layout_2025_construction_close_reset((batch, call))
+    report = json.loads((batch.node_runtimes[nodeid].owned_root / 'native-evidence/layout-workflow-observations.json').read_text())
+    assert report['reset']['selected_layout_name'] == report['owned_layout_name']
+    assert report['reset']['business_state_verified'] is False
+    assert report['reset']['post_reset_layout_survived'] is True
+    reset_args = [args for uri, args, _ in client.calls if uri == URI + 'resetLayouts']
+    assert reset_args == [{'layouts': [report['owned_layout_name']]}]
+    item = SimpleNamespace(nodeid=nodeid, _waapi_phase_reports={'setup': 'passed', 'call': 'passed'})
+    batch.prepare_stop([item])
+    item._waapi_phase_reports['teardown'] = 'passed'
+    assert batch.finalize([item])['outcome'] == 'PASS'
+    final = json.loads(target.read_text().splitlines()[-1])
+    categories = {row['category']: row for row in final['categories']}
+    assert categories['authoring-layout-construction-close']['status'] == 'PASS'
+    diagnostic = categories['authoring-layout-selected-reset-observation']
+    assert diagnostic['status'] == 'blocked' and diagnostic['business_state_verified'] is False
+    assert diagnostic['coverage_credit'] == 'none; diagnostic observation only'
+    assert len(final['transactions']) == 8
+    assert client.current == 'Designer' and set(client.layouts) == {'Designer', 'Profiler'}
+
+
+@pytest.mark.parametrize('owned_authoring,damage', [('2024.1', 'preservation'), ('2025.1', 'reset_absent'),
+    ('2025.1', 'reset_ambiguous')], indirect=['owned_authoring'])
+def test_layout_cohort_failures_stop_writes_and_retain_owned_evidence_without_blind_cleanup(owned_authoring, tmp_path, monkeypatch, damage):
+    from types import SimpleNamespace
+    from tests.destructive.support import authoring_batch
+    from tests.semantic.support.codex_expansion_case_helpers import CaseBoundaryError
+    from tests.destructive.support.layout_workflows import COMMON_NODE, CLOSE_NODE
+    for key in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'): monkeypatch.setenv(key, '1')
+    native = importlib.import_module('tests.destructive.test_authoring_ui_business_live')
+    client = _layout_cohort_host(tmp_path, monkeypatch, owned_authoring, damage=damage)
+    nodeid = COMMON_NODE if damage == 'preservation' else CLOSE_NODE
+    target = tmp_path / 'layout-category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    batch = authoring_batch.AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=[nodeid])
+    call = batch.node_gateway(nodeid)
+    run = native.test_authoring_layout_2024_construction_arrangement if damage == 'preservation' else native.test_authoring_layout_2025_construction_close_reset
+    with pytest.raises(CaseBoundaryError): run((batch, call))
+    report = json.loads((batch.node_runtimes[nodeid].owned_root / 'native-evidence/layout-workflow-observations.json').read_text())
+    assert report['complete'] is False and report['cleanup'] == {}
+    assert URI + 'removeLayout' not in [uri for uri, _, _ in client.calls]
+    assert [args for uri, args, _ in client.calls if uri == URI + 'switchLayout'] == [{'name': report['owned_layout_name']}]
+    if damage == 'preservation':
+        assert URI + 'moveSplitter' not in [uri for uri, _, _ in client.calls]
+    else:
+        assert report['reset']['post_reset_layout_survived'] is None
+        assert [args for uri, args, _ in client.calls if uri == URI + 'resetLayouts'] == [{'layouts': [report['owned_layout_name']]}]
+    item = SimpleNamespace(nodeid=nodeid, _waapi_phase_reports={'setup': 'passed', 'call': 'failed', 'teardown': 'passed'})
+    assert batch.finalize([item], exitstatus=1)['outcome'] in {'FAIL', 'BLOCKED'}
+    assert owned_authoring.runtime.owned_root.exists()
+    assert all(category['status'] != 'PASS' for row in map(json.loads, target.read_text().splitlines()) for category in row['categories'])
+
+
+@pytest.mark.parametrize('variant', ['wrong_common_version', 'wrong_close_version', 'mixed_selection'])
+def test_layout_cohort_owner_requires_one_exact_matching_version_node_before_allocation(tmp_path, monkeypatch, variant):
+    from types import SimpleNamespace
+    from tests.destructive.support import authoring_batch
+    from tests.destructive.support.layout_workflows import COMMON_NODE, CLOSE_NODE
+    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
+    events = _fakes(monkeypatch, tmp_path)
+    nodeid = CLOSE_NODE if variant == 'wrong_close_version' else COMMON_NODE
+    monkeypatch.setenv('WWISE_VERSION', '2024.1' if variant != 'wrong_common_version' else '2025.1')
+    config = _config(tmp_path)
+    config.args = [nodeid, NODE] if variant == 'mixed_selection' else [nodeid]
+    with pytest.raises(pytest.UsageError):
+        authoring_batch.configure_authoring_batch_owner(config, [SimpleNamespace(nodeid=name) for name in config.args], repo_root=tmp_path)
+    assert events == []
+
+
 @pytest.mark.parametrize('version', ['2024.1', '2025.1'])
 def test_owned_layout_registration_switch_fixture_uses_separate_verified_transactions(tmp_path, monkeypatch, version):
     for key in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'):

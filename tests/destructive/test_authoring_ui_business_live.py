@@ -200,6 +200,16 @@ def test_authoring_layout_owned_registration_and_switch(owned_authoring_layout_n
     _owned_layout_remove(call, original, name)
 
 
+def test_authoring_layout_2024_construction_arrangement(owned_authoring_layout_node):
+    from tests.destructive.support.layout_workflows import COMMON_NODE, collect_layout_workflow
+    collect_layout_workflow(*owned_authoring_layout_node, nodeid=COMMON_NODE, strong_effect=_layout_effect)
+
+
+def test_authoring_layout_2025_construction_close_reset(owned_authoring_layout_node):
+    from tests.destructive.support.layout_workflows import CLOSE_NODE, collect_layout_workflow
+    collect_layout_workflow(*owned_authoring_layout_node, nodeid=CLOSE_NODE, strong_effect=_layout_effect)
+
+
 @pytest.mark.parametrize('initial_position', [(), ('--initial-x', '17'), ('--initial-y', '29'),
     ('--initial-x', '17', '--initial-y', '29')], ids=['omitted', 'x-only', 'y-only', 'both'])
 def test_authoring_layout_owned_view_lifecycle(owned_authoring_layout_node, initial_position):

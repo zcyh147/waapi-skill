@@ -35,6 +35,10 @@ from tests.destructive.support.profiler_capture import (
 )
 from tests.destructive.support.meter_spelling_diagnostic import meter_packet_present
 from tests.destructive.support.loaded_media_probe import NODEID as LOADED_EVENT_NODEID, OUTCOME as LOADED_EVENT_OUTCOME
+from tests.destructive.support.layout_workflows import (
+    COMMON_NODE as LAYOUT_COMMON_NODE, CLOSE_NODE as LAYOUT_CLOSE_NODE, NODES as LAYOUT_WORKFLOW_NODES,
+    FILENAME as LAYOUT_REPORT_FILENAME, validate_layout_report,
+)
 
 from tests.destructive.support.integration_demo import NODEID as DEMO_NODEID
 
@@ -296,7 +300,36 @@ class AuthoringBatchAdapter:
                          **({'observation_artifact': self.observation_artifacts[row['nodeid']]}
                             if row['nodeid'] in self.observation_artifacts else {}),
                          **({'batch_finalization': self.batch_seal_descriptor}
-                            if outcome == 'PASS' else {})} for row in outcomes if row['nodeid'] not in CAPTURE_NODE_OUTCOMES and row['nodeid'] not in TRANSPORT_OBSERVATION_NODES]
+                            if outcome == 'PASS' else {})} for row in outcomes if row['nodeid'] not in CAPTURE_NODE_OUTCOMES
+                            and row['nodeid'] not in TRANSPORT_OBSERVATION_NODES and row['nodeid'] not in LAYOUT_WORKFLOW_NODES]
+        for row in (row for row in outcomes if row['nodeid'] in LAYOUT_WORKFLOW_NODES):
+            nodeid = row['nodeid']
+            report = {}
+            descriptor = self.observation_artifacts.get(nodeid)
+            if descriptor:
+                archived = json.loads(Path(descriptor['path']).read_text(encoding='utf-8'))
+                report_path = Path(archived['artifacts']['native-evidence']['path']) / LAYOUT_REPORT_FILENAME
+                if report_path.exists():
+                    if report_path.stat().st_size > 65536:
+                        raise ValueError('Owned layout cohort report exceeds its byte bound')
+                    report = json.loads(report_path.read_text(encoding='utf-8'))
+            if phase == 'final' and outcome == 'PASS':
+                validate_layout_report(report, nodeid=nodeid, candidate=self.candidate,
+                    version=self.runtime.version, receipts=self.receipts[nodeid])
+            category = {'nodeid': nodeid, 'observation_artifact': descriptor,
+                'status': 'PASS' if outcome == 'PASS' else 'FAIL' if row['outcome'] == 'FAIL' else 'blocked',
+                'category': 'authoring-layout-construction-arrangement' if nodeid == LAYOUT_COMMON_NODE else 'authoring-layout-construction-close',
+                'verifier_strength': 'public_gateway_independent_business_state_restore_and_owned_teardown',
+                'preservation_scope': report.get('preservation_scope'),
+                **({'batch_finalization': self.batch_seal_descriptor} if outcome == 'PASS' else {})}
+            categories.append(category)
+            if nodeid == LAYOUT_CLOSE_NODE:
+                categories.append({'category': 'authoring-layout-selected-reset-observation', 'nodeid': nodeid,
+                    'status': 'FAIL' if row['outcome'] == 'FAIL' else 'blocked',
+                    'verifier_strength': 'result_schema_only_with_bounded_owned_layout_observations',
+                    'business_state_verified': False, 'coverage_credit': 'none; diagnostic observation only',
+                    'reason': 'Default-state oracle and reset effect semantics remain unproved under #188',
+                    'selected_layout_name': report.get('owned_layout_name'), 'observation_artifact': descriptor})
         for capture_nodeid in (node for node in self.selected_nodeids if node in CAPTURE_NODE_OUTCOMES):
             # Consume the exact archived collector output, including partial
             # observations. A passing sibling never fills another outcome.
@@ -537,6 +570,8 @@ def install_authoring_batch(config, *, owner: ScenarioLifecycle, repo_root: Path
 # Only nodes that consume this actual owner can enter its native batch. Other
 # families remain explicit integration work until they use the same protocol.
 OWNED_AUTHORING_NODEIDS = (
+    LAYOUT_COMMON_NODE,
+    LAYOUT_CLOSE_NODE,
     *DIAGNOSTIC_NODEIDS,
     TRANSPORT_SEMANTICS_NODEID,
     TRANSPORT_MIXED_NODEID,
@@ -560,6 +595,8 @@ OWNED_AUTHORING_NODEIDS = (
 OWNED_AUTHORING_NODE_VERSIONS = {
     **dict.fromkeys(OWNED_AUTHORING_NODEIDS, ('2024.1', '2025.1')),
     **dict.fromkeys(DIAGNOSTIC_NODEIDS, ('2024.1',)),
+    LAYOUT_COMMON_NODE: ('2024.1',),
+    LAYOUT_CLOSE_NODE: ('2025.1',),
     METER_2024_NODEID: ('2024.1',),
     METER_SPELLING_NODEID: ('2025.1',),
     PROFILER_CAPTURE_NODEID: ('2025.1',),
@@ -596,6 +633,8 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Owned Authoring requires an explicit supported destructive Authoring test context')
     if any(os.getenv('WWISE_VERSION') not in OWNED_AUTHORING_NODE_VERSIONS[nodeid] for nodeid in selected):
         raise pytest.UsageError('Selected owned Authoring node is not available on the requested version')
+    if set(selected).intersection(LAYOUT_WORKFLOW_NODES) and len(selected) != 1:
+        raise pytest.UsageError('A layout workflow requires its one exact versioned cohort node')
     if DEMO_NODEID in selected and selected != (DEMO_NODEID,):
         raise pytest.UsageError('Integration Demo requires its exact single named node')
     if (set(selected).intersection(DIAGNOSTIC_NODEIDS)
