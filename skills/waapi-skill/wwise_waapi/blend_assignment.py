@@ -114,7 +114,19 @@ def prepare(args, *, read, version):
     position = materialize_index(args, len(order)).get("index", len(order))
     existing = _guid(args["child"]) in order
     expected = None if existing else [*order[:position], _guid(args["child"]), *order[position:]]
+    # Insertion can move the facing geometry of adjacent Automatic edges (R90).
+    # No formula is promised; unrelated edges and their mode/shape stay checked.
+    automatic_neighbors = []
+    if not existing:
+        for neighbor_position, edge_index in ((position - 1, 1), (position, 0)):
+            if 0 <= neighbor_position < len(order):
+                row = before["assignments"][neighbor_position]
+                edges = row.get("edges", [])
+                if len(edges) == 2 and edges[edge_index].get("fadeMode") == "Automatic":
+                    automatic_neighbors.append({"child": row["child"], "edge_index": edge_index})
     unobserved = []
+    if automatic_neighbors:
+        unobserved.append("automatic_non_target_edge_geometry")
     if existing:
         unobserved.append("existing_assignment_reassignment_semantics")
     if "edges" in args:
@@ -122,8 +134,9 @@ def prepare(args, *, read, version):
     if any("edges" not in row for row in before["assignments"] if row["child"] != _guid(args["child"])):
         unobserved.append("unreturned_non_target_edges")
     return {"before": before, "expected_position": position, "expected_order": expected,
+            "unverified_automatic_edges": automatic_neighbors,
             "requested_index": args.get("index"), "requested_edges": deepcopy(args.get("edges")),
-            "verification_scope": {"observed": ["track_child_owner_identity", "indexed_assignment_order", "returned_non_target_edges"],
+            "verification_scope": {"observed": ["track_child_owner_identity", "indexed_assignment_order", "stable_returned_non_target_edge_fields"],
                                    "unobserved": unobserved, "default_edge_geometry_promised": False}}
 
 
@@ -145,6 +158,14 @@ def compare(plan, after):
                        "passed": actual == plan["expected_order"], "evidence": {"expected": plan["expected_order"], "actual": actual}})
     by_id = {row["child"]: row for row in after["assignments"]}
     retained = [row for row in before["assignments"] if row["child"] != before["child"]["id"]]
-    checks.append({"name": "All observed non-target assignment data and edges are preserved",
-                   "passed": all(row["child"] in by_id and all(by_id[row["child"]].get(k) == v for k, v in row.items() if k != "index") for row in retained)})
+    unchecked = {(item["child"], item["edge_index"]) for item in plan.get("unverified_automatic_edges", [])}
+    def stable_data(row):
+        result = deepcopy({key: value for key, value in row.items() if key != "index"})
+        for edge_index, edge in enumerate(result.get("edges", [])):
+            if (row["child"], edge_index) in unchecked:
+                edge.pop("edgePosition", None)
+                edge.pop("fadePosition", None)
+        return result
+    checks.append({"name": "Stable non-target assignment data and edge fields are preserved",
+                   "passed": all(row["child"] in by_id and stable_data(row) == stable_data(by_id[row["child"]]) for row in retained)})
     return checks

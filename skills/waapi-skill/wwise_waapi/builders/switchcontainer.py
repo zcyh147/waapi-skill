@@ -393,19 +393,12 @@ def _object_ref(value: Any) -> str | int | None:
 
 def _validate_relationship_state(operation: SwitchContainerOperation, rows: Sequence[AssignmentPair], *, child: str | int, state_or_switch: str | int) -> None:
     exact = [row for row in rows if row.child == child and row.state_or_switch == state_or_switch]
-    same_child = [row for row in rows if row.child == child]
     if operation == SwitchContainerOperation.ADD_ASSIGNMENT:
         if exact:
             raise SemanticValidationError(
                 SemanticErrorCode.DESTRUCTIVE_GATE_REQUIRED,
                 "addAssignment would be a duplicate/no-op; source notes do not allow claiming no-op success.",
                 details={"child": child, "stateOrSwitch": state_or_switch, "existing": [row.as_dict() for row in exact]},
-            )
-        if same_child:
-            raise SemanticValidationError(
-                SemanticErrorCode.DESTRUCTIVE_GATE_REQUIRED,
-                "addAssignment requires fail-closed relationship state: child is already assigned to another stateOrSwitch.",
-                details={"child": child, "stateOrSwitch": state_or_switch, "existing": [row.as_dict() for row in same_child]},
             )
         return
     if not exact:
@@ -418,7 +411,7 @@ def _validate_relationship_state(operation: SwitchContainerOperation, rows: Sequ
 
 def _relationship_rule(operation: SwitchContainerOperation) -> str:
     if operation == SwitchContainerOperation.ADD_ASSIGNMENT:
-        return "fail closed unless preflight getAssignments proves the child has no existing assignment and target pair is absent"
+        return "fail closed unless preflight getAssignments proves the target pair is absent; preserve other pairs for the child"
     return "fail closed unless preflight getAssignments proves the target child/stateOrSwitch pair exists before removal"
 
 
