@@ -1,10 +1,12 @@
 # Conversion codec placement and configuration, #179
 
-This increment strengthens the existing 2024.1/2025.1
-`ak.wwise.core.audio.setConversionPlugin` Business Draft. Its setter path is
-program-tested; native placement remains blocked by ambiguous platform
-association. Older exact-GUID read/field effects below are separate evidence.
-Build/conversion execution remains #183.
+The existing 2024.1/2025.1 `ak.wwise.core.audio.setConversionPlugin` Business
+Draft now uses the [user-approved lightweight wrapper boundary](../plans/full-waapi-coverage/SPEC.md#user-approved-lightweight-wrapper-acceptance--2026-10-27):
+closed mapping and code controls, with native-result-only verification. Native
+setter effects and platform association remain unverified. Older exact-GUID
+read/field effects below are separate evidence. #179 and build/conversion #183
+remain open; no further native QA or platform-mapping research is required by
+this increment.
 
 The public plan binds an exact Conversion Settings object, one live project
 platform and one installed Conversion Type Handle. The Gateway derives the
@@ -20,33 +22,32 @@ The matching 2024/2025 SDK example
 `ak_wwise_core_object_get_example_getting_all_conversion_plug_ins.html` documents
 `from type conversionplugin` and the `pluginname`, `id`, `owner.name` and
 `classid` projections. `waql_reference.html` documents owner expressions;
-`object.get` documents its platform option. Gateway-owned observation filters
-by the exact owner's GUID, fixes a two-row ambiguity sentinel, and reads each
-project platform by its GUID. The documented platform option supplies value
-context; it does not by itself establish that the ConversionPlugin source
-enumerates exactly one instance for that platform. That native enumeration
-remains a precondition to be established by the selected read-only preflight.
-Multiple rows stop before the setter; no row-order choice is permitted.
-Before one setter execution the Gateway rechecks the
-Conversion identity, platform catalog, installed class and complete bounded
-codec field snapshots. Final verification checks the selected codec's class,
-name and owner independently of the setter's empty result, preserving the
-other platforms' codec GUIDs, classes and returned fields.
+`object.get` documents its platform option. The retained native observations
+below show that this option does not establish a one-codec-per-platform
+identity mapping. The setter no longer enumerates codecs or snapshots their
+fields as a precondition, and it never chooses a row from those results.
 
-After successful attachment, the returned codec GUID can enter the existing
-`object.setProperty` Draft. Live exact-object Field Handles select scalar
-properties, value domains and conditions; configuration has its own Preview,
-authorization, single execution and readback. ConversionPlugin Work Unit
-elements have `Name=""`. The retained Console2025.1.7.9143 read-only packet
-returns the opaque path `<Unnamed Conversion plugin>`. The existing type
-semantics now mark only ConversionPlugin paths as opaque display text, preserving
-their bounded, non-control native spelling unchanged. This adds no selector
-authority and does not relax ordinary hierarchy paths. Setter verification owns
-its class/owner checks; the separate ordinary field binding retains its existing
-GUID/name/type/path and Field Handle metadata revalidation contract.
-The verified codec identity is an operation-owned business outcome in the final
-`agent_result`, so ordinary verification compaction cannot remove the GUID,
-observed platform/class or separate configuration requirement.
+Before one setter execution the Gateway rechecks the exact Conversion
+identity, complete bounded platform catalog and selected installed class.
+The immutable Preview discloses that prior codec properties may reset.
+Verification validates the empty reflected native result and ends
+`result_schema_checked`, `verified=false`, `business_state_verified=false`.
+Actual replacement, platform-to-codec GUID association and other platform codec
+or field preservation remain unverified. Historical previews that promised the
+stronger placement verifier require recreation before execution.
+
+No codec GUID or automatic configuration continuation is returned. A separately
+chosen exact live codec GUID may enter the existing `object.setProperty` Draft.
+Live exact-object Field Handles select scalar properties, value domains and
+conditions; configuration has its own Preview, authorization, single execution
+and readback. An unresolved request for a named platform's codec property
+remains a boundary, rather than permission to guess an identity.
+ConversionPlugin Work Unit elements have `Name=""`; the retained Console
+2025.1.7.9143 packet returns the opaque path `<Unnamed Conversion plugin>`.
+The existing ConversionPlugin identity semantics preserve that bounded,
+non-control display text without granting selector or platform authority.
+Ordinary field binding retains its GUID/name/type/path and Field Handle
+metadata revalidation contract.
 
 ## Five pinned source lanes
 
@@ -60,8 +61,8 @@ None of these project sources was opened in Wwise or modified.
 | 2021.1.14.8108 | ConversionPluginInfoList contains anonymous per-platform codec GUIDs; installed codec classes discovered as Conversion | Exact-GUID read/metadata and one live-bound QualityFactor scalar change proven; arbitrary codec replacement/platform lookup unresolved |
 | 2022.1.19.8584 | Same persisted topology, independently inspected | Exact-GUID read/metadata proven; shared FieldHandle configuration program-tested; arbitrary replacement/platform lookup unresolved |
 | 2023.1.19.8928 | Same persisted topology, independently inspected | Exact-GUID read/metadata proven; shared FieldHandle configuration program-tested; arbitrary replacement/platform lookup unresolved |
-| 2024.1.13.9056 | Same topology plus reflected setter and documented ConversionPlugin getter example | Program-tested Type Handle/platform setter and codec Field Handles; native placement blocked |
-| 2025.1.7.9143 | Same topology plus matching reflected setter/getter example | Same program-tested mechanism; native placement blocked |
+| 2024.1.13.9056 | Same topology plus reflected setter and documented ConversionPlugin getter example | Closed Type Handle/platform setter with result-only verification; exact-GUID Field Handles remain separate |
+| 2025.1.7.9143 | Same topology plus matching reflected setter/getter example | Same result-only wrapper; native placement/platform association unverified |
 
 `object.create` in 2021 has no classId field; a native `Conversion` ShareSet
 creation is distinct from choosing its embedded codec. Neither XML PluginID
@@ -99,8 +100,8 @@ Live getTypes availability and field metadata remain authoritative.
 The Conversion Settings object's own scalar names are mapped by its existing
 exact-object Field Handle route. Live metadata supplies their types, legal
 values and conditions. No enum values or optional permutations were removed
-to fit the representative functional test selection. Representative behavior
-is class selection plus a separate Vorbis QualityFactor change; this is not
+to fit the representative functional test selection. The setter invocation and a separately chosen exact-GUID Vorbis QualityFactor
+change are separate program cases; this is not
 per-codec/value QA or audio-quality proof.
 
 ## Immutable source digests
@@ -129,25 +130,21 @@ SHA-256 of matching decompressed SDK HTML bytes:
 | 2024 ak_wwise_core_audio_setconversionplugin.html | beeac6ee222e18d578c6fb73e8e49d07df4ec4dfe40b2605a9d2ca3871f55166 |
 | 2025 same setter page | 44e885a4e25c80ed7cd51d15df4423d11c2950425cca0a78875028f59760f5dd |
 
-Program tests use the actual public Gateway and fake external native client.
-They prove closed mapping, installed class/platform drift refusal, a truthful
-failed business result after an empty native acknowledgement, other-platform
-preservation, and the separate exact-object field workflow. They do not prove
-native codec attachment, Windows, build or Fresh behavior. Separate older
-read/accessor and scalar evidence is scoped below. #195 retains the stable combined Program/Non-live gates.
+Program tests use the actual public Gateway and a fake external native client.
+They check closed mapping, exact authority drift refusal, one setter without
+codec enumeration, result-only acknowledgement, historical-preview refusal and
+the separate exact-object field workflow. They do not prove native codec
+attachment, platform preservation, Windows, build or Fresh behavior. #195 owns
+the final stable combined Program/Non-live gates.
 
-The selected native node is
+The retained stronger native node is
 `test_gateway_workflow_transaction_matrix.py::test_conversion_plugin_placement_and_field_configuration`.
-It uses the existing owned SampleProject lifecycle and its pinned existing PCM
-Conversion directly, performs read-only identity/platform/codec/field checks
-before mutation, then selects Vorbis and changes one discovered scalar in two
-separate transactions. Independent public reads compare every other platform
-and returned codec field after each effect. Unexpected anonymous identity
-shapes stop before writes and persist the partial observations. Four fake
-producer/consumer cases exercise this actual collector, independent post-verify
-corruption, setup stop, unresolved default reference, and the existing
-two-phase finalizer through its persisted category-v3 writer. Main's selected
-native attempt is recorded below; modern attachment/configuration effects remain unproved.
+Its existing collector still demands independently verified placement and a
+second scalar transaction. It is unchanged and receives no PASS credit from
+this result-only wrapper. Its fake-producer regression now checks that a weak
+setter result stops before the scalar change and remains a finalized FAIL with
+quarantined evidence. The read-only metadata-probe regression remains separate.
+No new native attempt is part of this increment.
 
 ## Retained native observations and current boundary
 
@@ -164,9 +161,9 @@ DefaultConversion independently resolved to the named PCM Conversion GUID.
 The separate `conversion-179-2025-metadata-r1` diagnostic at `73f944c7` was
 **PASS, 5.58s**, zero writes/transactions; business category remains **blocked**.
 Both complete PCM inventories disclosed only scalar MaxBitDepth, no platform or
-reference field. Current wrapper refuses ambiguous owner results; this does not
-prove that the documented setter cannot set a codec. Verification depth remains
-a pending user choice; no modern setter effect has been accepted live.
+reference field. The historical wrapper refused ambiguous owner results; this does not
+prove that the documented setter cannot set a codec. The current user-approved wrapper accepts result-only verification and removes
+that enumeration prerequisite; no modern setter effect has been accepted live.
 
 Older exact-GUID reads/QualityFactor metadata are now native-proven. Original
 read-r1 SKIPs remain: 2021 **9.26s**, 2022 **4.31s**; raw class 2818064/empty
