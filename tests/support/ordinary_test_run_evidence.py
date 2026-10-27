@@ -18,7 +18,7 @@ CONTRACT = 'waapi-skill.ordinary-test-run-attachment/v1'
 OUTCOME = 'reviewed_aggregate_code_mechanism'
 PROOF_SCOPE = {
     'proof_strength': OUTCOME,
-    'execution_scope': 'completed_aggregate_program_run_with_reviewed_source_selection',
+    'execution_scope': 'completed_ordinary_test_run_with_reviewed_source_selection',
     'direct_member_execution': 'not_recorded',
     'per_node_outcomes': 'not_recorded',
     'gateway_observations': 'not_recorded',
