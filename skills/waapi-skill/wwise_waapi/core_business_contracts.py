@@ -219,9 +219,12 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "field_semantics": {"plugin_type_handle": {
             "discovery": "draft-discover-types --role conversion",
             "selection": "one installed Conversion class; its discovered name becomes the native codec name",
-            "configuration": "after verified attachment, use the exact returned codec GUID with object.setProperty and live Field Handles in a separate Preview",
+            "configuration": "no codec GUID is produced; configuration needs a separately chosen exact live codec identity and live object.setProperty Field Handles in a separate Preview",
+            "property_reset": "prior codec properties may reset",
         }, "platform_name": {"selection": "exact unique live project platform; Gateway binds its GUID",
-            "preservation": "all other project platform codec identities and classes"}},
+            "verification": "result_schema_checked", "business_state_verified": False,
+            "unverified": ["actual codec replacement", "platform-to-codec GUID association",
+                "other platform codec and field preservation"]}},
         "execution_shape": "draft_mutation",
     },
     "ak.wwise.core.blendContainer.addAssignment": {

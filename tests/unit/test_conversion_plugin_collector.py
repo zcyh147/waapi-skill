@@ -65,15 +65,13 @@ def runtime_fixture(tmp_path, *, fault=None):
     def raw(argv):
         commands.append(list(argv))
         code, payload = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
-        if fault == "post-verify-field" and argv[0] == "verify" and payload.get("verified") is True and client.quality == 6:
-            client.quality = 5
         return code, payload
     runtime.raw_gateway = raw
     return runtime, commands, client
 
 
-@pytest.mark.parametrize("fault", [None, "post-verify-field", "prewrite-shape", "unresolved-default-target"])
-def test_conversion_collector_reaches_persisted_existing_finalizer(tmp_path, workflow, monkeypatch, fault):
+@pytest.mark.parametrize("fault", [None, "prewrite-shape", "unresolved-default-target"])
+def test_stronger_conversion_collector_preserves_failure_and_existing_finalizer(tmp_path, workflow, monkeypatch, fault):
     owned = tmp_path / "collector"; owned.mkdir()
     runtime, commands, client = runtime_fixture(owned, fault=fault)
     failure = None
@@ -83,25 +81,22 @@ def test_conversion_collector_reaches_persisted_existing_finalizer(tmp_path, wor
         failure = exc
         category = runtime.category_results[-1]
     receipt = json.loads(Path(category["observation_path"]).read_text())
-    expected_pass = fault in {None, "unresolved-default-target"}
-    assert category["status"] == ("PASS" if expected_pass else "FAIL"), json.dumps(receipt.get("failure"), indent=2)
-    assert receipt["business_effect_verified"] is expected_pass
-    assert (failure is None) is expected_pass
+    # The retained stronger collector still requires independently verified
+    # placement. A result-only wrapper cannot upgrade that workflow to PASS.
+    assert category["status"] == "FAIL", json.dumps(receipt.get("failure"), indent=2)
+    assert receipt["business_effect_verified"] is False
+    assert failure is not None
     if fault == "prewrite-shape":
         assert receipt["stage"] == "prewrite-native-shape" and receipt["failure"]
         assert not any(command[0] == "execute" for command in commands)
     else:
-        assert len([command for command in commands if command[0] == "execute"]) == 2
-        assert len(receipt["transaction_ids"]) == 2
-        assert receipt["phases"][-1]["verify"]["state"] == "verified"
+        assert len([command for command in commands if command[0] == "execute"]) == 1
+        assert len(receipt["transaction_ids"]) == 1
+        assert receipt["phases"][-1]["verify"]["state"] == "result_schema_checked"
         assert receipt["default_conversion_observation"]["status"] == (
             "unresolved" if fault == "unresolved-default-target" else "observed")
-        if fault == "post-verify-field":
-            assert receipt["phases"][-1]["effect_verified"] is False
-            assert receipt["observations"]["after_configuration"][WINDOWS]["fields"]["QualityFactor"] == 5
-        else:
-            assert receipt["observations"]["after_configuration"][WINDOWS]["fields"]["QualityFactor"] == 6
-            assert receipt["observations"]["after_configuration"][MAC] == receipt["observations"]["before"][MAC]
+        assert "after_configuration" not in receipt["observations"]
+        assert not any(uri == "ak.wwise.core.object.setProperty" for uri, _, _ in client.calls)
 
     lifecycle = tmp_path / "lifecycle"; lifecycle.mkdir()
     fixture, events, _ = _fixture_run(lifecycle, workflow, monkeypatch)
@@ -123,10 +118,10 @@ def test_conversion_collector_reaches_persisted_existing_finalizer(tmp_path, wor
     records = [json.loads(line) for line in target.read_text().splitlines()]
     final = records[-1]
     assert final["invocation"]["phase"] == "final"
-    assert final["invocation"]["outcome"] == ("PASS" if expected_pass else "FAIL")
+    assert final["invocation"]["outcome"] == "FAIL"
     assert [row for row in final["categories"] if row["category"] == "conversion-plugin-placement"] == runtime.category_results
-    assert len(final["transactions"]) == (0 if fault == "prewrite-shape" else 2)
-    assert final["residual_state"]["sandbox"] == ("deleted" if expected_pass else "quarantined")
+    assert len(final["transactions"]) == (0 if fault == "prewrite-shape" else 1)
+    assert final["residual_state"]["sandbox"] == "quarantined"
     assert events.index("shutdown") < events.index("release")
 
 

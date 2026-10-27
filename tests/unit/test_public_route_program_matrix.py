@@ -148,11 +148,10 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         return
 
     if entry.uri == "ak.wwise.core.audio.setConversionPlugin":
-        # The public setter observes the exact Conversion and each platform's
-        # attached codec. Reuse its stateful Gateway fixture: an empty generic
-        # readback cannot establish either identity or codec preservation.
+        # Bind the exact Conversion/platform/installed type, invoke once and
+        # retain the explicit result-only boundary for the empty native result.
         from tests.unit.test_conversion_plugin_gateway import (
-            CODEC, CONVERSION, ConversionClient, declare, gateway, preview,
+            CONVERSION, ConversionClient, declare, gateway, preview,
         )
         client = ConversionClient(entry.version)
         step, env = declare(tmp_path, entry.version, client)
@@ -163,10 +162,10 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         code, executed = gateway.execute_gateway(["execute", tx], env=env, client_factory=lambda _: client)
         assert code == 0 and executed["executed"] is True, executed
         code, verified = gateway.execute_gateway(["verify", tx], env=env, client_factory=lambda _: client)
-        assert code == 0 and verified["verification"]["business_state_verified"] is True, verified
-        codec = verified["agent_result"]["business_result"]["conversion_codec"]
-        assert codec["conversion_id"] == CONVERSION and codec["object_id"] == CODEC
-        assert codec["plugin_class"]["classId"] == 262145
+        assert code == 0 and verified["state"] == "result_schema_checked", verified
+        assert verified["verification"]["business_state_verified"] is False
+        assert verified["verified"] is False
+        assert "conversion_codec" not in verified["agent_result"].get("business_result", {})
         assert sum(uri == entry.uri for uri, _, _ in client.calls) == 1
         return
 
