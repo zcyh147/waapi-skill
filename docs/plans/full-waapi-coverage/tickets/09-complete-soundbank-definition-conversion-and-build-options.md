@@ -1,6 +1,6 @@
 # 09: Complete SoundBank definition, conversion and build options
 
-Status: approved for implementation on 2026-10-17. Published as [#183](https://github.com/zcyh147/waapi-skill/issues/183). Native GitHub dependencies determine readiness.
+Status: functional scope accepted under the 2026-10-27 lightweight method; ready for reviewed closeout of [#183](https://github.com/zcyh147/waapi-skill/issues/183). The fulfilled #179 blocking edge must be removed before closure; remaining #179 plugin work stays open.
 
 ## Parent
 
@@ -10,7 +10,7 @@ Status: approved for implementation on 2026-10-17. Published as [#183](https://g
 
 Users can manage inclusions, process definitions, convert external sources and generate requested banks without wrapper omissions in valid build branches.
 
-## Current acceptance method — user-approved 2026-10-26
+## Current acceptance method — user-approved 2026-10-27
 
 Keep complete legitimate parameter/option support and native-to-public mapping against the five pinned definitions. Aim for one or two representative public cases per meaningful parameter branch or shared mechanism; remaining legal values stay selectable. Mapping leaves, enum values, optional-field permutations and collection sizes are not separate execution-receipt or evidence-ID quotas. Simple APIs use an ordinary happy path and relevant retained proof. Select native work for actual business risk, independent behavior and host/version differences, reusing valid matching observations.
 
@@ -20,35 +20,48 @@ CRUD, queries and compound changes retain appropriate identity, policy, execute-
 
 ## Current conversion association boundary — user-approved 2026-10-27
 
-Existing conversion-getter attempts are sufficient; stop further platform/codec
-QA and research. Their ambiguous results cannot independently prove which codec
-belongs to a platform. Correctly wrap the setter through the pinned closed
-contract and code tests; the setter code adjustment remains required. Disclose
-the independent platform-association verification limit before authorization,
-without guessing codec IDs or asserting a stronger verified effect. Reuse
-existing observations only for their actual facts; ambiguity is not native
-absence. Preserve configuration, policies, immutable Preview, execute-once and
-truthful uncertainty. This acceptance boundary does not close #179 or #183,
-and does not remove other plugin placement or conversion/build input work.
+The required setter correction is delivered by reviewed `2a6a8fbd`, integrated
+in `c5ba64e5`. It binds an exact Conversion, explicit live project platform and
+discovered installed Conversion Type Handle through normal Preview,
+authorization, drift checks and one execution. Its disclosed result-only
+boundary is `result_schema_checked`, `verified=false`,
+`business_state_verified=false`; it produces no codec GUID or automatic scalar
+continuation. Getter ambiguity and unobserved native setter effects are accepted
+limits; no further platform/codec QA or accessor research is required.
+
+This completes the #179 component needed by #183. Other #179 plugin-kind and
+older-construction accounting remains with that issue and does not block this
+conversion/build closeout. See the [acceptance note](../../../research/soundbank183-lightweight-closeout.md).
 
 ## Acceptance criteria
 
-- [ ] Map native SoundBank definition/inclusion alternatives, external-source conversion forms and Core/CLI build options, including nested/repeated bank, platform and language selections.
-- [ ] Preserve default omission versus explicit choices and version-specific names/identities; resolve older nested schema forms using native evidence rather than dropping unfamiliar children.
-- [ ] Keep output roots and referenced input files within declared owned I/O scope; disclose every requested generation/conversion effect in Preview.
-- [ ] Verify actual expected artifacts, inclusion state and relevant metadata under the applicable acceptance method, including the code-only Definition import policy and explicit conversion platform-association limit. A successful process exit or empty result alone is not output verification.
-- [ ] Exercise partial build failures, unavailable licensed plugins, incompatible native options, wrong paths and output preservation. Existing source projects must remain unchanged in native tests.
-- [ ] Account explicitly for Wwise 2021.1, 2022.1, 2023.1, 2024.1 and 2025.1, with exact host/build provenance and applicable native shapes. A current packaged boundary is not proof of native absence.
-- [ ] Maintain exact owned native-to-public branch/field/option mappings, including reachable shared definitions and newly discovered variants. Map them to the selected representative mechanism tests and required business proof; do not demand a separate execution or evidence receipt per reflected leaf. In-scope omissions must be implemented here or split into linked same-parent implementation children; they never leave the overall scope.
-- [ ] Verify the highest existing public Gateway seam with positive and meaningful negative controls. Use sequential owned native tests where behavior needs native proof; preserve source projects and original evidence. No Fresh run is authorized until a separate exact budget is approved.
-- [ ] Preserve Gateway-owned request construction, configuration binding, the three modification policies, immutable Preview, execute-once semantics and truthful uncertainty. Do not add a raw-input escape or weaken safety to claim coverage.
+- [x] Map native SoundBank definition/inclusion alternatives, external-source conversion forms and Core/CLI build options, including nested/repeated bank, platform and language selections. [Accepted scope and proof](../../../research/soundbank183-lightweight-closeout.md#closed-inputs-and-code-controls).
+- [x] Preserve default omission versus explicit choices and version-specific names/identities; resolve older nested schema forms using native evidence rather than dropping unfamiliar children. [Accepted scope and proof](../../../research/soundbank183-lightweight-closeout.md#closed-inputs-and-code-controls).
+- [x] Keep output roots and referenced input files within declared owned I/O scope; disclose every requested generation/conversion effect in Preview. [Accepted scope and proof](../../../research/soundbank183-lightweight-closeout.md#closed-inputs-and-code-controls).
+- [x] Verify actual expected artifacts, inclusion state and relevant metadata under the applicable acceptance method, including the code-only Definition import policy and explicit conversion platform-association limit. A successful process exit or empty result alone is not output verification. [Accepted scope and proof](../../../research/soundbank183-lightweight-closeout.md#retained-artifact-evidence).
+- [x] Retain bounded diagnostics, no-retry failure handling and code controls for partial builds, unavailable native setup/plugins, incompatible options, wrong paths and output preservation. Reuse the scoped native artifact failures/successes without claiming a licensed-plugin matrix; source projects remain preserved. [Accepted scope and proof](../../../research/soundbank183-lightweight-closeout.md#closed-inputs-and-code-controls).
+- [x] Account explicitly for Wwise 2021.1, 2022.1, 2023.1, 2024.1 and 2025.1, with exact host/build provenance and applicable native shapes. A current packaged boundary is not proof of native absence. [Accepted scope and proof](../../../research/soundbank183-lightweight-closeout.md#closed-inputs-and-code-controls).
+- [x] Maintain exact owned native-to-public branch/field/option mappings, including reachable shared definitions and newly discovered variants. Map them to the selected representative mechanism tests and required business proof; do not demand a separate execution or evidence receipt per reflected leaf. In-scope omissions must be implemented here or split into linked same-parent implementation children; they never leave the overall scope. [Accepted scope and proof](../../../research/soundbank183-lightweight-closeout.md#closed-inputs-and-code-controls).
+- [x] Verify the highest existing public Gateway seam with positive and meaningful negative controls. Use sequential owned native tests where behavior needs native proof; preserve source projects and original evidence. No Fresh run is authorized until a separate exact budget is approved. [Accepted scope and proof](../../../research/soundbank183-lightweight-closeout.md#closed-inputs-and-code-controls).
+- [x] Preserve Gateway-owned request construction, configuration binding, the three modification policies, immutable Preview, execute-once semantics and truthful uncertainty. Do not add a raw-input escape or weaken safety to claim coverage. [Accepted scope and proof](../../../research/soundbank183-lightweight-closeout.md#delivered-conversion-setter-component).
 
-- [ ] Reconcile SoundBank Definition Short-ID resolution with #181 using the retained R89 repair/results first. The earlier audit found an unversioned Event/Effect/AuxBus table and unresolved 2021.1 mapping; this historical finding is not automatically new implementation work. Retain complete release/Definition-type mapping and use existing corrected proof plus representative Short-ID/type readback and wrong-type/ambiguity controls; add targeted checks only for a genuine remaining difference. Do not infer 2021 codes from later definitions, PluginID or classId, and do not count a new unsupported boundary as completion. This is a source-audit inconsistency at `a0c192d9`, not an observed native execution failure.
+- [x] Reconcile SoundBank Definition Short-ID resolution with #181 using the retained R89 repair/results first. The earlier audit found an unversioned Event/Effect/AuxBus table and unresolved 2021.1 mapping; this historical finding is not automatically new implementation work. Retain complete release/Definition-type mapping and use existing corrected proof plus representative Short-ID/type readback and wrong-type/ambiguity controls; add targeted checks only for a genuine remaining difference. Do not infer 2021 codes from later definitions, PluginID or classId, and do not count a new unsupported boundary as completion. This is a source-audit inconsistency at `a0c192d9`, not an observed native execution failure. [Accepted scope and proof](../../../research/soundbank183-lightweight-closeout.md#definition-and-short-id-acceptance).
+
 
 ## Completion boundary
 
-Complete the owned functional scope and selected evidence required by the current user-approved representative testing policy. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+The [current acceptance note](../../../research/soundbank183-lightweight-closeout.md)
+records complete owned inputs, code-only Definition acceptance, retained
+representative artifact proof and the delivered result-only Conversion setter.
+No additional #183 implementation or native QA is required by this closeout.
+The original combined native FAIL and failed sandboxes remain unchanged.
 
+Main should remove the fulfilled native GitHub blocking edge **#183 → #179**,
+retain a normal reference to the other #179 plugin obligations, and close #183
+after review. This documentation change performs no issue action. #179 and
+parent #174 remain open; #195 owns final global mapping and stable combined
+Program/Non-live gates. No Fresh, Windows or full five-version native claim is
+added.
 
 ### R89 current-source reconciliation — 2026-10-23
 
@@ -61,7 +74,7 @@ Do not reimplement the retired unversioned table or repeat accepted lookup tests
 
 ## Approved prerequisite and batch delivery — 2026-10-25
 
-Blocked by #197. Batch: **B: media/build/file**. Preserve this ticket's implementation scope, applicable 2021.1–2025.1 mappings and native distinctions; apply the current user-approved representative evidence method above. Use the shared prerequisite's deduplicated batch selection, independent outcomes, failed/affected reruns and durable result summaries. Reuse valid original results after relevant dependency review; a commit-number or unrelated documentation change does not require another native run.
+#197 is closed and its required pause/report is satisfied. Batch: **B: media/build/file**. Preserve this ticket's implementation scope, applicable 2021.1–2025.1 mappings and native distinctions; apply the current user-approved representative evidence method above. Use the shared prerequisite's deduplicated batch selection, independent outcomes, failed/affected reruns and durable result summaries. Reuse valid original results after relevant dependency review; a commit-number or unrelated documentation change does not require another native run.
 
 Functional tickets use Python tests and proportional real-Wwise validation. Fresh is centralized in #194 with a separately approved exact budget; #195 aggregates those results rather than scheduling a duplicate Fresh campaign. Necessary final combined Program/Nonlive gates are coordinated under #195 rather than repeated per functional ticket.
 
