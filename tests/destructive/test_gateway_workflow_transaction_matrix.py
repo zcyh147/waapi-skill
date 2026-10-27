@@ -1503,6 +1503,13 @@ def test_console_project_migrate_created_fixture_acceptance(workflow_sandbox_run
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_console_project_migrate_committed_2024_fixture_acceptance(workflow_sandbox_runtime):
+    from tests.destructive.support.console_project_acceptance import collect_console_project_acceptance
+    collect_console_project_acceptance(workflow_sandbox_runtime, 'migrate-committed-2024')
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_console_project_media_ids_to_work_units_acceptance(workflow_sandbox_runtime):
     from tests.destructive.support.console_project_acceptance import collect_console_project_acceptance
     collect_console_project_acceptance(workflow_sandbox_runtime, 'media-back')

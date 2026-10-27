@@ -18,11 +18,13 @@ from tests.destructive.support.console_file_observation import observe_console_f
 from tests.semantic.support.codex_archive_paths import parse_archive_relative_path, archive_relative_from_absolute
 
 FIXTURES = Path(__file__).resolve().parents[2] / 'fixtures/console-project-184'
+COMMITTED_MIGRATION_PROJECT = Path(__file__).resolve().parents[2] / '_org/2024.1/SampleProject.wproj'
 NODE_CASES = {
     'test_console_project_cli_create_acceptance': ('cli-create', '2024.1', 1),
     'test_console_project_create_close_acceptance': ('create-close', '2025.1', 2),
     'test_console_project_add_platform_copy_acceptance': ('add-copy', '2025.1', 2),
     'test_console_project_migrate_created_fixture_acceptance': ('migrate', '2025.1', 1),
+    'test_console_project_migrate_committed_2024_fixture_acceptance': ('migrate-committed-2024', '2025.1', 1),
     'test_console_project_media_ids_to_work_units_acceptance': ('media-back', '2025.1', 2),
     'test_console_project_media_ids_refresh_acceptance': ('media-refresh', '2025.1', 2),
 }
@@ -309,8 +311,9 @@ def collect_console_project_acceptance(runtime, case):
     """One selected witness, captured through the existing public Gateway path."""
     from tests.destructive.test_gateway_workflow_transaction_matrix import (
         _start_business_draft, _update_business_draft, _complete_business_draft, _save_sandbox_project,
+        _hash_mutation_bearing_project_files, _source_tree_inventory,
     )
-    assert case in {'cli-create', 'create-close', 'add-copy', 'migrate', 'media-back', 'media-refresh'}
+    assert case in {'cli-create', 'create-close', 'add-copy', 'migrate', 'migrate-committed-2024', 'media-back', 'media-refresh'}
     assert runtime.version == ('2024.1' if case == 'cli-create' else '2025.1')
     if case == 'cli-create':
         assert os.environ.get('WWISE_CATEGORY_EVIDENCE_PATH'), 'Pin the existing final category writer path for the migration donor'
@@ -325,6 +328,9 @@ def collect_console_project_acceptance(runtime, case):
         'limits': {'calls': 96, 'reply_bytes': 512 * 1024, 'receipt_bytes': 8 * 1024 * 1024}}
     attempted = set()
     terminal_transaction = None
+    observed_model_project = runtime.sandbox.sandbox_project
+    migration_sources = None
+    migration_project = None
     budget = next(count for selected, _, count in NODE_CASES.values() if selected == case)
     def persist():
         raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode()
@@ -413,6 +419,12 @@ def collect_console_project_acceptance(runtime, case):
         finally:
             if phase.get('transaction_id'):
                 category['transaction_ids'].append(phase['transaction_id'])
+    def immutable_source_observations():
+        return {name: {'project': str(project),
+            'full_tree_hash': list(_hash_mutation_bearing_project_files(project.parent)),
+            'tree_metadata': list(_source_tree_inventory(project.parent)), 'project_mtime_ns': project.stat().st_mtime_ns}
+            for name, project in migration_sources.items()}
+
     try:
         if case == 'cli-create':
             project = runtime.sandbox.sandbox_root / 'Blank2024' / 'Blank2024.wproj'
@@ -478,6 +490,38 @@ def collect_console_project_acceptance(runtime, case):
             receipt['copied_values'] = platform_values(project, 'ReviewCopy')
             receipt['excluded_project_settings']['target'] = project_copy_tab_values(project, 'ReviewCopy')
             assert receipt['copied_values'] == expected
+            receipt['model_after'] = retain_model(project, runtime.state_dir / 'console184-model-images', 'after')
+        elif case == 'migrate-committed-2024':
+            from tests.destructive.support.sandbox_fixture import prepare_sample_project_sandbox
+            metadata = runtime.sandbox.metadata
+            assert metadata.launch_project_path == str(runtime.sandbox.sandbox_project)
+            assert metadata.ready_duration_seconds is not None and metadata.get_info_version['year'] == 2025
+            host = saved_project(runtime.sandbox.sandbox_project)
+            assert host['wwise_version'].startswith('v2025.1.')
+            copy_root = runtime.sandbox.sandbox_root / 'migration-committed-2024'
+            assert not copy_root.exists() and not copy_root.is_relative_to(runtime.sandbox.sandbox_path)
+            migration_sources = {'host': runtime.sandbox.source_project, 'migration': COMMITTED_MIGRATION_PROJECT}
+            receipt['immutable_sources_before'] = immutable_source_observations()
+            copy_environment = {**runtime.env, 'WWISE_SAMPLE_PROJECT_PATH': str(COMMITTED_MIGRATION_PROJECT)}
+            secondary = prepare_sample_project_sandbox(copy_environment, sandbox_root=copy_root, hash_strategy='full')
+            assert secondary.metadata.source_hash.digest == secondary.metadata.sandbox_hash.digest
+            migration_project = observed_model_project = project = secondary.sandbox_project
+            assert project != runtime.sandbox.sandbox_project
+            receipt['migration_fixture'] = {'authority': 'committed-tests-org-2024.1',
+                'source_project': str(COMMITTED_MIGRATION_PROJECT), 'target_project': str(project),
+                'host_launch_project': metadata.launch_project_path, 'host_project': host,
+                'host_ready_duration_seconds': metadata.ready_duration_seconds,
+                'created_after_host_readiness': True, 'source_copy_sha256': secondary.metadata.source_hash.digest,
+                'copied_payload_matches_source': True}
+            receipt['target_tree_before'] = file_inventory(project.parent)
+            receipt['project_before'] = saved_project(project)
+            assert receipt['project_before']['wwise_version'].startswith('v2024.1.')
+            receipt['model_before'] = retain_model(project, runtime.state_dir / 'console184-model-images', 'before')
+            assert immutable_source_observations() == receipt['immutable_sources_before'], 'Immutable migration sources changed before Preview'
+            complete('ak.wwise.cli.migrate', ['--value', 'project_file', str(project)])
+            receipt['project_after'] = saved_project(project)
+            assert receipt['project_after']['wwise_version'].startswith('v2025.1.')
+            assert receipt['project_after']['id'] == receipt['project_before']['id']
             receipt['model_after'] = retain_model(project, runtime.state_dir / 'console184-model-images', 'after')
         elif case == 'migrate':
             donor, binding = load_created_fixture(runtime.env['WAAPI_CONSOLE184_CREATED_MANIFEST'])
@@ -551,10 +595,27 @@ def collect_console_project_acceptance(runtime, case):
                 receipt['mapping_after'] = {'exists': False}
         if receipt.get('model_before') and not receipt.get('model_after'):
             try:
-                receipt['model_after'] = retain_model(runtime.sandbox.sandbox_project,
+                receipt['model_after'] = retain_model(observed_model_project,
                     runtime.state_dir / 'console184-model-images', 'after')
             except Exception as capture:
                 receipt['after_capture_error'] = str(capture)[:2048]
+                if receipt['complete']:
+                    receipt['complete'] = False; category['status'] = 'FAIL'
+                    persist()
+                    raise
+        if migration_sources is not None:
+            try:
+                try:
+                    if migration_project is not None:
+                        receipt['target_tree_after'] = file_inventory(migration_project.parent)
+                finally:
+                    receipt['immutable_sources_after'] = immutable_source_observations()
+                    receipt['immutable_sources_verified'] = receipt['immutable_sources_before'] == receipt['immutable_sources_after']
+                    category['immutable_sources_verified'] = receipt['immutable_sources_verified']
+                    assert receipt['immutable_sources_verified'], 'Immutable migration source changed'
+            except Exception as capture:
+                category['immutable_sources_verified'] = receipt.get('immutable_sources_verified', False)
+                receipt['migration_preservation_error'] = str(capture)[:2048]
                 if receipt['complete']:
                     receipt['complete'] = False; category['status'] = 'FAIL'
                     persist()
