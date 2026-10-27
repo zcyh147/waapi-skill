@@ -383,4 +383,5 @@ tests/unit/test_legacy_curve_points_fixture.py
 tests/unit/test_soundbank_native_witness.py
 tests/unit/test_console_project_native_witness.py
 tests/unit/test_console_platform_copy_gateway.py
+tests/unit/test_authoring_model_native_fixture.py
 tests/unit/test_branch_evidence_readers.py

@@ -41,6 +41,10 @@ from tests.destructive.support.layout_workflows import (
 )
 
 from tests.destructive.support.integration_demo import NODEID as DEMO_NODEID
+from tests.destructive.support.model_workflows import (
+    NODES as MODEL_WORKFLOW_NODES, COMMON_NODE as MODEL_COMMON_NODE, FILE_NODE as MODEL_FILE_NODE,
+    FILENAME as MODEL_REPORT_FILENAME, validate_model_report,
+)
 
 CAPTURE_NODE_OUTCOMES = {**CAPTURE_NODE_OUTCOMES, LOADED_EVENT_NODEID: (LOADED_EVENT_OUTCOME,), DEMO_NODEID: (LOADED_EVENT_OUTCOME,)}
 
@@ -228,6 +232,43 @@ class AuthoringBatchAdapter:
             raise ValueError('Node live Authoring ownership differs from its lifecycle proof')
         return gateway
 
+    def node_signal_stream(self, nodeid, *, topic, digest, model, widget, stream_sink):
+        """One owned public observer; its ACK gates the packaged emitter peer."""
+        from tests.destructive import test_authoring_ui_business_live as native
+        from tests.destructive.support.model_workflows import OBSERVER_SECONDS
+        expected = ('ak.wwise.ui.signal.click', 'Trigger') if self.runtime.version == '2024.1' else ('ak.wwise.ui.signal.toggle', 'State')
+        if (MODEL_WORKFLOW_NODES.get(nodeid) != self.runtime.version or nodeid not in self.receipts
+                or nodeid not in self.node_runtimes or self.owner.runtime is not self.runtime
+                or self.owner._finished or not self.owner._lock_acquired
+                or self.runtime.lifecycle.process is None or self.runtime.lifecycle.process.poll() is not None
+                or (topic, widget) != expected):
+            raise ValueError('Signal observer lacks its exact active owned model node')
+        runtime = self.node_runtimes[nodeid]
+        argv = ['stream-topic', topic, '--topic-contract-digest', digest,
+            '--signal-model', model, '--signal-widget', widget, '--event-count', '1']
+        entry = {'argv': argv, 'stream_records': []}
+        self.receipts[nodeid].append(entry)
+        total_bytes = 0
+        def observe(record):
+            nonlocal total_bytes
+            size = len(json.dumps(record, ensure_ascii=False).encode('utf-8'))
+            total_bytes += size
+            if len(entry['stream_records']) >= 4 or size > 131072 or total_bytes > 262144:
+                raise ValueError('Owned signal stream exceeds its record/byte bound')
+            entry['stream_records'].append(deepcopy(record))
+            stream_sink(record)
+        environment = {**os.environ, **runtime.runner_environment,
+            'WAAPI_SKILL_CONFIG_PATH': str(runtime.owned_root / 'setup-config.json'),
+            'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONIOENCODING': 'utf-8:strict'}
+        try:
+            code, payload = native.gateway.execute_gateway(['--state-dir', str(runtime.owned_root / 'setup-state'),
+                '--timeout', str(OBSERVER_SECONDS), *argv], env=environment, stream_sink=observe)
+            entry.update(exit_code=code, payload=payload)
+            return code, payload
+        except BaseException as exc:
+            entry['error'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+            raise
+
     def _node_outcomes(self, items):
         indexed = {item.nodeid: item for item in items}
         outcomes = []
@@ -301,7 +342,8 @@ class AuthoringBatchAdapter:
                             if row['nodeid'] in self.observation_artifacts else {}),
                          **({'batch_finalization': self.batch_seal_descriptor}
                             if outcome == 'PASS' else {})} for row in outcomes if row['nodeid'] not in CAPTURE_NODE_OUTCOMES
-                            and row['nodeid'] not in TRANSPORT_OBSERVATION_NODES and row['nodeid'] not in LAYOUT_WORKFLOW_NODES]
+                            and row['nodeid'] not in TRANSPORT_OBSERVATION_NODES and row['nodeid'] not in LAYOUT_WORKFLOW_NODES
+                            and row['nodeid'] not in MODEL_WORKFLOW_NODES]
         for row in (row for row in outcomes if row['nodeid'] in LAYOUT_WORKFLOW_NODES):
             nodeid = row['nodeid']
             report = {}
@@ -330,6 +372,45 @@ class AuthoringBatchAdapter:
                     'business_state_verified': False, 'coverage_credit': 'none; diagnostic observation only',
                     'reason': 'Default-state oracle and reset effect semantics remain unproved under #188',
                     'selected_layout_name': report.get('owned_layout_name'), 'observation_artifact': descriptor})
+        for row in (row for row in outcomes if row['nodeid'] in MODEL_WORKFLOW_NODES):
+            nodeid = row['nodeid']
+            descriptor = self.observation_artifacts.get(nodeid)
+            report, state_root = {}, None
+            if descriptor:
+                archived = json.loads(Path(descriptor['path']).read_text(encoding='utf-8'))
+                state_root = Path(archived['artifacts']['setup-state']['path'])
+                path = Path(archived['artifacts']['native-evidence']['path']) / MODEL_REPORT_FILENAME
+                if path.exists():
+                    if path.stat().st_size > 65536:
+                        raise ValueError('Owned model report exceeds its byte bound')
+                    report = json.loads(path.read_text(encoding='utf-8'))
+            if phase == 'final' and outcome == 'PASS':
+                validate_model_report(report, nodeid=nodeid, candidate=self.candidate,
+                    version=self.runtime.version, receipts=self.receipts[nodeid], state_root=state_root)
+            common = {'nodeid': nodeid, 'observation_artifact': descriptor,
+                **({'batch_finalization': self.batch_seal_descriptor} if outcome == 'PASS' else {})}
+            passing = outcome == 'PASS'
+            for category, observed, strength in (
+                ('authoring-model-widget-state', report.get('state_observed') is True, 'independent_widget_state_observation'),
+                ('authoring-owned-signal-' + ('click' if nodeid == MODEL_COMMON_NODE else 'toggle'),
+                    (report.get('signal') or {}).get('target_completed') is True and (report.get('signal') or {}).get('cleanup') == 'unsubscribed',
+                    'acknowledged_owned_identity_event_and_unsubscribe'),
+                ('authoring-model-handle-retirement', report.get('cleanup', {}).get('local_resources_retired') is True,
+                    'gateway_owned_execute_once_retirement_native_disappearance_unobserved')):
+                categories.append({**common, 'category': category,
+                    'status': 'PASS' if passing and observed else 'FAIL' if row['outcome'] == 'FAIL' else 'blocked',
+                    'verifier_strength': strength,
+                    **({'native_disappearance_independently_verified': False} if category.endswith('retirement') else {})})
+            categories.append({**common, 'category': 'authoring-model-window-native-results', 'status': 'blocked',
+                'observation_task_status': 'PASS' if passing else 'BLOCKED',
+                'verifier_strength': 'native_result_only_observable_effect_unfinished',
+                'business_state_verified': False, 'visible_window_effect_verified': False,
+                'native_destroy_close_effect_verified': False, 'emit_result_is_delivery_proof': False,
+                'coverage_credit': 'accepted native results only; no visible-window or destruction effect proof'})
+            categories.append({**common, 'category': 'authoring-model-session-cleanup',
+                'status': 'PASS' if passing else 'FAIL' if row['outcome'] == 'FAIL' else 'blocked',
+                'verifier_strength': 'owned_process_port_source_and_final_batch_teardown',
+                'template_cleanup': 'owning_Authoring_session_end_no_unregister'})
         for capture_nodeid in (node for node in self.selected_nodeids if node in CAPTURE_NODE_OUTCOMES):
             # Consume the exact archived collector output, including partial
             # observations. A passing sibling never fills another outcome.
@@ -572,6 +653,7 @@ def install_authoring_batch(config, *, owner: ScenarioLifecycle, repo_root: Path
 OWNED_AUTHORING_NODEIDS = (
     LAYOUT_COMMON_NODE,
     LAYOUT_CLOSE_NODE,
+    *MODEL_WORKFLOW_NODES,
     *DIAGNOSTIC_NODEIDS,
     TRANSPORT_SEMANTICS_NODEID,
     TRANSPORT_MIXED_NODEID,
@@ -597,6 +679,7 @@ OWNED_AUTHORING_NODE_VERSIONS = {
     **dict.fromkeys(DIAGNOSTIC_NODEIDS, ('2024.1',)),
     LAYOUT_COMMON_NODE: ('2024.1',),
     LAYOUT_CLOSE_NODE: ('2025.1',),
+    **{nodeid: (version,) for nodeid, version in MODEL_WORKFLOW_NODES.items()},
     METER_2024_NODEID: ('2024.1',),
     METER_SPELLING_NODEID: ('2025.1',),
     PROFILER_CAPTURE_NODEID: ('2025.1',),
@@ -633,8 +716,13 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Owned Authoring requires an explicit supported destructive Authoring test context')
     if any(os.getenv('WWISE_VERSION') not in OWNED_AUTHORING_NODE_VERSIONS[nodeid] for nodeid in selected):
         raise pytest.UsageError('Selected owned Authoring node is not available on the requested version')
-    if set(selected).intersection(LAYOUT_WORKFLOW_NODES) and len(selected) != 1:
-        raise pytest.UsageError('A layout workflow requires its one exact versioned cohort node')
+    cohort_nodes = set(LAYOUT_WORKFLOW_NODES) | set(MODEL_WORKFLOW_NODES)
+    if set(selected).intersection(cohort_nodes):
+        version = os.getenv('WWISE_VERSION')
+        pair = ({LAYOUT_COMMON_NODE, MODEL_COMMON_NODE} if version == '2024.1'
+                else {LAYOUT_CLOSE_NODE, MODEL_FILE_NODE})
+        if len(selected) != 1 and set(selected) != pair:
+            raise pytest.UsageError('An Authoring workflow requires its one exact node or approved matching layout/model pair')
     if DEMO_NODEID in selected and selected != (DEMO_NODEID,):
         raise pytest.UsageError('Integration Demo requires its exact single named node')
     if (set(selected).intersection(DIAGNOSTIC_NODEIDS)

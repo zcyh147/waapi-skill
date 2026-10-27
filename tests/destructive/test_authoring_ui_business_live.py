@@ -193,6 +193,16 @@ def _owned_layout_remove(call, original, name):
     _layout_effect(call, 'removeLayout', layout_handle=owned['layout_handle'])
 
 
+def test_authoring_model_2024_state_click(owned_authoring_layout_node):
+    from tests.destructive.support.model_workflows import COMMON_NODE, collect_model_workflow
+    collect_model_workflow(*owned_authoring_layout_node, nodeid=COMMON_NODE)
+
+
+def test_authoring_model_2025_file_state_toggle(owned_authoring_layout_node):
+    from tests.destructive.support.model_workflows import FILE_NODE, collect_model_workflow
+    collect_model_workflow(*owned_authoring_layout_node, nodeid=FILE_NODE)
+
+
 def test_authoring_layout_owned_registration_and_switch(owned_authoring_layout_node):
     _, call = owned_authoring_layout_node
     original, name = _owned_layout_start(call)
