@@ -1,0 +1,51 @@
+{
+  "contract": "waapi-skill.retained-transport-assessment/v1",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.destroy|/resultSchema",
+  "profile": {
+    "provider": "2024.1-wwise-authoring",
+    "call": {
+      "uri": "ak.wwise.core.transport.destroy",
+      "args": {
+        "transport": 0
+      },
+      "options": {},
+      "result": {}
+    },
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789180503829000-f57f1c73c6cd4b39a6bdd4f314fa5b7d-ak_wwise_core_transport_destroy.json",
+    "raw_sha256": "82fd88e86ca0c17609fc0965d6233fb5155b1e0c49c3000cf5af914786a5eb8b",
+    "request_source": {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/profiler-capture.json",
+      "sha256": "ae720a473275e7baf9e9cf3ec6a29ad6fac5e526a19779761b33562d67676f0a",
+      "line": null,
+      "pointer": "/cleanup/receipts/2/result/agent_result",
+      "kind": "agent-result"
+    },
+    "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa"
+  },
+  "support_review": {
+    "artifact": "transport-support-review.json",
+    "sha256": "564f7d841a3520d568b48799a375d8c4ed4d15d771b983be33258cb3f29cbd44"
+  },
+  "archive": {
+    "artifact": "transport-origin-2024.1-wwise-authoring.json.gz",
+    "sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22"
+  },
+  "program_capture": {
+    "artifact": "transport-2024.1-13-capture.json",
+    "sha256": "d80d9d9af867f48205baf49cd78a71e1096e34ccdf8830da4d015ed83e3aeeb3"
+  },
+  "facts": {
+    "original_candidate": "a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8",
+    "original_context": {
+      "version": "2024.1",
+      "build": "2024.1.13.9056",
+      "host": "wwise-authoring"
+    },
+    "original_finalization": "BLOCKED",
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false,
+    "acoustic_output_verified": false,
+    "global_mode_restoration_verified": false,
+    "business_boundary": "owned_transport_identity_bounded_state_lifetime"
+  }
+}

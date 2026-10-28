@@ -389,3 +389,4 @@ tests/unit/test_console_platform_copy_gateway.py
 tests/unit/test_authoring_model_native_fixture.py
 tests/unit/test_ordinary_test_run_evidence.py
 tests/unit/test_branch_evidence_readers.py
+tests/unit/test_specialized_core_choices_gateway.py

@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-attachment/v1",
+  "branch_id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.executeAction|/resultSchema",
+  "assessment": {
+    "artifact": "transport-2024.1-5-assessment.json",
+    "sha256": "3c756107eff29850424123a5b4191028c7e05e6082e8918cab679496d623b2ce"
+  },
+  "evidence": {
+    "artifact": "transport-2024.1-5-qualified.json",
+    "sha256": "e0fe85a03e5b87502deea8aa9c840ec7f004731e84654f71e0f6c086f8dd5f8f"
+  }
+}

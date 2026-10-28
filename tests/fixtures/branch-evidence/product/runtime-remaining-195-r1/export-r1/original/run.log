@@ -1,0 +1,13 @@
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.001344, "reason": "locked developer interpreter ready", "automatic_repair_attempted": false}
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.000254, "reason": "selected Non-live prerequisites ready", "automatic_repair_attempted": false}
+== Test Context ==
+version:      none
+mode:         nonlive
+console:      <unset>
+project:      <unset>
+sandbox_root: <unset>
+test_config:  <unset>
+pytest args:  -q -ra tests/unit/test_typed_request_gateway.py::test_zero_input_mutation_cannot_bypass_preview_before_connection tests/unit/test_runtime_business_gateway.py::test_profiler_capture_data_rows_execute_once_without_claiming_settings[enable-disable-2025.1] tests/unit/test_runtime_business_gateway.py::test_profiler_cursor_setter_verifies_returned_snapped_time_through_public_transaction tests/unit/test_runtime_business_gateway.py::test_transport_create_matching_association_publishes_usable_zero_id_handle[native-default-2025.1] tests/unit/test_runtime_business_gateway.py::test_transport_state_read_maps_gateway_handle_without_exposing_native_id tests/unit/test_runtime_business_gateway.py::test_profiler_cursor_read_maps_business_cursor_and_projects_milliseconds tests/unit/test_runtime_result_reference_gateway.py::test_performance_counter_validates_local_result_references tests/unit/test_profiler_meter_objects_gateway.py::test_declared_meter_return_spellings_keep_exact_selection_and_unattributed_values[2025.1] tests/unit/test_profiler_meter_objects_gateway.py::test_meter_namespaced_source_outputs_reuse_known_business_fields[2024.1] tests/unit/test_runtime_remaining_completion_mapping.py::test_runtime_remaining_maps_exact_sources_without_fabricating_native_proof
+
+...............                                                          [100%]
+15 passed in 15.99s

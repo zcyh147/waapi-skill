@@ -8,22 +8,12 @@ from typing import Any, Mapping
 from .business_declaration_state import BusinessDeclarationSession
 from .business_declarations import business_repair
 from .core_business_contracts import (
-    MAX_CURVE_POINTS, _CURVE_KINDS, _CURVE_SOURCES, _CURVE_SHAPES,
+    MAX_CURVE_POINTS, _CURVE_KINDS, _CURVE_SOURCES, _CURVE_SHAPES, _PASTE_MODES, _FADE_MODES,
     core_business_contract_data,
 )
 from .operation_registry import parse_operation_request
 
 
-_PASTE_MODES = {
-    "replace": "replaceEntire",
-    "merge-replace": "addReplace",
-    "merge-keep": "addKeep",
-}
-_FADE_MODES = {
-    "none": "None",
-    "manual": "Manual",
-    "automatic": "Automatic",
-}
 
 
 def _object_id(
