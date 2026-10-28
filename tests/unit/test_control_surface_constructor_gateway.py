@@ -35,6 +35,15 @@ class SurfaceTask(OwnedGraphTask):
             'HardwareControllerKey': {'name': 'HardwareControllerKey', 'type': 'string', 'default': ''},
         }
 
+    def _create(self, node, parent, *, owned=False):
+        # Native constructor notes apply only to new occurrences. The general
+        # fixture also models explicit existing-field edits; keep this exact
+        # source-owned constructor behavior at the external Wwise boundary.
+        if self.conflict == 'merge' and any(row.get('parent') == {'id': parent}
+                and row['name'] == node['name'] for row in self.objects.values()):
+            node = {key: value for key, value in node.items() if key != 'notes'}
+        return super()._create(node, parent, owned=owned)
+
     def kind(self, meaning):
         code, found = self.step('draft-discover-types', '--role', 'object', '--meaning', meaning)
         assert code == 0, found
@@ -266,3 +275,98 @@ def test_constructor_conflicts_cannot_convert_or_replace_a_reserved_group(tmp_pa
     code, result = task.step('draft-check')
     assert code == 2 and 'CONTROL_SURFACE_ROLE_BOUNDARY' in json.dumps(result), result
     assert not any(uri.endswith('object.create') for uri, _, _ in task.calls)
+
+
+def test_set_rename_binds_actual_native_name_before_independent_verification(tmp_path):
+    task = SurfaceTask(tmp_path, '2022.1', 'object.set')
+    owner = task.bind(FIRST)
+    code, configured = task.step('draft-business-configure', '--name-conflict', 'rename')
+    assert code == 0, configured
+    code, declared = task.group(parent=owner)
+    assert code == 0, declared
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.set'):
+            task.objects[ROOT].update(name='Native User Group 6', path=task.objects[FIRST]['path'] + r'\Native User Group 6')
+            result['objects'][0]['children'][0]['name'] = 'Native User Group 6'
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    code, result = task.finish(tx, shown)
+    assert code == 0 and result['verified'] is True, json.dumps(result)
+    assert task.objects[ROOT]['name'] == 'Native User Group 6'
+
+
+def test_constructor_cannot_seal_an_incomplete_peer_projection(tmp_path):
+    task = SurfaceTask(tmp_path)
+    peer = '{55555555-5555-5555-5555-555555555555}'
+    # Both reads omit evidence rather than mutating a known value afterward.
+    task.objects[peer] = {'id': peer, 'name': 'Retained', 'type': 'ControlSurfaceBindingGroup',
+        'path': task.objects[FIRST]['path'] + r'\Retained', 'parent': {'id': FIRST}, '@GroupType': 2}
+    code, result = task.group()
+    assert code == 0, result
+    code, result = task.step('draft-check')
+    assert code == 2 and 'CONTROL_SURFACE' in json.dumps(result), result
+    assert not any(uri.endswith('object.create') for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('operation', ['object.create', 'object.set'])
+def test_rename_cannot_report_an_unchanged_existing_peer_as_new(tmp_path, operation):
+    task = SurfaceTask(tmp_path, '2022.1', operation)
+    peer = '{55555555-5555-5555-5555-555555555555}'
+    task.objects[peer] = {'id': peer, 'name': 'Retained', 'type': 'ControlSurfaceBindingGroup',
+        'classId': GROUP_CLASS, 'path': task.objects[FIRST]['path'] + r'\Retained',
+        'parent': {'id': FIRST}, 'notes': '', '@GroupType': 2}
+    before = deepcopy(task.objects)
+    owner = task.bind(FIRST)
+    code, configured = task.step('draft-business-configure', '--name-conflict', 'rename')
+    assert code == 0, configured
+    code, declared = task.group(parent=owner)
+    assert code == 0, declared
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri == 'ak.wwise.core.' + operation:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            occurrence = {'id': peer, 'name': 'Retained'}
+            return occurrence if operation == 'object.create' else {'objects': [
+                {'id': FIRST, 'name': task.objects[FIRST]['name'], 'children': [occurrence]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, result = task.finish(tx, shown)
+    assert code == 2 and result.get('verified') is not True, result
+    assert task.objects == before
+    code, result = task.run('execute', tx)
+    assert code == 2, result
+    assert len([uri for uri, _, _ in task.calls if uri == 'ak.wwise.core.' + operation]) == 1
+
+
+def test_genuine_merge_retains_bound_guid_notes_and_empty_notes_peer(tmp_path):
+    task = SurfaceTask(tmp_path, '2022.1', 'object.set')
+    peer = '{55555555-5555-5555-5555-555555555555}'
+    task.objects[ROOT] = {'id': ROOT, 'name': 'Layers', 'type': 'ControlSurfaceBindingGroup',
+        'classId': GROUP_CLASS, 'path': task.objects[FIRST]['path'] + r'\Layers',
+        'parent': {'id': FIRST}, 'notes': 'Keep existing group notes', '@GroupType': 2}
+    task.objects[peer] = {'id': peer, 'name': 'Retained', 'type': 'ControlSurfaceBinding',
+        'classId': BINDING_CLASS, 'path': task.objects[ROOT]['path'] + r'\Retained',
+        'parent': {'id': ROOT}, 'notes': ''}
+    before = deepcopy(task.objects)
+    owner = task.bind(FIRST)
+    code, result = task.step('draft-business-configure', '--name-conflict', 'merge')
+    assert code == 0, result
+    kind = task.kind('ControlSurfaceBindingGroup')
+    code, result = task.step('draft-declare-new', '--declaration-id', 'group', '--parent-handle', owner,
+        '--name', 'Layers', '--kind', kind, '--field', 'notes', 'Constructor notes apply only to new groups',
+        '--field-value', task.field(kind, 'GroupType'), '2')
+    assert code == 0, result
+    merged_group = result['draft']['declared_object']['result_handle']
+    kind = task.kind('ControlSurfaceBinding')
+    code, result = task.step('draft-declare-new', '--declaration-id', 'binding', '--parent-handle', merged_group,
+        '--name', 'Binding', '--kind', kind)
+    assert code == 0, result
+    tx, shown = task.preview()
+    code, result = task.finish(tx, shown)
+    assert code == 0 and result['verified'] is True, json.dumps([check for check in result.get('verification', {}).get('assertions', []) if not check.get('passed')])
+    assert all(task.objects[key] == row for key, row in before.items())
+    assert task.objects[CHILD]['parent'] == {'id': ROOT}

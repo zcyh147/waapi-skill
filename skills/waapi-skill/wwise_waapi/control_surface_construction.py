@@ -6,9 +6,13 @@ hardware behavior. Normal names are checked against actual mutation/read results
 from __future__ import annotations
 
 import json
+import re
+from collections.abc import Mapping
 from pathlib import Path
 
 from .canonical import canonical_sha256
+from .business_declarations import normalize_live_object_identity
+from .builders.query import STRUCTURED_GUID_PATTERN
 
 SOURCE = Path(__file__).resolve().parents[1] / 'resources/metadata/control-surface-constructor-sources.json'
 CLASSES = {'ControlSurfaceSession': 4325392, 'ControlSurfaceBindingGroup': 4456464, 'ControlSurfaceBinding': 4390928}
@@ -57,12 +61,38 @@ def role(node):
     return values[0] if len(values) == 1 and type(values[0]) is int else None
 
 
+def canonical_guid(value):
+    if not isinstance(value, str) or re.fullmatch(STRUCTURED_GUID_PATTERN, value) is None:
+        fail('Control Surface readback requires a canonical GUID.', 'CONTROL_SURFACE_READBACK_INVALID')
+    return value.upper()
+
+
+def normalize_row(row, *, parent_id=None):
+    """Validate complete requested evidence; never fill absent native values."""
+    if (not isinstance(row, Mapping) or not set(PEER_FIELDS) <= row.keys()
+            or type(row['classId']) is not int or not 0 <= row['classId'] <= 0xFFFFFFFF
+            or not isinstance(row['notes'], str) or not isinstance(row['parent'], Mapping)
+            or 'GroupType' in row and type(row['GroupType']) is not int):
+        fail('Control Surface identity/class/parent/notes projection is incomplete or malformed.', 'CONTROL_SURFACE_READBACK_INVALID')
+    try:
+        normalize_live_object_identity(row)
+    except ValueError as exc:
+        fail(str(exc), 'CONTROL_SURFACE_READBACK_INVALID')
+    actual_parent = canonical_guid(row['parent'].get('id'))
+    if parent_id is not None and actual_parent != canonical_guid(parent_id):
+        fail('Control Surface child is not under its exact selected parent.', 'CONTROL_SURFACE_READBACK_INVALID')
+    return dict(row)
+
+
 def children(identity, read):
+    canonical_guid(identity)
     rows = read(GET, {'from': {'id': [identity]}, 'transform': [{'select': ['children']}]}, {'return': PEER_FIELDS}).get('return')
-    if (not isinstance(rows, list) or len(rows) > 256 or any(not isinstance(row, dict) or not isinstance(row.get('id'), str) for row in rows)
-            or len({row['id'].casefold() for row in rows}) != len(rows)):
+    if not isinstance(rows, list) or len(rows) > 256:
         fail('Control Surface children must be a bounded set of unique GUIDs.')
-    return sorted(rows, key=lambda row: row['id'].casefold())
+    rows = [normalize_row(row, parent_id=identity) for row in rows]
+    if len({canonical_guid(row['id']) for row in rows}) != len(rows):
+        fail('Control Surface children must be a bounded set of unique GUIDs.')
+    return sorted(rows, key=lambda row: canonical_guid(row['id']))
 
 
 def prepare(nodes, *, parent, version, read, conflict='fail'):
@@ -82,7 +112,7 @@ def prepare(nodes, *, parent, version, read, conflict='fail'):
                     or existing[0].get('classId') != CLASSES[GROUP] or existing[0].get('type') != GROUP
                     or type(existing[0].get('GroupType')) is not int or existing[0]['GroupType'] != 2):
                 fail('Merge can retain an existing user group (2), never convert a reserved group.')
-            snapshots[node['preexisting_id']] = existing[0]
+            snapshots[node['preexisting_id']] = normalize_row(existing[0])
         owner = by_path.get(node.get('parent_request_path'))
         if owner and owner.get('existing_target') is not True:
             owner_type, owner_role = owner['canonical_type'], role(owner)
@@ -99,7 +129,7 @@ def prepare(nodes, *, parent, version, read, conflict='fail'):
                         or rows[0].get('type') != GROUP or rows[0].get('classId') != CLASSES[GROUP]
                         or any(rows[0].get(key) != expected[key] for key in ('id', 'name', 'type', 'path', 'classId', 'parent') if key in expected)):
                     fail('Selected Control Surface parent needs one exact live GUID/class/hierarchy identity.')
-                snapshots[identity] = rows[0]
+                snapshots[identity] = normalize_row(rows[0])
             owner_type = GROUP
             owner_role = snapshots[identity].get('GroupType')
             if owner and (owner.get('requested_name') != expected.get('name')
@@ -112,9 +142,10 @@ def prepare(nodes, *, parent, version, read, conflict='fail'):
         key = owner_path or owner_id
         if key not in owners:
             owners[key] = {'request_path': owner_path, 'id': owner_id,
-                'before': children(owner_id, read) if owner_id else [], 'new_paths': [], 'edited_ids': [], 'retired_ids': []}
+                'before': children(owner_id, read) if owner_id else [], 'new_paths': [], 'occurrences': [], 'edited_ids': [], 'retired_ids': []}
         frame = owners[key]
         frame['new_paths'].append(node['request_path'])
+        frame['occurrences'].append({'request_path': node['request_path'], 'merge_id': node.get('preexisting_id')})
         if node.get('preexisting_id'):
             frame['edited_ids'].append(node['preexisting_id'])
         if node.get('on_name_conflict', conflict) == 'replace':
@@ -125,7 +156,7 @@ def prepare(nodes, *, parent, version, read, conflict='fail'):
                         or rows[0].get('classId') != CLASSES[GROUP] or rows[0].get('type') != GROUP
                         or type(rows[0].get('GroupType')) is not int or rows[0]['GroupType'] != 2):
                     fail('Replacement may replace an explicitly owned user group (2), never a reserved group.')
-                snapshots[collision['id']] = rows[0]
+                snapshots[collision['id']] = normalize_row(rows[0])
             frame['retired_ids'].extend(row['id'] for row in collisions)
         if kind == GROUP and not (role(node) == 2 and owner_role == 3):
             fail('New user groups require explicit User Binding Group (2) under an existing User Binding Group Root (3); reserved roles and native default Global (0) are not constructors.')
@@ -146,10 +177,12 @@ def prepare(nodes, *, parent, version, read, conflict='fail'):
 def guard_assertions(boundary, *, read, after_write=False):
     try:
         current = authority(boundary['source']['version']) == boundary['source']
+        current = current and all(isinstance(owner.get('occurrences'), list) and owner['occurrences'] for owner in boundary['owners'])
         current = current and read(INFO, {'classId': CLASSES[GROUP], 'property': 'GroupType'}, {}) == boundary['group_metadata']
         parents = [row for row in boundary['parents'] if not (after_write and row['id'] in boundary['retired_ids'])]
         rows = [read(GET, {'from': {'id': [row['id']]}}, {'return': FIELDS}).get('return') for row in parents]
-        current = current and all(actual == [expected] for actual, expected in zip(rows, parents))
+        current = current and all(isinstance(actual, list) and len(actual) == 1 and normalize_row(actual[0]) == expected
+            for actual, expected in zip(rows, parents))
         if not after_write:
             current = current and all(children(owner['id'], read) == owner['before'] for owner in boundary['owners'] if owner['id'])
     except (OSError, ValueError, KeyError, TypeError):
@@ -160,18 +193,32 @@ def guard_assertions(boundary, *, read, after_write=False):
 
 def verification_assertions(boundary, identities, *, read):
     assertions = []
+    before_ids = {canonical_guid(row['id']) for owner in boundary['owners'] for row in owner['before']}
+    before_ids.update(canonical_guid(row['id']) for row in boundary['parents'])
+    seen_ids = set()
     for owner in boundary['owners']:
         identity = owner['id'] or identities.get(owner['request_path'])
+        freshness = []
         try:
             actual = children(identity, read)
-            current = {row['id']: row for row in actual}
-            retained = {row['id']: row for row in owner['before'] if row['id'] not in owner['retired_ids']}
-            new_ids = [identities.get(path) for path in owner['new_paths']]
+            current = {canonical_guid(row['id']): row for row in actual}
+            retired = {canonical_guid(value) for value in owner['retired_ids']}
+            retained = {canonical_guid(row['id']): row for row in owner['before'] if canonical_guid(row['id']) not in retired}
+            new_ids = []
+            for occurrence in owner['occurrences']:
+                result_id = canonical_guid(identities.get(occurrence['request_path']))
+                merge_id = occurrence['merge_id']
+                valid = (result_id == canonical_guid(merge_id) if merge_id is not None else result_id not in before_ids)
+                valid = valid and result_id not in seen_ids
+                freshness.append({'request_path': occurrence['request_path'], 'id': result_id, 'merge_id': merge_id, 'passed': valid})
+                seen_ids.add(result_id)
+                new_ids.append(result_id)
             expected = set(retained) | set(new_ids)
-            passed = bool(identity and all(new_ids) and set(current) == expected
-                and all(current.get(key) == row for key, row in retained.items() if key not in owner['edited_ids']))
+            edited = {canonical_guid(value) for value in owner['edited_ids']}
+            passed = bool(identity and new_ids and all(item['passed'] for item in freshness) and set(current) == expected
+                and all(current.get(key) == row for key, row in retained.items() if key not in edited))
         except (ValueError, KeyError, TypeError):
             actual, passed = [], False
         assertions.append({'name': 'Control Surface exact child membership and unrequested peers are preserved',
-            'passed': passed, 'evidence': {'owner': identity, 'before': owner, 'actual': actual}})
+            'passed': passed, 'evidence': {'owner': identity, 'before': owner, 'actual': actual, 'occurrence_identities': freshness}})
     return assertions

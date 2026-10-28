@@ -20597,6 +20597,7 @@ def _bind_object_set_result_nodes(
     observed_actions: Mapping[str, Mapping[str, Any]] | None = None,
     observe_anonymous: Callable | None = None,
     observe_owned_reference: Callable | None = None,
+    observe_control_surface: Callable | None = None,
 ) -> dict[str, ObjectResultNode]:
     """Bind sparse ``object.set`` associations to the sealed request graph.
 
@@ -20702,6 +20703,18 @@ def _bind_object_set_result_nodes(
         if spec.get("preexisting_id") is not None:
             return node.name == requested_name
         effective_conflict = spec.get("on_name_conflict", on_name_conflict)
+        if effective_conflict == "rename" and spec.get("control_surface_constructor"):
+            if observe_control_surface is None:
+                return False
+            actual = observe_control_surface(node.object, spec)
+            return (bool(node.name) and actual.get("name") == node.name
+                and _object_spec_row_matches(actual, spec, node.object)
+                and _same_identity(_parent_value(actual.get("parent")), owner_id)
+                and (not spec.get("notes_supplied") or actual.get("notes") == spec.get("requested_notes"))
+                and all(_has_field(actual, prop["name"]) and condition_values_equal(_field_value(actual, prop["name"]), prop["value"])
+                    for prop in spec.get("properties", []))
+                and all(_reference_requirement_matches(actual, ref["name"], ref.get("target_id"))
+                    for ref in spec.get("references", []) if "target_id" in ref))
         if effective_conflict == "rename":
             return node.name == requested_name or node.name.startswith(requested_name)
         return node.name == requested_name
@@ -23181,10 +23194,30 @@ def verify_prepared_operation(
                             if child.get("anonymous_list_member")})
                     return bound_ids
 
+                control_rows, control_fields = {}, {}
+                for spec in specs:
+                    if spec.get("control_surface_constructor"):
+                        key = (spec["class_id"], spec.get("platform"))
+                        control_fields[key] = _dedupe_fields([*control_fields.get(key, []), *_object_spec_return_fields(spec)])
+                def observe_control_surface(object_id, spec):
+                    key = (object_id, spec.get("platform"))
+                    if key not in control_rows:
+                        rows = read_object(object_id=object_id, fields=("id", "name", "type", "classId", "path", "parent", "notes"))
+                        if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id):
+                            raise ObjectOperationContractError("INVALID_READBACK", "Control Surface result candidate must resolve exactly once by GUID")
+                        fields = control_fields.get((rows[0].get("classId"), spec.get("platform")))
+                        if fields:
+                            rows = read_object(object_id=object_id, fields=fields, platform=spec.get("platform"))
+                            if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id):
+                                raise ObjectOperationContractError("INVALID_READBACK", "Control Surface fields lost their exact result GUID")
+                        control_rows[key] = rows[0]
+                    return control_rows[key]
+
                 result_by_path = _bind_object_set_result_nodes(
                     result_nodes, specs, on_name_conflict=str(plan.get("on_name_conflict")),
                     observed_rtpcs=observed_rtpcs, observed_owned_controls=observed_owned_controls, observed_actions=observed_actions, observe_anonymous=observe_anonymous,
                     observe_owned_reference=lambda owner, field: _observe_owned_reference_result(owner, field, read=read_call, readbacks=readbacks),
+                    observe_control_surface=observe_control_surface,
                 )
         except ObjectOperationContractError as exc:
             assertion_name = (
