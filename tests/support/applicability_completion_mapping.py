@@ -23,14 +23,15 @@ PREVIOUS_PROOF = {'path': 'tests/fixtures/metadata-conditions/applicability-curr
 SNAPSHOT = 'tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz'
 SDK_PATH = 'tests/fixtures/metadata-conditions/applicability-sdk-sources.json.gz'
 SDK_SHA256 = '646336b2e4cb7324831d6a8b5c4be5b00417764eaf044adeccb6719ddd2a771b'
+SAVED_CONSTRUCTOR_SOURCE = 'skills/waapi-skill/resources/metadata/saved-object-constructor-sources.json'
 ENTRYPOINT = 'skills/waapi-skill/scripts/run.py gateway.py'
 # Named hierarchy objects with ordinary public create routes. This is not the
 # complete getTypes roster: embedded/tool/media classes are classified below.
 HIERARCHY = frozenset(('AcousticTexture Action ActorMixer Attenuation AuxBus BlendContainer Bus '
-    'Conversion DialogueEvent Event Folder GameParameter MixingSession ModulatorEnvelope '
+    'ControlSurfaceSession Conversion DialogueEvent Event Folder GameParameter MixingSession ModulatorEnvelope '
     'ModulatorLfo ModulatorTime MusicPlaylistContainer MusicSegment MusicSwitchContainer MusicTrack '
     'PropertyContainer RandomSequenceContainer Sound SoundBank SoundcasterSession State StateGroup '
-    'Switch SwitchContainer SwitchGroup Trigger').split())
+    'SidechainMix Switch SwitchContainer SwitchGroup Trigger').split())
 PLUGIN_TYPES = {'Effect', 'Source', 'AudioDevice', 'Conversion', 'Metadata'}
 PLACEMENTS = {'Effect': ['owner-local-effect', 'shareset'], 'Source': ['sound-owned-source'],
     'AudioDevice': ['shareset'], 'Metadata': ['shareset', 'owner-local-metadata'],
@@ -89,6 +90,54 @@ def sdk_sources(root):
                 fact.encode() not in content for fact in source['facts']):
             raise ValueError('Exact installed applicability primary source/member differs')
     return record
+
+
+def _saved_constructor_correspondence(root, sdk, version, name, class_id, build):
+    """Join #205's exact source-backed public seam without upgrading its oracle."""
+    from wwise_waapi.canonical import canonical_sha256
+    source = load(root / SAVED_CONSTRUCTOR_SOURCE)
+    lane = source['versions'][version]
+    source_class = source[{'WorkUnit': 'workunit_class_id', 'Query': 'query_class_id',
+        'SearchCriteria': 'criterion_class_id'}[name]]
+    primary, = [s for s in sdk['sources'] if s['build'] == build and s['member'] == lane['sdk_member']]
+    if (source['contract'] != 'waapi-skill.saved-object-constructor-sources/v1'
+            or source['sha256'] != canonical_sha256({k: v for k, v in source.items() if k != 'sha256'})
+            or lane['build'] != build or source_class != class_id or lane['sdk_sha256'] != primary['sha256']):
+        raise ValueError('Exact installed applicability saved constructor source differs')
+    mechanism_tests = ['test_saved_constructor_sources_and_criterion_choices_match_exact_version_artifacts',
+        ('test_workunit_creation_discloses_saved_file_and_irreversible_history_effects' if name == 'WorkUnit'
+            else 'test_saved_query_constructor_has_exact_version_gate'),
+        *(['test_query_criterion_choice_owns_native_name_and_retains_live_field_validation']
+            if name == 'SearchCriteria' and lane['query_constructible'] else [])]
+    common = {'implementation_issue': 205,
+        'mechanism_sources': {'runtime': ['skills/waapi-skill/wwise_waapi/saved_object_construction.py',
+            'skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py',
+            'skills/waapi-skill/wwise_waapi/operation_registry.py'],
+            'test_nodes': ['tests/unit/test_workunit_query_constructor_gateway.py::' + node for node in mechanism_tests],
+            'strength': 'existing shared public mechanism tests; no per-row or native execution inferred'},
+        'source': {'path': SAVED_CONSTRUCTOR_SOURCE,
+        'sha256': source['sha256'], 'build': build, 'class_id': source_class,
+        'member': lane['sdk_member'], 'member_sha256': lane['sdk_sha256'], 'clauses': lane['sdk_clauses']}}
+    if name != 'WorkUnit' and not lane['query_constructible']:
+        return {**common, 'path': 'source_proven_query_constructor_boundary', 'operations': [],
+            'boundary': {'member': primary['member'], 'sha256': primary['sha256'], 'facts': primary['facts'],
+                'scope': 'object.create' if version == '2021.1' else 'object.create and object.set',
+                'native_absence_claim': False},
+            'admission': 'exact matching-SDK Query construction boundary exposed before Preview; existing Query reads/configuration remain separate'}
+    operations = ['object.create', *([] if version == '2021.1' else ['object.set'])]
+    if name == 'WorkUnit':
+        return {**common, 'path': 'source_bound_workunit_constructor', 'operations': operations,
+            'effects': ['undo_redo_history_cleared', 'clipboard_cleared', 'corresponding_WWU_saved_in_active_project'],
+            'admission': 'fresh WorkUnit Type Handle and exact WorkUnit/Folder owner; connected existing owner and owning-WorkUnit file scopes bound inside active project; native-owned destination; fail/merge/rename only; overlapping owner renames need separate Preview; no UndoGroup',
+            'verification': 'result_schema_checked with GUID/class/parent/name/requested-field readback; history/clipboard and saved WWU bytes/save completeness unobserved'}
+    if name == 'SearchCriteria':
+        common['source'].update(criteria=lane['criteria'], factory_member=lane['factory_member'], factory_sha256=lane['factory_sha256'])
+    return {**common, 'path': 'source_bound_query_criterion_constructor' if name == 'SearchCriteria' else 'source_bound_saved_query_constructor',
+        'operations': operations,
+        'admission': ('fresh SearchCriteria Type Handle under exact bound/planned Query in Queries hierarchy; one disclosed criterion choice; Gateway owns native SearchOperationID name; live class Field Handles; fail-only creation'
+            if name == 'SearchCriteria' else 'fresh Query Type Handle and exact WorkUnit/Folder owner in Queries hierarchy; selected live fields'),
+        'verification': ('result_schema_checked with GUID/class/Query-parent and requested-field readback; SearchOperationID_and_query_matches_unobserved'
+            if name == 'SearchCriteria' else 'ordinary GUID/class/name/parent and requested-field verification; Query evaluation not claimed')}
 
 
 def definition_mapping(root):
@@ -201,9 +250,33 @@ def definition_mapping(root):
                     'operations': ['object.setProperty', 'object.setReference'],
                     'admission': 'read candidates, select exact identity, bind exact GUID, discover object-scoped fields; missing identities/fields/hidden controllers remain explicit boundaries, never invented',
                     'independent_constructibility': 'not_claimed'}
+            elif name in {'WorkUnit', 'Query', 'SearchCriteria'}:
+                row['correspondence'] = _saved_constructor_correspondence(root, sdk, version, name, d['class_id'], row['build'])
             elif name in HIERARCHY:
                 row['correspondence'] = {'path': 'ordinary_selected_hierarchy_constructor', 'operations': ['object.create'],
                     'admission': 'fresh Type Handle, compatible selected parent, class prerequisites, exact identity/class/parent verification; no arbitrary hierarchy placement'}
+            elif name == 'BlendTrack' and version in {'2024.1', '2025.1'}:
+                from wwise_waapi.core_business_contracts import core_business_contract_data
+                operation = 'ak.wwise.core.blendContainer.addTrack'
+                schema_path = f'skills/waapi-skill/resources/manifest/{version}/schemas.json'
+                schema, = [s for s in load(root / schema_path)['schemas'] if s['uri'] == operation]
+                row['correspondence'] = {'path': 'blend_container_owned_track_factory', 'operations': [operation],
+                    'public_contract_sha256': digest(core_business_contract_data(operation, version)),
+                    'source': {'path': schema_path, 'schema': schema, 'schema_sha256': digest(schema)},
+                    'admission': 'bound exact BlendContainer and one track name through request-schema; no arbitrary hierarchy placement or assignment creation',
+                    'verification': 'result_schema_checked; no independent new-track identity, assignment edge or native business effect claimed'}
+            elif name == 'Marker' and version in {'2021.1', '2022.1'}:
+                from wwise_waapi.object_query_local_lists import MARKER_BOUNDARY_SHA256
+                path = f'skills/waapi-skill/references/semantic/{version}/source-marker-object-model-boundary.json'
+                raw = (root / path).read_bytes()
+                boundary = json.loads(raw)
+                if (hashlib.sha256(raw).hexdigest() != MARKER_BOUNDARY_SHA256[version]
+                        or boundary['version'] != version or boundary['wwise_build'] != row['build']
+                        or boundary['legacy_marker']['class_id'] != d['class_id']):
+                    raise ValueError('Exact installed applicability source Marker model boundary differs')
+                row['correspondence'] = {'path': 'source_proven_direct_marker_model_boundary', 'operations': [],
+                    'source': {'path': path, 'sha256': MARKER_BOUNDARY_SHA256[version]}, 'boundary': boundary,
+                    'admission': 'source-proven 2023 direct source Marker object/List introduction and public local-markers gate; legacy Inner registration is not modern Marker construction; file/imported/effective marker information remains separate'}
             elif published_lists.get(d.get('class_id')):
                 row['correspondence'] = {'path': 'owned_list_constructor', 'operations': ['object.create', *([] if version == '2021.1' else ['object.set'])],
                     'owners': published_lists[d['class_id']],
@@ -227,19 +300,6 @@ def definition_mapping(root):
             elif name == 'Platform':
                 row['correspondence'] = {'path': 'project_platform_creation', 'operations': ['ak.wwise.cli.addNewPlatform'],
                     'admission': 'closed project path and discovered supported platform; file/create side effects retain the existing CLI boundary'}
-            elif name in {'Query', 'SearchCriteria'} and version in {'2021.1', '2022.1'}:
-                source, = [s for s in sdk['sources'] if s['build'].startswith(version + '.') and s['member'] == 'waapi_import.html']
-                row['correspondence'] = {'path': 'source_proven_query_constructor_boundary', 'operations': [],
-                    'boundary': {'member': source['member'], 'sha256': source['sha256'], 'facts': source['facts'],
-                        'scope': 'object.create' if version == '2021.1' else 'object.create and object.set',
-                        'native_absence_claim': False},
-                    'admission': 'exact native documented construction boundary; existing Query reads/configuration remain in scope'}
-                row['state'] = 'implementation_dependency'
-                row['dependencies'] = [{'owner_issue': 178, 'class': name, 'version': version,
-                    'implementation_issue': 205,
-                    'missing': 'Expose this primary-source-proven Query construction boundary before Preview; current generic class resolver has no exact version gate',
-                    'source': {'member': source['member'], 'sha256': source['sha256']},
-                    'native_absence_probe_required': False}]
             else:
                 row['state'] = 'implementation_dependency'
                 owned = source_lists.get(name, [])
@@ -251,20 +311,14 @@ def definition_mapping(root):
                     'class': name, 'version': version,
                     'desired_user_operation': 'create/configure this class through its source-owned role, without assuming independent hierarchy construction',
                     'next_evidence': 'matching constructor/ownership source or retained existing mechanism receipt; no per-class native execution requirement'}]
-                if name == 'WorkUnit':
-                    row['dependencies'][0].update(implementation_issue=205,
-                        missing='Closed WorkUnit creation wrapper with source-declared side effects',
-                        required_side_effects=['clear undo/redo history', 'clear clipboard', 'save newly created WWU'],
-                        allowed_conflicts=['fail', 'merge', 'rename'], forbidden_conflict='replace',
-                        existing_hooks=['object_graph_business._compile_create_fields', 'operation_registry._prepare_object_create',
-                            'operation_registry._resolve_object_type', 'transaction owned file and authorization guards'])
-                if name in {'Query', 'SearchCriteria'}:
-                    source, = [s for s in sdk['sources'] if s['build'].startswith(version + '.') and s['member'] == 'waapi_import.html']
-                    row['dependencies'][0].update(implementation_issue=205,
-                        missing='Closed source-derived Query/SearchCriteria constructor choices',
-                        source={'member': source['member'], 'sha256': source['sha256']},
-                        required='criteria names must encode the documented SearchOperationID GUID from validated WWU/source; no model-authored IDs',
-                        existing_hooks=['object_graph_business new declarations', 'planned_references result naming', 'operation_registry exact class/parent/field verification'])
+                if name == 'MultiSwitchEntry' and version in {'2021.1', '2022.1'}:
+                    # One owned role is implemented. The class row also covers
+                    # other roles, so it must retain its unresolved dependency.
+                    row['correspondence']['partial_roles'] = [{
+                        'role': 'Dialogue_conditions_owned_association', 'operations': ['audio.import'],
+                        'admission': 'explicit Dialogue conditions; fresh live MultiSwitchEntry AudioNode admission; preserve nondefault WorkUnit import-group boundary and exact older Container/RandomSequenceContainer guard',
+                        'verification': 'owner/referrers and requested numeric fields checked; decision-path order readback unobserved',
+                        'other_roles': 'older MusicSwitch entry construction remains unresolved; no arbitrary hierarchy constructor'}]
             row['correspondence']['entrypoint'] = ENTRYPOINT
             rows.append(row)
     rows.sort(key=lambda r: r['id'])
