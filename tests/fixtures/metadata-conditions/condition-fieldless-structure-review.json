@@ -1,0 +1,305 @@
+{
+  "contract": "waapi-skill.fieldless-condition-source-review/v1",
+  "occurrences": [
+    {
+      "build": "2021.1.14.8108",
+      "group_node_sha256": "2b2ef9a27c88f52e12f44e5b1e6909e394822653d96e6f3f3975cf521d38dad3",
+      "group_pointer": "PluginModule/ObjectBase[PositioningType_BusNode]",
+      "members": [
+        {
+          "id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/74/Enumeration/2",
+          "shape_sha256": "2b4b4b5c490f962d5567c018eebcbd4bff6aba986c1b2a7442bee9514e5bf2d7"
+        },
+        {
+          "id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/74/Enumeration/2/value/0",
+          "shape_sha256": "18d10c7d2b4b04aaf04254d1ae5d655a5dc0407cbcdd5a8c3986e985370f36ee"
+        },
+        {
+          "id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/74/condition",
+          "shape_sha256": "38b2b188928a9a3a9fce8525ecb53248874b45a04147665f8a668fde303608ce"
+        }
+      ],
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/74/condition",
+      "peer_mapping_sha256": "b514cddc86c2d6f85045c15c05c071933384db88b6b398d822e920ed716321e8",
+      "peer_node_sha256": "d05641bb179a6c75781138e77a7f715184908cd0cd14991899de213e37de91aa",
+      "peer_occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[ListenerRelativePositioning]/Dependencies/81/condition",
+      "peer_pointer": "PluginModule/ObjectBase[ListenerRelativePositioning]",
+      "source_file_sha256": "6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d",
+      "source_row_sha256": "d6e266dd409d0b22f6627f797e9d27a194ece007ada515dcb3f40012b462fa6e",
+      "version": "2021.1",
+      "wrapper_node_sha256": "f923c103cb71646dbf0a3b1cfa885c5e48eb844e26183bc0518b0ed332c38028",
+      "wrapper_pointer": "PluginModule/ObjectBase[Positioning_BusNode]"
+    },
+    {
+      "build": "2021.1.14.8108",
+      "group_node_sha256": "f1084100274ce381909db422c16da0395fc54185b24f2f5f496ef83951ea3fba",
+      "group_pointer": "PluginModule/ObjectBase[PositioningType_AudioNode]",
+      "members": [
+        {
+          "id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/75/Enumeration/2",
+          "shape_sha256": "2b4b4b5c490f962d5567c018eebcbd4bff6aba986c1b2a7442bee9514e5bf2d7"
+        },
+        {
+          "id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/75/Enumeration/2/value/0",
+          "shape_sha256": "18d10c7d2b4b04aaf04254d1ae5d655a5dc0407cbcdd5a8c3986e985370f36ee"
+        },
+        {
+          "id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/75/condition",
+          "shape_sha256": "38b2b188928a9a3a9fce8525ecb53248874b45a04147665f8a668fde303608ce"
+        }
+      ],
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/75/condition",
+      "peer_mapping_sha256": "b514cddc86c2d6f85045c15c05c071933384db88b6b398d822e920ed716321e8",
+      "peer_node_sha256": "d05641bb179a6c75781138e77a7f715184908cd0cd14991899de213e37de91aa",
+      "peer_occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[ListenerRelativePositioning]/Dependencies/81/condition",
+      "peer_pointer": "PluginModule/ObjectBase[ListenerRelativePositioning]",
+      "source_file_sha256": "6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d",
+      "source_row_sha256": "8562454907ca8664323ee20fb7baa4723fd1a047e55bf8fdc62bba471abc4453",
+      "version": "2021.1",
+      "wrapper_node_sha256": "6a1bd7247a22534e2a86b342d1600c94a54024b84c5ff44c5beae3ab2742fdcf",
+      "wrapper_pointer": "PluginModule/ObjectBase[Positioning_AudioNode]"
+    },
+    {
+      "build": "2022.1.19.8584",
+      "group_node_sha256": "2b2ef9a27c88f52e12f44e5b1e6909e394822653d96e6f3f3975cf521d38dad3",
+      "group_pointer": "PluginModule/ObjectBase[PositioningType_BusNode]",
+      "members": [
+        {
+          "id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/76/Enumeration/2",
+          "shape_sha256": "2b4b4b5c490f962d5567c018eebcbd4bff6aba986c1b2a7442bee9514e5bf2d7"
+        },
+        {
+          "id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/76/Enumeration/2/value/0",
+          "shape_sha256": "18d10c7d2b4b04aaf04254d1ae5d655a5dc0407cbcdd5a8c3986e985370f36ee"
+        },
+        {
+          "id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/76/condition",
+          "shape_sha256": "38b2b188928a9a3a9fce8525ecb53248874b45a04147665f8a668fde303608ce"
+        }
+      ],
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/76/condition",
+      "peer_mapping_sha256": "0fe72849499a69a55ae51e7ed4ec8113aeff75d2def52b9dd6ee938bfdb163eb",
+      "peer_node_sha256": "6dfe86716dbaf4ce41653e3ab5ce1a06227a7f2a267eff9b3d9b5e05e2e99b2f",
+      "peer_occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[ListenerRelativePositioning]/Dependencies/83/condition",
+      "peer_pointer": "PluginModule/ObjectBase[ListenerRelativePositioning]",
+      "source_file_sha256": "018ddcb9e0b50c4cdc2f0849d0cc8a95d5568c169f0c888ca6f07c3f0e3266b6",
+      "source_row_sha256": "21d6f6fd7914d561781f1d0c363fb0c959518123a0415974b35e3b69ca53700e",
+      "version": "2022.1",
+      "wrapper_node_sha256": "658e71e411bbf44d195a2118a18be9b06401cf614f1f7b48caadeb353a562a13",
+      "wrapper_pointer": "PluginModule/ObjectBase[Positioning_BusNode]"
+    },
+    {
+      "build": "2022.1.19.8584",
+      "group_node_sha256": "f1084100274ce381909db422c16da0395fc54185b24f2f5f496ef83951ea3fba",
+      "group_pointer": "PluginModule/ObjectBase[PositioningType_AudioNode]",
+      "members": [
+        {
+          "id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/77/Enumeration/2",
+          "shape_sha256": "2b4b4b5c490f962d5567c018eebcbd4bff6aba986c1b2a7442bee9514e5bf2d7"
+        },
+        {
+          "id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/77/Enumeration/2/value/0",
+          "shape_sha256": "18d10c7d2b4b04aaf04254d1ae5d655a5dc0407cbcdd5a8c3986e985370f36ee"
+        },
+        {
+          "id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/77/condition",
+          "shape_sha256": "38b2b188928a9a3a9fce8525ecb53248874b45a04147665f8a668fde303608ce"
+        }
+      ],
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/77/condition",
+      "peer_mapping_sha256": "0fe72849499a69a55ae51e7ed4ec8113aeff75d2def52b9dd6ee938bfdb163eb",
+      "peer_node_sha256": "6dfe86716dbaf4ce41653e3ab5ce1a06227a7f2a267eff9b3d9b5e05e2e99b2f",
+      "peer_occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[ListenerRelativePositioning]/Dependencies/83/condition",
+      "peer_pointer": "PluginModule/ObjectBase[ListenerRelativePositioning]",
+      "source_file_sha256": "018ddcb9e0b50c4cdc2f0849d0cc8a95d5568c169f0c888ca6f07c3f0e3266b6",
+      "source_row_sha256": "029f7c81b0b239aa42561ef268d7b3b2eb269f5b6a6280596b2465cd1bd0aade",
+      "version": "2022.1",
+      "wrapper_node_sha256": "63bb82e9e5e779ec8d6fc88cc7917793d1cf0345b657b020ccb9a6f50aa04cb4",
+      "wrapper_pointer": "PluginModule/ObjectBase[Positioning_AudioNode]"
+    },
+    {
+      "build": "2023.1.19.8928",
+      "group_node_sha256": "aa6355f6461943f8acbfed4282c6e9772e447fa1d043b3e89a988945b0219daf",
+      "group_pointer": "PluginModule/ObjectBase[PositioningType_BusNode]",
+      "members": [
+        {
+          "id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/64/Enumeration/2",
+          "shape_sha256": "2b4b4b5c490f962d5567c018eebcbd4bff6aba986c1b2a7442bee9514e5bf2d7"
+        },
+        {
+          "id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/64/Enumeration/2/value/0",
+          "shape_sha256": "18d10c7d2b4b04aaf04254d1ae5d655a5dc0407cbcdd5a8c3986e985370f36ee"
+        },
+        {
+          "id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/64/condition",
+          "shape_sha256": "38b2b188928a9a3a9fce8525ecb53248874b45a04147665f8a668fde303608ce"
+        }
+      ],
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/64/condition",
+      "peer_mapping_sha256": "f8f6767eea49241220d43c431c398a625f0b48753fa8c9c427533e9f0c4d8a7e",
+      "peer_node_sha256": "9d44e080e64d6afdeabb247e63730f6fed79908016b4c00366abfc62262e2fa6",
+      "peer_occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[ListenerRelativePositioning]/Dependencies/71/condition",
+      "peer_pointer": "PluginModule/ObjectBase[ListenerRelativePositioning]",
+      "source_file_sha256": "bae4d5fdd821fef226f1939d34ba1810e08bf79578fb8edc4ae3bdc3c66bd468",
+      "source_row_sha256": "0713121bed79113bfcfe8005e082568a94cc22640b4394af56c6d465f2e653dd",
+      "version": "2023.1",
+      "wrapper_node_sha256": "658e71e411bbf44d195a2118a18be9b06401cf614f1f7b48caadeb353a562a13",
+      "wrapper_pointer": "PluginModule/ObjectBase[Positioning_BusNode]"
+    },
+    {
+      "build": "2023.1.19.8928",
+      "group_node_sha256": "7e40d36388684d188bdda05a54cb753679f2e4eae950fccfeefc9965a1b533e9",
+      "group_pointer": "PluginModule/ObjectBase[PositioningType_AudioNode]",
+      "members": [
+        {
+          "id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/65/Enumeration/2",
+          "shape_sha256": "2b4b4b5c490f962d5567c018eebcbd4bff6aba986c1b2a7442bee9514e5bf2d7"
+        },
+        {
+          "id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/65/Enumeration/2/value/0",
+          "shape_sha256": "18d10c7d2b4b04aaf04254d1ae5d655a5dc0407cbcdd5a8c3986e985370f36ee"
+        },
+        {
+          "id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/65/condition",
+          "shape_sha256": "38b2b188928a9a3a9fce8525ecb53248874b45a04147665f8a668fde303608ce"
+        }
+      ],
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/65/condition",
+      "peer_mapping_sha256": "f8f6767eea49241220d43c431c398a625f0b48753fa8c9c427533e9f0c4d8a7e",
+      "peer_node_sha256": "9d44e080e64d6afdeabb247e63730f6fed79908016b4c00366abfc62262e2fa6",
+      "peer_occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[ListenerRelativePositioning]/Dependencies/71/condition",
+      "peer_pointer": "PluginModule/ObjectBase[ListenerRelativePositioning]",
+      "source_file_sha256": "bae4d5fdd821fef226f1939d34ba1810e08bf79578fb8edc4ae3bdc3c66bd468",
+      "source_row_sha256": "0b33d63789e9f378680d77867327af01d0d9909f169c123e43ee15d3befec8f2",
+      "version": "2023.1",
+      "wrapper_node_sha256": "63bb82e9e5e779ec8d6fc88cc7917793d1cf0345b657b020ccb9a6f50aa04cb4",
+      "wrapper_pointer": "PluginModule/ObjectBase[Positioning_AudioNode]"
+    },
+    {
+      "build": "2024.1.13.9056",
+      "group_node_sha256": "dcab94003d5432908e39239a60d4019a982eb65e8b3890d4ac4440747f58a2f3",
+      "group_pointer": "PluginModule/ObjectBase[PositioningType_BusNode]",
+      "members": [
+        {
+          "id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/60/Enumeration/2",
+          "shape_sha256": "2b4b4b5c490f962d5567c018eebcbd4bff6aba986c1b2a7442bee9514e5bf2d7"
+        },
+        {
+          "id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/60/Enumeration/2/value/0",
+          "shape_sha256": "18d10c7d2b4b04aaf04254d1ae5d655a5dc0407cbcdd5a8c3986e985370f36ee"
+        },
+        {
+          "id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/60/condition",
+          "shape_sha256": "38b2b188928a9a3a9fce8525ecb53248874b45a04147665f8a668fde303608ce"
+        }
+      ],
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/60/condition",
+      "peer_mapping_sha256": "eae10ebbba2e2e10e42a8ac97e9547a276eb763b43671772c3e2e12cbda56a4f",
+      "peer_node_sha256": "a91cd50002185991e8d0ecbb6ec141a88083736510e282fe5a4ed18864ca7eb1",
+      "peer_occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[ListenerRelativePositioning]/Dependencies/64/condition",
+      "peer_pointer": "PluginModule/ObjectBase[ListenerRelativePositioning]",
+      "source_file_sha256": "28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f",
+      "source_row_sha256": "da6c32f1dac258843b92c318ff76f928ff1828963bdea5887c9e805a7811a6a8",
+      "version": "2024.1",
+      "wrapper_node_sha256": "2c9c35efa11e4712c558719b30f9b62c2751003f6fcaa9e1a3a27a3ef2a54e47",
+      "wrapper_pointer": "PluginModule/ObjectBase[Positioning_BusNode]"
+    },
+    {
+      "build": "2024.1.13.9056",
+      "group_node_sha256": "92b44b6b0f1fa2020cf8228e042362a7dd1f566ed1b5e642e80d81e10a9e19fa",
+      "group_pointer": "PluginModule/ObjectBase[PositioningType_AudioNode]",
+      "members": [
+        {
+          "id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/61/Enumeration/2",
+          "shape_sha256": "2b4b4b5c490f962d5567c018eebcbd4bff6aba986c1b2a7442bee9514e5bf2d7"
+        },
+        {
+          "id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/61/Enumeration/2/value/0",
+          "shape_sha256": "18d10c7d2b4b04aaf04254d1ae5d655a5dc0407cbcdd5a8c3986e985370f36ee"
+        },
+        {
+          "id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/61/condition",
+          "shape_sha256": "38b2b188928a9a3a9fce8525ecb53248874b45a04147665f8a668fde303608ce"
+        }
+      ],
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/61/condition",
+      "peer_mapping_sha256": "eae10ebbba2e2e10e42a8ac97e9547a276eb763b43671772c3e2e12cbda56a4f",
+      "peer_node_sha256": "a91cd50002185991e8d0ecbb6ec141a88083736510e282fe5a4ed18864ca7eb1",
+      "peer_occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[ListenerRelativePositioning]/Dependencies/64/condition",
+      "peer_pointer": "PluginModule/ObjectBase[ListenerRelativePositioning]",
+      "source_file_sha256": "28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f",
+      "source_row_sha256": "ab238bf0ea8d723778b328f35028dff62b858583b0547a0ab6e90585ddee9d34",
+      "version": "2024.1",
+      "wrapper_node_sha256": "1fd96b91284e189d414609189922ee1b4e68257797af4b22fa0ab32a7a7888f0",
+      "wrapper_pointer": "PluginModule/ObjectBase[Positioning_AudioNode]"
+    },
+    {
+      "build": "2025.1.7.9143",
+      "group_node_sha256": "dcab94003d5432908e39239a60d4019a982eb65e8b3890d4ac4440747f58a2f3",
+      "group_pointer": "PluginModule/ObjectBase[PositioningType_BusNode]",
+      "members": [
+        {
+          "id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/61/Enumeration/2",
+          "shape_sha256": "2b4b4b5c490f962d5567c018eebcbd4bff6aba986c1b2a7442bee9514e5bf2d7"
+        },
+        {
+          "id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/61/Enumeration/2/value/0",
+          "shape_sha256": "18d10c7d2b4b04aaf04254d1ae5d655a5dc0407cbcdd5a8c3986e985370f36ee"
+        },
+        {
+          "id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/61/condition",
+          "shape_sha256": "38b2b188928a9a3a9fce8525ecb53248874b45a04147665f8a668fde303608ce"
+        }
+      ],
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_BusNode]/Dependencies/61/condition",
+      "peer_mapping_sha256": "0465456d2d11d79a4c4e3486492a6100d570fec278407b007670ed3d8ee7ecfe",
+      "peer_node_sha256": "f28ef8d56b3a6ef30ebc018e0616e72f43aa2f5113e6478efa1ff1e3059ad3fb",
+      "peer_occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[ListenerRelativePositioning]/Dependencies/65/condition",
+      "peer_pointer": "PluginModule/ObjectBase[ListenerRelativePositioning]",
+      "source_file_sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454",
+      "source_row_sha256": "70dcbe535c470cdf0d3fd61653db3432ad36379057678e3813cac20628eb69c5",
+      "version": "2025.1",
+      "wrapper_node_sha256": "2c9c35efa11e4712c558719b30f9b62c2751003f6fcaa9e1a3a27a3ef2a54e47",
+      "wrapper_pointer": "PluginModule/ObjectBase[Positioning_BusNode]"
+    },
+    {
+      "build": "2025.1.7.9143",
+      "group_node_sha256": "92b44b6b0f1fa2020cf8228e042362a7dd1f566ed1b5e642e80d81e10a9e19fa",
+      "group_pointer": "PluginModule/ObjectBase[PositioningType_AudioNode]",
+      "members": [
+        {
+          "id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/62/Enumeration/2",
+          "shape_sha256": "2b4b4b5c490f962d5567c018eebcbd4bff6aba986c1b2a7442bee9514e5bf2d7"
+        },
+        {
+          "id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/62/Enumeration/2/value/0",
+          "shape_sha256": "18d10c7d2b4b04aaf04254d1ae5d655a5dc0407cbcdd5a8c3986e985370f36ee"
+        },
+        {
+          "id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/62/condition",
+          "shape_sha256": "38b2b188928a9a3a9fce8525ecb53248874b45a04147665f8a668fde303608ce"
+        }
+      ],
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[PositioningType_AudioNode]/Dependencies/62/condition",
+      "peer_mapping_sha256": "0465456d2d11d79a4c4e3486492a6100d570fec278407b007670ed3d8ee7ecfe",
+      "peer_node_sha256": "f28ef8d56b3a6ef30ebc018e0616e72f43aa2f5113e6478efa1ff1e3059ad3fb",
+      "peer_occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[ListenerRelativePositioning]/Dependencies/65/condition",
+      "peer_pointer": "PluginModule/ObjectBase[ListenerRelativePositioning]",
+      "source_file_sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454",
+      "source_row_sha256": "d186c643eb4f04754a0f15791eb9e96c19b844fc646bee53dcdf5b239d5e7f4b",
+      "version": "2025.1",
+      "wrapper_node_sha256": "1fd96b91284e189d414609189922ee1b4e68257797af4b22fa0ab32a7a7888f0",
+      "wrapper_pointer": "PluginModule/ObjectBase[Positioning_AudioNode]"
+    }
+  ],
+  "original_mapping": {
+    "path": "tests/fixtures/branch-evidence/product/condition-definitions-195-r1/mapping.json",
+    "sha256": "aa000929e10c66a25b13ffbfde5ac442476f87844097cdd71df4a839425b507b"
+  },
+  "review_id": "195-positioning-type-source-structure-r1",
+  "scope": "exact30 existing-object source members only; no native absence, UI effect or recipient execution claim",
+  "source_snapshot": {
+    "path": "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz",
+    "sha256": "b113f5511fa87c21679b99ab46197a7731203b0012d3b8e0052e195fea2e6978"
+  }
+}

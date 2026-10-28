@@ -57,7 +57,8 @@ def test_complete_source_subset_keeps_dependencies_and_deduplicates_witnesses(bu
         'routes': [], 'obligations': list(context['branches'].values())}}
     result = evaluate_coverage(ROOT, inventory, exported['bindings'], digest=digest, evidence_base=base,
         requirements_document={'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': policies})
-    assert result['completion']['states'] == {'implementation_dependency': 285, 'source_definition_verified': 7012}
+    assert result['completion']['states'] == {'implementation_dependency': 15,
+        'approved_exclusion': 240, 'source_definition_verified': 7042}
     assert result['completion']['complete'] is False
     assert Counter(b['metadata_scope'] for b in result['obligations']) == {'source_definition': 7243, 'object_type': 54}
     proofs = result['condition_source_definition_reuse']
@@ -148,7 +149,7 @@ def test_reconciled_sources_retain_original_program_authority(bundle):
     assert context['review']['current_sources'][source] == current_program['sources'][source]
     assert context['review']['current_sources'][source] == '2d8c26f100194adc7081c27aa04d8207c654f420c6a77e1bb29206a2c5e53023'
     assert len(context['members']) == 7297
-    assert sum(len(row['members']) for row in context['mapping']['occurrences'] if row['dependencies']) == 285
+    assert sum(len(row['members']) for row in context['mapping']['occurrences'] if row['dependencies']) == 15
     assert context['review']['source_definition_policy']['new_native_runs'] == 0
 
 

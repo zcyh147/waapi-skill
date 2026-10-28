@@ -1,0 +1,335 @@
+{
+  "authority": "docs/plans/full-waapi-coverage/SPEC.md#user-approved-batch-rename-window-boundary--2026-10-28",
+  "authority_heading": "## User-approved Batch Rename window boundary \u2014 2026-10-28",
+  "authority_path": "docs/plans/full-waapi-coverage/SPEC.md",
+  "authority_section_sha256": "373e9a2e8ffafbd43b670b02ed722714999e88656d08b8aebdfc6a109eb1700a",
+  "contract": "waapi-skill.batch-rename-settings-exclusion-review/v1",
+  "decision_url": "https://github.com/zcyh147/waapi-skill/issues/195#issuecomment-6464042727",
+  "member_count": 240,
+  "members_sha256": "dba80a5de8470a17a86afa6a32d0f0fa214ca33735c4b601324491ee194f50c4",
+  "occurrences": [
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceFindWhat]/Dependencies/164/condition",
+      "source_row_sha256": "7ab47bfffa662dfbc9d2ba8da99f8f09e960cb511b871178df4d1edbf9be072c"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceReplaceWith]/Dependencies/165/condition",
+      "source_row_sha256": "c6dd91a8a612c2561fb694191ded4b60be65d7fac379a2227fd77ba9dd845667"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableMatchCase]/Dependencies/166/condition",
+      "source_row_sha256": "c5c192791c46450f7b84656ad97fbc05f91edb678457448758e93db46dde01c8"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableMatchCase]/Dependencies/167/condition",
+      "source_row_sha256": "7a036097391c4b1a42765cc1648c3bf7636f9ce17e7fa7667a016e674b35defd"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableUseRegularExpression]/Dependencies/168/condition",
+      "source_row_sha256": "5107f03613b99d631568af0dc09c2a37c4ed7fb08d6c085c77fe23bb1b11ff05"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableReplaceAllInstances]/Dependencies/169/condition",
+      "source_row_sha256": "98bfb360efff8439881900089b1dd91d80a39a888881eebe642bbffb9dfd4475"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableReplaceAllInstances]/Dependencies/170/condition",
+      "source_row_sha256": "d6445ddf753447a16d3ffdb1575dfa7f582ce3f72897734d0c11e8c4e6facc85"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveCount]/Dependencies/171/condition",
+      "source_row_sha256": "34e4c3e02d45b604c7f95b90545c3d5385818683902aa2a95eaab4327caaaac3"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveAtPosition]/Dependencies/172/condition",
+      "source_row_sha256": "dee47dd7d72c2f5ca22db976cf5183726f57d137f82db42223e0638588fe05aa"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveFrom]/Dependencies/173/condition",
+      "source_row_sha256": "d3687ed5f2c98598c5e56def505a7b6cce7a83a98c7a5420c920e80f5e720085"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertWhat]/Dependencies/174/condition",
+      "source_row_sha256": "8d9821e496c1bbe50fd5b7b0eaf875dc80f073248ee2e413e9c6684e7279a183"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertStartAt]/Dependencies/175/condition",
+      "source_row_sha256": "b557f3467653ad4d5c346f09930a074c7c6151c02991b1d7f23b9f1c4e415c66"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertStartAt]/Dependencies/176/condition",
+      "source_row_sha256": "8c425d98efac4aabf1bfa520edb683986c5305e42f78ba15faf28c913df9f0f8"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertToInsert]/Dependencies/177/condition",
+      "source_row_sha256": "153f97d8e5860ca99e456399ba8ecf917a2d941f6faf7ebc33ee39ba54f727f8"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertAtPosition]/Dependencies/178/condition",
+      "source_row_sha256": "22c1866ae8229f4efe60f6f34c417a2c583052433ea8778d94c71ab714426345"
+    },
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[insertFrom]/Dependencies/179/condition",
+      "source_row_sha256": "2d48c80e780afa72e01598d3d978b67642ec130c280940fa3ecb2b134b406780"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceFindWhat]/Dependencies/168/condition",
+      "source_row_sha256": "5a37174daec8b20b56da98d1aaf459828cb4ffaa312df189f3733d3f23166a24"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceReplaceWith]/Dependencies/169/condition",
+      "source_row_sha256": "e3d8430a49af8d655286c66ed67ffbe275a43e99a2c125bb1efd361bcc3381e5"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableMatchCase]/Dependencies/170/condition",
+      "source_row_sha256": "b8a7c886c07d78cc189c48a04162f10681d4e13bcb333019c92e52d708a60b70"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableMatchCase]/Dependencies/171/condition",
+      "source_row_sha256": "176d5befbdecdd06d270312e5f4fb439104e36c75b34a35dfad736a489df8211"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableUseRegularExpression]/Dependencies/172/condition",
+      "source_row_sha256": "901d07463268e87db6986e1504adcadc1ef208583daa22554e2d0c103d786b27"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableReplaceAllInstances]/Dependencies/173/condition",
+      "source_row_sha256": "28ed6480124b83e603a7c08c2ee0940daf1715939f57f9f56d84c0ed96eee4d4"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableReplaceAllInstances]/Dependencies/174/condition",
+      "source_row_sha256": "5b6cec895a047e2488b29685f3a5896e1136022886bd108a92d6b7ae7797cc08"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveCount]/Dependencies/175/condition",
+      "source_row_sha256": "f04265850affe53b0cf2f353d47eef20dfd97e99f35b1f65f082415f94edd3cb"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveAtPosition]/Dependencies/176/condition",
+      "source_row_sha256": "3a93498fdfb4e60eb5be4bd8b27b15f53d01ec388c832b288025e0165429ce3b"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveFrom]/Dependencies/177/condition",
+      "source_row_sha256": "2cfc372bcc00a66228341e045f4ae8d2651467f9826a833828e3e013e70c1e4f"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertWhat]/Dependencies/178/condition",
+      "source_row_sha256": "3b1727efcc5589e96c6c6110cdf16046c897becd46b7b8efd85ec24193c02219"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertStartAt]/Dependencies/179/condition",
+      "source_row_sha256": "10bbfb872a087caabe7e731072239a551c2dcbfc1236930499d9d79853be882a"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertStartAt]/Dependencies/180/condition",
+      "source_row_sha256": "af5fd33c7f4419a7dec28928e4ecfa7cf25c2e7f84924a801c1f34005ca5bf42"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertToInsert]/Dependencies/181/condition",
+      "source_row_sha256": "eccf05bce90939a535b3d833aaacfe0d535934ef9d40054dcada4ba61b227fe8"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertAtPosition]/Dependencies/182/condition",
+      "source_row_sha256": "b922f076336f9f133dc94824bd496f42577a4eb60a8a2fff4bebd3d49f5a7a4e"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[insertFrom]/Dependencies/183/condition",
+      "source_row_sha256": "1721eaeeb22b009679a0d0ab61267d7f058233dde2031a5c2714645729db5fc9"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceFindWhat]/Dependencies/147/condition",
+      "source_row_sha256": "2f24e2cf65a13553ce92bd919b40acfdf8ffad0a3354efd026cae4627a5298e9"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceReplaceWith]/Dependencies/148/condition",
+      "source_row_sha256": "e9e62037ac486d43494157a798714594e20621aa072f96cc700aef11f4d11e10"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableMatchCase]/Dependencies/149/condition",
+      "source_row_sha256": "0b80c4e65fbba1d0e0599c7290d8c5662fd1bc019566b6d9d50fe3c1ac98c3db"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableMatchCase]/Dependencies/150/condition",
+      "source_row_sha256": "cb36eca1396c291c85aa70c0ac5a90de0f3998e64561170e8cfa7015369ae429"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableUseRegularExpression]/Dependencies/151/condition",
+      "source_row_sha256": "94b52a5869c4745fb50604121acdb6d219b0c28e548b718a014f3dd5d022abf0"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableReplaceAllInstances]/Dependencies/152/condition",
+      "source_row_sha256": "fc8048c167d9b0d07cbaf8184936e5e6fe7ac649325ce1d04d3218e5e7df1d93"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableReplaceAllInstances]/Dependencies/153/condition",
+      "source_row_sha256": "ee87487507d40e38f4fc55ba35c1ceb138dca8af9ca9779526c17bedb5aedce3"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveCount]/Dependencies/154/condition",
+      "source_row_sha256": "27910550d79db2e735a159ab9355dd61ecf340044bc0ea70b2b3b1f47d5f28bd"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveAtPosition]/Dependencies/155/condition",
+      "source_row_sha256": "9bd865b7514299beeb26c5e7a536ff1c3d947f510c817f9b034ef0b6099683eb"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveFrom]/Dependencies/156/condition",
+      "source_row_sha256": "00c3fc9f41a22e3ec041551a2153409de0109f1b05092030f36dcc00e2778944"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertWhat]/Dependencies/157/condition",
+      "source_row_sha256": "7275c36c916d2ef7f3d77850dc99a241b186e71f8742a3cb3f872666a75eeae9"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertStartAt]/Dependencies/158/condition",
+      "source_row_sha256": "740fc0fa2c10521919574829019c5793fcba2df4b26dda755f6656f9b4932fad"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertStartAt]/Dependencies/159/condition",
+      "source_row_sha256": "7c7e08a5aaee376286cd5f18f97b3548e2b65dcbc5f662c7b882516341e9c773"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertToInsert]/Dependencies/160/condition",
+      "source_row_sha256": "6679f5afbc915329f6c4696536a6e741240b302f3da46fddb5c9399bad31d093"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertAtPosition]/Dependencies/161/condition",
+      "source_row_sha256": "cdf1def77edd40b0c66dc6d84b3ba515314140e809194ecfc61062c06e2581eb"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertFrom]/Dependencies/162/condition",
+      "source_row_sha256": "e519f0a187bd506b8a3af31204a770587614db3ba7574037afa3be8c105fb43e"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceFindWhat]/Dependencies/156/condition",
+      "source_row_sha256": "589d1063087bf35df401909a34cab0fa7ee778dcec096cf9153fd1603c6addfa"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceReplaceWith]/Dependencies/157/condition",
+      "source_row_sha256": "59fdeda341230d335b5d63c5afd36829267dcb81e99da0efbc16b052ea0b6ef5"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableMatchCase]/Dependencies/158/condition",
+      "source_row_sha256": "3e1c16330d683aacfef2410155d62e740526b6ae678632fc42cbef827cb6b1d1"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableMatchCase]/Dependencies/159/condition",
+      "source_row_sha256": "731267a64d33ba134c945efd3b9c505f775dfd12accac829826d4f921a49820b"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableUseRegularExpression]/Dependencies/160/condition",
+      "source_row_sha256": "572f394a3ee7643c63fe06391a4978380793d665c2dddd07269f9dbdefe710d2"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableReplaceAllInstances]/Dependencies/161/condition",
+      "source_row_sha256": "5939bd1a1b9cd9796601ddf06685d852f1f3b9b517fc142177417e40f7d8ff46"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableReplaceAllInstances]/Dependencies/162/condition",
+      "source_row_sha256": "4d83a51ed108883e7a9c031577d8fedd4f64c5c9b2f475cf7d20a40712789388"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveCount]/Dependencies/163/condition",
+      "source_row_sha256": "11079e8bdd00cb2fc001011d4219cfb2d4dcacd42aa16c9cd81538ae80d24b8b"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveAtPosition]/Dependencies/164/condition",
+      "source_row_sha256": "b781ce191106ad5b5961f0741b5b12caed9ed53f60624aeac43126d806dd160f"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveFrom]/Dependencies/165/condition",
+      "source_row_sha256": "a58dfe2f0680886aea404b8d00b3b863cae1a03cf95ff1d20e80cecf6f630352"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertWhat]/Dependencies/166/condition",
+      "source_row_sha256": "43aabe9405035a7bde462be356cc1e9685c01db572e3ab461dc2613f20f6d203"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertStartAt]/Dependencies/167/condition",
+      "source_row_sha256": "603c5cb48b725a80846607f3646f207912f553f6f9296def3bd1ed070aa5fe6a"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertStartAt]/Dependencies/168/condition",
+      "source_row_sha256": "a541876571f62f9d84c22cded7cba40c6538ff31d7ec27e0efbb1791f1271a20"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertToInsert]/Dependencies/169/condition",
+      "source_row_sha256": "e8521ad9a5ad9e64c0c7b65a1c9aa5bce14f9741ef8020b0d01b9c785b00b6da"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertAtPosition]/Dependencies/170/condition",
+      "source_row_sha256": "ce34de5c6bfbef922861f0c4778e79ecc530629eb84bf5a80015334429e2f433"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertFrom]/Dependencies/171/condition",
+      "source_row_sha256": "42c15e643c81183d161a9dbc255e7d217d7c7005381bccfadcde383b43bf2614"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceFindWhat]/Dependencies/168/condition",
+      "source_row_sha256": "85a3dd9b4fd97e1261145f55bd805ff706c56d38eacb20996accdab188738c28"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceReplaceWith]/Dependencies/169/condition",
+      "source_row_sha256": "c4cce3e5d16a64b44416a4269cbc6c09ce79dbd05fde134c634d8306e445bbb1"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableMatchCase]/Dependencies/170/condition",
+      "source_row_sha256": "e8ba724e440e5b65cdd3f103bec4a6882037221f04defe44b0a251012621469c"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableMatchCase]/Dependencies/171/condition",
+      "source_row_sha256": "94f7019c6496017afe68f1dcbdbdc0321f5212d0f87632cae92e0507846febc0"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableUseRegularExpression]/Dependencies/172/condition",
+      "source_row_sha256": "e4a81fa64d1d95872a70101709d5331080b57e189fd9659a437947105b14db0b"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableReplaceAllInstances]/Dependencies/173/condition",
+      "source_row_sha256": "5c828ede786f86bd58023d05e17073ccb8fcbbf12ff61b14234455eb664806ba"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[ReplaceEnableReplaceAllInstances]/Dependencies/174/condition",
+      "source_row_sha256": "91d1a482d92d60402a37c27ee2e9f081831468ae91201bdc517c82fea11675a4"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveCount]/Dependencies/175/condition",
+      "source_row_sha256": "c26132bb339f4c31ddfbac722f9b322dd4f0548c4f8fcfdd57d25767eed8625f"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveAtPosition]/Dependencies/176/condition",
+      "source_row_sha256": "51535ee7fa03c0d57a5f72dec2a946699db1d0f1344f129fe0cd836a1e94f8f9"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[RemoveFrom]/Dependencies/177/condition",
+      "source_row_sha256": "703af4a611f9fae56d89fd6b5ff7a4dd1897cb2d966ca63e1a3aa44968981694"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertWhat]/Dependencies/178/condition",
+      "source_row_sha256": "a2f9b70b287225ea896f26ef9a0b6ab89ca697bb8644c7365220b8956ab97dfe"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertStartAt]/Dependencies/179/condition",
+      "source_row_sha256": "9f65df7072c3c1c5286714c7fc8b636c22c7a24a3d1405817e7e0a5c7c84cd7b"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertStartAt]/Dependencies/180/condition",
+      "source_row_sha256": "c8aece4d3311a4a02b55357953513aff57a308a64ee10033f68fe26dc89f401d"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertToInsert]/Dependencies/181/condition",
+      "source_row_sha256": "4bcf6334acb692334b62491ea23f6f5d74aadf6f4737b1427022271009f1f574"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertAtPosition]/Dependencies/182/condition",
+      "source_row_sha256": "4f17049694cdc352f5f25bb934564083e8fd2fa13f7460189e825ed73702225d"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[UserProjectSettings]/InnerTypes/InnerType[BatchRenameSettings]/Properties/Property[InsertFrom]/Dependencies/183/condition",
+      "source_row_sha256": "224f069dd223e1fe8e9f72e5c1d99806130e299c34efa8ac0675556f2df25258"
+    }
+  ],
+  "parent_class_id": 3342352,
+  "review_id": "195-user-approved-batch-rename-window-2026-10-28",
+  "settings_class_id": 65011712
+}

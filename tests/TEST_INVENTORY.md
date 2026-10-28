@@ -5,6 +5,52 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-28 #195 condition accounting and bounded playlist diagnosis
+
+Reviewed integration `2d4ed137` incorporates exact source-structure accounting
+for 30 PositioningType members and the user-approved exclusion of 240 Batch
+Rename window-setting members. The existing producer/reader assessment preserves
+all 7,297 IDs and shapes: 7,042 source definitions, 240 approved exclusions and
+15 unresolved MusicPlaylistItem dependencies; `complete=false`. Canonical
+condition publication and final combined gates remain pending. Source-definition
+and exclusion states confer no native effect or recipient-metadata observation.
+
+Fieldless implementation `c21b300f` recorded a grouped result of **49 passed,
+2 failed in 235.13s**; both failures were negative-test binding-scope mistakes.
+After correcting only those inputs, the two affected controls passed in72.41s.
+This is separate evidence, not a single51/51 run. User-approved exclusion
+implementation `32b5be8a` then passed its12 selected controls in138.78s, including
+the actual export/import/persisted assessment and non-Batch scope negatives.
+Original artifacts and failing verdicts remain unchanged; ordinary object
+renaming and unrelated Inner types were not excluded.
+
+Playlist read-plan change `0e29731f` added only first-item field inventory and
+exact LoopCount enabled-state reads through the existing public Gateway. Its
+focused file passed41 tests in1.23s. Standards review found that the new proof
+stopped before persistence; `8336093a` added the actual maintenance-entrypoint
+and final-v3 category writer check. Only its three new disabled/error/retained-
+failure cases ran: **3 passed,41 deselected in1.98s**. The original41 passing
+checks were not repeated, and the review finding was resolved.
+
+Two isolated macOS Console2025.1.7.9143 read-only diagnostics are retained:
+
+- At `747c88f8`, the original11-read playlist plan passed its diagnostic node
+  in8.46s. LoopCount was readable, while its native metadata named the
+  IsLoopingInfinite dependency absent from the returned nine-field inventory.
+- At `8336093a`, the reviewed13-read plan passed its diagnostic node in5.36s.
+  The first item's explicit inventory was complete with nine names and still
+  omitted that controller; native `isPropertyEnabled` for LoopCount on Mac
+  returned `false`.
+
+These PASS labels mean bounded diagnostic completion, not editable-condition,
+mutation or Fresh acceptance. Both final lifecycle records retain unchanged
+source content hashes/mtimes, zero transactions, deleted owned sandboxes and no
+residual processes. The playlist-root parent-comparison discrepancy remains a
+finding, not a passing ownership assertion or additional investigation. Original
+records and raw packets are retained in `.waapi-skill-state/full-coverage/`
+`195-music-read-2025-r1/` and `195-music-read-2025-r2/`. No additional native
+absence, other-version outcome, full gate or Fresh credit is claimed.
+
 ## 2026-10-27 #183 configured external-output correction
 
 The failed-only diagnostic at `46ec36ed`, root
