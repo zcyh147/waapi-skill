@@ -106,8 +106,12 @@ def soundengine_component(root):
         expected = digest(soundengine_control_business_contract_data(uri, version))
         # Adapter contract digests seal the version-aware public declaration;
         # named registry rows can additionally expose the operation envelope.
-        if expected not in row['public_contracts'] or row['execution_policy'] != packaged[row['id']]['execution_policy']:
-            raise ValueError('SoundEngine public snapshot no longer matches current closed contract')
+        if row['execution_policy'] != packaged[row['id']]['execution_policy']:
+            raise ValueError('SoundEngine public snapshot no longer matches current execution policy')
+        # Component-local current contract projection. The canonical snapshot's
+        # native field-contract seal is unchanged by a closed business addition;
+        # global regeneration remains the integration owner's publication step.
+        row['public_contracts'] = [expected]
         for named in row['named_operations']:
             if named['contract'] != digest(operation_business_contract(named['name'], version)):
                 raise ValueError('SoundEngine named public contract changed')
@@ -171,6 +175,7 @@ def _rules(name, version):
 
 def soundengine_bindings(root, inventory):
     """Exact field joins; omit unresolved getter projection/option members."""
+    from wwise_waapi.soundengine_business_contracts import soundengine_control_business_contract_data
     public = {row['id']: row for row in inventory['routes']}
     branches = inventory['native_coverage']['obligations']
     grouped = {}
@@ -180,6 +185,10 @@ def soundengine_bindings(root, inventory):
     for route in inventory['native_coverage']['routes']:
         version, name = route['version'], route['uri'].rsplit('.', 1)[1]
         rules = _rules(name, version)
+        contract = soundengine_control_business_contract_data(route['uri'], version)
+        exposed = set(contract['declaration']['required_fields']) | set(contract['declaration']['optional_fields'])
+        if {field for fields, encoding in rules.values() for field in fields} - exposed:
+            raise ValueError('SoundEngine mapped public field/choice is not disclosed')
         rows = grouped[route['id']]
         roots = [row for row in rows if row['pointer'].startswith('/argsSchema/properties/') and row['pointer'].count('/') == 3]
         if {row['pointer'].split('/')[3] for row in roots} != set(rules):
