@@ -21,6 +21,7 @@ class FakeActor:
         self.calls, self.objects, self.writes = [], {}, []
         self.closed = False
         self.fully_closed = False
+        self.verified_voices = set()
         self.types = [{'name': name, 'classId': value, 'type': kind} for name, value, kind in
             [('Action', 327696, 'WObject'), ('Event', 262160, 'WObject'),
              ('Sound', 65552, 'WObject'), ('EffectSlot', 5505040, 'Inner'),
@@ -49,6 +50,8 @@ class FakeActor:
             rows = [row for row in self.objects.values() if row.get('path') in source.get('path', []) or row['id'] in source.get('id', [])]
             if args.get('transform'):
                 rows = [row for row in self.objects.values() if row.get('parent', {}).get('id') in {item['id'] for item in rows}]
+            if '@IsVoice' in options['return']:
+                self.verified_voices.update(row['id'] for row in rows if row.get('@IsVoice') is True)
             return {'return': [{key: deepcopy(row[key]) for key in options['return'] if key in row} for row in rows]}
         if uri.endswith('object.create'):
             self.writes.append((uri, deepcopy(args)))
@@ -58,6 +61,8 @@ class FakeActor:
             results = []
             for root in args['objects']:
                 parent = self.objects[root['object']]
+                if any(node.get('type') == 'Source' and 'language' in node for node in root.get('children', [])):
+                    assert parent.get('@IsVoice') is True and parent['id'] in self.verified_voices, 'localized Source needs independently verified existing Voice'
                 result = {'id': parent['id'], 'name': parent['name']}
                 for key in ('children', '@Effects'):
                     if key in root:
@@ -67,6 +72,7 @@ class FakeActor:
         raise AssertionError(uri)
 
     def add(self, node, parent, *, owned=False):
+        assert not (node.get('@IsVoice') is True and any('language' in child for child in node.get('children', []))), 'new Voice and localized Source require separate writes'
         identity = guid(100 + len(self.objects))
         selected = next((row for row in self.types if row['name'] == node['type']), None)
         row = {'id': identity, 'name': node['name'], 'classId': node.get('classId', selected['classId'] if selected else 0),
@@ -146,11 +152,24 @@ def test_remaining_profiles_issue_only_six_discriminators_without_action_setup(t
     assert evidence['selected_profiles'] == ['effect_slot', 'source']
     assert evidence['requested_discriminators'] == len(evidence['cases']) == 6
     assert {row['profile'] for row in evidence['cases']} == {'effect_slot', 'source'}
-    assert len(actor.writes) == 12
+    assert len(actor.writes) == 15
     assert not any(row.get('args', {}).get('property') == 'ActionType' for row in actor.calls)
     assert not any(uri.endswith('object.create') for uri, _ in actor.writes)
     assert evidence['targets_before'] == evidence['targets_after'] == []
     assert evidence['cases'][0]['before']['members'][0]['@Effect'] == {'id': '{00000000-0000-0000-0000-000000000000}'}
+
+
+def test_source_only_setup_verifies_empty_voice_before_localized_source_children(tmp_path):
+    actor, lifecycle = FakeActor(), FakeLifecycle(tmp_path)
+    evidence = run_diagnostic(lifecycle, profiles=selected_profiles('source'), actor_factory=lambda **_: actor)
+    assert evidence['selected_profiles'] == ['source'] and evidence['requested_discriminators'] == 3
+    assert len(evidence['cases']) == len(evidence['source_owner_stages']) == 3
+    assert len(actor.writes) == evidence['native_writes_max'] == 9
+    for stage in evidence['source_owner_stages']:
+        assert stage['empty_voice']['owner']['@IsVoice'] is True and stage['empty_voice']['members'] == []
+        assert stage['request']['objects'][0]['object'] == stage['empty_voice']['owner']['id']
+        assert '@IsVoice' not in stage['request']['objects'][0]
+        assert {row['language'] for row in stage['request']['objects'][0]['children']} == {'English(US)', 'Japanese'}
 
 
 @pytest.mark.parametrize('profiles', [(), ('source', 'source'), ('unknown',)])
@@ -199,14 +218,14 @@ def test_real_lifecycle_persists_final_outcome_and_cleanup_after_collector(monke
     lifecycle = make_collision_lifecycle(root, live_environment={'WWISE_TEST_CONFIG': 'unused'})
     if shutdown_error:
         with pytest.raises(AssertionError):
-            run_diagnostic(lifecycle, profiles=('effect_slot', 'source'), actor_factory=lambda **_: actor)
+            run_diagnostic(lifecycle, profiles=('source',), actor_factory=lambda **_: actor)
     else:
-        run_diagnostic(lifecycle, profiles=('effect_slot', 'source'), actor_factory=lambda **_: actor)
+        run_diagnostic(lifecycle, profiles=('source',), actor_factory=lambda **_: actor)
     evidence = json.loads((root / 'evidence/object-constructor-collisions.json').read_text())
     finalized = json.loads((root / 'evidence/lifecycle.json').read_text())
     assert evidence['status'] == finalized['final_status'] == expected
-    assert evidence['collection_status'] == 'PASS' and len(evidence['cases']) == 6
-    assert evidence['selected_profiles'] == ['effect_slot', 'source'] and evidence['requested_discriminators'] == 6
+    assert evidence['collection_status'] == 'PASS' and len(evidence['cases']) == 3
+    assert evidence['selected_profiles'] == ['source'] and evidence['requested_discriminators'] == 3
     assert finalized['sandbox_retained'] is shutdown_error
     assert (root / 'owned').exists() is shutdown_error
     assert copied_before_launch['languages'] == ['English(US)', 'External', 'Japanese', 'Mixed', 'SFX']

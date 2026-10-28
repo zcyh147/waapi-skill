@@ -192,13 +192,25 @@ def collect_observations(actor, evidence):
                 seed = {'type': 'Source', 'name': 'SameName', 'classId': selected['Wwise Tone Generator']['classId'],
                         'language': 'English(US)', '@StartFreq': 660, 'notes': 'original'}
                 member = {**seed, 'language': 'Japanese', '@StartFreq': 440, 'notes': 'requested'}
-                owner_node.update({'@IsVoice': True, 'children': [seed,
-                    {**seed, 'name': 'UnrelatedJapanese', 'language': 'Japanese', 'notes': 'retain unrelated'}]})
+                owner_node['@IsVoice'] = True
+                source_seed_nodes = [seed,
+                    {**seed, 'name': 'UnrelatedJapanese', 'language': 'Japanese', 'notes': 'retain unrelated'}]
             # Setup is separate from the discriminator, always fail-on-name.
             call('ak.wwise.core.object.set', {'objects': [{'object': unit['id'], 'children': [owner_node]}],
                 'onNameConflict': 'fail', 'listMode': 'append'})
             owner = _one(_lookup(call, {'path': [unit['path'] + '\\' + name]}, BASE))
             assert owner['type'] == owner_type and owner['classId'] == selected[owner_type]['classId']
+            if profile == 'source':
+                # Reuse the retained R44/voice_source_staging sequence: Source
+                # language needs an independently verified existing Voice.
+                empty_voice = _snapshot(call, owner['id'], profile)
+                assert empty_voice['owner']['@IsVoice'] is True and empty_voice['members'] == []
+                assert empty_voice['owner']['notes'] == 'retain owner'
+                source_seed_args = {'objects': [{'object': owner['id'], 'children': source_seed_nodes}],
+                                    'onNameConflict': 'fail', 'listMode': 'append'}
+                source_stage = {'mode': mode, 'empty_voice': empty_voice, 'request': source_seed_args}
+                evidence['source_owner_stages'].append(source_stage)
+                source_stage['native_result'] = call('ak.wwise.core.object.set', source_seed_args)
             before = _snapshot(call, owner['id'], profile)
             assert len(before['members']) == (2 if profile == 'source' else 1)
             assert all(row['classId'] == selected['Wwise Tone Generator' if profile == 'source' else
@@ -214,6 +226,7 @@ def collect_observations(actor, evidence):
                     old['@Effect'], field='EffectSlot.@Effect', allow_none=True) is None
                 assert old['@Bypass'] is True and old['@Render'] is False
             else:
+                assert before['owner'] == empty_voice['owner'], 'Source setup changed independently verified Voice'
                 assert before['owner']['@IsVoice'] is True
                 assert {(row['name'], row['audioSource:language']['name'], row['@StartFreq'], row['notes'])
                         for row in before['members']} == {
@@ -260,7 +273,8 @@ def run_diagnostic(lifecycle, *, actor_factory=None, profiles=PROFILES):
                 'public_gateway_pass': False, 'agent_semantic_pass': False,
                 'bounds': BOUNDS, 'source_pins': source_pins(), 'cases': [], 'native_calls': [],
                 'selected_profiles': list(profiles), 'requested_discriminators': len(profiles) * 3,
-                'native_writes_max': len(profiles) * 6 + (2 if 'action' in profiles else 0)}
+                'native_writes_max': len(profiles) * 6 + (2 if 'action' in profiles else 0) + (3 if 'source' in profiles else 0),
+                'source_owner_stages': []}
     runtime = actor = None
     status, reason = 'FAIL', 'diagnostic did not complete'
     try:
