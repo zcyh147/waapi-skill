@@ -142,10 +142,24 @@ def test_source_discriminator_requires_exact_two_language_seed_before_its_write(
     assert actor.closed and lifecycle.finished[0][0] == 'FAIL'
 
 
-def test_late_host_cleanup_failure_cannot_leave_a_diagnostic_pass(tmp_path):
-    actor, lifecycle = FakeActor(), FakeLifecycle(tmp_path)
-    lifecycle.final_status = 'BLOCKED'
-    with pytest.raises(AssertionError):
+@pytest.mark.parametrize('shutdown_error,expected', [(False, 'PASS'), (True, 'BLOCKED')])
+def test_real_lifecycle_persists_final_outcome_and_cleanup_after_collector(monkeypatch, tmp_path, shutdown_error, expected):
+    from tests.semantic.test_codex_scenario_lifecycle_v3 import _install_fakes
+    from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle
+    source, _ = _install_fakes(monkeypatch, tmp_path, shutdown_error=shutdown_error, version='2025.1')
+    actor = FakeActor()
+    root = tmp_path / 'scenario'
+    lifecycle = ScenarioLifecycle(scenario_id='constructor-collision-2025.1', version='2025.1',
+        scenario_root=root, live_environment={'WWISE_TEST_CONFIG': 'unused'}, lock_root=tmp_path / 'lock')
+    if shutdown_error:
+        with pytest.raises(AssertionError):
+            run_diagnostic(lifecycle, actor_factory=lambda **_: actor)
+    else:
         run_diagnostic(lifecycle, actor_factory=lambda **_: actor)
-    evidence = json.loads((tmp_path / 'object-constructor-collisions.json').read_text())
-    assert evidence['status'] == 'BLOCKED' and evidence['collection_status'] == 'PASS'
+    evidence = json.loads((root / 'evidence/object-constructor-collisions.json').read_text())
+    finalized = json.loads((root / 'evidence/lifecycle.json').read_text())
+    assert evidence['status'] == finalized['final_status'] == expected
+    assert evidence['collection_status'] == 'PASS' and len(evidence['cases']) == 9
+    assert finalized['sandbox_retained'] is shutdown_error
+    assert (root / 'owned').exists() is shutdown_error
+    assert source.read_text() == 'test' and actor.closed
