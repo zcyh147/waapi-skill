@@ -92,10 +92,10 @@ def collect(actor, evidence):
             seen.add(identity)
             row = get(identity, BASE + ['children', 'PlaylistItemType', 'Segment', 'PlayMode'])
             assert row['type'] == 'MusicPlaylistItem' and row['classId'] == 2359312 and row['name'] == ''
-            children = row['children']
-            assert isinstance(children, list) and len(children) <= BOUNDS['items_per_tree']
             transform = call('ak.wwise.core.object.get', {'from': {'id': [identity]},
                 'transform': [{'select': ['children']}, {'range': [0, BOUNDS['items_per_tree'] + 1]}]}, {'return': BASE})['return']
+            children = row.get('children', [{'id': child['id']} for child in transform])
+            assert isinstance(children, list) and len(children) <= BOUNDS['items_per_tree']
             assert [child['id'] for child in transform] == [_identity(child) for child in children]
             return {'row': row, 'transformed_children': transform, 'children': [walk(_identity(child)) for child in children]}
         root = _identity(owner['PlaylistRoot'])

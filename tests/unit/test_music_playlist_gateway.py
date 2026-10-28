@@ -60,6 +60,10 @@ class MusicPlaylistTask(OwnedGraphTask):
         self.next_id = 100
 
     def call(self, uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('transform') == [{'select': ['children']}, {'range': [0, 65]}]:
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            parent = self.objects[args['from']['id'][0]]
+            return {'return': self.project_rows([self.objects[item['id']] for item in parent.get('children', [])], options)}
         if uri.endswith('object.get') and args.get('from', {}).get('id') and not args.get('transform'):
             # A relationship array is independent from result and object-map order.
             if len(args['from']['id']) == 1 and 'children' in options['return']:
@@ -166,6 +170,24 @@ def test_playlist_class_loop_discovery_uses_only_disclosed_controllers(tmp_path,
         assert not any(uri.endswith('getPropertyInfo') and args.get('property') == 'IsLoopingInfinite'
             for uri, args, _ in task.calls)
     assert task.writes == []
+
+
+def test_playlist_omitted_empty_children_uses_independent_relationship_query(tmp_path):
+    task = MusicPlaylistTask(tmp_path)
+    project = task.project_rows
+    def native_rows(rows, options):
+        result = project(rows, options)
+        for row in result:
+            if row.get('children') == []:
+                del row['children']
+        return result
+    task.project_rows = native_rows
+    task.declare()
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert any(args.get('transform') for uri, args, _ in task.calls if uri.endswith('object.get'))
+    assert len(task.writes) == 1
 
 
 @pytest.mark.parametrize('fault', ('reordered-readback', 'reordered-result', 'wrong-owner', 'wrong-class', 'retained-old-root', 'changed-segment'))

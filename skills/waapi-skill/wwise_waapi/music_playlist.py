@@ -260,7 +260,14 @@ def _tree_snapshot(read, root, names):
         row = _snapshot(read, guid, names)
         if row.get('type') != 'MusicPlaylistItem' or row.get('classId') != ITEM_CLASS or row.get('name') != '':
             _fail('INVALID_PLAYLIST_READBACK', 'Every owned playlist occurrence must have the exact class and anonymous name')
-        edges = _field(row, 'children')
+        if 'children' in row:
+            edges = row['children']
+        else:
+            # Native leaf items can omit this projection. Resolve the relation
+            # independently; omission alone never proves an empty collection.
+            relation = read(GET, {'from': {'id': [guid]},
+                'transform': [{'select': ['children']}, {'range': [0, MAX_ITEMS + 1]}]}, {'return': ['id']})
+            edges = relation.get('return') if isinstance(relation, Mapping) else None
         if not isinstance(edges, list) or len(edges) > MAX_ITEMS:
             _fail('INVALID_PLAYLIST_READBACK', 'Playlist children must be an independently returned bounded ordered array')
         child_ids = [_reference(edge) for edge in edges]

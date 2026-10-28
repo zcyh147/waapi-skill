@@ -21,6 +21,14 @@ class PlaylistActor:
         self.task.objects[A]['children'] = []
         self.task.objects[B]['children'] = []
         self.task.objects[SECOND]['path'] = r'\Containers\Default Work Unit'
+        project = self.task.project_rows
+        def native_rows(rows, options):
+            result = project(rows, options)
+            for row in result:
+                if row.get('children') == []:
+                    del row['children']
+            return result
+        self.task.project_rows = native_rows
         self.closed, self.fault, self.calls = False, fault, []
 
     def __call__(self, uri, args, options):
