@@ -1,6 +1,4 @@
 """Topic mapping export reaches the existing completion reader, without effects."""
-from copy import deepcopy
-
 import pytest
 
 from tests.maintenance import branch_coverage_audit as audit
@@ -14,7 +12,7 @@ def topic_inventory():
 
 
 def test_topic_family_maps_native_choices_to_public_contract_and_reports_missing_proof(tmp_path, topic_inventory):
-    from tests.support.topic_completion_mapping import topic_component, export_mapping
+    from tests.support.topic_completion_mapping import export_mapping
     inventory = topic_inventory
     exported = export_mapping(audit.ROOT, tmp_path, inventory=inventory)
     bindings, base, _ = audit.portable_binding_inputs(exported['index_path'], exported['requirements'])
@@ -24,7 +22,7 @@ def test_topic_family_maps_native_choices_to_public_contract_and_reports_missing
     field = ('2022.1|wwise-console|2022.1.19.8584|topic|ak.wwise.core.object.created|'
              '/optionsSchema/properties/return')
     mapping = bindings['bindings'][field]['input']['correspondence']
-    assert mapping['public_inputs'] == [
+    assert [{key: entry[key] for key in ('action', 'field', 'native_path')} for entry in mapping['public_inputs']] == [
         {'action': '--topic-option', 'field': 'include', 'native_path': ['return']},
         {'action': '--topic-option-empty', 'field': 'include', 'native_path': ['return']}]
     assert all(row['requirements'] == ['program'] for row in result['obligations'])
@@ -68,7 +66,7 @@ def test_topic_export_rejects_a_removed_public_option_instead_of_inheriting_type
                 option_empty_fields=tuple(field for field in contract.option_empty_fields if field.token != 'include'))
         return contract
     monkeypatch.setattr(business, 'topic_business_contract', missing_option)
-    with pytest.raises(ValueError, match='closed public correspondence: 2022.1.*object.created'):
+    with pytest.raises(ValueError, match='closed public correspondence.*2022.1.*object.created'):
         topic_bindings(audit.ROOT, topic_inventory)
 
 
@@ -116,7 +114,8 @@ def test_topic_program_anchor_rejects_an_unfinalized_run(topic_inventory, tmp_pa
         program_anchors(audit.ROOT, topic_inventory, tmp_path / 'output', review)
 
 
-def test_topic_ordinary_copy_preserves_the_original_finalizer_receipt_name(topic_inventory, tmp_path):
+@pytest.mark.parametrize("relative_flavor", ["native", "windows"])
+def test_topic_ordinary_copy_preserves_the_original_finalizer_receipt_name(topic_inventory, tmp_path, monkeypatch, relative_flavor):
     import hashlib
     import json
     from pathlib import Path
@@ -131,10 +130,112 @@ def test_topic_ordinary_copy_preserves_the_original_finalizer_receipt_name(topic
         'scope_kind': 'product', 'files': files, 'review': {'sources': {}}},
         'selected_tests': ['controlled-copy-fixture-never-executed']}))
     output = tmp_path / 'bundle'
+    if relative_flavor == 'windows':
+        from pathlib import PureWindowsPath
+        relative_to = Path.relative_to
+        def windows_relative(path, *parents):
+            result = relative_to(path, *parents)
+            return PureWindowsPath(*result.parts) if path.parts[:len(output.parts)] == output.parts else result
+        monkeypatch.setattr(Path, 'relative_to', windows_relative)
     anchors = program_anchors(audit.ROOT, topic_inventory, output, review)
     proof = json.loads((output / next(iter(anchors.values()))['evidence']['program']['artifact']).read_text())
+    assert proof['files']['result']['artifact'] == 'original/run.result'
     assert Path(proof['files']['result']['artifact']).name == 'run.result'
     summary = json.loads((output / proof['files']['summary']['artifact']).read_text())
     assert summary['original_receipt'] == Path(proof['files']['result']['artifact']).name
     for name, descriptor in proof['files'].items():
         assert (output / descriptor['artifact']).read_bytes() == Path(files[name]['artifact']).read_bytes()
+
+
+def topic_scope(inventory, version, uri):
+    from tests.support.topic_completion_mapping import digest
+    route_ids = {row['id'] for row in inventory['native_coverage']['routes']
+                 if row['version'] == version and row['uri'] == uri}
+    rows = [row for row in inventory['native_coverage']['obligations'] if row['route'] in route_ids]
+    return {**inventory, 'routes': [row for row in inventory['routes'] if row['id'] == version + '|topic|' + uri],
+        'native_coverage': {**inventory['native_coverage'], 'routes': [row for row in inventory['native_coverage']['routes']
+            if row['id'] in route_ids], 'obligations': rows},
+        'topic_roster_sha256': digest([(row['id'], row['shape_sha256']) for row in rows])}
+
+
+def test_legacy_implicit_topic_members_keep_closed_row_correspondence(topic_inventory):
+    from tests.support.topic_completion_mapping import topic_bindings
+    bindings = topic_bindings(audit.ROOT, topic_scope(topic_inventory, '2021.1', 'ak.wwise.core.soundbank.generated'))
+    prefix = '2021.1|wwise-console|2021.1.14.8108|topic|ak.wwise.core.soundbank.generated|'
+    cases = [
+        ('/publishSchema/properties/bankInfo/items/GameParameters/items/properties/Id',
+         ['bankInfo', None, 'GameParameters', None, 'Id'], 'bank-info-game-parameters', 'id'),
+        ('/publishSchema/properties/bankInfo/items/properties/IncludedEvents/items/SwitchContainers/items/properties/SwitchValue',
+         ['bankInfo', None, 'IncludedEvents', None, 'SwitchContainers', None, 'SwitchValue'],
+         'bank-info-included-events-switch-containers', 'switch-value'),
+    ]
+    for pointer, expected_path, collection, field in cases:
+        mapped = bindings[prefix + pointer]['input']['correspondence']
+        assert mapped['native_path'] == expected_path
+        assert any(item['action'] == '--event-row' and item['collection'] == collection
+                   and item['field'] == field for item in mapped['public_inputs'])
+
+
+def test_exact_entry_native_members_map_scalar_object_list_and_choices(topic_inventory):
+    from tests.support.topic_completion_mapping import topic_bindings
+    bindings = topic_bindings(audit.ROOT, topic_scope(topic_inventory, '2021.1', 'ak.wwise.core.object.created'))
+    prefix = ('2021.1|wwise-console|2021.1.14.8108|topic|ak.wwise.core.object.created|'
+              '/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/patternProperties/')
+    members = {key: value['input']['correspondence'] for key, value in bindings.items() if key.startswith(prefix)}
+    scalar = next(value for key, value in members.items() if key.endswith('/anyOf/0'))
+    assert scalar['native_path'] == ['object', '*']
+    choice, = [entry for entry in scalar['public_inputs'] if entry['action'] == '--event-entry-as']
+    assert choice['scope'] == 'object'
+    assert {value['kind'] for value in choice['value_choices']} == {'text', 'number', 'toggle'}
+    for suffix, expected_path, action in [
+        ('/anyOf/3/properties/name', ['object', '*', 'name'], '--event-entry-object'),
+        ('/anyOf/4/items/properties/name', ['object', '*', None, 'name'], '--event-entry-row'),
+    ]:
+        mapped = next(value for key, value in members.items() if key.endswith(suffix))
+        assert mapped['native_path'] == expected_path
+        assert any(entry['action'] == action and entry['scope'] == 'object'
+                   and entry['field'] == 'name' for entry in mapped['public_inputs'])
+
+
+@pytest.mark.parametrize('damage', ['entry', 'choice'])
+def test_missing_exact_entry_or_choice_cannot_receive_projection_only_mapping(topic_inventory, monkeypatch, damage):
+    from dataclasses import replace
+    import wwise_waapi.topic_business as business
+    from tests.support.topic_completion_mapping import topic_bindings
+    original_contract = business.topic_business_contract
+    original_choices = business.topic_business_value_choices
+    def contract(version, uri):
+        result = original_contract(version, uri)
+        if damage == 'entry' and version == '2021.1' and uri == 'ak.wwise.core.object.created':
+            return replace(result, entry_fields=tuple(item for item in result.entry_fields if item.token != 'object'))
+        return result
+    def choices(contract, *, channel, owner):
+        result = original_choices(contract, channel=channel, owner=owner)
+        if damage == 'choice' and contract.version == '2021.1' and contract.topic == 'ak.wwise.core.object.created' and channel == 'event-entry' and tuple(owner) == ('object',):
+            return tuple(item for item in result if item._kind != 'number')
+        return result
+    monkeypatch.setattr(business, 'topic_business_contract', contract)
+    monkeypatch.setattr(business, 'topic_business_value_choices', choices)
+    with pytest.raises(ValueError, match='Topic.*(correspondence|choice)'):
+        topic_bindings(audit.ROOT, topic_scope(topic_inventory, '2021.1', 'ak.wwise.core.object.created'))
+
+
+def test_log_parameter_output_maps_to_exact_projection_without_invented_predicate(topic_inventory, tmp_path):
+    from tests.support.topic_completion_mapping import topic_bindings
+    from tests.unit.test_topic_monitoring_contracts import run
+    uri = 'ak.wwise.core.soundbank.generationDone'
+    scoped = topic_scope(topic_inventory, '2021.1', uri)
+    bindings = topic_bindings(audit.ROOT, scoped)
+    identity = ('2021.1|wwise-console|2021.1.14.8108|topic|' + uri
+        + '|/publishSchema/@definition/waapi_definitions.json/definitions/logCentralItem/properties/parameters/items')
+    mapped = bindings[identity]['input']['correspondence']
+    assert mapped['native_path'] == ['logs', None, 'parameters', None]
+    assert mapped['public_inputs'] == []
+    assert mapped['input_role'] == 'output_only_no_predicate_required'
+    event = {'logs': [{'severity': 'Message', 'time': 0, 'messageId': 'mapping-proof',
+        'message': 'Parameters', 'parameters': ['雨', 'name "quoted" \\ value']}]}
+    code, terminal, client, records = run(tmp_path, '2021.1', 'stream-topic', uri, [event], timeout_seconds=1.0)
+    assert code == 0, terminal
+    assert [record['event'] for record in records if record['record_type'] == 'event'] == [event]
+    assert terminal['monitoring_outcome']['target_completed'] is True
+    assert client.unsubscribed == 1
