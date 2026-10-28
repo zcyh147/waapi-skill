@@ -4997,9 +4997,16 @@ def _prepare_object_create(
     )
     type_catalog = _read_object_type_catalog(read)
     render_native_nodes: dict[str, dict[str, Any]] = {}
+    root_list_binding = None
+    if list_name is not None:
+        from .documented_list_fields import resolve_live_list_evidence
+        root_list_binding = resolve_live_list_evidence(request.version, parent.object, list_name, read=read)
+        selected = arguments.get('documented_list_bindings', [])
+        if selected and selected != [root_list_binding]:
+            raise OperationContractError('DOCUMENTED_LIST_BINDING_INVALID', 'Selected List proof differs from its exact owner/class/source')
     from .planned_references import prepare_result_context
     result_context = prepare_result_context(arguments.get("graph_result_bindings", []), normalized.nodes,
-        {"$": (parent, requested_conflict)}, resolve_type=lambda node: _resolve_graph_node_type(node, catalog=type_catalog, version=request.version), read=read, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
+        {"$": (parent, requested_conflict)}, resolve_type=lambda node: _resolve_graph_node_type(node, catalog=type_catalog, version=request.version, root_list_binding=root_list_binding), read=read, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
     canonical_types: dict[str, str] = {}
     resolved_references: dict[str, Any] = {}
     derived_properties: dict[str, dict[str, Any]] = {}
@@ -5018,6 +5025,7 @@ def _prepare_object_create(
         derived_properties=derived_properties,
         identity_cache=identity_cache,
         property_info_cache=property_info_cache,
+        root_list_binding=root_list_binding,
         result_context=result_context,
         merge_existing=requested_conflict == "merge",
         merge_guards=early_merge_guards,
@@ -8806,8 +8814,16 @@ def _effect_shareset_placement_assertions(pre_state, *, read, after_write=False)
     return assertions
 
 
-def _resolve_graph_node_type(node, *, catalog, version):
+def _resolve_graph_node_type(node, *, catalog, version, root_list_binding=None):
     if node.plugin is None:
+        if root_list_binding is not None and node.request_path == '$':
+            from .documented_list_fields import source_owned_music_type
+            try:
+                owned = source_owned_music_type(node.type, version=version, binding=root_list_binding, catalog=catalog)
+            except ValueError as exc:
+                raise OperationContractError('DOCUMENTED_LIST_ELEMENT_CLASS_INVALID', str(exc)) from exc
+            if owned is not None:
+                return owned
         return _resolve_object_type("PropertyContainer" if version == "2025.1" and node.type == "ActorMixer" else node.type, catalog=catalog)
     matches = [row for row in catalog if row.class_id == node.plugin.class_id and row.type == node.plugin.object_type]
     if len(matches) != 1:
@@ -8844,6 +8860,7 @@ def _prepare_object_node_specs(
     live_source_parent: bool = False,
     playlist_owner: ResolvedObject | None = None,
     playlist_mode: str = "append",
+    root_list_binding: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
     node_paths = {node.request_path for node in nodes}
@@ -8867,7 +8884,7 @@ def _prepare_object_node_specs(
             if uses_2025_actor_mixer_alias
             else node.type
         )
-        type_info = _resolve_graph_node_type(node, catalog=type_catalog, version=version)
+        type_info = _resolve_graph_node_type(node, catalog=type_catalog, version=version, root_list_binding=root_list_binding)
         if (
             uses_2025_actor_mixer_alias
             and _object_type_token(type_info.name) != "propertycontainer"

@@ -228,6 +228,13 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/fixtures/metadata-conditions/lfo-eq-originals.json.gz',
                  'tests/unit/test_condition_mechanism_reuse.py', 'tests/unit/test_condition_source_resolution.py',
                  'tests/support/condition_completion_mapping.py', 'tests/maintenance/map_condition_completion.py',
+                 'tests/support/applicability_completion_mapping.py', 'tests/support/applicability_program.py',
+                 'tests/maintenance/map_applicability_completion.py', 'tests/unit/test_installed_applicability_completion.py',
+                 'tests/unit/test_applicability_public_program.py', 'tests/unit/test_legacy_owned_list_gateway.py',
+                 'tests/fixtures/metadata-conditions/applicability-sdk-sources.json.gz',
+                 'tests/fixtures/metadata-conditions/applicability-current-program.json.gz',
+                 'tests/fixtures/metadata-conditions/applicability-current-program-r2.json.gz',
+                 'tests/fixtures/metadata-conditions/applicability-current-program-r3.json.gz',
                  'tests/unit/test_condition_completion_mapping.py', 'tests/unit/test_condition_completion_reader.py',
                  'tests/fixtures/metadata-conditions/condition-completion-review.json',
                  'tests/fixtures/metadata-conditions/condition-completion-proof-inputs.json.gz'):
@@ -1643,6 +1650,9 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         if (binding or {}).get('condition_source_mapping_attachment'):
             from tests.support.condition_completion_mapping import mapping_evidence_result
             return mapping_evidence_result(descriptor, branch, category, scope_kind, base, binding, root)
+        if (binding or {}).get('installed_applicability_attachment'):
+            from tests.support.applicability_completion_mapping import mapping_evidence_result
+            return mapping_evidence_result(descriptor, branch, category, scope_kind, base, binding, root)
         if category == 'native' and (binding or {}).get('condition_mechanism_attachment'):
             from tests.support.condition_mechanism_reuse import condition_mechanism_result
             return condition_mechanism_result(descriptor, branch, candidate, scope_kind, base, binding, root, reference_edges or {})
@@ -2068,6 +2078,7 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
 
     condition_reuse_reviews, condition_reuse_runs = set(), set()
     definition_contexts, definition_proofs = {}, {}
+    applicability_contexts = {}
     historical_sources = {}  # Immutable Git objects only; never shared across evaluations.
     from tests.support.empty_candidate_evidence import classify_empty_candidate
     empty_cache = {}  # Frozen catalog/shape cache, local to this evaluation.
@@ -2111,6 +2122,15 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
             if branch['state'] == 'source_definition_verified':
                 for proof in witness_references(context['members'][branch['id']], context):
                     definition_proofs[proof['original_proof_id']] = proof
+            continue
+        if binding.get('installed_applicability_attachment'):
+            from tests.support.applicability_completion_mapping import validate_attachment, evaluate_binding
+            descriptor = binding['installed_applicability_attachment']
+            key = 'installed-applicability:' + digest(descriptor)
+            if key not in applicability_contexts:
+                applicability_contexts[key] = validate_attachment(descriptor, evidence_base or root, root)
+            evaluate_binding(branch, binding, policies.get(branch['id'], {}), scope_kind,
+                evidence_base or root, root, applicability_contexts[key])
             continue
         if binding.get('disposition') == 'native_absence':
             if route is not None or not binding.get('alternatives_considered'):
@@ -2215,6 +2235,12 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
             'original_native_witness_proofs': [definition_proofs[k] for k in sorted(definition_proofs)],
             'original_run_count': 'not_summed_from_member_bindings; original identities retained inside exact proofs',
             'new_native_runs': 0, 'direct_recipient_instance_metadata': 'not_observed'}
+    if applicability_contexts:
+        from tests.support.applicability_completion_mapping import program_review
+        program_review(root)
+        native['installed_applicability'] = {'review_ids': sorted({c['review']['review_id'] for c in applicability_contexts.values()}),
+            'native_runs': 0, 'direct_recipient_execution': 'not_observed',
+            'scope': 'installed class/mode source applicability; no independent constructibility inferred from type discovery'}
     native['scope_kind'] = scope_kind
     native['scope_sha256'] = digest(scope) if scope is not None else None
     native['bindings_sha256'] = digest(bindings_document)

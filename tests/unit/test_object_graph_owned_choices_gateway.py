@@ -730,8 +730,8 @@ def test_documented_list_immutable_preview_blocks_class_source_and_order_drift(t
 
 def test_2021_documented_list_discovery_reports_missing_source_without_native_absence(tmp_path):
     task = FieldTask(tmp_path, "2021.1", "object.create")
-    task.objects[FIRST] = {"id": FIRST, "name": "Rain", "type": "Sound", "classId": 65552,
-        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"}
+    task.objects[FIRST] = {"id": FIRST, "name": "Rain", "type": "AudioSource", "classId": 16,
+        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Sound\Rain"}
     owner = task.bind(FIRST)
     code, listed = task.step("draft-discover-fields", "--object-handle", owner,
         "--field-source", "documented-lists", "--list")

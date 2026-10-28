@@ -490,10 +490,10 @@ def portable_binding_inputs(index_path, requirements):
     from tests.maintenance.branch_audit_completion import read_sealed_artifact
     raw = index_path.read_bytes()
     index = json.loads(raw)
-    if (not {'contract', 'base', 'entries'} <= set(index) or set(index) - {'contract', 'base', 'entries', 'metadata_attachments', 'source_attachments', 'source_native_attachments', 'runtime_observation_attachments', 'qualified_runtime_read_attachments', 'condition_mechanism_attachments', 'condition_definition_attachments', 'mapping_attachments'}
+    if (not {'contract', 'base', 'entries'} <= set(index) or set(index) - {'contract', 'base', 'entries', 'metadata_attachments', 'source_attachments', 'source_native_attachments', 'runtime_observation_attachments', 'qualified_runtime_read_attachments', 'condition_mechanism_attachments', 'condition_definition_attachments', 'installed_applicability_attachments', 'mapping_attachments'}
             or index['contract'] != 'waapi-skill.branch-evidence-index/v1'
             or not isinstance(index['base'], str) or Path(index['base']).is_absolute()
-            or not isinstance(index['entries'], list) or (not index['entries'] and not index.get('condition_definition_attachments') and not index.get('mapping_attachments'))):
+            or not isinstance(index['entries'], list) or (not index['entries'] and not index.get('condition_definition_attachments') and not index.get('installed_applicability_attachments') and not index.get('mapping_attachments'))):
         raise ValueError('invalid portable evidence index')
     boundary = ROOT.resolve() if index_path.resolve().is_relative_to(ROOT.resolve()) else index_path.parent.resolve()
     base = (index_path.parent / index['base']).resolve(strict=True)
@@ -721,12 +721,17 @@ def portable_binding_inputs(index_path, requirements):
     if 'condition_definition_attachments' in index:
         from tests.support.condition_completion_mapping import attach_definition_mappings
         condition_definitions = attach_definition_mappings(index['condition_definition_attachments'], bindings, base, ROOT)
+    applicability = None
+    if 'installed_applicability_attachments' in index:
+        from tests.support.applicability_completion_mapping import attach_mappings
+        applicability = attach_mappings(index['installed_applicability_attachments'], bindings, base, ROOT)
     apply_mapping_attachments(mapping_inputs, bindings, original_policies)
     return {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': bindings}, base, {
         **({'mapping_attachments': index['mapping_attachments']} if index.get('mapping_attachments') else {}),
         **({'source_business_facts': source_business_facts} if source_business_facts else {}),
         **({'condition_mechanism_reuse': condition_mechanism_reuse} if condition_mechanism_reuse else {}),
         **({'condition_source_definitions': condition_definitions} if condition_definitions else {}),
+        **({'installed_applicability': applicability} if applicability else {}),
         'mode': 'portable-index', 'index_sha256': hashlib.sha256(raw).hexdigest(),
         'selected_documents_sha256': digest({'entries':index['entries'],'metadata_attachments':attachments,
             'source_attachments':index.get('source_attachments', []),
@@ -735,7 +740,8 @@ def portable_binding_inputs(index_path, requirements):
             **({'qualified_runtime_read_attachments':index['qualified_runtime_read_attachments']} if 'qualified_runtime_read_attachments' in index else {}),
             **({'condition_mechanism_attachments':index['condition_mechanism_attachments']} if 'condition_mechanism_attachments' in index else {}),
             **({'condition_definition_attachments':index['condition_definition_attachments']} if 'condition_definition_attachments' in index else {}),
-            **({'mapping_attachments':index['mapping_attachments']} if 'mapping_attachments' in index else {})}) if index.get('source_attachments') or index.get('source_native_attachments') or index.get('runtime_observation_attachments') or index.get('qualified_runtime_read_attachments') or index.get('condition_mechanism_attachments') or index.get('condition_definition_attachments') or index.get('mapping_attachments') else
+            **({'installed_applicability_attachments': index['installed_applicability_attachments']} if 'installed_applicability_attachments' in index else {}),
+            **({'mapping_attachments':index['mapping_attachments']} if 'mapping_attachments' in index else {})}) if index.get('source_attachments') or index.get('source_native_attachments') or index.get('runtime_observation_attachments') or index.get('qualified_runtime_read_attachments') or index.get('condition_mechanism_attachments') or index.get('condition_definition_attachments') or index.get('installed_applicability_attachments') or index.get('mapping_attachments') else
             digest({'entries':index['entries'],'metadata_attachments':attachments}) if attachments else digest(index['entries'])}
 
 
