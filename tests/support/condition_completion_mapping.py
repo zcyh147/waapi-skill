@@ -22,11 +22,53 @@ REVIEW_PATH = 'tests/fixtures/metadata-conditions/condition-completion-review.js
 PROOF_PATH = 'tests/fixtures/metadata-conditions/condition-completion-proof-inputs.json.gz'
 REVIEW_SHA256 = '56fe04bfe969fdafa404184a1166002a827c702561918dcc03a7948605acff84'
 SOURCE_RECONCILIATION_PATH = 'tests/fixtures/metadata-conditions/condition-source-reconciliation.json'
-SOURCE_RECONCILIATION_SHA256 = 'd1cfabad293db4bf1e36b5c4167b9dd8cab4dbd9a13ffe7068ef505d6b6ef6ef'
+SOURCE_RECONCILIATION_SHA256 = '4fe41e4bcef2a4d2ffc2f9e0ff484ea61c6616fd067ed5efb236c57069dc4882'
 FIELDLESS_REVIEW_PATH = 'tests/fixtures/metadata-conditions/condition-fieldless-structure-review.json'
 FIELDLESS_REVIEW_SHA256 = 'ad1abc319b41b1bfc157a09ed6630bd9af65d8a68cfe56a963a2d618c751d794'
 BATCH_EXCLUSION_REVIEW_PATH = 'tests/fixtures/metadata-conditions/batch-rename-settings-exclusion-review.json'
 BATCH_EXCLUSION_REVIEW_SHA256 = '40f248258e77b9216aea0608484299f9b021f34300b4bbcf6c7fdcc9892e2716'
+MUSIC_LIMIT_REVIEW_PATH = 'tests/fixtures/metadata-conditions/music-hidden-dependency-review.json'
+MUSIC_LIMIT_REVIEW_SHA256 = '9995235ea5c3494866cb97cd9d6e8ac32e259c2d84d9d5bf9b153a809f1ba74d'
+
+
+def _music_limit_review(root):
+    raw = (root / MUSIC_LIMIT_REVIEW_PATH).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != MUSIC_LIMIT_REVIEW_SHA256:
+        raise ValueError('Exact Music Playlist hidden-dependency review differs')
+    review = json.loads(raw)
+    text = (root / review['authority_path']).read_text(encoding='utf-8')
+    heading = review['authority_heading'] + '\n'
+    if text.count(heading) != 1:
+        raise ValueError('Music Playlist hidden-dependency decision is missing or ambiguous')
+    section = heading + text.split(heading, 1)[1].split('\n## ', 1)[0].strip() + '\n'
+    if hashlib.sha256(section.encode('utf-8')).hexdigest() != review['authority_section_sha256']:
+        raise ValueError('Exact Music Playlist hidden-dependency decision differs')
+    return review
+
+
+def _map_music_limit(rows, review):
+    """Accept only the hidden-controller mutation boundary, preserving its source."""
+    selected = {r['occurrence_id']: r for r in rows if r['dependency_kind'] == 'music'}
+    if set(selected) != {r['occurrence_id'] for r in review['occurrences']}:
+        raise ValueError('Exact Music Playlist hidden-dependency roster differs')
+    members = sorted((m['id'], m['shape_sha256']) for r in selected.values() for m in r['members'])
+    if len(members) != review['member_count'] or digest(members) != review['members_sha256']:
+        raise ValueError('Exact Music Playlist hidden-dependency members differ')
+    for expected in review['occurrences']:
+        row = selected[expected['occurrence_id']]
+        if (digest(row) != expected['source_row_sha256']
+                or [c['catalog'] for c in row['consumers']] != [
+                    {'classId': 2359312, 'name': 'MusicPlaylistItem', 'type': 'WObject'}]
+                or row['source_pointer'] != 'PluginModule/WwiseObject[MusicPlaylistItem]/Properties/Property[LoopCount]/Dependencies'
+                or row['predicate'] != {'kind': 'enum', 'type': 'bool', 'values': [False]}):
+            raise ValueError('Exact Music Playlist hidden-dependency identity/source differs')
+    for row in selected.values():
+        row['dependencies'] = []
+        row['approved_exclusion'] = {key: review[key] for key in (
+            'review_id', 'authority', 'authority_section_sha256', 'scope', 'when',
+            'reads_retained', 'exposed_controller_path_retained', 'execution_credit',
+            'native_absence_claim', 'writable_field_proof', 'observation_scope')}
+        row['approved_exclusion']['review_sha256'] = MUSIC_LIMIT_REVIEW_SHA256
 
 
 def _batch_exclusion_review(root):
@@ -133,6 +175,7 @@ def _map_fieldless_structure(rows, roots, review):
 def definition_mapping(root):
     fieldless_review = _fieldless_review(root)
     batch_review = _batch_exclusion_review(root)
+    music_review = _music_limit_review(root)
     scalar = reconcile_sources(root)
     scalar_rows = {r['occurrence_id']: r for r in scalar['occurrences']}
     source = load(root / 'docs/branch-coverage-condition-sources.json')
@@ -253,6 +296,7 @@ def definition_mapping(root):
         raise ValueError('Exact full installed condition ID/shape roster differs')
     _map_fieldless_structure(rows, roots, fieldless_review)
     _map_batch_exclusions(rows, batch_review)
+    _map_music_limit(rows, music_review)
     return {'contract': 'waapi-skill.condition-definition-mapping/v1', 'owner_issue': 177,
         'parent_issue': 174, 'source_manifest_sha256': hashlib.sha256((root / 'docs/branch-coverage-condition-sources.json').read_bytes()).hexdigest(),
         'members_sha256': digest(sorted(pairs)), 'recipes': sorted({r['recipe'] for r in rows}),
@@ -360,6 +404,7 @@ def validate_mapping_attachment(descriptor, base, root, *, selected_mapping=None
     review = _review(root); files = _proofs(str(root), REVIEW_SHA256)
     _fieldless_review(root)  # Recheck immutable inputs even after an expected-map cache hit.
     _batch_exclusion_review(root)
+    _music_limit_review(root)
     attachment = _read(descriptor, base)
     if (set(attachment) != {'contract', 'review', 'mapping'}
             or attachment['contract'] != 'waapi-skill.condition-definition-attachment/v1'
@@ -470,7 +515,7 @@ def mapping_evidence_result(descriptor, branch, category, scope_kind, base, bind
         if row['dependencies']:
             return 'implementation_dependency', json.dumps(row['dependencies'], sort_keys=True)
         if 'approved_exclusion' in row:
-            return 'missing', 'User-approved window-configuration exclusion supplies no execution or metadata evidence'
+            return 'missing', 'User-approved bounded exclusion supplies no execution or metadata evidence'
         if 'source_structure' in row:
             if category != 'program':
                 return 'missing', 'Structural source mapping supplies no native or recipient metadata evidence'
@@ -500,6 +545,7 @@ def export_mapping(root, destination):
     review = _review(root); _proofs(str(root), REVIEW_SHA256)
     _fieldless_review(root)
     _batch_exclusion_review(root)
+    _music_limit_review(root)
     mapping, branches = _expected(str(root), REVIEW_SHA256)
     def write(name, value):
         path = destination / name
@@ -519,7 +565,9 @@ def export_mapping(root, destination):
             policies[identity] = {'native_shape_sha256': member['shape_sha256'],
                 'categories': ([] if 'approved_exclusion' in row else ['program'] if 'source_structure' in row else
                     ['program', 'native', *(['live_metadata'] if observed else [])]),
-                'reason': ('User-approved exclusion of exact internal Batch Rename window settings; object renaming remains in scope.'
+                'reason': ('User-approved conditional refusal of MusicPlaylistItem LoopCount when its controller is not exposed; reads and exposed-controller paths remain in scope.'
+                    if row['dependency_kind'] == 'music' else
+                    'User-approved exclusion of exact internal Batch Rename window settings; object renaming remains in scope.'
                     if 'approved_exclusion' in row else
                     'Reviewed exact structural source group and shared scalar condition mechanism; no field, native effect or absence inferred.'
                     if 'source_structure' in row else
@@ -566,7 +614,7 @@ def evaluate_definition_binding(branch, binding, policy, scope_kind, base, root,
                 or policy.get('approved_exclusion') != row['approved_exclusion']
                 or any(branch.get(k) != v for k, v in expected.items() if k != 'state')
                 or binding != _binding(row, member, binding.get('condition_source_mapping_attachment'))):
-            branch.update(state='unresolved', reasons=['Exact user-approved window exclusion missing or stale'])
+            branch.update(state='unresolved', reasons=['Exact user-approved bounded exclusion missing or stale'])
             return
         branch.update(state='approved_exclusion', requirements=[], evidence_results={},
             exclusion=deepcopy(row['approved_exclusion']), metadata_scope='source_definition',

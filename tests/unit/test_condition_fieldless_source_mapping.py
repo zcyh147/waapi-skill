@@ -32,8 +32,8 @@ def test_successor_export_resolves_only_structural_groups_through_the_reader(suc
     destination = successor
     assessment = json.loads((destination / 'assessment.json').read_bytes())
     assert assessment['completion']['states'] == {
-        'implementation_dependency': 15, 'approved_exclusion': 240, 'source_definition_verified': 7042}
-    assert assessment['completion']['complete'] is False
+        'approved_exclusion': 255, 'source_definition_verified': 7042}
+    assert assessment['completion']['complete'] is True
     requirements = json.loads((destination / 'requirements.json').read_bytes())
     imported, base, _ = portable_binding_inputs(destination / 'evidence-index.json', requirements)
     assert base == destination
@@ -57,7 +57,7 @@ def test_successor_export_resolves_only_structural_groups_through_the_reader(suc
     assert {row['id']: row['shape_sha256'] for row in assessment['obligations']} == {
         m['id']: m['shape_sha256'] for row in original['occurrences'] for m in row['members']}
     assert {row['id'] for row in assessment['obligations']
-            if row['state'] == 'implementation_dependency'} == {
+            if row.get('exclusion', {}).get('when') == 'required_controller_not_exposed_by_applicable_metadata'} == {
         m['id'] for row in original['occurrences']
         if row['dependency_kind'] == 'music' for m in row['members']}
     mapping = json.loads((destination / 'mapping.json').read_bytes())
@@ -65,7 +65,7 @@ def test_successor_export_resolves_only_structural_groups_through_the_reader(suc
     assert {row['occurrence_id']: row for row in mapping['occurrences']
             if 'source_structure' not in row and 'approved_exclusion' not in row} == {
         row['occurrence_id']: row for row in original['occurrences']
-        if row['dependency_kind'] not in {'fieldless', 'batch'}}
+        if row['dependency_kind'] not in {'fieldless', 'batch', 'music'}}
 
 
 @pytest.mark.parametrize('damage', ['owned-field', 'inherited-field', 'list', 'identity',
