@@ -1,7 +1,9 @@
 """The maintainer diagnostic owns nine discriminators and always closes its host."""
 from copy import deepcopy
 import json
+from pathlib import Path
 from types import SimpleNamespace
+import xml.etree.ElementTree as ET
 
 import pytest
 
@@ -145,12 +147,31 @@ def test_source_discriminator_requires_exact_two_language_seed_before_its_write(
 @pytest.mark.parametrize('shutdown_error,expected', [(False, 'PASS'), (True, 'BLOCKED')])
 def test_real_lifecycle_persists_final_outcome_and_cleanup_after_collector(monkeypatch, tmp_path, shutdown_error, expected):
     from tests.semantic.test_codex_scenario_lifecycle_v3 import _install_fakes
-    from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle
+    from tests.semantic.support import codex_scenario_lifecycle_v3 as lifecycle_v3
+    from tests.destructive.test_object_constructor_collision_diagnostic import make_collision_lifecycle
     source, _ = _install_fakes(monkeypatch, tmp_path, shutdown_error=shutdown_error, version='2025.1')
+    source.write_bytes((Path(__file__).parents[1] / '_org/2025.1/SampleProject.wproj').read_bytes())
+    source_bytes, source_mtime = source.read_bytes(), source.stat().st_mtime_ns
+    prepare, launch = lifecycle_v3.prepare_sample_project_sandbox, lifecycle_v3.launch_sandboxed_wwise
+    copied_before_launch = {}
+    def copy_project(*args, **kwargs):
+        sandbox = prepare(*args, **kwargs)
+        sandbox.sandbox_project.write_bytes(source.read_bytes())
+        return sandbox
+    def inspect_launch(sandbox, environment, **kwargs):
+        language_rows = ET.parse(sandbox.sandbox_project).findall('.//LanguageList/Language')
+        names = {row.get('Name') for row in language_rows}
+        assert names == {'English(US)', 'Japanese', 'External', 'Mixed', 'SFX'}
+        assert names - {'SFX', 'External', 'Mixed'} == {'English(US)', 'Japanese'}
+        assert len({row.get('ID') for row in language_rows}) == len(language_rows)
+        assert source.read_bytes() == source_bytes and source.stat().st_mtime_ns == source_mtime
+        copied_before_launch['languages'] = sorted(names)
+        return launch(sandbox, environment, **kwargs)
+    monkeypatch.setattr(lifecycle_v3, 'prepare_sample_project_sandbox', copy_project)
+    monkeypatch.setattr(lifecycle_v3, 'launch_sandboxed_wwise', inspect_launch)
     actor = FakeActor()
     root = tmp_path / 'scenario'
-    lifecycle = ScenarioLifecycle(scenario_id='constructor-collision-2025.1', version='2025.1',
-        scenario_root=root, live_environment={'WWISE_TEST_CONFIG': 'unused'}, lock_root=tmp_path / 'lock')
+    lifecycle = make_collision_lifecycle(root, live_environment={'WWISE_TEST_CONFIG': 'unused'})
     if shutdown_error:
         with pytest.raises(AssertionError):
             run_diagnostic(lifecycle, actor_factory=lambda **_: actor)
@@ -162,4 +183,6 @@ def test_real_lifecycle_persists_final_outcome_and_cleanup_after_collector(monke
     assert evidence['collection_status'] == 'PASS' and len(evidence['cases']) == 9
     assert finalized['sandbox_retained'] is shutdown_error
     assert (root / 'owned').exists() is shutdown_error
-    assert source.read_text() == 'test' and actor.closed
+    assert copied_before_launch['languages'] == ['English(US)', 'External', 'Japanese', 'Mixed', 'SFX']
+    assert source.read_bytes() == source_bytes and source.stat().st_mtime_ns == source_mtime
+    assert actor.closed
