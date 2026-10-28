@@ -395,6 +395,20 @@ def prepare(payload, *, version, owner, catalog, read, resolve_segment, validate
     return native_root, proof
 
 
+def replacement_notice(replacement):
+    """Retain reviewable effects when the immutable full trees are summarized."""
+    def item_count(node):
+        return 0 if node is None else 1 + sum(item_count(child) for child in node.get('children', []))
+    old_tree = replacement['old_tree']
+    return {'owner_id': replacement['owner_id'],
+        'owner_name': replacement['owner_name'], 'owner_path': replacement['owner_path'],
+        'old_root_id': old_tree['row']['id'] if old_tree is not None else None,
+        'intent': replacement['intent'], 'removed_item_count': item_count(old_tree),
+        'replacement_item_count': item_count(replacement['requested_tree']),
+        'verification_scope': replacement['verification_scope'],
+        'ordered_getter_evidence': replacement['ordered_getter_evidence']}
+
+
 def guard_assertions(proof, *, read, after_write=False):
     """Revalidate source, metadata and every retained identity before one write."""
     checks = []

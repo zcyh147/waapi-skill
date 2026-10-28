@@ -144,6 +144,49 @@ def test_existing_playlist_nested_repeated_occurrences_survive_persisted_transac
     assert code == 2 and len(task.writes) == 1, rejected
 
 
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_bounded_playlist_preview_retains_old_tree_removal_and_verification_scope(tmp_path, version):
+    task = MusicPlaylistTask(tmp_path, version)
+    old_children = ['{DDDDDDDD-1111-1111-1111-%012d}' % index for index in range(16)]
+    task.objects[OLD]['children'] = [{'id': guid} for guid in old_children]
+    for guid in old_children:
+        task.objects[guid] = {**deepcopy(task.objects[OLD]), 'id': guid,
+            'parent': {'id': OLD}, 'owner': None, 'children': [], '@PlaylistItemType': 1,
+            '@Segment': {'id': A}, 'notes': 'Preserved old occurrence ' + 'x' * 300}
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx, '--summary-only')
+    assert code == 0, shown
+    code, full = task.run('transaction-show', tx)
+    assert code == 0, full
+    stored = full['artifact']['prepared_operation']['pre_state']['music_playlists'][0]['old_tree']
+    assert stored['row']['id'] == OLD
+    assert [node['row']['id'] for node in stored['children']] == old_children
+    assert stored['children'][-1]['row']['notes'] == 'Preserved old occurrence ' + 'x' * 300
+    for result in (preview, shown):
+        summary = result['preview_summary']
+        assert summary['summary_contract'] == 'waapi-skill.transaction-show-summary/v1'
+        assert summary['fixed_projection_bytes'] <= 6144
+        notice, = summary['music_playlist_replacements']
+        assert {key: notice[key] for key in ('owner_id', 'old_root_id', 'intent',
+            'removed_item_count', 'replacement_item_count', 'verification_scope')} == {
+                'owner_id': FIRST, 'old_root_id': OLD, 'intent': 'remove_previous_playlist_tree',
+                'removed_item_count': 17, 'replacement_item_count': 5,
+                'verification_scope': 'stored_playlist_tree; never_audio_or_playback_quality'}
+        assert notice['owner_name'] == 'Sequence'
+        assert notice['owner_path'] == r'\Interactive Music Hierarchy\Default Work Unit\Sequence'
+        assert notice['ordered_getter_evidence']['other_versions'] == 'matching_source_and_program_correspondence_only'
+        assert notice['ordered_getter_evidence']['audio_or_playback_quality'] == 'not_verified'
+        assert 'old_tree' not in notice and 'requested_tree' not in notice
+        assert result['state'] == 'awaiting_confirmation'
+    assert preview['preview_summary']['music_playlist_replacements'] == shown['preview_summary']['music_playlist_replacements']
+    assert task.writes == []
+
+
 @pytest.mark.parametrize('exposed', (False, True))
 def test_playlist_class_loop_discovery_uses_only_disclosed_controllers(tmp_path, exposed):
     from tests.unit.test_conditional_reference_gateway import condition
@@ -223,6 +266,12 @@ def test_playlist_null_root_reference_allows_first_tree(tmp_path):
     task.objects[FIRST]['@PlaylistRoot'] = {'id': '{00000000-0000-0000-0000-000000000000}'}
     del task.objects[OLD]
     tx, shown = task.preview()
+    code, compact = task.run('transaction-show', tx, '--summary-only')
+    assert code == 0, compact
+    notice, = compact['preview_summary']['music_playlist_replacements']
+    assert notice['owner_id'] == FIRST and notice['old_root_id'] is None
+    assert notice['removed_item_count'] == 0 and notice['replacement_item_count'] == 5
+    assert notice['verification_scope'] == 'stored_playlist_tree; never_audio_or_playback_quality'
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True, verified
     assert len(task.writes) == 1

@@ -7512,6 +7512,7 @@ def _prepare_object_set(
         metadata={
             "closed_object_batch": True,
             **({"music_playlist_replacements": [{"owner_id": proof["owner_id"],
+                "owner_name": proof["owner_snapshot"]["name"], "owner_path": proof["owner_snapshot"]["path"],
                 "intent": proof["replacement_intent"], "old_tree": proof["old_tree"],
                 "requested_tree": proof["requested_tree"], "ordered_getter_evidence": proof["ordered_getter_evidence"],
                 "verification_scope": proof["verification_scope"]} for proof in music_playlists]} if music_playlists else {}),

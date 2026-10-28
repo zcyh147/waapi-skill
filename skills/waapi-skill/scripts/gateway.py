@@ -32960,6 +32960,10 @@ def transaction_show_summary(
     owned_replacements = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("owned_control_input_replacements")
     if owned_replacements:
         derived_notice["owned_control_input_replacements"] = owned_replacements
+    playlist_replacements = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("music_playlist_replacements")
+    if playlist_replacements:
+        from wwise_waapi.music_playlist import replacement_notice
+        derived_notice["music_playlist_replacements"] = [replacement_notice(row) for row in playlist_replacements]
     paste_selection = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("paste_selection")
     if isinstance(paste_selection, Mapping):
         derived_notice["paste_selection"] = dict(paste_selection)
