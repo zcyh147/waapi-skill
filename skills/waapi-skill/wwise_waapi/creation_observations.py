@@ -36,6 +36,7 @@ def ordinary_creation_graph(plan, state, *, parent, max_observations=128):
                 or node.get('collection') != 'children' or node.get('existing_target') is not False
                 or node.get('preexisting_id') is not None or node.get('requested_language') is not None
                 or node.get('list_request_paths') or node.get('import_requested') or 'import' in node
+                or node.get('saved_constructor')
                 or 'graph_plugin_native' in node or any('curve' in field or 'array' in field for field in fields)
                 or len({field['name'] for field in fields}) != len(fields)):
             raise ValueError('Creation history requires every declared node and field to have an ordinary hierarchy observation')

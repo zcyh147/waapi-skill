@@ -340,11 +340,23 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
-    # Event -> Action is the sole machine-contract delta for this constructor
-    # increment. Keep all 149 older rows and historical seals intact.
+    # Saved Query construction adds only Query -> SearchCriteria to the five
+    # create contracts. The older SDK refusal remains a separate runtime gate;
+    # this class placement relation does not grant version availability.
+    assert canonical_sha256(non_object_set_digests) == "776100a86b9d21a241290cc823cc147155372ffc264acf3f7c33e3604b7276f1"
+    def before_saved_query_parent(operation, version):
+        contract = operation_request_machine_contract(operation, version)
+        if operation == "object.create":
+            assert contract["parent_child_contract"].pop("Query") == ["SearchCriteria"]
+        return contract
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(
+            before_saved_query_parent("object.create", version))
+    # Retain the prior Event -> Action seal and invert that exact relation
+    # after Query's inverse in every independently reconstructed contract.
     assert canonical_sha256(non_object_set_digests) == "1a71f79d0b2c8ad0b2962dfdb14b7dd8e4c9d78df5bf3f70e76c0dca16d3f04f"
     def before_action_parent(operation, version):
-        contract = operation_request_machine_contract(operation, version)
+        contract = before_saved_query_parent(operation, version)
         if operation == "object.create":
             assert contract["parent_child_contract"].pop("Event") == ["Action"]
         return contract

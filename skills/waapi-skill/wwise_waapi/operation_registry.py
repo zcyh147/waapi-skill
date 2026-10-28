@@ -5051,9 +5051,16 @@ def _prepare_object_create(
     )
     type_catalog = _read_object_type_catalog(read)
     render_native_nodes: dict[str, dict[str, Any]] = {}
+    root_list_binding = None
+    if list_name is not None:
+        from .documented_list_fields import resolve_live_list_evidence
+        root_list_binding = resolve_live_list_evidence(request.version, parent.object, list_name, read=read)
+        selected = arguments.get('documented_list_bindings', [])
+        if selected and selected != [root_list_binding]:
+            raise OperationContractError('DOCUMENTED_LIST_BINDING_INVALID', 'Selected List proof differs from its exact owner/class/source')
     from .planned_references import prepare_result_context
     result_context = prepare_result_context(arguments.get("graph_result_bindings", []), normalized.nodes,
-        {"$": (parent, requested_conflict)}, resolve_type=lambda node: _resolve_graph_node_type(node, catalog=type_catalog, version=request.version), read=read, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
+        {"$": (parent, requested_conflict)}, resolve_type=lambda node: _resolve_graph_node_type(node, catalog=type_catalog, version=request.version, root_list_binding=root_list_binding if node.request_path == "$" else None), read=read, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
     canonical_types: dict[str, str] = {}
     resolved_references: dict[str, Any] = {}
     derived_properties: dict[str, dict[str, Any]] = {}
@@ -5072,6 +5079,7 @@ def _prepare_object_create(
         derived_properties=derived_properties,
         identity_cache=identity_cache,
         property_info_cache=property_info_cache,
+        root_list_binding=root_list_binding,
         result_context=result_context,
         merge_existing=requested_conflict == "merge",
         merge_guards=early_merge_guards,
@@ -5096,11 +5104,8 @@ def _prepare_object_create(
     list_before: list[dict[str, Any]] = []
     documented_guards = list(early_merge_guards)
     if list_name is not None:
-        from .documented_list_fields import resolve_live_list_evidence, observe_list_binding
-        proof = resolve_live_list_evidence(request.version, parent.object, list_name, read=read)
-        selected = arguments.get("documented_list_bindings", [])
-        if selected and selected != [proof]:
-            raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Selected List proof differs from its exact owner/class/source")
+        from .documented_list_fields import observe_list_binding
+        proof = root_list_binding
         allowed_classes = {element["class_id"] for element in proof["declaration"]["element_classes"]}
         if proof["declaration"]["unresolved_element_types"] or node_specs[0]["class_id"] not in allowed_classes:
             raise OperationContractError("DOCUMENTED_LIST_ELEMENT_CLASS_INVALID", "The requested root class is not proved by this exact List source")
@@ -5355,6 +5360,12 @@ def _prepare_object_create(
             _prepare_action_collision(spec, conflict, read=read,
                 replacement_snapshots=replace_subtree_snapshots, specs=node_specs)
 
+    from .saved_object_construction import graph_boundary, SavedConstructorError
+    try:
+        saved_constructors = graph_boundary(node_specs, parent=parent, version=request.version,
+            conflict=requested_conflict, read=read)
+    except SavedConstructorError as exc:
+        raise OperationContractError(exc.code, str(exc)) from exc
     parent_children = (
         _read_direct_children(
             parent.object,
@@ -5372,6 +5383,8 @@ def _prepare_object_create(
         resolved_references=resolved_references,
         derived_properties=derived_properties,
         native_nodes=render_native_nodes,
+        constructor_names={spec["request_path"]: spec["saved_constructor"]["native_name"] for spec in node_specs
+            if spec.get("saved_constructor", {}).get("object_type") == "SearchCriteria"},
         prepared_names=result_context["prepared_names"] if result_context else None,
     )
     if node_specs[0].get("inner_identity", {}).get("collection") == "Playlist":
@@ -5487,6 +5500,8 @@ def _prepare_object_create(
             "irreversible_preexisting_changes": conflict == "merge",
         }
     state = {"object_graph_guard": graph_guard, "object_create_nodes": node_specs, "effect_render_chains": effect_render_chains}
+    if saved_constructors:
+        state["saved_object_constructors"] = saved_constructors
     from .creation_observations import ordinary_creation_fields, ordinary_creation_graph
     try:
         ordinary_creation_graph(verification, state, parent=parent.row)
@@ -6122,6 +6137,7 @@ def _prepare_object_set(
     documented_bindings = [binding for binding in all_documented_bindings if "planned_owner" not in binding]
     music_playlists = []
     planned_guards = []
+    saved_constructor_batches = []
     early_merge_guards = []
     rtpc_snapshots = {}
     raw_objects = _mapping_sequence(arguments.get("objects"), field="objects")
@@ -6198,6 +6214,7 @@ def _prepare_object_set(
         return read(uri, args, options)
 
     result_context = None
+    result_list_bindings, result_list_proofs = {}, {}
     if arguments.get("graph_result_bindings"):
         from .planned_references import prepare_result_context
         result_nodes, result_roots, result_references = [], {}, []
@@ -6217,11 +6234,19 @@ def _prepare_object_set(
             result_nodes.extend(normalize_object_forest(result_item.get("children", []), base_path=prefix + ".children",
                 on_name_conflict=result_item.get("on_name_conflict", conflict),
                 replace_owned=result_item.get("on_name_conflict", conflict) == "replace", allow_platform=True, allow_language=True, allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS).nodes)
-            result_nodes.extend(node for descriptor in normalize_object_lists(result_item.get("lists", []),
-                request_path=prefix + ".lists", allow_platform=True, allow_language=True,
-                allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS) for node in descriptor.nodes)
+            for descriptor in normalize_object_lists(result_item.get("lists", []),
+                    request_path=prefix + ".lists", allow_platform=True, allow_language=True,
+                    allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS):
+                from .documented_list_fields import resolve_live_list_evidence
+                owner = result_roots[prefix][0]
+                proof = resolve_live_list_evidence(request.version, owner.object, descriptor.name, read=read)
+                result_list_proofs[owner.object, descriptor.name] = proof
+                for root in descriptor.objects:
+                    result_list_bindings[root.request_path] = proof
+                result_nodes.extend(descriptor.nodes)
         result_context = prepare_result_context(arguments["graph_result_bindings"], result_nodes, result_roots,
-            resolve_type=lambda node: _resolve_graph_node_type(node, catalog=type_catalog, version=request.version), read=read, references=result_references, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
+            resolve_type=lambda node: _resolve_graph_node_type(node, catalog=type_catalog, version=request.version,
+                root_list_binding=result_list_bindings.get(node.request_path)), read=read, references=result_references, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
     resolved_target_ids: dict[str, int] = {}
     for index, item in enumerate(raw_objects):
         merge_child_snapshots: list[dict[str, Any]] = []
@@ -6661,6 +6686,8 @@ def _prepare_object_set(
                     derived_properties=derived_child_properties,
                     native_nodes=render_native_nodes,
                     materialized_imports=materialized_imports,
+                    constructor_names={spec["request_path"]: spec["saved_constructor"]["native_name"] for spec in child_specs
+                        if spec.get("saved_constructor", {}).get("object_type") == "SearchCriteria"},
                     prepared_names=result_context["prepared_names"] if result_context else None,
                     rtpc_updates={spec["request_path"]: spec for spec in child_specs if spec.get("rtpc_update")},
                     plugin_materializations={spec["request_path"]: spec["graph_plugin_native"] for spec in child_specs if "graph_plugin_native" in spec},
@@ -6860,7 +6887,9 @@ def _prepare_object_set(
         target_list_snapshots: list[dict[str, Any]] = []
         for list_index, descriptor in enumerate(lists):
             from .documented_list_fields import resolve_live_list_evidence
-            proof = resolve_live_list_evidence(request.version, target.object, descriptor.name, read=read)
+            proof = result_list_proofs.get((target.object, descriptor.name))
+            if proof is None:
+                proof = resolve_live_list_evidence(request.version, target.object, descriptor.name, read=read)
             selected = [binding for binding in documented_bindings
                 if binding.get("scope", {}).get("scope_value") == target.object
                 and binding.get("declaration", {}).get("name") == descriptor.name]
@@ -6920,6 +6949,7 @@ def _prepare_object_set(
                 list_bindings=planned_bindings,
                 result_context=result_context,
                 root_collection=descriptor.name,
+                root_list_binding=proof,
                 playlist_owner=target if descriptor.name == "Playlist" else None,
                 playlist_mode=row_list_mode,
                 rtpc_replace_all=row_list_mode == "replaceAll",
@@ -7288,6 +7318,13 @@ def _prepare_object_set(
         target_spec["list_request_paths"] = [
             row["request_path"] for row in list_specs
         ]
+        from .saved_object_construction import graph_boundary, SavedConstructorError
+        try:
+            saved_boundary = graph_boundary([target_spec, *child_specs], parent=target, version=request.version, conflict=row_conflict, read=read)
+        except SavedConstructorError as exc:
+            raise OperationContractError(exc.code, str(exc)) from exc
+        if saved_boundary:
+            saved_constructor_batches.append(saved_boundary)
         node_specs.append(target_spec)
         node_specs.extend(child_specs)
         node_specs.extend(list_specs)
@@ -7325,6 +7362,11 @@ def _prepare_object_set(
         raise OperationContractError("ANCESTOR_RENAME_PATH_UNPROVED", str(exc)) from exc
     for row in added_ancestors:
         field_snapshots.append({"object_id": row["id"], "fields": list(ANCESTOR_PATH_FIELDS), "rows": [row], "platform": None})
+    from .saved_object_construction import reject_batch_owner_renames, SavedConstructorError
+    try:
+        reject_batch_owner_renames(saved_constructor_batches, node_specs, read=read)
+    except SavedConstructorError as exc:
+        raise OperationContractError(exc.code, str(exc)) from exc
 
     replaced_ids = {
         _identity_key(row["id"])
@@ -7559,6 +7601,7 @@ def _prepare_object_set(
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
         **({"music_playlists": music_playlists} if music_playlists else {}),
+        **({"saved_object_constructor_batches": saved_constructor_batches} if saved_constructor_batches else {}),
         "existing_field_observations": existing_field_history,
         "effect_render_chains": effect_render_chains,
         "graph_rtpc_guards": [spec for spec in node_specs if spec.get("rtpc_binding")],
@@ -8948,8 +8991,26 @@ def _effect_shareset_placement_assertions(pre_state, *, read, after_write=False)
     return assertions
 
 
-def _resolve_graph_node_type(node, *, catalog, version):
+def _resolve_graph_node_type(node, *, catalog, version, root_list_binding=None):
+    if node.plugin is None and node.type in {"WorkUnit", "Query", "SearchCriteria"}:
+        from .saved_object_construction import authority, SavedConstructorError
+        try:
+            proof = authority(version, node.type)
+        except SavedConstructorError as exc:
+            raise OperationContractError(exc.code, str(exc)) from exc
+        matches = [row for row in catalog if row.name == node.type and row.class_id == proof["class_id"]]
+        if len(matches) != 1:
+            raise OperationContractError("SAVED_CONSTRUCTOR_CLASS_UNPROVEN", "Saved object constructor requires its exact fresh source-proven class.")
+        return matches[0]
     if node.plugin is None:
+        if root_list_binding is not None:
+            from .documented_list_fields import source_owned_music_type
+            try:
+                owned = source_owned_music_type(node.type, version=version, binding=root_list_binding, catalog=catalog)
+            except ValueError as exc:
+                raise OperationContractError('DOCUMENTED_LIST_ELEMENT_CLASS_INVALID', str(exc)) from exc
+            if owned is not None:
+                return owned
         return _resolve_object_type("PropertyContainer" if version == "2025.1" and node.type == "ActorMixer" else node.type, catalog=catalog)
     matches = [row for row in catalog if row.class_id == node.plugin.class_id and row.type == node.plugin.object_type]
     if len(matches) != 1:
@@ -8986,6 +9047,7 @@ def _prepare_object_node_specs(
     live_source_parent: bool = False,
     playlist_owner: ResolvedObject | None = None,
     playlist_mode: str = "append",
+    root_list_binding: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
     node_paths = {node.request_path for node in nodes}
@@ -9009,7 +9071,8 @@ def _prepare_object_node_specs(
             if uses_2025_actor_mixer_alias
             else node.type
         )
-        type_info = _resolve_graph_node_type(node, catalog=type_catalog, version=version)
+        type_info = _resolve_graph_node_type(node, catalog=type_catalog, version=version,
+            root_list_binding=root_list_binding if node.parent_request_path not in node_paths else None)
         if (
             uses_2025_actor_mixer_alias
             and _object_type_token(type_info.name) != "propertycontainer"
@@ -9047,6 +9110,14 @@ def _prepare_object_node_specs(
             "references": [],
             "collection": root_collection if node.request_path == "$" else node.collection,
         }
+        if type_info.name in {"WorkUnit", "Query", "SearchCriteria"}:
+            from .saved_object_construction import authority, criterion, SavedConstructorError
+            try:
+                proof = criterion(version, node.name) if type_info.name == "SearchCriteria" else authority(version, type_info.name)
+            except SavedConstructorError as exc:
+                raise OperationContractError(exc.code, str(exc)) from exc
+            spec["saved_constructor"] = proof
+            spec["structural_class_id"] = type_info.class_id
         if type_info.name == "Action":
             from .action_construction import authority
             source = authority(version)
@@ -9999,6 +10070,10 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None, af
             "evidence": {"expected": list(expected_classes.values()),
                 "actual": [row for row in actual_classes if row.get("classId") in
                     {expected.get("classId") for expected in expected_classes.values()}]}})
+    for boundary in ([pre_state["saved_object_constructors"]] if pre_state.get("saved_object_constructors") else []) + pre_state.get("saved_object_constructor_batches", []):
+        from .saved_object_construction import guard_matches
+        assertions.append({"name": "saved constructor source and exact project owner remain bound",
+            "passed": guard_matches(boundary, read), "evidence": boundary})
     from .constructor_inputs import authority as constructor_authority, complete as constructor_complete, public_requirements
     for node in nodes:
         if node.get('anonymous_list_mode_source'):
@@ -10780,6 +10855,7 @@ def _materialize_canonical_object_node(
     rtpc_update_rows: list[dict[str, Any]] | None = None,
     plugin_materializations: Mapping[str, Mapping[str, Any]] | None = None,
     native_nodes: dict[str, dict[str, Any]] | None = None,
+    constructor_names: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     try:
         subtree_import_paths = {
@@ -10826,6 +10902,8 @@ def _materialize_canonical_object_node(
             row.update(payload)
         if prepared_names and current.request_path in prepared_names:
             row["name"] = prepared_names[current.request_path]
+        if constructor_names and current.request_path in constructor_names:
+            row["name"] = constructor_names[current.request_path]
         for property_name, value in derived_properties.get(current.request_path, {}).items():
             if (
                 not isinstance(property_name, str)
@@ -13130,6 +13208,16 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             raise OperationContractError('INVALID_SOURCE_COPY_SAVE', 'Generated Save cannot alter the fixed versioned request')
         revalidate_origin(origin, copy_proof_context, read=read)
         metadata[ORIGIN] = origin
+    saved_boundaries = ([metadata["saved_object_constructors"]] if metadata.get("saved_object_constructors") else []) + metadata.get("saved_object_constructor_batches", [])
+    if saved_boundaries:
+        from .saved_object_construction import verification_scope
+        verification["verification_scope"] = verification_scope(saved_boundaries)
+    if compound_child and any(boundary["workunit_effects"] for boundary in saved_boundaries):
+        raise OperationContractError("WORKUNIT_UNDO_GROUP_UNSUPPORTED", "Work Unit creation clears history and cannot be composed inside an undo group; use a standalone immutable Preview.")
+    if any(boundary["workunit_effects"] for boundary in saved_boundaries):
+        warnings.append("Creating a Work Unit clears undo/redo history and the clipboard and saves a corresponding WWU file in the active project. Verification checks object identity and requested fields; history, clipboard contents and saved WWU bytes remain unobserved.")
+    if any(proof["object_type"] == "SearchCriteria" for boundary in saved_boundaries for proof in boundary["sources"]):
+        warnings.append("Saved Query criteria use source-owned SearchOperationID names. Verification checks returned GUID/class/parent and requested fields; SearchOperationID and Query matches are not independently observed.")
     return PreparedOperation(
         request=request,
         semantic_preview=preview,
@@ -26827,6 +26915,12 @@ def verify_prepared_operation(
         from .existing_field_observations import capture_after
         for proof in (pre_state or {}).get("existing_field_observations", []):
             readbacks.append(capture_after(proof, read=read_call))
+    if (kind in {"object-create-graph", "object-set-batch"}
+            and plan.get("verification_scope", {}).get("mode") == "saved_object_identity_and_fields"
+            and not plan["verification_scope"]["complete_business_verification"]):
+        success_status = "result_schema_checked"
+        business_state_verified = False
+        verification_strength = "saved_object_identity_and_field_readback"
     outcome = _verification(
         operation,
         assertions,
@@ -26837,6 +26931,11 @@ def verify_prepared_operation(
         verification_scope=plan.get("verification_scope") if plan.get("source_copy_live_fields") is True or kind in {"blend-assignment", "soundbank-definition-exact", "object-plugin-created"} else None,
     )
 
+    if kind in {"object-create-graph", "object-set-batch"} and plan.get("verification_scope", {}).get("mode") == "saved_object_identity_and_fields":
+        scope = plan["verification_scope"]
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
+            "Saved object identity, topology and requested fields were checked. The disclosed history/clipboard/file and criterion evaluation effects remain unobserved where listed; do not replay the executed constructor.",
+            outcome.verification_strength, outcome.business_state_verified and scope["complete_business_verification"], scope)
     if kind == "object-plugin-created" and plan.get("verification_scope", {}).get("mode") == "direct_metadata_list_association_and_fields":
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
             "The new Metadata GUID/class/fields and ordered direct List association were checked; intrinsic owner/parent values are observations, not proof of local ownership. Do not replay the executed constructor.",
@@ -29351,7 +29450,8 @@ def _require_object_create_writable_parent(
     if (
         object_type == "Project"
         or path in {"\\", ""}
-        or (isinstance(path, str) and path.count("\\") <= 1)
+        or (isinstance(path, str) and path.count("\\") <= 1
+            and not (object_type == "WorkUnit" and tuple(child_types) == ("WorkUnit",)))
     ):
         raise OperationContractError(
             "PROTECTED_CREATE_PARENT",

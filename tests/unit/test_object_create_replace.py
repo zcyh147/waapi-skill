@@ -284,6 +284,8 @@ def test_public_create_schema_exposes_merge_query_and_2025_type_alias() -> None:
         "SwitchGroup -> Switch"
     ) in constraints
     assert spec["parent_child_contract"] == {
+        "Event": ["Action"],
+        "Query": ["SearchCriteria"],
         "AuxBus": ["AuxBus", "Bus"],
         "Bus": ["AuxBus", "Bus"],
         "StateGroup": ["State"],
