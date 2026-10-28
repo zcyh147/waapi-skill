@@ -72,6 +72,20 @@ def test_soundengine_mapping_retains_five_versions_and_reachable_definitions(com
     assert all(row['reference']['target'] in identities for row in references)
 
 
+def test_soundengine_getter_maps_forwarded_scope_and_exact_declared_spelling(component):
+    from tests.maintenance.soundengine_branch_mapping import soundengine_bindings
+    bindings = soundengine_bindings(ROOT, component)
+    native = next(row for row in component['native_coverage']['obligations'] if row.get('value') == 'suppportsRandomizer'
+        and row['id'].startswith('2025.1|wwise-authoring|') and '|ak.soundengine.getState|' in row['id'])
+    spelling = bindings[native['id']]['input']['correspondence']
+    assert spelling['public_choices'] == ['suppportsRandomizer']
+    assert spelling['native_choice'] == 'suppportsRandomizer'
+    platform = next(binding for identity, binding in bindings.items() if '|ak.soundengine.getState|' in identity
+        and identity.startswith('2025.1|wwise-authoring|') and identity.endswith('/definitions/objectReturnOptions/properties/platform'))
+    assert platform['input']['correspondence']['public_fields'] == ['platform']
+    assert platform['input']['correspondence']['rule'] == 'forwarded_closed_getter_return_options'
+
+
 @pytest.mark.parametrize('damage', ['missing-choice', 'wrong-choice', 'missing-version'])
 def test_soundengine_component_rejects_native_choice_and_version_drift(component, monkeypatch, damage):
     import tests.maintenance.soundengine_branch_mapping as mapping
