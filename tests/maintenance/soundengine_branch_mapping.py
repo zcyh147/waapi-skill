@@ -117,7 +117,8 @@ def soundengine_component(root):
             if named['contract'] != digest(operation_business_contract(named['name'], version)):
                 raise ValueError('SoundEngine named public contract changed')
     sources = debug_control_component(root)['sources']
-    for name in (TICKET, 'tests/maintenance/soundengine_branch_mapping.py', BASE + 'source-roster.json'):
+    for name in (TICKET, 'tests/maintenance/soundengine_branch_mapping.py',
+            'tests/semantic/support/codex_archive_paths.py', BASE + 'source-roster.json'):
         sources[name] = digest((root / name).read_text(encoding='utf-8'))
     inventory = {'component': 'soundengine-195-r1', 'routes': public, 'sources': sources, 'native_coverage': native}
     native['candidate_sha256'] = candidate_identity(root, inventory, native['catalogs'], digest=digest)
@@ -163,6 +164,13 @@ def field_rules(name, version):
         fields['gameObject'] = (['game_object_handle'], 'active generation; required 2021.1/2022.1; omission 2023.1+ uses native transport default')
     if name == 'postEvent':
         fields['gameObject'] = (['game_object_handle'], 'active generation; required through 2023.1; omission 2024.1+ uses native invalid-game-object default')
+    if name == 'getSwitch':
+        fields['gameObject'] = (['game_object_handle'],
+            'required active context-bound runtime generation; omitted public handle is rejected' if version == '2022.1' else
+            'present handle binds an active context-bound runtime generation; absent handle omits native gameObject; '
+            + ('2025.1 pinned description specifies AK_INVALID_GAME_OBJECT' if version == '2025.1'
+                else 'pinned schema permits omission without stating its default value')
+            + '; no equivalence to the setter omitted-object scope is claimed')
     return fields
 
 
@@ -326,6 +334,19 @@ def soundengine_bindings(root, inventory):
                 'validation': {'source': LIB + 'builders/schema.py#' + ('validate_semantic_result' if section == 'resultSchema' else 'validate_semantic_payload'), 'selector': pointer},
                 'verifier': {'source': GATEWAY + '#dispatch_soundengine_business_read' if read else LIB + 'operation_registry.py#verify_prepared_operation', 'selector': pointer},
                 'representative_mechanism': 'soundengine195-' + mechanism + '-v1', 'evidence': {}}
+            if name == 'getSwitch' and section == 'argsSchema' and 'gameObject' in fields:
+                scope = {'required': version == '2022.1', 'present': 'active_context_bound_runtime_generation',
+                    'absent': 'rejected_required_field' if version == '2022.1' else 'native_argument_omitted',
+                    'native_default': 'AK_INVALID_GAME_OBJECT' if version == '2025.1' else 'not_stated_by_pinned_schema',
+                    'setter_omission_equivalence': 'not_claimed'}
+                if row['kind'] == 'optional_presence':
+                    scope['selected_native_presence'] = 'omitted' if row['value'] == 'absent' else 'present_bound_generation'
+                    binding['input']['correspondence']['encoding'] = (
+                        'absent game_object_handle omits native gameObject; ' +
+                        ('2025.1 pinned default is AK_INVALID_GAME_OBJECT' if version == '2025.1'
+                         else 'pinned schema does not state the omitted native default')
+                        if row['value'] == 'absent' else 'present game_object_handle resolves one active context-bound runtime generation')
+                binding['input']['correspondence']['game_object_scope'] = scope
             bindings[row['id']] = binding
     return bindings
 
@@ -369,6 +390,13 @@ RUNTIME_SOURCES = {
 }
 
 
+def soundengine_artifact_coordinates(output, product):
+    """Derive publication identities with the shared archive-path boundary."""
+    from tests.semantic.support.codex_archive_paths import archive_relative_from_absolute
+    relative = archive_relative_from_absolute(output, product)
+    return relative.canonical, '/'.join('..' for _ in relative.parts)
+
+
 def soundengine_export(root, output, run):
     """Publish component-local attachments at the existing portable reader seam.
 
@@ -404,8 +432,7 @@ def soundengine_export(root, output, run):
         if name in sources and hashlib.sha256((root / name).read_bytes()).hexdigest() != seal:
             raise ValueError('SoundEngine selected code source changed: ' + name)
     product = root / 'tests/fixtures/branch-evidence/product'
-    relative_output = output.relative_to(product)
-    prefix = relative_output.as_posix()
+    prefix, archive_base = soundengine_artifact_coordinates(output, product)
     output.mkdir(parents=True, exist_ok=False)
     def write(name, value):
         raw = (json.dumps(value, indent=2, ensure_ascii=False) + '\n').encode()
@@ -419,7 +446,7 @@ def soundengine_export(root, output, run):
         files[key] = {'artifact': prefix + '/' + filename, 'sha256': hashlib.sha256(raw).hexdigest()}
     requirements = {'contract': 'waapi-skill.branch-evidence-requirements/v1',
         'branches': {}, 'representative_mechanisms': {}}
-    predecessors, entries, program_bindings = {}, [], {}
+    predecessors, entries = {}, []
     for group in GROUPS:
         mechanism = 'soundengine195-' + group + '-v1'
         members = {identity: binding for identity, binding in bindings.items()
@@ -441,7 +468,6 @@ def soundengine_export(root, output, run):
         proof_descriptor = write(group + '-program.json', proof)
         original = deepcopy(binding)
         original['evidence']['program'] = proof_descriptor
-        program_bindings[anchor] = original
         original_document = {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': {anchor: original}}
         original_policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {anchor: policy}}
         origin = {'bindings': write(group + '-original-bindings.json', original_document), 'program': proof_descriptor,
@@ -470,7 +496,7 @@ def soundengine_export(root, output, run):
         'bindings': bindings, 'predecessors': predecessors}
     mapping_descriptor = write('mapping.json', attachment)
     index = {'contract': 'waapi-skill.branch-evidence-index/v1',
-        'base': '/'.join('..' for _ in relative_output.parts), 'entries': entries,
+        'base': archive_base, 'entries': entries,
         'mapping_attachments': [mapping_descriptor]}
     write('index.json', index)
     gaps = soundengine_gaps(inventory, bindings)

@@ -86,6 +86,28 @@ def test_soundengine_getter_maps_forwarded_scope_and_exact_declared_spelling(com
     assert platform['input']['correspondence']['rule'] == 'forwarded_closed_getter_return_options'
 
 
+@pytest.mark.parametrize('version', ('2022.1', '2023.1', '2024.1', '2025.1'))
+def test_get_switch_mapping_separates_required_present_and_native_omission(component, version):
+    from tests.maintenance.soundengine_branch_mapping import soundengine_bindings
+    bindings = soundengine_bindings(ROOT, component)
+    native = next(row for row in component['native_coverage']['routes']
+        if row['version'] == version and row['host'] == 'wwise-authoring' and row['uri'] == 'ak.soundengine.getSwitch')
+    identity = native['id'] + '|/argsSchema/properties/gameObject'
+    root = bindings[identity]['input']['correspondence']
+    assert root['game_object_scope']['required'] is (version == '2022.1')
+    assert root['game_object_scope']['present'] == 'active_context_bound_runtime_generation'
+    assert root['game_object_scope']['absent'] == ('rejected_required_field' if version == '2022.1' else 'native_argument_omitted')
+    assert root['game_object_scope']['native_default'] == ('AK_INVALID_GAME_OBJECT' if version == '2025.1' else 'not_stated_by_pinned_schema')
+    assert root['game_object_scope']['setter_omission_equivalence'] == 'not_claimed'
+    if version == '2022.1':
+        assert identity + '/@presence/absent' not in bindings
+    else:
+        absent = bindings[identity + '/@presence/absent']['input']['correspondence']
+        present = bindings[identity + '/@presence/present']['input']['correspondence']
+        assert absent['game_object_scope']['selected_native_presence'] == 'omitted'
+        assert present['game_object_scope']['selected_native_presence'] == 'present_bound_generation'
+
+
 def test_soundengine_string_nodes_map_compilers_constraints_and_input_rejection(component):
     from tests.maintenance.soundengine_branch_mapping import soundengine_bindings, soundengine_gaps
     bindings = soundengine_bindings(ROOT, component)
@@ -177,3 +199,24 @@ def test_soundengine_export_rejects_an_unfinalized_code_anchor(tmp_path):
         (run / filename).write_text(json.dumps({}))
     with pytest.raises(ValueError, match='anchor is missing or unfinalized'):
         soundengine_export(ROOT, tmp_path / 'out', run)
+
+
+@pytest.mark.parametrize('output,product,expected', [
+    ('/bundle/product/SoundEngine/Packet', '/bundle/product', ('SoundEngine/Packet', '../..')),
+    (r'C:\Bundle\PRODUCT\SoundEngine\Packet', r'c:\bundle\product', ('SoundEngine/Packet', '../..')),
+    (r'\\Host\Share\product\SoundEngine\Packet', r'\\host\share\PRODUCT', ('SoundEngine/Packet', '../..')),
+])
+def test_soundengine_export_coordinates_preserve_windows_archive_identity(output, product, expected):
+    from tests.maintenance.soundengine_branch_mapping import soundengine_artifact_coordinates
+    assert soundengine_artifact_coordinates(output, product) == expected
+
+
+@pytest.mark.parametrize('output,product', [
+    ('/bundle/product/bad\\component', '/bundle/product'),
+    (r'C:\bundle\product/mixed\component', r'C:\bundle\product'),
+])
+def test_soundengine_export_coordinates_reject_ambiguous_archive_identity(output, product):
+    from tests.maintenance.soundengine_branch_mapping import soundengine_artifact_coordinates
+    from tests.semantic.support.codex_archive_paths import ArchiveRelativePathError
+    with pytest.raises(ArchiveRelativePathError):
+        soundengine_artifact_coordinates(output, product)
