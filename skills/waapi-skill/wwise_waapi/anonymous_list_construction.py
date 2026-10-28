@@ -29,7 +29,8 @@ def certify(spec, *, collection, list_mode, version):
     marker = (collection == 'Markers' and spec.get('class_id') == 5373968
               and isinstance(spec.get('manual_marker'), dict))
     if (version not in {'2023.1', '2024.1', '2025.1'} or not spec.get('anonymous_list_member')
-            or list_mode not in {'append', 'replaceAll'} or not (effect or marker)):
+            or list_mode not in {'append', 'replaceAll'} or not (effect or marker or
+                collection == 'Paths' and spec.get('media_pool_database') and spec.get('class_id') == 5898240)):
         return False
     spec['anonymous_list_mode_source'] = authority(version)
     return True

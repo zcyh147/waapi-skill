@@ -6999,6 +6999,8 @@ def _prepare_object_set(
                 if is_root:
                     from .documented_list_fields import certify_anonymous_marker
                     certify_anonymous_marker(list_spec, proof)
+                    from .media_pool_database import certify as certify_directory
+                    certify_directory(list_spec, proof)
                     list_spec["documented_list_element_class"] = list_spec["class_id"]
                 list_spec["target_index"] = index
                 list_spec.setdefault("platform", platform)
@@ -7176,6 +7178,8 @@ def _prepare_object_set(
                 for member in descriptor.objects:
                     from .documented_list_fields import certify_anonymous_marker
                     certify_anonymous_marker(nested_specs[member.request_path], binding)
+                    from .media_pool_database import certify as certify_directory
+                    certify_directory(nested_specs[member.request_path], binding)
                     nested_specs[member.request_path]["documented_list_element_class"] = nested_specs[member.request_path]["class_id"]
                 before_proof = observe_planned_list(binding, owner_spec["preexisting_id"], read=read) if owner_spec.get("preexisting_id") else None
                 planned_guards.append({"binding": binding, "before": before_proof})
@@ -7511,6 +7515,12 @@ def _prepare_object_set(
         family="object-mutation",
         metadata={
             "closed_object_batch": True,
+            **({"media_pool_directories": [{"owner_request_path": spec["parent_request_path"],
+                "directory": next(field["value"] for field in spec["properties"] if field["name"] == "Path"),
+                "outcome": "stored_audio_directory_configuration",
+                "verification_scope": spec["media_pool_database"]["verification"]}
+                for spec in node_specs if spec.get("media_pool_database")]}
+                if any(spec.get("media_pool_database") for spec in node_specs) else {}),
             **({"music_playlist_replacements": [{"owner_id": proof["owner_id"],
                 "owner_name": proof["owner_snapshot"]["name"], "owner_path": proof["owner_snapshot"]["path"],
                 "intent": proof["replacement_intent"], "old_tree": proof["old_tree"],
@@ -8993,6 +9003,19 @@ def _effect_shareset_placement_assertions(pre_state, *, read, after_write=False)
 
 
 def _resolve_graph_node_type(node, *, catalog, version, root_list_binding=None):
+    if node.plugin is None and node.type in {"MediaPoolDatabase", "MediaPoolDatabasePath"}:
+        from .media_pool_database import authority
+        try:
+            proof = authority(version)
+        except (OSError, ValueError) as exc:
+            raise OperationContractError("MEDIA_POOL_DATABASE_SOURCE_INVALID", str(exc)) from exc
+        if proof is None:
+            raise OperationContractError("VERSION_BEHAVIOR_BOUNDARY", "Media Pool database construction is source-certified only for Wwise 2025.1.")
+        expected_class = proof["database_class" if node.type == "MediaPoolDatabase" else "path_class"]
+        matches = [row for row in catalog if row.name == node.type and row.class_id == expected_class]
+        if len(matches) != 1:
+            raise OperationContractError("MEDIA_POOL_DATABASE_CLASS_UNPROVEN", "Media Pool construction requires its exact source-proven live class.")
+        return matches[0]
     if node.plugin is None and node.type in {"WorkUnit", "Query", "SearchCriteria"}:
         from .saved_object_construction import authority, SavedConstructorError
         try:
@@ -9182,9 +9205,13 @@ def _prepare_object_node_specs(
         elif node.anonymous:
             from .documented_list_fields import is_manual_marker_class
             marker = node.collection == "Markers" and is_manual_marker_class(version, type_info.name, type_info.class_id)
-            if version not in {"2023.1", "2024.1", "2025.1"} or not (marker or node.collection == "Effects" and type_info.name == "EffectSlot"):
+            from .media_pool_database import is_path_class, authority
+            directory = node.collection == "Paths" and is_path_class(version, type_info.name, type_info.class_id)
+            if version not in {"2023.1", "2024.1", "2025.1"} or not (marker or directory or node.collection == "Effects" and type_info.name == "EffectSlot"):
                 raise OperationContractError("ANONYMOUS_LIST_PLACEMENT_INVALID", "Anonymous construction requires source-proven List/type placement")
             spec["anonymous_list_member"] = True
+            if directory:
+                spec["media_pool_database"] = authority(version)
             if marker:
                 spec["manual_marker"] = True
         elif merge_existing:
@@ -9233,6 +9260,17 @@ def _prepare_object_node_specs(
                             "required_inputs": public_requirements(constructor), "field_discovery": {"class_id": type_info.class_id,
                                 "meaning": name, "value": "verified_existing_object_handle"}, "mutation_dispatched": False})
             spec["constructor_inputs"] = constructor
+        if type_info.name == "MediaPoolDatabasePath":
+            from .media_pool_database import validate_directory
+            if not node.anonymous:
+                raise OperationContractError("ANONYMOUS_LIST_PLACEMENT_INVALID", "Media Pool directory entries require Gateway-owned empty names in Paths")
+            path_values = [field.value for field in node.properties if field.name == "Path"]
+            try:
+                if len(path_values) != 1:
+                    raise ValueError("Choose the live Path Field Handle and requested audio directory before creating this entry")
+                validate_directory(path_values[0])
+            except ValueError as exc:
+                raise OperationContractError("INVALID_MEDIA_POOL_DIRECTORY", str(exc)) from exc
         metadata_scope = {"object_id": merge_target.object} if merge_target is not None else {"class_id": type_info.class_id}
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
         node_derived_properties: dict[str, Any] = {}
@@ -10077,6 +10115,10 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None, af
             "passed": guard_matches(boundary, read), "evidence": boundary})
     from .constructor_inputs import authority as constructor_authority, complete as constructor_complete, public_requirements
     for node in nodes:
+        if node.get('media_pool_database'):
+            from .media_pool_database import current
+            assertions.append({'name': 'Media Pool directory constructor source remains bound',
+                'passed': current(node['media_pool_database']), 'evidence': node['media_pool_database']})
         if node.get('anonymous_list_mode_source'):
             from .anonymous_list_construction import authority as list_mode_authority
             proof = node['anonymous_list_mode_source']
@@ -23057,8 +23099,9 @@ def verify_prepared_operation(
                     # values, assigns stable declaration identities.
                     anonymous = [child for child in children if child.get("anonymous_list_member")]
                     collections = {child.get("collection") for child in anonymous}
-                    if (not collections <= {"Effects", "Markers"} or any(child.get("collection") == "Markers"
-                            and not isinstance(child.get("manual_marker"), Mapping) for child in anonymous)):
+                    if (not collections <= {"Effects", "Markers", "Paths"} or any(child.get("collection") == "Markers"
+                            and not isinstance(child.get("manual_marker"), Mapping) for child in anonymous)
+                            or any(child.get("collection") == "Paths" and not isinstance(child.get("media_pool_database"), Mapping) for child in anonymous)):
                         raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results require their sealed List profile")
                     bound_ids = {}
                     for collection in sorted(collections):

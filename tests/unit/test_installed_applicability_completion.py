@@ -343,3 +343,30 @@ def test_shared_program_source_closure_includes_invoked_gateway_helpers():
         if p.suffix in {'.html', '.json'}}
     assert len(playlist_sources) == 8
     assert playlist_sources <= sources.keys()
+
+
+def test_media_pool_database_birth_joins_exact_source_owned_directory_flow():
+    from tests.support.applicability_completion_mapping import definition_mapping, validate_mapping
+    mapping = definition_mapping(ROOT)
+    selected = [row for row in mapping['rows'] if row['version'] == '2025.1'
+        and row['class_name'] in {'MediaPoolDatabase', 'MediaPoolDatabasePath'} and row['operation_mode'] == 'new-object']
+    assert len(selected) == 2
+    for row in selected:
+        assert row['state'] == 'source_definition_verified'
+        assert row['dependencies'] == []
+        role = row['correspondence']
+        assert role['implementation_issue'] == 207
+        assert role['path'] == 'media_pool_database_owned_directory_configuration'
+        assert role['operations'] == ['object.set']
+        assert role['source']['class_id'] == row['source_dimensions']['class_id']
+        assert role['source']['member_sha256'] == 'de5de9c1908f5dbcd810714bb1f9dc693bb05764da85a1cdd0493cc75bc5d708'
+        assert 'index_completion_not_claimed' in role['verification_scope']
+        assert row['native_effect'] == 'not_claimed' and row['direct_recipient_execution'] == 'not_observed'
+    query, = [row for row in mapping['rows'] if row['version'] == '2025.1'
+        and row['class_name'] == 'MediaPoolQuery' and row['operation_mode'] == 'new-object']
+    assert query['state'] == 'implementation_dependency'
+    promoted = deepcopy(mapping)
+    row = next(row for row in promoted['rows'] if row['id'] == selected[0]['id'])
+    row['correspondence']['verification_scope'] = 'indexing_completed'
+    with pytest.raises(ValueError, match='Exact installed applicability'):
+        validate_mapping(promoted, ROOT)

@@ -198,6 +198,42 @@ def _music_playlist_correspondence(root, version, class_id, build):
         'other_roles': '2021.1/2022.1 birth applicability remains independently assigned; existing-item edits remain separate; no audio or playback effect claimed'}
 
 
+
+def _media_pool_database_correspondence(root, version, class_id, build):
+    """Join the exact 2025 factory, retaining configuration-only strength."""
+    from wwise_waapi.media_pool_database import authority, DATABASE_CLASS, PATH_CLASS
+    from wwise_waapi.object_graph_business_contracts import object_graph_business_contract_data
+    proof = authority(version)
+    if proof is None or proof['build'] != build or class_id not in {DATABASE_CLASS, PATH_CLASS}:
+        raise ValueError('Exact installed applicability Media Pool database scope differs')
+    source = f"skills/waapi-skill/references/semantic/{version}/media-pool-database-sources/{proof['sdk_member']}"
+    if hashlib.sha256((root / source).read_bytes()).hexdigest() != proof['sdk_sha256']:
+        raise ValueError('Exact installed applicability Media Pool database source differs')
+    return {'implementation_issue': 207, 'path': 'media_pool_database_owned_directory_configuration',
+        'operations': ['object.set'],
+        'public_contract_sha256': digest(object_graph_business_contract_data('object.set', version)),
+        'source': {'path': source, 'member': proof['sdk_member'], 'member_sha256': proof['sdk_sha256'],
+            'build': build, 'class_id': class_id, 'owner_class_id': DATABASE_CLASS,
+            'element_class_id': PATH_CLASS, 'list_source': proof['list_source']},
+        'mechanism_sources': {'runtime': ['skills/waapi-skill/wwise_waapi/media_pool_database.py',
+            'skills/waapi-skill/wwise_waapi/anonymous_list_construction.py',
+            'skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py',
+            'skills/waapi-skill/wwise_waapi/operation_registry.py'],
+            'test_nodes': ['tests/unit/test_media_pool_database_gateway.py::' + node for node in (
+                'test_database_directory_survives_persisted_preview_authorization_and_verification',
+                'test_database_public_schema_discloses_source_scoped_directory_outcome',
+                'test_database_verification_rejects_wrong_owned_directory_without_retry',
+                'test_database_malformed_directory_fails_before_preview',
+                'test_database_directory_constructor_rejects_unproved_roles',
+                'test_database_directory_preview_rejects_drift_before_write',
+                'test_database_directory_not_admitted_from_unproved_older_registration',
+                'test_database_constructor_requires_matching_source_class_not_name_alone')],
+            'strength': 'matching primary source and shared public program mechanism; no per-class native execution inferred'},
+        'admission': '2025.1 selected live database and directory Type Handles; ordinary exact bound parent; source-scoped Paths List and Path Field Handles; Gateway-owned empty name; bounded absolute directory string; immutable Preview, authorization, metadata/identity/source drift checks and one execution',
+        'example_parent': proof['example_parent'], 'directory': proof['directory'],
+        'verification_scope': proof['verification'],
+        'other_roles': 'older lane class registration is not assumed; MediaPoolQuery saved construction remains independently assigned; no arbitrary anonymous List or hierarchy placement'}
+
 def definition_mapping(root):
     """Keep every independent ID/shape and join only source-supported paths."""
     root = Path(root)
@@ -312,6 +348,8 @@ def definition_mapping(root):
                 row['correspondence'] = _saved_constructor_correspondence(root, sdk, version, name, d['class_id'], row['build'])
             elif name == 'MusicPlaylistItem' and version in {'2023.1', '2024.1', '2025.1'}:
                 row['correspondence'] = _music_playlist_correspondence(root, version, d['class_id'], row['build'])
+            elif version == '2025.1' and name in {'MediaPoolDatabase', 'MediaPoolDatabasePath'}:
+                row['correspondence'] = _media_pool_database_correspondence(root, version, d['class_id'], row['build'])
             elif name in HIERARCHY:
                 row['correspondence'] = {'path': 'ordinary_selected_hierarchy_constructor', 'operations': ['object.create'],
                     'admission': 'fresh Type Handle, compatible selected parent, class prerequisites, exact identity/class/parent verification; no arbitrary hierarchy placement'}
