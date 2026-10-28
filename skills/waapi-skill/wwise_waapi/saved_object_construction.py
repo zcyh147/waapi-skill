@@ -52,7 +52,7 @@ def declaration_contract(version):
             "name": "one_portable_filename_component_without_path_syntax",
             "name_conflict": ["fail", "rename", "merge"], "effects": WORKUNIT_EFFECTS,
             "io_scope": "every_exact_existing_owner_and_owning_WorkUnit_in_connected_ancestry_within_same_active_project; corresponding_WWU_destination_is_native_owned_not_synthesized",
-            "same_batch_owner_rename": "separate_rename_Preview_then_bind_actual_existing_parent_for_WorkUnit_creation",
+            "same_batch_owner_rename": "all_SET_rows_checked_for_owner_owning_WorkUnit_or_proven_ancestor_overlap; separate_rename_Preview_then_bind_actual_existing_parent_for_WorkUnit_creation; unrelated_renames_remain_allowed",
             "verification": "GUID_class_parent_name_and_requested_fields; history_clipboard_and_saved_WWU_bytes_unobserved"},
         "Query": {"status": "supported" if lane["query_constructible"] else "unavailable_in_matching_SDK", "source_sha256": data["sha256"],
             "parent": "Queries_hierarchy_WorkUnit_or_Folder", "ordinary_query_object_reads": "unaffected",
@@ -227,3 +227,49 @@ def verification_scope(boundaries):
     unobserved = list(dict.fromkeys(item for boundary in boundaries for item in boundary["verification"]["unobserved"]))
     return {"mode": "saved_object_identity_and_fields", "observed": observed, "unobserved": unobserved,
         "complete_business_verification": not unobserved}
+
+
+def reject_batch_owner_renames(boundaries, specs, *, read):
+    """Keep all SET name edits outside sealed constructor owner/path contexts.
+
+    Identity overlap is exact. Ancestor overlap reuses the existing bounded
+    GUID/path proof; it makes no assertion about native file relocation.
+    """
+    from .object_graph_paths import prepare_ancestor_path_guards
+    renamed = [node for node in specs if node.get("existing_target") is True
+        and node.get("requested_name") != node.get("original_name")]
+    if not renamed:
+        return
+    protected = {row["id"].casefold(): row for boundary in boundaries if boundary.get("file_scopes")
+        for snapshot in boundary["parent_snapshots"] for row in snapshot["rows"]}
+    if not protected:
+        return
+    guards = {node["target_id"].casefold(): node["ancestor_rename_path_guard"] for node in specs
+        if node.get("ancestor_rename_path_guard")}
+    message = "A SET name edit overlaps a WorkUnit constructor owner or its proven ancestor. Prepare the rename separately, then bind the actual existing parent for a new WorkUnit Preview."
+    unproved = "The SET name edit cannot be certified independent of a captured WorkUnit owner path. Prepare it separately, then bind the actual existing parent for a new WorkUnit Preview."
+    for node in renamed:
+        identity = node["target_id"].casefold()
+        if identity in protected:
+            raise SavedConstructorError("WORKUNIT_PROJECT_IO_BOUNDARY", message)
+        for row in protected.values():
+            old_path = node["pre_state"]["path"]
+            if not isinstance(row.get("path"), str):
+                raise SavedConstructorError("WORKUNIT_PROJECT_IO_BOUNDARY", unproved)
+            if not row["path"].startswith(old_path + "\\"):
+                continue
+            # The full SET proof normally covers its constructor target. A
+            # linked owning WorkUnit can be outside the SET targets; acquire
+            # only that missing pair's ordinary bounded ancestry proof.
+            guard = guards.get(row["id"].casefold())
+            if guard is None:
+                context = {"existing_target": True, "target_id": row["id"], "pre_state": row,
+                    "requested_name": row["name"], "original_name": row["name"]}
+                try:
+                    prepare_ancestor_path_guards([node, context], read=read)
+                except (ValueError, KeyError, TypeError) as exc:
+                    raise SavedConstructorError("WORKUNIT_PROJECT_IO_BOUNDARY", unproved) from exc
+                guard = context.get("ancestor_rename_path_guard")
+            if not guard or identity not in {ancestor["id"].casefold() for ancestor in guard["ancestors"]}:
+                raise SavedConstructorError("WORKUNIT_PROJECT_IO_BOUNDARY", unproved)
+            raise SavedConstructorError("WORKUNIT_PROJECT_IO_BOUNDARY", message)

@@ -7257,6 +7257,11 @@ def _prepare_object_set(
         raise OperationContractError("ANCESTOR_RENAME_PATH_UNPROVED", str(exc)) from exc
     for row in added_ancestors:
         field_snapshots.append({"object_id": row["id"], "fields": list(ANCESTOR_PATH_FIELDS), "rows": [row], "platform": None})
+    from .saved_object_construction import reject_batch_owner_renames, SavedConstructorError
+    try:
+        reject_batch_owner_renames(saved_constructor_batches, node_specs, read=read)
+    except SavedConstructorError as exc:
+        raise OperationContractError(exc.code, str(exc)) from exc
 
     replaced_ids = {
         _identity_key(row["id"])

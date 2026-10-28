@@ -408,3 +408,65 @@ def test_workunit_save_requires_existing_owner_name_to_remain_bound_in_same_batc
     code, rejected = task.step("draft-check")
     assert code == 2 and "WORKUNIT_PROJECT_IO_BOUNDARY" in json.dumps(rejected), rejected
     assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
+
+
+class BatchOwnerRenameTask(ConstructorTask):
+    def __init__(self, path, overlap):
+        super().__init__(path, "2025.1", "object.set", hierarchy="Events")
+        base = self.objects[SECOND]["path"]
+        self.objects[FIRST] = {"id": FIRST, "name": "A", "type": "Folder", "classId": 131088,
+            "path": base + r"\A", "parent": {"id": SECOND}, "notes": "Keep A", "workunit": {"id": SECOND},
+            "filePath": self.objects[SECOND]["filePath"]}
+        self.objects[NESTED] = {"id": NESTED, "name": "B", "type": "Folder", "classId": 131088,
+            "path": base + (r"\A\B" if overlap == "ancestor" else r"\B"),
+            "parent": {"id": FIRST if overlap == "ancestor" else SECOND}, "notes": "Keep B",
+            "workunit": {"id": SECOND}, "filePath": self.objects[SECOND]["filePath"]}
+        rename_id = FIRST
+        if overlap == "owning-unit":
+            rename_id = SECOND  # Obtained independently via B's workunit link.
+        owner = self.bind(NESTED)
+        rename = self.bind(rename_id)
+        if overlap == "owning-unit":
+            code, value = self.step("draft-declare-existing", "--declaration-id", "rename", "--object-handle", rename,
+                "--field", "new_name", "Renamed")
+            assert code == 0, value
+        self.declare("WorkUnit", "NewUnit", parent=owner)
+        if overlap != "owning-unit":
+            code, value = self.step("draft-declare-existing", "--declaration-id", "rename", "--object-handle", rename,
+                "--field", "new_name", "Renamed")
+            assert code == 0, value
+
+    def call(self, uri, args=None, options=None):
+        if uri.endswith("object.set"):
+            # Ordinary native hierarchy rename only. No file movement is
+            # inferred, simulated or needed by the scope-overlap assertion.
+            for item in args["objects"]:
+                if "name" not in item:
+                    continue
+                row = self.objects[item["object"]]
+                before = row["path"]
+                after = before.rsplit("\\", 1)[0] + "\\" + item["name"]
+                for target in self.objects.values():
+                    if target["path"] == before or target["path"].startswith(before + "\\"):
+                        target["path"] = after + target["path"][len(before):]
+                row["name"] = item["name"]
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("overlap", ["ancestor", "owning-unit"])
+def test_workunit_constructor_rejects_overlapping_name_edit_from_another_set_row(tmp_path, overlap):
+    task = BatchOwnerRenameTask(tmp_path, overlap)
+    code, checked = task.step("draft-check")
+    assert code == 2 and "WORKUNIT_PROJECT_IO_BOUNDARY" in json.dumps(checked), checked
+    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+
+
+def test_workunit_constructor_allows_unrelated_name_edit_in_same_set_batch(tmp_path):
+    task = BatchOwnerRenameTask(tmp_path, "unrelated")
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is False, verified
+    assert verified["verification"]["failed_assertion_count"] == 0
+    assert task.objects[FIRST]["name"] == "Renamed"
+    assert task.objects[NESTED]["notes"] == "Keep B"
+    assert len([uri for uri, _, _ in task.calls if uri.endswith("object.set")]) == 1
