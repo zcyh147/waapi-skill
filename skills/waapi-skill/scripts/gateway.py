@@ -1743,6 +1743,13 @@ def build_parser() -> argparse.ArgumentParser:
     core_call.add_argument("--state-group-id")
     core_call.add_argument("--switch-group-id")
     core_call.add_argument("--game-object-handle")
+    core_call.add_argument("--include", dest="soundengine_outputs", action="append", default=[])
+    core_call.add_argument("--platform", dest="soundengine_platform")
+    core_call.add_argument("--language", dest="soundengine_language")
+    core_call.add_argument("--include-override-source-value", action="append", default=[])
+    core_call.add_argument("--include-local-reference", action="append", default=[])
+    from wwise_waapi.soundengine_related_outputs import add_soundengine_related_arguments
+    add_soundengine_related_arguments(core_call)
     add_media_build_read_arguments(core_call)
     core_call.add_argument("--project-file", action="append", default=[])
     core_call.add_argument("--originals-file", action="append", default=[])
@@ -5341,8 +5348,20 @@ def preflight_core_business_input(
         raise GatewayInputError("Source-control file locators apply only to the getStatus read alternative")
     if (args.runtime_observation is not None or args.runtime_page is not None) and args.api not in runtime_inspection_business_read_operations():
         raise GatewayInputError("Runtime observation continuation is valid only for its original runtime-inspection operation")
+    from wwise_waapi.soundengine_related_outputs import RELATED_INPUTS, compile_soundengine_related_requests
+    related_supplied = any(getattr(args, attribute) for _, attribute, _ in RELATED_INPUTS)
+    if (related_supplied or args.soundengine_outputs or args.soundengine_platform is not None or args.soundengine_language is not None or args.include_override_source_value or args.include_local_reference) and args.api not in soundengine_control_business_read_operations():
+        raise GatewayInputError("--include, --platform and --language apply only to SoundEngine getState/getSwitch")
     if args.api in soundengine_control_business_read_operations():
         contract = soundengine_control_business_contract_data(args.api, versions[0])
+        defaults = vars(build_parser().parse_args(["core-call", args.api]))
+        allowed = {"api", "command", "version", "timeout", "evidence_dir", "state_dir", "state_group_id",
+            "switch_group_id", "game_object_handle", "soundengine_outputs", "soundengine_platform",
+            "soundengine_language", "include_field", "include_override_source_value", "include_local_reference",
+            *(attribute for _, attribute, _ in RELATED_INPUTS)}
+        unexpected = [key for key, value in vars(args).items() if key not in allowed and value != defaults.get(key)]
+        if unexpected:
+            raise GatewayInputError("SoundEngine getter accepts only its disclosed business inputs: " + ", ".join(unexpected))
         identity_field = (
             "state_group_id" if args.api == GET_STATE_URI else "switch_group_id"
         )
@@ -5368,8 +5387,28 @@ def preflight_core_business_input(
             validate_runtime_game_object_handle(args.game_object_handle)
             if args.api != GET_SWITCH_URI:
                 raise GatewayInputError("getState does not accept a game object handle")
+        from wwise_waapi.soundengine_object_returns import compile_soundengine_object_returns, compile_soundengine_field_meanings
+        try:
+            args.soundengine_return_options, args.query_output_bindings = compile_soundengine_object_returns(
+                versions[0], args.soundengine_outputs, platform=args.soundengine_platform, language=args.soundengine_language)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        try:
+            args.soundengine_field_declarations = compile_soundengine_field_meanings(args)
+            args.soundengine_related_requests, related_declarations = compile_soundengine_related_requests(args, versions[0])
+            args.soundengine_field_declarations.update(related_declarations)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        args.object_type = "State" if args.api == GET_STATE_URI else "Switch"
+        args.path = args.object_id = None
+        args.query_related_version = versions[0]
         args.soundengine_read_business_request = {
+            **args.soundengine_field_declarations,
+
             identity_field: identity.upper(),
+            **({"outputs": list(args.soundengine_outputs)} if args.soundengine_outputs else {}),
+            **({"platform": args.soundengine_platform} if args.soundengine_platform is not None else {}),
+            **({"language": args.soundengine_language} if args.soundengine_language is not None else {}),
             **(
                 {"game_object_handle": args.game_object_handle}
                 if args.game_object_handle is not None
@@ -12155,24 +12194,67 @@ def dispatch_soundengine_business_read(
                 error_code=exc.error_code,
             ) from exc
         native_args["gameObject"] = game_object_record.game_object_id
+    if args.query_custom_field_meanings:
+        clarification = _bind_query_custom_fields_from_live_metadata(
+            args, connection=connection, detected_version=detected_version, dispatcher=dispatcher)
+        if clarification is not None:
+            raise GatewayResultShapeError("Refine the getter's field meanings against live State/Switch class metadata.",
+                details=clarification, error_code="SOUNDENGINE_FIELD_SELECTION_REQUIRED")
+        args.soundengine_return_options = {**args.soundengine_return_options,
+            "return": list(dict.fromkeys(["id", "name", "type", *(native for _, native, _ in args.query_output_bindings)]))}
+    capability = live_capability(detected_version, args.api, live_info=live_info)
+    def before_getter():
+        if game_object_record is not None:
+            try:
+                current = RuntimeGameObjectHandleStore(state_dir).resolve(handle,
+                    context=_runtime_game_object_context_from_live(endpoint=common["endpoint"], project=project,
+                        detected_version=detected_version, live_info=live_info))
+                if current != game_object_record:
+                    raise RuntimeGameObjectHandleError("GAME_OBJECT_HANDLE_NOT_AVAILABLE",
+                        "Runtime game-object generation changed before the getter.")
+            except RuntimeGameObjectHandleError as exc:
+                raise GatewayResultShapeError(str(exc), details={"handle_kind": "game_object", "next_getter_dispatched": False},
+                    error_code=exc.error_code) from exc
+    related_projection = None
+    if args.soundengine_related_requests:
+        from wwise_waapi.soundengine_related_outputs import SoundEngineRelatedProjection
+        from wwise_waapi.object_query_related_runtime import RelatedQueryError
+        def read_getter(options):
+            validate_semantic_payload(args.api, native_args, options, version=detected_version)
+            observation = dispatch(dispatcher, args.api, connection=connection, version=detected_version,
+                args=native_args, options=options, allow_destructive=True,
+                result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+                operation_timeout=float(capability.execution_contract["timeout_seconds"]))
+            if observation.get("ok") is not True:
+                raise GatewayResultShapeError("Runtime getter preparation failed.",
+                    details={"call": dispatch_call_summary(observation)}, error_code="SOUNDENGINE_RELATED_READ_FAILED")
+            validate_semantic_result(args.api, observation.get("result"), version=detected_version)
+            return observation["result"]
+        related_projection = SoundEngineRelatedProjection(version=detected_version,
+            requests=args.soundengine_related_requests, bindings=args.query_output_bindings,
+            getter=read_getter, read=read_call,
+            scope={key: value for key, value in args.soundengine_return_options.items() if key != "return"},
+            expected_type=args.object_type, before_getter=before_getter,
+            compile_condition=lambda condition: _query_sequence_condition(detected_version, condition))
+        try:
+            related_projection.prepare()
+            args.soundengine_return_options = related_projection.final_options()
+        except RelatedQueryError as exc:
+            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
     request_validation = validate_semantic_payload(
         args.api,
         native_args,
-        {},
+        args.soundengine_return_options,
         version=detected_version,
     )
-    capability = live_capability(
-        detected_version,
-        args.api,
-        live_info=live_info,
-    )
+    before_getter()
     result = dispatch(
         dispatcher,
         args.api,
         connection=connection,
         version=detected_version,
         args=native_args,
-        options={},
+        options=args.soundengine_return_options,
         allow_destructive=True,
         result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         operation_timeout=float(capability.execution_contract["timeout_seconds"]),
@@ -12197,19 +12279,25 @@ def dispatch_soundengine_business_read(
             or not _canonical_guid(returned_object.get("id"))
             or not isinstance(returned_object.get("name"), str)
             or not returned_object["name"]
+            or (args.query_custom_field_meanings and returned_object.get("type") != args.object_type)
         )
     ):
         raise GatewayResultShapeError(
             "SoundEngine state/switch result must contain one bounded returned "
-            "object with an exact id and name.",
+            "object with an exact id/name and the metadata-bound State/Switch type when custom fields are selected.",
             details={"actual_result": raw_result},
             error_code="SOUNDENGINE_READ_RESULT_INVALID",
         )
     agent_result = (
-        {"id": returned_object["id"], "name": returned_object["name"]}
+        _project_query_business_rows(args, [returned_object], identity_fields=("id", "name"))[0]
         if result.get("ok")
         else None
     )
+    if result.get("ok") and related_projection is not None:
+        try:
+            agent_result.update(related_projection.project(raw_result))
+        except RelatedQueryError as exc:
+            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
     return {
         "ok": bool(result.get("ok")),
         "status": "ok" if result.get("ok") else "error",
@@ -12235,6 +12323,7 @@ def dispatch_soundengine_business_read(
             "request": request_validation.as_dict(),
             "result": result_validation.as_dict() if result_validation else None,
         },
+        **({"related_projection": related_projection.proof()} if related_projection is not None else {}),
         "agent_result": agent_result,
     }
 
@@ -25574,16 +25663,19 @@ def _prepare_query_related_outputs(args, *, build_preview, connection, detected_
 def _project_query_business_rows(
     args: argparse.Namespace,
     rows: Sequence[Mapping[str, Any]],
+    *,
+    identity_fields: Sequence[str] = SELECTED_REQUIRED_RETURN_FIELDS,
 ) -> list[dict[str, Any]]:
     """Rename Gateway-compiled native accessors into stable business fields."""
 
+    result_page = getattr(args, "result_page", None)
     root_conditions = getattr(args,'query_root_condition_plan',None)
     if root_conditions is not None:
         from wwise_waapi.object_query_related_runtime import RelatedQueryError
         try:
             root_conditions.validate(rows)
         except RelatedQueryError as exc:
-            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
             raise GatewayResultShapeError(str(exc),details=exc.details,error_code=code) from exc
     bindings = tuple(getattr(args, "query_output_bindings", ()) or ())
     proof = getattr(args, "query_related_scope_binding", None)
@@ -25595,7 +25687,7 @@ def _project_query_business_rows(
             related_rows = list_plan.project(rows)
             args.query_related_scope_binding = list_plan.proof()
         except RelatedQueryError as exc:
-            code = "QUERY_RESULT_CONTINUATION_CHANGED" if args.result_page is not None else exc.code
+            code = "QUERY_RESULT_CONTINUATION_CHANGED" if result_page is not None else exc.code
             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
     elif proof is not None:
         from wwise_waapi.object_query_related_runtime import RelatedQueryError, validate_related_observation
@@ -25605,8 +25697,8 @@ def _project_query_business_rows(
             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
     projected: list[dict[str, Any]] = []
     for row_index, row in enumerate(rows):
-        item = {field: row[field] for field in SELECTED_REQUIRED_RETURN_FIELDS if field in row}
-        missing_identity = [field for field in SELECTED_REQUIRED_RETURN_FIELDS if field not in row]
+        item = {field: row[field] for field in identity_fields if field in row}
+        missing_identity = [field for field in identity_fields if field not in row]
         unavailable = list(missing_identity)
         grouped: dict[str, dict[str, Any]] = {}
         related_groups: dict[str, dict[str, Any]] = {}
@@ -25649,7 +25741,7 @@ def _project_query_business_rows(
                         try:
                             validate_randomizer_value(output['randomizer_value'], row[native], RelatedQueryError)
                         except RelatedQueryError as exc:
-                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
                             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
                     if 'function_value' in output:
                         from wwise_waapi.object_query_functions import validate_function_value
@@ -25657,7 +25749,7 @@ def _project_query_business_rows(
                         try:
                             validate_function_value(output['function_value'], row[native], RelatedQueryError)
                         except RelatedQueryError as exc:
-                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
                             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
                     if group is None and field == 'curve_points':
                         from wwise_waapi.object_query_local_lists import validate_curve_points
@@ -25665,7 +25757,7 @@ def _project_query_business_rows(
                         try:
                             validate_curve_points(args.query_related_version, row[native], RelatedQueryError)
                         except RelatedQueryError as exc:
-                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
                             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
                     target = context.setdefault(group, {}) if group else context
                     target[field] = row[native]
@@ -25685,7 +25777,7 @@ def _project_query_business_rows(
                     try:
                         validate_marker_records(row[native])
                     except ValueError as exc:
-                        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else 'QUERY_MARKER_RECORDS_SHAPE'
+                        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else 'QUERY_MARKER_RECORDS_SHAPE'
                         raise GatewayResultShapeError(str(exc),details={'id':row.get('id'),'output':'marker_records','native_key':native},error_code=code) from exc
             if native not in row:
                 unavailable.append(f"{group}.{output}" if group else output)
@@ -25699,7 +25791,7 @@ def _project_query_business_rows(
                     try:
                         validate_curve_points(args.query_related_version, row[native], RelatedQueryError)
                     except RelatedQueryError as exc:
-                        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+                        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
                         raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
                 item[output] = row[native]
         declared = [native for kind, native, _ in bindings if kind == "declared_return"]
@@ -25707,7 +25799,7 @@ def _project_query_business_rows(
             item["declared_return_observation"] = {
                 "selected_spellings": declared,
                 "returned_values": {key: value for key, value in row.items()
-                                    if key not in SELECTED_REQUIRED_RETURN_FIELDS},
+                                    if key not in identity_fields},
             }
         for group in QUERY_FIELD_OUTPUT_GROUPS.values():
             if group in grouped:
