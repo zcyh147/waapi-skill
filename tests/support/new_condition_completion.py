@@ -14,9 +14,13 @@ from pathlib import Path
 from tests.maintenance.branch_coverage_audit import digest, load
 from tests.maintenance.branch_audit_completion import installed_obligations
 
-PROOF_PATH = 'tests/fixtures/metadata-conditions/new-condition-current-program-r2.json.gz'
-PREVIOUS_PROOF = {'path': 'tests/fixtures/metadata-conditions/new-condition-current-program.json.gz',
+PROOF_PATH = 'tests/fixtures/metadata-conditions/new-condition-current-program-r3.json.gz'
+ORIGINAL_PROOF = {'path': 'tests/fixtures/metadata-conditions/new-condition-current-program.json.gz',
     'sha256': 'f19e45ba8e04a97d5ce8fdfb9f97d2e3567e75f11547d7baf5869149a9aa65cd'}
+PREVIOUS_PROOF = {'path': 'tests/fixtures/metadata-conditions/new-condition-current-program-r2.json.gz',
+    'sha256': '23f291cd2417075ef624866fafbd3edfccfd33476c2a005f2535e45688fba2d8'}
+MEDIA_POOL_PRIMARY_SOURCE = ('skills/waapi-skill/references/semantic/2025.1/media-pool-database-sources/'
+    'ak_wwise_core_object_set_example_creating_a_media_pool_database.html')
 VERSIONS = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
 LIB = 'skills/waapi-skill/wwise_waapi/'
 
@@ -27,7 +31,8 @@ def program_sources(root):
     selected = {p.relative_to(root).as_posix() for directory in ('scripts', 'wwise_waapi')
         for p in (root / 'skills/waapi-skill' / directory).rglob('*.py') if '__pycache__' not in p.parts}
     selected.update({'tests/support/new_condition_completion.py',
-        'tests/support/platform_filesystem.py', PREVIOUS_PROOF['path'],
+        'tests/support/platform_filesystem.py', ORIGINAL_PROOF['path'], PREVIOUS_PROOF['path'],
+        MEDIA_POOL_PRIMARY_SOURCE,
         'tests/support/condition_source_resolution.py', 'tests/support/condition_scalar_batch.py',
         'tests/support/condition_mechanism_reuse.py', 'tests/support/exact_evidence_finalization.py',
         'docs/branch-coverage-condition-sources.json',
@@ -152,8 +157,9 @@ def review(root):
     _fieldless_review(root)
     _batch_exclusion_review(root)
     _music_limit_review(root)
-    if hashlib.sha256((root / PREVIOUS_PROOF['path']).read_bytes()).hexdigest() != PREVIOUS_PROOF['sha256']:
-        raise ValueError('Original new-object public program proof changed')
+    for predecessor in (ORIGINAL_PROOF, PREVIOUS_PROOF):
+        if hashlib.sha256((root / predecessor['path']).read_bytes()).hexdigest() != predecessor['sha256']:
+            raise ValueError('Historical new-object public program proof changed')
     raw = (root / PROOF_PATH).read_bytes()
     if hashlib.sha256(raw).hexdigest() != PROOF_SHA256:
         raise ValueError('Exact new-object public program proof differs')
@@ -207,7 +213,7 @@ def review(root):
             or set(master.get('versions', [])) != {'2024.1', '2025.1'}
             or master.get('proof_kind') != 'structural-reference-visibility'):
         raise ValueError('Master-only condition requires its object-scoped reference proof')
-    return {'review_id': 'new-object-condition-correspondence-r2', 'operation_mode': 'new-object',
+    return {'review_id': 'new-object-condition-correspondence-r3', 'operation_mode': 'new-object',
         'current_sources': {**proof['sources'], **resources}, 'predecessor': PREVIOUS_PROOF, 'program_proof': {'path': PROOF_PATH, 'sha256': PROOF_SHA256},
         'source_definition_policy': {'new_native_runs': 0}, 'recipe_public_proofs': {}}
 
