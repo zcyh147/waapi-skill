@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from tests.destructive.support.object_constructor_collision import run_diagnostic
+from tests.destructive.support.object_constructor_collision import run_diagnostic, selected_profiles
 from tests.semantic.support.codex_project_prelaunch_v3 import ProjectPrelaunchRequest, make_project_prelaunch_hook
 from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle
 
@@ -35,5 +35,6 @@ def test_2025_object_constructor_collision_diagnostic():
         pytest.skip('requires a new explicit WAAPI_OBJECT_COLLISION_PROBE_ROOT')
     root = Path(root_text)
     assert root.is_absolute() and not root.exists()
+    profiles = selected_profiles(os.environ.get('WAAPI_OBJECT_COLLISION_PROFILES'))
     lifecycle = make_collision_lifecycle(root, live_environment=dict(os.environ))
-    run_diagnostic(lifecycle)
+    run_diagnostic(lifecycle, profiles=profiles)

@@ -1,8 +1,9 @@
 """Fixed maintainer-only constructor diagnostic; no public raw execution route.
 
 One existing ScenarioLifecycle and one OwnedDirectWaapiCall own the complete
-attempt. A collection PASS means nine observations were retained, never that a
-native policy was equivalent or a public operation passed.
+attempt. A collection PASS means the requested fixed observations were retained
+(nine by default), never that a native policy was equivalent or a public
+operation passed.
 """
 from __future__ import annotations
 
@@ -12,8 +13,10 @@ import json
 from pathlib import Path
 
 from wwise_waapi.builders.schema import SemanticSchemaValidator
+from wwise_waapi.operation_plugin import _closed_object_reference_id
 
 VERSION = '2025.1'
+PROFILES = ('action', 'effect_slot', 'source')
 BOUNDS = {'discriminators': 9, 'native_calls': 100, 'members_per_owner': 16,
           'result_bytes_per_call': 262144, 'evidence_bytes': 4194304}
 BASE = ['id', 'name', 'type', 'classId', 'path', 'parent', 'owner', 'notes']
@@ -26,6 +29,18 @@ RESOURCE = REPO / 'skills/waapi-skill/resources/metadata'
 
 def _encoded(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False).encode('utf-8')
+
+
+def selected_profiles(text=None):
+    """Closed maintainer selection; omitted selects the original nine cases."""
+    return _validate_profiles(PROFILES if text is None else tuple(text.split(',')))
+
+
+def _validate_profiles(profiles):
+    if (not isinstance(profiles, tuple) or not profiles or len(profiles) > len(PROFILES)
+            or any(profile not in PROFILES for profile in profiles) or len(set(profiles)) != len(profiles)):
+        raise ValueError('select each of action,effect_slot,source at most once; at least one is required')
+    return tuple(profile for profile in PROFILES if profile in profiles)
 
 
 def source_pins():
@@ -116,8 +131,9 @@ def _snapshot(call, identity, profile):
 
 
 def collect_observations(actor, evidence):
-    """Observe the fixed nine cases; never derive or assert conflict equivalence."""
+    """Observe selected fixed profiles; never derive conflict equivalence."""
     call = _Calls(actor, evidence)
+    profiles = evidence['selected_profiles']
     info = call('ak.wwise.core.getInfo', {})
     evidence['get_info'] = info
     version = info['version']
@@ -134,26 +150,31 @@ def collect_observations(actor, evidence):
     for source in evidence['source_pins'][VERSION]['classes']:
         assert selected[source['name']]['classId'] == source['class_id']
     evidence['selected_live_types'] = selected
-    action_metadata = call('ak.wwise.core.object.getPropertyInfo',
-        {'classId': selected['Action']['classId'], 'property': 'ActionType'})
-    play = _one([row for row in action_metadata['restriction']['values'] if row['displayName'] == '/Play'])
-    frequency_metadata = call('ak.wwise.core.object.getPropertyInfo',
-        {'classId': selected['Wwise Tone Generator']['classId'], 'property': 'StartFreq'})
-    restriction = frequency_metadata['restriction']
-    assert restriction['type'] == 'range' and restriction['min'] <= 440 < 660 <= restriction['max']
-    evidence['selected_live_fields'] = {'ActionType': action_metadata, 'StartFreq': frequency_metadata}
+    evidence['selected_live_fields'] = {}
+    if 'action' in profiles:
+        action_metadata = call('ak.wwise.core.object.getPropertyInfo',
+            {'classId': selected['Action']['classId'], 'property': 'ActionType'})
+        play = _one([row for row in action_metadata['restriction']['values'] if row['displayName'] == '/Play'])
+        evidence['selected_live_fields']['ActionType'] = action_metadata
+    if 'source' in profiles:
+        frequency_metadata = call('ak.wwise.core.object.getPropertyInfo',
+            {'classId': selected['Wwise Tone Generator']['classId'], 'property': 'StartFreq'})
+        restriction = frequency_metadata['restriction']
+        assert restriction['type'] == 'range' and restriction['min'] <= 440 < 660 <= restriction['max']
+        evidence['selected_live_fields']['StartFreq'] = frequency_metadata
     units = {key: _one(_lookup(call, {'path': [path]}, BASE)) for key, path in
-             [('event', r'\Events\Default Work Unit'), ('sound', r'\Containers\Default Work Unit')]}
+             [('event', r'\Events\Default Work Unit'), ('sound', r'\Containers\Default Work Unit')]
+             if key == 'sound' or 'action' in profiles}
     assert all(row['type'] == 'WorkUnit' for row in units.values())
     targets = []
-    for name in ('CollisionTargetA', 'CollisionTargetB'):
+    for name in (('CollisionTargetA', 'CollisionTargetB') if 'action' in profiles else ()):
         created = call('ak.wwise.core.object.create', {'parent': units['sound']['id'], 'type': 'Sound',
             'name': name, 'onNameConflict': 'fail'})
         target = _one(_lookup(call, {'id': [created['id']]}, BASE))
         assert target['type'] == 'Sound' and target['classId'] == selected['Sound']['classId']
         targets.append(target)
     evidence['targets_before'] = targets
-    for profile in ('action', 'effect_slot', 'source'):
+    for profile in profiles:
         for mode in ('rename', 'merge', 'replace'):
             name = f'ConstructorCollision_{profile}_{mode}'
             owner_type = 'Event' if profile == 'action' else 'Sound'
@@ -189,7 +210,8 @@ def collect_observations(actor, evidence):
                 assert (target['id'] if isinstance(target, dict) else target) == targets[0]['id']
             elif profile == 'effect_slot':
                 old = _one(before['members'])
-                assert old['name'] == '' and old['@Effect'] is None
+                assert old['name'] == '' and _closed_object_reference_id(
+                    old['@Effect'], field='EffectSlot.@Effect', allow_none=True) is None
                 assert old['@Bypass'] is True and old['@Render'] is False
             else:
                 assert before['owner']['@IsVoice'] is True
@@ -225,17 +247,20 @@ def collect_observations(actor, evidence):
                                         'added': sorted(new_ids - old_ids)}
     evidence['targets_after'] = [_one(_lookup(call, {'id': [target['id']]}, BASE)) for target in targets]
     assert evidence['targets_before'] == evidence['targets_after'], 'unrelated Action targets changed'
-    assert len(evidence['cases']) == BOUNDS['discriminators']
+    assert len(evidence['cases']) == evidence['requested_discriminators']
 
 
-def run_diagnostic(lifecycle, *, actor_factory=None):
+def run_diagnostic(lifecycle, *, actor_factory=None, profiles=PROFILES):
     """Run once and seal collection/failure evidence before lifecycle shutdown."""
+    profiles = _validate_profiles(profiles)
     if actor_factory is None:
         from tests.semantic.support.codex_heavy_project_runner_v3 import OwnedDirectWaapiCall
         actor_factory = OwnedDirectWaapiCall
     evidence = {'kind': 'native-constructor-collision-diagnostic', 'version': VERSION,
                 'public_gateway_pass': False, 'agent_semantic_pass': False,
-                'bounds': BOUNDS, 'source_pins': source_pins(), 'cases': [], 'native_calls': []}
+                'bounds': BOUNDS, 'source_pins': source_pins(), 'cases': [], 'native_calls': [],
+                'selected_profiles': list(profiles), 'requested_discriminators': len(profiles) * 3,
+                'native_writes_max': len(profiles) * 6 + (2 if 'action' in profiles else 0)}
     runtime = actor = None
     status, reason = 'FAIL', 'diagnostic did not complete'
     try:

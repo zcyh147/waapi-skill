@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from tests.destructive.support.object_constructor_collision import run_diagnostic
+from tests.destructive.support.object_constructor_collision import run_diagnostic, selected_profiles
 
 
 def guid(number):
@@ -70,10 +70,12 @@ class FakeActor:
         identity = guid(100 + len(self.objects))
         selected = next((row for row in self.types if row['name'] == node['type']), None)
         row = {'id': identity, 'name': node['name'], 'classId': node.get('classId', selected['classId'] if selected else 0),
-            'type': 'SourcePlugin' if node['type'] == 'Source' else 'PluginInnerObject' if owned else node['type'],
+            'type': 'SourcePlugin' if node['type'] == 'Source' else 'EffectSlot' if owned else node['type'],
             'path': self.objects[parent]['path'] + '\\' + (node['name'] or identity),
             'owner' if owned else 'parent': {'id': parent}, 'notes': node.get('notes', '')}
         row.update({key: deepcopy(value) for key, value in node.items() if key.startswith('@') and key != '@Effects'})
+        if owned and row.get('@Effect') is None:
+            row['@Effect'] = {'id': '{00000000-0000-0000-0000-000000000000}'}
         if node.get('language'):
             row['audioSource:language'] = {'name': 'Japanese' if self.wrong_seed_language else node['language']}
             row['@WaveType'] = 0
@@ -121,6 +123,8 @@ def test_diagnostic_records_nine_independent_discriminators_with_exact_membershi
     assert source['request']['objects'][0]['children'][0]['language'] == 'Japanese'
     assert source['before']['members'][0]['audioSource:language']['name'] == 'English(US)'
     assert evidence['public_gateway_pass'] is False and evidence['agent_semantic_pass'] is False
+    assert evidence['selected_profiles'] == ['action', 'effect_slot', 'source']
+    assert evidence['requested_discriminators'] == 9
     assert len(evidence['native_calls']) <= evidence['bounds']['native_calls']
     assert json.loads((tmp_path / 'object-constructor-collisions.json').read_text())['status'] == 'PASS'
 
@@ -134,6 +138,27 @@ def test_indeterminate_call_stops_without_retry_and_still_finalizes_owned_host(t
     assert lifecycle.finished[0][0] == expected
     evidence = json.loads((tmp_path / 'object-constructor-collisions.json').read_text())
     assert evidence['status'] == expected and evidence['cases'] == []
+
+
+def test_remaining_profiles_issue_only_six_discriminators_without_action_setup(tmp_path):
+    actor, lifecycle = FakeActor(), FakeLifecycle(tmp_path)
+    evidence = run_diagnostic(lifecycle, profiles=selected_profiles('effect_slot,source'), actor_factory=lambda **_: actor)
+    assert evidence['selected_profiles'] == ['effect_slot', 'source']
+    assert evidence['requested_discriminators'] == len(evidence['cases']) == 6
+    assert {row['profile'] for row in evidence['cases']} == {'effect_slot', 'source'}
+    assert len(actor.writes) == 12
+    assert not any(row.get('args', {}).get('property') == 'ActionType' for row in actor.calls)
+    assert not any(uri.endswith('object.create') for uri, _ in actor.writes)
+    assert evidence['targets_before'] == evidence['targets_after'] == []
+    assert evidence['cases'][0]['before']['members'][0]['@Effect'] == {'id': '{00000000-0000-0000-0000-000000000000}'}
+
+
+@pytest.mark.parametrize('profiles', [(), ('source', 'source'), ('unknown',)])
+def test_invalid_profile_selection_is_rejected_before_lifecycle_start(tmp_path, profiles):
+    actor, lifecycle = FakeActor(), FakeLifecycle(tmp_path)
+    with pytest.raises(ValueError):
+        run_diagnostic(lifecycle, profiles=profiles, actor_factory=lambda **_: actor)
+    assert not lifecycle.finished and not actor.calls
 
 
 def test_source_discriminator_requires_exact_two_language_seed_before_its_write(tmp_path):
@@ -174,13 +199,14 @@ def test_real_lifecycle_persists_final_outcome_and_cleanup_after_collector(monke
     lifecycle = make_collision_lifecycle(root, live_environment={'WWISE_TEST_CONFIG': 'unused'})
     if shutdown_error:
         with pytest.raises(AssertionError):
-            run_diagnostic(lifecycle, actor_factory=lambda **_: actor)
+            run_diagnostic(lifecycle, profiles=('effect_slot', 'source'), actor_factory=lambda **_: actor)
     else:
-        run_diagnostic(lifecycle, actor_factory=lambda **_: actor)
+        run_diagnostic(lifecycle, profiles=('effect_slot', 'source'), actor_factory=lambda **_: actor)
     evidence = json.loads((root / 'evidence/object-constructor-collisions.json').read_text())
     finalized = json.loads((root / 'evidence/lifecycle.json').read_text())
     assert evidence['status'] == finalized['final_status'] == expected
-    assert evidence['collection_status'] == 'PASS' and len(evidence['cases']) == 9
+    assert evidence['collection_status'] == 'PASS' and len(evidence['cases']) == 6
+    assert evidence['selected_profiles'] == ['effect_slot', 'source'] and evidence['requested_discriminators'] == 6
     assert finalized['sandbox_retained'] is shutdown_error
     assert (root / 'owned').exists() is shutdown_error
     assert copied_before_launch['languages'] == ['English(US)', 'External', 'Japanese', 'Mixed', 'SFX']
