@@ -1,0 +1,13 @@
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.001245, "reason": "locked developer interpreter ready", "automatic_repair_attempted": false}
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.000227, "reason": "selected Non-live prerequisites ready", "automatic_repair_attempted": false}
+== Test Context ==
+version:      none
+mode:         nonlive
+console:      <unset>
+project:      <unset>
+sandbox_root: <unset>
+test_config:  <unset>
+pytest args:  -q -ra tests/unit/test_soundengine_business_gateway.py::test_monitor_message_uses_one_business_draft_and_seals_native_preview tests/unit/test_soundengine_business_gateway.py::test_register_game_object_derives_native_id_and_binds_cleanup tests/unit/test_soundengine_business_gateway.py::test_state_switch_write_is_verified_by_independent_exact_scope_getter tests/unit/test_soundengine_business_gateway.py::test_getter_binds_custom_field_meanings_to_live_state_class_before_one_dispatch tests/unit/test_soundengine_business_gateway.py::test_getter_related_projection_uses_the_final_native_getter_value tests/unit/test_soundengine_business_gateway.py::test_getter_existing_related_list_form_preserves_native_or_grouped_value_provenance tests/unit/test_soundengine_business_gateway.py::test_getter_custom_fields_reject_raw_meanings_duplicates_limits_and_unrelated_options[extra3] tests/unit/test_soundengine_branch_mapping.py::test_soundengine_string_nodes_map_compilers_constraints_and_input_rejection tests/unit/test_soundengine_branch_mapping.py::test_soundengine_attachment_uses_existing_reader_without_fabricating_receipts
+
+.................                                                        [100%]
+17 passed in 8.98s
