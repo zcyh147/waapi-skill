@@ -60,7 +60,7 @@ Execution follows the [shared test-selection and evidence-reuse rules](https://g
 First prove each changed public Gateway business path with code integration tests, including disclosure, discovery, binding, Preview and exact terminal results. Then propose only the Fresh cases needed to check Agent discovery/use of changed interfaces; obtain an exact separate Mac-only budget before launch. Reuse valid routing/harness evidence and attribute infrastructure failures before scheduling a rerun. Code integration and native Wwise cases are distinct from Fresh Agent acceptance.
 
 
-## Pending Fresh selection — 2026-10-27
+## Superseded Fresh proposal — 2026-10-27
 
 The user requested a concrete proposal for review and explicitly prohibited running it yet. Execution authorization remains **zero**. Static inspection used candidate `f7be160bb3c24ebf88d043cd40757d945395d2ac`; no Fresh, model probe, Wwise, fixture preparation or test was started for this proposal.
 
@@ -77,3 +77,14 @@ Proposed budget: **3 Fresh tasks, 3 user turns, 2 Previews, 0 Agent mutation exe
 These cases sample three distinct Agent interactions: query/refinement, planned new objects and existing-object field/reference discovery. They do not establish five-version native execution, actual graph creation/rerouting, every conditional field, or fully unprompted type discovery. Five-version mappings/code validation and necessary combined gates remain under #195. Preserve raw verdicts; inspect final replies for material false completion claims, without treating harmless wording as a reason to rerun. Stop on systemic evidence/authorization/cleanup faults; otherwise finish the approved frozen batch before consolidating failures. Any further attempt needs a new cost decision.
 
 #179, #182 and #184 are closed under the user's accepted limits; earlier proposals listing them as pending are superseded. #195 can independently reconcile mappings and retained evidence while this proposal awaits review. Its final aggregate cannot claim Fresh acceptance before the selected runs and assessments exist.
+
+
+## Revised Fresh decision — 2026-10-28
+
+Withdraw all three proposed repeat runs. The user questioned their duplication and requested a comparison with existing tests before any execution. The proposed additional Fresh count is now **zero**; no Fresh run, model probe, Wwise launch or test was performed for this decision.
+
+- Weather graph creation and Alarm Output Bus editing repeat existing task goals without an identified new interaction requiring another Agent observation. Preserve their historical evidence and original candidate limits; do not label them current-candidate Fresh passes.
+- The exact `TYP22-GENERIC-OBJECT-QUERY` also already passed on both hosts at `1fc30be7` (Mac r15 and Windows r16), including the Music candidate repair, eight CombatMix Sounds and 5/3 bus counts. The later `ce06b25` deep19 profile contains the same unit; its Mac failure was only OMB and its Windows result was 19/19. These facts are recorded in `tests/TEST_INVENTORY.md` under the final query and r72-r74 deep19 entries. The later `82530a9` OMB rerun is not query evidence.
+- The selected TYP22 prompt is unchanged. A focused comparison from `ce06b25` to `ab69468b` found new outputs, scope/Short-ID choices and missing-field reporting, but this existing query selects none of those branches. Its first-candidate repair and flat-AND query remain the same interaction. Optional native candidate facts are a producer/consumer change for deterministic validation, not sufficient reason to repeat this Agent task.
+
+A new commit, old archive-reader incompatibility, broader instructions or an important feature name alone does not justify another Fresh attempt. This decision retains historical observations rather than manufacturing a current archive PASS or weakening archive integrity checks. #194 still owns final routing/evidence reconciliation; #195 owns current mapping, affected code proof and stable combined gates. Any later concrete new Agent interaction requires a separately justified proposal and exact budget. The three-run table above is historical proposal context only and must not be scheduled.
