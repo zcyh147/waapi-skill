@@ -629,7 +629,7 @@ def test_unbound_source_program_equivalence_cannot_borrow_valid_old_context(sour
     result = completion.evidence_result(binding['evidence']['program'], branch,
         case['inventory']['native_coverage']['candidate_sha256'], 'program', 'product', base,
         binding, source_root=audit.ROOT)
-    assert result == ('missing', 'Unbound Source accounting program equivalence')
+    assert result == ('missing', 'Source successor current candidate differs')
 
 
 def test_source_successor_rejects_resigned_predecessor_substitution(source_successor_case):

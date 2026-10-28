@@ -223,7 +223,7 @@
     "tests/unit/test_object_graph_owned_choices_gateway.py": "5930214aa36f90792c135815226c6f8b4c703a9774c62e38b1084e66b3917e61",
     "tests/unit/test_plugin_shareset_gateway.py": "12b278738bb4f4d2b789d41e3734e4b4654313b52bf76cf384a80c5d2d79b9ff",
     "tests/unit/test_source_copy_branch_evidence.py": "f6e6efdf7a359b6a575badf36668782a790bef311265089b3128ed36af6667d6",
-    "tests/unit/test_source_copy_capture.py": "1fc29a909e863b8fd5f56a116df96d02e9909dd58bf67507318518c7acd0aa7c",
+    "tests/unit/test_source_copy_capture.py": "71ac089794f317b646f9f9ae7289ffe84cc92c48497a3eceefd2d7d173336358",
     "tests/unit/test_source_copy_modern_collector.py": "bb57de305574935a7a0ca80bbe85aa5fc2d135fca37f7ef176b74bce908db3e2",
     "tests/unit/test_source_copy_repeated_fixture.py": "e581b38eb4e89720e90b618c0bed05e788af5f7995f013b3a60be12877e82ee6",
     "tests/unit/test_source_copy_saved_continuation_gateway.py": "c06386ee2205bc1c06925aa4f11a74c4437585bda111a5b0849a3662c53732f3",
@@ -981,7 +981,7 @@
     },
     "tests/unit/test_source_copy_capture.py": {
       "captured_sha256": "ceece769cefd6af10803de9247689571ae878041a0e06fea15ec5701d98a0e95",
-      "current_sha256": "1fc29a909e863b8fd5f56a116df96d02e9909dd58bf67507318518c7acd0aa7c",
+      "current_sha256": "71ac089794f317b646f9f9ae7289ffe84cc92c48497a3eceefd2d7d173336358",
       "reason": "Ordinary portable-import/evidence_result controls reuse the five committed packets; no producer/native execution."
     }
   }

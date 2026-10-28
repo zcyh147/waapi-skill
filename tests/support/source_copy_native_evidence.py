@@ -9,7 +9,7 @@ from tests.support.source_copy_branch_evidence import dependency_review
 SUCCESSOR_REVIEW_PATH = 'tests/fixtures/source-copy/branch-successor-review-195.json'
 SUCCESSOR_REVIEW_SHA256 = '4cd9a81b3d413f46d7ecca6eec191984e338c5b3657b0d4e6955a167dac09a9b'
 ACCOUNTING_REVIEW_PATH = 'tests/fixtures/source-copy/branch-accounting-review-195.json'
-ACCOUNTING_REVIEW_SHA256 = '96a26029aa669d206ac2031ad29596933951f03324596981d6488c35c9e9ec9c'
+ACCOUNTING_REVIEW_SHA256 = '06adc9aa623548df1caff9842b0d1aaf14b0c2ee0b73a0916f1a7688e0ef2163'
 ACCOUNTING_READER = 'tests/support/source_copy_native_evidence.py'
 ACCOUNTING_DEPENDENCIES = (
     'tests/support/new_condition_completion.py',
