@@ -1,0 +1,36 @@
+{
+  "candidate_sha256": "2b34c59aa6a3d23aa042efeae53c6e6eef63f236fa8bf628bacef80dd7780ce8",
+  "original_code_candidate": "06ae89d041ced9611ecf11c1823e7a01b4a648bd",
+  "completion": {
+    "complete": true,
+    "obligations": 12606,
+    "routes": 74,
+    "states": {
+      "mapped_with_representative_proof": 12590,
+      "verified": 16
+    },
+    "by_owner": {
+      "181": {
+        "mapped_with_representative_proof": 12590,
+        "verified": 16
+      }
+    }
+  },
+  "native_routes": 74,
+  "native_members": 12606,
+  "ordinary_program_run": {
+    "candidate": "06ae89d041ced9611ecf11c1823e7a01b4a648bd",
+    "exit_code": 0,
+    "log_sha256": "b5c81cdb78b22a75754e96cd817e6cba0d971e87873e6af97445ff7c4a7df3df",
+    "original_receipt": "run.result.json",
+    "owned_processes_remaining": [],
+    "passed": 241,
+    "pytest_seconds": 24.51,
+    "skipped": 0,
+    "source_unchanged": true,
+    "status": "PASS"
+  },
+  "mapping_is_not_execution_credit": true,
+  "native_effect_credit": false,
+  "fresh_started": false
+}
