@@ -41,6 +41,85 @@ def test_changed_or_unknown_source_cannot_become_constructible(tmp_path):
             validate_mapping(proposed, ROOT)
 
 
+def test_named_session_and_sidechain_births_reuse_ordinary_constructor_strength():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    mapping = definition_mapping(ROOT)
+    selected = [r for r in mapping['rows'] if r['operation_mode'] == 'new-object'
+        and r['class_name'] in {'ControlSurfaceSession', 'SidechainMix'}]
+    assert len(selected) == 6
+    for row in selected:
+        assert row['id'] == f"{row['version']}|metadata|{row['build']}|target|{4325392 if row['class_name'] == 'ControlSurfaceSession' else 5636112}|new-object"
+        comparison = next(r for r in mapping['rows'] if r['version'] == row['version']
+            and r['class_name'] == 'AcousticTexture' and r['operation_mode'] == 'new-object')
+        assert row['correspondence'] == comparison['correspondence']
+        assert row['state'] == 'source_definition_verified'
+        assert row['dependencies'] == []
+        assert row['native_effect'] == 'not_claimed'
+        assert row['direct_recipient_execution'] == 'not_observed'
+
+
+def test_blend_factory_and_legacy_marker_join_preserve_exact_role_boundaries():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    mapping = definition_mapping(ROOT)
+    births = {(r['version'], r['class_name']): r for r in mapping['rows']
+        if r['kind'] == 'target_applicability' and r['operation_mode'] == 'new-object'}
+    for version in ('2024.1', '2025.1'):
+        row = births[version, 'BlendTrack']
+        assert row['state'] == 'source_definition_verified'
+        assert row['correspondence']['path'] == 'blend_container_owned_track_factory'
+        assert row['correspondence']['operations'] == ['ak.wwise.core.blendContainer.addTrack']
+        assert 'result_schema_checked' in row['correspondence']['verification']
+    for version in ('2021.1', '2022.1'):
+        row = births[version, 'Marker']
+        assert row['state'] == 'source_definition_verified'
+        assert row['source_dimensions']['class_id'] == 65077248
+        boundary = row['correspondence']['boundary']
+        assert boundary['introduced_in'] == '2023.1'
+        assert boundary['all_marker_information_absence_proven'] is False
+        assert boundary['modern_marker']['class_id'] == 5373968
+        assert row['dependencies'] == []
+    for version in ('2021.1', '2022.1', '2023.1'):
+        assert births[version, 'BlendTrack']['state'] == 'implementation_dependency'
+    for version in ('2021.1', '2022.1'):
+        row = births[version, 'MultiSwitchEntry']
+        assert row['state'] == 'implementation_dependency'
+        assert row['dependencies']
+        role, = row['correspondence']['partial_roles']
+        assert role['operations'] == ['audio.import']
+        assert role['role'] == 'Dialogue_conditions_owned_association'
+        assert 'decision-path order' in role['verification']
+    assert not any(r['state'] == 'proven_native_absence' for r in mapping['rows'])
+
+
+def test_saved_constructor_join_uses_version_gates_and_disclosed_weaker_outcomes():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    mapping = definition_mapping(ROOT)
+    rows = [r for r in mapping['rows'] if r['operation_mode'] == 'new-object'
+        and r['class_name'] in {'WorkUnit', 'Query', 'SearchCriteria'}]
+    assert len(rows) == 15
+    for row in rows:
+        role = row['correspondence']
+        assert row['state'] == 'source_definition_verified'
+        assert row['dependencies'] == []
+        assert role['implementation_issue'] == 205
+        assert role['source']['build'] == row['build']
+        assert role['source']['class_id'] == row['source_dimensions']['class_id']
+        if row['class_name'] != 'WorkUnit' and row['version'] < '2023.1':
+            assert role['operations'] == []
+            assert role['boundary']['native_absence_claim'] is False
+            assert role['boundary']['scope'] == ('object.create' if row['version'] == '2021.1' else 'object.create and object.set')
+        else:
+            assert role['operations'] == (['object.create'] if row['version'] == '2021.1' else ['object.create', 'object.set'])
+            if row['class_name'] == 'WorkUnit':
+                assert role['effects'] == ['undo_redo_history_cleared', 'clipboard_cleared', 'corresponding_WWU_saved_in_active_project']
+                assert 'result_schema_checked' in role['verification']
+                assert 'unobserved' in role['verification']
+            elif row['class_name'] == 'SearchCriteria':
+                assert len(role['source']['criteria']) == 11
+                assert 'SearchOperationID_and_query_matches_unobserved' in role['verification']
+        assert row['native_effect'] == 'not_claimed'
+
+
 def test_portable_applicability_join_keeps_unproved_births_assigned(tmp_path):
     from tests.maintenance.map_applicability_completion import main
     from tests.maintenance.branch_coverage_audit import portable_binding_inputs
@@ -64,16 +143,43 @@ def test_portable_applicability_join_keeps_unproved_births_assigned(tmp_path):
     assert assessment['completion']['obligations'] == 1664
     pending = [r for r in assessment['obligations'] if r['state'] == 'implementation_dependency']
     assert pending and all(r['implementation_dependencies'] for r in pending)
-    assert any(r['business_dimensions']['class_name'] == 'WorkUnit' for r in pending)
+    assert any(r['business_dimensions']['class_name'] == 'MusicTransition' for r in pending)
     assert all(r.get('direct_recipient_native_effect') == 'not_observed' for r in assessment['obligations'])
     assert not any(r['state'] in {'verified', 'proven_native_absence'} for r in assessment['obligations'])
     assert load(base / 'assessment.json')['completion'] == assessment['completion']
-    assert all(d.get('implementation_issue') == 205 for r in pending
+    saved = [r for r in assessment['obligations']
         if r['business_dimensions']['class_name'] in {'WorkUnit', 'Query', 'SearchCriteria'}
-        for d in r['implementation_dependencies'])
+        and r['business_dimensions']['operation_mode'] == 'new-object']
+    assert len(saved) == 15
+    assert all(r['state'] == 'source_definition_verified' for r in saved)
     previous = load(ROOT / 'docs/branch-coverage-requirements.json')['branches']
     assert all(result['requirements']['branches'][i] == p for i, p in previous.items()
         if i not in {b['id'] for b in result['branches']})
+
+
+def test_joined_roles_reject_scope_or_strength_promotion_and_keep_source_identity():
+    from tests.maintenance.branch_audit_completion import installed_obligations
+    from tests.maintenance.branch_coverage_audit import digest, load
+    from tests.support.applicability_completion_mapping import definition_mapping, validate_mapping
+    mapping = definition_mapping(ROOT)
+    original = {r['id']: r for r in installed_obligations(ROOT, digest=digest, load=load)
+        if r['kind'] in {'target_applicability', 'plugin_topology'}}
+    for row in mapping['rows']:
+        source = original[row['id']]
+        assert all(row[k] == source[k] for k in ('id', 'version', 'build', 'shape_sha256',
+            'source_file_sha256', 'source_evidence_kind', 'owner_issue'))
+        assert row['source_dimensions'] == source['business_dimensions']
+    for name, version, field, value in (
+        ('WorkUnit', '2025.1', 'verification', 'verified_all_effects'),
+        ('SearchCriteria', '2023.1', 'operations', ['audio.import']),
+        ('Marker', '2021.1', 'boundary', {'all_marker_information_absence_proven': True}),
+        ('MultiSwitchEntry', '2022.1', 'partial_roles', [])):
+        proposed = deepcopy(mapping)
+        row = next(r for r in proposed['rows'] if r['class_name'] == name
+            and r['version'] == version and r['operation_mode'] == 'new-object')
+        row['correspondence'][field] = value
+        with pytest.raises(ValueError, match='Exact installed applicability'):
+            validate_mapping(proposed, ROOT)
 
 
 @pytest.mark.parametrize('source,damage', [
