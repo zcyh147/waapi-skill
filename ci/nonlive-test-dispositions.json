@@ -131,6 +131,7 @@
     "tests/unit/test_condition_fieldless_source_mapping.py": "Exact installed source-structure mapping and evidence-scope controls through the existing exporter and completion reader; no public runtime route change or native execution.",
     "tests/unit/test_test_admission.py": "Preflight admission regression, selected explicitly by pure-code preflight in Non-live mode.",
     "tests/unit/test_requirements_parts.py": "Coverage-accounting packaging through the ordinary loader, audit CLI, metadata plan and candidate identity; no public Gateway or native execution change.",
-    "tests/unit/test_topic_completion_mapping.py": "Exact five-version Topic wrapper mapping and missing choice/source/evidence controls through the existing attachment exporter and completion reader; program-only accounting, no public runtime change or native delivery claim."
+    "tests/unit/test_topic_completion_mapping.py": "Exact five-version Topic wrapper mapping and missing choice/source/evidence controls through the existing attachment exporter and completion reader; program-only accounting, no public runtime change or native delivery claim.",
+    "tests/unit/test_query_completion_mapping.py": "Exact nine-route owner #181 native-to-public query/metadata/media/peak correspondence and missing route, choice, source and evidence controls through the existing exporter and completion reader; accounting only, no native or Fresh execution credit."
   }
 }
