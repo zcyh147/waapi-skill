@@ -19,16 +19,21 @@ def authority(version):
     if (example['type'] != 'Event' or action['type'] != 'Action' or action['name'] != '' or returned['name'] != ''
             or action['@ActionType'] != 1 or not isinstance(action['@Target'], str)):
         raise ValueError('Action constructor source has no exact unnamed Event child')
+    fields = lane['class_source']['fields']
+    if fields['Target'][2:5] != ['Reference', '', 'None'] or fields['ActionType'][2] != 'int16':
+        raise ValueError('Action class field source changed')
     return {'version': version, 'build': lane['build'], 'class_id': 327696, 'type': 'Action',
         'parent_type': 'Event', 'name': '', 'source_sha256': source['sha256'],
-        'sdk_member': lane['sdk_member'], 'sdk_sha256': lane['sdk_sha256'], 'native_effect': 'not_claimed'}
+        'sdk_member': lane['sdk_member'], 'sdk_sha256': lane['sdk_sha256'],
+        'class_source': {key: lane['class_source'][key] for key in ('sdk_member', 'sdk_sha256')}, 'native_effect': 'not_claimed'}
 
 
 def declaration_contract():
-    return {'status': 'supported_targeted_fail_mode', 'parent': 'exact_Event_parent_handle',
+    return {'status': 'supported_fail_mode', 'parent': 'exact_Event_parent_handle',
         'kind': 'selected_Action_Type_Handle', 'name': 'local_declaration_label; Gateway_emits_source_certified_empty_native_name',
         'required_class_fields': ['ActionType', 'Target'],
-        'values': 'selected_live_ActionType_enum_value_and_bound_existing_Target_Object_Handle',
+        'values': 'selected_live_ActionType_enum_value_and_bound_existing_Target_Object_Handle_or_explicit_null',
+        'occurrences': 'multiple_new_Actions_bind_by_exact_ID_full_requested_fields_and_complete_Event_population; no_association_order_authority',
         'verification': 'fresh_actual_GUID_class_Event_parent_empty_name_and_requested_fields; derived_path_observed_not_synthesized',
-        'remaining_same_parent_work': ['non_fail_collision_semantics', 'multiple_new_Actions_under_one_Event_in_one_Preview', 'targetless_Action_constructors'],
+        'remaining_same_parent_work': ['non_fail_collision_semantics'],
         'native_execution': 'not_claimed_from_SDK_example', 'tracking_issue': 180}

@@ -44,7 +44,34 @@
           }
         ]
       },
-      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution"
+      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution",
+      "class_source": {
+        "sdk_member": "wwiseobject_action.html",
+        "sdk_sha256": "a5b3d05ed4ef42f199f65452ab9d15b410875cb6615091e9d8e4d2399adf1b72",
+        "fields": {
+          "ActionType": [
+            "ActionType",
+            "Type",
+            "int16",
+            "1",
+            "Possible values : Value Display Name 1 /Play 2 /Stop/Stop 3 /Stop/Stop All 7 /Pause/Pause 8 /Pause/Pause All 9 /Pause/Resume 10 /Pause/Resume All 34 /Break 36 /Seek/Seek 37 /Seek/Seek All 41 /Post Event 11 ---/Bus Volume/Set Bus Volume 14 /Bus Volume/Reset Bus Volume 15 /Bus Volume/Reset Bus Volume All 12 /Voice Volume/Set Voice Volume 16 /Voice Volume/Reset Voice Volume 17 /Voice Volume/Reset Voice Volume All 13 /Voice Pitch/Set Voice Pitch 18 /Voice Pitch/Reset Pitch 19 /Voice Pitch/Reset Pitch All 26 /Voice Low-pass Filter/Set LPF 27 /Voice Low-pass Filter/Reset LPF 28 /Voice Low-pass Filter/Reset LPF All 29 /Voice High-pass Filter/Set HPF 30 /Voice High-pass Filter/Reset HPF 31 /Voice High-pass Filter/Reset HPF All 4 /Mute/Mute 5 /Mute/UnMute 6 /Mute/UnMute All 38 ---/Game Parameter/Set Game Parameter 39 /Game Parameter/Reset Game Parameter 20 /States/Enable State 21 /States/Disable State 22 /States/Set State 23 /Set Switch 35 /Trigger 24 ---/Bypass Effect/Enable Bypass 25 /Bypass Effect/Disable Bypass 32 /Bypass Effect/Reset Bypass Effect 33 /Bypass Effect/Reset Bypass Effect All 40 /Release Envelope 42 /Reset Playlist",
+            "true",
+            "None",
+            "false"
+          ],
+          "Target": [
+            "Target",
+            "Target",
+            "Reference",
+            "",
+            "None",
+            "true",
+            "",
+            ""
+          ]
+        },
+        "claim": "Target is an unconstrained Reference; the create/set property-value null alternative provides explicit null input. ActionType values remain selected from live metadata, never copied from this source."
+      }
     },
     "2022.1": {
       "build": "2022.1.19.8584",
@@ -86,7 +113,34 @@
           }
         ]
       },
-      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution"
+      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution",
+      "class_source": {
+        "sdk_member": "wwiseobject_action.html",
+        "sdk_sha256": "5f53c3f2a9dfdbd1cc98e7004c2a1cafe859fff1354059d072c52280b394955c",
+        "fields": {
+          "ActionType": [
+            "ActionType",
+            "Type",
+            "int16",
+            "1",
+            "Possible values : Value Display Name 1 /Play 2 /Stop/Stop 3 /Stop/Stop All 7 /Pause/Pause 8 /Pause/Pause All 9 /Pause/Resume 10 /Pause/Resume All 34 /Break 36 /Seek/Seek 37 /Seek/Seek All 41 /Post Event 11 ---/Bus Volume/Set Bus Volume 14 /Bus Volume/Reset Bus Volume 15 /Bus Volume/Reset Bus Volume All 12 /Voice Volume/Set Voice Volume 16 /Voice Volume/Reset Voice Volume 17 /Voice Volume/Reset Voice Volume All 13 /Voice Pitch/Set Voice Pitch 18 /Voice Pitch/Reset Pitch 19 /Voice Pitch/Reset Pitch All 26 /Voice Low-pass Filter/Set LPF 27 /Voice Low-pass Filter/Reset LPF 28 /Voice Low-pass Filter/Reset LPF All 29 /Voice High-pass Filter/Set HPF 30 /Voice High-pass Filter/Reset HPF 31 /Voice High-pass Filter/Reset HPF All 4 /Mute/Mute 5 /Mute/UnMute 6 /Mute/UnMute All 38 ---/Game Parameter/Set Game Parameter 39 /Game Parameter/Reset Game Parameter 20 /States/Enable State 21 /States/Disable State 22 /States/Set State 23 /Set Switch 35 /Trigger 24 ---/Bypass Effect/Enable Bypass 25 /Bypass Effect/Disable Bypass 32 /Bypass Effect/Reset Bypass Effect 33 /Bypass Effect/Reset Bypass Effect All 40 /Release Envelope 42 /Reset Playlist 43 ---/Set Effect/Set Effect 44 /Set Effect/Reset Set Effect 45 /Set Effect/Reset Set Effect All",
+            "true",
+            "None",
+            "false"
+          ],
+          "Target": [
+            "Target",
+            "Target",
+            "Reference",
+            "",
+            "None",
+            "true",
+            "",
+            ""
+          ]
+        },
+        "claim": "Target is an unconstrained Reference; the create/set property-value null alternative provides explicit null input. ActionType values remain selected from live metadata, never copied from this source."
+      }
     },
     "2023.1": {
       "build": "2023.1.19.8928",
@@ -128,7 +182,34 @@
           }
         ]
       },
-      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution"
+      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution",
+      "class_source": {
+        "sdk_member": "wwiseobject_action.html",
+        "sdk_sha256": "2494aa5ae0a4ab4e65252fe8e40d0a378b2b02084d35c1be9cdd0d81481c3651",
+        "fields": {
+          "ActionType": [
+            "ActionType",
+            "Type",
+            "int16",
+            "1",
+            "Possible values : Value Display Name 1 /Play 2 /Stop/Stop 3 /Stop/Stop All 7 /Pause/Pause 8 /Pause/Pause All 9 /Pause/Resume 10 /Pause/Resume All 34 /Break 36 /Seek/Seek 37 /Seek/Seek All 41 /Post Event 11 ---/Bus Volume/Set Bus Volume 14 /Bus Volume/Reset Bus Volume 15 /Bus Volume/Reset Bus Volume All 12 /Voice Volume/Set Voice Volume 16 /Voice Volume/Reset Voice Volume 17 /Voice Volume/Reset Voice Volume All 13 /Voice Pitch/Set Voice Pitch 18 /Voice Pitch/Reset Pitch 19 /Voice Pitch/Reset Pitch All 26 /Voice Low-pass Filter/Set LPF 27 /Voice Low-pass Filter/Reset LPF 28 /Voice Low-pass Filter/Reset LPF All 29 /Voice High-pass Filter/Set HPF 30 /Voice High-pass Filter/Reset HPF 31 /Voice High-pass Filter/Reset HPF All 4 /Mute/Mute 5 /Mute/UnMute 6 /Mute/UnMute All 38 ---/Game Parameter/Set Game Parameter 39 /Game Parameter/Reset Game Parameter 20 /States/Enable State 21 /States/Disable State 22 /States/Set State 23 /Set Switch 35 /Trigger 40 /Release Envelope 42 /Reset Playlist 50 ---/Bypass Effect/Set - Bypass Effect Slot 51 /Bypass Effect/Reset - Bypass Effect Slot 52 /Bypass Effect/Reset - Bypass Effect Slot - All 53 /Bypass Effect/---Set - Bypass All Effects 54 /Bypass Effect/Reset - Bypass All Effects 55 /Bypass Effect/Reset - Bypass All Effects - All 56 /Bypass Effect/---Reset - All Effect Bypasses 57 /Bypass Effect/Reset - All Effect Bypasses - All 43 ---/Set Effect/Set Effect 44 /Set Effect/Reset Set Effect 45 /Set Effect/Reset Set Effect All",
+            "true",
+            "None",
+            "false"
+          ],
+          "Target": [
+            "Target",
+            "Target",
+            "Reference",
+            "",
+            "None",
+            "true",
+            "",
+            ""
+          ]
+        },
+        "claim": "Target is an unconstrained Reference; the create/set property-value null alternative provides explicit null input. ActionType values remain selected from live metadata, never copied from this source."
+      }
     },
     "2024.1": {
       "build": "2024.1.13.9056",
@@ -170,7 +251,34 @@
           }
         ]
       },
-      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution"
+      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution",
+      "class_source": {
+        "sdk_member": "wwiseobject_action.html",
+        "sdk_sha256": "f99a99f644f7e801733ac882d4ec2882f7c1cfe4ed5281024a5b4f387e507e16",
+        "fields": {
+          "ActionType": [
+            "ActionType",
+            "Type",
+            "int16",
+            "1",
+            "Possible values : Value Display Name 1 /Play 2 /Stop/Stop 3 /Stop/Stop All 7 /Pause/Pause 8 /Pause/Pause All 9 /Pause/Resume 10 /Pause/Resume All 34 /Break 36 /Seek/Seek 37 /Seek/Seek All 41 /Post Event 11 ---/Bus Volume/Set Bus Volume 14 /Bus Volume/Reset Bus Volume 15 /Bus Volume/Reset Bus Volume All 12 /Voice Volume/Set Voice Volume 16 /Voice Volume/Reset Voice Volume 17 /Voice Volume/Reset Voice Volume All 13 /Voice Pitch/Set Voice Pitch 18 /Voice Pitch/Reset Pitch 19 /Voice Pitch/Reset Pitch All 26 /Voice LPF/Set LPF 27 /Voice LPF/Reset LPF 28 /Voice LPF/Reset LPF All 29 /Voice HPF/Set HPF 30 /Voice HPF/Reset HPF 31 /Voice HPF/Reset HPF All 4 /Mute/Mute 5 /Mute/UnMute 6 /Mute/UnMute All 38 ---/Game Parameter/Set Game Parameter 39 /Game Parameter/Reset Game Parameter 20 /States/Enable State 21 /States/Disable State 22 /States/Set State 23 /Set Switch 35 /Trigger 40 /Release Envelope 42 /Reset Playlist 50 ---/Bypass Effect/Set - Bypass Effect Slot 51 /Bypass Effect/Reset - Bypass Effect Slot 52 /Bypass Effect/Reset - Bypass Effect Slot - All 53 /Bypass Effect/---Set - Bypass All Effects 54 /Bypass Effect/Reset - Bypass All Effects 55 /Bypass Effect/Reset - Bypass All Effects - All 56 /Bypass Effect/---Reset - All Effect Bypasses 57 /Bypass Effect/Reset - All Effect Bypasses - All 43 ---/Set Effect/Set Effect 44 /Set Effect/Reset Set Effect 45 /Set Effect/Reset Set Effect All",
+            "true",
+            "None",
+            "false"
+          ],
+          "Target": [
+            "Target",
+            "Target",
+            "Reference",
+            "",
+            "None",
+            "true",
+            "",
+            ""
+          ]
+        },
+        "claim": "Target is an unconstrained Reference; the create/set property-value null alternative provides explicit null input. ActionType values remain selected from live metadata, never copied from this source."
+      }
     },
     "2025.1": {
       "build": "2025.1.7.9143",
@@ -212,8 +320,35 @@
           }
         ]
       },
-      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution"
+      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution",
+      "class_source": {
+        "sdk_member": "wwiseobject_action.html",
+        "sdk_sha256": "6020fbf3f0886f46ed02d5a23590b0e81855308e672a992abb3d0c94de46c056",
+        "fields": {
+          "ActionType": [
+            "ActionType",
+            "Type",
+            "int16",
+            "1",
+            "Possible values : Value Display Name 1 /Play 2 /Stop/Stop 3 /Stop/Stop All 7 /Pause/Pause 8 /Pause/Pause All 9 /Pause/Resume 10 /Pause/Resume All 34 /Break 36 /Seek/Seek 37 /Seek/Seek All 41 /Post Event 11 ---/Bus Volume/Set Bus Volume 14 /Bus Volume/Reset Bus Volume 15 /Bus Volume/Reset Bus Volume All 12 /Voice Volume/Set Voice Volume 16 /Voice Volume/Reset Voice Volume 17 /Voice Volume/Reset Voice Volume All 13 /Voice Pitch/Set Voice Pitch 18 /Voice Pitch/Reset Pitch 19 /Voice Pitch/Reset Pitch All 26 /Voice LPF/Set LPF 27 /Voice LPF/Reset LPF 28 /Voice LPF/Reset LPF All 29 /Voice HPF/Set HPF 30 /Voice HPF/Reset HPF 31 /Voice HPF/Reset HPF All 4 /Mute/Mute 5 /Mute/UnMute 6 /Mute/UnMute All 38 ---/Game Parameter/Set Game Parameter 39 /Game Parameter/Reset Game Parameter 20 /States/Enable State 21 /States/Disable State 22 /States/Set State 23 /Set Switch 35 /Trigger 40 /Release Envelope 42 /Reset Playlist 50 ---/Bypass Effect/Set - Bypass Effect Slot 51 /Bypass Effect/Reset - Bypass Effect Slot 52 /Bypass Effect/Reset - Bypass Effect Slot - All 53 /Bypass Effect/---Set - Bypass All Effects 54 /Bypass Effect/Reset - Bypass All Effects 55 /Bypass Effect/Reset - Bypass All Effects - All 56 /Bypass Effect/---Reset - All Effect Bypasses 57 /Bypass Effect/Reset - All Effect Bypasses - All 43 ---/Set Effect/Set Effect 44 /Set Effect/Reset Set Effect 45 /Set Effect/Reset Set Effect All",
+            "true",
+            "None",
+            "false"
+          ],
+          "Target": [
+            "Target",
+            "Target",
+            "Reference",
+            "",
+            "None",
+            "true",
+            "",
+            ""
+          ]
+        },
+        "claim": "Target is an unconstrained Reference; the create/set property-value null alternative provides explicit null input. ActionType values remain selected from live metadata, never copied from this source."
+      }
     }
   },
-  "sha256": "fecb6fcdc9bfc3022e0310b2d48746058f28658b9ebf60437debbdb165e95661"
+  "sha256": "d716ca5667ed62e6c72543fcfae351b9e8da456dec82bf2e1dcde446c01da4c7"
 }

@@ -517,19 +517,14 @@ def _compile_action_constructor(session, declaration, node):
     if session.settings.get('name_conflict', 'fail') != 'fail':
         raise _repair(session, 'ACTION_COLLISION_SEMANTICS_UNRESOLVED', field='name_conflict',
             action='use a separately previewed fail-mode Action constructor; other modes remain assigned implementation work')
-    siblings = [row for row in session.declarations if isinstance(row.target, NewDescendantTarget)
-        and row.target.parent_handle == declaration.target.parent_handle
-        and row.target.kind.startswith('bth1-') and session.handles.resolve_type(row.target.kind).name == 'Action']
-    if len(siblings) > 1:
-        raise _repair(session, 'ACTION_OCCURRENCE_BINDING_UNRESOLVED', field='declarations',
-            action='create each Action in a separate Preview until equivalent unnamed occurrence binding is implemented')
     properties = {row['name']: row['value'] for row in node.get('properties', [])}
     references = {row['name']: row['target'] for row in node.get('references', [])}
     target = references.get('Target')
-    if (type(properties.get('ActionType')) is not int or not isinstance(target, dict)
-            or target.get('kind') != 'id' or not str(target.get('value', '')).startswith('{')):
+    if (type(properties.get('ActionType')) is not int or 'Target' not in references
+            or (target is not None and (not isinstance(target, dict)
+                or target.get('kind') != 'id' or not str(target.get('value', '')).startswith('{')))):
         raise _repair(session, 'ACTION_CONSTRUCTOR_FIELDS_REQUIRED', field='field_values',
-            action='discover ActionType and Target on the selected Action Type Handle; choose one live enum value and one bound existing target')
+            action='discover ActionType and Target on the selected Action Type Handle; choose one live enum value and a bound existing target or explicit null Target')
     # Keep the task-local label in the canonical request; Registry owns the native empty name.
 
 

@@ -341,7 +341,9 @@ def object_graph_business_contract_data(
                         "retained_children": "complete_GUID_childset_plus_observed_plugin_and_file_Source_class_notes_language_original_path_and_live_discovered_fields_preserved",
                         "retained_field_reads": "all_discovered_fields_in_Gateway_bounded_projection_pages; existing_result_bytes_and_deadline_limits_apply",
                         "explicit_locale": "nonSFX_Project_locale_requires_actual_Voice; explicit_SFX_is_not_an_admitted_declaration",
-                        "name_conflict": "fail; other_Source_collision_modes_remain_unresolved"},
+                        "name_conflict": {"fail": "absent_exact_name", "rename": "fresh_native_named_GUID_and_preserved_collision",
+                            "merge": "same_exact_class_GUID_and_selected_language; unselected_fields_preserved",
+                            "replace": "exact_old_subtree_absent; fresh_GUID_and_other_children_preserved"}},
                     "source_verification": "actual_graph_GUID_class_parent_owner_fields_and_requested_language; closed_declared_childset",
                     "native_class_id": "Gateway_owned_from_Type_Handle"},
                 "optional_fields": [
