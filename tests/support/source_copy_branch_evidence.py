@@ -84,7 +84,8 @@ def relevant_sources():
 def capture_sources(inventory_sources=()):
     # Current pytest fake producers/importer are separate from native 6d/411 bytes.
     from tests.support.source_copy_native_evidence import SUCCESSOR_REVIEW_PATH
-    names = [REVIEW_PATH, 'tests/fixtures/source-copy/branch-successor-review-r92.json', SUCCESSOR_REVIEW_PATH,
+    names = [REVIEW_PATH, 'tests/fixtures/source-copy/branch-successor-review-r92.json',
+        'tests/fixtures/source-copy/branch-successor-review-r123.json', SUCCESSOR_REVIEW_PATH,
         'tests/support/source_copy_native_evidence.py',
         'tests/support/source_copy_branch_evidence.py', 'tests/support/platform_filesystem.py',
         'tests/support/gateway_config.py', 'tests/unit/test_source_copy_capture.py',
