@@ -8,6 +8,7 @@ from collections import defaultdict
 from copy import deepcopy
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 from tests.maintenance.branch_coverage_audit import digest, schema_branches
 from tests.support.topic_completion_mapping import _path
@@ -298,6 +299,13 @@ SELECTED_TEST_DEPENDENCIES = {
     'tests/conftest.py', 'tests/support/exact_evidence_finalization.py',
     'pyproject.toml', 'ci/test_readiness.py',
 }
+# The ordinary aggregate has no call graph. Seal its finite tracked Python
+# runtime through existing Git enumeration and original/current byte checks.
+# Unrelated packaged code changes deliberately invalidate conservative reuse;
+# generated files, caches and local environments never enter this roster.
+PACKAGED_RUNTIME_SOURCES = {name for name in subprocess.check_output(
+    ['git', 'ls-files', '--', 'skills/waapi-skill/scripts', 'skills/waapi-skill/wwise_waapi'],
+    cwd=Path(__file__).resolve().parents[2], text=True).splitlines() if name.endswith('.py')}
 RUNTIME_SOURCES = {GATEWAY, 'tests/support/gateway_config.py', *SELECTED_TEST_DEPENDENCIES,
     *(node.split('::')[0] for nodes in SELECTED_TESTS.values() for node in nodes),
     *(LIB + name + '.py' for name in ('source_control_business', 'source_control_business_contracts',
@@ -309,6 +317,9 @@ RUNTIME_SOURCES = {GATEWAY, 'tests/support/gateway_config.py', *SELECTED_TEST_DE
         'business_declarations', 'business_fields', 'operation_registry', 'operation_drafts', 'operation_composer',
         'transactions', 'transaction_runtime', 'transaction_cleanup', 'dispatcher', 'config', 'capabilities',
         'execution_contracts', 'builders/schema', 'typed_requests', 'typed_operations', 'io_policy'))}
+
+from tests.support.ordinary_test_run_evidence import RUNNER_SOURCES
+RUNTIME_SOURCES.update(PACKAGED_RUNTIME_SOURCES | RUNNER_SOURCES)
 
 
 def history_program_anchors(root, inventory, destination, run):
@@ -328,6 +339,12 @@ def history_program_anchors(root, inventory, destination, run):
         raise ValueError('History selected code anchor is missing or unfinalized')
     if not {node for nodes in SELECTED_TESTS.values() for node in nodes} <= set(plan['argv'][6:]):
         raise ValueError('History code anchor omits a selected representative mechanism')
+    original_runtime = {name for name in subprocess.check_output(
+        ['git', 'ls-tree', '-r', '--name-only', plan['candidate'], '--',
+            'skills/waapi-skill/scripts', 'skills/waapi-skill/wwise_waapi'],
+        cwd=root, text=True).splitlines() if name.endswith('.py')}
+    if original_runtime != PACKAGED_RUNTIME_SOURCES:
+        raise ValueError('History packaged runtime source roster changed')
     originals = {}
     for name in RUNTIME_SOURCES | RUNNER_SOURCES:
         raw = subprocess.run(['git', 'show', plan['candidate'] + ':' + name], cwd=root,

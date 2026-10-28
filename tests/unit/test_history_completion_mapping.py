@@ -123,7 +123,7 @@ def test_history_code_review_seals_original_and_current_direct_test_dependencies
 
 
 def test_history_source_review_companion_reaches_existing_portable_and_code_readers(history_inventory):
-    from tests.support.history_completion_mapping import BASE
+    from tests.support.history_completion_mapping import BASE, RUNTIME_SOURCES
     from tests.support.ordinary_test_run_evidence import read_ordinary_test_run, OUTCOME
     directory = audit.ROOT / BASE / 'source-review-r1'
     # This fixture records a component review, not the later combined candidate.
@@ -134,6 +134,7 @@ def test_history_source_review_companion_reaches_existing_portable_and_code_read
     rows = {row['id']: row for row in history_inventory['native_coverage']['obligations']}
     assert len(bindings['bindings']) == 4
     for identity, binding in bindings['bindings'].items():
+        assert set(binding['relevant_sources']) == RUNTIME_SOURCES
         proof = json.loads((base / binding['evidence']['program']['artifact']).read_bytes())
         assert proof['original_candidate'] == '59daee38fa92f4ad6610a5698be464334718585c'
         for descriptor in proof['files'].values():
@@ -145,7 +146,14 @@ def test_history_source_review_companion_reaches_existing_portable_and_code_read
 
 @pytest.mark.parametrize('helper', ['tests/unit/test_operation_input_gateway.py',
     'tests/unit/test_object_graph_business_gateway.py', 'tests/conftest.py',
-    'tests/support/exact_evidence_finalization.py', 'pyproject.toml', 'ci/test_readiness.py'])
+    'tests/support/exact_evidence_finalization.py', 'pyproject.toml', 'ci/test_readiness.py',
+    'skills/waapi-skill/wwise_waapi/builders/properties.py',
+    'skills/waapi-skill/wwise_waapi/builders/common.py',
+    'skills/waapi-skill/wwise_waapi/builders/source_notes.py',
+    'skills/waapi-skill/wwise_waapi/builders/identity.py',
+    'skills/waapi-skill/wwise_waapi/waql.py',
+    'skills/waapi-skill/wwise_waapi/canonical.py',
+    'skills/waapi-skill/wwise_waapi/cli_console_business_cli.py'])
 def test_history_code_reader_rejects_changed_direct_helper(tmp_path, history_inventory, history_reviewed_anchors, helper):
     from tests.support.ordinary_test_run_evidence import read_ordinary_test_run
     base, bindings, rows = history_reviewed_anchors
@@ -156,7 +164,7 @@ def test_history_code_reader_rejects_changed_direct_helper(tmp_path, history_inv
     # sources below this temporary root are real ordinary files.
     git_directory = subprocess.check_output(['git', 'rev-parse', '--absolute-git-dir'], cwd=audit.ROOT, text=True).strip()
     (root / '.git').write_text('gitdir: ' + git_directory + '\n', encoding='utf-8')
-    for name in binding['relevant_sources']:
+    for name in set(binding['relevant_sources']) | {helper}:
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((audit.ROOT / name).read_bytes())
@@ -165,3 +173,20 @@ def test_history_code_reader_rejects_changed_direct_helper(tmp_path, history_inv
     with pytest.raises(ValueError, match='reviewed current relevant source changed'):
         read_ordinary_test_run(binding['evidence']['program'], rows[identity],
             history_inventory['native_coverage']['candidate_sha256'], 'program', 'product', base, binding, root)
+
+
+def test_history_code_reader_rejects_missing_runtime_source(history_inventory, history_reviewed_anchors, monkeypatch):
+    from pathlib import Path
+    from tests.support.ordinary_test_run_evidence import read_ordinary_test_run
+    base, bindings, rows = history_reviewed_anchors
+    identity, binding = next(iter(bindings.items()))
+    missing = audit.ROOT / 'skills/waapi-skill/wwise_waapi/builders/properties.py'
+    original = Path.read_bytes
+    def missing_bytes(path):
+        if path == missing:
+            raise FileNotFoundError('missing packaged runtime source')
+        return original(path)
+    monkeypatch.setattr(Path, 'read_bytes', missing_bytes)
+    with pytest.raises(FileNotFoundError, match='missing packaged runtime source'):
+        read_ordinary_test_run(binding['evidence']['program'], rows[identity],
+            history_inventory['native_coverage']['candidate_sha256'], 'program', 'product', base, binding, audit.ROOT)

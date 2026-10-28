@@ -1,12 +1,12 @@
 # History selected CODE source review
 
-This companion repairs the direct test-dependency seal for four selected CODE
+This companion repairs the complete runtime and selected test-dependency seal for four CODE
 anchors. It uses the existing portable evidence index, branch-bindings,
 requirements and ordinary-test-run attachment contracts. There is no mapping
 attachment or new reader. `export-r1/` remains the unchanged historical packet.
 
 The component candidate is
-`dcaeb1dbc567acf629e97d945020ec04eed855d3f32631de8503d82c790b73ab`.
+`4325083b1f753c06256ad0ecce977a54591fa55da061d5554c43d9b1ea411b12`.
 All anchors retain the original candidate
 `59daee38fa92f4ad6610a5698be464334718585c` and byte-identical original plan,
 result, summary, log and exit: 56 passed, zero skipped, 47.35 seconds.
@@ -42,3 +42,20 @@ ordinary selected anchors for that exact candidate; source drift rejects before
 emission. Join those anchors through the existing combined mapping consumer.
 This companion makes no combined/global completion claim and does not re-export
 the roughly 106 MiB historical mapping packet.
+
+The final review seals all **202 tracked packaged Python files** below
+`scripts/` and `wwise_waapi/`, plus the precise selected tests/helpers,
+`pyproject.toml`, `ci/test_readiness.py` and four ordinary runner files:
+**215 relevant sources** per anchor. `summary.json` lists the runtime,
+runner, added and complete relevant-source rosters; each program anchor owns
+all original/current source seals. The producer compares the tracked runtime
+roster with the original Git tree, then rejects any unequal source bytes before
+emission. Generated files, caches and local environments are excluded by tracked
+file enumeration.
+
+This finite conservative closure includes `builders/properties.py` and its
+`common`, `source_notes`, `identity` and `waql` chain, `canonical.py`, parser
+registration and manifest/schema support. An unrelated packaged Python change
+also invalidates aggregate reuse. This costs extra invalidation, not extra
+coverage; the existing portable and ordinary readers and all original evidence
+contracts remain unchanged.
