@@ -13,7 +13,8 @@
     "archive_sha256": "fa5e37e8adacc33cf9189be46a4bdbb7f780ebf776429154fddc0ae2df303415",
     "archive_sha256_provenance": "prior source index (not recomputed)",
     "member": "ak_wwise_core_object_set.html",
-    "sha256": "18feb6864dc219f6468b32c1670db14b6a23138c2d27bb5028a82310026b5a3d"
+    "sha256": "18feb6864dc219f6468b32c1670db14b6a23138c2d27bb5028a82310026b5a3d",
+    "packaged_member": "ak_wwise_core_object_set.html.gz"
   },
   "manifest_sha256": "103f35083206246ccbcade0c43a159d6f51c0758efff48109ecb2844c19040d7",
   "derivation": "Common_TransitionNode.TransitionRoot: custom-only, non-null MusicTransition; exact two inheriting owners; SDK custom-object and recursive children grammar; rename mode creates fresh children rather than merging; no dedicated class example prerequisite",

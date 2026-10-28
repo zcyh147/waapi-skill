@@ -76,7 +76,7 @@ def authority(version, *, root=None):
             or record['sdk']['sha256'] != SOURCES[version][1]):
         fail('MUSIC_TRANSITION_SOURCE_DRIFT', 'Transition source/version/build/reflected grammar differs')
     xml = gzip.decompress((source / 'WObjects.xml.gz').read_bytes())
-    sdk = (source / 'ak_wwise_core_object_set.html').read_bytes()
+    sdk = gzip.decompress((source / 'ak_wwise_core_object_set.html.gz').read_bytes())
     if (sha256(xml).hexdigest(), sha256(sdk).hexdigest()) != SOURCES[version]:
         fail('MUSIC_TRANSITION_SOURCE_DRIFT', 'Matching TransitionRoot definition or custom-object grammar changed')
     tree = ET.fromstring(xml)

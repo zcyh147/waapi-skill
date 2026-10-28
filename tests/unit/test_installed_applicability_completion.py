@@ -412,6 +412,6 @@ def test_transition_join_checks_selected_candidate_primary_bytes(tmp_path):
     shutil.copyfile(ROOT / manifest, tmp_path / manifest)
     role = _music_transition_correspondence(tmp_path, '2025.1', 2424848, '2025.1.7.9143')
     assert role['source']['authority']['version'] == '2025.1'
-    (tmp_path / directory / 'ak_wwise_core_object_set.html').write_bytes(b'changed selected source')
+    (tmp_path / directory / 'ak_wwise_core_object_set.html.gz').write_bytes(b'changed selected source')
     with pytest.raises(ValueError, match='Music Transition source differs'):
         _music_transition_correspondence(tmp_path, '2025.1', 2424848, '2025.1.7.9143')

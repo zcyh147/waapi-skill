@@ -245,7 +245,7 @@ def _music_transition_correspondence(root, version, class_id, build):
         directory = f'skills/waapi-skill/references/semantic/{version}/music-transition-sources'
         members = [{'path': directory + '/' + member,
             'sha256': hashlib.sha256((root / directory / member).read_bytes()).hexdigest()}
-            for member in ('source-contract.json', 'WObjects.xml.gz', 'ak_wwise_core_object_set.html')]
+            for member in ('source-contract.json', 'WObjects.xml.gz', 'ak_wwise_core_object_set.html.gz')]
     except (ValueError, OSError, KeyError, TypeError) as exc:
         raise ValueError('Exact installed applicability Music Transition source differs: ' + str(exc)) from exc
     declaration = declaration_contract(version)
