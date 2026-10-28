@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-source195-current-88a6cbbe-r1/test_modern_collector_2025_pre0/native/1793224826968999000-7105be0dbc27481b90febb777c9c70d0-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Osc2 Invert"
+    },
+    "name": "Osc2Invert",
+    "type": "bool"
+  },
+  "risk_level": "low",
+  "timeout": 9.976391916978173,
+  "version": "2025.1"
+}

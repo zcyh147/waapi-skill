@@ -1,0 +1,43 @@
+{
+  "complete": true,
+  "errors": [],
+  "files": {
+    "Actor-Mixer Hierarchy/MIDI.wwu": {
+      "artifact_path": "after/files/Actor-Mixer Hierarchy/MIDI.wwu",
+      "artifact_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "device": 16777232,
+        "inode": 347544004,
+        "mtime_ns": 1793224800467655522,
+        "path": "/private/tmp/waapi-source195-current-88a6cbbe-r1/test_modern_collector_preserve0/state/modern-source-copy-save-children-artifacts/model-images/after/files/Actor-Mixer Hierarchy/MIDI.wwu",
+        "proof_sha256": "1569b9c773977e5ffd4d902f69b4485907de2d2cda2504fb8ef5b4ebb8b13a1a",
+        "sha256": "78f473d808f14dae3c41685be79f9ee1c6407cd9038f5d7e9f58542e11a28efb",
+        "size": 728855
+      },
+      "file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "device": 16777232,
+        "inode": 347542815,
+        "mtime_ns": 1793224800070499084,
+        "path": "/private/tmp/waapi-source195-current-88a6cbbe-r1/test_modern_collector_preserve0/project/Actor-Mixer Hierarchy/MIDI.wwu",
+        "proof_sha256": "4eca841406355875c292517401d88331444f19f3d36956f50169224f81fda0d8",
+        "sha256": "78f473d808f14dae3c41685be79f9ee1c6407cd9038f5d7e9f58542e11a28efb",
+        "size": 728855
+      },
+      "sha256": "78f473d808f14dae3c41685be79f9ee1c6407cd9038f5d7e9f58542e11a28efb",
+      "size": 728855,
+      "status": "captured"
+    }
+  },
+  "limits": {
+    "file_bytes": 8388608,
+    "index_bytes": 2097152,
+    "project_bytes": 8388608,
+    "project_files": 1,
+    "work_unit_bytes": 268435456,
+    "work_units": 512
+  },
+  "phase": "after",
+  "representation": "exact_sandbox_model_file_images",
+  "total_bytes": 728855
+}
