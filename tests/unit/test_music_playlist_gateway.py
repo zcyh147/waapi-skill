@@ -39,7 +39,7 @@ class MusicPlaylistTask(OwnedGraphTask):
                 'path': r'\Interactive Music Hierarchy\Default Work Unit', 'parent': None, 'notes': ''},
             OLD: {'id': OLD, 'name': '', 'type': 'MusicPlaylistItem', 'classId': 2359312,
                 'path': r'\old-root', 'parent': None, 'owner': {'id': FIRST}, 'notes': '',
-                '@PlaylistItemType': 0, '@PlayMode': 0, 'children': []},
+                '@PlaylistItemType': 0, '@PlayMode': 0, '@Weight': 50, '@Segment': None, 'children': []},
         }
         for guid, name in ((A, 'A'), (B, 'B')):
             self.objects[guid] = {'id': guid, 'name': name, 'type': 'MusicSegment', 'classId': 1769488,
@@ -59,7 +59,20 @@ class MusicPlaylistTask(OwnedGraphTask):
         self.writes, self.fault = [], None
         self.next_id = 100
 
+    def scoped_field_names(self, scope):
+        class_id = scope.get('classId')
+        if 'object' in scope:
+            class_id = self.objects[scope['object']]['classId']
+        if class_id == 2228240:
+            return ['PlaylistRoot']
+        if class_id == 2359312:
+            return [name for name in self.metadata if name != 'PlaylistRoot']
+        return []
+
     def call(self, uri, args=None, options=None):
+        if uri.endswith('getPropertyAndReferenceNames'):
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': self.scoped_field_names(args)}
         if uri.endswith('object.get') and args.get('transform') == [{'select': ['children']}, {'range': [0, 65]}]:
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
             parent = self.objects[args['from']['id'][0]]
@@ -83,8 +96,9 @@ class MusicPlaylistTask(OwnedGraphTask):
                 row = {'id': guid, 'name': '', 'type': 'MusicPlaylistItem', 'classId': 2359312,
                     'path': '\\opaque-' + str(self.next_id), 'notes': '', 'parent': None if root else {'id': owner},
                     'owner': {'id': owner} if root else None, 'children': [{'id': child['id']} for child in children],
+                    '@PlaylistItemType': 0, '@PlayMode': 0, '@Weight': 50, '@Segment': None,
                     **{key: deepcopy(value) for key, value in node.items() if key.startswith('@')}}
-                if '@Segment' in row:
+                if row.get('@Segment') is not None:
                     row['@Segment'] = {'id': row['@Segment']}
                 self.objects[guid] = row
                 return {'id': guid, 'name': '', **({'children': children} if children else {})}
@@ -132,6 +146,14 @@ class MusicPlaylistTask(OwnedGraphTask):
 
 def test_existing_playlist_nested_repeated_occurrences_survive_persisted_transaction(tmp_path):
     task = MusicPlaylistTask(tmp_path).declare()
+    project = task.project_rows
+    def prefixed_weight(rows, options):
+        projected = project(rows, options)
+        for row in projected:
+            if 'Weight' in row:
+                row['@Weight'] = row.pop('Weight')
+        return projected
+    task.project_rows = prefixed_weight
     preserved = {guid: deepcopy(task.objects[guid]) for guid in (A, B, SECOND)}
     tx, shown = task.preview()
     assert task.writes == []
@@ -348,8 +370,12 @@ def test_playlist_closed_declaration_rejects_wrong_roles_raw_fields_and_oversize
     if fault == 'segment':
         task.objects[A]['type'] = 'MusicPlaylistContainer'
         task.objects[A]['classId'] = 2228240
-    if fault in ('owner', 'segment'):
-        with pytest.raises(AssertionError, match='MUSIC_PLAYLIST_(OWNER|SEGMENT)_REQUIRED'):
+    if fault == 'owner':
+        code, result = task.step('draft-declare-existing', '--declaration-id', 'playlist', '--object-handle', task.bind(FIRST),
+            '--field', 'music_playlist', '{}')
+        assert code == 2 and result['error_code'] == 'MUSIC_PLAYLIST_OWNER_REQUIRED', result
+    elif fault == 'segment':
+        with pytest.raises(AssertionError, match='MUSIC_PLAYLIST_SEGMENT_REQUIRED'):
             task.declare()
     else:
         task.declare()
@@ -398,4 +424,31 @@ def test_playlist_source_class_enum_drift_is_rejected_before_preview(tmp_path):
     task = MusicPlaylistTask(tmp_path).declare()
     task.metadata['PlaylistItemType']['restriction']['values'][1]['value'] = 7
     code, rejected = task.step('draft-check')
-    assert code == 2 and rejected['error_code'] == 'INVALID_METADATA' and task.writes == [], rejected
+    assert code == 2 and rejected['error_code'] == 'OPERATION_DRAFT_CHECK_FAILED' and task.writes == [], rejected
+    assert rejected['details']['issues'][0]['error_code'] == 'INVALID_METADATA', rejected
+
+
+@pytest.mark.parametrize('phase', ['preview', 'verify'])
+def test_playlist_snapshot_refuses_missing_disclosed_field(tmp_path, phase):
+    task = MusicPlaylistTask(tmp_path).declare()
+    original = task.project_rows
+    def project(rows, options):
+        projected = original(rows, options)
+        for row in projected:
+            missing = (row.get('id') == OLD if phase == 'preview' else row.get('id') not in (FIRST, SECOND, OLD, A, B))
+            if missing and 'Weight' in options['return']:
+                row.pop('Weight', None)
+                row.pop('@Weight', None)
+        return projected
+    if phase == 'preview':
+        task.project_rows = project
+        code, result = task.step('draft-check')
+        assert code == 2 and 'INVALID_PLAYLIST_READBACK' in json.dumps(result), result
+        assert task.writes == []
+    else:
+        tx, shown = task.preview()
+        task.project_rows = project
+        code, result = task.finish(tx, shown)
+        assert code == 2 and result['verified'] is False, result
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and len(task.writes) == 1, rejected

@@ -7,6 +7,7 @@ from .anonymous_list_construction import authority as anonymous_list_mode_author
 from .media_pool_database import authority as media_pool_database_authority
 from .effect_render_conditions import CLEAR_SUFFIX_OBSERVATIONS
 from .music_playlist import declaration_contract as music_playlist_contract
+from .music_transitions import declaration_contract as music_transition_contract
 from .saved_object_construction import declaration_contract as saved_constructor_contract
 
 from typing import Any
@@ -365,6 +366,7 @@ def object_graph_business_contract_data(
                     "max_instances",
                     "media_files",
                     "music_playlist",
+                    "music_transitions",
                     "name_conflict",
                     "new_name",
                     "notes",
@@ -386,6 +388,7 @@ def object_graph_business_contract_data(
                     "platform": "string",
                     "plugin_placement": "string",
                     "music_playlist": "music_playlist",
+                    "music_transitions": "music_transitions",
                 },
                 "field_semantics": ACTION_DURATION_SEMANTICS,
                 "existing_target_choices": {
@@ -396,6 +399,7 @@ def object_graph_business_contract_data(
                 },
             },
             "music_playlist": music_playlist_contract(version),
+            "music_transitions": music_transition_contract(version),
             "rtpc_declaration": {
                 "subcommand": "draft-declare-rtpc", "supported_versions": ["2022.1", "2023.1", "2024.1", "2025.1"],
                 "required_fields": ["declaration_id", "object_handle", "field_handle", "curve_points"],

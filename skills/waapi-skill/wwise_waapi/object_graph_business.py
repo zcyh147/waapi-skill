@@ -1201,6 +1201,7 @@ def _compile_existing_set_fields(
         "list_behavior",
         "media_files",
         "music_playlist",
+        "music_transitions",
         "name_conflict",
         "new_name",
         "platform",
@@ -1223,6 +1224,7 @@ def _compile_existing_set_fields(
             "list_behavior",
             "media_files",
             "music_playlist",
+            "music_transitions",
             "name_conflict",
             "new_name",
             "platform",
@@ -1444,6 +1446,12 @@ def _compile_existing_set_fields(
             raise _repair(session, "MUSIC_PLAYLIST_STANDALONE_REQUIRED", field="music_playlist",
                 action="declare one existing container's complete playlist in its own transaction")
         compiled["music_playlist"] = compile_business(session, source, fields["music_playlist"])
+    if "music_transitions" in fields:
+        from .music_transitions import compile_business
+        if set(fields) != {"music_transitions"} or session.settings or len(session.declarations) != 1:
+            raise _repair(session, "MUSIC_TRANSITION_STANDALONE_REQUIRED", field="music_transitions",
+                action="declare one existing owner's transition root/rule change in its own transaction")
+        compiled["music_transitions"] = compile_business(session, source, fields["music_transitions"])
     return compiled
 
 

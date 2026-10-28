@@ -21,6 +21,9 @@ def program_sources(root):
     selected.update(p.relative_to(root).as_posix() for version in ('2023.1', '2024.1', '2025.1')
         for p in (root / 'skills/waapi-skill/references/semantic' / version / 'music-playlist-sources').rglob('*')
         if p.is_file() and p.suffix in {'.html', '.json'})
+    selected.update(p.relative_to(root).as_posix() for version in ('2023.1', '2024.1', '2025.1')
+        for p in (root / 'skills/waapi-skill/references/semantic' / version / 'music-transition-sources').rglob('*')
+        if p.is_file() and p.suffix in {'.html', '.json', '.gz'})
     selected.update(p.relative_to(root).as_posix() for p in
         (root / 'skills/waapi-skill/references/semantic/2025.1/media-pool-database-sources').rglob('*.html')
         if p.is_file())
@@ -33,7 +36,7 @@ def program_sources(root):
         'tests/fixtures/metadata-conditions/applicability-current-program-r2.json.gz',
         'tests/fixtures/metadata-conditions/applicability-current-program-r3.json.gz',
         *['tests/_org/' + v + '/SampleProject.wproj' for v in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')]})
-    pending = ['tests/unit/test_applicability_public_program.py', 'tests/unit/test_music_playlist_gateway.py', 'tests/unit/test_media_pool_database_gateway.py',
+    pending = ['tests/unit/test_music_transition_gateway.py', 'tests/unit/test_applicability_public_program.py', 'tests/unit/test_music_playlist_gateway.py', 'tests/unit/test_media_pool_database_gateway.py',
         'tests/conftest.py']
     while pending:
         name = pending.pop()

@@ -259,7 +259,12 @@ def _snapshot(read, guid, names):
     fields = list(dict.fromkeys([*IDENTITY_FIELDS, 'children', *names]))
     result = {}
     for start in range(0, len(fields), 32):
-        row = _one(read, guid, list(dict.fromkeys(['id', *fields[start:start + 32]])))
+        page = list(dict.fromkeys(['id', *fields[start:start + 32]]))
+        row = _one(read, guid, page)
+        missing = [name for name in names if name in page and name not in {'parent', 'owner', 'children'}
+            and name not in row and '@' + name not in row]
+        if missing:
+            _fail('INVALID_PLAYLIST_READBACK', 'Music Playlist snapshot omitted disclosed fields: ' + ', '.join(missing))
         if result and any(result[key] != value for key, value in row.items() if key in result):
             _fail('INVALID_PLAYLIST_READBACK', 'Music Playlist object changed during its bounded snapshot')
         result.update(row)

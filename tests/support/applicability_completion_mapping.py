@@ -234,6 +234,44 @@ def _media_pool_database_correspondence(root, version, class_id, build):
         'verification_scope': proof['verification'],
         'other_roles': 'older lane class registration is not assumed; MediaPoolQuery saved construction remains independently assigned; no arbitrary anonymous List or hierarchy placement'}
 
+def _music_transition_correspondence(root, version, class_id, build):
+    """Three source-backed modern roles; no native execution upgrade."""
+    from wwise_waapi.music_transitions import CLASS, authority, declaration_contract
+    from wwise_waapi.object_graph_business_contracts import object_graph_business_contract_data
+    try:
+        current = authority(version, root=root / 'skills/waapi-skill')
+        if current['build'] != build or class_id != CLASS:
+            raise ValueError('exact version/build/class differs')
+        directory = f'skills/waapi-skill/references/semantic/{version}/music-transition-sources'
+        members = [{'path': directory + '/' + member,
+            'sha256': hashlib.sha256((root / directory / member).read_bytes()).hexdigest()}
+            for member in ('source-contract.json', 'WObjects.xml.gz', 'ak_wwise_core_object_set.html.gz')]
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        raise ValueError('Exact installed applicability Music Transition source differs: ' + str(exc)) from exc
+    declaration = declaration_contract(version)
+    return {'implementation_issue': 195, 'parent_issue': 174,
+        'path': 'music_owner_transition_root_and_rule_construction', 'operations': ['object.set'],
+        'public_contract_sha256': digest(object_graph_business_contract_data('object.set', version)),
+        'source': {'build': build, 'class_id': class_id, 'authority': current, 'members': members},
+        'declaration': declaration,
+        'mechanism_sources': {'runtime': ['skills/waapi-skill/wwise_waapi/music_transitions.py',
+            'skills/waapi-skill/wwise_waapi/object_graph_business.py',
+            'skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py',
+            'skills/waapi-skill/wwise_waapi/operation_registry.py', 'skills/waapi-skill/scripts/gateway.py'],
+            'test_nodes': ['tests/unit/test_music_transition_gateway.py::' + node for node in (
+                'test_transition_root_replacement_is_reviewable_and_verified_once',
+                'test_append_transition_rules_preserves_root_and_every_existing_rule',
+                'test_rule_membership_and_field_verification_does_not_treat_result_order_as_priority',
+                'test_transition_independent_result_faults_fail_without_retry',
+                'test_transition_preview_rejects_drift_without_dispatch',
+                'test_transition_declaration_rejects_unbound_or_uncontrolled_construction',
+                'test_transition_schema_and_older_version_limit_do_not_claim_native_absence')],
+            'strength': 'matching primary source plus representative persisted public Python mechanism; no per-class native execution inferred'},
+        'admission': 'one exact existing MusicSwitchContainer, MusicPlaylistContainer or MusicTrack; live MusicTransition Type Handle and exact owner TransitionRoot Reference Field Handle; bounded class scalar/reference Field Handles; explicit append-rules preserving current root/rules or replace-entire-root disclosing full removal; Gateway owns structural IsFolder and role naming; immutable policy/configuration/source/identity/metadata drift checks and execute once',
+        'verification_scope': declaration['verification_scope'],
+        'other_roles': 'older 2021.1/2022.1 constructors remain separately assigned to #195/#174; fade lifecycle/resolver remains separate; unordered membership gives no priority proof; no arbitrary class/custom-reference framework'}
+
+
 def definition_mapping(root):
     """Keep every independent ID/shape and join only source-supported paths."""
     root = Path(root)
@@ -348,6 +386,8 @@ def definition_mapping(root):
                 row['correspondence'] = _saved_constructor_correspondence(root, sdk, version, name, d['class_id'], row['build'])
             elif name == 'MusicPlaylistItem' and version in {'2023.1', '2024.1', '2025.1'}:
                 row['correspondence'] = _music_playlist_correspondence(root, version, d['class_id'], row['build'])
+            elif name == 'MusicTransition' and version in {'2023.1', '2024.1', '2025.1'}:
+                row['correspondence'] = _music_transition_correspondence(root, version, d['class_id'], row['build'])
             elif version == '2025.1' and name in {'MediaPoolDatabase', 'MediaPoolDatabasePath'}:
                 row['correspondence'] = _media_pool_database_correspondence(root, version, d['class_id'], row['build'])
             elif name in HIERARCHY:
@@ -409,6 +449,11 @@ def definition_mapping(root):
                     'class': name, 'version': version,
                     'desired_user_operation': 'create/configure this class through its source-owned role, without assuming independent hierarchy construction',
                     'next_evidence': 'matching constructor/ownership source or retained existing mechanism receipt; no per-class native execution requirement'}]
+                if name == 'MusicTransition' and version in {'2021.1', '2022.1'}:
+                    row['dependencies'] = [{'owner_issue': 195, 'parent_issue': 174,
+                        'missing': 'Older source-owned MusicTransition root/rule constructor role remains separately assigned',
+                        'class': name, 'version': version, 'native_absence_claim': False,
+                        'existing_fields': 'exact existing GUID scalar/reference edits remain separate'}]
                 if name == 'MultiSwitchEntry' and version in {'2021.1', '2022.1'}:
                     # One owned role is implemented. The class row also covers
                     # other roles, so it must retain its unresolved dependency.
