@@ -166,10 +166,9 @@ def candidate_identity(root, inventory, catalogs, *, digest):
         sources[path] = digest((root / path).read_text(encoding='utf-8'))
     for name in ('branch-coverage-ownership.json', 'branch-coverage-condition-sources.json', 'branch-coverage-requirements.json'):
         path = 'docs/' + name
-        content = (root / path).read_text(encoding='utf-8')
         if name == 'branch-coverage-requirements.json':
-            import json
-            document = json.loads(content)
+            from tests.maintenance.branch_coverage_audit import load
+            document = load(root / path)
             mechanisms = document.get('representative_mechanisms', {})
             if isinstance(mechanisms, dict) and mechanisms:
                 # Only self-attestation values are normalized. All policy,
@@ -178,7 +177,9 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                 for review in mechanisms.values():
                     if isinstance(review, dict) and 'candidate_sha256' in review:
                         review['candidate_sha256'] = 'waapi-skill.candidate-self-attestation/v1'
-                content = document
+            content = document
+        else:
+            content = (root / path).read_text(encoding='utf-8')
         sources[path] = digest(content)
     for path in sorted((root / 'skills/waapi-skill/resources/metadata').glob('*/object-types.json')):
         sources[str(path.relative_to(root))] = digest(path.read_text(encoding='utf-8'))
@@ -2018,10 +2019,11 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
     if set(bindings) - ids:
         raise ValueError('binding is not an exact in-scope branch')
     if requirements_document is None:
+        from tests.maintenance.branch_coverage_audit import load
         requirements_document = ({'contract': 'waapi-skill.branch-evidence-requirements/v1',
             'branches': {r['id']: {'native_shape_sha256': r['shape_sha256'], 'categories': scope['requirements'],
                          'reason': 'Explicit sealed controlled program scope'} for r in native['obligations']}}
-            if scope is not None else __import__('json').loads((root / 'docs/branch-coverage-requirements.json').read_text()))
+            if scope is not None else load(root / 'docs/branch-coverage-requirements.json'))
     if requirements_document.get('contract') != 'waapi-skill.branch-evidence-requirements/v1':
         raise ValueError('invalid evidence requirements contract')
     policies = requirements_document['branches']

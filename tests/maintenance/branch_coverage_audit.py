@@ -101,8 +101,144 @@ def schema_branches(schema, pointer=""):
             yield {"pointer": pointer + "/" + keyword, "kind": "reference", "value": schema[keyword]}
 
 
+REQUIREMENTS_CONTRACT = "waapi-skill.branch-evidence-requirements/v1"
+REQUIREMENTS_INDEX_CONTRACT = "waapi-skill.branch-evidence-requirements-index/v1"
+REQUIREMENTS_MAX_PARTS = 256
+REQUIREMENTS_MAX_PART_BYTES = 64 * 1024 * 1024
+REQUIREMENTS_MAX_TOTAL_BYTES = 1024 * 1024 * 1024
+REQUIREMENTS_MAX_INDEX_BYTES = 1024 * 1024
+# All root JSON documents share this pre-decode raw byte limit. Keep large
+# legacy flat requirements/inventories valid; the smaller index-only limit is
+# a structural check after the contract can be recognized by ordinary JSON.
+AUDIT_MAX_DOCUMENT_BYTES = 1024 * 1024 * 1024
+
+
+def _unique_json(pairs):
+    document = {}
+    for key, value in pairs:
+        if key in document:
+            raise ValueError("duplicate requirements JSON key: " + key)
+        document[key] = value
+    return document
+
+
+def _requirements_shape(document):
+    if (not isinstance(document, dict)
+            or document.get('contract') != REQUIREMENTS_CONTRACT
+            or not {'contract', 'branches'} <= set(document)
+            or set(document) - {'contract', 'branches', 'representative_mechanisms'}
+            or any(not isinstance(document.get(key, {}), dict)
+                   or any(not isinstance(identity, str) or not identity or not isinstance(value, dict)
+                          for identity, value in document.get(key, {}).items())
+                   for key in ('branches', 'representative_mechanisms'))):
+        raise ValueError('invalid standard requirements part')
+
+
+def _assemble_requirements(path, index):
+    import re
+    if (set(index) != {'contract', 'parts', 'document_sha256'}
+            or not isinstance(index['parts'], list)
+            or not 1 <= len(index['parts']) <= REQUIREMENTS_MAX_PARTS
+            or not isinstance(index['document_sha256'], str)
+            or not re.fullmatch('[0-9a-f]{64}', index['document_sha256'])):
+        raise ValueError('invalid requirements index')
+    merged = {'contract': REQUIREMENTS_CONTRACT, 'branches': {}}
+    seen, total = set(), 0
+    for descriptor in index['parts']:
+        if (not isinstance(descriptor, dict) or set(descriptor) != {'path', 'sha256'}
+                or not isinstance(descriptor['path'], str)
+                or descriptor['path'] in {'', '.', '..'}
+                or '/' in descriptor['path'] or '\\' in descriptor['path'] or ':' in descriptor['path']
+                or not isinstance(descriptor['sha256'], str)
+                or not re.fullmatch('[0-9a-f]{64}', descriptor['sha256'])):
+            raise ValueError('requirements part must be an adjacent sealed file')
+        name = descriptor['path']
+        part = path.parent / name
+        if name in seen or not part.resolve().is_relative_to(path.parent.resolve()):
+            raise ValueError('duplicate or escaping requirements part')
+        seen.add(name)
+        with part.open('rb') as stream:
+            raw = stream.read(REQUIREMENTS_MAX_PART_BYTES + 1)
+        total += len(raw)
+        if len(raw) > REQUIREMENTS_MAX_PART_BYTES or total > REQUIREMENTS_MAX_TOTAL_BYTES:
+            raise ValueError('requirements part byte bound exceeded')
+        if hashlib.sha256(raw).hexdigest() != descriptor['sha256']:
+            raise ValueError('requirements part digest mismatch')
+        document = json.loads(raw, object_pairs_hook=_unique_json)
+        _requirements_shape(document)  # An index can never reference another index.
+        for key in ('branches', 'representative_mechanisms'):
+            if key not in document:
+                continue
+            target = merged.setdefault(key, {})
+            if target.keys() & document[key].keys():
+                raise ValueError('duplicate requirements ' + key + ' identity')
+            target.update(document[key])
+    if digest(merged) != index['document_sha256']:
+        raise ValueError('assembled requirements semantic digest mismatch')
+    return merged
+
+
+def write_requirements(path, document, *, max_part_bytes=REQUIREMENTS_MAX_PART_BYTES):
+    """Write deterministic adjacent standard parts, then publish their sealed index.
+
+    Parts preserve whole branch policies and whole representative mechanisms.
+    The caller owns selecting the complete reviewed document and destination.
+    """
+    _requirements_shape(document)
+    if type(max_part_bytes) is not int or not 1 <= max_part_bytes <= REQUIREMENTS_MAX_PART_BYTES:
+        raise ValueError('invalid requirements part byte bound')
+    path = Path(path)
+    keys = [key for key in ('branches', 'representative_mechanisms') if key in document]
+    empty = {'contract': REQUIREMENTS_CONTRACT, **{key: {} for key in keys}}
+    def encode(value):
+        return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode('utf-8')
+    overhead = len(encode(empty))
+    if overhead > max_part_bytes:
+        raise ValueError('requirements envelope exceeds part byte bound')
+    parts, current, size = [], {key: {} for key in keys}, overhead
+    for key in keys:
+        for identity, item in sorted(document[key].items()):
+            item_size = len(encode({identity: item})) - 2
+            if overhead + item_size > max_part_bytes:
+                raise ValueError('oversized indivisible requirements item: ' + identity)
+            extra = item_size + bool(current[key])
+            if size + extra > max_part_bytes:
+                parts.append(encode({'contract': REQUIREMENTS_CONTRACT, **current}))
+                current, size, extra = {key: {} for key in keys}, overhead, item_size
+            current[key][identity] = item
+            size += extra
+    if any(current.values()) or not parts:
+        parts.append(encode({'contract': REQUIREMENTS_CONTRACT, **current}))
+    if (len(parts) > REQUIREMENTS_MAX_PARTS or any(len(raw) > max_part_bytes for raw in parts)
+            or sum(map(len, parts)) > REQUIREMENTS_MAX_TOTAL_BYTES):
+        raise ValueError('requirements parts count/total byte bound exceeded')
+    descriptors = [{'path': path.stem + f'.part-{index:04d}.json',
+                    'sha256': hashlib.sha256(raw).hexdigest()} for index, raw in enumerate(parts, 1)]
+    index = encode({'contract': REQUIREMENTS_INDEX_CONTRACT, 'parts': descriptors,
+                    'document_sha256': digest(document)})
+    if len(index) > REQUIREMENTS_MAX_INDEX_BYTES:
+        raise ValueError('requirements index byte bound exceeded')
+    destinations = [path.parent / descriptor['path'] for descriptor in descriptors]
+    if any(target.is_symlink() for target in [path, *destinations]):
+        raise ValueError('requirements writer cannot replace a symlink')
+    for target, raw in zip(destinations, parts):
+        target.write_bytes(raw)
+    path.write_bytes(index)
+
+
 def load(path):
-    document = json.loads(path.read_text(encoding="utf-8"))
+    path = Path(path)
+    if path.stat().st_size > AUDIT_MAX_DOCUMENT_BYTES:
+        raise ValueError('audit document byte bound exceeded')
+    with path.open('rb') as stream:
+        raw = stream.read(AUDIT_MAX_DOCUMENT_BYTES + 1)
+    if len(raw) > AUDIT_MAX_DOCUMENT_BYTES:
+        raise ValueError('audit document byte bound exceeded')
+    document = json.loads(raw)
+    if isinstance(document, dict) and document.get('contract') == REQUIREMENTS_INDEX_CONTRACT:
+        if len(raw) > REQUIREMENTS_MAX_INDEX_BYTES:
+            raise ValueError('requirements index byte bound exceeded')
+        return _assemble_requirements(path, json.loads(raw, object_pairs_hook=_unique_json))
     descriptor = document.get("native_coverage", {}).get("obligations_artifact") if isinstance(document, dict) else None
     if descriptor is not None:
         import gzip
