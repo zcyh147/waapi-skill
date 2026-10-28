@@ -41,6 +41,9 @@ class SurveyActor:
                 return {'return': []}
             row = {'id': INSTANCE, 'name': 'English(US)', 'type': name, 'classId': 4915216,
                 'path': r'\Languages\English(US)', 'parent': {'id': RELATED}, 'owner': {'id': RELATED}}
+            if self.fault == 'nullable-mismatch':
+                row.update(type='ObservedWObject', classId=3342352,
+                    owner={'id': '{00000000-0000-0000-0000-000000000000}'})
             if self.fault == 'oversized-result':
                 row['path'] = 'x' * survey.BOUNDS['bytes_per_result']
             return {'return': [row]}
@@ -59,7 +62,7 @@ class SurveyActor:
         return self.closed and self.fault != 'close-error'
 
 
-@pytest.mark.parametrize('fault,expected', [(None, 'PASS'), ('transport', 'FAIL'),
+@pytest.mark.parametrize('fault,expected', [(None, 'PASS'), ('nullable-mismatch', 'PASS'), ('transport', 'FAIL'),
     ('wrong-build', 'FAIL'), ('oversized-result', 'FAIL'), ('missing-related', 'FAIL'),
     ('shutdown', 'BLOCKED'), ('evidence-write', 'BLOCKED'), ('close-error', 'BLOCKED')])
 def test_survey_actual_persisted_finalizer(monkeypatch, tmp_path, fault, expected):
@@ -78,7 +81,7 @@ def test_survey_actual_persisted_finalizer(monkeypatch, tmp_path, fault, expecte
                 raise OSError('required survey evidence unavailable')
         return original_write(path, content)
     monkeypatch.setattr(Path, 'write_bytes', write)
-    if fault is None:
+    if fault in {None, 'nullable-mismatch'}:
         from tests.semantic.support import codex_heavy_project_runner_v3
         monkeypatch.setattr(codex_heavy_project_runner_v3, 'OwnedDirectWaapiCall', lambda **_: actor)
         survey.run_survey(lifecycle)
@@ -99,13 +102,19 @@ def test_survey_actual_persisted_finalizer(monkeypatch, tmp_path, fault, expecte
         assert len(evidence['native_calls']) <= survey.BOUNDS['native_calls']
         assert {row['uri'] for row in evidence['native_calls']} <= survey.READ_ONLY_URIS
         assert evidence['constructor_proven'] is evidence['automatic_birth_proven'] is False
-        if fault is None:
+        if fault in {None, 'nullable-mismatch'}:
             findings = {row['class_name']: row for row in evidence['classes']}
             assert len(findings) == 17 and evidence['survey_completed'] is True
             assert findings['MediaPoolQuery']['finding'] == 'absent_class_in_live_getTypes'
             assert findings['MusicFade']['finding'] == 'registered_type_query_rejected'
             assert findings['MidiParameter']['finding'] == 'registered_no_instance_in_sample'
             assert findings['Language']['instance_ids'] == [INSTANCE]
+            observed = findings['Language']['identity_observations'][0]
+            assert observed['registration_matches'] is (fault is None)
+            assert observed['certifies_constructibility'] is False
+            if fault == 'nullable-mismatch':
+                assert observed['type'] == 'ObservedWObject' and observed['classId'] == 3342352
+                assert not observed['type_matches_registration'] and not observed['class_id_matches_registration']
             lookups = [row for row in actor.calls if 'id' in row[1].get('from', {})]
             assert len(lookups) == 1 and lookups[0][1] == {'from': {'id': [RELATED]}}
             assert len(actor.calls) == 19

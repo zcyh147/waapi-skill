@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 
 from wwise_waapi.builders.schema import SemanticSchemaValidator
+from wwise_waapi.operation_plugin import _closed_object_reference_id
 
 VERSION = '2025.1'
 CLASSES = (
@@ -131,7 +132,12 @@ def collect(actor, evidence):
         finding.update(finding='sampled_instances' if rows else 'registered_no_instance_in_sample',
             instance_ids=[row['id'] for row in rows], sample_is_complete=False)
         for row in rows:
-            assert row['type'] == source['name'] and row['classId'] == source['classId'], 'Wrong sampled class'
+            finding.setdefault('identity_observations', []).append({
+                'id': row['id'], 'type': row['type'], 'classId': row['classId'],
+                'type_matches_registration': row['type'] == source['name'],
+                'class_id_matches_registration': row['classId'] == source['classId'],
+                'registration_matches': row['type'] == source['name'] and row['classId'] == source['classId'],
+                'certifies_constructibility': False})
             sampled.add(_guid(row['id']))
             for field in ('parent', 'owner'):
                 reference = row.get(field)
@@ -140,8 +146,9 @@ def collect(actor, evidence):
                 if isinstance(reference, dict) and 'id' not in reference:
                     finding.setdefault('unresolved_related_references', []).append({'id': row['id'], 'field': field})
                     continue
-                assert isinstance(reference, dict) and 'id' in reference, 'Malformed related identity'
-                related.add(_guid(reference['id']))
+                identity = _closed_object_reference_id(reference, field='role-survey.' + field, allow_none=True)
+                if identity is not None:
+                    related.add(_guid(identity))
     lookup_ids = sorted(related - sampled)
     assert len(lookup_ids) <= BOUNDS['related_ids'], 'Related identity batch bound exceeded'
     evidence['related_lookup'] = {'ids': lookup_ids, 'sampled_identities_reused': sorted(related & sampled)}
