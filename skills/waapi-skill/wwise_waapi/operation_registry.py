@@ -10113,8 +10113,15 @@ def _collect_existing_condition_closure(
                 raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds the finite unique-field budget.")
             child = collected.get(controller) or property_info_by_name.get(controller)
             if child is None:
-                child = (_read_property_info_cached(read, cache=property_info_cache, name=name, object_id=object_id)
-                         if property_info_cache is not None else _read_property_info(read, name=name, object_id=object_id))
+                try:
+                    child = (_read_property_info_cached(read, cache=property_info_cache, name=name, object_id=object_id)
+                             if property_info_cache is not None else _read_property_info(read, name=name, object_id=object_id))
+                except OperationContractError as exc:
+                    raise OperationContractError(exc.error_code,
+                        "Required condition controller metadata is unavailable; this field change cannot be prepared.",
+                        details={"reason": "required_controller_metadata_unavailable", "field": info.name,
+                            "controller": name, "cause": {"error_code": exc.error_code,
+                                "message": str(exc), "details": exc.details}}) from exc
             if child.name != name:
                 raise OperationContractError("INVALID_METADATA", "Condition controller metadata names a different field.")
             collected[controller] = child
