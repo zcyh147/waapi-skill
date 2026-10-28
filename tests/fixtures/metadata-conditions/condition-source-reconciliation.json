@@ -10,6 +10,23 @@
     "current_package": "0586b6d467bdf1461b6adc3c92f4dd253d35d187",
     "dependencies_retained": 285,
     "final_existing_condition_source_successor": {
+      "import_closure_spec_review_fix": {
+        "exact_added_python_sources": [
+          "skills/waapi-skill/wwise_waapi/action_construction.py",
+          "skills/waapi-skill/wwise_waapi/anonymous_list_construction.py",
+          "skills/waapi-skill/wwise_waapi/control_surface_construction.py",
+          "skills/waapi-skill/wwise_waapi/media_pool_database.py",
+          "skills/waapi-skill/wwise_waapi/music_playlist.py",
+          "skills/waapi-skill/wwise_waapi/music_transitions.py",
+          "skills/waapi-skill/wwise_waapi/saved_object_construction.py"
+        ],
+        "predecessor_commit": "7e951fcd8ad13c0abda9ca6b5889afa71140dbe7",
+        "predecessor_reconciliation_sha256": "750d0aa1f8fb2530bd223965679a8476ad6a6e32ecae20c0d4535fba5860d2ea",
+        "review": "Confirmed SPEC P2: selected function not called does not exclude eager import-time Python code. Finite reviewer closure is 54 local modules, other 47 already sealed. Action declaration_contract returns constants; no additional eager resource read.",
+        "runtime_candidate": "8e32450372867bad2b7b669f92c645ebfe8968df",
+        "scope": "Import-time source integrity only; original source changes/before hashes, proof archive/program/native bytes and verdicts retained. No additional constructor/condition execution evidence.",
+        "superseded_exclusion_rationale": "None. New ControlSurface module has definitions only at import and its preparation returns before source/reads for no selected constructor nodes. Its authority resource is read by constructor/schema branches, not the retained named existing-field condition mechanism. Existing master-sink addition remains sealed."
+      },
       "incremental_review": {
         "control_surface_candidate": "7d65e8de1d813f97f1724342397adfee037a4210",
         "display_identity_candidate": "1849c95c1e2c4b772e3b9f95b1177e984b3b2959",
@@ -29,7 +46,7 @@
       },
       "producer_recaptures": 0,
       "scope": "Existing-object source-definition and retained representative-mechanism admission only. Historical program sources/results/native facts and all original before hashes retained; no current-candidate functional/native effect or NEW-role credit.",
-      "source_additions": "None. New ControlSurface module has definitions only at import and its preparation returns before source/reads for no selected constructor nodes. Its authority resource is read by constructor/schema branches, not the retained named existing-field condition mechanism. Existing master-sink addition remains sealed.",
+      "source_additions": "Seven exact current Python import-closure dependencies are added with null original predecessors. Eager module import executes code even when constructor functions are unselected. The original Master Sink resource remains unchanged. No extra constructor resource seal is required for this narrow eager-import chain; resource reads remain inside unselected functions.",
       "updates": {
         "skills/waapi-skill/scripts/gateway.py": {
           "causal_finding": "Adds per-declaration media source-control flags, explicit all-platform notice, bounded JSON parsing only for music_playlist/music_transitions, and transition/playlist replacement notice only when sealed metadata exists. The extra unknown-kind discovery read requires operation object.create/object.set, class scope, and unknown kind; certify_class then restricts it to exact Action.Target. Existing object-scoped single-field discovery and setter dispatch do not select this arm. No ordinary scalar parser/value rule changes. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
@@ -207,6 +224,41 @@
       "before_sha256": null,
       "current_sha256": "0c2567a74adcc562b96bb02faf9ad28ede9ef239d768b1b112bb405d6adbad34",
       "reason": "Exact Bus AudioDevice target guard consumes the sealed five-version explicit No Output denial and fresh installed class proof; unspecified capabilities remain unspecified."
+    },
+    "skills/waapi-skill/wwise_waapi/action_construction.py": {
+      "before_sha256": null,
+      "current_sha256": "d61a807d6ad0a16c6b56bd341a90f85da247ad44c9e0517718317520ebccb19d",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/anonymous_list_construction.py": {
+      "before_sha256": null,
+      "current_sha256": "a177b225e60e96f8a3389cdbc415f4defdcbab63e4d88d397f8a9811991c055f",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/control_surface_construction.py": {
+      "before_sha256": null,
+      "current_sha256": "db975c21bd063e2c124e10854abdb627768fcf005b5b66d480ba50b96c871e8e",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/media_pool_database.py": {
+      "before_sha256": null,
+      "current_sha256": "eff48f7a6403c0e11807cc35c2d611ac7200414a8545d3d999d9962653d3675b",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/music_playlist.py": {
+      "before_sha256": null,
+      "current_sha256": "3b45e8dca7934c61d08541aeab1ae3c3e3b2d0bdf04258e249cc0b2ce632be72",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/music_transitions.py": {
+      "before_sha256": null,
+      "current_sha256": "475f6086162f3a99b312e10cc40481d1b7e61cb7350c195b5dc5517c1c641726",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/saved_object_construction.py": {
+      "before_sha256": null,
+      "current_sha256": "d1a7da145b00c0c3360fd08b363b31102f73ea29e1749acee67ab2cf4e39f605",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
     }
   },
   "source_changes": {
