@@ -120,6 +120,77 @@ def test_saved_constructor_join_uses_version_gates_and_disclosed_weaker_outcomes
         assert row['native_effect'] == 'not_claimed'
 
 
+def test_playlist_constructor_join_is_exactly_three_source_bound_owned_roles():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    from wwise_waapi.music_playlist import declaration_contract
+    mapping = definition_mapping(ROOT)
+    rows = [r for r in mapping['rows'] if r['class_name'] == 'MusicPlaylistItem']
+    births = [r for r in rows if r['operation_mode'] == 'new-object']
+    assert len(births) == 5
+    for row in births:
+        if row['version'] in ('2021.1', '2022.1'):
+            assert row['state'] == 'implementation_dependency'
+            assert row['dependencies']
+            assert row['correspondence']['operations'] == []
+            continue
+        role = row['correspondence']
+        contract = declaration_contract(row['version'])
+        assert row['id'] == f"{row['version']}|metadata|{row['build']}|target|2359312|new-object"
+        assert row['state'] == 'source_definition_verified' and row['dependencies'] == []
+        assert role['implementation_issue'] == 206
+        assert role['path'] == 'music_playlist_container_owned_ordered_tree'
+        assert role['operations'] == ['object.set']
+        assert role['source']['build'] == row['build']
+        assert role['source']['class_id'] == row['source_dimensions']['class_id'] == 2359312
+        assert len(role['source']['members']) == 2
+        assert len(role['source']['supporting_readback_sources']) == 2
+        assert role['source']['supporting_readback_scope']['version'] == '2025.1'
+        assert role['source']['supporting_readback_scope']['public_gateway_execution'] == 'not_claimed'
+        assert role['source']['supporting_readback_scope']['other_versions'] == 'matching_source_and_program_correspondence_only'
+        assert role['declaration'] == contract
+        assert role['verification_scope'] == 'stored_playlist_tree; never_audio_or_playback_quality'
+        assert role['ordered_readback'] == contract['ordered_readback']
+        assert role['hidden_loop_controller'] == contract['hidden_loop_controller']
+        assert 'unexposed_IsLoopingInfinite' in role['hidden_loop_controller']
+        assert role['mechanism_sources']['strength'] == 'existing shared public mechanism tests; no per-row or native execution inferred'
+        assert row['native_effect'] == 'not_claimed'
+        assert row['direct_recipient_execution'] == 'not_observed'
+    assert all(r['correspondence']['path'] == 'exact_existing_object_fields'
+        for r in rows if r['operation_mode'] == 'existing-object')
+
+
+@pytest.mark.parametrize('damage', ('resource-version', 'member', 'native-member', 'manifest', 'class', 'build'))
+def test_playlist_join_rejects_selected_source_or_identity_drift(tmp_path, damage):
+    import shutil
+    from tests.support.applicability_completion_mapping import _music_playlist_correspondence
+    version = '2025.1'
+    resource = f'skills/waapi-skill/resources/metadata/{version}/music-playlist-construction.json'
+    manifest = f'skills/waapi-skill/resources/manifest/{version}/schemas.json'
+    for relative in (resource, manifest):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, target)
+    members = f'skills/waapi-skill/references/semantic/{version}/music-playlist-sources'
+    shutil.copytree(ROOT / members, tmp_path / members)
+    class_id, build = 2359312, '2025.1.7.9143'
+    if damage == 'resource-version':
+        record = json.loads((tmp_path / resource).read_bytes())
+        record['version'] = '2024.1'
+        (tmp_path / resource).write_text(json.dumps(record))
+    elif damage == 'member':
+        (tmp_path / members / 'wwiseobject_musicplaylistitem.html').write_bytes(b'changed primary source')
+    elif damage == 'native-member':
+        (tmp_path / members / 'native-readback.original.json').write_bytes(b'changed readback source')
+    elif damage == 'manifest':
+        (tmp_path / manifest).write_bytes(b'changed reflected schema')
+    elif damage == 'class':
+        class_id += 1
+    else:
+        build = '2024.1.13.9056'
+    with pytest.raises(ValueError, match='Exact installed applicability Music Playlist'):
+        _music_playlist_correspondence(tmp_path, version, class_id, build)
+
+
 def test_portable_applicability_join_keeps_unproved_births_assigned(tmp_path):
     from tests.maintenance.map_applicability_completion import main
     from tests.maintenance.branch_coverage_audit import portable_binding_inputs
@@ -152,6 +223,12 @@ def test_portable_applicability_join_keeps_unproved_births_assigned(tmp_path):
         and r['business_dimensions']['operation_mode'] == 'new-object']
     assert len(saved) == 15
     assert all(r['state'] == 'source_definition_verified' for r in saved)
+    playlists = [r for r in assessment['obligations']
+        if r['business_dimensions']['class_name'] == 'MusicPlaylistItem'
+        and r['business_dimensions']['operation_mode'] == 'new-object']
+    assert len(playlists) == 5
+    assert all(r['state'] == ('implementation_dependency' if r['version'] in ('2021.1', '2022.1')
+        else 'source_definition_verified') for r in playlists)
     previous = load(ROOT / 'docs/branch-coverage-requirements.json')['branches']
     assert all(result['requirements']['branches'][i] == p for i, p in previous.items()
         if i not in {b['id'] for b in result['branches']})
@@ -172,6 +249,9 @@ def test_joined_roles_reject_scope_or_strength_promotion_and_keep_source_identit
     for name, version, field, value in (
         ('WorkUnit', '2025.1', 'verification', 'verified_all_effects'),
         ('SearchCriteria', '2023.1', 'operations', ['audio.import']),
+        ('MusicPlaylistItem', '2023.1', 'operations', ['object.create']),
+        ('MusicPlaylistItem', '2024.1', 'verification_scope', 'playback_order_verified'),
+        ('MusicPlaylistItem', '2025.1', 'hidden_loop_controller', 'infer_from_LoopCount'),
         ('Marker', '2021.1', 'boundary', {'all_marker_information_absence_proven': True}),
         ('MultiSwitchEntry', '2022.1', 'partial_roles', [])):
         proposed = deepcopy(mapping)
@@ -256,4 +336,10 @@ def test_shared_program_source_closure_includes_invoked_gateway_helpers():
         'tests/unit/test_object_graph_owned_choices_gateway.py',
         'tests/unit/test_field_interface_closure_gateway.py',
         'tests/unit/test_plugin_shareset_gateway.py',
-        'tests/unit/test_plugin_kind_placements_gateway.py'} <= sources.keys()
+        'tests/unit/test_plugin_kind_placements_gateway.py',
+        'tests/unit/test_music_playlist_gateway.py'} <= sources.keys()
+    playlist_sources = {p.relative_to(ROOT).as_posix() for version in ('2023.1', '2024.1', '2025.1')
+        for p in (ROOT / 'skills/waapi-skill/references/semantic' / version / 'music-playlist-sources').iterdir()
+        if p.suffix in {'.html', '.json'}}
+    assert len(playlist_sources) == 8
+    assert playlist_sources <= sources.keys()

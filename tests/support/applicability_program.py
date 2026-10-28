@@ -16,6 +16,11 @@ def program_sources(root):
     selected = {p.relative_to(root).as_posix() for directory in ('scripts', 'wwise_waapi', 'resources')
         for p in (root / 'skills/waapi-skill' / directory).rglob('*')
         if p.is_file() and '__pycache__' not in p.parts and p.suffix in {'.py', '.json'}}
+    # Playlist applicability also depends on exact retained SDK/native bytes,
+    # not merely the JSON descriptors or imported compiler implementation.
+    selected.update(p.relative_to(root).as_posix() for version in ('2023.1', '2024.1', '2025.1')
+        for p in (root / 'skills/waapi-skill/references/semantic' / version / 'music-playlist-sources').rglob('*')
+        if p.is_file() and p.suffix in {'.html', '.json'})
     selected.update({'tests/support/applicability_program.py', 'tests/support/applicability_completion_mapping.py',
         'tests/support/exact_evidence_finalization.py', 'docs/branch-coverage-condition-sources.json',
         'docs/plans/full-waapi-coverage/SPEC.md',
@@ -25,7 +30,8 @@ def program_sources(root):
         'tests/fixtures/metadata-conditions/applicability-current-program-r2.json.gz',
         'tests/fixtures/metadata-conditions/applicability-current-program-r3.json.gz',
         *['tests/_org/' + v + '/SampleProject.wproj' for v in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')]})
-    pending = ['tests/unit/test_applicability_public_program.py', 'tests/conftest.py']
+    pending = ['tests/unit/test_applicability_public_program.py', 'tests/unit/test_music_playlist_gateway.py',
+        'tests/conftest.py']
     while pending:
         name = pending.pop()
         if name in selected:

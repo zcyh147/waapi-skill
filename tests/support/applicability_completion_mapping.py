@@ -140,6 +140,64 @@ def _saved_constructor_correspondence(root, sdk, version, name, class_id, build)
             if name == 'SearchCriteria' else 'ordinary GUID/class/name/parent and requested-field verification; Query evaluation not claimed')}
 
 
+def _music_playlist_correspondence(root, version, class_id, build):
+    """Join #206's owned constructor without native or playback-effect credit."""
+    from wwise_waapi.music_playlist import ITEM_CLASS, authority, declaration_contract
+    from wwise_waapi.object_graph_business_contracts import object_graph_business_contract_data
+    resource = f'skills/waapi-skill/resources/metadata/{version}/music-playlist-construction.json'
+    try:
+        current = authority(version)
+        raw = (root / resource).read_bytes()
+        source = json.loads(raw)
+        if (hashlib.sha256(raw).hexdigest() != current['resource_sha256']
+                or source['version'] != version or source['build'] != build
+                or current['build'] != build or source['item_class'] != class_id or class_id != ITEM_CLASS):
+            raise ValueError('source/version/class/build differs')
+        members = []
+        for member in current['sources']:
+            path = f"skills/waapi-skill/references/semantic/{version}/music-playlist-sources/{member['member']}"
+            if hashlib.sha256((root / path).read_bytes()).hexdigest() != member['sha256']:
+                raise ValueError('retained primary source differs')
+            members.append({'path': path, **member})
+        native_members = []
+        observed_version = current['native_readback_observation']['version']
+        for member, sha in current['native_source_sha256'].items():
+            path = f'skills/waapi-skill/references/semantic/{observed_version}/music-playlist-sources/{member}'
+            if hashlib.sha256((root / path).read_bytes()).hexdigest() != sha:
+                raise ValueError('representative readback source differs')
+            native_members.append({'path': path, 'sha256': sha})
+        manifest = f'skills/waapi-skill/resources/manifest/{version}/schemas.json'
+        if hashlib.sha256((root / manifest).read_bytes()).hexdigest() != source['manifest_sha256']:
+            raise ValueError('reflected grammar differs')
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise ValueError('Exact installed applicability Music Playlist source differs: ' + str(exc)) from exc
+    declaration = declaration_contract(version)
+    return {'implementation_issue': 206, 'path': 'music_playlist_container_owned_ordered_tree',
+        'operations': ['object.set'], 'public_contract_sha256': digest(object_graph_business_contract_data('object.set', version)),
+        'source': {'path': resource, 'sha256': current['resource_sha256'], 'build': build,
+            'class_id': class_id, 'members': members, 'manifest': manifest, 'manifest_sha256': source['manifest_sha256'],
+            'supporting_readback_sources': native_members,
+            'supporting_readback_scope': current['native_readback_observation']},
+        'declaration': declaration,
+        'mechanism_sources': {'runtime': ['skills/waapi-skill/wwise_waapi/music_playlist.py',
+            'skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py',
+            'skills/waapi-skill/wwise_waapi/operation_registry.py'],
+            'test_nodes': ['tests/unit/test_music_playlist_gateway.py::' + node for node in (
+                'test_existing_playlist_nested_repeated_occurrences_survive_persisted_transaction',
+                'test_source_supported_versions_compile_the_same_closed_playlist_tree',
+                'test_playlist_closed_declaration_rejects_wrong_roles_raw_fields_and_oversized_trees',
+                'test_playlist_immutable_preview_blocks_drift_before_write',
+                'test_playlist_source_version_drift_blocks_persisted_execution',
+                'test_playlist_result_or_independent_state_fault_fails_verification_without_retry',
+                'test_playlist_class_loop_discovery_uses_only_disclosed_controllers',
+                'test_playlist_constructor_older_version_is_a_scoped_boundary')],
+            'strength': 'existing shared public mechanism tests; no per-row or native execution inferred'},
+        'admission': 'standalone object.set for one exact existing MusicPlaylistContainer, live MusicPlaylistItem Type and owner PlaylistRoot Field Handles; bounded anonymous root/groups and distinct ordered repeated Segment occurrences; complete replacement with old-tree/metadata/configuration drift checks, policy authorization and execute-once verification; no arbitrary hierarchy placement or native custom-reference JSON',
+        'verification_scope': declaration['verification_scope'], 'ordered_readback': declaration['ordered_readback'],
+        'hidden_loop_controller': declaration['hidden_loop_controller'],
+        'other_roles': '2021.1/2022.1 birth applicability remains independently assigned; existing-item edits remain separate; no audio or playback effect claimed'}
+
+
 def definition_mapping(root):
     """Keep every independent ID/shape and join only source-supported paths."""
     root = Path(root)
@@ -252,6 +310,8 @@ def definition_mapping(root):
                     'independent_constructibility': 'not_claimed'}
             elif name in {'WorkUnit', 'Query', 'SearchCriteria'}:
                 row['correspondence'] = _saved_constructor_correspondence(root, sdk, version, name, d['class_id'], row['build'])
+            elif name == 'MusicPlaylistItem' and version in {'2023.1', '2024.1', '2025.1'}:
+                row['correspondence'] = _music_playlist_correspondence(root, version, d['class_id'], row['build'])
             elif name in HIERARCHY:
                 row['correspondence'] = {'path': 'ordinary_selected_hierarchy_constructor', 'operations': ['object.create'],
                     'admission': 'fresh Type Handle, compatible selected parent, class prerequisites, exact identity/class/parent verification; no arbitrary hierarchy placement'}
