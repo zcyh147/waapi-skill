@@ -111,3 +111,57 @@ def test_runtime_remaining_imports_keep_original_receipts_without_current_native
         assert review['current_candidate_admission'].startswith('not_claimed;')
         imported, _, _ = audit.portable_binding_inputs(base / 'index.json', audit.load(base / 'requirements.json'))
         assert len(imported['bindings']) == (42 if expected == 14 else 3)
+
+
+def test_runtime_proof_plan_joins_explicit_routes_and_retains_all_profile_identities(component):
+    from tests.support.runtime_remaining_completion_mapping import build_retained_history, selected_proof_plan
+    native = component['native_coverage']
+    assert any('/patternProperties/' in row['pointer'] and '|' in row['pointer'] for row in native['obligations'])
+    history = build_retained_history(audit.ROOT, native)
+    plan = selected_proof_plan(native, history)
+    meters = plan['rows']['ak.wwise.core.profiler.getMeters']
+    assert set(meters['native_routes']) == {
+        '2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters',
+        '2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters',
+        '2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters',
+        '2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters'}
+    assert len(meters['retained_native_profiles']) == 2
+    names = ('getMeters', 'getCpuUsage', 'getPerformanceMonitor', 'getStreamedMedia')
+    assert sum(len(plan['rows']['ak.wwise.core.profiler.' + name]['retained_native_profiles']) for name in names) == 20
+    assert sum(len(row['retained_native_profiles']) for row in plan['rows'].values()) == 133
+    assert sum(len(row['routes_without_profile']) for row in plan['rows'].values()) == 11
+    assert sum(len(row['native_routes']) for row in plan['rows'].values()) == 144
+    assert history['sources']['tests/fixtures/runtime-meter/support-review.json']['original_profile_ids'][0].endswith('|/resultSchema')
+    assert len(meters['retained_profile_identities']) == 2
+    from tests.support.runtime_remaining_completion_mapping import BASE
+    assert plan == json.loads((audit.ROOT / BASE / 'selected-proof-plan.json').read_bytes())
+    assert history == json.loads((audit.ROOT / BASE / 'accepted-history.json').read_bytes())
+
+
+@pytest.mark.parametrize('damage', ['unknown-profile', 'mismatched-profile-route', 'unknown-member', 'mismatched-member-route', 'unknown-retained-profile'])
+def test_runtime_proof_plan_rejects_unexpected_source_identities(component, damage):
+    from tests.support.runtime_remaining_completion_mapping import build_retained_history, selected_proof_plan, retained_profile_mappings
+    native = deepcopy(component['native_coverage'])
+    if damage == 'unknown-retained-profile':
+        history = build_retained_history(audit.ROOT, native)
+        record = history['sources']['tests/fixtures/runtime-meter/support-review.json']
+        identity = record['original_profile_ids'][0]
+        record['original_profile_ids'][0] += '|unexpected'
+        record['profile_mappings'][identity + '|unexpected'] = record['profile_mappings'].pop(identity)
+        with pytest.raises(ValueError, match='profile identity'):
+            selected_proof_plan(native, history)
+        return
+    if 'profile' in damage:
+        source = 'tests/fixtures/runtime-meter/support-review.json'
+        document = json.loads((audit.ROOT / source).read_bytes())
+        identity = next(iter(document['profiles']))
+        if damage == 'unknown-profile': document['profiles'][identity + '|unexpected'] = document['profiles'].pop(identity)
+        else: document['profiles'][identity]['route'] = next(route['id'] for route in native['routes'] if route['uri'].endswith('getCpuUsage'))
+        with pytest.raises(ValueError, match='profile identity'):
+            retained_profile_mappings(native, source, document)
+    else:
+        history = build_retained_history(audit.ROOT, native)
+        if damage == 'unknown-member': native['obligations'][0]['route'] += '|unexpected'
+        else: native['obligations'][0]['id'] += '|unexpected'
+        with pytest.raises(ValueError, match='member identity'):
+            selected_proof_plan(native, history)

@@ -84,6 +84,111 @@ def discover_runtime(root):
     return {'routes': routes, 'catalogs': catalogs, 'obligations': sorted(rows.values(), key=lambda r: r['id'])}, dict(locations)
 
 
+def _native_route_rows(native):
+    routes = {}
+    for row in native['routes']:
+        identity = '|'.join(row[key] for key in ('version', 'host', 'build', 'kind', 'uri'))
+        if row['id'] != identity or row['uri'] not in URIS or identity in routes:
+            raise ValueError('Runtime unexpected native route identity')
+        routes[identity] = row
+    return routes
+
+
+def _retained_profile_route(routes, source, identity, profile):
+    result_profiles = {'tests/fixtures/runtime-extra-reads/support-review.json',
+        'tests/fixtures/runtime-meter/support-review.json'}
+    if source not in HISTORY:
+        raise ValueError('Runtime unexpected retained profile identity source')
+    # Three older providers key profiles by the complete native route and
+    # have no separate route member. Other providers disclose it explicitly.
+    route = profile.get('route')
+    if route is None and identity in routes:
+        route = routes[identity]['id']
+    expected = route + '|/resultSchema' if source in result_profiles and isinstance(route, str) else route
+    if route not in routes or identity != expected:
+        raise ValueError('Runtime unexpected retained profile identity: ' + str(identity))
+    if any(key in profile and profile[key] != routes[route][key] for key in ('version', 'host', 'build')):
+        raise ValueError('Runtime retained profile identity context differs')
+    return route
+
+
+def retained_profile_mappings(native, source, document):
+    """Join each source's exact profile protocol, never split a schema pointer."""
+    routes = _native_route_rows(native)
+    result = {}
+    for identity, profile in document['profiles'].items():
+        route = _retained_profile_route(routes, source, identity, profile)
+        result[identity] = {'route': route, 'profile_sha256': digest(profile)}
+    return result
+
+
+def build_retained_history(root, native):
+    """Preserve reviewed archive seals and retain original IDs beside route joins."""
+    root = Path(root)
+    history = json.loads((root / BASE / 'accepted-history.json').read_bytes())
+    if set(history['sources']) != set(HISTORY):
+        raise ValueError('Runtime retained history source roster changed')
+    for source, record in history['sources'].items():
+        raw = (root / source).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != record['sha256']:
+            raise ValueError('Runtime retained history source seal changed')
+        mappings = retained_profile_mappings(native, source, json.loads(raw))
+        record['native_routes'] = sorted({item['route'] for item in mappings.values()})
+        record['original_profile_ids'] = sorted(mappings)
+        record['profile_mappings'] = mappings
+    return history
+
+
+def selected_proof_plan(native, history):
+    routes = _native_route_rows(native)
+    members = defaultdict(list)
+    for member in native['obligations']:
+        route = member['route']
+        if route not in routes or member['id'] != route + '|' + member['pointer']:
+            raise ValueError('Runtime unexpected native member identity')
+        members[route].append(member)
+    profiles = defaultdict(list)
+    if set(history['sources']) != set(HISTORY):
+        raise ValueError('Runtime unexpected retained profile identity source roster')
+    for source, record in history['sources'].items():
+        if set(record['original_profile_ids']) != set(record['profile_mappings']):
+            raise ValueError('Runtime retained profile identity roster differs')
+        for identity, profile in record['profile_mappings'].items():
+            route = _retained_profile_route(routes, source, identity, profile)
+            profiles[route].append({'source': source, 'id': identity,
+                'profile_sha256': profile['profile_sha256']})
+    rows = {}
+    for uri in sorted(URIS):
+        selected = sorted(row['id'] for row in routes.values() if row['uri'] == uri)
+        name = uri.rsplit('.', 1)[1]
+        group = ('zero' if uri in ZERO else 'transport' if uri.startswith(TRANSPORT) else
+            'meter' if name == 'getMeters' else 'fixed-read' if name in {
+                'getCpuUsage', 'getCursorTime', 'getPerformanceMonitor', 'getStreamedMedia'} else 'control')
+        rows[uri] = {'source_members': sum(len(members[route]) for route in selected),
+            'native_routes': selected, 'retained_native_profiles': [route for route in selected if profiles[route]],
+            'retained_profile_identities': [profile for route in selected for profile in profiles[route]],
+            'routes_without_profile': [route for route in selected if not profiles[route]],
+            'code_mechanism': group, 'new_native_receipts_required': 'not_inferred_from_route_count',
+            'actual_product_gap': ('getMeters omitted exact declared return spellings and namespaced source outputs; now reuses existing closed projection'
+                if name == 'getMeters' else 'none_demonstrated'),
+            'current_native_effect_admission': 'not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence'}
+    return {'contract': 'waapi-skill.runtime-remaining-selected-proof-plan/v1',
+        'legacy_gate': 'same-route native resultSchema root for every branch; 144 roots, preserved unchanged in exported requirements',
+        'reconciliation_proposal': 'Review exact source-backed native facts per meaningful effect/host mechanism; admit CODE siblings through existing representative layer; do not infer current native PASS or new host facts. Missing native source slots remain observation limits unless actual host/effect risk requires a selected witness.',
+        'canonical_index_remaining_bindings': 0, 'retained_native_profiles': sum(len(items) for items in profiles.values()), 'rows': rows}
+
+
+def refresh_selected_proof_plan(root):
+    """Refresh only the finite history/plan accounting, retaining native artifacts."""
+    root = Path(root)
+    native, _ = discover_runtime(root)
+    history = build_retained_history(root, native)
+    plan = selected_proof_plan(native, history)
+    for name, document in [('accepted-history.json', history), ('selected-proof-plan.json', plan)]:
+        (root / BASE / name).write_text(json.dumps(document, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+    return plan
+
+
 def runtime_component(root):
     from tests.maintenance.branch_audit_completion import candidate_identity
     from tests.maintenance.branch_audit_mapping import debug_control_component
