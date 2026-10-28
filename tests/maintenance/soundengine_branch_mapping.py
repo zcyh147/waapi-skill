@@ -173,6 +173,23 @@ def _rules(name, version):
     return field_rules(name, version)
 
 
+def _nested_value_paths(name, pointer):
+    """Index exact closed tuple members rather than inheriting a parent label."""
+    parts = pointer.split('/')
+    if name in {'setPosition', 'setMultiplePositions'} and len(parts) >= 4 and parts[-2] == 'properties' and parts[-1] in {'x', 'y', 'z'}:
+        vector = parts[-3]
+        # The immediately enclosing property appears before /properties/x.
+        if vector in {'position', 'orientationFront', 'orientationTop'}:
+            index = {'position': 0, 'orientationFront': 3, 'orientationTop': 6}[vector] + {'x': 0, 'y': 1, 'z': 2}[parts[-1]]
+            return [('position_frame' if name == 'setPosition' else 'position_frames[*]') + f'[{index}]']
+    if name == 'setGameObjectAuxSendValues' and '/items/properties/' in pointer:
+        field = pointer.split('/items/properties/', 1)[1].split('/')[0]
+        return {'listener': ['aux_sends[*][0]', 'aux_sends_all_listeners: Gateway uint64 sentinel'],
+            'auxBus': ['aux_sends[*][1]', 'aux_sends_all_listeners[*][0]'],
+            'controlValue': ['aux_sends[*][2] / 100', 'aux_sends_all_listeners[*][1] / 100']}.get(field, [])
+    return []
+
+
 def soundengine_bindings(root, inventory):
     """Exact field joins; omit unresolved getter projection/option members."""
     from wwise_waapi.soundengine_business_contracts import soundengine_control_business_contract_data
@@ -236,7 +253,9 @@ def soundengine_bindings(root, inventory):
                 'public_route': route['public_route'], 'public_route_sha256': digest(public[route['public_route']]),
                 'input': {'gateway_argv': ['core-call' if read else 'draft-start', route['uri']],
                     'declaration': 'core-call' if read else 'draft-declare-soundengine-plan', 'selector': pointer,
-                    'correspondence': {'rule': rule, 'native_fields': fields, 'public_fields': public_fields, 'encoding': encoding}},
+                    'correspondence': {'rule': rule, 'native_pointer': pointer, 'native_fields': fields,
+                        'public_fields': public_fields, 'value_paths': _nested_value_paths(name, pointer), 'encoding': encoding,
+                        **({'native_choice': row['value']} if row['kind'] in {'enum_value', 'boolean_value', 'optional_presence', 'default', 'collection_cardinality'} else {})}},
                 'construction': {'source': source, 'selector': pointer},
                 'validation': {'source': LIB + 'builders/schema.py#' + ('validate_semantic_result' if section == 'resultSchema' else 'validate_semantic_payload'), 'selector': pointer},
                 'verifier': {'source': GATEWAY + '#dispatch_soundengine_business_read' if read else LIB + 'operation_registry.py#verify_prepared_operation', 'selector': pointer},

@@ -31,6 +31,9 @@ def test_soundengine_mapping_uses_percentage_and_exact_runtime_scope(component):
     assert percent['evidence'] == {}
     assert percent['public_route_sha256'] == digest(next(row for row in inventory['routes']
         if row['id'] == percent['public_route']))
+    spatial_prefix = prefix.replace('seekOnEvent', 'setMultiplePositions')
+    top_z = bindings[spatial_prefix + '/argsSchema/properties/positions/items/properties/position/properties/orientationTop/properties/z']
+    assert top_z['input']['correspondence']['value_paths'] == ['position_frames[*][8]']
 
 
 def reviewed_attachment(inventory):
