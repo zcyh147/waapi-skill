@@ -127,8 +127,17 @@ def collect(actor, evidence):
             compare(child, observed)
     compare(native_tree, actual)
     old_ids = evidence['before']['occurrence_ids']
-    old_rows = call('ak.wwise.core.object.get', {'from': {'id': old_ids}}, {'return': BASE})['return']
+    from waapi import WaapiRequestFailed
+    old_rows, exact_absences = [], []
+    for old_id in old_ids:
+        try:
+            old_rows.extend(call('ak.wwise.core.object.get', {'from': {'id': [old_id]}}, {'return': BASE})['return'])
+        except WaapiRequestFailed as exc:
+            if exc.uri != 'ak.wwise.query.unknown_object':
+                raise
+            exact_absences.append({'id': old_id, 'source': exc.uri})
     evidence['old_guid_lifetime'] = {'before': old_ids, 'survivors': old_rows,
+        'exact_absences': exact_absences,
         'root_reused': evidence['before']['owner']['PlaylistRoot'] == evidence['after']['owner']['PlaylistRoot']}
     evidence['ordered_getter_observed'] = True
     evidence['playback_quality_verified'] = False

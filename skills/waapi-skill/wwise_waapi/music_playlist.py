@@ -469,7 +469,9 @@ def verify(proof, payload, *, read):
                 old(child)
     old(proof['old_tree'])
     if old_ids:
-        rows = _rows(read, old_ids, ['id'])
+        # Gateway normalizes native unknown_object only for an exact singleton.
+        # A failed bulk lookup cannot establish absence of every old occurrence.
+        rows = [row for old_id in old_ids for row in _rows(read, [old_id], ['id'])]
         check('Music Playlist previous owned tree GUIDs are absent', rows == [], {'old_ids': old_ids, 'actual': rows})
     check('Music Playlist created occurrence GUIDs are fresh', not set(old_ids) & seen, {'old_ids': old_ids, 'new_ids': sorted(seen)})
     return checks, identities

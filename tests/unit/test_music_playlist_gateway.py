@@ -190,6 +190,34 @@ def test_playlist_omitted_empty_children_uses_independent_relationship_query(tmp
     assert len(task.writes) == 1
 
 
+def test_playlist_replacement_checks_each_missing_old_guid_independently(tmp_path):
+    from waapi import WaapiRequestFailed
+    from autobahn.wamp.exception import ApplicationError
+    task = MusicPlaylistTask(tmp_path)
+    old_child = '{DDDDDDDD-1111-1111-1111-111111111111}'
+    task.objects[OLD]['children'] = [{'id': old_child}]
+    task.objects[old_child] = {**deepcopy(task.objects[OLD]), 'id': old_child,
+        'parent': {'id': OLD}, 'owner': None, 'children': [], '@PlaylistItemType': 1, '@Segment': {'id': A}}
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and any(guid not in task.objects for guid in args.get('from', {}).get('id', [])):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            raise WaapiRequestFailed(ApplicationError('ak.wwise.query.unknown_object',
+                message='from id object is unknown', details={'procedureUri': uri}))
+        result = original(uri, args, options)
+        if uri.endswith('object.set'):
+            del task.objects[old_child]
+        return result
+    task.call = call
+    task.declare()
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    for guid in (OLD, old_child):
+        assert any(args.get('from') == {'id': [guid]} for uri, args, _ in task.calls if uri.endswith('object.get'))
+    assert len(task.writes) == 1
+
+
 @pytest.mark.parametrize('fault', ('reordered-readback', 'reordered-result', 'wrong-owner', 'wrong-class', 'retained-old-root', 'changed-segment'))
 def test_playlist_result_or_independent_state_fault_fails_verification_without_retry(tmp_path, fault):
     task = MusicPlaylistTask(tmp_path).declare()

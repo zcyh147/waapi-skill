@@ -33,6 +33,10 @@ class PlaylistActor:
 
     def __call__(self, uri, args, options):
         self.calls.append((uri, deepcopy(args), deepcopy(options)))
+        if uri.endswith('object.get') and any(guid not in self.task.objects for guid in args.get('from', {}).get('id', [])):
+            from waapi import WaapiRequestFailed
+            from autobahn.wamp.exception import ApplicationError
+            raise WaapiRequestFailed(ApplicationError('ak.wwise.query.unknown_object'))
         if self.fault == 'transport':
             raise RuntimeError('transport indeterminate')
         if uri.endswith('getInfo'):
