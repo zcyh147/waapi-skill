@@ -2073,3 +2073,34 @@ def test_declared_return_respects_existing_native_response_byte_ceiling(tmp_path
     assert code == 2, result
     assert result['agent_result'] is None
     assert result['call']['error_code'] == 'RESULT_TOO_LARGE'
+
+
+@pytest.mark.parametrize('version', SUPPORTED_WWISE_VERSION_KEYS)
+def test_exact_declared_randomizer_spelling_is_selectable_without_alias_equivalence(tmp_path, version):
+    from tests.unit.test_object_query_result_pages import QueryTask, PROJECT_GUID
+    task = QueryTask(tmp_path, version)
+    code, schema = task.run('query-schema', '--output', 'suppportsRandomizer')
+    assert code == 0, schema
+    detail = schema['business_output']
+    assert detail['available'] is (version == '2025.1')
+    assert detail['supported_versions'] == ['2025.1']
+    assert detail['selected_spelling'] == 'suppportsRandomizer'
+    assert detail['alias_equivalence_proven'] is False
+    task.row.pop('notes')
+    task.row['suppportsRandomizer'] = None
+    code, result = task.run('query-object', '--exact-id', PROJECT_GUID, '--include', 'suppportsRandomizer')
+    if version != '2025.1':
+        assert code == 2, result
+        assert task.calls == []
+        return
+    assert code == 0, result
+    assert result['agent_result'][0]['declared_return_observation'] == {
+        'selected_spellings': ['suppportsRandomizer'], 'returned_values': {'suppportsRandomizer': None}}
+    assert [call for call in task.calls if call[0].endswith('object.get')] == [
+        ('ak.wwise.core.object.get', {'waql': 'from object "' + PROJECT_GUID + '"'},
+         {'return': ['id', 'name', 'type', 'path', 'suppportsRandomizer']})]
+    assert list(result)[-1] == 'agent_result'
+    task.row.pop('suppportsRandomizer')
+    code, result = task.run('query-object', '--exact-id', PROJECT_GUID, '--include', 'suppportsRandomizer')
+    assert code == 0, result
+    assert result['agent_result'][0]['declared_return_observation']['returned_values'] == {}

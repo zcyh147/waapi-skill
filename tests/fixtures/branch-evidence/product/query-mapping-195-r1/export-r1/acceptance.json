@@ -1,0 +1,59 @@
+{
+  "contract": "waapi-skill.query-acceptance-attribution/v1",
+  "authority": "docs/plans/full-waapi-coverage/tickets/07-complete-object-queries-and-metadata-discovery-projections.md",
+  "scope": "all nine exact owner #181 URIs; 37 public version rows; 74 pinned native host/build contexts; 12606 branch identities",
+  "current_code": {
+    "candidate": "06ae89d041ced9611ecf11c1823e7a01b4a648bd",
+    "passed": 241,
+    "skipped": 0,
+    "proof_strength": "reviewed_aggregate_code_mechanism",
+    "per_node_outcomes": "not_recorded",
+    "gateway_observations": "not_recorded",
+    "native_effect": "not_observed",
+    "fresh_started": false
+  },
+  "accepted_functional_history": {
+    "record": "tests/TEST_INVENTORY.md#2026-10-26-181-functional-closeout",
+    "ticket": "docs/plans/full-waapi-coverage/tickets/07-complete-object-queries-and-metadata-discovery-projections.md",
+    "verdicts_unchanged": true,
+    "reused_under_accepted_scope": true,
+    "current_candidate_native_rerun": false,
+    "per_member_native_effect_credit": false,
+    "retained_roots": [
+      {
+        "root": ".waapi-skill-state/full-coverage/query181-2021-active-source-r1",
+        "original_verdict": "FAIL",
+        "candidate": "ceb9a58c",
+        "build": "2021.1.14.8108",
+        "observation": "one public SELECT activeSource: native Unknown accessor activeSource (61); source protection and clean teardown retained; quarantined sandbox"
+      },
+      {
+        "root": ".waapi-skill-state/full-coverage/query181-2021-points-r1",
+        "original_verdict": "FAIL",
+        "candidate": "36de89a1",
+        "build": "2021.1.14.8108",
+        "observation": "native Unknown accessor points; narrower declared accessor boundary; other Curve/RTPC reads remain available"
+      },
+      {
+        "root": ".waapi-skill-state/full-coverage/query181-2025-functions-r1",
+        "original_verdict": "FAIL",
+        "candidate": "36de89a1",
+        "build": "2025.1.7.9143",
+        "observation": "selected State/Panner readbacks and field-status/curve-source values retained; empty duration is not nonempty proof; radius target observation differs from old XML-derived oracle; no reached exact-ID radius readback"
+      }
+    ]
+  },
+  "boundaries": {
+    "2021_stored_property_to_RTPC": "user-approved Skill limitation, not universal native impossibility; RTPC/Game Parameter/typed ControlInput retained",
+    "declared_returns": "the eleven legacy spellings in every lane and states only in 2025.1 remain finite choices; exact suppportsRandomizer additionally selected in 2025.1; no alias/result-shape equivalence or per-spelling native quota",
+    "2023_marker_model": "source-established introduction; earlier-version code gates rather than absence probes",
+    "ObjectSettingAssoc": "live getTypes membership does not establish WAQL queryability; native rejection preserved without substitution or retry",
+    "raw_inputs": "no native args/options, arbitrary return grammar, mutation WAQL, new payload language, or selected-UI projection expansion"
+  },
+  "publication_remaining": [
+    "merge and independently review this component",
+    "reconcile exact predecessors and restamp global candidate through existing index/requirements attachment readers",
+    "retain accepted native history and original failures separately",
+    "run stable combined Program/Non-live gates once under #195"
+  ]
+}
