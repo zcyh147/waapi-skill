@@ -36,7 +36,7 @@ def discover_imports(root):
     owners = json.loads((root / 'docs/branch-coverage-ownership.json').read_bytes())['routes']
     if {key.split('|', 1)[1]: value['owner_issue'] for key, value in owners.items()
             if value['owner_issue'] == 182} != OWNERS:
-        raise ValueError('Imports exact #183/#184 ownership roster changed')
+        raise ValueError('Imports exact #182 ownership roster changed')
     routes, rows, catalogs, locations = [], {}, {}, defaultdict(list)
     for version in SUPPORTED_WWISE_VERSION_KEYS:
         for host in NATIVE_HOSTS:
