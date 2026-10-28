@@ -11,6 +11,12 @@ PROJECT_SETTING_BUSINESS_CONTRACT = "waapi-skill.project-setting-business/v1"
 GAME_PARAMETER_SET_RANGE_URI = "ak.wwise.core.gameParameter.setRange"
 SOUND_SET_ACTIVE_SOURCE_URI = "ak.wwise.core.sound.setActiveSource"
 
+_CURVE_UPDATE_OUTCOMES = {
+    "stretch": "stretch",
+    "preserve-x": "preserveX",
+}
+
+
 _CONTRACTS: dict[str, dict[str, Any]] = {
     SOUND_SET_ACTIVE_SOURCE_URI: {
         "versions": ("2022.1", "2023.1", "2024.1", "2025.1"),
@@ -160,6 +166,8 @@ def project_setting_business_contract_data(
             "required_fields": list(row["required_fields"]),
             "optional_fields": list(row["optional_fields"]),
             "field_types": dict(row["field_types"]),
+            **({"value_domains": {"curve_update_outcome": {"choices": sorted(_CURVE_UPDATE_OUTCOMES)}}}
+                if operation == GAME_PARAMETER_SET_RANGE_URI else {}),
         },
         "gateway_derivations": [
             "exact_object_identities",

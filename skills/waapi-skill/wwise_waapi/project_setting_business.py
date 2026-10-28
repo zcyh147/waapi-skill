@@ -9,16 +9,13 @@ from .business_declaration_state import BusinessDeclarationSession
 from .business_declarations import BoundObjectHandle, business_repair
 from .operation_registry import parse_operation_request
 from .project_setting_business_contracts import (
+    _CURVE_UPDATE_OUTCOMES,
     GAME_PARAMETER_SET_RANGE_URI,
     SOUND_SET_ACTIVE_SOURCE_URI,
     project_setting_business_contract_data,
 )
 
 
-_CURVE_UPDATE_OUTCOMES = {
-    "stretch": "stretch",
-    "preserve-x": "preserveX",
-}
 
 
 def _plan(session: BusinessDeclarationSession) -> Mapping[str, Any]:

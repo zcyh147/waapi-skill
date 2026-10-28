@@ -54,6 +54,18 @@ _CURVE_SHAPES = {
     "exp-2": "Exp2",
     "exp-3": "Exp3",
 }
+_PASTE_MODES = {
+    "replace": "replaceEntire",
+    "merge-replace": "addReplace",
+    "merge-keep": "addKeep",
+}
+_FADE_MODES = {
+    "none": "None",
+    "manual": "Manual",
+    "automatic": "Automatic",
+}
+
+
 MAX_CURVE_POINTS = 64
 
 _CONTRACTS: dict[str, dict[str, Any]] = {
@@ -547,6 +559,17 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
         declaration["history"] = history_declaration()
     if operation == "ak.wwise.core.object.setAttenuationCurve":
         declaration["value_domains"] = attenuation_curve_value_domains(version)
+    if operation == "ak.wwise.core.object.pasteProperties":
+        declaration["value_domains"] = {
+            "list_mode": {"choices": sorted(_PASTE_MODES), "omitted_effect": "replace"},
+        }
+    if operation == "ak.wwise.core.blendContainer.addAssignment":
+        declaration["value_domains"] = {"edges": {
+            "items": 2, "order": ["left", "right"],
+            "fade_mode_choices": sorted(_FADE_MODES),
+            "shape_choices": sorted(_CURVE_SHAPES),
+            "fade_position": {"required_for": "manual", "otherwise": "optional; native ignores it"},
+        }}
     field_semantics = row.get("field_semantics")
     if field_semantics is not None:
         declaration["field_semantics"] = {
