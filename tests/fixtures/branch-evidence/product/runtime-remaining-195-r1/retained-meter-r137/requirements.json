@@ -1,0 +1,27 @@
+{
+  "branches": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "58e0f3bdc14e2e8c5f22f0e743c093fd12111dd4469387c6927f373357c50d56",
+      "reason": "R127 exact remaining runtime extra_reads: native_business_anchor; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema/properties/meters/@cardinality/single": {
+      "categories": [
+        "program"
+      ],
+      "native_shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "reason": "R127 exact remaining runtime extra_reads: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema/properties/meters/items/properties/object/$ref": {
+      "categories": [
+        "program"
+      ],
+      "native_shape_sha256": "6fd717c06082c8bb771ecafa2d692528e78f4f5b9c3dbda0f27cf49aa026c3d5",
+      "reason": "R127 exact remaining runtime extra_reads: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    }
+  },
+  "contract": "waapi-skill.branch-evidence-requirements/v1"
+}

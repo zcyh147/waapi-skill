@@ -498,6 +498,44 @@ def test_representative_program_support_preserves_existing_category_outcomes(eva
     assert recipient['representative_proof']['reused_categories'] == ['program']
 
 
+@pytest.mark.parametrize('program_ready,native_ready', [(True, False), (False, False), (False, True), (True, True)])
+def test_representative_readiness_is_independent_for_program_and_native(
+    evaluated_representative_rows, program_ready, native_ready,
+):
+    from tests.maintenance.branch_audit_completion import apply_representative_mechanisms
+    native, bindings, requirements, selected, member = evaluated_representative_rows
+    review = requirements['representative_mechanisms']['controlled-mechanism']
+    review['selected_proofs']['native'] = [selected]
+    for row in native['obligations']:
+        row['requirements'].append('native')
+        requirements['branches'][row['id']]['categories'].append('native')
+        row['evidence_results']['native'] = {'outcome': 'passed' if row['id'] == selected and native_ready else 'missing'}
+        row['state'] = 'verified' if row['id'] == selected and program_ready and native_ready else 'implemented_unverified'
+    native['obligations'][0]['evidence_results']['program']['outcome'] = 'passed' if program_ready else 'missing'
+    if native_ready:
+        bindings[selected]['evidence']['native'] = {'original_native_fact': True}
+    program_only = deepcopy(native['obligations'][1])
+    program_only['id'] += '-program-only'
+    program_only['requirements'] = ['program']
+    program_only['evidence_results'].pop('native')
+    native['obligations'].append(program_only)
+    bindings[program_only['id']] = deepcopy(bindings[member])
+    requirements['branches'][program_only['id']] = {'representative_mechanism': 'controlled-mechanism', 'categories': ['program']}
+    review['members'][program_only['id']] = {**review['members'][member],
+        'mapping_sha256': audit.digest({k: v for k, v in bindings[program_only['id']].items() if k != 'evidence'})}
+    apply_representative_mechanisms(native, bindings, requirements, audit.ROOT,
+        digest=audit.digest, scope_kind='controlled')
+    recipient = native['obligations'][1]
+    assert recipient['evidence_results']['program']['outcome'] == ('reviewed_representative_mechanism' if program_ready else 'missing')
+    assert recipient['evidence_results']['native']['outcome'] == ('reviewed_representative_mechanism' if native_ready else 'missing')
+    assert recipient['state'] == ('mapped_with_representative_proof' if program_ready and native_ready else 'implemented_unverified')
+    assert program_only['state'] == ('mapped_with_representative_proof' if program_ready else 'implemented_unverified')
+    assert native['obligations'][0]['evidence_results']['native']['outcome'] == ('passed' if native_ready else 'missing')
+    if not native_ready:
+        assert 'native' not in program_only['evidence_results']
+        assert recipient.get('representative_proof', {}).get('reused_categories', []) == (['program'] if program_ready else [])
+
+
 @pytest.mark.parametrize('state', ['verified', 'mapped_with_representative_proof',
     'source_definition_verified', 'proven_native_absence', 'approved_exclusion'])
 def test_missing_required_runtime_anchor_invalidates_every_complete_recipient(state):

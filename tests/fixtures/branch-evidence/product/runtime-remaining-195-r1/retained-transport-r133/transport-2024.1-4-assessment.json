@@ -1,0 +1,53 @@
+{
+  "contract": "waapi-skill.retained-transport-assessment/v1",
+  "branch_id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getState|/resultSchema",
+  "profile": {
+    "provider": "2024.1-wwise-console",
+    "call": {
+      "args": {
+        "transport": 0
+      },
+      "options": {},
+      "result": {
+        "state": "stopped"
+      },
+      "uri": "ak.wwise.core.transport.getState"
+    },
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792830812983136000-efc242da1fef476e996c515dc5e8a6c1-ak_wwise_core_transport_getState.json",
+    "raw_sha256": "076b50ab65b7fa657bd915d7f9c57792ce4f8f233f6e1a3421a3d76f0b2ae4d8",
+    "request_source": {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/state/transactions/tx1-dafz657pdhph4csa9472/events.jsonl",
+      "sha256": "44e8a2606521540359c7de9c0ec154f5b81531cb41c9edf71daf1eb32c813d74",
+      "line": 5,
+      "pointer": "/details/verification/readbacks/1",
+      "kind": "readback"
+    },
+    "native_shape_sha256": "6a623600015a7398c8002dc4a177bf14e3c519ede481231b9dd7ce996c69d9cd"
+  },
+  "support_review": {
+    "artifact": "transport-support-review.json",
+    "sha256": "564f7d841a3520d568b48799a375d8c4ed4d15d771b983be33258cb3f29cbd44"
+  },
+  "archive": {
+    "artifact": "transport-origin-2024.1-wwise-console.json.gz",
+    "sha256": "4e1239dee37408b9eeec3822a03640f02c4a9be87ec2aabcb9c5555b6aa23b0e"
+  },
+  "program_capture": {
+    "artifact": "transport-2024.1-4-capture.json",
+    "sha256": "07b93899abab38e94fadf745263e54806d2be7bc7b47cd4e1a3b5953628c6c8a"
+  },
+  "facts": {
+    "original_candidate": "0d56a083da7a7965d734df3e02c0fb5681a75c70",
+    "original_context": {
+      "version": "2024.1",
+      "build": "2024.1.13.9056",
+      "host": "wwise-console"
+    },
+    "original_finalization": "PASS",
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false,
+    "acoustic_output_verified": false,
+    "global_mode_restoration_verified": false,
+    "business_boundary": "owned_transport_identity_bounded_state_lifetime"
+  }
+}

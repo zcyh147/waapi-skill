@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 
 from .builders.query import query_return_scope_options
 from .canonical import canonical_json_bytes, canonical_sha256
-from .object_query_outputs import available_query_outputs, QUERY_FIELD_MODES, QUERY_FIELD_OUTPUT_GROUPS
+from .object_query_outputs import (available_query_outputs, QUERY_FIELD_MODES,
+    QUERY_FIELD_OUTPUT_GROUPS, DECLARED_QUERY_RETURN_SPELLINGS)
 from .object_query_related import (related_native_fields, _meaning,
     parse_related_request, related_sequence_specs, related_query_contract)
 from .object_query_related_metadata import RelatedFieldBinder
@@ -24,6 +25,7 @@ MAX_CLARIFICATION_BYTES = 16 * 1024
 # a related-object projection is a separate selection, never a substitute.
 METER_OUTPUT_NAMES = frozenset('''
 notes volume-db output-bus parent owner work-unit included playable
+source-duration max-radius source-language
 explicitly-muted explicitly-soloed implicitly-muted implicitly-soloed child-count
 plugin-name category file-path override-output class-id short-id
 work-unit-is-default work-unit-is-dirty work-unit-type work-unit-is-loaded
@@ -50,7 +52,7 @@ original-normal-channel-count original-sample-count original-sample-rate
 original-total-channel-count conversion-format converted-ambisonics-channel-count
 converted-non-lfe-channel-count converted-sample-rate-setting
 converted-trimmed-duration original-ambisonics-channel-count original-non-lfe-channel-count
-'''.split())
+'''.split()).union(DECLARED_QUERY_RETURN_SPELLINGS)
 METER_FIELD_MODES = (
     ('meter_object_fields','meter_object_include_field',QUERY_FIELD_MODES[0]),
     ('meter_object_override_source_values','meter_object_include_override_source_value',QUERY_FIELD_MODES[1]),
@@ -120,6 +122,13 @@ def meter_object_contract(version):
             'selected':'retain id/name/type/path plus requested outputs; helper fields are not silently published'},
         'scope':'platform/language select nested Authoring object values, not captured runtime meter values',
         'presence':'unavailable_fields preserves absence; explicit null is preserved',
+        'declared_return_observation': {
+            'selected_spellings': 'exact declared return choices in request order',
+            'returned_values': 'all actual additional native keys and values; no per-choice attribution',
+            'alias_equivalence_proven': False,
+            'native_semantics_proven': False,
+            'presence': 'omitted keys stay omitted; null, empty values and unknown shapes remain exact',
+        },
         'limits':{'named_outputs':MAX_OUTPUTS, 'custom_outputs':MAX_CUSTOM_OUTPUTS,
             'metadata_preparation_rows':MAX_METADATA_ROWS,'clarification_bytes':MAX_CLARIFICATION_BYTES,
             'meter_observations':MAX_METER_OBSERVATIONS,'cumulative_meter_bytes':MAX_METER_OBSERVATION_BYTES},
@@ -154,7 +163,9 @@ def compile_meter_object_options(args, version, *, compile_condition=None):
     available = meter_named_outputs(version)
     if any(value not in IDENTITY and value not in available for value in outputs):
         raise ValueError('Meter object output must be one disclosed business output')
-    bindings = [('business', name, name) if name in IDENTITY else ('business', *available[name]) for name in outputs]
+    bindings = [('business', name, name) if name in IDENTITY else
+        ('declared_return', *available[name]) if name in DECLARED_QUERY_RETURN_SPELLINGS else
+        ('business', *available[name]) for name in outputs]
     scope = query_return_scope_options(platform=args.meter_platform, language=args.meter_language)
     return MeterObjectOptions(version, outputs, meanings, bindings, scope, empty=args.meter_object_empty_selection,
         related=related,compile_condition=compile_condition)
@@ -333,12 +344,18 @@ class MeterObjectOptions:
             item = {key:deepcopy(obj[key]) for key in IDENTITY if key in obj}
             bindings = [*self.bindings, *(self.row_bindings[index] if self.row_bindings else [])]
             for kind,native,output in bindings:
+                if kind == 'declared_return':
+                    continue
                 group = QUERY_FIELD_OUTPUT_GROUPS.get(kind)
                 if native not in obj:
                     item.setdefault('unavailable_fields',[]).append(f'{group}.{output}' if group else output)
                 else:
                     target = item.setdefault(group,{}) if group else item
                     target[output] = deepcopy(obj[native])
+            declared = [native for kind,native,_ in bindings if kind == 'declared_return']
+            if declared:
+                item['declared_return_observation'] = {'selected_spellings': declared,
+                    'returned_values': {key:deepcopy(value) for key,value in obj.items() if key not in IDENTITY}}
             if index in self.unavailable:
                 item['unavailable_field_requests'] = deepcopy(self.unavailable[index])
             if related is not None:

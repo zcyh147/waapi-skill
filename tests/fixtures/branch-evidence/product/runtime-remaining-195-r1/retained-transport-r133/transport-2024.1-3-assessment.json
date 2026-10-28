@@ -1,0 +1,57 @@
+{
+  "contract": "waapi-skill.retained-transport-assessment/v1",
+  "branch_id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getList|/resultSchema",
+  "profile": {
+    "provider": "2024.1-wwise-console",
+    "call": {
+      "args": {},
+      "options": {},
+      "result": {
+        "list": [
+          {
+            "gameObject": 18446744073709551614,
+            "object": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+            "transport": 0
+          }
+        ]
+      },
+      "uri": "ak.wwise.core.transport.getList"
+    },
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792830812967699000-3475cf4b6b18401481910f02c9c99f56-ak_wwise_core_transport_getList.json",
+    "raw_sha256": "819e49e2aaaa9d7341f5d4b53b0ccc97b32b18bdd45b0a7dfa8178241efca549",
+    "request_source": {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/state/console-runtime-read-batch.json",
+      "sha256": "0cd4b6488684b19dd9896254e7ecc7e7005b7da37345e12cf6d193e970853498",
+      "line": null,
+      "pointer": "/calls/49/payload/artifact/prepared_operation/preflight_reads/0",
+      "kind": "readback"
+    },
+    "native_shape_sha256": "5aea3055499dc68234c702cd2f033b2436d2d624e4c5544745f065675044695b"
+  },
+  "support_review": {
+    "artifact": "transport-support-review.json",
+    "sha256": "564f7d841a3520d568b48799a375d8c4ed4d15d771b983be33258cb3f29cbd44"
+  },
+  "archive": {
+    "artifact": "transport-origin-2024.1-wwise-console.json.gz",
+    "sha256": "4e1239dee37408b9eeec3822a03640f02c4a9be87ec2aabcb9c5555b6aa23b0e"
+  },
+  "program_capture": {
+    "artifact": "transport-2024.1-3-capture.json",
+    "sha256": "bc4e1f759cf2f534ec7cd73a1f70d9c57001d4cd6b979fc4950cc6e0dcb5dc3f"
+  },
+  "facts": {
+    "original_candidate": "0d56a083da7a7965d734df3e02c0fb5681a75c70",
+    "original_context": {
+      "version": "2024.1",
+      "build": "2024.1.13.9056",
+      "host": "wwise-console"
+    },
+    "original_finalization": "PASS",
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false,
+    "acoustic_output_verified": false,
+    "global_mode_restoration_verified": false,
+    "business_boundary": "owned_transport_identity_bounded_state_lifetime"
+  }
+}

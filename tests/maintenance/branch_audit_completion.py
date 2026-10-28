@@ -1958,18 +1958,22 @@ def apply_representative_mechanisms(native, bindings, requirements, root, *, dig
         # from a sibling. Selected proofs must be direct ordinary-reader support
         # (including explicitly scoped aggregate program proof), not another
         # representative relation or a cycle.
-        ready = (all(rows[key]['state'] in {'verified', 'implemented_unverified'} for key in members)
-                 and all(rows[key]['evidence_results'].get(category, {}).get('outcome') in (
-                             {'passed', 'reviewed_aggregate_code_mechanism'} if category == 'program' else {'passed'})
-                         for category, selected in review['selected_proofs'].items() for key in selected))
-        if not ready:
+        # A missing native observation cannot suppress already established CODE
+        # support. Each category still needs its own direct selected proof;
+        # completeness and runtime native-anchor guards remain separate.
+        ready_categories = {category for category, selected in review['selected_proofs'].items()
+            if all(rows[key]['evidence_results'].get(category, {}).get('outcome') in (
+                {'passed', 'reviewed_aggregate_code_mechanism'} if category == 'program' else {'passed'})
+                for key in selected)}
+        if (not all(rows[key]['state'] in {'verified', 'implemented_unverified'} for key in members)
+                or not ready_categories):
             continue
         review_sha256 = digest(review)
         for identity in members:
             row, binding = rows[identity], bindings[identity]
             reused = []
             for category in row['requirements']:
-                if category not in binding.get('evidence', {}):
+                if category in ready_categories and category not in binding.get('evidence', {}):
                     row['evidence_results'][category] = {'outcome': 'reviewed_representative_mechanism',
                         'reason': mechanism_id + '; member execution/effect not observed'}
                     reused.append(category)
