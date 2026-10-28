@@ -333,7 +333,7 @@ def soundengine_export(root, output, run):
         original_sources[name] = seal
         if name in sources and hashlib.sha256((root / name).read_bytes()).hexdigest() != seal:
             raise ValueError('SoundEngine selected code source changed: ' + name)
-    output.mkdir(parents=True, exist_ok=True)
+    output.mkdir(parents=True, exist_ok=False)
     def write(name, value):
         raw = (json.dumps(value, indent=2, ensure_ascii=False) + '\n').encode()
         (output / name).parent.mkdir(parents=True, exist_ok=True)

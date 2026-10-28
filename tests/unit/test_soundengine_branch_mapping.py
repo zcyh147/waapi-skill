@@ -100,6 +100,20 @@ def test_soundengine_mapping_rejects_an_unknown_native_argument(component):
         soundengine_bindings(ROOT, changed)
 
 
+def test_soundengine_mapping_rejects_a_removed_public_choice_field(component, monkeypatch):
+    from tests.maintenance.soundengine_branch_mapping import soundengine_bindings
+    from wwise_waapi import soundengine_business_contracts as contracts
+    original = contracts.soundengine_control_business_contract_data
+    def removed(operation, version):
+        contract = original(operation, version)
+        if operation == 'ak.soundengine.executeActionOnEvent':
+            contract['declaration']['optional_fields'].remove('fade_curve')
+        return contract
+    monkeypatch.setattr(contracts, 'soundengine_control_business_contract_data', removed)
+    with pytest.raises(ValueError, match='public field/choice is not disclosed'):
+        soundengine_bindings(ROOT, component)
+
+
 def test_soundengine_attachment_uses_existing_reader_without_fabricating_receipts(component):
     from tests.maintenance.branch_audit_mapping import read_mapping_attachments
     requirements, attachment = reviewed_attachment(component)
