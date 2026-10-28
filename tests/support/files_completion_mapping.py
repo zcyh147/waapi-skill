@@ -475,7 +475,7 @@ def files_program_anchors(root, inventory, destination, run):
     from tests.maintenance.branch_audit_completion import binding_semantics
     from tests.support.ordinary_test_run_evidence import RUNNER_SOURCES
     from tests.semantic.support.codex_archive_paths import archive_relative_from_absolute
-    root, destination, run = Path(root), Path(destination), Path(run)
+    root, destination, run = Path(root).resolve(), Path(destination).resolve(), Path(run).resolve()
     plan = json.loads((run / 'run.plan.json').read_bytes())
     result = json.loads((run / 'run.result.json').read_bytes())
     summary = json.loads((run / 'run.summary.json').read_bytes())
@@ -533,7 +533,7 @@ def export_files_mapping(root, destination, *, inventory=None, anchors=None):
     """Use standard mapping attachments and bounded requirements parts only."""
     from tests.maintenance.branch_coverage_audit import write_requirements
     from tests.semantic.support.codex_archive_paths import archive_relative_from_absolute
-    root, destination = Path(root), Path(destination)
+    root, destination = Path(root).resolve(), Path(destination).resolve()
     destination.mkdir(parents=True, exist_ok=True)
     inventory = files_component(root) if inventory is None else inventory
     bindings = files_bindings(root, inventory)

@@ -190,3 +190,19 @@ def test_files_retained_history_preserves_original_failed_outcomes():
     assert latest['raw_outcomes'] == {'PASS': 1, 'FAIL': 1}
     assert next(case for case in latest['cases'] if case['case'] == 'D-migrate-committed-2024')['raw_outcome'] == 'FAIL'
     assert 'original FAIL' in manifest['accepted_limits']['migration']
+
+
+def test_files_maintenance_entrypoint_consumes_original_code_proof_and_persists_completion(tmp_path, monkeypatch):
+    from tests.maintenance.map_files_completion import main
+    from tests.support.files_completion_mapping import BASE
+    # Exercise the real CLI, source-seal reader, requirements parts, mapping
+    # attachment merger, ordinary reader and persisted assessment together.
+    run = ROOT / BASE / 'export-r2/original'
+    monkeypatch.chdir(tmp_path)
+    assert main(['--output-directory', 'relative-output', '--ordinary-run', str(run)]) == 0
+    report = json.loads((tmp_path / 'relative-output/assessment.json').read_bytes())
+    assert report['completion']['complete'] is True
+    assert report['completion']['states'] == {'mapped_with_representative_proof': 10860, 'verified': 8}
+    assert report['evidence_outcomes'] == ['reviewed_aggregate_code_mechanism', 'reviewed_representative_mechanism']
+    assert report['summary']['native_or_fresh_started'] is False
+    assert report['summary']['canonical_import_pending'] is True
