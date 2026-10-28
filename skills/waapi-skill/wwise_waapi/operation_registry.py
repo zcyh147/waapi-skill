@@ -6955,7 +6955,8 @@ def _prepare_object_set(
             collisions_by_name: dict[str, list[dict[str, Any]]] = {}
             for root_spec in root_specs:
                 if root_spec.get("anonymous_list_member"):
-                    if row_conflict != "fail" and not (root_spec['class_id'] == 5505040 and descriptor.name == 'Effects' and row_list_mode == 'append'):
+                    from .anonymous_list_construction import certify
+                    if row_conflict != "fail" and not certify(root_spec, collection=descriptor.name, list_mode=row_list_mode, version=request.version):
                         raise OperationContractError("ANONYMOUS_LIST_CONFLICT_UNRESOLVED", "Anonymous nondefault name conflict semantics remain pending exact source/native proof")
                     continue
                 if root_spec.get("rtpc_binding"):
@@ -7154,7 +7155,8 @@ def _prepare_object_set(
                         # RTPC preparation already bound or admitted this row.
                         continue
                     if member.anonymous:
-                        if row_conflict != "fail" and not (spec['class_id'] == 5505040 and descriptor.name == 'Effects' and row_list_mode == 'append'):
+                        from .anonymous_list_construction import certify
+                        if row_conflict != "fail" and not certify(spec, collection=descriptor.name, list_mode=row_list_mode, version=request.version):
                             raise OperationContractError("ANONYMOUS_LIST_CONFLICT_UNRESOLVED", "Anonymous nondefault name conflict semantics remain pending exact source/native proof")
                         continue
                     collisions = [row for row in before_rows if str(row.get("name", "")).casefold() == member.name.casefold()]
@@ -9960,6 +9962,11 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None, af
                     {expected.get("classId") for expected in expected_classes.values()}]}})
     from .constructor_inputs import authority as constructor_authority, complete as constructor_complete, public_requirements
     for node in nodes:
+        if node.get('anonymous_list_mode_source'):
+            from .anonymous_list_construction import authority as list_mode_authority
+            proof = node['anonymous_list_mode_source']
+            assertions.append({'name': 'anonymous List population source remains bound',
+                'passed': list_mode_authority(proof['version']) == proof, 'evidence': proof})
         if node.get('action_constructor'):
             from .action_construction import authority
             proof = node['action_constructor']

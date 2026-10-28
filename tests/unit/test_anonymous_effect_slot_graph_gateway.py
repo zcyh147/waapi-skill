@@ -527,7 +527,7 @@ def test_public_schema_and_continuation_disclose_source_owned_blank_name(tmp_pat
     assert contract['omit'] == ['name']
     assert contract['versions'] == ['2023.1', '2024.1', '2025.1']
     assert contract['on_name_conflict']['supported'] == ['fail', 'rename', 'merge', 'replace']
-    assert contract['on_name_conflict']['other_profiles_supported'] == ['fail']
+    assert contract['on_name_conflict']['list_modes'] == ['append', 'replaceAll']
     task.bind(FIRST)
     code, found = task.step('draft-discover-types', '--role', 'object', '--meaning', 'EffectSlot')
     assert code == 0, found
@@ -621,18 +621,21 @@ def test_anonymous_append_rejects_aggregate_population_beyond_complete_read_boun
     assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version,conflict', [('2023.1', 'rename'), ('2024.1', 'merge'), ('2025.1', 'replace')])
-def test_anonymous_effect_append_ignores_name_policy_and_preserves_independent_fields(tmp_path, version, conflict):
+@pytest.mark.parametrize('version,conflict,list_mode', [('2023.1', 'rename', 'append'), ('2024.1', 'merge', 'append'), ('2025.1', 'replace', 'append'), ('2025.1', 'merge', 'replace-all')])
+def test_anonymous_effect_list_mode_ignores_name_policy_and_preserves_independent_fields(tmp_path, version, conflict, list_mode):
     task = anonymous_task(tmp_path, version)
     before = deepcopy(task.objects)
     declare_slots(task)
-    code, configured = task.step('draft-business-configure', '--name-conflict', conflict)
+    code, configured = task.step('draft-business-configure', '--name-conflict', conflict, '--list-behavior', list_mode)
     assert code == 0, configured
     original, writes = task.call, []
     def call(uri, args=None, options=None):
         if uri.endswith('object.set'):
             writes.append(deepcopy(args))
-            assert args['onNameConflict'] == conflict and args['listMode'] == 'append'
+            assert args['onNameConflict'] == conflict and args['listMode'] == ('append' if list_mode == 'append' else 'replaceAll')
+            if list_mode == 'replace-all':
+                task.objects[FIRST]['@Effects'] = []
+                for identity in (ROOT, CHILD): del task.objects[identity]
             for identity, descriptor in zip((SLOT_A, SLOT_B), args['objects'][0]['@Effects']):
                 task.objects[identity] = {'id': identity, 'name': '', 'type': 'EffectSlot', 'classId': 5505040,
                     'owner': {'id': FIRST}, 'path': '\\Opaque ' + identity, 'notes': '',
@@ -645,7 +648,8 @@ def test_anonymous_effect_append_ignores_name_policy_and_preserves_independent_f
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True, json.dumps(verified)
     assert len(writes) == 1
-    assert all(task.objects[identity] == before[identity] for identity in (ROOT, CHILD, EFFECT, EFFECT_B))
+    assert all(task.objects[identity] == before[identity] for identity in ((ROOT, CHILD, EFFECT, EFFECT_B) if list_mode == 'append' else (EFFECT, EFFECT_B)))
+    if list_mode == 'replace-all': assert ROOT not in task.objects and CHILD not in task.objects
 
 
 def test_explicit_render_false_before_later_true_is_rejected_before_any_write(tmp_path):

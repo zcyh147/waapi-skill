@@ -57,10 +57,12 @@ def marker_task(path, version='2025.1', *, fault=None, omit_empty_markers=False)
             task.objects[FIRST]['@MarkerInputMode'] = row.get('@MarkerInputMode', task.objects[FIRST]['@MarkerInputMode'])
             node, = row['@Markers']
             assert node == {'type': 'Marker', 'name': '', '@Time': 0.0, '@Label': 'R90_MARKER'}
+            if args.get('listMode') == 'replaceAll':
+                for member in task.objects[FIRST]['@Markers']: del task.objects[member['id']]
+                task.objects[FIRST]['@Markers'] = []
             task.objects[MARKER] = {'id': MARKER, 'name': '', 'type': 'Marker', 'classId': 5373968,
                 'path': '[Marker]' if version == '2025.1' else r'\opaque-marker',
                 'owner': {'id': FIRST}, 'notes': '', '@Time': 0.0, '@Label': 'R90_MARKER'}
-            if args.get('listMode') == 'replaceAll': task.objects[FIRST]['@Markers'] = []
             task.objects[FIRST]['@Markers'].append({'id': MARKER})
             if fault == 'owner': task.objects[MARKER]['owner'] = {'id': SECOND}
             elif fault == 'class': task.objects[MARKER]['classId'] = 16
@@ -179,8 +181,8 @@ def test_manual_marker_schema_and_draft_continuation_disclose_exact_matching_pro
     assert (marker['version'], marker['owner_class_id'], marker['collection'], marker['element_class_id']) == (version, 16, 'Markers', 5373968)
     assert marker['native_name'] == '' and marker['element_type'] == 'Marker'
     assert marker['source']['member'] == 'ak_wwise_core_object_set_example_adding_a_marker_to_an_audio_source.html'
-    assert contract['on_name_conflict']['supported'] == ['fail']
-    assert contract['on_name_conflict']['pending_source_native_proof'] == ['rename', 'merge', 'replace']
+    assert contract['on_name_conflict']['supported'] == ['fail', 'rename', 'merge', 'replace']
+    assert contract['on_name_conflict']['list_modes'] == ['append', 'replaceAll']
     task.bind(FIRST)
     code, result = task.step('draft-discover-types', '--role', 'object', '--meaning', 'Marker'); assert code == 0, result
     continuation = result['draft']['next_action_binding']['declare_new']['anonymous_list_member']
@@ -215,6 +217,28 @@ def test_manual_marker_append_preserves_existing_member_values_and_identity(tmp_
     tx, shown = task.preview(); code, result = task.finish(tx, shown)
     assert code == 0 and result['verified'] is True, result
     assert task.objects[CHILD] == before and task.objects[FIRST]['@Markers'] == [{'id': CHILD}, {'id': MARKER}]
+
+
+@pytest.mark.parametrize('version,conflict,list_mode', [('2023.1', 'merge', 'append'), ('2024.1', 'replace', 'replace-all'), ('2025.1', 'rename', 'append')])
+@pytest.mark.parametrize('fault', [None, 'class'])
+def test_manual_marker_name_policies_share_source_proven_list_population(tmp_path, version, conflict, list_mode, fault):
+    task = marker_task(tmp_path, version, fault=fault)
+    task.objects[CHILD] = {'id': CHILD, 'name': '', 'type': 'Marker', 'classId': 5373968,
+        'path': r'\older-opaque-marker', 'owner': {'id': FIRST}, 'notes': 'Retain marker', '@Time': 0.02, '@Label': 'Retained'}
+    task.objects[FIRST]['@Markers'] = [{'id': CHILD}]
+    before = deepcopy(task.objects[CHILD])
+    code, result = declare_marker(task); assert code == 0, result
+    code, result = task.step('draft-business-configure', '--name-conflict', conflict, '--list-behavior', list_mode)
+    assert code == 0, result
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == (2 if fault else 0), verified
+    assert len(task.writes) == 1 and task.writes[0]['onNameConflict'] == conflict
+    if list_mode == 'append': assert task.objects[CHILD] == before
+    else: assert CHILD not in task.objects
+    if fault:
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and len(task.writes) == 1, rejected
 
 
 def test_manual_marker_owner_class_cannot_substitute_another_actual_object_type(tmp_path):

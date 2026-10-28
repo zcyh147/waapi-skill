@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .documented_list_fields import discovery_contract as documented_list_discovery_contract, manual_marker_profile
+from .anonymous_list_construction import authority as anonymous_list_mode_authority
 from .effect_render_conditions import CLEAR_SUFFIX_OBSERVATIONS
 
 from typing import Any
@@ -319,10 +320,10 @@ def object_graph_business_contract_data(
                         "manual_marker": manual_marker_profile(version)},
                     "native_name": "Gateway_owned_empty_string",
                     "on_name_conflict": {"supported": ["fail", "rename", "merge", "replace"],
-                        "non_fail_scope": "EffectSlot_in_source_proven_Effects_append_only; all_modes_append_fresh_GUIDs; existing_Render_chain_semantics_apply",
-                        "other_profiles_supported": ["fail"],
-                        "pending_source_native_proof": {"manual_marker_and_replace_all": ["rename", "merge", "replace"]},
-                        "pending_behavior": "reject_before_dispatch_without_selecting_old_blank_name_members_or_changing_policy"},
+                        "scope": "source_certified_anonymous_profiles_only; List_mode_controls_new_member_population; existing_Render_and_Marker_prerequisites_apply",
+                        "list_modes": ["append", "replaceAll"],
+                        "duplicate_restrictions": "per_List_metadata_and_profile_restrictions_remain_authoritative",
+                        "source": anonymous_list_mode_authority(version)},
                     "result_binding": "independent_ordered_owner_membership_then_exact_GUID_class_owner_and_values",
                     "render_conditions": {
                         "applies_to": "EffectSlot",
