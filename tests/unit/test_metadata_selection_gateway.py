@@ -123,6 +123,58 @@ class PropertyTask(FieldTask):
         return super().call(uri, args, options)
 
 
+@pytest.mark.parametrize("version", VERSIONS[2:])
+def test_state_column_selection_routes_existing_custom_state_value_to_instance_field(tmp_path: Path, version: str) -> None:
+    task = PropertyTask(tmp_path, version, "object.setProperty")
+    columns_uri = "ak.wwise.core.object.setStateProperties"
+    code, described = task.run("describe", columns_uri)
+    assert code == 0, described
+    guidance = described["availability"][version]["capability"]["interface"]["selection_guidance"]
+    # The SDK distinguishes the States tab's visible columns from an existing
+    # CustomState's scalar values. The latter must lead to a callable field route.
+    edit_route, = [item for item in guidance["choose_instead"] if item["target"] == "object.setProperty"]
+    assert "CustomState" in edit_route["when"]
+    assert "column" in " ".join(guidance["use_when"]).lower()
+    code, runtime = task.run("describe", "ak.soundengine.setState")
+    assert code == 0, runtime
+    alternatives = runtime["availability"][version]["capability"]["interface"]["selection_guidance"]["choose_instead"]
+    assert any(item["target"] == edit_route["target"] and "CustomState" in item["when"] for item in alternatives)
+    assert any(item["target"] == columns_uri and "column" in item["when"].lower() for item in alternatives)
+    code, columns = task.run("request-schema", columns_uri)
+    assert code == 0, columns
+    assert set(columns["business_adapter"]["declaration"]["required_fields"]) == {"object_handle", "field_handles"}
+    code, schema = task.run("operation-schema", edit_route["target"])
+    assert code == 0, schema
+
+    task.set_object_type(FIRST, "CustomState", 5177360)
+    task.objects[FIRST].update(name="", path="[Fight (Custom)]", **{"@Volume": 0.0})
+    task.metadata = {"Volume": {"name": "Volume", "type": "Real32",
+        "restriction": {"type": "range", "min": -96.3, "max": 12}}}
+    target = task.bind(FIRST)
+    field = task.discover(target, "Volume")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field, "--business-value", "-4")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    assert task.objects[FIRST]["@Volume"] == 0.0
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST]["@Volume"] == -4
+    assert [args for uri, args, _ in task.calls if uri.endswith("setProperty")] == [
+        {"object": FIRST, "property": "Volume", "value": -4}]
+    assert all(uri != columns_uri for uri, _, _ in task.calls)
+
+
 @pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize("operation,token,native_name_present", [
     ("object.setProperty", "Volume", True), ("object.setProperty", "NativeProperty" + "x" * 600, True),
