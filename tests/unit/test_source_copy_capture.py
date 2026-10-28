@@ -55,6 +55,14 @@ def test_source_successor_current_review_admits_exact_dependencies_and_preserves
     assert hashlib.sha256(historical_bytes).hexdigest() == '278fcf8f3f404aba71d12995a6e42cc447bdabb2606800f6456a2751f9bd032f'
     historical = json.loads(historical_bytes)
     review = successor_dependency_review()
+    prior_path = audit.ROOT / 'tests/fixtures/source-copy/branch-successor-review-r123.json'
+    prior_bytes = prior_path.read_bytes()
+    assert hashlib.sha256(prior_bytes).hexdigest() == '4f2ccb1aad3e3826b0db88e484919dce06b909d6136a5a3794dc8fc469c2f714'
+    prior = json.loads(prior_bytes)
+    successor = review['current_source_successor_review']
+    assert successor['predecessor_current_sources'] == prior['current_sources']
+    assert successor['predecessor_added_dependencies'] == prior['added_dependencies']
+    assert review['historical_current_sources'] == prior['historical_current_sources']
     assert review['selected_native_shapes'] == historical['selected_native_shapes']
     assert len(review['selected_native_shapes']) == 26
     assert review['predecessor_attachments'] == historical['predecessor_attachments']
@@ -91,17 +99,21 @@ def test_source_successor_current_review_admits_exact_dependencies_and_preserves
     # A reviewed map never exempts future changed bytes from the real reader.
     from unittest.mock import patch
     original_read = Path.read_bytes
-    target = audit.ROOT / observer
-    with patch.object(Path, 'read_bytes', lambda path: original_read(path) + b' ' if path == target else original_read(path)):
-        with pytest.raises(ValueError, match='^Source successor current dependency changed$'):
-            validate_successor_context(descriptor, tmp_path, candidate='a' * 64)
+    primary = 'skills/waapi-skill/references/semantic/2025.1/media-pool-database-sources/ak_wwise_core_object_set_example_creating_a_media_pool_database.html'
+    for dependency in (observer, 'skills/waapi-skill/wwise_waapi/control_surface_construction.py', primary):
+        target = audit.ROOT / dependency
+        with patch.object(Path, 'read_bytes', lambda path: original_read(path) + b' ' if path == target else original_read(path)):
+            with pytest.raises(ValueError, match='^Source successor current dependency changed$'):
+                validate_successor_context(descriptor, tmp_path, candidate='a' * 64)
     assert historical_path.read_bytes() == historical_bytes
+    assert prior_path.read_bytes() == prior_bytes
 
 
 def test_source_capture_seals_both_successor_reviews_and_new_log_dependency():
     from tests.support.source_copy_branch_evidence import capture_sources, relevant_sources
     from tests.support.source_copy_native_evidence import SUCCESSOR_REVIEW_PATH, successor_dependency_review
-    assert {'tests/fixtures/source-copy/branch-successor-review-r92.json', SUCCESSOR_REVIEW_PATH} <= capture_sources().keys()
+    assert {'tests/fixtures/source-copy/branch-successor-review-r92.json',
+        'tests/fixtures/source-copy/branch-successor-review-r123.json', SUCCESSOR_REVIEW_PATH} <= capture_sources().keys()
     observer = 'skills/waapi-skill/wwise_waapi/runtime_log_observer.py'
     review = successor_dependency_review()
     assert observer in relevant_sources()
