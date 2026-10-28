@@ -23,9 +23,10 @@ class LanguageActor:
 
     def _save(self):
         new = f'<Language Name="{self.name}" ID="{NEW}"/>' if self.name and self.fault != 'saved-missing' else ''
+        default = self.name if self.name and self.fault == 'saved-default-drift' else 'English(US)'
         self.project.write_text(f'<WwiseDocument><ProjectInfo><Project Name="SampleProject" ID="{PROJECT}">'
             f'<LanguageList><Language Name="English(US)" ID="{OLD}"/>{new}</LanguageList>'
-            '<PropertyList><Property Name="DefaultLanguage" Type="string" Value="English(US)"/>'
+            f'<PropertyList><Property Name="DefaultLanguage" Type="string" Value="{default}"/>'
             '</PropertyList></Project></ProjectInfo></WwiseDocument>')
 
     def _languages(self, *, typed):
@@ -77,12 +78,16 @@ class LanguageActor:
             assert args == {'autoCheckOutToSourceControl': False}
             self._save()
             self.saved = True
+            if self.fault == 'ambiguous-save':
+                raise TimeoutError('save timed out after possible effect')
             return {}
         assert uri == probe.GET
         if args.get('from', {}).get('ofType') == ['Language']:
             assert args['transform'] == [{'range': [0, probe.BOUNDS['language_rows'] + 1]}]
             return {'return': self._languages(typed=True)}
         if args.get('from', {}).get('id') == [NEW]:
+            if self.fault == 'postwrite-read-timeout':
+                raise TimeoutError('created identity read unavailable')
             row = {'id': NEW, 'name': self.name, 'type': 'Language', 'classId': 4915216, 'path': self.name}
             if self.fault == 'wrong-created-class':
                 row['classId'] = 65552
@@ -109,7 +114,9 @@ class LanguageActor:
 
 @pytest.mark.parametrize('fault,expected', [(None, 'PASS'), ('already-saved', 'PASS'),
     ('wrong-build', 'FAIL'), ('wrong-project', 'FAIL'), ('baseline-overflow', 'FAIL'),
-    ('missing-default', 'FAIL'), ('native-rejection', 'FAIL'), ('ambiguous-create', 'FAIL'),
+    ('missing-default', 'FAIL'), ('native-rejection', 'INDETERMINATE'), ('ambiguous-create', 'INDETERMINATE'),
+    ('ambiguous-save', 'INDETERMINATE'), ('postwrite-read-timeout', 'INDETERMINATE'),
+    ('saved-default-drift', 'FAIL'),
     ('wrong-created-class', 'FAIL'), ('lost-old', 'FAIL'), ('changed-default', 'FAIL'),
     ('saved-missing', 'FAIL'), ('shutdown', 'BLOCKED'), ('evidence-write', 'BLOCKED'), ('close-error', 'BLOCKED')])
 def test_language_candidate_real_finalizer_and_single_dispatch(monkeypatch, tmp_path, fault, expected):
@@ -153,8 +160,10 @@ def test_language_candidate_real_finalizer_and_single_dispatch(monkeypatch, tmp_
     assert len(creates) <= 1 and len(saves) <= 1
     if fault in {'wrong-build', 'wrong-project', 'baseline-overflow', 'missing-default'}:
         assert not creates and not saves
-    elif fault in {'native-rejection', 'ambiguous-create', 'wrong-created-class', 'lost-old', 'changed-default'}:
+    elif fault in {'native-rejection', 'ambiguous-create', 'postwrite-read-timeout', 'wrong-created-class', 'lost-old', 'changed-default'}:
         assert len(creates) == 1 and not saves
+    elif fault in {'ambiguous-save', 'saved-default-drift'}:
+        assert len(creates) == len(saves) == 1
     elif expected == 'PASS':
         assert len(creates) == 1 and len(saves) == (fault != 'already-saved')
     if fault != 'evidence-write':
@@ -168,8 +177,26 @@ def test_language_candidate_real_finalizer_and_single_dispatch(monkeypatch, tmp_
         if expected == 'PASS':
             assert evidence['candidate_registration_observed']
             assert NEW in evidence['saved_project_after']['languages']
+            assert evidence['before']['saved_project']['explicit_default_settings'] == evidence['saved_project_after']['explicit_default_settings']
+        if expected == 'INDETERMINATE':
+            uncertain = evidence['mutation_uncertainty']
+            failed = evidence['native_calls'][uncertain['failed_call_index']]
+            assert failed['error']
+            mutations = [evidence['native_calls'][index] for index in uncertain['mutation_call_indices']]
+            assert mutations and all(row['mutation']['attempted'] for row in mutations)
+            if fault == 'ambiguous-create':
+                assert failed['uri'] == probe.CREATE and failed['mutation'] == {
+                    'attempted': True, 'acknowledged': False, 'result_validated': False}
+            if fault == 'ambiguous-save':
+                assert failed['uri'] == probe.SAVE and failed['mutation'] == {
+                    'attempted': True, 'acknowledged': False, 'result_validated': False}
+                assert mutations[0]['mutation'] == {'attempted': True, 'acknowledged': True, 'result_validated': True}
         if fault == 'native-rejection':
             assert evidence['native_calls'][-1]['error']['uri'] == 'ak.wwise.core.object.create.failed'
+            assert evidence['native_calls'][-1]['response_kind'] == 'native_error'
+        if fault == 'saved-default-drift':
+            assert not evidence['candidate_registration_observed']
+            assert 'Saved default-language settings changed' in evidence['error']['message']
 
 
 def test_language_candidate_failed_start_keeps_existing_start_receipt(monkeypatch, tmp_path):

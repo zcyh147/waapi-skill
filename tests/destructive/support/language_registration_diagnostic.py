@@ -117,9 +117,15 @@ def collect(actor, evidence, runtime):
         options = options or {}
         record = {'uri': uri, 'args': deepcopy(args), 'options': deepcopy(options),
             'schema_validation': validator.validate(uri, args, options).as_dict()}
+        if uri in {CREATE, SAVE}:
+            record['mutation'] = {'attempted': True, 'acknowledged': False, 'result_validated': False}
+        record['response_kind'] = 'none'
         evidence['native_calls'].append(record)  # Count even rejected/ambiguous dispatches.
         try:
             result = actor(uri, args, options)
+            record['response_kind'] = 'result'
+            if 'mutation' in record:
+                record['mutation']['acknowledged'] = True
             raw = _encoded(result)
             record.update(result_bytes=len(raw), result_sha256=sha256(raw).hexdigest())
             assert len(raw) <= BOUNDS['bytes_per_result'], 'Native result exceeds byte bound'
@@ -128,10 +134,25 @@ def collect(actor, evidence, runtime):
                 del record['result']
                 raise ValueError('Diagnostic evidence exceeds byte bound')
             record['result_schema_validation'] = validator.validate_result(uri, result).as_dict()
+            if 'mutation' in record:
+                record['mutation']['result_validated'] = True
             return result
         except BaseException as exc:
+            from waapi import WaapiRequestFailed
+            if isinstance(exc, WaapiRequestFailed):
+                record['response_kind'] = 'native_error'
+                # An explicit server error is not a documented atomic no-effect
+                # guarantee for these two mutation APIs. Preserve it separately
+                # from transport loss without inventing rollback certainty.
+                record['native_error_no_effect_certified'] = False
             record['error'] = {'type': type(exc).__name__, 'message': str(exc)[:4096],
-                **({'uri': exc.uri} if hasattr(exc, 'uri') else {})}
+                **({'uri': str(exc.uri)[:512]} if hasattr(exc, 'uri') else {})}
+            mutations = [index for index, row in enumerate(evidence['native_calls']) if 'mutation' in row]
+            if mutations:
+                evidence['mutation_uncertainty'] = {'failed_call_index': len(evidence['native_calls']) - 1,
+                    'mutation_call_indices': mutations,
+                    'reason': 'mutation_response_missing_or_unvalidated' if 'mutation' in record
+                        else 'postwrite_observation_unavailable'}
             raise
 
     def project_info():
@@ -211,6 +232,7 @@ def collect(actor, evidence, runtime):
     evidence['saved_project_after'] = saved_after
     assert saved_after['project_id'] == parent
     _addition(saved_before['languages'], saved_after['languages'], identity, name)
+    assert saved_after['explicit_default_settings'] == saved_before['explicit_default_settings'], 'Saved default-language settings changed'
     evidence['candidate_registration_observed'] = True
     evidence['observation_scope'] = 'one_2025.1.7.9143_Console_Project_parent_create; live_and_saved_registration; no_public_route_or_other_version_credit'
 
@@ -238,6 +260,8 @@ def run_diagnostic(lifecycle, *, actor_factory=None):
         collect(actor, evidence, runtime)
         status, reason = 'PASS', ''
     except BaseException as exc:
+        if evidence.get('mutation_uncertainty'):
+            status = 'INDETERMINATE'
         reason = str(exc)[:4096]
         evidence['error'] = {'type': type(exc).__name__, 'message': reason}
         raise
