@@ -396,6 +396,7 @@ SELECTED_TESTS = {
         'tests/unit/test_action_creation_gateway.py::test_new_action_uses_discovered_fields_empty_name_and_exact_parent',
         'tests/unit/test_action_creation_gateway.py::test_action_native_acknowledgement_cannot_hide_wrong_effect_or_reused_guid',
         'tests/unit/test_object_graph_business_gateway.py::test_gateway_adds_subordinate_media_without_model_authored_json',
+        'tests/unit/test_object_graph_business_gateway.py::test_subordinate_import_source_control_reaches_immutable_native_preview',
         'tests/unit/test_object_graph_owned_choices_gateway.py::test_reference_array_business_schema_matches_each_pinned_lane',
         'tests/unit/test_object_graph_owned_choices_gateway.py::test_create_reference_unions_use_class_field_evidence_and_exact_bound_targets',
         'tests/unit/test_object_graph_owned_choices_gateway.py::test_documented_metadata_list_handle_clears_through_one_verified_transaction',

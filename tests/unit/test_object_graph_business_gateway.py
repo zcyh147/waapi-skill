@@ -2661,7 +2661,7 @@ INLINE_PCM_PADDED = "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA
 INLINE_PCM_UNPADDED = "UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAAA"
 
 
-def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True, verification_case=None):
+def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True, verification_case=None, source_control=None):
     """Drive the actual public Draft/Preview with only the native client faked."""
     from tests.unit.test_object_native_surface import _project_info
 
@@ -2787,7 +2787,8 @@ def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True, 
     )
     assert code == 0, declared_sound
     code, added = update("draft-add-media", "--declaration-id", "rain", "--inline-wav", source_value,
-                         "--kind", "sound-sfx", "--language", "SFX")
+                         "--kind", "sound-sfx", "--language", "SFX",
+                         *([] if source_control is None else ["--add-to-source-control" if source_control else "--no-add-to-source-control"]))
     if code != 0:
         return code, added, calls
     code, checked = update("draft-check")
@@ -3063,3 +3064,14 @@ def test_public_object_set_inline_wav_rejects_cross_language_target_mismatch(tmp
     type_check = assertions["$.objects[0].import source 0 created the requested object type"]
     assert type_check["passed"] is False
     assert type_check["evidence"]["target_read_language"] == "French"
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("choice", [False, True])
+def test_subordinate_import_source_control_reaches_immutable_native_preview(tmp_path, version, choice):
+    code, prepared, calls = _public_inline_wav_preview(tmp_path, version,
+        "Inline.wav|" + INLINE_PCM_PADDED, nested=False, source_control=choice)
+    assert code == 0, prepared
+    child = prepared["dispatch"]["args"]["objects"][0]["children"][0]
+    assert child["import"]["autoAddToSourceControl"] is choice
+    assert "ak.wwise.core.object.set" not in calls
