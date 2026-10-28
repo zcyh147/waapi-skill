@@ -370,7 +370,7 @@ _CATALOG_INTENTS = {
     "ak.wwise.core.audio.solo": "solo or unsolo authoring objects",
     "ak.wwise.core.object.isLinked": "inspect one platform-linked property",
     "ak.wwise.core.object.setStateGroups": "set an object's State Groups",
-    "ak.wwise.core.object.setStateProperties": "set an object's State properties",
+    "ak.wwise.core.object.setStateProperties": "select an object's States tab property columns",
     "ak.wwise.core.project.save": "save the current Wwise project with optional source-control auto-checkout",
     "ak.wwise.core.audio.convert": "convert selected audio for platforms and languages",
     "ak.wwise.core.audio.setConversionPlugin": "select an installed Conversion plug-in",

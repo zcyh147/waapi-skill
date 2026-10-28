@@ -97,9 +97,13 @@ CAPABILITY_SELECTION_GUIDANCE: dict[str, Mapping[str, Any]] = {
         "The user asks to set an Authoring object's State Group structure.",
         generic_targets=("object.setReference", "object.set"),
     ),
-    "ak.wwise.core.object.setStateProperties": _specialized_authoring_mutation(
-        "The user asks to set Authoring State property values.",
-        generic_targets=("object.setProperty", "object.set"),
+    "ak.wwise.core.object.setStateProperties": _guidance(
+        domain="authoring_project_model",
+        use_when=("Select the property columns visible in an Authoring object's States tab, replacing the previous selection including default columns.",),
+        avoid_when=("The user asks to edit one existing CustomState's scalar property value.",),
+        preferred_over=(("object.setProperty", "the requested outcome is selecting States tab property columns"),
+                        ("object.set", "the requested outcome is selecting States tab property columns")),
+        choose_instead=(("object.setProperty", "edit one existing CustomState's value using its exact identity and a Field Handle discovered from that instance's live metadata; the requested field must be exposed and enabled"),),
     ),
     "ak.wwise.core.sound.setActiveSource": _specialized_authoring_mutation(
         "The user asks to select the active source of an Authoring Sound object.",
@@ -140,7 +144,8 @@ CAPABILITY_SELECTION_GUIDANCE: dict[str, Mapping[str, Any]] = {
         avoid_when=("The user asks to edit Authoring State Groups or State properties.",),
         choose_instead=(
             ("ak.wwise.core.object.setStateGroups", "the requested outcome is Authoring State Group structure"),
-            ("ak.wwise.core.object.setStateProperties", "the requested outcome is Authoring State property data"),
+            ("ak.wwise.core.object.setStateProperties", "the requested outcome is selecting the property columns visible in an Authoring object's States tab"),
+            ("object.setProperty", "edit one existing CustomState's scalar value using its exact identity and a Field Handle discovered from that instance's live metadata; the requested field must be exposed and enabled"),
         ),
     ),
     "ak.soundengine.postTrigger": _guidance(
