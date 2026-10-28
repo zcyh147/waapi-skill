@@ -403,17 +403,20 @@ def soundengine_export(root, output, run):
         original_sources[name] = seal
         if name in sources and hashlib.sha256((root / name).read_bytes()).hexdigest() != seal:
             raise ValueError('SoundEngine selected code source changed: ' + name)
+    product = root / 'tests/fixtures/branch-evidence/product'
+    relative_output = output.relative_to(product)
+    prefix = relative_output.as_posix()
     output.mkdir(parents=True, exist_ok=False)
     def write(name, value):
         raw = (json.dumps(value, indent=2, ensure_ascii=False) + '\n').encode()
         (output / name).parent.mkdir(parents=True, exist_ok=True)
         (output / name).write_bytes(raw)
-        return {'artifact': name, 'sha256': hashlib.sha256(raw).hexdigest()}
+        return {'artifact': prefix + '/' + name, 'sha256': hashlib.sha256(raw).hexdigest()}
     files = {}
     for key, filename in {'plan': 'run.plan.json', 'result': 'run.result.json', 'summary': 'run.summary.json', 'log': 'run.log', 'exit': 'run.exit'}.items():
         raw = (run / filename).read_bytes()
         (output / filename).write_bytes(raw)
-        files[key] = {'artifact': filename, 'sha256': hashlib.sha256(raw).hexdigest()}
+        files[key] = {'artifact': prefix + '/' + filename, 'sha256': hashlib.sha256(raw).hexdigest()}
     requirements = {'contract': 'waapi-skill.branch-evidence-requirements/v1',
         'branches': {}, 'representative_mechanisms': {}}
     predecessors, entries, program_bindings = {}, [], {}
@@ -466,7 +469,8 @@ def soundengine_export(root, output, run):
         'requirements_sha256': digest(requirements), 'mechanisms': list(requirements['representative_mechanisms']),
         'bindings': bindings, 'predecessors': predecessors}
     mapping_descriptor = write('mapping.json', attachment)
-    index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': '.', 'entries': entries,
+    index = {'contract': 'waapi-skill.branch-evidence-index/v1',
+        'base': '/'.join('..' for _ in relative_output.parts), 'entries': entries,
         'mapping_attachments': [mapping_descriptor]}
     write('index.json', index)
     gaps = soundengine_gaps(inventory, bindings)
