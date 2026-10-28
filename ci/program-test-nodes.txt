@@ -392,3 +392,4 @@ tests/unit/test_branch_evidence_readers.py
 tests/unit/test_specialized_core_choices_gateway.py
 tests/unit/test_legacy_owned_list_gateway.py
 tests/unit/test_workunit_query_constructor_gateway.py
+tests/unit/test_media_pool_database_gateway.py
