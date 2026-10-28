@@ -17012,6 +17012,16 @@ def _prepare_closed_soundbank_operation(
             "memory_data_topic": "ak.wwise.core.soundbank.generated",
             "memory_data_subscription_required_before_generation": not files_requested,
         }
+        if plan["scope"]["all_platforms"]:
+            # This exact scope is required notice, including in compact/digest
+            # transaction projections. The existing output ceiling fails closed
+            # rather than hiding configured destinations before authorization.
+            verification["verification_scope"]["all_configured_platforms"] = [
+                {"id": row["id"], "name": row["name"], "base_name": row["baseName"],
+                 "bank_output_root": row["soundBankPath"], "copied_media_output_root": row["copiedMediaPath"]}
+                for row in plan["artifact_plan"]["platforms"]
+            ]
+            verification["verification_scope"]["platform_scope_strategy"] = "bounded_live_enumeration"
     if definition_oracle is not None:
         verification["definition_oracle"] = _json_mapping(definition_oracle)
         weak_banks = [bank for bank in definition_oracle["banks"] if bank["expected_inclusions"] is None]

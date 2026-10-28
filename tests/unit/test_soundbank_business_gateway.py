@@ -1672,8 +1672,16 @@ def test_generate_explicit_all_platforms_reaches_bounded_immutable_preview(tmp_p
     assert [row['id'] for row in flow.prepared['verification_plan']['plan']['artifact_plan']['platforms']] == expected
     assert ('all_platforms' in json.dumps(previewed)) is (selection == 'all')
     assert 'Mac' in json.dumps(previewed)
+    visible_scope = previewed['preview_summary']['verification_plan']['verification_scope']
     if selection == 'all':
         assert 'Windows' in json.dumps(previewed)
+        assert [(row['id'], row['name']) for row in visible_scope['all_configured_platforms']] == list(zip(expected, ['Mac', 'Windows']))
+        assert visible_scope['platform_scope_strategy'] == 'bounded_live_enumeration'
+        for visible, planned in zip(visible_scope['all_configured_platforms'], flow.prepared['verification_plan']['plan']['artifact_plan']['platforms']):
+            assert visible['bank_output_root'] == planned['soundBankPath']
+            assert visible['copied_media_output_root'] == planned['copiedMediaPath']
+    else:
+        assert 'all_configured_platforms' not in visible_scope
     assert not any(uri.endswith('soundbank.generate') for uri, _, _ in flow.calls)
     # The new scope choice does not authorize its own execution.
     code, refused = flow.run('execute', flow.tx)
