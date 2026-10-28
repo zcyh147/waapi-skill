@@ -5,10 +5,12 @@ import gzip
 import hashlib
 import json
 import os
+import shutil
 
 import pytest
 
 from tests.maintenance.branch_coverage_audit import digest, load
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.support.condition_completion_mapping import definition_mapping, validate_mapping_attachment
 
 ROOT = Path(__file__).parents[2]
@@ -26,7 +28,15 @@ def test_new_condition_roster_preserves_mode_shapes_and_unproved_applicability()
     assert len(association) == 10
     assert all(r['construction_correspondence']['path'] == 'switch_assignment_owned_configuration' for r in association)
     assert all(r['applicability_obligations'] and not r['dependencies'] for r in association)
-    assert len(mapping['source_forms']) == 9
+    assert len(mapping['source_forms']) == 9 and len(mapping['condition_mechanisms']) == 10
+    master = [r for r in mapping['occurrences'] if r['source_attributes'].get('Value') == 'True'
+        and r['source_xml'].startswith('<IsMasterBusDependency')]
+    assert len(master) == 2 and {r['version'] for r in master} == {'2024.1', '2025.1'}
+    assert all(r['source_pointer'].endswith('Reference[AudioDevice]/Dependencies') for r in master)
+    assert all(r['construction_correspondence']['path'] == 'verified_object_scoped_master_reference_configuration'
+        and r['construction_correspondence']['constructor'] is None
+        and r['construction_correspondence']['predicate']['value'] is True
+        and r['representative_public_mechanism'].endswith('|Value=True') for r in master)
     assert all(r['direct_recipient_native_effect'] == 'not_observed' for r in mapping['occurrences'])
 
 
@@ -73,7 +83,7 @@ def test_same_completion_reader_retains_new_constructor_dependencies(bundle):
     assert all(exported['requirements']['branches'][i] == p for i, p in previous.items() if i not in context['branches'])
 
 
-@pytest.mark.parametrize('damage', ['omitted-choice', 'mode', 'source', 'route', 'unassigned-recipient'])
+@pytest.mark.parametrize('damage', ['omitted-choice', 'mode', 'source', 'route', 'unassigned-recipient', 'master-polarity'])
 def test_new_mode_mapping_cannot_omit_choices_or_borrow_existing_scope(bundle, damage):
     base, exported = bundle
     mapping = deepcopy(exported['mapping'])
@@ -82,6 +92,11 @@ def test_new_mode_mapping_cannot_omit_choices_or_borrow_existing_scope(bundle, d
     elif damage == 'mode': row['occurrence_id'] = row['occurrence_id'].replace('|new-object|', '|existing-object|')
     elif damage == 'source': row['source_xml'] = '<PropertyDependency Name="invented" />'
     elif damage == 'route': row['construction_correspondence']['path'] = 'arbitrary_hierarchy_creation'
+    elif damage == 'master-polarity':
+        row = next(r for r in mapping['occurrences'] if r['condition_mechanism'].endswith('|Value=True'))
+        row['condition_mechanism'] = row['condition_mechanism'].replace('Value=True', 'Value=False')
+        row['representative_public_mechanism'] = row['condition_mechanism']
+        row['construction_correspondence']['path'] = 'class_default_with_structural_bus_proof'
     else: row['applicability_obligations'] = []
     with pytest.raises(ValueError, match='exact source definition'):
         validate_mapping_attachment(exported['attachment'], base, ROOT, selected_mapping=mapping)
@@ -108,8 +123,8 @@ def test_non_object_condition_attachment_fails_closed(tmp_path):
 
 def test_changed_selected_constructor_helper_invalidates_program_proof(tmp_path):
     from tests.support.new_condition_completion import review
-    (tmp_path / 'tests').symlink_to(ROOT / 'tests', target_is_directory=True)
-    (tmp_path / 'docs').symlink_to(ROOT / 'docs', target_is_directory=True)
+    create_symlink_or_skip(tmp_path / 'tests', ROOT / 'tests', target_is_directory=True)
+    create_symlink_or_skip(tmp_path / 'docs', ROOT / 'docs', target_is_directory=True)
     for directory in ('scripts', 'wwise_waapi'):
         base = ROOT / 'skills/waapi-skill' / directory
         for source in base.rglob('*.py'):
@@ -120,19 +135,63 @@ def test_changed_selected_constructor_helper_invalidates_program_proof(tmp_path)
             if source.name == 'new_object_defaults.py':
                 target.write_bytes(source.read_bytes() + b'\n# changed constructor dependency\n')
             else:
-                target.symlink_to(source)
-    (tmp_path / 'skills/waapi-skill/resources').symlink_to(ROOT / 'skills/waapi-skill/resources', target_is_directory=True)
+                create_symlink_or_skip(target, source)
+    create_symlink_or_skip(tmp_path / 'skills/waapi-skill/resources', ROOT / 'skills/waapi-skill/resources', target_is_directory=True)
     with pytest.raises(ValueError, match='source closure'):
         review(tmp_path)
 
 
-def test_representative_new_condition_creation_and_verified_configuration(tmp_path, request):
+@pytest.mark.parametrize('resource', ['metadata/2025.1/documented-list-fields.json', 'metadata/reference-master-bus-applicability.json',
+    'manifest/2025.1/definitions.json'])
+@pytest.mark.parametrize('damage', ['missing', 'changed'])
+def test_existing_reader_rejects_changed_selected_resource(bundle, tmp_path, resource, damage):
+    from tests.maintenance.branch_audit_completion import evidence_result
+    base, exported = bundle
+    for name in ('tests', 'docs'):
+        create_symlink_or_skip(tmp_path / name, ROOT / name, target_is_directory=True)
+    package = tmp_path / 'skills/waapi-skill'; package.mkdir(parents=True)
+    for name in ('scripts', 'wwise_waapi'):
+        create_symlink_or_skip(package / name, ROOT / 'skills/waapi-skill' / name, target_is_directory=True)
+    resources = package / 'resources'; resources.mkdir()
+    for source in (ROOT / 'skills/waapi-skill/resources').iterdir():
+        target = resources / source.name
+        if source.name in {'metadata', 'manifest'}:
+            shutil.copytree(source, target)
+        else:
+            create_symlink_or_skip(target, source, target_is_directory=source.is_dir())
+    path = resources / resource
+    if damage == 'missing':
+        path.unlink()
+    else:
+        path.write_bytes(path.read_bytes() + b'\nchanged selected resource\n')
+    context = validate_mapping_attachment(exported['attachment'], base, ROOT)
+    identity = next(i for i, r in context['members'].items() if r.get('condition_mechanism', '').endswith('|Value=True'))
+    branch = context['branches'][identity]; binding = exported['bindings']['bindings'][identity]
+    outcome, reason = evidence_result(exported['attachment'], branch, 'c' * 64, 'program', 'product', base, binding, tmp_path)
+    assert outcome == 'missing' and ('source closure' in reason or 'No such file' in reason)
+
+
+def test_representative_new_condition_creation_and_verified_configuration(tmp_path, request, monkeypatch):
     """Actual public Gateway code path; injected Wwise boundary, no native credit."""
     from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-    from tests.support.new_condition_completion import program_sources
+    from tests.support.new_condition_completion import program_sources, PREVIOUS_PROOF
     from tests.unit.test_new_object_conditions_gateway import ClassTask, restart, CREATED, EXISTING
     sources = program_sources(ROOT)
     observations = {}
+    # Record concrete packaged data consumed by the selected public flows.
+    # This includes schemas and list/ancestry resources, not just Python callers.
+    selected_resources = {}
+    original_open = Path.open
+    resource_root = (ROOT / 'skills/waapi-skill/resources').resolve()
+    def observed_open(path, *args, **kwargs):
+        actual = path.resolve()
+        mode = args[0] if args else kwargs.get('mode', 'r')
+        if actual.is_relative_to(resource_root) and not any(flag in mode for flag in 'wax+'):
+            with original_open(path, 'rb') as stream:
+                selected_resources[path.relative_to(ROOT).as_posix()] = hashlib.sha256(stream.read()).hexdigest()
+            assert len(selected_resources) <= 1024
+        return original_open(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'open', observed_open)
     for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'):
         path = tmp_path / version; path.mkdir()
         task = ClassTask(path, version)
@@ -208,8 +267,36 @@ def test_representative_new_condition_creation_and_verified_configuration(tmp_pa
     tx, shown = task.preview()
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True and len(writes) == 1
-    mechanism_observations['IsMasterBusDependency|Enable|Self|'] = {
+    mechanism_observations['IsMasterBusDependency|Enable|Self||Value=False'] = {
         'verified': True, 'native_effect': 'not_observed', 'scope': 'structurally proved non-master child', 'writes': writes}
+    from tests.unit.test_conditional_reference_gateway import MasterBusDeviceTask, FIRST, SECOND
+    from tests.unit.test_time_modulator_range_gateway import finish
+    master_flows = {}
+    for version in ('2024.1', '2025.1'):
+        path = tmp_path / ('master-' + version); path.mkdir()
+        task = MasterBusDeviceTask(path, version)
+        before = deepcopy(task.objects)
+        source, target = task.bind(FIRST), task.bind(SECOND)
+        field = task.discover(source, 'AudioDevice')
+        code, declared = task.step('draft-declare-field-change', '--object-handle', source,
+            '--field-handle', field, '--target-handle', target)
+        assert code == 0, declared
+        preview, code, verified, tx = finish(task)
+        assert code == 0 and verified['verified'] is True
+        code, shown = task.run('transaction-show', tx)
+        assert code == 0, shown
+        prepared = shown['artifact']['prepared_operation']
+        proof, = prepared['pre_state']['condition_metadata']['structural_applicability']
+        assert proof['kind'] == 'structural-reference-visibility'
+        assert proof['condition']['value'] is True
+        assert task.objects == {**before, FIRST: {**before[FIRST], 'AudioDevice': {'id': SECOND}}}
+        writes = [{'uri': u, 'args': a, 'options': o} for u, a, o in task.calls if u.endswith(('setReference', 'object.create', 'object.set'))]
+        assert len(writes) == 1 and writes[0]['uri'].endswith('setReference')
+        master_flows[version] = {'proof': proof, 'writes': writes, 'verified': True}
+    mechanism_observations['IsMasterBusDependency|Enable|Self||Value=True'] = {
+        'verified': True, 'native_effect': 'not_observed', 'public_operation': 'object.setReference',
+        'predicate': {'kind': 'isMasterBus', 'value': True}, 'versions': master_flows,
+        'proof_kind': 'structural-reference-visibility', 'scope': 'staged object-scoped configuration; independent constructor applicability retained'}
     from tests.unit.test_switch_child_context_gateway import test_existing_type_absent_context_changes_property_through_owner_child_binding
     path = tmp_path / 'association'; path.mkdir()
     test_existing_type_absent_context_changes_property_through_owner_child_binding(path, '2025.1', False, 'ContinuePlay', True, None)
@@ -222,7 +309,7 @@ def test_representative_new_condition_creation_and_verified_configuration(tmp_pa
         assert sources == program_sources(ROOT)
         record = {'contract': 'waapi-skill.new-condition-current-public-mechanism/v1',
             'evidence_kind': 'injected_client_program', 'scope_kind': 'product', 'reports': reports,
-            'sources': sources, 'observations': observations, 'mechanism_observations': mechanism_observations, 'direct_recipient_native_effect': 'not_observed'}
+            'sources': sources, 'predecessor': PREVIOUS_PROOF, 'selected_resources': selected_resources, 'observations': observations, 'mechanism_observations': mechanism_observations, 'direct_recipient_native_effect': 'not_observed'}
         capture = Path(os.environ.get('WAAPI_NEW_CONDITION_CAPTURE', str(tmp_path / 'new-condition-program.json.gz')))
         assert not capture.exists()
         capture.write_bytes(gzip.compress(json.dumps(record, sort_keys=True).encode(), mtime=0))

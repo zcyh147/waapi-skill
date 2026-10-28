@@ -231,6 +231,7 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/unit/test_condition_completion_mapping.py', 'tests/unit/test_condition_completion_reader.py',
                  'tests/support/new_condition_completion.py', 'tests/unit/test_new_condition_completion_reader.py',
                  'tests/fixtures/metadata-conditions/new-condition-current-program.json.gz',
+                 'tests/fixtures/metadata-conditions/new-condition-current-program-r2.json.gz',
                  'tests/fixtures/metadata-conditions/condition-completion-review.json',
                  'tests/fixtures/metadata-conditions/condition-completion-proof-inputs.json.gz'):
         path = root / name
