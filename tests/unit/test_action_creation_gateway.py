@@ -310,3 +310,102 @@ def test_new_event_can_own_two_selected_action_occurrences_in_create(tmp_path):
     assert code == 0, executed
     code, verified = task.run('verify', tx)
     assert code == 0 and verified['verified'] is True, json.dumps(verified, indent=2)
+
+
+@pytest.mark.parametrize('version,operation,conflict,existing_event,drift', [
+    ('2021.1', 'object.create', 'merge', False, False),
+    ('2025.1', 'object.create', 'merge', False, False),
+    ('2025.1', 'object.set', 'merge', False, False),
+    ('2025.1', 'object.set', 'replace', False, False),
+    ('2025.1', 'object.set', 'rename', False, False),
+    ('2025.1', 'object.set', 'fail', False, False),
+    ('2025.1', 'object.create', 'merge', True, False),
+    ('2025.1', 'object.set', 'merge', True, False),
+    ('2025.1', 'object.set', 'merge', False, True),
+    ('2025.1', 'object.set', 'merge', True, True),
+])
+def test_nested_event_single_action_uses_proven_fresh_or_sealed_parent_scope(tmp_path, version, operation, conflict, existing_event, drift):
+    task = ActionCreateTask(tmp_path, version, operation)
+    event_id = '{77777777-7777-7777-7777-777777777777}'
+    event_path = task.objects[FIRST]['path'] + r'\New Event'
+    if existing_event:
+        task.objects[event_id] = {'id': event_id, 'name': 'New Event', 'type': 'Event', 'classId': 131088,
+            'path': event_path, 'parent': {'id': FIRST}, 'notes': 'retain Event notes'}
+        task.objects[OLD].update(parent={'id': event_id}, path=event_path + r'\[Stop - Rain]')
+    parent = task.bind(FIRST)
+    kind = task.discover_kind('Event')
+    code, event = task.step('draft-declare-new', '--declaration-id', 'event', '--parent-handle', parent,
+        '--name', 'New Event', '--kind', kind)
+    assert code == 0, event
+    task.declare_action(parent_handle=event['draft']['declared_object']['result_handle'], notes='new notes')
+    code, configured = task.step('draft-business-configure', '--name-conflict', conflict)
+    assert code == 0, configured
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri in {'ak.wwise.core.object.create', 'ak.wwise.core.object.set'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            root = args if uri.endswith('.create') else args['objects'][0]['children'][0]
+            if not existing_event:
+                task.objects[event_id] = {'id': event_id, 'name': 'New Event', 'type': 'Event', 'classId': 131088,
+                    'path': event_path, 'parent': {'id': FIRST}, 'notes': ''}
+            node = root['children'][0]
+            identity = OLD if existing_event else CREATED
+            notes = task.objects[OLD]['notes'] if existing_event else node['notes']
+            task.objects[identity] = {'id': identity, 'name': '', 'type': 'Action', 'classId': 327696,
+                'path': event_path + r'\[Play - Rain]', 'parent': {'id': event_id}, 'notes': notes,
+                'ActionType': node['@ActionType'], 'Target': {'id': node['@Target']}}
+            result = {'id': event_id, 'name': 'New Event', 'children': [{'id': identity, 'name': ''}]}
+            return result if uri.endswith('.create') else {'objects': [{'id': FIRST,
+                'name': task.objects[FIRST]['name'], 'children': [result]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = preview(task)
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if drift:
+        if existing_event:
+            task.objects[CREATED] = {**deepcopy(task.objects[OLD]), 'id': CREATED}
+        else:
+            task.objects[event_id] = {'id': event_id, 'name': 'New Event', 'type': 'Event', 'classId': 131088,
+                'path': event_path, 'parent': {'id': FIRST}, 'notes': 'unreviewed collision'}
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and rejected.get('executed') is not True, rejected
+        assert not any(uri.endswith(('object.create', 'object.set')) for uri, _, _ in task.calls)
+        assert task.run('execute', tx)[0] == 2
+        return
+    code, executed = task.run('execute', tx)
+    assert code == 0, json.dumps(executed)
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, json.dumps(verified)
+    assert task.objects[OLD]['notes'] == 'retained'
+    if existing_event:
+        assert CREATED not in task.objects and task.objects[OLD]['ActionType'] == 1
+        assert task.objects[event_id]['notes'] == 'retain Event notes'
+    else:
+        assert task.objects[CREATED]['notes'] == 'new notes'
+
+
+@pytest.mark.parametrize('existing_event', [False, True])
+def test_nested_event_ambiguous_blank_action_scope_stops_before_write(tmp_path, existing_event):
+    task = ActionCreateTask(tmp_path, '2025.1', 'object.set')
+    event_id = '{77777777-7777-7777-7777-777777777777}'
+    if existing_event:
+        task.objects[event_id] = {'id': event_id, 'name': 'New Event', 'type': 'Event', 'classId': 131088,
+            'path': task.objects[FIRST]['path'] + r'\New Event', 'parent': {'id': FIRST}, 'notes': ''}
+        task.objects[OLD].update(parent={'id': event_id}, path=task.objects[event_id]['path'] + r'\[Stop - Rain]')
+        task.objects[CREATED] = {**deepcopy(task.objects[OLD]), 'id': CREATED}
+    parent = task.bind(FIRST)
+    kind = task.discover_kind('Event')
+    code, event = task.step('draft-declare-new', '--declaration-id', 'event', '--parent-handle', parent,
+        '--name', 'New Event', '--kind', kind)
+    assert code == 0, event
+    handle = event['draft']['declared_object']['result_handle']
+    task.declare_action(parent_handle=handle)
+    if not existing_event:
+        task.declare_action(parent_handle=handle, targetless=True, declaration_id='stop-all')
+    code, configured = task.step('draft-business-configure', '--name-conflict', 'merge')
+    assert code == 0, configured
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == ('AMBIGUOUS_ACTION_COLLISION' if existing_event else 'ACTION_COLLISION_PARENT_REQUIRED'), rejected
+    assert not any(uri.endswith(('object.create', 'object.set')) for uri, _, _ in task.calls)
+    assert not (task.path / 'state' / 'transactions').exists()

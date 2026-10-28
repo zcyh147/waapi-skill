@@ -4913,15 +4913,23 @@ def _action_collision_preview(nodes, conflict):
         for node in nodes if node.get('action_constructor') and node.get('action_parent_snapshot')]
 
 
-def _prepare_action_collision(spec, conflict, *, read, replacement_snapshots):
+def _prepare_action_collision(spec, conflict, *, read, replacement_snapshots, specs=()):
     """Bind a blank-name collision only from the complete exact Event roster."""
     spec['on_name_conflict'] = conflict
+    spec.pop('expected_path', None)  # Action display paths derive from its fields.
     if conflict in {'fail', 'rename'}:
         return
     snapshot = spec.get('action_parent_snapshot')
     if snapshot is None:
+        parent = next((row for row in specs if row['request_path'] == spec.get('parent_request_path')), None)
+        count = sum(bool(row.get('action_constructor')) and row.get('parent_request_path') == spec.get('parent_request_path') for row in specs)
+        if (parent is not None and parent.get('canonical_type') == 'Event' and parent.get('class_id') == 131088
+                and not parent.get('existing_target') and not parent.get('preexisting_id') and count == 1):
+            spec['fresh_action_parent'] = {'request_path': parent['request_path'], 'class_id': parent['class_id'],
+                'collision_effect': 'one_fresh_occurrence_under_new_Event'}
+            return
         raise OperationContractError('ACTION_COLLISION_PARENT_REQUIRED',
-            'Action merge/replace requires a bound existing Event; create a new Event separately before configuring its Actions.')
+            'Action merge/replace needs one proven fresh Event occurrence or a sealed exact existing Event roster. For multiple new Actions, create the Event first, then use a separate Action Preview or rename.')
     before = snapshot['rows']
     if len(before) > 1 or before and snapshot['new_occurrences'] != 1:
         raise OperationContractError('AMBIGUOUS_ACTION_COLLISION',
@@ -5230,6 +5238,8 @@ def _prepare_object_create(
     elif conflict == "merge":
         assert isinstance(root_path, str)
         for spec in node_specs:
+            if spec.get('action_constructor'):
+                continue
             expected_path = _request_node_expected_path(parent.row.get("path"), spec, node_specs)
             fields = _object_spec_return_fields(spec)
             rows = _read_object_path_rows(expected_path, fields=fields, read=read)
@@ -5340,6 +5350,11 @@ def _prepare_object_create(
                 node_specs,
             )
 
+    for spec in node_specs[1:]:
+        if spec.get('action_constructor'):
+            _prepare_action_collision(spec, conflict, read=read,
+                replacement_snapshots=replace_subtree_snapshots, specs=node_specs)
+
     parent_children = (
         _read_direct_children(
             parent.object,
@@ -5391,6 +5406,7 @@ def _prepare_object_create(
         metadata={
             "closed_object_tree": True,
             "action_collisions": _action_collision_preview(node_specs, conflict),
+            "fresh_action_parents": [node['fresh_action_parent'] for node in node_specs if node.get('fresh_action_parent')],
             "constructor_notes": {"new_objects": "apply_requested_notes", "merged_existing": "preserve_existing_notes", "edit_existing_notes": "configure_exact_existing_GUID"},
             **({"native_default_reference_omissions": null_reference_omissions} if null_reference_omissions else {}),
             "native_name_bindings": result_context["renames"] if result_context else [],
@@ -6705,7 +6721,7 @@ def _prepare_object_set(
                 else child_spec["parent_request_path"]
             )
             if child_spec.get('action_constructor'):
-                _prepare_action_collision(child_spec, row_conflict, read=read, replacement_snapshots=replace_subtree_snapshots)
+                _prepare_action_collision(child_spec, row_conflict, read=read, replacement_snapshots=replace_subtree_snapshots, specs=child_specs)
                 continue
             if child_spec.get("collection") != "children":
                 continue
@@ -7077,7 +7093,7 @@ def _prepare_object_set(
         for node in nested_nodes:
             owner_spec = nested_specs[node.request_path]
             parent_spec = nested_specs.get(str(owner_spec.get("parent_request_path")))
-            if (node.collection == "children" and parent_spec is not None
+            if (node.collection == "children" and parent_spec is not None and not owner_spec.get('action_constructor')
                     and "expected_path" not in owner_spec and parent_spec.get("existing_path")
                     and row_conflict in {"fail", "merge"}):
                 expected_path = _child_path(parent_spec["existing_path"], node.name, field="nested-parent.path")
@@ -7440,6 +7456,7 @@ def _prepare_object_set(
         metadata={
             "closed_object_batch": True,
             "action_collisions": _action_collision_preview(node_specs, conflict),
+            "fresh_action_parents": [node['fresh_action_parent'] for node in node_specs if node.get('fresh_action_parent')],
             "constructor_notes": {"new_objects": "apply_requested_notes", "merged_existing": "preserve_existing_notes", "edit_existing_notes": "configure_exact_existing_GUID"},
             "source_language_collisions": [{'source_id': spec.get('source_collision_id', spec.get('preexisting_id')),
                 'existing_language': spec['source_collision_language'], 'selected_language': spec['source_language']['selected'],
@@ -9021,19 +9038,22 @@ def _prepare_object_node_specs(
             spec['action_constructor'] = source
             spec['action_declaration_label'] = node.name
             spec['requested_name'] = ''
-            if node.parent_request_path is None and root_parent is not None:
+            parent_spec = next((item for item in specs if item['request_path'] == node.parent_request_path), None)
+            action_parent_id = (root_parent.object if node.parent_request_path is None and root_parent is not None else
+                parent_spec.get('preexisting_id') if parent_spec is not None else None)
+            if action_parent_id is not None:
                 fields = ['id', 'name', 'type', 'path', 'classId', 'parent', 'notes', 'ActionType', 'Target']
                 parent_fields = ['id', 'name', 'type', 'path', 'classId']
-                parent_rows = _read_object_id_rows(root_parent.object, fields=parent_fields, read=read)
+                parent_rows = _read_object_id_rows(action_parent_id, fields=parent_fields, read=read)
                 event_classes = [item.class_id for item in type_catalog if item.name == 'Event']
-                if (len(parent_rows) != 1 or not _same_identity(parent_rows[0].get('id'), root_parent.object)
+                if (len(parent_rows) != 1 or not _same_identity(parent_rows[0].get('id'), action_parent_id)
                         or parent_rows[0].get('type') != 'Event' or event_classes != [parent_rows[0].get('classId')]):
                     raise OperationContractError('ACTION_PARENT_CLASS_UNPROVEN', 'Action constructor requires its exact live Event parent class')
-                before = _read_direct_children(root_parent.object, fields=fields, read=read)
+                before = _read_direct_children(action_parent_id, fields=fields, read=read)
                 if any(row.get('type') != 'Action' or row.get('classId') != source['class_id']
                         or row.get('name') != '' or type(_field_value(row, 'ActionType')) is not int for row in before):
                     raise OperationContractError('ACTION_PARENT_ROSTER_INVALID', 'Event children require exact Action identities and typed ActionType')
-                spec['action_parent_snapshot'] = {'object_id': root_parent.object, 'fields': fields, 'rows': before,
+                spec['action_parent_snapshot'] = {'object_id': action_parent_id, 'fields': fields, 'rows': before,
                     'new_occurrences': sum(other.type == 'Action' and other.parent_request_path == node.parent_request_path for other in nodes),
                     'parent_fields': parent_fields, 'parent': parent_rows[0]}
 

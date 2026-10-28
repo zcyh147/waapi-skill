@@ -39,5 +39,6 @@ def declaration_contract():
             'merge': 'one_unique_empty_name_collision_and_one_declaration; exact_existing_object_metadata; preserve_existing_notes',
             'replace': 'one_unique_empty_name_collision_and_one_declaration; exact_old_subtree_absence_and_fresh_GUID; object.create_requires_reviewed_replacement_owner'},
         'ambiguity': 'multiple_empty_name_collisions_refused; use_exact_existing_Action_GUID_for_configuration',
-        'remaining_same_parent_work': ['planned_parent_merge_replace_requires_separate_existing_Event_preview'],
+        'planned_Event_parent': 'one_Action_under_proven_fresh_Event_is_creation; nested_merged_existing_Event_uses_complete_exact_roster',
+        'remaining_same_parent_work': ['multiple_Actions_under_planned_Event_with_merge_replace_require_separate_Event_Preview_or_rename'],
         'native_execution': 'not_claimed_from_SDK_example', 'tracking_issue': 180}
