@@ -340,7 +340,8 @@ def ui_bindings(root, inventory):
             'public_route': route['public_route'], 'public_route_sha256': digest(public[route['public_route']]),
             'input': {'gateway_argv': argv, 'selector': pointer, 'correspondence': _correspondence(row, route, inventory['native_locations'][row['id']], contracts[route['public_route']])},
             'construction': {'source': LIB + module + '.py#' + construct, 'selector': pointer},
-            'validation': {'source': LIB + module + '.py#' + ('validate_layout_read_result' if read else 'validate_layout_call' if '.layout.' in uri else 'validate_model_call'), 'selector': pointer},
+            'validation': {'source': (LIB + 'builders/schema.py#validate_semantic_result' if section == 'resultSchema' and not read else
+                LIB + module + '.py#' + ('validate_layout_read_result' if read else 'validate_layout_call' if '.layout.' in uri else 'validate_model_call')), 'selector': pointer},
             'verifier': {'source': LIB + 'authoring_layout.py#validate_layout_read_result' if read else LIB + 'operation_registry.py#verify_prepared_operation', 'selector': pointer},
             'representative_mechanism': 'ui195-' + ('layout-read' if read else 'layout-plan' if '.layout.' in uri else 'model-resource') + '-v1', 'evidence': {}}
     return bindings

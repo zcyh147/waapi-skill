@@ -33,6 +33,10 @@ def test_ui_cohort_maps_exact_sources_without_manufacturing_effect_proof(tmp_pat
     assert any(m['rule'] == 'accepted_unresolved_native_definition' for m in mapped)
     assert any('registration_medium' in m['public_fields'] for m in mapped)
     assert all(m['native_effect'] == 'not_claimed' for m in mapped)
+    model_result = next(binding for identity, binding in bindings['bindings'].items()
+                        if '|ak.wwise.ui.model.getState|/resultSchema' in identity)
+    assert model_result['input']['gateway_argv'] == ['draft-start', 'ak.wwise.ui.model.getState']
+    assert model_result['validation']['source'] == 'skills/waapi-skill/wwise_waapi/builders/schema.py#validate_semantic_result'
 
 
 @pytest.mark.parametrize('damage', ['choice', 'host'])
