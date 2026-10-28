@@ -7,6 +7,8 @@ qualified non-PASS producers are deliberately outside its contract.
 from __future__ import annotations
 
 from copy import deepcopy
+from contextlib import contextmanager
+from contextvars import ContextVar
 import hashlib
 import json
 from pathlib import Path
@@ -2103,6 +2105,78 @@ RUNTIME_SOURCE_SUCCESSOR = 'tests/fixtures/branch-evidence/product/runtime-read-
 RUNTIME_SOURCE_SUCCESSOR_SHA = 'da83fa524df905daf8b3ced0b83269777f085d7bb4d23f54b05f34a055cc7381'
 
 
+SELECTED_RUNTIME_SOURCE_SUCCESSOR = 'tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-source-successor.json'
+SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA = '575a91323408a7981e22f632c897924a5afcaf8942440fb895665cca846d7f01'
+_RETAINED_QUALIFIED_MEMBER = ContextVar('retained_qualified_runtime_member', default=None)
+
+
+def selected_runtime_source_successor(root=audit.ROOT):
+    """The additive selected roster never changes the legacy300 review."""
+    raw = (root / SELECTED_RUNTIME_SOURCE_SUCCESSOR).read_bytes()
+    if sha(raw) != SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA:
+        raise ValueError('Selected runtime source successor seal differs')
+    review = json.loads(raw)
+    fields = {'contract', 'packaged_sources', 'historical_packaged_sources', 'members',
+        'scope_ids', 'selected_program_ids'}
+    if (set(review) != fields or review['contract'] != 'waapi-skill.runtime-read-source-successor/v1'
+            or len(review['scope_ids']) != 35 or len(set(review['scope_ids'])) != 35
+            or not set(review['members']) <= set(review['scope_ids'])
+            or review['packaged_sources'] != program_source_context(root)['packaged']):
+        raise ValueError('Selected runtime exact source/identity roster differs')
+    maps = {audit.digest(value): value for value in review['historical_packaged_sources']}
+    for member in review['members'].values():
+        if 'source_map_sha256' in member:
+            member['sources'] = maps[member['source_map_sha256']]
+            member['original_review_target'] = maps[member['original_review_target_sha256']]
+            if member['captured_context'] is not None:
+                member['captured_context']['packaged'] = maps[member['captured_context'].pop('packaged_sha256')]
+    return review
+
+
+@contextmanager
+def retained_qualified_context(member):
+    token = _RETAINED_QUALIFIED_MEMBER.set(member)
+    try:
+        yield
+    finally:
+        _RETAINED_QUALIFIED_MEMBER.reset(token)
+
+
+def original_source_context_key():
+    member = _RETAINED_QUALIFIED_MEMBER.get()
+    return None if member is None else audit.digest(member['original_review_target'])
+
+
+def original_runtime_source_context(root=audit.ROOT, *, flow=None):
+    member = _RETAINED_QUALIFIED_MEMBER.get()
+    if member is None:
+        return program_source_context(root, flow=flow)
+    # This is only an original source-review target, never current CODE context.
+    return {'packaged': member['original_review_target']}
+
+
+def qualified_source_review_matches(descriptor, expected_sha, current, base):
+    member = _RETAINED_QUALIFIED_MEMBER.get()
+    document = completion.read_sealed_artifact(descriptor, base)
+    if member is not None:
+        return descriptor['sha256'] in member['source_reviews']
+    return descriptor['sha256'] == expected_sha and document == current
+
+
+def retained_qualified_capture(capture):
+    member = _RETAINED_QUALIFIED_MEMBER.get()
+    if member is None:
+        return False
+    if (audit.digest(capture) != member['capture_sha256']
+            or capture.get('source_context') != member['captured_context']
+            or capture.get('source_unchanged') is not True
+            or capture.get('phase_reports') != dict.fromkeys(('setup', 'call', 'teardown'), 'passed')):
+        raise ValueError('Retained qualified capture/context differs')
+    # Family original validators independently checked actual native calls/facts.
+    # This sealed historical fake capture supplies no current PROGRAM credit.
+    return True
+
+
 def runtime_source_successor(root=audit.ROOT):
     raw = (root / RUNTIME_SOURCE_SUCCESSOR).read_bytes()
     if sha(raw) != RUNTIME_SOURCE_SUCCESSOR_SHA:
@@ -2127,8 +2201,10 @@ def retained_runtime_mapping(binding):
 
 
 def retained_runtime_origin(binding, identity, program, capture, root=audit.ROOT):
-    review = runtime_source_successor(root)
-    member = review['members'].get(identity)
+    if binding.get('native_only_review', {}).get('sha256') == SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA:
+        member = retained_runtime_native(binding, {'id': identity, 'shape_sha256': binding['native_shape_sha256']}, root, root)
+    else:
+        member = runtime_source_successor(root)['members'].get(identity)
     if (member is None or binding.get('branch_id') != identity
             or audit.digest(retained_runtime_mapping(binding)) != member['mapping_sha256']
             or audit.digest(program) != member['program_sha256']
@@ -2142,14 +2218,42 @@ def retained_runtime_native(binding, branch, root, base):
     if not binding.get('native_only_review'):
         return False
     descriptor = binding['native_only_review']
-    if descriptor['sha256'] != RUNTIME_SOURCE_SUCCESSOR_SHA:
+    selected = descriptor['sha256'] == SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA
+    if descriptor['sha256'] != RUNTIME_SOURCE_SUCCESSOR_SHA and not selected:
         raise ValueError('Runtime native-only source review differs')
-    review = runtime_source_successor(root)
+    if selected:
+        completion.read_sealed_artifact(descriptor, base)
+    review = selected_runtime_source_successor(root) if selected else runtime_source_successor(root)
     member = review['members'].get(branch['id'])
     if (member is None or binding.get('native_shape_sha256') != branch['shape_sha256']
             or audit.digest(retained_runtime_mapping(binding)) != member['mapping_sha256']
-            or binding.get('native_only_base') != member.get('base')):
+            or (not selected and binding.get('native_only_base') != member.get('base'))):
         raise ValueError('Runtime native-only exact branch/public mapping differs')
+    if selected:
+        # Validate distinct original/captured/qualification identities and all
+        # stored descriptor seals before scoped historical checks are enabled.
+        records = {key: completion.read_sealed_artifact(member[key], root)
+            for key in ('assessment', 'capture', 'program', 'qualification', *(['binding'] if 'binding' in member else []))}
+        original_binding = records.get('binding', {}).get('bindings', {}).get(branch['id'], binding)
+        assessment = records['assessment']
+        native = records['qualification']
+        if (member['sources'] not in review['historical_packaged_sources']
+                or audit.digest(records['program']) != member['program_sha256']
+                or audit.digest(records['capture']) != member['capture_sha256']
+                or (not member.get('original_report') and records['capture'].get('source_context') != member['captured_context'])
+                or (member.get('original_report') and records['capture'].get('candidate') != member['native_source_candidate'])
+                or original_binding is None
+                or audit.digest(retained_runtime_mapping(original_binding)) != member['mapping_sha256']
+                or native['candidate_sha256'] != member['native_evidence_candidate']
+                or native['branch_id'] != branch['id']
+                or native['native_shape_sha256'] != branch['shape_sha256']
+                or native['assessment_sha256'] != member['assessment']['sha256']
+                or native['relevant_sources'] != member['sources']
+                or native['retained_facts'] != member['facts']
+                or member['qualification']['sha256'] != member['native_evidence_sha256']
+                or assessment['branch_id'] != branch['id']):
+            raise ValueError('Selected runtime original/capture/qualification binding differs')
+        member = dict(member, base=binding['native_only_base'])
     return member
 
 

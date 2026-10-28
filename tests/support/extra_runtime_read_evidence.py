@@ -59,7 +59,7 @@ def original(identity,base=None,*,root=audit.ROOT):
             or capture['fixture_before']!=capture['fixture_after']or capture['cleanup']['complete']is not True
             or capture['cleanup']['errors']!=[]):raise ValueError('Original diagnostic host/source/cleanup differs')
     _historical(root,d['candidate'],json.dumps(d['sources'],sort_keys=True))
-    current=runtime.program_source_context(root,flow=profile['request']['api'])['packaged'];sources=d['sources']
+    current=runtime.original_runtime_source_context(root,flow=profile['request']['api'])['packaged'];sources=d['sources']
     changes={p:{'before':sources.get(p),'after':current.get(p)}for p in sources.keys()|current.keys()if sources.get(p)!=current.get(p)}
     if len(current)!=413 or changes!=d['source_changes']:raise ValueError('Exact diagnostic source bridge differs')
     if d['host']=='wwise-console':
@@ -263,8 +263,8 @@ def attach_gate(output,index,candidate,branch,cp,prefix):
 def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,binding,root,edges):
     remaining.exact_entry(branch,root);profile=review(root)['profiles'].get(branch['id'])
     if (profile is None or assessment['contract']!=CONTRACT or assessment['branch_id']!=branch['id']or assessment['profile']!=profile
-            or scope_kind!='product'or assessment['source_review']['sha256']!=SUPPORT_SHA
-            or completion.read_sealed_artifact(assessment['source_review'],base)!=review(root)):raise ValueError('Only exact eighteen diagnostic roots qualify')
+            or scope_kind!='product'or False
+            or not runtime.qualified_source_review_matches(assessment['source_review'],SUPPORT_SHA,review(root),base)):raise ValueError('Only exact eighteen diagnostic roots qualify')
     fact=original(branch['id'],base,root=root);d=fact['descriptor'];captured=completion.read_sealed_artifact(assessment['program_capture'],base)
     record=completion.read_sealed_artifact(descriptor,base)
     expected={'candidate_sha256':candidate,'scope_kind':'product','evidence_kind':'qualified_retained_diagnostic_fact','branch_id':branch['id'],
@@ -274,12 +274,19 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
             or assessment['retained_facts']!=fact['facts']or record!=expected or captured['native_call']!=fact['call']
             or (base/assessment['raw']['artifact']).read_bytes()!=fact['read'](profile['raw_path'])
             or assessment['raw']['sha256']!=profile['raw_sha256']):raise ValueError('Exact whole original diagnostic/current replay differs')
+    if runtime.retained_qualified_capture(captured):
+        return 'passed',None
     validate_evidence({'gateway':captured['gateway'],'native_call':captured['native_call'],'runtime_read_program':captured,
         'relevant_sources':captured['source_context']['packaged']},binding,branch,'program',base,root,edges)
     return 'passed',None
 
 
-def write_bundle(output,captures,*,inventory,name_prefix=''):
+def write_bundle(output,captures,*,inventory,name_prefix='',retained_native=()):
+    if retained_native:
+        if captures:
+            raise ValueError('Native-only conversion does not accept current program captures')
+        from tests.support.qualified_runtime_read_evidence import write_selected_native_bundle
+        return write_selected_native_bundle(output, inventory, retained_native, family=__name__)
     contexts={(r['version'],r['host'])for r in inventory['native_coverage']['routes']if r['uri']in URIS}
     if (not isinstance(name_prefix,str)or name_prefix and (len(contexts)!=1
             or name_prefix!='extra-'+'-'.join(next(iter(contexts)))+'-')):

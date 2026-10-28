@@ -1,0 +1,21 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime|/resultSchema": {
+      "native_shape_sha256": "8f96661a84f7927219214041b5331793cba7936a433b5d45e66a1a74535ea7d7",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: native_business_anchor; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime|/resultSchema": {
+      "native_shape_sha256": "8f96661a84f7927219214041b5331793cba7936a433b5d45e66a1a74535ea7d7",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: native_business_anchor; same-route business/native gate required; no native optional-value occurrence claim"
+    }
+  }
+}

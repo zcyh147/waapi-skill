@@ -459,8 +459,18 @@ def attach_qualified_reads(descriptors, bindings, read, requirements, captures):
         binding['evidence']['native'] = item['evidence']
 
 
-def qualified_read_result(descriptor, branch, candidate, scope_kind, base, binding, root, edges, historical_sources):
+def qualified_read_result(descriptor, branch, candidate, scope_kind, base, binding, root, edges, historical_sources, *, retained_member=None):
     assessment = completion.read_sealed_artifact(binding['qualified_runtime_read_attachment'], base)
+    member = retained_member
+    if member is not None and scope_kind != 'product':
+        raise ValueError('Selected native facts require product scope')
+    if member is not None:
+        if runtime._RETAINED_QUALIFIED_MEMBER.get() is None:
+            with runtime.retained_qualified_context(member):
+                return qualified_read_result(descriptor, branch, member['native_evidence_candidate'],
+                    scope_kind, base, binding, root, edges, historical_sources, retained_member=member)
+    if member is not None and member.get('original_report'):
+        return _selected_native_report_result(descriptor, assessment, branch, base, root, member)
     if assessment.get('contract') == 'waapi-skill.retained-transport-assessment/v1':
         from tests.support.runtime_transport_evidence import qualified_result
         return qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,binding,root,edges)
@@ -591,4 +601,135 @@ def qualified_read_result(descriptor, branch, candidate, scope_kind, base, bindi
              else {'pointer': pointer, 'equals': value})
     if not completion.proves_alternative(check, branch):
         raise ValueError('Exact observed value does not prove branch semantics')
+    return 'passed', None
+
+
+def _selected_native_original(identity, root):
+    """Use the existing six original-fact validators; no receipt reconstruction."""
+    from tests.support import runtime_cursor_evidence as cursor
+    from tests.support import runtime_capture_control_evidence as capture
+    from tests.support import runtime_owned_control_evidence as owned
+    from tests.support import extra_runtime_read_evidence as extra
+    from tests.support import meter_runtime_read_evidence as meter
+    route = identity.removesuffix('|/resultSchema')
+    uri = route.split('|')[-1]
+    if uri in capture.URIS:
+        module = capture; fact = capture.original_control(route, root=root)
+        source = cursor.review(root)['profiles'][fact['profile']['cursor_route']]
+    elif uri == cursor.URI:
+        module = cursor; fact = cursor.original_cursor(route, root=root); source = fact['profile']
+    elif uri in extra.URIS:
+        module = extra; fact = extra.original(identity, root=root); source = fact['descriptor']
+    elif uri in meter.URIS:
+        module = meter; fact = meter.original_profile(route.split('|')[0], root=root); source = fact['descriptor']
+    elif uri in owned.URIS:
+        module = owned; fact = owned.original_control(route, root=root)
+        source = (owned.review(root)['r108'] if uri.endswith('.moveCursor') else
+            cursor.review(root)['profiles'][fact['profile']['cursor_route']])
+    else:
+        raise ValueError('Selected report converter has no existing original validator')
+    candidate = source.get('candidate', source.get('original_candidate'))
+    sources = (fact.get('sources') or source.get('sources') or
+        (source.get('original_sources') if uri.endswith('.moveCursor') else None) or
+        cursor.review(root)['source_maps'][candidate]['sources'])
+    report_path = source.get('report_path', source.get('capture_path'))
+    raw = fact['read'](report_path)
+    return module, fact, source, candidate, sources, report_path, raw
+
+
+def write_selected_native_bundle(output, inventory, identities, *, family):
+    """The existing converters' native-only mode transports exact reports only."""
+    import os
+    from tests.support import runtime_remaining_evidence as remaining
+    root = audit.ROOT
+    review = runtime.selected_runtime_source_successor(root)
+    identities = list(identities)
+    if (not identities or len(set(identities)) != len(identities)
+            or not set(identities) <= set(review['scope_ids'])):
+        raise ValueError('Only the adopted selected native identity roster qualifies')
+    output = Path(output).resolve()
+    if not output.is_relative_to(root):
+        raise ValueError('Native-only descriptors require the existing repository evidence base')
+    output.mkdir(parents=True, exist_ok=False)
+    prefix = output.relative_to(root).as_posix()
+    write = lambda name, value: runtime.write_json(output / name, value)
+    def emit(name, value):
+        d = write(name, value); return {**d, 'artifact': prefix + '/' + d['artifact']}
+    index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': os.path.relpath(root, output),
+        'entries': [], 'qualified_runtime_read_attachments': []}
+    requirements = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    context = {'original_review_target': next(iter(review['members'].values()))['original_review_target']}
+    branches = {b['id']: b for b in inventory['native_coverage']['obligations']}
+    for identity in identities:
+        with runtime.retained_qualified_context(context):
+            module, fact, source, original_candidate, sources, report_path, report_raw = _selected_native_original(identity, root)
+        if module.__name__ != family or identity not in branches:
+            raise ValueError('Native-only conversion family or exact inventory differs')
+        branch = branches[identity]; profile = fact['profile']
+        family_uris = module.URIS if hasattr(module, 'URIS') else {module.URI}
+        family_ids = [item for item in review['scope_ids']
+            if item.removesuffix('|/resultSchema').split('|')[-1] in family_uris]
+        name = f'native-{family_ids.index(identity):02}-'
+        archive = {'artifact': source['archive_source'], 'sha256': source['archive_sha256']}
+        capture = emit(name + 'capture.json', {'archive': archive, 'capture_original_path': report_path,
+            'report_sha256': runtime.sha(report_raw), 'candidate': original_candidate})
+        support = {'artifact': module.SUPPORT, 'sha256': module.SUPPORT_SHA}
+        field = 'source_review' if module.__name__.endswith(('extra_runtime_read_evidence', 'meter_runtime_read_evidence')) else 'support_review'
+        facts_field = 'retained_facts' if field == 'source_review' else 'facts'
+        assessment = emit(name + 'assessment.json', {'contract': module.CONTRACT, 'branch_id': identity,
+            'profile': profile, field: support, 'archive': archive, 'program_capture': {**capture, 'artifact': Path(capture['artifact']).name},
+            facts_field: fact['facts']})
+        kind = {'runtime_cursor_evidence': 'cursor_fact', 'runtime_capture_control_evidence': 'capture_control_ack',
+            'runtime_owned_control_evidence': 'owned_control_fact', 'extra_runtime_read_evidence': 'diagnostic_fact',
+            'meter_runtime_read_evidence': 'meter_fact'}[module.__name__.split('.')[-1]]
+        qualified = emit(name + 'qualified.json', {'candidate_sha256': original_candidate, 'scope_kind': 'product',
+            'evidence_kind': 'qualified_retained_' + kind, 'branch_id': identity,
+            'native_shape_sha256': branch['shape_sha256'], 'assessment_sha256': assessment['sha256'],
+            'retained_facts': fact['facts'], 'relevant_sources': sources})
+        public_id = '|'.join([branch['route'].split('|')[0], 'function', branch['route'].split('|')[-1]])
+        public, = [r for r in inventory['routes'] if r['id'] == public_id]
+        code = module.code_bindings(branch) if hasattr(module, 'code_bindings') else module._code_bindings(branch)
+        uri = branch['route'].split('|')[-1]
+        from tests.support.runtime_remaining_completion_mapping import runtime_gateway_argv
+        argv = runtime_gateway_argv(uri)
+        binding = {'branch_id': identity, 'native_shape_sha256': branch['shape_sha256'],
+            'public_route': public['id'], 'public_route_sha256': audit.digest(public),
+            'input': {'gateway_argv': argv, 'selector': branch['pointer'], 'native_observation_only': True},
+            'relevant_sources': sorted(sources), **code, 'evidence': {}, 'native_only_base': prefix,
+            'native_only_review': {'artifact': runtime.SELECTED_RUNTIME_SOURCE_SUCCESSOR,
+                'sha256': runtime.SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA}}
+        program = emit(name + 'program.json', {'candidate_sha256': original_candidate, 'scope_kind': 'product',
+            'relevant_sources': sources, 'native_only': True})
+        bindings = emit(name + 'bindings.json', {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': {identity: binding}})
+        policy = {'contract': requirements['contract'], 'branches': {identity: remaining.policy(remaining.exact_entry(branch, root))}}
+        rd = emit(name + 'requirements.json', policy)
+        index['entries'].append({'id': 'runtime195-native-' + family.split('.')[-1] + '-' + name, 'bindings': bindings,
+            'origin': {'bindings': bindings, 'program': program, 'capture': capture, 'requirements': rd}})
+        index['qualified_runtime_read_attachments'].append(emit(name + 'attachment.json',
+            {'contract': 'waapi-skill.qualified-retained-read-attachment/v1', 'branch_id': identity,
+                'assessment': assessment, 'evidence': qualified}))
+        requirements['branches'].update(policy['branches'])
+    write('requirements.json', requirements); write('index.json', index)
+    return output / 'index.json'
+
+
+
+def _selected_native_report_result(descriptor, assessment, branch, base, root, member):
+    """Report-backed facts retain their original partial/ACK/verdict boundaries."""
+    module, fact, source, original_candidate, sources, report_path, report_raw = _selected_native_original(branch['id'], root)
+    record = completion.read_sealed_artifact(descriptor, base)
+    capture = completion.read_sealed_artifact(assessment['program_capture'], base)
+    field = 'source_review' if module.__name__.endswith(('extra_runtime_read_evidence', 'meter_runtime_read_evidence')) else 'support_review'
+    facts_field = 'retained_facts' if field == 'source_review' else 'facts'
+    expected = {'contract': module.CONTRACT, 'branch_id': branch['id'], 'profile': fact['profile'],
+        field: {'artifact': module.SUPPORT, 'sha256': module.SUPPORT_SHA},
+        'archive': {'artifact': source['archive_source'], 'sha256': source['archive_sha256']},
+        'program_capture': assessment['program_capture'], facts_field: fact['facts']}
+    if (assessment != expected or capture != {'archive': expected['archive'],
+            'capture_original_path': report_path, 'report_sha256': runtime.sha(report_raw), 'candidate': original_candidate}
+            or record['candidate_sha256'] != original_candidate or original_candidate != member['native_source_candidate']
+            or record['retained_facts'] != fact['facts'] or record['relevant_sources'] != sources
+            or record['assessment_sha256'] != member['assessment']['sha256']
+            or member['facts'] != fact['facts']):
+        raise ValueError('Selected native report/candidate/completeness differs')
     return 'passed', None

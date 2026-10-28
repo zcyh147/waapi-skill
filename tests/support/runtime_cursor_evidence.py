@@ -39,7 +39,7 @@ def original_cursor(route,base=None,*,root=audit.ROOT):
     data=review(root);p=data['profiles'][route]
     archive_path=root/p['archive_source']if base is None else Path(base)/('cursor-'+p['version']+'-'+p['host']+'-original.json.gz')
     stat=archive_path.stat()
-    return _original(route,archive_path,root,(stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
+    return _original(route,archive_path,root,(stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns,runtime.original_source_context_key()))
 
 
 @lru_cache(maxsize=64)
@@ -106,7 +106,7 @@ def _original(route,archive_path,root,signature):
                 raise ValueError('R92 original user/snapped cursor witness differs')
         if life['source_hash_before']!=life['source_hash_after']or life['source_mtime_before_ns']!=life['source_mtime_after_ns']:
             raise ValueError('Original Authoring source drift')
-    current=runtime.program_source_context(root,flow=URI)['packaged']
+    current=runtime.original_runtime_source_context(root,flow=URI)['packaged']
     changes={k:{'before':source.get(k),'after':current.get(k)}for k in source.keys()|current.keys()if source.get(k)!=current.get(k)}
     if len(current)!=413 or changes!=data['source_maps'][p['candidate']]['changes']:
         raise ValueError('Exact reviewed cursor source delta differs')
@@ -188,19 +188,26 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
     record=completion.read_sealed_artifact(descriptor,base);cap=completion.read_sealed_artifact(assessment['program_capture'],base)
     expected={'contract':CONTRACT,'branch_id':branch['id'],'profile':p,'support_review':assessment['support_review'],
         'archive':original['archive'],'program_capture':assessment['program_capture'],'facts':original['facts']}
-    if (assessment!=expected or assessment['support_review']['sha256']!=SUPPORT_SHA
-            or completion.read_sealed_artifact(assessment['support_review'],base)!=review(root)
+    if (assessment!=expected
+            or not runtime.qualified_source_review_matches(assessment['support_review'],SUPPORT_SHA,review(root),base)
             or record!={'candidate_sha256':candidate,'scope_kind':'product','evidence_kind':'qualified_retained_cursor_fact',
                 'branch_id':branch['id'],'native_shape_sha256':branch['shape_sha256'],'assessment_sha256':binding['qualified_runtime_read_attachment']['sha256'],
                 'relevant_sources':review(root)['source_maps'][p['candidate']]['sources'],'retained_facts':original['facts']}
             or cap['native_call']!={'uri':URI,'args':p['native_args'],'options':{},'result':p['result']}):
         raise ValueError('Exact original cursor fact/current same-mode scalar replay differs')
+    if runtime.retained_qualified_capture(cap):
+        return 'passed',None
     validate_evidence({'gateway':cap['gateway'],'native_call':cap['native_call'],'runtime_read_program':cap,
         'relevant_sources':cap['source_context']['packaged']},binding,branch,'program',base,root,edges)
     return 'passed',None
 
 
-def write_cursor_bundle(output,captures,*,inventory,name_prefix=''):
+def write_cursor_bundle(output,captures,*,inventory,name_prefix='',retained_native=()):
+    if retained_native:
+        if captures:
+            raise ValueError('Native-only conversion does not accept current program captures')
+        from tests.support.qualified_runtime_read_evidence import write_selected_native_bundle
+        return write_selected_native_bundle(output, inventory, retained_native, family=__name__)
     versions={r['version']for r in inventory['native_coverage']['routes']if r['uri']==URI}
     if (not isinstance(name_prefix,str)or name_prefix and (len(versions)!=1
             or name_prefix!='cursor-'+next(iter(versions))+'-')):

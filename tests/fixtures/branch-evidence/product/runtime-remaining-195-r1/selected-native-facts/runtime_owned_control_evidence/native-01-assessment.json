@@ -1,0 +1,70 @@
+{
+  "contract": "waapi-skill.retained-owned-control-assessment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.unregisterMeter|/resultSchema",
+  "profile": {
+    "provider": "r92",
+    "cursor_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime",
+    "request": {
+      "api": "ak.wwise.core.profiler.unregisterMeter",
+      "args": {
+        "object": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}"
+      },
+      "options": {}
+    },
+    "result": {},
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3/evidence/authoring-node-observations/f5b183948b1318c348e72a5f-native-evidence/1792757545640541000-59dd17c1c30f4e70abe66a83d84aa1d4-ak_wwise_core_profiler_unregisterMeter.json",
+    "raw_sha256": "0b7fa94e29b75c6ec791aca0ac8d81431398926789d563b93d8850b07367dc13",
+    "receipt_indices": [
+      130,
+      131,
+      132,
+      133,
+      134
+    ],
+    "receipt_sha256": "48a5b460ec3b023abc9ec02fa59d3d0714eac01b99b5d8cf8e47403b18f7ef7a",
+    "object": {
+      "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}",
+      "name": "WAAPI_V2_Weapons",
+      "type": "Bus",
+      "path": "\\Busses\\Default Work Unit\\WAAPI_V2_Weapons"
+    }
+  },
+  "support_review": {
+    "artifact": "tests/fixtures/runtime-owned-controls/support-review.json",
+    "sha256": "35a20ad0115b35ab2074168eea03d6d5b416cb06178e90f868a5f9067226a4bb"
+  },
+  "archive": {
+    "artifact": "tests/fixtures/runtime-log/r92-original.json.gz",
+    "sha256": "c1957c432d88ab27c4323da50f25ff06d213dc06819fb86de357fe8f20e89d06"
+  },
+  "program_capture": {
+    "artifact": "native-01-capture.json",
+    "sha256": "84f0669efbf36f39d4d747192432c797a689850f41d09bcae8fa03f55c6efa40"
+  },
+  "facts": {
+    "original_candidate": "3368fd48d500db9e56d14dfa3a0901496f32ab3a",
+    "original_context": {
+      "version": "2025.1",
+      "build": "2025.1.7.9143",
+      "host": "wwise-authoring"
+    },
+    "original_finalization": "PASS",
+    "actual_cursor": "capture",
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false,
+    "continuing_position_verified": false,
+    "capture_completeness_verified": false,
+    "actual_control": "ak.wwise.core.profiler.unregisterMeter",
+    "bound_object": {
+      "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}",
+      "name": "WAAPI_V2_Weapons",
+      "type": "Bus",
+      "path": "\\Busses\\Default Work Unit\\WAAPI_V2_Weapons"
+    },
+    "verification": "result_schema_checked",
+    "business_state_verified": false,
+    "registration_membership_verified": false,
+    "reference_count_verified": false,
+    "prior_settings_restoration_verified": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.setCursorTime|/resultSchema": {
+      "native_shape_sha256": "2fcf945be57dbdf4895fbd194b2b0d73055d28223c553c2c288342483cf72d54",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "R127 exact remaining runtime capture_meter_cursor_controls: native_business_anchor; same-route business/native gate required; no native optional-value occurrence claim"
+    }
+  }
+}

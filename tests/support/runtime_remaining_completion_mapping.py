@@ -244,6 +244,17 @@ FIELDS = {
 ZERO = frozenset({PROFILER + 'startCapture', PROFILER + 'stopCapture', TRANSPORT + 'getList'})
 
 
+def runtime_gateway_argv(uri):
+    """Closed implementation correspondence; this is never an execution receipt."""
+    if uri not in URIS:
+        raise ValueError('Runtime route declaration is outside the closed URI roster')
+    if uri in ZERO:
+        return ['request-schema', uri]
+    reads = {PROFILER + name for name in ('getCpuUsage', 'getCursorTime', 'getMeters',
+        'getPerformanceMonitor', 'getStreamedMedia')} | {TRANSPORT + 'getState'}
+    return ['core-call' if uri in reads else 'draft-start', uri]
+
+
 def public_contract(uri, version):
     from wwise_waapi.runtime_inspection_business_contracts import runtime_inspection_business_contract_data
     from wwise_waapi.typed_requests import request_contract
@@ -360,7 +371,7 @@ def runtime_bindings(root, inventory):
             LIB + 'profiler_meter_objects.py#compile_meter_object_options' if name == 'getMeters' and section == 'optionsSchema' else
             LIB + 'runtime_inspection_business.py#materialize_runtime_inspection_business_request' if group in {'meter', 'fixed-read'} or name == 'getState' else
             LIB + 'runtime_inspection_business.py#materialize_runtime_control_business_request')
-        argv = ['core-call', uri] if group in {'meter', 'fixed-read'} or name == 'getState' else ['request-schema', uri] if uri in ZERO else ['draft-start', uri]
+        argv = runtime_gateway_argv(uri)
         bindings[row['id']] = {'branch_id': row['id'], 'native_shape_sha256': row['shape_sha256'],
             'public_route': route['public_route'], 'public_route_sha256': digest(public[route['public_route']]),
             'input': {'gateway_argv': argv, 'selector': pointer,

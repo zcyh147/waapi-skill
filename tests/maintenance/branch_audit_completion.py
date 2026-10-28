@@ -1668,7 +1668,8 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         if category == 'native' and (binding or {}).get('qualified_runtime_read_attachment'):
             from tests.support.qualified_runtime_read_evidence import qualified_read_result
             return qualified_read_result(descriptor, branch, candidate, scope_kind, base, binding,
-                                         root, reference_edges or {}, historical_sources)
+                                         root, reference_edges or {}, historical_sources,
+                                         retained_member=retained_member if retained_member and 'assessment' in retained_member else None)
         record = read_sealed_artifact(descriptor, base)
         from tests.support.empty_candidate_evidence import classify_empty_candidate, validate_counterexample
         empty = classify_empty_candidate(root, branch)

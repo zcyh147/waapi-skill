@@ -1,0 +1,9 @@
+{
+  "archive": {
+    "artifact": "tests/fixtures/runtime-log/r92-original.json.gz",
+    "sha256": "c1957c432d88ab27c4323da50f25ff06d213dc06819fb86de357fe8f20e89d06"
+  },
+  "capture_original_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3/evidence/authoring-node-observations/f5b183948b1318c348e72a5f-native-evidence/profiler-capture.json",
+  "report_sha256": "2baf12196740ce9525fe1c4eb3b4b6ea8e16158c762d16c6add82c208b97bf20",
+  "candidate": "3368fd48d500db9e56d14dfa3a0901496f32ab3a"
+}
