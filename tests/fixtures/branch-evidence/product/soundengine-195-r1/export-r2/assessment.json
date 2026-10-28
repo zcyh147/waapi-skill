@@ -1,0 +1,15 @@
+{
+  "complete": true,
+  "obligations": 15050,
+  "routes": 248,
+  "states": {
+    "mapped_with_representative_proof": 15042,
+    "verified": 8
+  },
+  "by_owner": {
+    "185": {
+      "mapped_with_representative_proof": 15042,
+      "verified": 8
+    }
+  }
+}
