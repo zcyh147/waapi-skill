@@ -1746,6 +1746,8 @@ def build_parser() -> argparse.ArgumentParser:
     core_call.add_argument("--include", dest="soundengine_outputs", action="append", default=[])
     core_call.add_argument("--platform", dest="soundengine_platform")
     core_call.add_argument("--language", dest="soundengine_language")
+    core_call.add_argument("--include-override-source-value", action="append", default=[])
+    core_call.add_argument("--include-local-reference", action="append", default=[])
     add_media_build_read_arguments(core_call)
     core_call.add_argument("--project-file", action="append", default=[])
     core_call.add_argument("--originals-file", action="append", default=[])
@@ -5344,10 +5346,17 @@ def preflight_core_business_input(
         raise GatewayInputError("Source-control file locators apply only to the getStatus read alternative")
     if (args.runtime_observation is not None or args.runtime_page is not None) and args.api not in runtime_inspection_business_read_operations():
         raise GatewayInputError("Runtime observation continuation is valid only for its original runtime-inspection operation")
-    if (args.soundengine_outputs or args.soundengine_platform is not None or args.soundengine_language is not None) and args.api not in soundengine_control_business_read_operations():
+    if (args.soundengine_outputs or args.soundengine_platform is not None or args.soundengine_language is not None or args.include_override_source_value or args.include_local_reference) and args.api not in soundengine_control_business_read_operations():
         raise GatewayInputError("--include, --platform and --language apply only to SoundEngine getState/getSwitch")
     if args.api in soundengine_control_business_read_operations():
         contract = soundengine_control_business_contract_data(args.api, versions[0])
+        defaults = vars(build_parser().parse_args(["core-call", args.api]))
+        allowed = {"api", "command", "version", "timeout", "evidence_dir", "state_dir", "state_group_id",
+            "switch_group_id", "game_object_handle", "soundengine_outputs", "soundengine_platform",
+            "soundengine_language", "include_field", "include_override_source_value", "include_local_reference"}
+        unexpected = [key for key, value in vars(args).items() if key not in allowed and value != defaults.get(key)]
+        if unexpected:
+            raise GatewayInputError("SoundEngine getter accepts only its disclosed business inputs: " + ", ".join(unexpected))
         identity_field = (
             "state_group_id" if args.api == GET_STATE_URI else "switch_group_id"
         )
@@ -5373,14 +5382,22 @@ def preflight_core_business_input(
             validate_runtime_game_object_handle(args.game_object_handle)
             if args.api != GET_SWITCH_URI:
                 raise GatewayInputError("getState does not accept a game object handle")
-        from wwise_waapi.soundengine_object_returns import compile_soundengine_object_returns
+        from wwise_waapi.soundengine_object_returns import compile_soundengine_object_returns, compile_soundengine_field_meanings
         try:
             args.soundengine_return_options, args.query_output_bindings = compile_soundengine_object_returns(
                 versions[0], args.soundengine_outputs, platform=args.soundengine_platform, language=args.soundengine_language)
         except ValueError as exc:
             raise GatewayInputError(str(exc)) from exc
+        try:
+            args.soundengine_field_declarations = compile_soundengine_field_meanings(args)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        args.object_type = "State" if args.api == GET_STATE_URI else "Switch"
+        args.path = args.object_id = None
         args.query_related_version = versions[0]
         args.soundengine_read_business_request = {
+            **args.soundengine_field_declarations,
+
             identity_field: identity.upper(),
             **({"outputs": list(args.soundengine_outputs)} if args.soundengine_outputs else {}),
             **({"platform": args.soundengine_platform} if args.soundengine_platform is not None else {}),
@@ -12170,6 +12187,14 @@ def dispatch_soundengine_business_read(
                 error_code=exc.error_code,
             ) from exc
         native_args["gameObject"] = game_object_record.game_object_id
+    if args.query_custom_field_meanings:
+        clarification = _bind_query_custom_fields_from_live_metadata(
+            args, connection=connection, detected_version=detected_version, dispatcher=dispatcher)
+        if clarification is not None:
+            raise GatewayResultShapeError("Refine the getter's field meanings against live State/Switch class metadata.",
+                details=clarification, error_code="SOUNDENGINE_FIELD_SELECTION_REQUIRED")
+        args.soundengine_return_options = {**args.soundengine_return_options,
+            "return": list(dict.fromkeys(["id", "name", "type", *(native for _, native, _ in args.query_output_bindings)]))}
     request_validation = validate_semantic_payload(
         args.api,
         native_args,
@@ -12212,11 +12237,12 @@ def dispatch_soundengine_business_read(
             or not _canonical_guid(returned_object.get("id"))
             or not isinstance(returned_object.get("name"), str)
             or not returned_object["name"]
+            or (args.query_custom_field_meanings and returned_object.get("type") != args.object_type)
         )
     ):
         raise GatewayResultShapeError(
             "SoundEngine state/switch result must contain one bounded returned "
-            "object with an exact id and name.",
+            "object with an exact id/name and the metadata-bound State/Switch type when custom fields are selected.",
             details={"actual_result": raw_result},
             error_code="SOUNDENGINE_READ_RESULT_INVALID",
         )

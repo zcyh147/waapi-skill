@@ -108,7 +108,7 @@ def test_operations_catalog_lists_all_soundengine_business_routes(
         "post one exact message to the runtime Profiler Capture Log"
     )
     assert all_rows["ak.wwise.core.log.addItem"]["intent"] == (
-        "add one message to a named Authoring Log view"
+        "add one message to a named Wwise Log view"
     )
     assert payload["request_schema_command_template"] == [
         "request-schema",
@@ -2621,6 +2621,9 @@ def test_getter_schema_discloses_versioned_closed_object_return_options(tmp_path
     choices = declaration["constraints"]["outputs"]["choices"]
     assert {"id", "name", "type", "path", "notes", "short-id", "workunit:type"} <= set(choices)
     assert ("blend-tracks" in choices) is (version in {"2024.1", "2025.1"})
+    assert {"fields", "override_source_values", "local_references"} <= set(declaration["optional_fields"])
+    assert declaration["constraints"]["class_fields"]["inputs"]["fields"]["flag"] == "--include-field"
+    assert declaration["constraints"]["custom_fields"]["native_getter_expression_equivalence"] == "not claimed for the separate read"
     assert declaration["constraints"]["custom_fields"]["route"] == "query-object --exact-id <returned-id>"
     assert declaration["constraints"]["custom_fields"]["native_return_expression_input"] == "forbidden"
     assert ("game_object_handle" in declaration["required_fields"]) is (subject == "Switch" and version == "2022.1")
@@ -2779,6 +2782,137 @@ def test_getter_preserves_2025_exact_declared_randomizer_spelling_without_alias_
     assert calls == [{"return": ["id", "name", "suppportsRandomizer"]}]
     assert result["agent_result"] == {"id": client.state_id, "name": "Storm", "declared_return_observation": {
         "selected_spellings": ["suppportsRandomizer"], "returned_values": {"nativeExtension": False}}}
+
+
+def test_getter_binds_custom_field_meanings_to_live_state_class_before_one_dispatch(tmp_path: Path) -> None:
+    client = _SoundEngineDraftClient(tmp_path)
+    original = client.call
+    calls = []
+
+    def observe(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        if uri == "ak.wwise.core.object.getTypes":
+            return {"return": [{"name": "State", "classId": 123}]}
+        if uri.endswith("getPropertyAndReferenceNames"):
+            assert args == {"classId": 123}
+            return {"return": ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            assert args == {"classId": 123, "property": "Volume"}
+            return {"name": "Volume", "type": "Real32", "display": {"name": "Loudness"}}
+        if uri == "ak.soundengine.getState":
+            return {"return": {"id": client.state_id, "name": "Storm", "type": "State", "@Volume": -6.0}}
+        return original(uri, args, options)
+
+    client.call = observe
+    code, result = gateway.execute_gateway(
+        ["core-call", "ak.soundengine.getState", "--state-group-id", client.state_group_id,
+         "--include-field", "Loudness", "--platform", "Windows"],
+        env=_env(tmp_path), client_factory=lambda _url: client,
+    )
+    assert code == 0, result
+    assert [call for call in calls if call[0].startswith("ak.soundengine.")] == [
+        ("ak.soundengine.getState", {"stateGroup": client.state_group_id},
+         {"return": ["id", "name", "type", "@Volume"], "platform": "Windows"})]
+    assert result["agent_result"] == {"id": client.state_id, "name": "Storm", "properties": {"Volume": -6.0}}
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("subject", ("State", "Switch"))
+def test_getter_custom_projection_preserves_property_and_reference_value_sources(tmp_path: Path, version: str, subject: str) -> None:
+    env = _env(tmp_path, version)
+    client = _SoundEngineDraftClient(tmp_path, version=version)
+    state_dir = tmp_path / "state"
+    declaration = []
+    if subject == "Switch" and version == "2022.1":
+        handle, _ = _register_game_object_for_test(tmp_path=tmp_path, state_dir=state_dir, env=env,
+            client=client, name="Player", version=version)
+        declaration = ["--game-object-handle", handle]
+    original = client.call
+    calls = []
+    operation = "ak.soundengine.get" + subject
+    object_id = client.state_id if subject == "State" else client.switch_id
+    group_id = client.state_group_id if subject == "State" else client.switch_group_id
+    actual_reference = {"id": client.other_event_id, "name": "Actual", "extension": [None, False]}
+
+    def observe(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.getTypes":
+            return {"return": [{"name": subject, "classId": 123}]}
+        if uri.endswith("getPropertyAndReferenceNames"):
+            assert args == {"classId": 123}
+            return {"return": ["Volume", "Target"]}
+        if uri.endswith("getPropertyInfo"):
+            assert args["classId"] == 123
+            if args["property"] == "Volume":
+                return {"name": "Volume", "type": "Real32"}
+            return {"name": "Target", "type": "", "restriction": {"type": "reference"}}
+        if uri == operation:
+            calls.append((args, options))
+            return {"return": {"id": object_id, "name": "Active", "type": subject,
+                "notes": None, "@Volume": -4.5, "@@Volume": -2.0, "Target": actual_reference, "@Target": None}}
+        return original(uri, args, options)
+
+    client.call = observe
+    code, result = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "core-call", operation, "--" + subject.lower() + "-group-id", group_id,
+         *declaration, "--include", "notes", "--include-field", "Volume", "--include-field", "Target",
+         "--include-override-source-value", "volume", "--include-local-reference", "target"],
+        env=env, client_factory=lambda _url: client,
+    )
+    assert code == 0, result
+    assert len(calls) == 1
+    assert calls[0][1] == {"return": ["id", "name", "type", "notes", "@Volume", "@@Volume", "Target", "@Target"]}
+    assert result["agent_result"] == {"id": object_id, "name": "Active", "notes": None,
+        "properties": {"Volume": -4.5}, "override_source_values": {"Volume": -2.0},
+        "references": {"Target": actual_reference}, "local_references": {"Target": None}}
+    assert list(result)[-1] == "agent_result"
+
+
+@pytest.mark.parametrize("extra", [
+    ["--include-field", "@Volume"], ["--include-field", "parent.Volume"],
+    ["--include-local-reference", "Target;name"], ["--include-override-source-value", ""],
+    ["--include-field", "Volume", "--include-field", "volume"],
+    sum((["--include-field", "Field " + str(i)] for i in range(9)), []),
+    ["--include-field", "Volume", "--result-view", "summary"],
+])
+def test_getter_custom_fields_reject_raw_meanings_duplicates_limits_and_unrelated_options(tmp_path: Path, extra: list[str]) -> None:
+    code, result = gateway.execute_gateway(
+        ["core-call", "ak.soundengine.getState", "--state-group-id", _SoundEngineDraftClient.state_group_id, *extra],
+        env=_env(tmp_path), client_factory=lambda _url: pytest.fail("invalid field declaration connected"),
+    )
+    assert code == 2, result
+
+
+@pytest.mark.parametrize("failure", ("ambiguous", "unknown-kind", "wrong-kind", "wrong-class", "returned-type", "duplicate-native"))
+def test_getter_custom_metadata_boundaries_fail_closed(tmp_path: Path, failure: str) -> None:
+    client = _SoundEngineDraftClient(tmp_path)
+    original = client.call
+    getter_calls = []
+
+    def observe(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.getTypes":
+            return {"return": [{"name": "Sound" if failure == "wrong-class" else "State", "classId": 123}]}
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["Volume", "Pitch"] if failure == "ambiguous" else ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            return {"name": args["property"], "type": "" if failure == "unknown-kind" else "Real32",
+                "display": {"name": "Amount" if failure == "ambiguous" else "Volume"}}
+        if uri == "ak.soundengine.getState":
+            getter_calls.append(uri)
+            return {"return": {"id": client.state_id, "name": "Storm", "type": "Sound", "@Volume": -6.0}}
+        return original(uri, args, options)
+
+    client.call = observe
+    flag = "--include-local-reference" if failure == "wrong-kind" else "--include-field"
+    meaning = "Amount" if failure == "ambiguous" else "Volume"
+    extra = ["--include", "volume-db"] if failure == "duplicate-native" else []
+    code, result = gateway.execute_gateway(
+        ["core-call", "ak.soundengine.getState", "--state-group-id", client.state_group_id, flag, meaning, *extra],
+        env=_env(tmp_path), client_factory=lambda _url: client,
+    )
+    assert code == 2, result
+    assert result["error_code"] not in {"AttributeError", "KeyError", "TypeError"}
+    assert getter_calls == (["ak.soundengine.getState"] if failure == "returned-type" else [])
+    assert result.get("agent_result") is None
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
