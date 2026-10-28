@@ -615,21 +615,74 @@ def test_accounting_successor_rejects_unreviewed_source_changes(source_accountin
         audit.portable_binding_inputs(packet['index'], packet['requirements'])
 
 
-def test_unbound_source_program_equivalence_cannot_borrow_valid_old_context(source_accounting_case):
+@pytest.mark.parametrize('ownership', ('program', 'native-proof'))
+def test_unbound_source_program_equivalence_cannot_borrow_valid_accounting_context(source_accounting_case, ownership):
     from copy import deepcopy
+    import hashlib
     from tests.maintenance import branch_audit_completion as completion
     case = source_accounting_case
     packet = case['cases']['2022.1']
-    old, base, _ = audit.portable_binding_inputs(packet['old_index'], packet['requirements'])
-    current, _, _ = audit.portable_binding_inputs(packet['index'], packet['requirements'])
-    identity = next(iter(old['bindings']))
-    binding = deepcopy(old['bindings'][identity])
-    binding['source_copy_program_equivalence'] = current['bindings'][identity]['source_copy_program_equivalence']
+    current, base, _ = audit.portable_binding_inputs(packet['index'], packet['requirements'])
+    identity = next(iter(current['bindings']))
+    binding = deepcopy(current['bindings'][identity])
+    context = completion.read_sealed_artifact(binding['source_copy_successor_context'], base)
+    assert context['contract'] == 'waapi-skill.source-copy-successor-context/v2'
+    assert context['current_candidate_sha256'] == case['inventory']['native_coverage']['candidate_sha256']
+    if ownership == 'program':
+        original = binding['evidence']['program']
+        raw = (base / original['artifact']).read_bytes() + b' '
+        path = case['output'] / 'unowned-program.json'
+        path.write_bytes(raw)
+        binding['evidence']['program'] = {**original, 'artifact': path.relative_to(base).as_posix(),
+                                        'sha256': hashlib.sha256(raw).hexdigest()}
+    else:
+        other = case['cases']['2023.1']
+        unrelated, _, _ = audit.portable_binding_inputs(other['index'], other['requirements'])
+        binding['source_copy_native_proof'] = next(iter(unrelated['bindings'].values()))['source_copy_native_proof']
     branch = next(row for row in case['inventory']['native_coverage']['obligations'] if row['id'] == identity)
     result = completion.evidence_result(binding['evidence']['program'], branch,
         case['inventory']['native_coverage']['candidate_sha256'], 'program', 'product', base,
         binding, source_root=audit.ROOT)
-    assert result == ('missing', 'Source successor current candidate differs')
+    assert result == ('missing', 'Unbound Source accounting program equivalence')
+
+
+@pytest.mark.parametrize('origin_field', ('capture', 'program', 'bindings', 'requirements'))
+def test_accounting_successor_rejects_resigned_origin_descriptor_substitution(source_accounting_case, origin_field):
+    import hashlib
+    import os
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_branch_evidence import write_json
+    case = source_accounting_case
+    packet = case['cases']['2022.1']
+    product = case['product']
+    index = json.loads(packet['index'].read_bytes())
+    output = case['output'] / ('origin-substitution-' + origin_field)
+    output.mkdir()
+    def emit(name, value):
+        return {**write_json(output / name, value), 'artifact': (output / name).relative_to(product).as_posix()}
+    origin = index['entries'][0]['origin']
+    original = origin[origin_field]
+    raw = (product / original['artifact']).read_bytes()
+    # Program identity already has a hash check; isolate its locator identity.
+    # Other origins replace bytes and hash while keeping parsed JSON identical.
+    replacement_raw = raw if origin_field == 'program' else raw + b'\n '
+    replacement_path = output / (origin_field + '.json')
+    replacement_path.write_bytes(replacement_raw)
+    replacement = {'artifact': replacement_path.relative_to(product).as_posix(),
+                   'sha256': hashlib.sha256(replacement_raw).hexdigest()}
+    assert replacement != original
+    assert json.loads(replacement_raw) == json.loads(raw)
+    origin[origin_field] = replacement
+    if origin_field == 'program':
+        projected = completion.read_sealed_artifact(index['entries'][0]['bindings'], product)
+        for binding in projected['bindings'].values():
+            binding['evidence']['program']['artifact'] = replacement['artifact']
+        index['entries'][0]['bindings'] = emit('projected-bindings.json', projected)
+    index['base'] = os.path.relpath(product, output)
+    path = output / 'index.json'
+    write_json(path, index)
+    with pytest.raises(ValueError, match='Source accounting changed retained (origin|program)'):
+        audit.portable_binding_inputs(path, packet['requirements'])
 
 
 def test_source_successor_rejects_resigned_predecessor_substitution(source_successor_case):
