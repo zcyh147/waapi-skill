@@ -105,6 +105,10 @@ def selected_code_review(tmp_path_factory, component):
     'tests/conftest.py',
     'tests/support/exact_evidence_finalization.py',
     'pyproject.toml',
+    'ci/test_readiness.py',
+    'skills/waapi-skill/wwise_waapi/cli_console_business_cli.py',
+    'skills/waapi-skill/wwise_waapi/builders/common.py',
+    'skills/waapi-skill/wwise_waapi/manifest.py',
 ])
 def test_host_selected_code_reader_rejects_changed_execution_helper(selected_code_review, monkeypatch, helper):
     from pathlib import Path
@@ -150,7 +154,7 @@ def test_host_mapping_reader_rejects_changed_verifier_helper(mapping_review, mon
 
 
 def test_host_source_reconciliation_keeps_original_run_and_reads_seven_selected_anchors(component):
-    from tests.support.host_completion_mapping import BASE
+    from tests.support.host_completion_mapping import BASE, RUNTIME_SOURCES
     from tests.support.ordinary_test_run_evidence import read_ordinary_test_run, OUTCOME
     original = audit.ROOT / BASE / 'export-r1/original'
     companion = audit.ROOT / BASE / 'source-repair-r1'
@@ -161,6 +165,23 @@ def test_host_source_reconciliation_keeps_original_run_and_reads_seven_selected_
     rows = {row['id']: row for row in component['native_coverage']['obligations']}
     assert len(bindings['bindings']) == 7
     for identity, binding in bindings['bindings'].items():
+        assert set(binding['relevant_sources']) == RUNTIME_SOURCES
         assert read_ordinary_test_run(binding['evidence']['program'], rows[identity],
             component['native_coverage']['candidate_sha256'], 'program', 'product', base,
             binding, audit.ROOT) == (OUTCOME, None)
+
+
+def test_host_selected_code_reader_rejects_missing_runtime_source(selected_code_review, monkeypatch):
+    from pathlib import Path
+    from tests.support.ordinary_test_run_evidence import read_ordinary_test_run
+    destination, binding, branch, candidate = selected_code_review
+    missing = audit.ROOT / 'skills/waapi-skill/wwise_waapi/cli_console_business_cli.py'
+    original = Path.read_bytes
+    def missing_bytes(path):
+        if path == missing:
+            raise FileNotFoundError('missing packaged runtime source')
+        return original(path)
+    monkeypatch.setattr(Path, 'read_bytes', missing_bytes)
+    with pytest.raises(FileNotFoundError, match='missing packaged runtime source'):
+        read_ordinary_test_run(binding['evidence']['program'], branch, candidate,
+            'program', 'product', destination, binding, audit.ROOT)

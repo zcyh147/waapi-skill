@@ -9,12 +9,12 @@ added.
 The five files in `original/` are byte-identical copies from `../export-r1/original/`:
 **70 passed, zero skipped, 190.22s**, clean candidate
 `727187ced057643927a6f692f66d4eabe86293dd`. They are not a new test run.
-`source-review.json` explains the nine added dependency seals; the seven
+`source-review.json` lists the complete runtime and selected dependency seals; the seven
 `program-anchor-*.json` records enforce them through the ordinary reader's
 original Git source and current source checks.
 
 The finite Host component candidate is
-`5fac21cf64756fcd5fa769a0d52e6ea3a99f77226ba70269c3240a8d21ed90bc`.
+`1a6bc8f75b1975f3904233e18a8d8302aa7d1586ed75e038e48b5dac462d04b8`.
 It is neither the global candidate nor a sibling completion claim. Original
 `export-r1` mappings remain frozen historical evidence. The settled integration
 join must use current representative mappings and requirements, with these
@@ -68,3 +68,18 @@ WAAPI_TEST_PYTHON=/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mo
 Use a fresh basetemp for a new invocation. No Fresh, native Wwise or full gate
 was run for this repair. Combined gates, candidate reconciliation and canonical
 publication remain integration-owned.
+
+The final source review seals all **202 tracked packaged Python files** below
+`scripts/` and `wwise_waapi/`, plus the precise selected tests/helpers,
+`pyproject.toml`, the four ordinary runner files and `ci/test_readiness.py`:
+**224 relevant sources** per anchor. The finite runtime roster comes from
+`git ls-files`; the producer compares it with `git ls-tree` at the original
+candidate and checks every original/current byte before emission. No source
+from a generated tree, cache or local virtual environment is enumerated.
+
+This conservative closure includes parser registration in
+`cli_console_business_cli.py`, manifest/schema helpers, all setter/readback
+builders and canonical serialization. It deliberately invalidates reuse after
+an unrelated packaged Python change. It grants no extra execution coverage.
+The full lists and exact original/current seals live in `source-review.json`
+and the seven standard program anchors; no reader or dependency framework changed.
