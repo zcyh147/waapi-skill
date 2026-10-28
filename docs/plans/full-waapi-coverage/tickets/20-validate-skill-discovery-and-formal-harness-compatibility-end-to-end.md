@@ -1,6 +1,6 @@
 # 20: Validate Skill discovery and formal-harness compatibility end to end
 
-Status: approved for implementation on 2026-10-17. Published as [20: Validate Skill discovery and formal-harness compatibility end to end](https://github.com/zcyh147/waapi-skill/issues/194).
+Status: completed on 2026-10-28 under the approved representative acceptance policy. Published as [20: Validate Skill discovery and formal-harness compatibility end to end](https://github.com/zcyh147/waapi-skill/issues/194).
 
 ## Parent
 
@@ -88,3 +88,14 @@ Withdraw all three proposed repeat runs. The user questioned their duplication a
 - The selected TYP22 prompt is unchanged. A focused comparison from `ce06b25` to `ab69468b` found new outputs, scope/Short-ID choices and missing-field reporting, but this existing query selects none of those branches. Its first-candidate repair and flat-AND query remain the same interaction. Optional native candidate facts are a producer/consumer change for deterministic validation, not sufficient reason to repeat this Agent task.
 
 A new commit, old archive-reader incompatibility, broader instructions or an important feature name alone does not justify another Fresh attempt. This decision retains historical observations rather than manufacturing a current archive PASS or weakening archive integrity checks. #194 still owns final routing/evidence reconciliation; #195 owns current mapping, affected code proof and stable combined gates. Any later concrete new Agent interaction requires a separately justified proposal and exact budget. The three-run table above is historical proposal context only and must not be scheduled.
+
+
+## Closeout — 2026-10-28
+
+Completed the shared Skill/Gateway routing and formal-harness implementation, exact public Draft/event compatibility, original compound-child replay, near-capacity Unicode/escaped terminal delivery through the actual Gateway → authenticated Broker → archive chain, and the current-format formal Fresh evidence reader with source/scope/corruption controls.
+
+Existing completed proof is retained with its original candidate: `8a87aa3e` affected integration (1488 passed, 5 intentional skips); `f6adb041` central preflight (825 passed) and separate affected integration (494 passed); Fresh reader final selection (22 passed) and its separately recorded material review repair (4 affected tests passed); actual current public Draft/event roster at `0586b6d4` (1 passed). These are distinct deterministic runs, not a new combined gate or Fresh execution. `IMPLEMENTATION.md`, `tests/TEST_INVENTORY.md`, and the retained reader/roster reports preserve the original outcomes, including earlier failures.
+
+The final additional Fresh selection is zero following the duplicate-task delta audit above. Historical Fresh observations retain their original task/candidate/host limits. Incompatible old archives do not receive current-reader PASS, and no archive, raw verdict or source seal was changed to obtain acceptance.
+
+Final exhaustive five-version native-to-public field/option mappings, representative evidence assignments, accepted-limit/host/build reconciliation and the stable combined Program/Non-live gates remain required under [#195](https://github.com/zcyh147/waapi-skill/issues/195). This is the existing integration ticket's work, not a scope exclusion or a declaration that the parent is complete. The shared mechanisms above have no identified remaining #194 implementation gap; any concrete new Agent interaction found during final reconciliation needs its own justified budget decision rather than an automatic repeat of old cases.
