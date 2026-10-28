@@ -24,8 +24,10 @@ _POST_2021_OPERATIONS = frozenset(
 
 _DECLARATIONS: dict[str, dict[str, Any]] = {
     "soundbank.generate": {
-        "required_fields": ["soundbanks", "platforms", "io_root"],
+        "required_fields": ["soundbanks", "io_root"],
         "optional_fields": [
+            "platforms",
+            "all_platforms",
             "all_user_soundbanks",
             "all_user_bank_expectations",
             "write_to_disk",
@@ -73,7 +75,9 @@ _DECLARATION_SCHEMAS: dict[str, dict[str, Any]] = {
     "soundbank.generate": {
         "type": "object",
         "additionalProperties": False,
-        "required": ["soundbanks", "platforms", "io_root"],
+        "required": ["soundbanks", "io_root"],
+        "oneOf": [{"required": ["platforms"], "not": {"required": ["all_platforms"]}},
+                  {"required": ["all_platforms"], "not": {"required": ["platforms"]}}],
         "properties": {
             "soundbanks": {
                 "type": "array",
@@ -120,6 +124,7 @@ _DECLARATION_SCHEMAS: dict[str, dict[str, Any]] = {
                 "default": True, "description": "Public default true preserves file generation. false explicitly selects memory generation; native-default omits native writeToDisk (documented false). Memory mode checks only the bounded result schema, diagnostics and input/output guards; it never verifies bank data or delivered artifacts. To receive memory data, establish the existing Gateway soundbank.generated Topic workflow before generation."},
             "skip_languages": {"oneOf": [{"type": "boolean"}, {"const": "native-default"}],
                 "description": "Public default derives from artifact layout for compatibility. Explicit true suppresses localized banks; false enables selected/all project languages; native-default omits native skipLanguages. Omitted languages select all live project languages without synthesizing a native languages array."},
+            "all_platforms": {"const": True, "description": "Explicitly generate for all configured live project platforms, bounded to 16. Mutually exclusive with platforms. Preview captures every GUID/name/output path and execution rejects changed scope; native dispatch enumerates only those captured GUIDs. Missing selection never implies all."},
             "platforms": {
                 "type": "array",
                 "minItems": 1,

@@ -1576,3 +1576,186 @@ def test_definition_gamesync_invalid_forms_stop_at_public_check(tmp_path: Path, 
     assert code == 2 and rejected["error_code"] == error, rejected
     assert not any(uri.endswith("processDefinitionFiles") for uri in calls)
     assert not list((tmp_path / "state" / "transactions").glob("*.json"))
+
+
+class GenerationPlatformFlow:
+    """Public Gateway flow with two independently declared project platforms."""
+    def __init__(self, tmp_path, version):
+        from tests.unit.test_operation_registry_soundbank import _project as generation_project, _copy_2021_project, WWISE_2021_PROJECT_ID
+        from copy import deepcopy
+        self.tmp_path, self.version, self.calls = tmp_path, version, []
+        if version == '2021.1':
+            self.io_root, self.project_file = _copy_2021_project(tmp_path)
+            self.project = {'id': WWISE_2021_PROJECT_ID, 'name': 'SampleProject', 'path': str(self.project_file)}
+            self.expected_ids = ['{9C6217D5-DD11-4795-87C1-6CE02853C541}', '{6E0CB257-C6C8-4C5C-8366-2740DFC441EC}']
+        else:
+            self.io_root, self.project = generation_project(tmp_path)
+            self.project_file = Path(self.project['path'])
+            windows = deepcopy(self.project['platforms'][0])
+            windows.update(id='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}', name='Windows', baseName='Windows',
+                soundBankPath=str(self.project_file.parent / 'GeneratedSoundBanks/Windows'),
+                copiedMediaPath=str(self.project_file.parent / 'GeneratedSoundBanks/Windows/Media'))
+            self.project['platforms'].append(windows)
+            self.expected_ids = ['{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}', '{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}']
+        self.env = set_gateway_config(_env(tmp_path), wwise_version=version)
+
+    def call(self, uri, args=None, options=None):
+        self.calls.append((uri, args, options))
+        if uri == 'ak.wwise.core.getInfo':
+            info = _info()
+            info['version'].update(year=int(self.version[:4]), displayName=f'v{self.version}.0.1')
+            return info
+        if uri == 'ak.wwise.core.getProjectInfo':
+            return self.project
+        if uri == 'ak.wwise.core.object.get':
+            if 'SoundBank' in args.get('waql', ''):
+                return {'return': []}
+            return {'return': [{'id': self.project['id'], 'name': 'SampleProject', 'type': 'Project',
+                'path': '\\', 'filePath': str(self.project_file), 'workunitIsDirty': False}]}
+        if uri == 'ak.wwise.core.soundbank.generate':
+            return {}
+        raise AssertionError((uri, args, options))
+
+    def disconnect(self):
+        pass
+
+    def run(self, *argv):
+        return gateway.execute_gateway(['--state-dir', str(self.tmp_path / 'state'), *argv],
+            env=self.env, client_factory=lambda _: self)
+
+    def start(self):
+        code, started = self.run('draft-start', 'soundbank.generate')
+        assert code == 0, started
+        self.draft, self.authority = started['draft']['draft_id'], started['task_authority']
+        return started
+
+    def declare(self, *platform_flags):
+        return self.run('draft-declare-soundbank-plan', self.draft, '--task-authority', self.authority,
+            '--expected-revision', '1', '--temporary-soundbank', 'Platform_Bank', 'nonlocalized',
+            *platform_flags, '--io-root', str(self.io_root), '--write-to-disk', 'false')
+
+    def preview(self):
+        code, checked = self.run('draft-check', self.draft, '--task-authority', self.authority, '--expected-revision', '2')
+        assert code == 0, checked
+        code, previewed = self.run('preview-from-draft', self.draft, '--task-authority', self.authority,
+            '--expected-revision', str(checked['draft']['revision']))
+        assert code == 0, previewed
+        self.tx = previewed['transaction_id']
+        self.prepared = TransactionStore(self.tmp_path / 'state').load_preview(self.tx).artifact['prepared_operation']
+        return previewed
+
+
+@pytest.mark.parametrize('version', OPERATIONS['soundbank.generate'])
+@pytest.mark.parametrize('selection', ['all', 'subset'])
+def test_generate_explicit_all_platforms_reaches_bounded_immutable_preview(tmp_path, version, selection):
+    flow = GenerationPlatformFlow(tmp_path, version)
+    if selection == 'all':
+        code, schema = flow.run('--version', version, 'operation-schema', 'soundbank.generate')
+        assert code == 0, schema
+        declaration = schema['business_adapter']['declaration']
+        assert declaration['schema']['properties']['all_platforms']['const'] is True
+        assert declaration['schema']['oneOf'] == [
+            {'required': ['platforms'], 'not': {'required': ['all_platforms']}},
+            {'required': ['all_platforms'], 'not': {'required': ['platforms']}}]
+    started = flow.start()
+    assert '--all-platforms' in json.dumps(started)
+    code, declared = flow.declare(*(['--all-platforms'] if selection == 'all' else ['--platform', 'Mac']))
+    assert code == 0, declared
+    previewed = flow.preview()
+    scope = flow.prepared['verification_plan']['plan']['scope']
+    assert scope['all_platforms'] is (selection == 'all')
+    assert scope['all_platform_scope_strategy'] == ('bounded_live_enumeration' if selection == 'all' else None)
+    assert scope['implicit_all_platforms_allowed'] is False
+    expected = flow.expected_ids if selection == 'all' else flow.expected_ids[:1]
+    assert flow.prepared['dispatch']['args']['platforms'] == expected
+    assert [row['name'] for row in scope['platforms']] == (['Mac', 'Windows'] if selection == 'all' else ['Mac'])
+    assert [row['id'] for row in flow.prepared['verification_plan']['plan']['artifact_plan']['platforms']] == expected
+    assert ('all_platforms' in json.dumps(previewed)) is (selection == 'all')
+    assert 'Mac' in json.dumps(previewed)
+    if selection == 'all':
+        assert 'Windows' in json.dumps(previewed)
+    assert not any(uri.endswith('soundbank.generate') for uri, _, _ in flow.calls)
+    # The new scope choice does not authorize its own execution.
+    code, refused = flow.run('execute', flow.tx)
+    assert code == 2, refused
+    assert not any(uri.endswith('soundbank.generate') for uri, _, _ in flow.calls)
+    code, shown = flow.run('transaction-show', flow.tx)
+    assert code == 0, shown
+    code, confirmed = flow.run('confirm', flow.tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, executed = flow.run('execute', flow.tx)
+    assert code == 0, executed
+    code, verified = flow.run('verify', flow.tx)
+    assert code == 0, verified
+    flow.run('execute', flow.tx)
+    assert sum(uri.endswith('soundbank.generate') for uri, _, _ in flow.calls) == 1
+
+
+@pytest.mark.parametrize('version', OPERATIONS['soundbank.generate'])
+@pytest.mark.parametrize('selection', ['missing', 'contradictory'])
+def test_generate_platform_selection_is_explicit_and_invalid_declaration_is_atomic(tmp_path, version, selection):
+    flow = GenerationPlatformFlow(tmp_path, version)
+    flow.start()
+    code, rejected = flow.declare(*([] if selection == 'missing' else ['--all-platforms', '--platform', 'Mac']))
+    assert code == 2, rejected
+    assert not any(uri.endswith('soundbank.generate') for uri, _, _ in flow.calls)
+    # The same revision remains usable with one explicit narrow selector.
+    code, declared = flow.declare('--platform', 'Mac')
+    assert code == 0, declared
+
+
+@pytest.mark.parametrize('version,fault', [('2021.1', 'platform-added'), ('2025.1', 'platform-added'), ('2025.1', 'configuration')])
+def test_generate_all_platforms_revalidates_scope_and_configuration_before_one_write(tmp_path, version, fault):
+    flow = GenerationPlatformFlow(tmp_path, version)
+    flow.start()
+    code, declared = flow.declare('--all-platforms')
+    assert code == 0, declared
+    flow.preview()
+    code, shown = flow.run('transaction-show', flow.tx)
+    assert code == 0, shown
+    code, confirmed = flow.run('confirm', flow.tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if fault == 'configuration':
+        set_gateway_config(flow.env, waapi_port=31338)
+    elif version == '2021.1':
+        import xml.etree.ElementTree as ET
+        tree = ET.parse(flow.project_file)
+        platforms = tree.find('./ProjectInfo/Project/Platforms')
+        ET.SubElement(platforms, 'Platform', {'Name': 'Linux', 'ReferencePlatform': 'Linux',
+            'ID': '{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}'})
+        tree.write(flow.project_file, encoding='utf-8', xml_declaration=True)
+    else:
+        from copy import deepcopy
+        added = deepcopy(flow.project['platforms'][0])
+        added.update(id='{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}', name='NewMac')
+        flow.project['platforms'].append(added)
+    code, rejected = flow.run('execute', flow.tx)
+    assert code == 2, rejected
+    if fault == 'configuration':
+        assert rejected['error_code'] == 'GatewayInputError'
+        assert 'configuration changed' in rejected['message']
+    else:
+        assert rejected['error_code'] == 'ROLE_GUARD_MISMATCH'
+    assert not any(uri.endswith('soundbank.generate') for uri, _, _ in flow.calls)
+
+
+@pytest.mark.parametrize('fault', ['empty', 'duplicate', 'oversized'])
+def test_generate_all_platform_inventory_fails_closed_before_preview(tmp_path, fault):
+    from copy import deepcopy
+    flow = GenerationPlatformFlow(tmp_path, '2025.1')
+    if fault == 'empty':
+        flow.project['platforms'] = []
+    elif fault == 'duplicate':
+        flow.project['platforms'].append(deepcopy(flow.project['platforms'][0]))
+    else:
+        for index in range(15):
+            added = deepcopy(flow.project['platforms'][0])
+            added.update(id=f'{{{index + 1:08X}-FFFF-FFFF-FFFF-FFFFFFFFFFFF}}', name=f'Platform_{index}')
+            flow.project['platforms'].append(added)
+    flow.start()
+    code, declared = flow.declare('--all-platforms')
+    assert code == 0, declared
+    code, rejected = flow.run('draft-check', flow.draft, '--task-authority', flow.authority, '--expected-revision', '2')
+    assert code == 2, rejected
+    assert rejected['error_code'] == ('DUPLICATE_SCOPE' if fault == 'duplicate' else 'INVALID_SCOPE'), rejected
+    assert not any(uri.endswith('soundbank.generate') for uri, _, _ in flow.calls)

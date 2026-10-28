@@ -67,9 +67,9 @@ MAX_TREE_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
 MAX_TREE_FILE_BYTES = 512 * 1024 * 1024
 MAX_TREE_DEPTH = 32
 
-_GENERATE_REQUIRED_KEYS = frozenset({"soundbanks", "platforms"})
+_GENERATE_REQUIRED_KEYS = frozenset({"soundbanks"})
 _GENERATE_OPTIONAL_KEYS = frozenset(
-    {"languages", "skipLanguages", "writeToDisk", "rebuildSoundBanks", "clearAudioFileCache", "rebuildInitBank", "allUserSoundBanks"}
+    {"languages", "skipLanguages", "writeToDisk", "rebuildSoundBanks", "clearAudioFileCache", "rebuildInitBank", "allUserSoundBanks", "platforms", "allPlatforms"}
 )
 _GENERATE_BANK_REQUIRED_KEYS = frozenset({"name", "artifactExpectation"})
 _GENERATE_BANK_OPTIONAL_KEYS = frozenset({"events", "auxBusses", "inclusions", "rebuild"})
@@ -994,11 +994,18 @@ def build_generate_operation_plan(
             bank["rebuild"] = _require_bool(raw["rebuild"], field=f"soundbanks[{index}].rebuild")
         normalized_banks.append(bank)
 
-    requested_platforms = _require_nonempty_strings(
-        arguments.get("platforms"),
-        field="platforms",
-        limit=MAX_PLATFORMS,
-    )
+    # Native omission means all platforms. Deliberate all-platform intent is
+    # captured here and still dispatches explicit GUIDs, so a later native
+    # platform addition cannot silently widen the write beyond Preview.
+    all_platforms = "allPlatforms" in arguments
+    if all_platforms:
+        if arguments["allPlatforms"] is not True or "platforms" in arguments:
+            raise SoundBankContractError("INVALID_SCOPE", "Choose all configured platforms or one explicit platform list.")
+        available = _require_sequence(project_info.get("platforms"), field="project_info.platforms")
+        requested = [row.get("id") if isinstance(row, Mapping) else None for row in available]
+    else:
+        requested = arguments.get("platforms")
+    requested_platforms = _require_nonempty_strings(requested, field="platforms", limit=MAX_PLATFORMS)
     selected_platforms = _resolve_project_rows(
         requested_platforms,
         project_info.get("platforms"),
@@ -1145,6 +1152,8 @@ def build_generate_operation_plan(
             "all_user_soundbanks": "allUserSoundBanks" in arguments,
             "all_user_scope_strategy": ("native_empty_list" if lane in {"2023.1", "2024.1", "2025.1"} else "bounded_live_enumeration") if "allUserSoundBanks" in arguments else None,
             "implicit_all_platforms_allowed": False,
+            "all_platforms": all_platforms,
+            "all_platform_scope_strategy": "bounded_live_enumeration" if all_platforms else None,
             "implicit_all_languages_allowed": "languages" not in arguments,
             "auto_defined_soundbanks": (
                 "generated_by_wwise_if_project_feature_enabled_and_not_selectable_by_this_api"
