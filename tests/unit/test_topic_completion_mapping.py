@@ -33,6 +33,9 @@ def test_topic_family_maps_native_choices_to_public_contract_and_reports_missing
     assert all('native' not in row['evidence_results'] for row in result['obligations'])
     assert exported['summary']['mapping_is_not_execution_credit'] is True
     assert exported['summary']['largest_mapping_bytes'] < 100 * 1024 * 1024
+    assert len(exported['summary']['requirements_parts']) == 5
+    assert exported['summary']['canonical_requirements_import_ready'] is False
+    assert max(path.stat().st_size for path in tmp_path.rglob('*.json')) < 100 * 1024 * 1024
     owned = bindings['bindings'][
         '2025.1|wwise-authoring|2025.1.7.9143|topic|ak.wwise.ui.signal.toggle|/optionsSchema/properties/handleID']
     assert owned['input']['correspondence']['public_inputs'] == [{

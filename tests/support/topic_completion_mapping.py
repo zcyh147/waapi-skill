@@ -271,7 +271,18 @@ def export_mapping(root, destination, *, inventory=None, anchors=None):
             'requirements_sha256': requirements_sha256, 'mechanisms': [mechanism],
             'bindings': proposed, 'predecessors': predecessors}
         descriptors.append(write(f'mapping-{number:02}.json', attachment))
-    write('requirements.json', requirements)
+    # Each file remains an existing standard requirements document. The caller
+    # receives the merged in-memory document for the existing consumer; these
+    # parts do not introduce a new canonical loader or publish global policy.
+    requirement_parts = []
+    for version in sorted({identity.split('|')[0] for identity in rows}):
+        selected_members = {identity: policy for identity, policy in requirements['branches'].items()
+                            if identity.startswith(version + '|')}
+        selected_mechanisms = {policy['representative_mechanism'] for policy in selected_members.values()}
+        part = {'contract': requirements['contract'], 'branches': selected_members,
+            'representative_mechanisms': {key: requirements['representative_mechanisms'][key]
+                                        for key in sorted(selected_mechanisms)}}
+        requirement_parts.append(write(f'requirements-{version}.json', part))
     index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': '.', 'entries': entries, 'mapping_attachments': descriptors}
     write('evidence-index.json', index)
     summary = {'component': inventory['component'], 'public_routes': len(inventory['routes']),
@@ -279,6 +290,8 @@ def export_mapping(root, destination, *, inventory=None, anchors=None):
         'mechanisms': {key: len(value) for key, value in sorted(groups.items())},
         'catalogs': inventory['native_coverage']['catalogs'], 'candidate_sha256': candidate,
         'mapping_is_not_execution_credit': True, 'native_delivery_credit': False,
+        'requirements_parts': requirement_parts, 'merged_requirements_sha256': requirements_sha256,
+        'canonical_requirements_import_ready': False,
         'largest_mapping_bytes': max((destination / d['artifact']).stat().st_size for d in descriptors)}
     write('summary.json', summary)
     return {'index_path': destination / 'evidence-index.json', 'requirements': requirements,
