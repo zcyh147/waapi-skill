@@ -176,6 +176,43 @@ def object_identity_semantics(object_type: str) -> ObjectIdentitySemantics:
     return _BY_OBJECT_TYPE.get(object_type, _DEFAULT)
 
 
+def reviewed_existing_display_identity(*, version: str | None, object_type: str,
+                                      name: object, path: object) -> bool:
+    """Recognize reviewed exact-GUID display facts, never selector/name authority.
+
+    The #195 owned-role survey observed these shapes on 2025.1.7.9143.
+    Language, UserProjectSettings and MidiParameter have matching class/type
+    definitions in all five lanes; MediaPoolQuery is introduced in 2025. These
+    rules accept a matching live shape, without claiming it was seen on every
+    version or treating its text as a hierarchy path.
+    This comparison-only admission neither constructs nor renames an object.
+    """
+    if (version not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}
+            or not isinstance(name, str) or not isinstance(path, str)):
+        return False
+    if any(ord(character) < 32 or 127 <= ord(character) <= 159 for character in name + path):
+        return False
+    if object_type == "UserProjectSettings":
+        return name == "" and path == "<Unnamed Default Object Values>"
+    if not name or name != name.strip() or any(character in name for character in "\\/"):
+        return False
+    if object_type == "Language" or (version == "2025.1" and object_type == "MediaPoolQuery"):
+        return path == name
+    if object_type == "MidiParameter":
+        parts = path.split("\\")
+        return (len(parts) >= 2 and parts[0] == "MIDI" and parts[-1] == name
+                and all(part and part not in {".", ".."} and "/" not in part for part in parts))
+    return False
+
+
+def display_identity_requires_name_boundary(*, version: str | None, object_type: str,
+                                           name: object, path: object) -> bool:
+    """Withhold new name authority without regressing the old 2021 Language rule."""
+    return (reviewed_existing_display_identity(version=version, object_type=object_type,
+                name=name, path=path)
+            and not (version == "2021.1" and object_type == "Language"))
+
+
 def object_child_capability(
     *,
     version: str,

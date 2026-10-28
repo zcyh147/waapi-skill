@@ -2554,7 +2554,10 @@ def normalize_live_object_identity(row: Any, *, owned_identity=None, version: st
             and row['classId'] == descriptor['class_id'])
         if not certified_owned:
             raise ValueError('Owned identity does not name this exact GUID/class')
-    name = "" if (playlist_slot or certified_owned) and row.get("name") == "" else _bounded_object_name(row.get("name"), object_type=object_type)
+    from .object_capabilities import reviewed_existing_display_identity
+    existing_display = reviewed_existing_display_identity(version=version, object_type=object_type,
+        name=row.get("name"), path=row.get("path"))
+    name = "" if (playlist_slot or certified_owned or existing_display) and row.get("name") == "" else _bounded_object_name(row.get("name"), object_type=object_type)
     path = _bounded_required_text(
         row.get("path"),
         field="path",
@@ -2591,7 +2594,7 @@ def normalize_live_object_identity(row: Any, *, owned_identity=None, version: st
             and path == '[Marker]')
     )
     opaque_display_path = semantics.opaque_display_path
-    if not path.startswith("\\") and not derived_display_path and not reviewed_relative_display_path and not opaque_display_path:
+    if not path.startswith("\\") and not derived_display_path and not reviewed_relative_display_path and not opaque_display_path and not existing_display:
         raise ValueError(
             "path must be an absolute Wwise path or a reviewed derived display identity"
         )

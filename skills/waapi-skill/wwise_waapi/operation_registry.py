@@ -6486,6 +6486,7 @@ def _prepare_object_set(
             _reject_non_intrinsic_object_name_operation(
                 target,
                 operation="object.set objects[].name",
+                version=request.version,
             )
             requested_name = item.get("name")
             if not isinstance(requested_name, str) or not requested_name.strip():
@@ -12835,6 +12836,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         _reject_non_intrinsic_object_name_operation(
             source,
             operation=request.operation,
+            version=request.version,
         )
         if not isinstance(source_name, str) or not source_name or not isinstance(parent_path, str):
             raise OperationContractError(
@@ -12970,6 +12972,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             _reject_non_intrinsic_object_name_operation(
                 target,
                 operation=request.operation,
+                version=request.version,
             )
             if target.row.get("name") == value:
                 raise OperationContractError("NO_OP", "setName value already matches the live object name.")
@@ -29555,10 +29558,16 @@ def _reject_non_intrinsic_object_name_operation(
     target: ResolvedObject,
     *,
     operation: str,
+    version: str,
 ) -> None:
     """Fail when rename or collision proof needs a mutable intrinsic name."""
 
     object_type = target.row.get("type")
+    from .object_capabilities import display_identity_requires_name_boundary
+    if display_identity_requires_name_boundary(version=version, object_type=object_type,
+            name=target.row.get("name"), path=target.row.get("path")):
+        raise OperationContractError("DISPLAY_IDENTITY_NAME_BOUNDARY",
+            f"{operation} requires name/topology authority not established by exact display-identity admission.")
     semantics = (
         object_identity_semantics(object_type)
         if isinstance(object_type, str)
