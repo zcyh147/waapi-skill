@@ -30,7 +30,7 @@
     "sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22"
   },
   "program_capture": {
-    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-05-capture.json",
+    "artifact": "native-05-capture.json",
     "sha256": "c58b78c4c17b239d48bc82cd86566c1bc0eae645a819e038fd85d435c1d523ba"
   },
   "retained_facts": {

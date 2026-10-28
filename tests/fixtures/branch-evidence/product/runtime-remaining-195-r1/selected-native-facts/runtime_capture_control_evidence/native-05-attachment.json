@@ -3,10 +3,10 @@
   "branch_id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.stopCapture|/resultSchema",
   "assessment": {
     "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-05-assessment.json",
-    "sha256": "289fa9a57a2b2a10ebb29452f9e693b5c49c30ff22649a8898624b0caec5615f"
+    "sha256": "bdcc0ebebabf7b8494c87c617839f85ae4456f27c4905466b31fb9d3537d40b8"
   },
   "evidence": {
     "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-05-qualified.json",
-    "sha256": "4d494e21b5907666fa92e21edfe988362cb03c22b93e66faa53d57724e0c7a00"
+    "sha256": "fff84a0ff4eb3694dacad0da25223fcfe7af24fad117adf556fff774126c2b7a"
   }
 }

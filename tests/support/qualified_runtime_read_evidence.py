@@ -462,6 +462,8 @@ def attach_qualified_reads(descriptors, bindings, read, requirements, captures):
 def qualified_read_result(descriptor, branch, candidate, scope_kind, base, binding, root, edges, historical_sources, *, retained_member=None):
     assessment = completion.read_sealed_artifact(binding['qualified_runtime_read_attachment'], base)
     member = retained_member
+    if member is not None and scope_kind != 'product':
+        raise ValueError('Selected native facts require product scope')
     if member is not None:
         if runtime._RETAINED_QUALIFIED_MEMBER.get() is None:
             with runtime.retained_qualified_context(member):
@@ -658,12 +660,16 @@ def write_selected_native_bundle(output, inventory, identities, *, family):
     requirements = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
     context = {'original_review_target': next(iter(review['members'].values()))['original_review_target']}
     branches = {b['id']: b for b in inventory['native_coverage']['obligations']}
-    for ordinal, identity in enumerate(identities):
+    for identity in identities:
         with runtime.retained_qualified_context(context):
             module, fact, source, original_candidate, sources, report_path, report_raw = _selected_native_original(identity, root)
         if module.__name__ != family or identity not in branches:
             raise ValueError('Native-only conversion family or exact inventory differs')
-        branch = branches[identity]; profile = fact['profile']; name = f'native-{ordinal:02}-'
+        branch = branches[identity]; profile = fact['profile']
+        family_uris = module.URIS if hasattr(module, 'URIS') else {module.URI}
+        family_ids = [item for item in review['scope_ids']
+            if item.removesuffix('|/resultSchema').split('|')[-1] in family_uris]
+        name = f'native-{family_ids.index(identity):02}-'
         archive = {'artifact': source['archive_source'], 'sha256': source['archive_sha256']}
         capture = emit(name + 'capture.json', {'archive': archive, 'capture_original_path': report_path,
             'report_sha256': runtime.sha(report_raw), 'candidate': original_candidate})
@@ -671,7 +677,7 @@ def write_selected_native_bundle(output, inventory, identities, *, family):
         field = 'source_review' if module.__name__.endswith(('extra_runtime_read_evidence', 'meter_runtime_read_evidence')) else 'support_review'
         facts_field = 'retained_facts' if field == 'source_review' else 'facts'
         assessment = emit(name + 'assessment.json', {'contract': module.CONTRACT, 'branch_id': identity,
-            'profile': profile, field: support, 'archive': archive, 'program_capture': capture,
+            'profile': profile, field: support, 'archive': archive, 'program_capture': {**capture, 'artifact': Path(capture['artifact']).name},
             facts_field: fact['facts']})
         kind = {'runtime_cursor_evidence': 'cursor_fact', 'runtime_capture_control_evidence': 'capture_control_ack',
             'runtime_owned_control_evidence': 'owned_control_fact', 'extra_runtime_read_evidence': 'diagnostic_fact',
@@ -712,7 +718,7 @@ def _selected_native_report_result(descriptor, assessment, branch, base, root, m
     """Report-backed facts retain their original partial/ACK/verdict boundaries."""
     module, fact, source, original_candidate, sources, report_path, report_raw = _selected_native_original(branch['id'], root)
     record = completion.read_sealed_artifact(descriptor, base)
-    capture = completion.read_sealed_artifact(assessment['program_capture'], root)
+    capture = completion.read_sealed_artifact(assessment['program_capture'], base)
     field = 'source_review' if module.__name__.endswith(('extra_runtime_read_evidence', 'meter_runtime_read_evidence')) else 'support_review'
     facts_field = 'retained_facts' if field == 'source_review' else 'facts'
     expected = {'contract': module.CONTRACT, 'branch_id': branch['id'], 'profile': fact['profile'],

@@ -4,7 +4,7 @@
   "evidence_kind": "qualified_retained_capture_control_ack",
   "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.enableProfilerData|/resultSchema",
   "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
-  "assessment_sha256": "21dd45917cff5d337853e695fb044229bfd77b0fdd33d8de0067407673f968af",
+  "assessment_sha256": "97e8b1982695cee13eac43c13c16ea8cce94eb05d74e8ffb871bc7d7a25555dc",
   "retained_facts": {
     "original_candidate": "3368fd48d500db9e56d14dfa3a0901496f32ab3a",
     "original_context": {

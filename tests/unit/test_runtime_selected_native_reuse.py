@@ -61,6 +61,28 @@ def test_partial_cpu_native_conversion_does_not_create_current_program(native_ou
     assert not any('program' in binding['evidence']
         for entry in document['entries']
         for binding in completion.read_sealed_artifact(entry['bindings'], audit.ROOT)['bindings'].values())
+    policies = json.loads((index.parent / 'requirements.json').read_bytes())
+    imported, base, _ = audit.portable_binding_inputs(index, policies)
+    binding = imported['bindings'][identity]
+    produced_native = base / binding['evidence']['native']['artifact']
+    assert produced_native.resolve().is_relative_to(native_output.resolve())
+    inventory = log_inventory(route, pointers={'/resultSchema'})
+    def consume():
+        return completion.evaluate_coverage(audit.ROOT, inventory, imported,
+            digest=audit.digest, evidence_base=base, requirements_document=policies)['obligations'][0]
+    row = consume()
+    assert row['evidence_results']['native']['outcome'] == 'passed', row['evidence_results']
+    assert row['evidence_results']['program']['outcome'] == 'missing'
+    assert row['state'] != 'verified'
+    # Damage this actual emitted artifact, rather than a committed packet.
+    qualified = json.loads(produced_native.read_bytes())
+    qualified['retained_facts']['original_public_complete'] = True
+    produced_native.write_text(json.dumps(qualified))
+    damaged, _, _ = audit.portable_binding_inputs(index, policies)
+    imported = damaged
+    row = consume()
+    assert row['evidence_results']['native']['outcome'] == 'missing'
+    assert row['state'] != 'verified'
 
 
 @pytest.fixture(scope='module')
@@ -161,7 +183,7 @@ def test_missing_current_code_leaves_requirement_incomplete_and_native_fact_inta
         {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': {identity: binding}},
         digest=audit.digest, evidence_base=audit.ROOT, requirements_document=requirements)
     row, = result['obligations']
-    assert row['evidence_results']['native']['outcome'] == 'passed'
+    assert row['evidence_results']['native']['outcome'] == 'passed', row['evidence_results']
     assert row['evidence_results']['program']['outcome'] == 'missing'
     assert row['state'] != 'verified'
 
@@ -177,3 +199,18 @@ def test_scoped_native_reuse_does_not_relax_legacy_source_or_cache_guards(select
     route = '2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime'
     with pytest.raises(ValueError, match='source delta'):
         cursor.original_cursor(route)
+
+
+
+@pytest.mark.parametrize('damage', ['review-locator', 'scope'])
+def test_selected_review_locator_and_scope_fail_closed(selected_native_inputs, damage):
+    _, branches, bindings, _ = selected_native_inputs
+    identity = next(i for i in bindings if '|wwise-authoring|' in i and i.endswith('getCpuUsage|/resultSchema'))
+    binding = deepcopy(bindings[identity])
+    if damage == 'review-locator':
+        binding['native_only_review']['artifact'] = 'missing-selected-source-review.json'
+        result = native_result(binding, branches[identity])
+    else:
+        result = completion.evidence_result(binding['evidence']['native'], branches[identity], 'e' * 64,
+            'native', 'controlled', audit.ROOT, binding=binding, source_root=audit.ROOT)
+    assert result[0] == 'missing'

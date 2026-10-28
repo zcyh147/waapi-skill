@@ -2106,7 +2106,7 @@ RUNTIME_SOURCE_SUCCESSOR_SHA = 'da83fa524df905daf8b3ced0b83269777f085d7bb4d23f54
 
 
 SELECTED_RUNTIME_SOURCE_SUCCESSOR = 'tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-source-successor.json'
-SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA = 'c6e1a2318e30e3450e17c229b29f2f6665478564c4eef18299721d8ddf04a912'
+SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA = '575a91323408a7981e22f632c897924a5afcaf8942440fb895665cca846d7f01'
 _RETAINED_QUALIFIED_MEMBER = ContextVar('retained_qualified_runtime_member', default=None)
 
 
@@ -2221,6 +2221,8 @@ def retained_runtime_native(binding, branch, root, base):
     selected = descriptor['sha256'] == SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA
     if descriptor['sha256'] != RUNTIME_SOURCE_SUCCESSOR_SHA and not selected:
         raise ValueError('Runtime native-only source review differs')
+    if selected:
+        completion.read_sealed_artifact(descriptor, base)
     review = selected_runtime_source_successor(root) if selected else runtime_source_successor(root)
     member = review['members'].get(branch['id'])
     if (member is None or binding.get('native_shape_sha256') != branch['shape_sha256']

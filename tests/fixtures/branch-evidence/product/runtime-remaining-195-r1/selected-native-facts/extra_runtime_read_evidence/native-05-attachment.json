@@ -3,10 +3,10 @@
   "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia|/resultSchema",
   "assessment": {
     "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-05-assessment.json",
-    "sha256": "5722af47117c585038a0db9d5a67564d70589bcf78f4acf81223a001c461a1e8"
+    "sha256": "da306be4fc151e4105184ee4eaf6724033681f673aeed59d66ae2047f75983e7"
   },
   "evidence": {
     "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-05-qualified.json",
-    "sha256": "c2f1320697aa72fe1530b441cf704fba98e678580cb586e7dcf1558a4da88508"
+    "sha256": "2647806c991864e0d0eac53f7fa945b61474a4a5d33be14bc4d0635ec8559ea8"
   }
 }
