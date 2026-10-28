@@ -3455,8 +3455,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "ak.wwise.core.soundbank.generate",
         "soundbank",
         "Generate selected, temporary, or all user SoundBanks inside an owned I/O root; verify files independently or disclose the in-memory result-only boundary.",
-        ("soundbanks", "platforms", "io_root"),
+        ("soundbanks", "io_root"),
         (
+            "platforms",
+            "all_platforms",
             "all_user_soundbanks",
             "all_user_bank_expectations",
             "skip_languages",
@@ -3466,10 +3468,11 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "clear_audio_file_cache",
             "rebuild_init_bank",
         ),
-        argument_contract=_object_contract(
-            ("soundbanks", "platforms", "io_root"),
+        argument_contract={**_object_contract(
+            ("soundbanks", "io_root"),
             {
                 "soundbanks": {"type": "array", "minItems": 0, "maxItems": 64, "items": _SOUNDBANK_GENERATE_ITEM_SCHEMA},
+                "all_platforms": {"const": True},
                 "platforms": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "string", "minLength": 1}},
                 "languages": {
                     "type": "array",
@@ -3509,6 +3512,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "io_root": {"type": "string", "minLength": 1},
             },
             optional=(
+                "platforms",
+                "all_platforms",
                 "all_user_soundbanks",
                 "all_user_bank_expectations",
                 "skip_languages",
@@ -3518,10 +3523,11 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "clear_audio_file_cache",
                 "rebuild_init_bank",
             ),
-        ),
+        ), "oneOf": [{"required": ["platforms"], "not": {"required": ["all_platforms"]}},
+                      {"required": ["all_platforms"], "not": {"required": ["platforms"]}}]},
         identity_arguments=("soundbanks[].events[]", "soundbanks[].aux_busses[]", "all_user_bank_expectations[].soundbank"),
         constraints=(
-            "SoundBank scope is selected or explicitly all-user; platforms remain bounded and explicit; omitted languages mean all live project languages; Init is an automatic by-product",
+            "SoundBank scope is selected or explicitly all-user; platform scope is one explicit list or all_platforms=true with bounded live enumeration; missing/contradictory selection fails; omitted languages mean all live project languages; Init is an automatic by-product",
             "language selection is batch-wide; explicit skip_languages=true conflicts with localized artifact expectations; preserve native omission and explicit options",
             "batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent; preserve every explicitly supplied value at its original level",
             "Event and AuxBus descriptors resolve live to one GUID before preview",
@@ -10107,8 +10113,15 @@ def _collect_existing_condition_closure(
                 raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds the finite unique-field budget.")
             child = collected.get(controller) or property_info_by_name.get(controller)
             if child is None:
-                child = (_read_property_info_cached(read, cache=property_info_cache, name=name, object_id=object_id)
-                         if property_info_cache is not None else _read_property_info(read, name=name, object_id=object_id))
+                try:
+                    child = (_read_property_info_cached(read, cache=property_info_cache, name=name, object_id=object_id)
+                             if property_info_cache is not None else _read_property_info(read, name=name, object_id=object_id))
+                except OperationContractError as exc:
+                    raise OperationContractError(exc.error_code,
+                        "Required condition controller metadata is unavailable; this field change cannot be prepared.",
+                        details={"reason": "required_controller_metadata_unavailable", "field": info.name,
+                            "controller": name, "cause": {"error_code": exc.error_code,
+                                "message": str(exc), "details": exc.details}}) from exc
             if child.name != name:
                 raise OperationContractError("INVALID_METADATA", "Condition controller metadata names a different field.")
             collected[controller] = child
@@ -17006,6 +17019,16 @@ def _prepare_closed_soundbank_operation(
             "memory_data_topic": "ak.wwise.core.soundbank.generated",
             "memory_data_subscription_required_before_generation": not files_requested,
         }
+        if plan["scope"]["all_platforms"]:
+            # This exact scope is required notice, including in compact/digest
+            # transaction projections. The existing output ceiling fails closed
+            # rather than hiding configured destinations before authorization.
+            verification["verification_scope"]["all_configured_platforms"] = [
+                {"id": row["id"], "name": row["name"], "base_name": row["baseName"],
+                 "bank_output_root": row["soundBankPath"], "copied_media_output_root": row["copiedMediaPath"]}
+                for row in plan["artifact_plan"]["platforms"]
+            ]
+            verification["verification_scope"]["platform_scope_strategy"] = "bounded_live_enumeration"
     if definition_oracle is not None:
         verification["definition_oracle"] = _json_mapping(definition_oracle)
         weak_banks = [bank for bank in definition_oracle["banks"] if bank["expected_inclusions"] is None]
@@ -17337,10 +17360,15 @@ def _normalize_generate_arguments(
             if name in bank:
                 normalized[name] = bank[name]
         normalized_banks.append(normalized)
-    result: dict[str, Any] = {
-        "soundbanks": normalized_banks,
-        "platforms": list(arguments.get("platforms", [])),
-    }
+    result: dict[str, Any] = {"soundbanks": normalized_banks}
+    if "all_platforms" in arguments:
+        if arguments["all_platforms"] is not True or "platforms" in arguments:
+            raise OperationContractError("INVALID_SCOPE", "Choose all configured platforms or an explicit platform list.")
+        result["allPlatforms"] = True
+    elif "platforms" in arguments:
+        result["platforms"] = list(arguments["platforms"])
+    else:
+        raise OperationContractError("INVALID_SCOPE", "Platform selection must be explicit; missing does not imply all.")
     if "all_user_soundbanks" in arguments:
         query = "from type SoundBank take 65"
         rows = _rows(read(OBJECT_GET_URI, {"waql": query}, {"return": list(IDENTITY_RETURN_FIELDS)}))

@@ -1,0 +1,26 @@
+{
+  "control": "remove exactly one required ordinary CODE anchor, keeping all native mappings and requirements",
+  "removed_anchor": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.audio.convert|/argsSchema",
+  "completion": {
+    "complete": false,
+    "obligations": 10868,
+    "routes": 144,
+    "states": {
+      "implemented_unverified": 290,
+      "mapped_with_representative_proof": 10571,
+      "verified": 7
+    },
+    "by_owner": {
+      "183": {
+        "implemented_unverified": 290,
+        "mapped_with_representative_proof": 8643,
+        "verified": 5
+      },
+      "184": {
+        "mapped_with_representative_proof": 1928,
+        "verified": 2
+      }
+    }
+  },
+  "no_test_native_or_fresh_execution": true
+}

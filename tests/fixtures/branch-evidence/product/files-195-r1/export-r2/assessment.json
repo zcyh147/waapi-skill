@@ -1,0 +1,59 @@
+{
+  "assessment_scope": "exact #183/#184 correspondence and representative CODE only; historical native effects/limits separately attributed; no global completion",
+  "completion": {
+    "by_owner": {
+      "183": {
+        "mapped_with_representative_proof": 8932,
+        "verified": 6
+      },
+      "184": {
+        "mapped_with_representative_proof": 1928,
+        "verified": 2
+      }
+    },
+    "complete": true,
+    "obligations": 10868,
+    "routes": 144,
+    "states": {
+      "mapped_with_representative_proof": 10860,
+      "verified": 8
+    }
+  },
+  "evidence_outcomes": [
+    "reviewed_aggregate_code_mechanism",
+    "reviewed_representative_mechanism"
+  ],
+  "summary": {
+    "candidate_sha256": "e75754c0d43ed19ac572218e6c1fff09a3341395d90332c8a6418c4b42c43cdc",
+    "canonical_import_pending": true,
+    "catalogs": {
+      "2021.1|wwise-authoring|2021.1.14.8108": "237c92402a950df73a75cb15a5ad2fc48fbfeadef311053afea846632996ec7b",
+      "2021.1|wwise-console|2021.1.14.8108": "1095c5d28b63fa0c36da6bf7a970462e979d72d03b24444d51061a5c703501c8",
+      "2022.1|wwise-authoring|2022.1.19.8584": "b04cb8629b2f26a69e827bb6957885685dc61b8bd6ea95df2949f9ec2cbe6df1",
+      "2022.1|wwise-console|2022.1.19.8584": "a01fdc6d252579c8c4a83ed9423850efe6a70dc83b2882f8a7e49eca5032bdae",
+      "2023.1|wwise-authoring|2023.1.19.8928": "e2b9eca52f6b57622253b3d937fb7974dc9ec9176fb7cfe7d1b64dc3e63ea9b1",
+      "2023.1|wwise-console|2023.1.19.8928": "d5990c1eab159c8ab86d168777265f6f4d6531ea84891e3d569be29ad9668841",
+      "2024.1|wwise-authoring|2024.1.13.9056": "32d68574fe0f41a4ee70bb1c6098f5ecdac434d6f6e00bbb237cba4aa28f7fd9",
+      "2024.1|wwise-console|2024.1.13.9056": "7f7e2f12e5a6fa369d33edc24f4aaa5dcf7fcaa48d5a357d7ddec33481840b89",
+      "2025.1|wwise-authoring|2025.1.7.9143": "411c83c1e9b0d8d1fcb0fa82242e1a47728525379dfca93d1c4c40a9325679b5",
+      "2025.1|wwise-console|2025.1.7.9143": "7b3e3bc255bbc425bde6820e44bfdda6302a42da623e987e9ab4414651a36dc8"
+    },
+    "component": "files-195-r1",
+    "largest_mapping_bytes": 14099319,
+    "mapping_is_not_execution_credit": true,
+    "mechanisms": {
+      "files195-audio-convert-v1": 290,
+      "files195-cli-build-v1": 2344,
+      "files195-cli-project-files-v1": 1570,
+      "files195-console-project-transitions-v1": 360,
+      "files195-conversion-result-only-v1": 136,
+      "files195-core-generation-conversion-v1": 5176,
+      "files195-definition-table-v1": 112,
+      "files195-inclusions-v1": 880
+    },
+    "native_members": 10868,
+    "native_or_fresh_started": false,
+    "native_routes": 144,
+    "public_routes": 85
+  }
+}

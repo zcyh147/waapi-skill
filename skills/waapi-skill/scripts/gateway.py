@@ -29836,7 +29836,7 @@ def _business_next_action_binding(
                 "[--aux-bus <bound-soundbank-handle> <bound-aux-bus-handle>]...",
                 "[--generation-inclusion <bound-soundbank-handle> <one-or-more-unique-events|structures|media-filters>]...",
                 "[--soundbank-rebuild <bound-soundbank-handle> true|false]...",
-                "--platform <project-platform-name> [--platform ...]",
+                "--platform <project-platform-name> [--platform ...] | --all-platforms (explicit all configured platforms, at most 16; do not combine)",
                 "[--language <localized-project-language>]...",
                 "[--rebuild-soundbanks true|false]",
                 "[--clear-audio-file-cache true|false]",

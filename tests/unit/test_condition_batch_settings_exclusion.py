@@ -24,7 +24,7 @@ def test_only_the_exact_window_configuration_members_receive_the_exclusion():
                            'condition-definitions-195-r1/mapping.json').read_bytes())
     expected = {m['id']: m['shape_sha256'] for row in original['occurrences']
                 if row['dependency_kind'] == 'batch' for m in row['members']}
-    excluded = [row for row in mapping['occurrences'] if 'approved_exclusion' in row]
+    excluded = [row for row in mapping['occurrences'] if row.get('approved_exclusion', {}).get('authority') == AUTHORITY]
     assert {m['id']: m['shape_sha256'] for row in excluded for m in row['members']} == expected
     assert len(expected) == 240
     for row in excluded:
@@ -49,16 +49,16 @@ def test_combined_successor_preserves_three_separate_dispositions(successor):
     assert base == successor
     result = json.loads((successor / 'assessment.json').read_bytes())
     assert result['completion']['states'] == {
-        'source_definition_verified': 7042, 'approved_exclusion': 240, 'implementation_dependency': 15}
-    assert result['completion']['complete'] is False
+        'source_definition_verified': 7042, 'approved_exclusion': 255}
+    assert result['completion']['complete'] is True
     original = json.loads((ROOT / 'tests/fixtures/branch-evidence/product/'
                            'condition-definitions-195-r1/mapping.json').read_bytes())
     assert {r['id']: r['shape_sha256'] for r in result['obligations']} == {
         m['id']: m['shape_sha256'] for r in original['occurrences'] for m in r['members']}
-    assert {r['id'] for r in result['obligations'] if r['state'] == 'implementation_dependency'} == {
+    assert {r['id'] for r in result['obligations'] if r.get('exclusion', {}).get('when') == 'required_controller_not_exposed_by_applicable_metadata'} == {
         m['id'] for r in original['occurrences'] if r['dependency_kind'] == 'music' for m in r['members']}
     for row in result['obligations']:
-        if row['state'] != 'approved_exclusion':
+        if row.get('exclusion', {}).get('authority') != AUTHORITY:
             continue
         identity = row['id']
         assert row['exclusion']['authority'] == AUTHORITY
@@ -76,7 +76,7 @@ def test_non_batch_members_cannot_borrow_the_window_exclusion(successor, kind):
     attachment = json.loads((successor / 'evidence-index.json').read_bytes())['condition_definition_attachments'][0]
     context = validate_mapping_attachment(attachment, successor, ROOT)
     exclusion = next(r['approved_exclusion'] for r in context['mapping']['occurrences']
-                     if 'approved_exclusion' in r)
+                     if r.get('approved_exclusion', {}).get('authority') == AUTHORITY)
     row = next(r for r in context['mapping']['occurrences'] if
         (r['dependency_kind'] == 'music' if kind == 'music-inner' else
          r['version'] == '2025.1' and r['source_pointer'].endswith('Property[BaseFrequency]/Dependencies')))
@@ -100,7 +100,7 @@ def test_non_batch_members_cannot_borrow_the_window_exclusion(successor, kind):
 def test_exclusion_receipt_cannot_change_its_exact_approved_scope(successor, damage):
     attachment = json.loads((successor / 'evidence-index.json').read_bytes())['condition_definition_attachments'][0]
     mapping = json.loads((successor / 'mapping.json').read_bytes())
-    row = next(r for r in mapping['occurrences'] if 'approved_exclusion' in r)
+    row = next(r for r in mapping['occurrences'] if r.get('approved_exclusion', {}).get('authority') == AUTHORITY)
     if damage == 'class': row['consumers'][0]['catalog']['classId'] = 1
     elif damage == 'parent': row['source_parent']['catalog']['classId'] = 1
     elif damage == 'decision': row['approved_exclusion']['authority'] = 'unapproved'
@@ -131,7 +131,7 @@ def test_exclusion_requires_the_recorded_user_decision(tmp_path, damage):
 def test_exclusion_does_not_supply_execution_or_metadata_evidence(successor):
     attachment = json.loads((successor / 'evidence-index.json').read_bytes())['condition_definition_attachments'][0]
     context = validate_mapping_attachment(attachment, successor, ROOT)
-    row = next(r for r in context['mapping']['occurrences'] if 'approved_exclusion' in r)
+    row = next(r for r in context['mapping']['occurrences'] if r.get('approved_exclusion', {}).get('authority') == AUTHORITY)
     identity = row['members'][0]['id']
     binding = json.loads((successor / 'bindings.json').read_bytes())['bindings'][identity]
     for category in ('program', 'native', 'live_metadata'):
