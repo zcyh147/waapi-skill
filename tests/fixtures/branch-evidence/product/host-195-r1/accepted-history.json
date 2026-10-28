@@ -1,0 +1,25 @@
+{
+  "scope": "retained original facts only; no new native execution or current-native PASS",
+  "sources": {
+    "tests/TEST_INVENTORY.md": {
+      "admission": "original historical outcome only; matching exact host/build and effect scope required for reuse",
+      "original_candidate": "8a36907ddfe35f9ed0df2658439347bf539529e2",
+      "sha256": "7207b06bcf6b24bcef4e566792c70fefffc94daae69efd30580e65dc94434e86"
+    },
+    "tests/fixtures/tone/console-2025.1.7.9143/envelopes/manifest.json": {
+      "admission": "original historical outcome only; matching exact host/build and effect scope required for reuse",
+      "original_candidate": "8a36907ddfe35f9ed0df2658439347bf539529e2",
+      "sha256": "2e95bc8f4ed39543b2ce91e6393e17b5c6546317c1c62f15724236f0a164b9d6"
+    },
+    "tests/fixtures/tone/console-2025.1.7.9143/manifest.json": {
+      "admission": "original historical outcome only; matching exact host/build and effect scope required for reuse",
+      "original_candidate": "8a36907ddfe35f9ed0df2658439347bf539529e2",
+      "sha256": "72d807bff01c6805872a82c3ea960934dc3c607cfd3e3a012fea85fa90c16f66"
+    },
+    "tests/fixtures/tone/console-2025.1.7.9143/waveforms/manifest.json": {
+      "admission": "original historical outcome only; matching exact host/build and effect scope required for reuse",
+      "original_candidate": "8a36907ddfe35f9ed0df2658439347bf539529e2",
+      "sha256": "b5b0e5834a91b4f906072fe1f00fe605174f3677d76d858a9fe5be0ea4c6cf16"
+    }
+  }
+}

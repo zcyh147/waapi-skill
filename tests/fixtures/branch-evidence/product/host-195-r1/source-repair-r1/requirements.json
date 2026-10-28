@@ -1,0 +1,54 @@
+{
+  "branches": {
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.cli.waapiServer|/argsSchema": {
+      "categories": [
+        "program"
+      ],
+      "native_shape_sha256": "df8fae577f65225371d2dbba3699b61fe62e9bdc0b79e3535258ebbd8f4c6d23",
+      "reason": "P2 exact selected aggregate CODE source closure reconciliation; no representative sibling or native credit."
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.getInfo|/argsSchema": {
+      "categories": [
+        "program"
+      ],
+      "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+      "reason": "P2 exact selected aggregate CODE source closure reconciliation; no representative sibling or native credit."
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.project.save|/argsSchema": {
+      "categories": [
+        "program"
+      ],
+      "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+      "reason": "P2 exact selected aggregate CODE source closure reconciliation; no representative sibling or native credit."
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.remote.connect|/argsSchema": {
+      "categories": [
+        "program"
+      ],
+      "native_shape_sha256": "8bfa6216378bad79796736a0beaafa96b3b01130d2265caf4239d40a08bef0dc",
+      "reason": "P2 exact selected aggregate CODE source closure reconciliation; no representative sibling or native credit."
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.ui.captureScreen|/argsSchema": {
+      "categories": [
+        "program"
+      ],
+      "native_shape_sha256": "6caad1c7cf29f99405560b73eee6d4d191128cf3d5c3d6747813663736c8be4d",
+      "reason": "P2 exact selected aggregate CODE source closure reconciliation; no representative sibling or native credit."
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.generateToneWAV|/argsSchema": {
+      "categories": [
+        "program"
+      ],
+      "native_shape_sha256": "dd303ce31dbaf02dffd52f913b352b213066c68d66664e535e276699bf8d61ba",
+      "reason": "P2 exact selected aggregate CODE source closure reconciliation; no representative sibling or native credit."
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.getWalTree|/argsSchema": {
+      "categories": [
+        "program"
+      ],
+      "native_shape_sha256": "d746974fa9afd5e951f76f9af38954b0ad7f436f2120dc974da65e5ee39f856f",
+      "reason": "P2 exact selected aggregate CODE source closure reconciliation; no representative sibling or native credit."
+    }
+  },
+  "contract": "waapi-skill.branch-evidence-requirements/v1"
+}
