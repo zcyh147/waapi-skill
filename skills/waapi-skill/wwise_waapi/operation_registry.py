@@ -10133,6 +10133,9 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None, af
             "evidence": {"expected": list(expected_classes.values()),
                 "actual": [row for row in actual_classes if row.get("classId") in
                     {expected.get("classId") for expected in expected_classes.values()}]}})
+    if pre_state.get("control_surface_constructors"):
+        from .control_surface_construction import guard_assertions
+        assertions.extend(guard_assertions(pre_state["control_surface_constructors"], read=read, after_write=after_write))
     for boundary in ([pre_state["saved_object_constructors"]] if pre_state.get("saved_object_constructors") else []) + pre_state.get("saved_object_constructor_batches", []):
         from .saved_object_construction import guard_matches
         assertions.append({"name": "saved constructor source and exact project owner remain bound",
@@ -13262,6 +13265,16 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         metadata.update(workflow_state)
     else:  # pragma: no cover - parse_operation_request closes this branch.
         raise OperationContractError("OPERATION_BOUNDARY", f"No preparer exists for {request.operation}.")
+
+    if request.operation in {"object.create", "object.set"}:
+        from .control_surface_construction import prepare as prepare_control_surface
+        control_boundary = prepare_control_surface(
+            metadata.get("object_create_nodes", []) + metadata.get("object_set_nodes", []),
+            parent=roles["parent"].row if "parent" in roles else {}, version=request.version, read=read,
+            conflict=arguments.get("on_name_conflict", "fail"))
+        if control_boundary:
+            metadata["control_surface_constructors"] = control_boundary
+            warnings.append("Control Surface verification checks stored identity, group role and requested fields. Hardware assignment encoding, hardware operation and reserved-group automatic creation are not verified.")
 
     if "voice_source_staging" in arguments:
         from .voice_source_staging import prepare as prepare_staging, projection as staging_projection
@@ -20584,6 +20597,7 @@ def _bind_object_set_result_nodes(
     observed_actions: Mapping[str, Mapping[str, Any]] | None = None,
     observe_anonymous: Callable | None = None,
     observe_owned_reference: Callable | None = None,
+    observe_control_surface: Callable | None = None,
 ) -> dict[str, ObjectResultNode]:
     """Bind sparse ``object.set`` associations to the sealed request graph.
 
@@ -20689,6 +20703,18 @@ def _bind_object_set_result_nodes(
         if spec.get("preexisting_id") is not None:
             return node.name == requested_name
         effective_conflict = spec.get("on_name_conflict", on_name_conflict)
+        if effective_conflict == "rename" and spec.get("control_surface_constructor"):
+            if observe_control_surface is None:
+                return False
+            actual = observe_control_surface(node.object, spec)
+            return (bool(node.name) and actual.get("name") == node.name
+                and _object_spec_row_matches(actual, spec, node.object)
+                and _same_identity(_parent_value(actual.get("parent")), owner_id)
+                and (not spec.get("notes_supplied") or actual.get("notes") == spec.get("requested_notes"))
+                and all(_has_field(actual, prop["name"]) and condition_values_equal(_field_value(actual, prop["name"]), prop["value"])
+                    for prop in spec.get("properties", []))
+                and all(_reference_requirement_matches(actual, ref["name"], ref.get("target_id"))
+                    for ref in spec.get("references", []) if "target_id" in ref))
         if effective_conflict == "rename":
             return node.name == requested_name or node.name.startswith(requested_name)
         return node.name == requested_name
@@ -20814,6 +20840,15 @@ def _bind_object_set_result_nodes(
                 identity, name = observe_owned_reference(node.object, "ControlInput")
                 returned.append(ObjectResultNode(node.request_path + ".@ControlInput[0]", node.request_path,
                     identity, name, 0, "ControlInput"))
+        def exact_control_name(child, candidate):
+            return (candidate.get("control_surface_constructor") and candidate.get("preexisting_id") is None
+                and candidate.get("on_name_conflict", on_name_conflict) == "rename"
+                and child.collection == candidate.get("collection", "children")
+                and child.name == candidate.get("requested_name"))
+        # Reserve exact declaration names before considering unrelated native
+        # names. Remaining fallbacks must still have one independent match;
+        # association array order never chooses between ambiguous candidates.
+        returned = sorted(returned, key=lambda child: not any(exact_control_name(child, candidate) for candidate in available))
         for child in returned:  # result-relative parent path
             collection_matches = [
                 candidate
@@ -20827,9 +20862,10 @@ def _bind_object_set_result_nodes(
                 if candidate.get("preexisting_id") is not None
                 and _same_identity(child.object, candidate.get("preexisting_id"))
             ]
+            exact_names = [candidate for candidate in collection_matches if exact_control_name(child, candidate)]
             matches = sealed_matches or [
                 candidate
-                for candidate in collection_matches
+                for candidate in (exact_names or collection_matches)
                 if (name_matches(child, candidate, owner_id=node.object)
                     and (not candidate.get('action_constructor')
                         or action_assignment.get(candidate['request_path']) == _identity_key(child.object)))
@@ -23168,10 +23204,30 @@ def verify_prepared_operation(
                             if child.get("anonymous_list_member")})
                     return bound_ids
 
+                control_rows, control_fields = {}, {}
+                for spec in specs:
+                    if spec.get("control_surface_constructor"):
+                        key = (spec["class_id"], spec.get("platform"))
+                        control_fields[key] = _dedupe_fields([*control_fields.get(key, []), *_object_spec_return_fields(spec)])
+                def observe_control_surface(object_id, spec):
+                    key = (object_id, spec.get("platform"))
+                    if key not in control_rows:
+                        rows = read_object(object_id=object_id, fields=("id", "name", "type", "classId", "path", "parent", "notes"))
+                        if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id):
+                            raise ObjectOperationContractError("INVALID_READBACK", "Control Surface result candidate must resolve exactly once by GUID")
+                        fields = control_fields.get((rows[0].get("classId"), spec.get("platform")))
+                        if fields:
+                            rows = read_object(object_id=object_id, fields=fields, platform=spec.get("platform"))
+                            if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id):
+                                raise ObjectOperationContractError("INVALID_READBACK", "Control Surface fields lost their exact result GUID")
+                        control_rows[key] = rows[0]
+                    return control_rows[key]
+
                 result_by_path = _bind_object_set_result_nodes(
                     result_nodes, specs, on_name_conflict=str(plan.get("on_name_conflict")),
                     observed_rtpcs=observed_rtpcs, observed_owned_controls=observed_owned_controls, observed_actions=observed_actions, observe_anonymous=observe_anonymous,
                     observe_owned_reference=lambda owner, field: _observe_owned_reference_result(owner, field, read=read_call, readbacks=readbacks),
+                    observe_control_surface=observe_control_surface,
                 )
         except ObjectOperationContractError as exc:
             assertion_name = (
@@ -23308,6 +23364,8 @@ def verify_prepared_operation(
                 # Native conflict naming is certified by the owned GUID/name
                 # association, never a guessed prefix or suffix convention.
                 name_ok = row.get("name") == owned_stage_identities[request_path]["name"] == returned_name
+            elif spec.get("control_surface_constructor") and effective_conflict == "rename":
+                name_ok = result_node is not None and isinstance(row.get("name"), str) and bool(row["name"]) and row["name"] == returned_name
             elif effective_conflict == "rename" and spec.get("existing_target") is not True:
                 actual_name = row.get("name")
                 requested_name = spec.get("requested_name")
@@ -23455,6 +23513,12 @@ def verify_prepared_operation(
                 # its sealed GUID/class/owner and snapshot fields certify it.
                 # The scoped preservation snapshot records before/after paths.
                 expected_path = None
+            if spec.get("control_surface_constructor") and effective_conflict == "rename":
+                parent_row = observed_row_by_path.get(parent_request_path)
+                if parent_row is None:
+                    parent_row = next((item for item in pre_state.get("control_surface_constructors", {}).get("parents", [])
+                        if _same_identity(item.get("id"), expected_parent_id)), {})
+                expected_path = _child_path(parent_row.get("path"), returned_name, field="actual_control_surface_parent.path")
             if isinstance(expected_path, str):
                 check(
                     f"{request_path} exact path matches",
@@ -26960,6 +27024,9 @@ def verify_prepared_operation(
             )
     else:
         raise OperationContractError("INVALID_PREVIEW", f"Unknown verification plan kind {kind!r}.")
+    if kind in {"object-create-graph", "object-set-batch"} and pre_state.get("control_surface_constructors"):
+        from .control_surface_construction import verification_assertions
+        assertions.extend(verification_assertions(pre_state["control_surface_constructors"], resolved_id_by_path, read=read_call))
     if kind in {"object-create-graph", "object-set-batch"} and owned_stage_identities and all(item.get("passed") is True for item in assertions):
         from .owned_result_stages import observe_preservation
         preserved = observe_preservation(prepared, owned_stage_identities, read=read_call, context=compound_path_context)

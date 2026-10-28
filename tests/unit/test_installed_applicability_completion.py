@@ -416,3 +416,25 @@ def test_transition_join_checks_selected_candidate_primary_bytes(tmp_path):
     (tmp_path / directory / 'ak_wwise_core_object_set.html.gz').write_bytes(b'changed selected source')
     with pytest.raises(ValueError, match='Music Transition source differs'):
         _music_transition_correspondence(tmp_path, '2025.1', 2424848, '2025.1.7.9143')
+
+
+def test_control_surface_birth_join_is_exactly_ten_role_scoped_rows():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    mapping = definition_mapping(ROOT)
+    rows = [row for row in mapping['rows'] if row['class_name'] in {'ControlSurfaceBindingGroup', 'ControlSurfaceBinding'}]
+    births = [row for row in rows if row['operation_mode'] == 'new-object']
+    assert len(births) == 10
+    for row in births:
+        role = row['correspondence']
+        assert row['state'] == 'source_definition_verified' and row['dependencies'] == []
+        assert row['id'] == f"{row['version']}|metadata|{row['build']}|target|{4456464 if row['class_name'] == 'ControlSurfaceBindingGroup' else 4390928}|new-object"
+        assert role['path'] == 'control_surface_role_guarded_named_children'
+        assert role['source']['build'] == row['build']
+        assert role['source']['classes'][row['class_name']] == row['source_dimensions']['class_id']
+        assert role['operations'] == ['object.create', *([] if row['version'] == '2021.1' else ['object.set'])]
+        assert 'automatic_birth_not_claimed' in role['declaration']['reserved_groups']
+        assert 'hardware_effect_not_claimed' in role['declaration']['hardware_assignment']
+        assert row['native_effect'] == 'not_claimed' and row['direct_recipient_execution'] == 'not_observed'
+    assert all(row['correspondence']['path'] == 'exact_existing_object_fields' for row in rows if row['operation_mode'] == 'existing-object')
+    assert any(row['class_name'] == 'UserProjectSettings' and row['operation_mode'] == 'new-object'
+        and row['state'] == 'implementation_dependency' for row in mapping['rows'])
