@@ -18142,11 +18142,14 @@ def _parse_object_graph_business_fields(
             )
         if name in fields:
             raise GatewayInputError(f"Business field {name!r} was supplied twice")
-        if name == "music_playlist" and value_type == "music_playlist":
-            from wwise_waapi.music_playlist import MAX_BYTES
+        if name in {"music_playlist", "music_transitions"} and value_type == name:
+            if name == "music_transitions":
+                from wwise_waapi.music_transitions import MAX_BYTES
+            else:
+                from wwise_waapi.music_playlist import MAX_BYTES
             if len(raw.encode("utf-8")) > MAX_BYTES:
-                raise GatewayInputError("music_playlist exceeds its UTF-8 byte limit")
-            fields[name] = parse_json_object(raw, "music_playlist")
+                raise GatewayInputError(name + " exceeds its UTF-8 byte limit")
+            fields[name] = parse_json_object(raw, name)
         else:
             fields[name] = _parse_business_value(value_type, raw, field=name)
     if field_value_pairs:
@@ -32960,6 +32963,10 @@ def transaction_show_summary(
     owned_replacements = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("owned_control_input_replacements")
     if owned_replacements:
         derived_notice["owned_control_input_replacements"] = owned_replacements
+    transition_replacements = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("music_transition_replacements")
+    if transition_replacements:
+        from wwise_waapi.music_transitions import replacement_notice
+        derived_notice["music_transition_replacements"] = [replacement_notice(row) for row in transition_replacements]
     playlist_replacements = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("music_playlist_replacements")
     if playlist_replacements:
         from wwise_waapi.music_playlist import replacement_notice

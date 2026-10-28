@@ -344,6 +344,12 @@ def test_shared_program_source_closure_includes_invoked_gateway_helpers():
     assert len(playlist_sources) == 8
     assert playlist_sources <= sources.keys()
 
+    transition_sources = {p.relative_to(ROOT).as_posix() for version in ('2023.1', '2024.1', '2025.1')
+        for p in (ROOT / 'skills/waapi-skill/references/semantic' / version / 'music-transition-sources').iterdir()}
+    assert len(transition_sources) == 9
+    assert transition_sources <= sources.keys()
+    assert 'tests/unit/test_music_transition_gateway.py' in sources
+
 
 def test_media_pool_database_birth_joins_exact_source_owned_directory_flow():
     from tests.support.applicability_completion_mapping import definition_mapping, validate_mapping
@@ -370,3 +376,42 @@ def test_media_pool_database_birth_joins_exact_source_owned_directory_flow():
     row['correspondence']['verification_scope'] = 'indexing_completed'
     with pytest.raises(ValueError, match='Exact installed applicability'):
         validate_mapping(promoted, ROOT)
+
+
+def test_modern_transition_births_join_owned_append_and_explicit_replacement_only():
+    from tests.support.applicability_completion_mapping import definition_mapping, validate_mapping
+    mapping = definition_mapping(ROOT)
+    rows = {row['version']: row for row in mapping['rows'] if row['class_name'] == 'MusicTransition'
+        and row['operation_mode'] == 'new-object'}
+    assert set(rows) == {'2021.1', '2022.1', '2023.1', '2024.1', '2025.1'}
+    for version in ('2023.1', '2024.1', '2025.1'):
+        row = rows[version]
+        role = row['correspondence']
+        assert row['state'] == 'source_definition_verified' and row['dependencies'] == []
+        assert role['implementation_issue'] == 195 and role['parent_issue'] == 174
+        assert role['path'] == 'music_owner_transition_root_and_rule_construction'
+        assert role['operations'] == ['object.set']
+        assert role['declaration']['mode'] == ['append-rules', 'replace-entire-root']
+        assert len(role['source']['members']) == 3
+        assert 'priority_not_verified' in role['verification_scope']
+        assert row['native_effect'] == 'not_claimed' and row['direct_recipient_execution'] == 'not_observed'
+    for version in ('2021.1', '2022.1'):
+        assert rows[version]['state'] == 'implementation_dependency'
+        assert rows[version]['dependencies'][0]['owner_issue'] == 195
+        assert rows[version]['dependencies'][0]['native_absence_claim'] is False
+    assert validate_mapping(mapping, ROOT) == mapping
+
+
+def test_transition_join_checks_selected_candidate_primary_bytes(tmp_path):
+    import shutil
+    from tests.support.applicability_completion_mapping import _music_transition_correspondence
+    directory = 'skills/waapi-skill/references/semantic/2025.1/music-transition-sources'
+    shutil.copytree(ROOT / directory, tmp_path / directory)
+    manifest = 'skills/waapi-skill/resources/manifest/2025.1/schemas.json'
+    (tmp_path / manifest).parent.mkdir(parents=True)
+    shutil.copyfile(ROOT / manifest, tmp_path / manifest)
+    role = _music_transition_correspondence(tmp_path, '2025.1', 2424848, '2025.1.7.9143')
+    assert role['source']['authority']['version'] == '2025.1'
+    (tmp_path / directory / 'ak_wwise_core_object_set.html').write_bytes(b'changed selected source')
+    with pytest.raises(ValueError, match='Music Transition source differs'):
+        _music_transition_correspondence(tmp_path, '2025.1', 2424848, '2025.1.7.9143')

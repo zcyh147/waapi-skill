@@ -6136,19 +6136,22 @@ def _prepare_object_set(
     planned_bindings = [binding for binding in all_documented_bindings if "planned_owner" in binding]
     documented_bindings = [binding for binding in all_documented_bindings if "planned_owner" not in binding]
     music_playlists = []
+    music_transitions = []
     planned_guards = []
     saved_constructor_batches = []
     early_merge_guards = []
     rtpc_snapshots = {}
     raw_objects = _mapping_sequence(arguments.get("objects"), field="objects")
     playlist_constructor = len(raw_objects) == 1 and "music_playlist" in raw_objects[0]
-    conflict = "merge" if playlist_constructor else str(arguments.get("on_name_conflict", "fail"))
+    transition_constructor = len(raw_objects) == 1 and "music_transitions" in raw_objects[0]
+    conflict = "rename" if transition_constructor else "merge" if playlist_constructor else str(arguments.get("on_name_conflict", "fail"))
     global_platform = (
         _non_empty_string(arguments.get("platform"), field="platform")
         if "platform" in arguments
         else None
     )
-    global_list_mode = "replaceAll" if playlist_constructor else str(arguments.get("list_mode", "append"))
+    transition_replacement = transition_constructor and raw_objects[0]["music_transitions"]["mode"] == "replace-entire-root"
+    global_list_mode = "replaceAll" if playlist_constructor or transition_replacement else str(arguments.get("list_mode", "append"))
     auto_add_to_source_control = arguments.get(
         "auto_add_to_source_control",
         False,
@@ -6435,6 +6438,25 @@ def _prepare_object_set(
             )
             trusted["import"] = trusted_import
             target_spec["import"] = import_spec
+        if "music_transitions" in item:
+            from .music_transitions import prepare as prepare_music_transitions
+            def resolve_transition_target(identity, role):
+                resolved = _resolve_identity(identity, role=role, read=read, identity_cache=identity_cache)
+                roles[role] = resolved
+                return resolved
+            native_transitions, transition_proof = prepare_music_transitions(item["music_transitions"], version=request.version,
+                owner=target, catalog=type_catalog, read=read, resolve_target=resolve_transition_target,
+                validate_scalar=_require_object_property_value, validate_reference=_require_reference_target_allowed)
+            if transition_proof["mode"] == "append-rules":
+                trusted["object"] = transition_proof["old_tree"]["row"]["id"]
+                trusted["children"] = native_transitions["children"]
+            else:
+                trusted["@TransitionRoot"] = native_transitions
+                trusted["listMode"] = "replaceAll"
+            # Matching SDK rename semantics guarantee new children on name
+            # collisions; never merge an additive rule into an existing GUID.
+            trusted["onNameConflict"] = "rename"
+            music_transitions.append(transition_proof)
         if "music_playlist" in item:
             from .music_playlist import prepare as prepare_music_playlist
             def resolve_playlist_segment(identity, role):
@@ -7521,6 +7543,7 @@ def _prepare_object_set(
                 "verification_scope": spec["media_pool_database"]["verification"]}
                 for spec in node_specs if spec.get("media_pool_database")]}
                 if any(spec.get("media_pool_database") for spec in node_specs) else {}),
+            **({"music_transition_replacements": music_transitions} if music_transitions else {}),
             **({"music_playlist_replacements": [{"owner_id": proof["owner_id"],
                 "owner_name": proof["owner_snapshot"]["name"], "owner_path": proof["owner_snapshot"]["path"],
                 "intent": proof["replacement_intent"], "old_tree": proof["old_tree"],
@@ -7612,6 +7635,7 @@ def _prepare_object_set(
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
         **({"music_playlists": music_playlists} if music_playlists else {}),
+        **({"music_transitions": music_transitions} if music_transitions else {}),
         **({"saved_object_constructor_batches": saved_constructor_batches} if saved_constructor_batches else {}),
         "existing_field_observations": existing_field_history,
         "effect_render_chains": effect_render_chains,
@@ -19608,6 +19632,9 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 ]
             )
 
+    from .music_transitions import guard_assertions as music_transition_guard_assertions
+    for proof in pre_state.get("music_transitions", []):
+        assertions.extend(music_transition_guard_assertions(proof, read=read_call))
     from .music_playlist import guard_assertions as music_playlist_guard_assertions
     for proof in pre_state.get("music_playlists", []):
         assertions.extend(music_playlist_guard_assertions(proof, read=read_call))
@@ -23021,6 +23048,17 @@ def verify_prepared_operation(
                 version=version,
             )
         payload = _execution_payload(execution_result)
+        if pre_state.get("music_transitions"):
+            from .music_transitions import verify as verify_music_transitions, without_result_tree as without_transition_result
+            for proof in pre_state["music_transitions"]:
+                try:
+                    transition_checks, transition_identities = verify_music_transitions(proof, payload, read=read_call)
+                    assertions.extend(transition_checks)
+                    readbacks.append({"role": "music-transition-verified-identities", "identities": transition_identities,
+                        "scope": proof["verification_scope"]})
+                except OperationContractError as exc:
+                    check("Transition root and rules are independently readable", False, exc.as_dict())
+            payload = without_transition_result(payload, proof)
         if pre_state.get("music_playlists"):
             from .music_playlist import verify as verify_music_playlist, without_result_tree
             for proof in pre_state["music_playlists"]:
@@ -27983,6 +28021,7 @@ def _validate_nested_request_shape(
                     "children",
                     "lists",
                     "music_playlist",
+                    "music_transitions",
                 ),
                 context=f"object.set objects[{index}]",
             )
@@ -28010,12 +28049,19 @@ def _validate_nested_request_shape(
                     "children",
                     "lists",
                     "music_playlist",
+                    "music_transitions",
                 )
             ):
                 raise OperationContractError(
                     "NO_OP",
                     f"object.set objects[{index}] must request at least one field, child, or list change.",
                 )
+            if "music_transitions" in item:
+                if len(raw_objects) != 1 or set(item) != {"object", "music_transitions"} or set(arguments) != {"objects"}:
+                    raise OperationContractError("MUSIC_TRANSITION_STANDALONE_REQUIRED",
+                        "A TransitionRoot/rule declaration requires one existing owner and its own transaction.")
+                from .music_transitions import validate_descriptor as validate_transitions
+                total_nodes += validate_transitions(item["music_transitions"], version)
             if "music_playlist" in item:
                 if len(raw_objects) != 1 or set(item) != {"object", "music_playlist"} or set(arguments) != {"objects"}:
                     raise OperationContractError("MUSIC_PLAYLIST_STANDALONE_REQUIRED",

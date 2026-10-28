@@ -1,0 +1,21 @@
+{
+  "contract": "waapi-skill.music-transition-source/v1",
+  "version": "2024.1",
+  "build": "2024.1.13.9056",
+  "installed_xml": {
+    "original_snapshot": "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz",
+    "source_key": "2024.1.13.9056|condition|WObjects/WObjects.xml",
+    "member": "WObjects.xml.gz",
+    "decompressed_sha256": "28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f"
+  },
+  "sdk": {
+    "archive": "WwiseSDK-Windows.chm",
+    "archive_sha256": "aa6b467caae07c2363806adc1dadeed8df7a29c4bdf2d23fd629126208054364",
+    "archive_sha256_provenance": "prior source index (not recomputed)",
+    "member": "ak_wwise_core_object_set.html",
+    "sha256": "be298cfbaa7a82cd3c7975cc94f6cd3a90bed5df0465fbadeb489ba825ef868d"
+  },
+  "manifest_sha256": "45e1f3cd2e18f0c9d6b86adcc5ce5823a05bb059c26a6713c6c99e9461aa0f68",
+  "derivation": "Common_TransitionNode.TransitionRoot: custom-only, non-null MusicTransition; exact two inheriting owners; SDK custom-object and recursive children grammar; rename mode creates fresh children rather than merging; no dedicated class example prerequisite",
+  "evidence_strength": "source_and_program_only; no_new_native_or_Fresh; no_priority_or_fade_allocation_or_playback_claim"
+}
