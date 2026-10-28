@@ -23,5 +23,15 @@
   "native_root": "PlaylistRoot",
   "native_segment": "Segment",
   "intrinsic_name": "",
-  "ordered_getter_native_evidence": "pending_parent_owned_discriminator"
+  "ordered_getter_native_evidence": {
+    "observed_version": "2025.1",
+    "build": "2025.1.7.9143",
+    "host": "wwise-console",
+    "platform": "macOS",
+    "scope": "representative stored tree order and exact old GUID absence; no playback quality or other-version native claim",
+    "source": "references/semantic/2025.1/music-playlist-sources/native-readback.original.json",
+    "sha256": "1b65f7cbff6ecd83fb20059157f6b78b70eef375eca0e1bc15ae8a067e0a47b1",
+    "lifecycle_source": "references/semantic/2025.1/music-playlist-sources/native-lifecycle.original.json",
+    "lifecycle_sha256": "4311c617f6588d7547b80c86e02ae40a6f55820dbeeacd8ae77fc873bdbce6c8"
+  }
 }

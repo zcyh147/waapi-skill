@@ -26,3 +26,4 @@ tests/fixtures/runtime-loaded-media/** -text
 tests/fixtures/runtime-loaded-media/composite-*.html -whitespace
 # Runtime Music Playlist authority uses verbatim, hash-bound installed SDK pages.
 skills/waapi-skill/references/semantic/*/music-playlist-sources/*.html -text -whitespace
+skills/waapi-skill/references/semantic/*/music-playlist-sources/*.original.json -text

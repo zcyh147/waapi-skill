@@ -1,7 +1,7 @@
 """Owner-scoped Music Playlist construction; no general custom-reference grammar.
 
-Matching SDK examples own native PlaylistRoot/anonymous item syntax. The one
-2025 native discriminator, when collected, establishes only the ordered getter
+Matching SDK examples own native PlaylistRoot/anonymous item syntax. The
+2025 native discriminator establishes only the ordered getter
 contract; neither source examples nor fake-host tests prove playback behavior.
 """
 from __future__ import annotations
@@ -13,6 +13,12 @@ MAX_BYTES = 32768
 ITEM_CLASS = 2359312
 CONTAINER_CLASS = 2228240
 SEGMENT_CLASS = 1769488
+READBACK_OBSERVATION = {
+    'version': '2025.1', 'build': '2025.1.7.9143', 'host': 'wwise-console', 'platform': 'macOS',
+    'scope': 'one_nested_repeated_Segment_tree; stored_order_and_replaced_GUID_absence',
+    'other_versions': 'matching_source_and_program_correspondence_only',
+    'audio_or_playback_quality': 'not_verified', 'public_gateway_execution': 'not_claimed',
+}
 
 
 def declaration_contract(version):
@@ -34,7 +40,8 @@ def declaration_contract(version):
         'native_fields_names_GUIDs_custom_reference_JSON': 'forbidden',
         'hidden_loop_controller': 'do_not_invent_or_probe_unexposed_IsLoopingInfinite; existing_conditional_refusal_retained',
         'limits': {'items_including_root': MAX_ITEMS, 'depth': MAX_DEPTH, 'UTF8_bytes': MAX_BYTES},
-        'ordered_readback': 'independent_exact_root_and_per_group_child_GUID_sequence_and_Segment_references; native_discriminator_pending',
+        'ordered_readback': 'independent_exact_root_and_per_group_child_GUID_sequence_and_Segment_references',
+        'native_readback_observation': dict(READBACK_OBSERVATION),
         'verification_scope': 'stored_playlist_tree; never_audio_or_playback_quality',
         'older_version_boundary': 'this_PlaylistRoot_constructor_introduced_2023.1; independent_existing_item_edits_and_other_older_factories_unclassified',
     }
@@ -55,6 +62,10 @@ _EXAMPLE_SHA = {'2023.1': '10fdc3112e485e03009daa3e3822ec4d30644ac4a524436fdfab1
 _CLASS_SHA = {'2023.1': 'deaf5d5dce2f0d2f7e045d8d84c81545077cbcc27fcb4306620c757708384efa',
     '2024.1': 'ed6ce04c586d3dd5faed4e608d2ad1bb7bf30770a3870676547e8d051fbbdd91',
     '2025.1': '89f54369c93c47b6f5ce2262795c1c629d0ebdf459737507f7a1bbcd6893fda6'}
+_NATIVE_SOURCES = {
+    'native-readback.original.json': '1b65f7cbff6ecd83fb20059157f6b78b70eef375eca0e1bc15ae8a067e0a47b1',
+    'native-lifecycle.original.json': '4311c617f6588d7547b80c86e02ae40a6f55820dbeeacd8ae77fc873bdbce6c8',
+}
 _GUID = re.compile(r'^\{[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}$')
 GET = 'ak.wwise.core.object.get'
 INFO = 'ak.wwise.core.object.getPropertyInfo'
@@ -84,8 +95,12 @@ def authority(version):
             raise ValueError('Music Playlist retained primary source drifted')
     if sha256((_ROOT / 'resources/manifest' / version / 'schemas.json').read_bytes()).hexdigest() != proof['manifest_sha256']:
         raise ValueError('Music Playlist reflected grammar drifted')
+    for member, digest in _NATIVE_SOURCES.items():
+        if sha256((_ROOT / 'references/semantic/2025.1/music-playlist-sources' / member).read_bytes()).hexdigest() != digest:
+            raise ValueError('Music Playlist representative native observation drifted')
     return {'version': version, 'resource_sha256': sha256(raw).hexdigest(), 'source_enum': proof['source_enum'],
-        'sources': proof['sources'], 'build': proof['build']}
+        'sources': proof['sources'], 'build': proof['build'],
+        'native_readback_observation': dict(READBACK_OBSERVATION), 'native_source_sha256': dict(_NATIVE_SOURCES)}
 
 
 def _fail(code, message):
@@ -100,8 +115,9 @@ def _guid(value):
 
 
 def _reference(value, *, nullable=False):
-    if nullable and value is None:
-        return None
+    if nullable:
+        from .operation_plugin import _closed_object_reference_id
+        return _closed_object_reference_id(value, field='playlist-reference', allow_none=True)
     return _guid(value.get('id') if isinstance(value, Mapping) else value)
 
 
@@ -375,7 +391,7 @@ def prepare(payload, *, version, owner, catalog, read, resolve_segment, validate
         'native_tree': native_root, 'requested_tree': payload['tree'], 'condition_plans': condition_plans,
         'replacement_intent': 'remove_previous_playlist_tree',
         'verification_scope': declaration_contract(version)['verification_scope'],
-        'ordered_getter_evidence': 'pending_native_discriminator'}
+        'ordered_getter_evidence': dict(READBACK_OBSERVATION)}
     return native_root, proof
 
 

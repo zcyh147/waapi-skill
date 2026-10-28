@@ -90,7 +90,7 @@ class MusicPlaylistTask(OwnedGraphTask):
                 return {'id': guid, 'name': '', **({'children': children} if children else {})}
             root = create(item['@PlaylistRoot'], FIRST, True)
             self.objects[FIRST]['@PlaylistRoot'] = {'id': root['id']}
-            del self.objects[OLD]
+            self.objects.pop(OLD, None)
             if self.fault == 'reordered-readback':
                 self.objects[root['id']]['children'].reverse()
             if self.fault == 'wrong-owner':
@@ -215,6 +215,16 @@ def test_playlist_replacement_checks_each_missing_old_guid_independently(tmp_pat
     assert code == 0 and verified['verified'] is True, verified
     for guid in (OLD, old_child):
         assert any(args.get('from') == {'id': [guid]} for uri, args, _ in task.calls if uri.endswith('object.get'))
+    assert len(task.writes) == 1
+
+
+def test_playlist_null_root_reference_allows_first_tree(tmp_path):
+    task = MusicPlaylistTask(tmp_path).declare()
+    task.objects[FIRST]['@PlaylistRoot'] = {'id': '{00000000-0000-0000-0000-000000000000}'}
+    del task.objects[OLD]
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
     assert len(task.writes) == 1
 
 
