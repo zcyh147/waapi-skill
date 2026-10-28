@@ -1,0 +1,13 @@
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.001277, "reason": "locked developer interpreter ready", "automatic_repair_attempted": false}
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.000356, "reason": "selected Non-live prerequisites ready", "automatic_repair_attempted": false}
+== Test Context ==
+version:      none
+mode:         nonlive
+console:      <unset>
+project:      <unset>
+sandbox_root: <unset>
+test_config:  <unset>
+pytest args:  -q -ra tests/unit/test_remaining_core_business_gateway.py::test_source_file_usage_outputs_do_not_advertise_unpinned_source_control_route tests/unit/test_remaining_core_business_gateway.py::test_source_file_usage_outputs_are_disclosed_and_sealed_through_public_draft tests/unit/test_remaining_core_business_gateway.py::test_source_control_move_preserves_multiple_bound_rows_and_literal_pairs tests/unit/test_remaining_core_business_gateway.py::test_source_control_object_file_accessor_drift_stops_before_provider_write tests/unit/test_remaining_core_business_gateway.py::test_source_control_per_file_status_read_preserves_native_responses_under_read_only_policy tests/unit/test_remaining_core_business_gateway.py::test_source_control_provider_profile_preview_and_execution_never_persist_credentials_or_native_echo tests/unit/test_remaining_core_business_gateway.py::test_source_control_provider_disabled_intent_is_reviewable_and_has_no_connection_arguments tests/unit/test_remaining_core_business_gateway.py::test_source_control_provider_file_or_configuration_drift_cannot_reach_native_provider tests/unit/test_compound_undo_business_gateway.py::test_public_compound_undo_snapshots_checked_business_children_into_one_preview tests/unit/test_compound_undo_business_gateway.py::test_compound_failure_cancellation_keeps_native_choices_and_observes_partial_state tests/unit/test_compound_undo_business_gateway.py::test_older_compound_native_default_is_observed_without_inventing_undo_option tests/unit/test_compound_undo_business_gateway.py::test_compound_cancellation_does_not_turn_acknowledgement_or_missing_reads_into_rollback tests/unit/test_compound_undo_business_gateway.py::test_standalone_history_latest_gui_action_without_receipt_reports_only_result_schema tests/unit/test_compound_undo_business_gateway.py::test_standalone_history_without_expectation_still_requires_confirmation_and_valid_native_result tests/unit/test_compound_undo_business_gateway.py::test_standalone_history_ambiguous_native_failure_is_not_replayed_or_compensated tests/unit/test_history_completion_mapping.py::test_history_mapping_retains_versioned_owned_lifecycle_and_result_only_scope
+
+........................................................                 [100%]
+56 passed in 47.35s
