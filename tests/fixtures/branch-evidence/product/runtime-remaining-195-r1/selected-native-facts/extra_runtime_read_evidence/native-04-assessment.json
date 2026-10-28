@@ -1,0 +1,44 @@
+{
+  "contract": "waapi-skill.extra-runtime-read-assessment/v1",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor|/resultSchema",
+  "profile": {
+    "provider": "authoring-2024.1",
+    "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor",
+    "native_shape_sha256": "edf881b40d9d078eab9849e99cbb5dbbd89b2f3c61842125729b564d82c820a9",
+    "reader": "performance",
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789162112524000-b3ee08861c974eb5882a84ff365d8abb-ak_wwise_core_profiler_getPerformanceMonitor.json",
+    "raw_sha256": "117cf634b0f850b361e191e3a92a26f7f6fbcf126a293858c82b10143a014ffe",
+    "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-setup-state/runtime-inspection-observations-v1/rto1-530dda8d7ca0da231de91896ec14a847.json",
+    "issuer_sha256": "701abddee1986f167330e5ac7532cf3fb7eb39cf9f758eeb9593a035bb3f89b6",
+    "request": {
+      "api": "ak.wwise.core.profiler.getPerformanceMonitor",
+      "args": {
+        "time": 45621
+      },
+      "options": {}
+    },
+    "native_rows": 45,
+    "original_public_complete": true,
+    "original_reader_outcome": "PASS"
+  },
+  "source_review": {
+    "artifact": "tests/fixtures/runtime-extra-reads/support-review.json",
+    "sha256": "3ab3b25f660dc4bd6eb9b7967b9449ff71067ae3a56e6a2a276b9a1e68059009"
+  },
+  "archive": {
+    "artifact": "tests/fixtures/runtime-qualified-reads/r104-2024.1-original.json.gz",
+    "sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22"
+  },
+  "program_capture": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-04-capture.json",
+    "sha256": "c58b78c4c17b239d48bc82cd86566c1bc0eae645a819e038fd85d435c1d523ba"
+  },
+  "retained_facts": {
+    "original_finalization": "BLOCKED",
+    "original_reader_outcome": "PASS",
+    "original_public_complete": true,
+    "native_nonempty_rows": 45,
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false
+  }
+}

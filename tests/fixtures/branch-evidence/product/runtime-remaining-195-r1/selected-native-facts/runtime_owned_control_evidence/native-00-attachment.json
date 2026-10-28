@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-attachment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.registerMeter|/resultSchema",
+  "assessment": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_owned_control_evidence/native-00-assessment.json",
+    "sha256": "b005f433732cdefb7e1b7ad0e6857c252c16cf2830906be2cdbe4ca7adf30c1d"
+  },
+  "evidence": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_owned_control_evidence/native-00-qualified.json",
+    "sha256": "722c7a3cb003655619bde4873d5f91c437726dd59fec9c2eeeb823a9f2cd998c"
+  }
+}

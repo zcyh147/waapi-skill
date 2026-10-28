@@ -215,16 +215,23 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
     if branch['route'].endswith('.saveCapture'):
         expected['destination_binding']={'mode':'exact-authorized-directory-plus-name','original':p['request']['args']['file'],'program':cap['native_call']['args']['file']}
     expected_args=cap['native_call']['args']if branch['route'].endswith('.saveCapture')else p['request']['args']
-    if (assessment!=expected or assessment['support_review']['sha256']!=SUPPORT_SHA or completion.read_sealed_artifact(assessment['support_review'],base)!=review(root)
+    if (assessment!=expected or not runtime.qualified_source_review_matches(assessment['support_review'],SUPPORT_SHA,review(root),base)
             or record!={'candidate_sha256':candidate,'scope_kind':'product','evidence_kind':'qualified_retained_owned_control_fact','branch_id':branch['id'],
                 'native_shape_sha256':branch['shape_sha256'],'assessment_sha256':binding['qualified_runtime_read_attachment']['sha256'],
                 'relevant_sources':_original_sources(original,root),'retained_facts':original['facts']}
             or cap['native_call']!={'uri':p['request']['api'],'args':expected_args,'options':{},'result':p['result']}):raise ValueError('Exact original owned control/current full replay differs')
+    if runtime.retained_qualified_capture(cap):
+        return 'passed',None
     validate_evidence({'gateway':cap['gateway'],'native_call':cap['native_call'],'runtime_read_program':cap,'relevant_sources':cap['source_context']['packaged']},binding,branch,'program',base,root,edges)
     return 'passed',None
 
 
-def write_owned_control_bundle(output,captures,*,inventory,name_prefix='',file_boundaries=()):
+def write_owned_control_bundle(output,captures,*,inventory,name_prefix='',file_boundaries=(),retained_native=()):
+    if retained_native:
+        if captures:
+            raise ValueError('Native-only conversion does not accept current program captures')
+        from tests.support.qualified_runtime_read_evidence import write_selected_native_bundle
+        return write_selected_native_bundle(output, inventory, retained_native, family=__name__)
     versions={r['version']for r in inventory['native_coverage']['routes']if r['uri']in URIS}
     families={('meter'if r['uri']in METER_URIS else'save'if r['uri']==PREFIX+'saveCapture'else'cursor')for r in inventory['native_coverage']['routes']if r['uri']in URIS}
     if (not isinstance(name_prefix,str)or name_prefix and (len(versions)!=1 or len(families)!=1
@@ -562,7 +569,7 @@ def original_moves(route,base=None,*,root=audit.ROOT):
     if (audit.digest(node['source_context'])!=r['source_context_sha256']or final['source_context']!=node['source_context']
             or {k:v for k,v in node['source_context']['sources'].items()if k.startswith('skills/waapi-skill/')}!=r['original_sources']):
         raise ValueError('All617 original source entries/native413 subset differ')
-    source=r['original_sources'];current=runtime.program_source_context(root,flow=PREFIX+'moveCursor')['packaged']
+    source=r['original_sources'];current=runtime.original_runtime_source_context(root,flow=PREFIX+'moveCursor')['packaged']
     changes={k:{'before':source.get(k),'after':current.get(k)}for k in source.keys()|current.keys()if source.get(k)!=current.get(k)}
     if len(source)!=413 or len(current)!=413 or changes!=r['source_changes']:raise ValueError('Exact reviewed R108 full413 source delta differs')
     checked=0

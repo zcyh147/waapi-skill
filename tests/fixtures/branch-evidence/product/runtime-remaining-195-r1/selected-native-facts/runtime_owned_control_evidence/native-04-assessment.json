@@ -1,0 +1,179 @@
+{
+  "contract": "waapi-skill.retained-owned-control-assessment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor|/resultSchema",
+  "profile": {
+    "provider": "move-effect",
+    "request": {
+      "api": "ak.wwise.core.profiler.moveCursor",
+      "args": {
+        "position": "first"
+      },
+      "options": {}
+    },
+    "result": {
+      "return": 10133
+    },
+    "modes": [
+      {
+        "request": {
+          "api": "ak.wwise.core.profiler.moveCursor",
+          "args": {
+            "position": "first"
+          },
+          "options": {}
+        },
+        "result": {
+          "return": 10133
+        },
+        "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-native-evidence/1792795248979410000-52628822302249e3bd523b75e8fa36a2-ak_wwise_core_profiler_moveCursor.json",
+        "raw_sha256": "7596f9b02d9fe43f038df334927d9e4845afe8bfdbe4a858d0d8583d75e50790",
+        "receipt_indices": [
+          26,
+          27,
+          28,
+          29,
+          30
+        ],
+        "receipt_sha256": "a00e33cd5a834dc4a121c9cb40ca39000681ffc65831386ad223c568313f67b4",
+        "witness": "profiler-cursor-first-frame",
+        "witness_sha256": "e13a0cab2caea533a9c3f81ff3c2cbb1344401596dbc192006cea5ce840ba5a2",
+        "journal_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-setup-state/transactions/tx1-y9tfqvtdkpz4s336ey87/events.jsonl",
+        "verification_sha256": "7b5c605102550fa58b11b55444074c78e8d80f07df29378d4b42db9ec71e8de3",
+        "getter_raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-native-evidence/1792795249561182000-763e3d0ac9624304803ca702755991a0-ak_wwise_core_profiler_getCursorTime.json",
+        "getter_raw_sha256": "1d23272f2ccb12bd719935950c069e754b8b6e913376cc3e597d522d64cacef6"
+      },
+      {
+        "request": {
+          "api": "ak.wwise.core.profiler.moveCursor",
+          "args": {
+            "position": "next"
+          },
+          "options": {}
+        },
+        "result": {
+          "return": 10144
+        },
+        "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-native-evidence/1792795253408388000-281c9b8a63ad46bd9e2664d994b3c36f-ak_wwise_core_profiler_moveCursor.json",
+        "raw_sha256": "12db8afe84dc7416ac539bd914ce936baf47b3da315c65b0fa39af2a7768b018",
+        "receipt_indices": [
+          34,
+          35,
+          36,
+          37,
+          38
+        ],
+        "receipt_sha256": "750c81d5ef54a283e1a68ef01520daa3525c6eb3a8f6b21b820db63f2b83bc3b",
+        "witness": "profiler-cursor-next-frame",
+        "witness_sha256": "a5eb8442792eb6b7b85cb69a0d898cbc106b499382643b204d8285b22d6adfa5",
+        "journal_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-setup-state/transactions/tx1-j0xtmnfm2m1hy6dyy58g/events.jsonl",
+        "verification_sha256": "fbc26758e7de6741400d447a040131c014e08178b47f4254088e18ceefcddd88",
+        "getter_raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-native-evidence/1792795253991802000-e6831cc97e7d4146b88d09a1653aaba1-ak_wwise_core_profiler_getCursorTime.json",
+        "getter_raw_sha256": "ba6684f47e5cced4f57e75e6b2c0922e100a5d6d238b638e313d12db6f0a3719"
+      },
+      {
+        "request": {
+          "api": "ak.wwise.core.profiler.moveCursor",
+          "args": {
+            "position": "last"
+          },
+          "options": {}
+        },
+        "result": {
+          "return": 13600
+        },
+        "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-native-evidence/1792795257813503000-accbc12dfc3648079973a598266fccdc-ak_wwise_core_profiler_moveCursor.json",
+        "raw_sha256": "74e5f66e8ebeaed98ee3b45c7e4a57d659d196901cc023cdb58611af5e61ca93",
+        "receipt_indices": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ],
+        "receipt_sha256": "9f5ed8e85288b74ea2c7ce17c707192c1830761596ec5621a9dce247e999612b",
+        "witness": "profiler-cursor-last-frame",
+        "witness_sha256": "62bb0c928c3f423653d66c2b7f27ea4421bd451972f8a3a0aaed1d843346a1ec",
+        "journal_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-setup-state/transactions/tx1-13jbb0wka1s3t109ba19/events.jsonl",
+        "verification_sha256": "1de901535d1891ea8c91d9562c5f50be31c271804b6a49aa3e0b56da9091a4bd",
+        "getter_raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-native-evidence/1792795258396883000-c645e48ba3ca42579e0075d424457dd0-ak_wwise_core_profiler_getCursorTime.json",
+        "getter_raw_sha256": "b6dc7b195b87dc153e1ded60c96f944662d482c8f59041f41f305f9cc65c29cc"
+      },
+      {
+        "request": {
+          "api": "ak.wwise.core.profiler.moveCursor",
+          "args": {
+            "position": "previous"
+          },
+          "options": {}
+        },
+        "result": {
+          "return": 13589
+        },
+        "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-native-evidence/1792795262239362000-245346b9426342b5aa99d7b0bc35d059-ak_wwise_core_profiler_moveCursor.json",
+        "raw_sha256": "e779683a44e38ed38a2a44760519b960a35c6b416205072e83584d7bc0d3dc0d",
+        "receipt_indices": [
+          50,
+          51,
+          52,
+          53,
+          54
+        ],
+        "receipt_sha256": "3fedfbfc7ba98f65e1587438039c208b1241ebba5042929709e39c42fb6b63c7",
+        "witness": "profiler-cursor-previous-frame",
+        "witness_sha256": "669c8cd7e763e7cbc7c18d22025527f61cd1a16cea0c7dd27015857f1d471729",
+        "journal_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-setup-state/transactions/tx1-fny71ypdds80sa1x4zwt/events.jsonl",
+        "verification_sha256": "bc39a3d9fe60010cedf484bb4c4aba032d72006df6d66f3b63c9a7c7f1403585",
+        "getter_raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-native-evidence/1792795262820405000-08952d6ef9dd452bbfcfcaf82458e026-ak_wwise_core_profiler_getCursorTime.json",
+        "getter_raw_sha256": "bf2e04ead28c085aa3141e104231496f8cea74871c1b66e70e727d340f936c74"
+      }
+    ]
+  },
+  "support_review": {
+    "artifact": "tests/fixtures/runtime-owned-controls/support-review.json",
+    "sha256": "35a20ad0115b35ab2074168eea03d6d5b416cb06178e90f868a5f9067226a4bb"
+  },
+  "archive": {
+    "artifact": "tests/fixtures/runtime-owned-controls/r108-original.json.gz",
+    "sha256": "051ea895006d129d2ffd6ade395097dd19b991aefd9990a6667f85b985020d9f"
+  },
+  "program_capture": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_owned_control_evidence/native-04-capture.json",
+    "sha256": "e8bded6b77912d3c01492501505bd5327b2b6943090fc05d056e15e89af0ce50"
+  },
+  "facts": {
+    "original_candidate": "013776270f6d9c1b65bf53940442f4ac593e5714",
+    "original_context": {
+      "version": "2025.1",
+      "build": "2025.1.7.9143",
+      "host": "wwise-authoring"
+    },
+    "original_finalization": "PASS",
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false,
+    "actual_control": "ak.wwise.core.profiler.moveCursor",
+    "modes": [
+      {
+        "position": "first",
+        "returned_time_ms": 10133,
+        "observed_time_ms": 10133
+      },
+      {
+        "position": "next",
+        "returned_time_ms": 10144,
+        "observed_time_ms": 10144
+      },
+      {
+        "position": "last",
+        "returned_time_ms": 13600,
+        "observed_time_ms": 13600
+      },
+      {
+        "position": "previous",
+        "returned_time_ms": 13589,
+        "observed_time_ms": 13589
+      }
+    ],
+    "continuing_position_verified": false,
+    "capture_completeness_verified": false
+  }
+}

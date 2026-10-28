@@ -1,0 +1,66 @@
+{
+  "contract": "waapi-skill.meter-runtime-read-assessment/v1",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters|/resultSchema",
+  "profile": {
+    "version": "2024.1",
+    "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters",
+    "native_shape_sha256": "58e0f3bdc14e2e8c5f22f0e743c093fd12111dd4469387c6927f373357c50d56",
+    "argv": [
+      "core-call",
+      "ak.wwise.core.profiler.getMeters",
+      "--profiler-position",
+      "36853",
+      "--max-results",
+      "64",
+      "--meter-object-include",
+      "volume-db",
+      "--meter-object-include-related",
+      "parent",
+      "volume-db"
+    ],
+    "request": {
+      "api": "ak.wwise.core.profiler.getMeters",
+      "args": {
+        "time": 36853
+      },
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path",
+          "classId",
+          "@Volume",
+          "parent",
+          "parent.classId",
+          "parent.@Volume"
+        ]
+      }
+    },
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r93-runtime-native-2024-r2/evidence/authoring-node-observations/b7a415443063cf5fe14766cf-native-evidence/1792760644638039000-865c299a50df4160ba592866f02dfdf6-ak_wwise_core_profiler_getMeters.json",
+    "raw_sha256": "08daac30aacbd1b54ce0fc6da0e552ee5b6442bb4fb389ad35ad9740ed26c177",
+    "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r93-runtime-native-2024-r2/evidence/authoring-node-observations/b7a415443063cf5fe14766cf-setup-state/runtime-inspection-observations-v1/rto1-421cce036ba93f5b9806e8a7fe5c17ed.json",
+    "issuer_sha256": "23432483f65075880d8c649ea692cb96e1c4e88796786da35b812626f1a1d66e",
+    "native_rows": 2
+  },
+  "source_review": {
+    "artifact": "tests/fixtures/runtime-meter/support-review.json",
+    "sha256": "18594040da2afa4a090a8e1a2c8756b8a5f23391a93e8a5bdb69c4f91fe1efc0"
+  },
+  "archive": {
+    "artifact": "tests/fixtures/runtime-meter/r93-original.json.gz",
+    "sha256": "30add5bc5d7bd0c6e9a479aafa5b00935c52ee1ba09bee2fcaf204afd9567601"
+  },
+  "program_capture": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/meter_runtime_read_evidence/native-00-capture.json",
+    "sha256": "952288d605ad7220b1bcf3b89b6f6a02bec3e8c6d45e7d8fd79623d5e6d136b1"
+  },
+  "retained_facts": {
+    "original_finalization": "PASS",
+    "original_reader_outcome": "PASS",
+    "native_nonempty_rows": 2,
+    "physical_cleanup_complete": true,
+    "source_preserved": true,
+    "global_pass_transferred": false
+  }
+}

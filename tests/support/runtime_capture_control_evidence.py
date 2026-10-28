@@ -195,18 +195,25 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
     sources=cursor.review(root)['source_maps'][cursor.review(root)['profiles'][p['cursor_route']]['candidate']]['sources']
     expected={'contract':CONTRACT,'branch_id':branch['id'],'profile':p,'support_review':assessment['support_review'],
         'archive':original['archive'],'program_capture':assessment['program_capture'],'facts':original['facts']}
-    if (assessment!=expected or assessment['support_review']['sha256']!=SUPPORT_SHA or completion.read_sealed_artifact(assessment['support_review'],base)!=review(root)
+    if (assessment!=expected or not runtime.qualified_source_review_matches(assessment['support_review'],SUPPORT_SHA,review(root),base)
             or record!={'candidate_sha256':candidate,'scope_kind':'product','evidence_kind':'qualified_retained_capture_control_ack',
                 'branch_id':branch['id'],'native_shape_sha256':branch['shape_sha256'],'assessment_sha256':binding['qualified_runtime_read_attachment']['sha256'],
                 'relevant_sources':sources,'retained_facts':original['facts']}
             or cap['native_call']!={'uri':branch['route'].split('|')[-1],'args':original['args'],'options':{},'result':original['result']}):
         raise ValueError('Exact original control ACK/current complete replay differs')
+    if runtime.retained_qualified_capture(cap):
+        return 'passed',None
     validate_evidence({'gateway':cap['gateway'],'native_call':cap['native_call'],'runtime_read_program':cap,
         'relevant_sources':cap['source_context']['packaged']},binding,branch,'program',base,root,edges)
     return 'passed',None
 
 
-def write_capture_control_bundle(output,captures,*,inventory,name_prefix=''):
+def write_capture_control_bundle(output,captures,*,inventory,name_prefix='',retained_native=()):
+    if retained_native:
+        if captures:
+            raise ValueError('Native-only conversion does not accept current program captures')
+        from tests.support.qualified_runtime_read_evidence import write_selected_native_bundle
+        return write_selected_native_bundle(output, inventory, retained_native, family=__name__)
     versions={r['version']for r in inventory['native_coverage']['routes']if r['uri']in URIS}
     if (not isinstance(name_prefix,str)or name_prefix and (len(versions)!=1
             or name_prefix!='capture-control-'+next(iter(versions))+'-')):

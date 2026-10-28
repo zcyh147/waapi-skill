@@ -1,0 +1,9 @@
+{
+  "archive": {
+    "artifact": "tests/fixtures/runtime-loaded-media/r127-console-2024.1-original.json.gz",
+    "sha256": "97d366a9dec97aa947c1029f41422d76fd425ae612b2043f77dc2ba1a302c6e5"
+  },
+  "capture_original_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r127-console-additional-native-2024-r1/pytest/gateway-workflows-2024-10/state/console-additional-runtime-read-batch.json",
+  "report_sha256": "c0026874af269ff8e045d49235b7412db6f50e69189221f1efe61e50e52c0cdf",
+  "candidate": "2dc0ee57718f41b2378d8d4415572366de322704"
+}

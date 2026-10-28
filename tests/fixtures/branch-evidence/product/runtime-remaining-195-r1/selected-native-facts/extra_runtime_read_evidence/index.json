@@ -1,0 +1,182 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": "../../../../../../..",
+  "entries": [
+    {
+      "id": "runtime195-native-extra_runtime_read_evidence-native-00-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-00-bindings.json",
+        "sha256": "4fa15d4ee3b21a91e92668841f711b4a7dc1fc6dd288789a8d4920695debe93e"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-00-bindings.json",
+          "sha256": "4fa15d4ee3b21a91e92668841f711b4a7dc1fc6dd288789a8d4920695debe93e"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-00-program.json",
+          "sha256": "47514ee26e5500df282f06f9f62582e670bd2eb85ac88907c051a800158ef797"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-00-capture.json",
+          "sha256": "5af7016d712f3335c1e266d26abc16dce9fdf1872c6b42f7c99c319f7f35377a"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-00-requirements.json",
+          "sha256": "1f29165368f82fa737da395ac5df8140aaa3fe57debdfb5d198a4ecbcd74a881"
+        }
+      }
+    },
+    {
+      "id": "runtime195-native-extra_runtime_read_evidence-native-01-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-01-bindings.json",
+        "sha256": "0665f3347575533365347bf432f8b513a40dbe08eafa54aa48766a464c193b91"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-01-bindings.json",
+          "sha256": "0665f3347575533365347bf432f8b513a40dbe08eafa54aa48766a464c193b91"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-01-program.json",
+          "sha256": "47514ee26e5500df282f06f9f62582e670bd2eb85ac88907c051a800158ef797"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-01-capture.json",
+          "sha256": "5af7016d712f3335c1e266d26abc16dce9fdf1872c6b42f7c99c319f7f35377a"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-01-requirements.json",
+          "sha256": "539ec61044343ed166d9ce4b892dc768a9152427c87778308518fdae02de75fd"
+        }
+      }
+    },
+    {
+      "id": "runtime195-native-extra_runtime_read_evidence-native-02-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-02-bindings.json",
+        "sha256": "69a1d6a03be50ecd098eb50e4c63f0eb0a2ac1f88ec9ff518b567d58d07bb95d"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-02-bindings.json",
+          "sha256": "69a1d6a03be50ecd098eb50e4c63f0eb0a2ac1f88ec9ff518b567d58d07bb95d"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-02-program.json",
+          "sha256": "47514ee26e5500df282f06f9f62582e670bd2eb85ac88907c051a800158ef797"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-02-capture.json",
+          "sha256": "5af7016d712f3335c1e266d26abc16dce9fdf1872c6b42f7c99c319f7f35377a"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-02-requirements.json",
+          "sha256": "06a24d936710ce0cbf69ac05b83466fac96208b7b4e0e104ce62a9232d5dade7"
+        }
+      }
+    },
+    {
+      "id": "runtime195-native-extra_runtime_read_evidence-native-03-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-03-bindings.json",
+        "sha256": "10e2a0cbad722c2364afcd4ad9e5de59311489ce430e1d8b265dd562462baf1b"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-03-bindings.json",
+          "sha256": "10e2a0cbad722c2364afcd4ad9e5de59311489ce430e1d8b265dd562462baf1b"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-03-program.json",
+          "sha256": "163a76d1b00e35ebd2ed9550e767fca7fcc6fcc2491f2b4298f2e2bca239abb7"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-03-capture.json",
+          "sha256": "c58b78c4c17b239d48bc82cd86566c1bc0eae645a819e038fd85d435c1d523ba"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-03-requirements.json",
+          "sha256": "9927c6701015597af52421f7adb4fafbc138ba6daf8e3ef0518efa702f56ad5f"
+        }
+      }
+    },
+    {
+      "id": "runtime195-native-extra_runtime_read_evidence-native-04-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-04-bindings.json",
+        "sha256": "22e4dfedae0051f0d9541bee9a05412c35637d16f867ff7f07ad50b876c189f6"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-04-bindings.json",
+          "sha256": "22e4dfedae0051f0d9541bee9a05412c35637d16f867ff7f07ad50b876c189f6"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-04-program.json",
+          "sha256": "163a76d1b00e35ebd2ed9550e767fca7fcc6fcc2491f2b4298f2e2bca239abb7"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-04-capture.json",
+          "sha256": "c58b78c4c17b239d48bc82cd86566c1bc0eae645a819e038fd85d435c1d523ba"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-04-requirements.json",
+          "sha256": "ab1f1f754bf998639ca4a4092c1145a9b5c5fb924815e82f3d9c716201271766"
+        }
+      }
+    },
+    {
+      "id": "runtime195-native-extra_runtime_read_evidence-native-05-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-05-bindings.json",
+        "sha256": "82efcd9e5a1979b2da71b5f19b04932cef8ffaebf115bf831c1b9cb268d74228"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-05-bindings.json",
+          "sha256": "82efcd9e5a1979b2da71b5f19b04932cef8ffaebf115bf831c1b9cb268d74228"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-05-program.json",
+          "sha256": "163a76d1b00e35ebd2ed9550e767fca7fcc6fcc2491f2b4298f2e2bca239abb7"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-05-capture.json",
+          "sha256": "c58b78c4c17b239d48bc82cd86566c1bc0eae645a819e038fd85d435c1d523ba"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-05-requirements.json",
+          "sha256": "9c55279880cf111a2a2c8daebeb2c99b1b2ecc08123073bb5d46e06fe89a9565"
+        }
+      }
+    }
+  ],
+  "qualified_runtime_read_attachments": [
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-00-attachment.json",
+      "sha256": "76a3f94248c456c715be6de421001f2534c553c1deeb6fb25798781256213d76"
+    },
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-01-attachment.json",
+      "sha256": "3c928f3bcff1120702bed706567d3953866be8aa4ede6d6e33c04798ce7347ae"
+    },
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-02-attachment.json",
+      "sha256": "b0ffe3e371defbf3791abe3a1335ec9e682c836f67669fa0b236cc2f99d4ec64"
+    },
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-03-attachment.json",
+      "sha256": "4267db18bbe3f63f65cd10867ca9802d891ec0f440aefd4a1f76a5e148dab4da"
+    },
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-04-attachment.json",
+      "sha256": "782bdf22a1e56935d5e2fb1fea0b137cc4f7e61904d85884d772a3da58982100"
+    },
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-05-attachment.json",
+      "sha256": "a165590c9ad8ea7b4621e785e08a6b1e1f3be848a8993fcef5aa3d05b0199d69"
+    }
+  ]
+}

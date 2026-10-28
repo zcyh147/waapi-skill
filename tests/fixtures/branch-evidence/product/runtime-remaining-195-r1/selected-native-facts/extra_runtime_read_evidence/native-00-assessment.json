@@ -1,0 +1,44 @@
+{
+  "contract": "waapi-skill.extra-runtime-read-assessment/v1",
+  "branch_id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage|/resultSchema",
+  "profile": {
+    "provider": "console-2024.1",
+    "route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage",
+    "native_shape_sha256": "f3fc2bbad16686301bd6456f8ce80af2c0f3d4d0eeee281c09a04f177b986e42",
+    "reader": "cpu",
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r127-console-additional-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792837038914932000-c9312c1dcfe64690be2b7926bf4e4124-ak_wwise_core_profiler_getCpuUsage.json",
+    "raw_sha256": "69a225c65e907bfa2750e06cf2d2d8fbac9a14af92abc20f6a9cfbad9630a6c6",
+    "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r127-console-additional-native-2024-r1/pytest/gateway-workflows-2024-10/state/runtime-inspection-observations-v1/rto1-55b490fe8bb95c111a21765ad8ab6ea2.json",
+    "issuer_sha256": "9ef4b1828368939bf2c83d55e66fb25d7336f7f65fe747427c430d60a36c3d9b",
+    "request": {
+      "api": "ak.wwise.core.profiler.getCpuUsage",
+      "args": {
+        "time": 2581
+      },
+      "options": {}
+    },
+    "native_rows": 34,
+    "original_public_complete": true,
+    "original_reader_outcome": "PASS"
+  },
+  "source_review": {
+    "artifact": "tests/fixtures/runtime-extra-reads/support-review.json",
+    "sha256": "3ab3b25f660dc4bd6eb9b7967b9449ff71067ae3a56e6a2a276b9a1e68059009"
+  },
+  "archive": {
+    "artifact": "tests/fixtures/runtime-loaded-media/r127-console-2024.1-original.json.gz",
+    "sha256": "97d366a9dec97aa947c1029f41422d76fd425ae612b2043f77dc2ba1a302c6e5"
+  },
+  "program_capture": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-00-capture.json",
+    "sha256": "5af7016d712f3335c1e266d26abc16dce9fdf1872c6b42f7c99c319f7f35377a"
+  },
+  "retained_facts": {
+    "original_finalization": "PASS",
+    "original_reader_outcome": "PASS",
+    "original_public_complete": true,
+    "native_nonempty_rows": 34,
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false
+  }
+}

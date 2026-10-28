@@ -56,7 +56,7 @@ def _provider(label,root,signature):
 def original_transport(route,base=None,*,root=audit.ROOT):
     data=review(root);profile=data['profiles'][route];p=data['providers'][profile['provider']]
     source=root/p['archive_source'];stat=source.stat()
-    read,sources,facts=_provider(profile['provider'],root,(stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
+    read,sources,facts=_provider(profile['provider'],root,(stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns,runtime.original_source_context_key()))
     name='transport-origin-'+profile['provider']+'.json.gz'
     archive={'artifact':name,'sha256':p['archive_sha256']}
     if base is not None:
@@ -392,11 +392,13 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
     expected={'contract':CONTRACT,'branch_id':branch['id'],'profile':original['profile'],'support_review':assessment['support_review'],
         'archive':original['archive'],'program_capture':assessment['program_capture'],'facts':original['facts']}
     record=completion.read_sealed_artifact(descriptor,base)
-    if (assessment!=expected or assessment['support_review']['sha256']!=SUPPORT_SHA or completion.read_sealed_artifact(assessment['support_review'],base)!=review(root)
+    if (assessment!=expected or not runtime.qualified_source_review_matches(assessment['support_review'],SUPPORT_SHA,review(root),base)
             or record!={'candidate_sha256':candidate,'scope_kind':'product','evidence_kind':'qualified_retained_transport_fact','branch_id':branch['id'],
                 'native_shape_sha256':branch['shape_sha256'],'assessment_sha256':binding['qualified_runtime_read_attachment']['sha256'],
                 'relevant_sources':original['sources'],'retained_facts':original['facts']}
             or cap['native_call']!=original['call']):raise ValueError('Exact original transport fact/current complete request replay differs')
+    if runtime.retained_qualified_capture(cap):
+        return 'passed',None
     validate_evidence({'gateway':cap['gateway'],'native_call':cap['native_call'],'runtime_read_program':cap,'relevant_sources':cap['source_context']['packaged']},binding,branch,'program',base,root,edges)
     return 'passed',None
 

@@ -1,0 +1,44 @@
+{
+  "contract": "waapi-skill.extra-runtime-read-assessment/v1",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage|/resultSchema",
+  "profile": {
+    "provider": "authoring-2024.1",
+    "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage",
+    "native_shape_sha256": "f3fc2bbad16686301bd6456f8ce80af2c0f3d4d0eeee281c09a04f177b986e42",
+    "reader": "cpu",
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789160814694000-43e83a4f22864fb08f4af0ee5283b665-ak_wwise_core_profiler_getCpuUsage.json",
+    "raw_sha256": "05dc4a6c6c28c2f1635bd3e741f208ad2630a379f6a2b57da5bdbe9d4bbf43a0",
+    "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-setup-state/runtime-inspection-observations-v1/rto1-93b43d4cce5b91a0877d2b77a2078770.json",
+    "issuer_sha256": "abfcb239a683795fb63162d725e39d7ac6db6682fc2a42f7bdc3c0a739f4728f",
+    "request": {
+      "api": "ak.wwise.core.profiler.getCpuUsage",
+      "args": {
+        "time": 45621
+      },
+      "options": {}
+    },
+    "native_rows": 34,
+    "original_public_complete": false,
+    "original_reader_outcome": "BLOCKED"
+  },
+  "source_review": {
+    "artifact": "tests/fixtures/runtime-extra-reads/support-review.json",
+    "sha256": "3ab3b25f660dc4bd6eb9b7967b9449ff71067ae3a56e6a2a276b9a1e68059009"
+  },
+  "archive": {
+    "artifact": "tests/fixtures/runtime-qualified-reads/r104-2024.1-original.json.gz",
+    "sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22"
+  },
+  "program_capture": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-03-capture.json",
+    "sha256": "c58b78c4c17b239d48bc82cd86566c1bc0eae645a819e038fd85d435c1d523ba"
+  },
+  "retained_facts": {
+    "original_finalization": "BLOCKED",
+    "original_reader_outcome": "BLOCKED",
+    "original_public_complete": false,
+    "native_nonempty_rows": 34,
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false
+  }
+}

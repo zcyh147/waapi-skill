@@ -1,0 +1,44 @@
+{
+  "contract": "waapi-skill.extra-runtime-read-assessment/v1",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia|/resultSchema",
+  "profile": {
+    "provider": "authoring-2024.1",
+    "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia",
+    "native_shape_sha256": "3f0422793226b97c13806294a31a578dd001251a6fc75faac1b58441ad3c595f",
+    "reader": "streamed_media",
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789162766890000-428a623808d74f88b928e65426d85b80-ak_wwise_core_profiler_getStreamedMedia.json",
+    "raw_sha256": "b6f89d95bbf45307d683175f607bff34e4f0602dc4974da2769e33eb8cce5fdf",
+    "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-setup-state/runtime-inspection-observations-v1/rto1-6da07978f426de26841f5ecd95169dce.json",
+    "issuer_sha256": "84033dcddbe13fad21b5f86c77eb8b9f1e026c91fc763463b100a518d6ace4c9",
+    "request": {
+      "api": "ak.wwise.core.profiler.getStreamedMedia",
+      "args": {
+        "time": 45621
+      },
+      "options": {}
+    },
+    "native_rows": 1,
+    "original_public_complete": true,
+    "original_reader_outcome": "PASS"
+  },
+  "source_review": {
+    "artifact": "tests/fixtures/runtime-extra-reads/support-review.json",
+    "sha256": "3ab3b25f660dc4bd6eb9b7967b9449ff71067ae3a56e6a2a276b9a1e68059009"
+  },
+  "archive": {
+    "artifact": "tests/fixtures/runtime-qualified-reads/r104-2024.1-original.json.gz",
+    "sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22"
+  },
+  "program_capture": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/extra_runtime_read_evidence/native-05-capture.json",
+    "sha256": "c58b78c4c17b239d48bc82cd86566c1bc0eae645a819e038fd85d435c1d523ba"
+  },
+  "retained_facts": {
+    "original_finalization": "BLOCKED",
+    "original_reader_outcome": "PASS",
+    "original_public_complete": true,
+    "native_nonempty_rows": 1,
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false
+  }
+}
