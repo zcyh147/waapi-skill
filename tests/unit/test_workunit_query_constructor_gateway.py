@@ -291,3 +291,120 @@ def test_workunit_name_cannot_become_a_filesystem_path(tmp_path):
         code, value = task.step("draft-check")
     assert code == 2, value
     assert not any(uri.endswith("object.create") for uri, _, _ in task.calls)
+
+
+NESTED = "{55555555-5555-5555-5555-555555555555}"
+LEAF = "{66666666-6666-6666-6666-666666666666}"
+
+
+class NestedWorkunitTask(ConstructorTask):
+    def __init__(self, path, operation="object.create", owner_kind="WorkUnit"):
+        super().__init__(path, "2025.1", operation, hierarchy="Events")
+        self.objects[FIRST] = {"id": FIRST, "name": "Nested", "type": owner_kind,
+            "classId": 1638416 if owner_kind == "WorkUnit" else 131088,
+            "path": self.objects[SECOND]["path"] + r"\Nested", "parent": {"id": SECOND}, "notes": "Keep nested",
+            "workunitType": "nestedFile", "filePath": str(self.project_file.parent / "Events" / "Nested.wwu")}
+        if owner_kind == "Folder":
+            self.objects[FIRST]["workunit"] = {"id": NESTED}
+            self.objects[NESTED] = {"id": NESTED, "name": "OwningUnit", "type": "WorkUnit", "classId": 1638416,
+                "path": self.objects[SECOND]["path"] + r"\OwningUnit", "parent": {"id": SECOND}, "notes": "Keep owning unit",
+                "workunitType": "rootFile", "filePath": str(self.project_file.parent / "Events" / "OwningUnit.wwu")}
+        parent = self.bind(SECOND)
+        code, value = self.step("draft-business-configure", "--name-conflict", "merge")
+        assert code == 0, json.dumps(value)
+        outer = self.declare(owner_kind, "Nested", parent=parent)
+        code, declared = self.step("draft-declare-new", "--declaration-id", "new-unit", "--parent-handle", outer,
+            "--name", "NewUnit", "--kind", self.discover_kind("WorkUnit"))
+        assert code == 0, declared
+
+
+@pytest.mark.parametrize("operation,owner_kind,fault", [("object.create", "WorkUnit", "external"),
+    ("object.set", "Folder", "external"), ("object.create", "WorkUnit", "symlink"), ("object.set", "Folder", "missing-owning-unit")])
+def test_nested_workunit_merge_checks_actual_owner_file_scope_before_preview(tmp_path, operation, owner_kind, fault):
+    task = NestedWorkunitTask(tmp_path, operation, owner_kind)
+    owner_id = FIRST if owner_kind == "WorkUnit" else NESTED
+    if fault == "external":
+        task.objects[owner_id]["filePath"] = str(tmp_path / "External.wwu")
+    elif fault == "missing-owning-unit":
+        task.objects[FIRST]["workunit"] = None
+    else:
+        redirected = task.project_file.parent / "Redirected"
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        redirected.symlink_to(outside, target_is_directory=True)
+        task.objects[owner_id]["filePath"] = str(redirected / "Nested.wwu")
+    code, checked = task.step("draft-check")
+    assert code == 2 and "WORKUNIT_PROJECT_IO_BOUNDARY" in json.dumps(checked), checked
+    assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("operation,owner_kind", [("object.create", "WorkUnit"), ("object.set", "Folder")])
+def test_nested_workunit_merge_seals_actual_existing_owners_and_succeeds_with_scoped_proof(tmp_path, operation, owner_kind):
+    task = NestedWorkunitTask(tmp_path, operation, owner_kind)
+    tx, shown = task.preview()
+    prepared = shown["artifact"]["prepared_operation"]
+    boundary = (prepared["pre_state"]["saved_object_constructors"] if operation == "object.create"
+        else prepared["pre_state"]["saved_object_constructor_batches"][0])
+    assert {SECOND, FIRST} <= {row["object"] for row in boundary["parent_snapshots"]}
+    expected = {SECOND, FIRST} if owner_kind == "WorkUnit" else {SECOND, FIRST, NESTED}
+    assert {row["object"] for row in boundary["file_scopes"]} == expected
+    assert boundary["owned_ancestry"] and boundary["project_snapshot"][0]["id"]
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is False, verified
+    assert verified["verification"]["failed_assertion_count"] == 0
+    assert verified["verification"]["assertion_count"] > 0
+    assert task.objects[FIRST]["notes"] == "Keep nested"
+    assert len([call for call in task.calls if call[0].endswith(operation)]) == 1
+
+
+@pytest.mark.parametrize("fault", ["nested-filepath", "nested-filetype", "nested-symlink", "project"])
+def test_nested_workunit_owner_scope_drift_stops_before_execution(tmp_path, fault):
+    task = NestedWorkunitTask(tmp_path)
+    directory = task.project_file.parent / "Events" / "NestedDir"
+    directory.mkdir(parents=True)
+    task.objects[FIRST]["filePath"] = str(directory / "Nested.wwu")
+    tx, shown = task.preview()
+    if fault == "nested-filepath":
+        task.objects[FIRST]["filePath"] = str(task.project_file.parent / "Events" / "Different.wwu")
+    elif fault == "nested-filetype":
+        task.objects[FIRST]["workunitType"] = "folder"
+    elif fault == "nested-symlink":
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        directory.rename(directory.with_name("OldNestedDir"))
+        directory.symlink_to(outside, target_is_directory=True)
+    else:
+        task.project_file = tmp_path / "Different.wproj"
+        task.project_file.write_text("<Project />")
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, rejected = task.run("execute", tx)
+    assert code == 2, rejected
+    assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
+
+
+def test_fresh_workunit_owner_uses_only_certified_connected_project_ancestry(tmp_path):
+    task = ConstructorTask(tmp_path, "2025.1", hierarchy="Events")
+    parent = task.bind(SECOND)
+    outer = task.declare("Folder", "Layers", parent=parent)
+    code, declared = task.step("draft-declare-new", "--declaration-id", "new-unit", "--parent-handle", outer,
+        "--name", "NewUnit", "--kind", task.discover_kind("WorkUnit"))
+    assert code == 0, declared
+    tx, shown = task.preview()
+    boundary = shown["artifact"]["prepared_operation"]["pre_state"]["saved_object_constructors"]
+    assert {row["object"] for row in boundary["file_scopes"]} == {SECOND}
+    assert {row["planned_class_id"] for row in boundary["owned_ancestry"][0]["chain"]} == {1638416, 131088}
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is False, verified
+
+
+def test_workunit_save_requires_existing_owner_name_to_remain_bound_in_same_batch(tmp_path):
+    task = ConstructorTask(tmp_path, "2025.1", "object.set", hierarchy="Events")
+    parent = task.bind(SECOND)
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", parent,
+        "--field", "new_name", "Renamed")
+    assert code == 0, declared
+    task.declare("WorkUnit", "NewUnit", parent=parent)
+    code, rejected = task.step("draft-check")
+    assert code == 2 and "WORKUNIT_PROJECT_IO_BOUNDARY" in json.dumps(rejected), rejected
+    assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)

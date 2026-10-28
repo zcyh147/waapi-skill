@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from uuid import UUID
 
 from .canonical import canonical_sha256
 from .host_paths import localize_waapi_host_path, parse_relative_host_path
@@ -50,7 +51,8 @@ def declaration_contract(version):
     return {"WorkUnit": {"status": "supported", "source_sha256": data["sha256"], "parent": "bound_WorkUnit_or_Folder_in_active_project",
             "name": "one_portable_filename_component_without_path_syntax",
             "name_conflict": ["fail", "rename", "merge"], "effects": WORKUNIT_EFFECTS,
-            "io_scope": "exact_native_owner_file_or_directory_within_active_project; corresponding_WWU_destination_is_native_owned_not_synthesized",
+            "io_scope": "every_exact_existing_owner_and_owning_WorkUnit_in_connected_ancestry_within_same_active_project; corresponding_WWU_destination_is_native_owned_not_synthesized",
+            "same_batch_owner_rename": "separate_rename_Preview_then_bind_actual_existing_parent_for_WorkUnit_creation",
             "verification": "GUID_class_parent_name_and_requested_fields; history_clipboard_and_saved_WWU_bytes_unobserved"},
         "Query": {"status": "supported" if lane["query_constructible"] else "unavailable_in_matching_SDK", "source_sha256": data["sha256"],
             "parent": "Queries_hierarchy_WorkUnit_or_Folder", "ordinary_query_object_reads": "unaffected",
@@ -86,45 +88,113 @@ def graph_boundary(nodes, *, parent, version, conflict, read):
         if kind in {"Query", "SearchCriteria"} and not (path == "\\Queries" or path.startswith("\\Queries\\")):
             raise SavedConstructorError("QUERY_HIERARCHY_REQUIRED", "Saved Query construction requires a bound owner in the Queries hierarchy.")
     snapshots = []
-    fields = ["id", "name", "type", "path", "classId", "filePath", "workunit", "workunitType"]
-    rows = read("ak.wwise.core.object.get", {"from": {"id": [parent.object]}}, {"return": fields}).get("return")
-    if not isinstance(rows, list) or len(rows) != 1 or rows[0].get("id") != parent.object:
-        raise SavedConstructorError("SAVED_CONSTRUCTOR_PARENT_INVALID", "Constructor owner must resolve exactly once.")
-    expected_class = {"WorkUnit": 1638416, "Folder": 131088, "Query": 2097168}.get(parent.row.get("type"))
-    if (rows[0].get("classId") != expected_class
-            or any(rows[0].get(field) != parent.row.get(field) for field in ("id", "name", "type", "path"))):
-        raise SavedConstructorError("SAVED_CONSTRUCTOR_PARENT_INVALID", "Constructor owner requires its exact live class, name, type and path.")
-    snapshots.append({"object": parent.object, "fields": fields, "rows": rows})
-    # The existing project guard remains authoritative. WorkUnit writes add a
-    # native file-scope check, without inventing a destination WWU filename.
-    project_root = None
-    file_scope = None
+    fields = ["id", "name", "type", "path", "classId", "parent", "filePath", "workunit", "workunitType"]
+    owner_classes = {"WorkUnit": 1638416, "Folder": 131088, "Query": 2097168}
+    captured = {}
+
+    def capture(object_id, *, expected=None, kind=None):
+        # Graph identities and canonical relationship GUIDs are already live
+        # evidence, but malformed links must fail before another read.
+        if not isinstance(object_id, str):
+            raise ValueError("missing exact constructor owner GUID")
+        UUID(object_id)
+        if object_id not in captured:
+            rows = read("ak.wwise.core.object.get", {"from": {"id": [object_id]}}, {"return": fields}).get("return")
+            if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict) or rows[0].get("id") != object_id:
+                raise ValueError("constructor owner must resolve exactly once")
+            captured[object_id] = rows[0]
+            snapshots.append({"object": object_id, "fields": fields, "rows": rows})
+        row = captured[object_id]
+        if (row.get("type") not in owner_classes or row.get("classId") != owner_classes[row["type"]]
+                or kind is not None and row["type"] != kind
+                or expected is not None and any(row.get(field) != expected[field]
+                    for field in ("id", "name", "type", "path", "classId", "parent") if field in expected)):
+            raise ValueError("constructor owner identity or class changed")
+        return row
+
+    try:
+        root_owner = capture(parent.object, expected=parent.row)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise SavedConstructorError("SAVED_CONSTRUCTOR_PARENT_INVALID", "Constructor owner requires its exact live class, name, type and path.") from exc
+    project_root, project_snapshot, file_scope = None, None, None
+    file_scopes, ancestry = [], []
     if any(node["canonical_type"] == "WorkUnit" for node in selected):
-        projects = read("ak.wwise.core.object.get", {"waql": "from type Project take 1"}, {"return": ["id", "filePath"]}).get("return")
+        project_snapshot = read("ak.wwise.core.object.get", {"waql": "from type Project take 1"}, {"return": ["id", "filePath"]}).get("return")
         try:
-            if not isinstance(projects, list) or len(projects) != 1:
+            if not isinstance(project_snapshot, list) or len(project_snapshot) != 1:
                 raise ValueError("one active project required")
-            project_file = projects[0]["filePath"]
+            project_id = project_snapshot[0]["id"]
+            if not isinstance(project_id, str):
+                raise ValueError("active project needs its exact GUID")
+            UUID(project_id)
+            project_file = project_snapshot[0]["filePath"]
             project_root = Path(localize_waapi_host_path(project_file)).resolve(strict=False).parent
-            container = rows[0]
-            if container.get("type") == "Folder":
-                owner_id = container.get("workunit", {}).get("id")
-                owned = read("ak.wwise.core.object.get", {"from": {"id": [owner_id]}}, {"return": fields}).get("return")
-                if not isinstance(owned, list) or len(owned) != 1 or owned[0].get("id") != owner_id:
-                    raise ValueError("Folder needs exact owning Work Unit")
-                snapshots.append({"object": owner_id, "fields": fields, "rows": owned})
-                container = owned[0]
-            local = Path(localize_waapi_host_path(container["filePath"])).resolve(strict=False)
-            if (container.get("type") != "WorkUnit" or container.get("classId") != 1638416
-                    or container.get("workunitType") not in {"folder", "rootFile", "nestedFile"}
-                    or local == project_root or not local.is_relative_to(project_root)):
-                raise ValueError("Work Unit file scope outside active project")
-            file_scope = {"project_file": project_file, "owner_file": container["filePath"], "resolved_owner_file": str(local),
-                "destination": "native_corresponding_WWU_path_not_synthesized"}
-        except (KeyError, TypeError, ValueError) as exc:
-            raise SavedConstructorError("WORKUNIT_PROJECT_IO_BOUNDARY", "Work Unit creation requires an exact native owning Work Unit file/directory inside the active project.") from exc
+            owners = {parent.object: root_owner}
+            for node in selected:
+                if node["canonical_type"] != "WorkUnit":
+                    continue
+                current, seen, chain = node, set(), []
+                while current is not None:
+                    request_path = current["request_path"]
+                    if request_path in seen or len(seen) >= len(specs):
+                        raise ValueError("ambiguous constructor ancestry")
+                    seen.add(request_path)
+                    kind = current["canonical_type"]
+                    if kind not in {"WorkUnit", "Folder"}:
+                        raise ValueError("constructor ancestry lacks a reviewed owner class")
+                    identity = current.get("target_id") if current.get("existing_target") else current.get("preexisting_id")
+                    if identity is not None:
+                        if current.get("existing_target") and current.get("requested_name") != current.get("original_name"):
+                            raise ValueError("owner rename requires a separate Preview before binding its new file context")
+                        row = capture(identity, expected=current.get("pre_state"), kind=kind)
+                        owners[identity] = row
+                        chain.append({"request_path": request_path, "existing_owner": identity})
+                    else:
+                        # A new owner has no native file yet. Its only authority
+                        # is this fresh exact class and connected owned ancestry.
+                        name = parse_relative_host_path(current["requested_name"])
+                        if (current.get("class_id") != owner_classes[kind] or current.get("collection") != "children"
+                                or len(name.components) != 1 or kind == "WorkUnit" and not current.get("saved_constructor")):
+                            raise ValueError("fresh constructor owner is not source/class certified")
+                        chain.append({"request_path": request_path, "planned_class_id": current["class_id"]})
+                    parent_path = current.get("parent_request_path")
+                    if parent_path is None:
+                        current = None
+                    elif parent_path in specs:
+                        current = specs[parent_path]
+                    else:
+                        raise ValueError("constructor ancestry has an unresolved owner")
+                ancestry.append({"request_path": node["request_path"], "chain": chain, "bound_parent": parent.object})
+
+            def retain_scope(row):
+                raw = row["filePath"]
+                local = Path(localize_waapi_host_path(raw)).resolve(strict=False)
+                if local == project_root or not local.is_relative_to(project_root):
+                    raise ValueError("constructor owner file scope outside active project")
+                scope = {"object": row["id"], "project_file": project_file, "owner_file": raw,
+                    "resolved_owner_file": str(local), "destination": "native_corresponding_WWU_path_not_synthesized"}
+                if scope not in file_scopes:
+                    file_scopes.append(scope)
+
+            for row in owners.values():
+                if row["type"] == "Folder":
+                    link = row.get("workunit")
+                    owner_id = link.get("id") if isinstance(link, dict) else None
+                    owned = capture(owner_id, kind="WorkUnit")
+                    # A supplied Folder filepath is also native file authority;
+                    # it cannot escape merely because its workunit link is local.
+                    if row.get("filePath"):
+                        retain_scope(row)
+                    row = owned
+                if row["type"] != "WorkUnit" or row.get("workunitType") not in {"folder", "rootFile", "nestedFile"}:
+                    raise ValueError("constructor owner needs its exact Work Unit file type")
+                retain_scope(row)
+            file_scope = file_scopes[0]
+        except (KeyError, TypeError, ValueError, OSError, RuntimeError) as exc:
+            raise SavedConstructorError("WORKUNIT_PROJECT_IO_BOUNDARY", "Every existing constructor owner and owning Work Unit must resolve inside the same active project; for an unresolved chain, bind the exact existing parent and prepare a direct WorkUnit Preview.") from exc
     return {"version": version, "sources": [node["saved_constructor"] for node in selected],
-        "parent_snapshots": snapshots, "project_root": str(project_root) if project_root else None, "file_scope": file_scope,
+        "parent_snapshots": snapshots, "project_root": str(project_root) if project_root else None,
+        "project_snapshot": project_snapshot, "file_scope": file_scope, "file_scopes": file_scopes, "owned_ancestry": ancestry,
         "workunit_effects": WORKUNIT_EFFECTS if project_root else [],
         "verification": {"observed": ["GUID_class_name_parent_and_requested_fields"],
             "unobserved": (["history_and_clipboard_contents", "WWU_file_bytes_and_save_completeness"] if project_root else [])
@@ -134,18 +204,21 @@ def graph_boundary(nodes, *, parent, version, conflict, read):
 def guard_matches(boundary, read):
     try:
         if boundary.get("file_scope"):
-            scope = boundary["file_scope"]
-            root = Path(localize_waapi_host_path(scope["project_file"])).resolve(strict=False).parent
-            owner_file = Path(localize_waapi_host_path(scope["owner_file"])).resolve(strict=False)
-            if str(root) != boundary["project_root"] or str(owner_file) != scope["resolved_owner_file"] or not owner_file.is_relative_to(root):
+            projects = read("ak.wwise.core.object.get", {"waql": "from type Project take 1"}, {"return": ["id", "filePath"]}).get("return")
+            if projects != boundary["project_snapshot"]:
                 return False
+            for scope in boundary["file_scopes"]:
+                root = Path(localize_waapi_host_path(scope["project_file"])).resolve(strict=False).parent
+                owner_file = Path(localize_waapi_host_path(scope["owner_file"])).resolve(strict=False)
+                if str(root) != boundary["project_root"] or str(owner_file) != scope["resolved_owner_file"] or not owner_file.is_relative_to(root):
+                    return False
         for proof in boundary["sources"]:
             current = criterion(proof["version"], proof["choice"]) if "choice" in proof else authority(proof["version"], proof["object_type"])
             if current != proof:
                 return False
         return all(read("ak.wwise.core.object.get", {"from": {"id": [snapshot["object"]]}},
             {"return": snapshot["fields"]}).get("return") == snapshot["rows"] for snapshot in boundary["parent_snapshots"])
-    except (SavedConstructorError, OSError, ValueError, KeyError, TypeError):
+    except (SavedConstructorError, OSError, ValueError, KeyError, TypeError, RuntimeError):
         return False
 
 

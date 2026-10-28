@@ -5028,12 +5028,6 @@ def _prepare_object_create(
         spec["collection"] = (
             list_name if index == 0 and list_name is not None else "children"
         )
-    from .saved_object_construction import graph_boundary, SavedConstructorError
-    try:
-        saved_constructors = graph_boundary(node_specs, parent=parent, version=request.version,
-            conflict=requested_conflict, read=read)
-    except SavedConstructorError as exc:
-        raise OperationContractError(exc.code, str(exc)) from exc
     root_path = (
         _child_path(parent.row.get("path"), normalized.root.name, field="parent.path")
         if list_name is None and normalized.root.type != "Action"
@@ -5298,6 +5292,12 @@ def _prepare_object_create(
                 node_specs,
             )
 
+    from .saved_object_construction import graph_boundary, SavedConstructorError
+    try:
+        saved_constructors = graph_boundary(node_specs, parent=parent, version=request.version,
+            conflict=requested_conflict, read=read)
+    except SavedConstructorError as exc:
+        raise OperationContractError(exc.code, str(exc)) from exc
     parent_children = (
         _read_direct_children(
             parent.object,
@@ -6564,13 +6564,6 @@ def _prepare_object_set(
             live_source_parent=live_source_parent,
             playlist_mode=row_list_mode,
         )
-        from .saved_object_construction import graph_boundary, SavedConstructorError
-        try:
-            saved_boundary = graph_boundary(child_specs, parent=target, version=request.version, conflict=row_conflict, read=read)
-        except SavedConstructorError as exc:
-            raise OperationContractError(exc.code, str(exc)) from exc
-        if saved_boundary:
-            saved_constructor_batches.append(saved_boundary)
         child_spec_by_path = {
             str(spec["request_path"]): spec for spec in child_specs
         }
@@ -7220,6 +7213,13 @@ def _prepare_object_set(
         target_spec["list_request_paths"] = [
             row["request_path"] for row in list_specs
         ]
+        from .saved_object_construction import graph_boundary, SavedConstructorError
+        try:
+            saved_boundary = graph_boundary([target_spec, *child_specs], parent=target, version=request.version, conflict=row_conflict, read=read)
+        except SavedConstructorError as exc:
+            raise OperationContractError(exc.code, str(exc)) from exc
+        if saved_boundary:
+            saved_constructor_batches.append(saved_boundary)
         node_specs.append(target_spec)
         node_specs.extend(child_specs)
         node_specs.extend(list_specs)
