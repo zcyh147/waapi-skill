@@ -1,0 +1,550 @@
+{
+  "canonical_index_remaining_bindings": 0,
+  "contract": "waapi-skill.runtime-remaining-selected-proof-plan/v1",
+  "legacy_gate": "same-route native resultSchema root for every branch; 144 roots, preserved unchanged in exported requirements",
+  "reconciliation_proposal": "Review exact source-backed native facts per meaningful effect/host mechanism; admit CODE siblings through existing representative layer; do not infer current native PASS or new host facts. Missing native source slots remain observation limits unless actual host/effect risk requires a selected witness.",
+  "retained_native_profiles": 133,
+  "rows": {
+    "ak.wwise.core.profiler.enableProfilerData": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.enableProfilerData",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.enableProfilerData",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.enableProfilerData",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.enableProfilerData",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.enableProfilerData",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.enableProfilerData",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.enableProfilerData",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.enableProfilerData"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.enableProfilerData",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.enableProfilerData",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.enableProfilerData",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.enableProfilerData",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.enableProfilerData",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.enableProfilerData",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.enableProfilerData",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.enableProfilerData"
+      ],
+      "routes_without_profile": [],
+      "source_members": 432
+    },
+    "ak.wwise.core.profiler.getCpuUsage": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "fixed-read",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getCpuUsage",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getCpuUsage",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCpuUsage",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getCpuUsage"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [],
+      "routes_without_profile": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getCpuUsage",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getCpuUsage",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCpuUsage",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getCpuUsage"
+      ],
+      "source_members": 198
+    },
+    "ak.wwise.core.profiler.getCursorTime": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "fixed-read",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getCursorTime",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getCursorTime",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getCursorTime",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getCursorTime",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getCursorTime",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getCursorTime",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getCursorTime",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getCursorTime",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getCursorTime",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getCursorTime",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getCursorTime",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getCursorTime",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime"
+      ],
+      "routes_without_profile": [],
+      "source_members": 142
+    },
+    "ak.wwise.core.profiler.getMeters": {
+      "actual_product_gap": "getMeters omitted exact declared return spellings and namespaced source outputs; now reuses existing closed projection",
+      "code_mechanism": "meter",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/patternProperties/^((@?@?[a-zA-Z0-9:_\\(\\),]+)|[a-zA-Z\\(\\),]+\\(.+\\))(\\.@?@?[a-zA-Z0-9:_\\(\\),]+",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/patternProperties/^((@?@?[a-zA-Z0-9:_\\(\\),]+)|[a-zA-Z\\(\\),]+\\(.+\\))(\\.@?@?[a-zA-Z0-9:_\\(\\),]+",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/patternProperties/^((@?@?[a-zA-Z0-9:_\\(\\),]+)|[a-zA-Z\\(\\),]+\\(.+\\))(\\.@?@?[a-zA-Z0-9:_\\(\\),]+",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/patternProperties/^((@?@?[a-zA-Z0-9:_\\(\\),]+)|[a-zA-Z\\(\\),]+\\(.+\\))(\\.@?@?[a-zA-Z0-9:_\\(\\),]+"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [],
+      "routes_without_profile": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/patternProperties/^((@?@?[a-zA-Z0-9:_\\(\\),]+)|[a-zA-Z\\(\\),]+\\(.+\\))(\\.@?@?[a-zA-Z0-9:_\\(\\),]+",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/patternProperties/^((@?@?[a-zA-Z0-9:_\\(\\),]+)|[a-zA-Z\\(\\),]+\\(.+\\))(\\.@?@?[a-zA-Z0-9:_\\(\\),]+",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/patternProperties/^((@?@?[a-zA-Z0-9:_\\(\\),]+)|[a-zA-Z\\(\\),]+\\(.+\\))(\\.@?@?[a-zA-Z0-9:_\\(\\),]+",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/patternProperties/^((@?@?[a-zA-Z0-9:_\\(\\),]+)|[a-zA-Z\\(\\),]+\\(.+\\))(\\.@?@?[a-zA-Z0-9:_\\(\\),]+"
+      ],
+      "source_members": 2744
+    },
+    "ak.wwise.core.profiler.getPerformanceMonitor": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "fixed-read",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getPerformanceMonitor"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [],
+      "routes_without_profile": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getPerformanceMonitor"
+      ],
+      "source_members": 222
+    },
+    "ak.wwise.core.profiler.getStreamedMedia": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "fixed-read",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getStreamedMedia"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [],
+      "routes_without_profile": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getStreamedMedia"
+      ],
+      "source_members": 234
+    },
+    "ak.wwise.core.profiler.moveCursor": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor"
+      ],
+      "routes_without_profile": [
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor"
+      ],
+      "source_members": 36
+    },
+    "ak.wwise.core.profiler.registerMeter": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.registerMeter",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.registerMeter",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.registerMeter",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.registerMeter"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.registerMeter",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.registerMeter"
+      ],
+      "routes_without_profile": [
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.registerMeter",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.registerMeter"
+      ],
+      "source_members": 92
+    },
+    "ak.wwise.core.profiler.saveCapture": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture"
+      ],
+      "routes_without_profile": [
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture"
+      ],
+      "source_members": 60
+    },
+    "ak.wwise.core.profiler.setCursorTime": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.setCursorTime",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.setCursorTime"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.setCursorTime"
+      ],
+      "routes_without_profile": [
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.setCursorTime"
+      ],
+      "source_members": 18
+    },
+    "ak.wwise.core.profiler.startCapture": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "zero",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.startCapture",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.startCapture",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.startCapture",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.startCapture",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.startCapture",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.startCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.startCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.startCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.startCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.startCapture"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.startCapture",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.startCapture",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.startCapture",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.startCapture",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.startCapture",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.startCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.startCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.startCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.startCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.startCapture"
+      ],
+      "routes_without_profile": [],
+      "source_members": 120
+    },
+    "ak.wwise.core.profiler.stopCapture": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "zero",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.stopCapture",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.stopCapture",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.stopCapture",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.stopCapture",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.stopCapture",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.stopCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.stopCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.stopCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.stopCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.stopCapture"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.stopCapture",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.stopCapture",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.stopCapture",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.stopCapture",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.stopCapture",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.stopCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.stopCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.stopCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.stopCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.stopCapture"
+      ],
+      "routes_without_profile": [],
+      "source_members": 120
+    },
+    "ak.wwise.core.profiler.unregisterMeter": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.unregisterMeter",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.unregisterMeter",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.unregisterMeter",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.unregisterMeter"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.unregisterMeter",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.unregisterMeter"
+      ],
+      "routes_without_profile": [
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.unregisterMeter",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.unregisterMeter"
+      ],
+      "source_members": 92
+    },
+    "ak.wwise.core.transport.create": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.create",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.create",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.create",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.create",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.create",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.create",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.create",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.create",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.create",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.create"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.create",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.create",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.create",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.create",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.create",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.create",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.create",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.create",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.create",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.create"
+      ],
+      "routes_without_profile": [],
+      "source_members": 370
+    },
+    "ak.wwise.core.transport.destroy": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.destroy",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.destroy",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.destroy",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.destroy",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.destroy",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.destroy",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.destroy",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.destroy",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.destroy",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.destroy"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.destroy",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.destroy",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.destroy",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.destroy",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.destroy",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.destroy",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.destroy",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.destroy",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.destroy",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.destroy"
+      ],
+      "routes_without_profile": [],
+      "source_members": 130
+    },
+    "ak.wwise.core.transport.executeAction": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.executeAction",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.executeAction",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.executeAction",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.executeAction",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.executeAction",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.executeAction",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.executeAction",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.executeAction",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.executeAction",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.executeAction"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.executeAction",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.executeAction",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.executeAction",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.executeAction",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.executeAction",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.executeAction",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.executeAction",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.executeAction",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.executeAction",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.executeAction"
+      ],
+      "routes_without_profile": [],
+      "source_members": 210
+    },
+    "ak.wwise.core.transport.getList": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "zero",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.getList",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.getList",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.getList",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.getList",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.getList",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.getList",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getList",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getList",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.getList",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.getList"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.getList",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.getList",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.getList",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.getList",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.getList",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.getList",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getList",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getList",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.getList",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.getList"
+      ],
+      "routes_without_profile": [],
+      "source_members": 360
+    },
+    "ak.wwise.core.transport.getState": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.getState",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.getState",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.getState",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.getState",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.getState",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.getState",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getState",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getState",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.getState",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.getState"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.getState",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.getState",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.getState",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.getState",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.getState",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.getState",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getState",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getState",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.getState",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.getState"
+      ],
+      "routes_without_profile": [],
+      "source_members": 160
+    },
+    "ak.wwise.core.transport.prepare": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.prepare",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.prepare",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.prepare",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.prepare",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.prepare",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.prepare",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.prepare",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.prepare"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.prepare",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.prepare",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.prepare",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.prepare",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.prepare",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.prepare",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.prepare",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.prepare"
+      ],
+      "routes_without_profile": [],
+      "source_members": 184
+    },
+    "ak.wwise.core.transport.useOriginals": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.useOriginals",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.useOriginals",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.useOriginals",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.useOriginals"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.useOriginals",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.useOriginals",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.useOriginals",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.useOriginals"
+      ],
+      "routes_without_profile": [],
+      "source_members": 72
+    }
+  }
+}

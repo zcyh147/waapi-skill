@@ -654,13 +654,70 @@ def test_canonical_meter_root_outputs_reach_exact_request_and_complete_pages(tmp
     code, failure = run(*argv)
     assert code == 2 and "agent_result" not in failure and "originalFilePath" in str(failure), failure
     client.rows[0]["object"]["originalFilePath"] = "/original/a.wav"
-    rejected = ("sound:originalWavFilePath", "states", "suppportsRandomizer", "unknown-meter-output")
+    rejected = ("unknown-meter-output",)
     if version == "2024.1":
         rejected += tuple(name for name, _, _, _ in _CANONICAL_METER_2025_OUTPUTS)
     for name in rejected:
         reads = len(client.calls)
         code, failure = run("core-call", METERS, "--profiler-position", "123", "--meter-object-include", name, offline=True)
         assert code == 2 and "agent_result" not in failure and len(client.calls) == reads, failure
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_declared_meter_return_spellings_keep_exact_selection_and_unattributed_values(tmp_path, version):
+    client, run = task(tmp_path, version)
+    selected = ["sound:originalWavFilePath", "workunit:isDefault"]
+    if version == "2025.1":
+        selected.extend(("states", "suppportsRandomizer"))
+    code, schema = run("request-schema", METERS, offline=True)
+    assert code == 0, schema
+    projection = schema["business_adapter"]["declaration"]["meter_object_projection"]
+    assert set(selected) <= set(projection["fields"]["meter_object_outputs"]["choices"])
+    assert projection["declared_return_observation"]["alias_equivalence_proven"] is False
+    original = client.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == METERS:
+            result["meters"][0]["object"] = {"native:unknown": {"empty": [], "null": None}, "legacyResponse": ""}
+        return result
+    client.call = call
+    argv = ["core-call", METERS, "--profiler-position", "123", "--max-results", "1"]
+    for spelling in selected:
+        argv.extend(("--meter-object-include", spelling))
+    code, result = run(*argv)
+    assert code == 0, result
+    assert [entry for entry in client.calls if entry[0] == METERS] == [
+        (METERS, {"time": 123}, {"return": ["id", "name", "type", "path", *selected]})]
+    pages = [result["agent_result"]]
+    while pages[-1]["complete"] is False:
+        code, result = run(*pages[-1]["next_command"]["gateway_argv"], offline=True)
+        assert code == 0, result
+        pages.append(result["agent_result"])
+    objects = [row["object"] for page in pages for row in page["meters"]]
+    assert objects[0]["declared_return_observation"] == {"selected_spellings": selected, "returned_values": {}}
+    assert objects[1]["declared_return_observation"] == {"selected_spellings": selected,
+        "returned_values": {"native:unknown": {"empty": [], "null": None}, "legacyResponse": ""}}
+    assert not {'id', 'name', 'type', 'path'} & objects[1].keys()
+    assert all("unavailable_fields" not in obj for obj in objects)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_meter_namespaced_source_outputs_reuse_known_business_fields(tmp_path, version):
+    client, run = task(tmp_path, version)
+    values = {"audioSource:playbackDuration": {"playbackDurationMin": 1.0, "playbackDurationMax": 2.0,
+        "playbackDurationType": "OneShot"}, "audioSource:maxRadiusAttenuation": {"id": BUS, "radius": 40.0},
+        "audioSource:language": {"id": BUS, "name": "SFX"}}
+    client.rows[0]["object"].update(deepcopy(values))
+    code, result = run("core-call", METERS, "--profiler-position", "123",
+        "--meter-object-include", "source-duration", "--meter-object-include", "max-radius",
+        "--meter-object-include", "source-language")
+    assert code == 0, result
+    assert [entry for entry in client.calls if entry[0] == METERS] == [
+        (METERS, {"time": 123}, {"return": ["id", "name", "type", "path", *values]})]
+    obj = result["agent_result"]["meters"][0]["object"]
+    assert obj["source_duration"] == values["audioSource:playbackDuration"]
+    assert obj["max_radius"] == values["audioSource:maxRadiusAttenuation"]
+    assert obj["source_language"] == values["audioSource:language"]
 
 
 @pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1"])
