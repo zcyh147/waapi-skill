@@ -1,0 +1,30 @@
+{
+  "scope": "corrected component-local portable importer and ordinary completion assessment; no canonical/global completion claim",
+  "mapping_candidate": "35a4963c6f53d16bc04fbfd7d875ee8fc1b54870",
+  "code_run_candidate": "0e2e4e0b56bc1a4505f1f64c1f93916fbfeca44d",
+  "component_candidate_sha256": "8b4bd77ca5542af154a822edb96279d66caf6e13de3d79997d4bae7f29319789",
+  "packaged_skill_git_tree": {
+    "captured": "aae686dcaa1b62eab5002c91e718252e3340288d",
+    "current": "aae686dcaa1b62eab5002c91e718252e3340288d",
+    "byte_identical": true
+  },
+  "assessment_sha256": "12b91539e5e29d491bcfaaf01b8b58243cda309431eda7bbcaee26111122a3e3",
+  "structural_members": 15050,
+  "representative_mechanisms": 8,
+  "current_code_proof": "Original 17 passed in8.98 seconds retained without rerun; unchanged raw wrapper files and aggregate program strength only",
+  "review_repairs": {
+    "getSwitch_scope": "2022 required;2023/2024 omitted native argument with no documented default;2025 omitted default AK_INVALID_GAME_OBJECT; present stays active-generation-bound; no setter omission equivalence",
+    "artifact_identity": "existing codex_archive_paths.archive_relative_from_absolute boundary; POSIX, Windows drive and UNC controls; ambiguous separator rejection",
+    "focused_mapper_controls": "13 passed in8.80 seconds; Windows identity cases are off-host lexical controls, not native Windows execution",
+    "root_merge": "aa0e60ed Topic/cache changes are causally unrelated to SoundEngine runtime; both independent Nonlive admissions retained"
+  },
+  "preserved_packet": "export-r2 remains byte-unchanged; five original CODE files compared byte-for-byte against successor",
+  "native_fresh_or_full_gate_started": false,
+  "actual_functional_gaps_found": [],
+  "unproved": [
+    "full native return-expression-language equivalence",
+    "per-member execution/native effect",
+    "new native getter-options execution",
+    "atomic snapshot for related/helper values"
+  ]
+}

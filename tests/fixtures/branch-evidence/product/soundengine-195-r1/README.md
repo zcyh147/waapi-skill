@@ -1,8 +1,10 @@
 # SoundEngine #195 component
 
+`export-r3` is the corrected successor. `export-r2` and its recorded assessment remain unchanged. The successor records getSwitch's exact required/present/omitted distinctions and derives descriptor identities through the existing archive-path boundary; it does not rerun the original code capture.
+
 This is component-local accounting for #185's 26 URIs: 124 version rows, 248 Console/Authoring catalog host rows, and 15,050 reachable native members. The source roster seals exact fields, choices and shared definitions against the five pinned catalogs. It is not an execution quota.
 
-`export-r2/index.json` uses the existing portable evidence-index contract and the shared product bundle as its base. Its entry and mapping descriptors are already product-relative, so canonical publication can compose them without rewriting nested proof locators. `requirements.json` and `mapping.json` are component successors; the canonical index and requirements are untouched.
+`export-r3/index.json` uses the existing portable evidence-index contract and the shared product bundle as its base. Its entry and mapping descriptors are already product-relative, so canonical publication can compose them without rewriting nested proof locators. `requirements.json` and `mapping.json` are component successors; the canonical index and requirements are untouched.
 
 The ordinary importer and completion reader admitted all 15,050 members: eight aggregate-code anchors and 15,042 representative mappings. Eight mechanisms retain the seven accepted #185 business families and the reviewed getter-projection extension. Existing Draft/registration behavior supplies shared current code support; accepted family-specific construction/lifetime history remains separately attributed. Neither the anchors nor their siblings are per-API/native execution receipts.
 
