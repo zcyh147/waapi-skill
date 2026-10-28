@@ -32,7 +32,7 @@ def test_successor_export_resolves_only_structural_groups_through_the_reader(suc
     destination = successor
     assessment = json.loads((destination / 'assessment.json').read_bytes())
     assert assessment['completion']['states'] == {
-        'implementation_dependency': 255, 'source_definition_verified': 7042}
+        'implementation_dependency': 15, 'approved_exclusion': 240, 'source_definition_verified': 7042}
     assert assessment['completion']['complete'] is False
     requirements = json.loads((destination / 'requirements.json').read_bytes())
     imported, base, _ = portable_binding_inputs(destination / 'evidence-index.json', requirements)
@@ -59,13 +59,13 @@ def test_successor_export_resolves_only_structural_groups_through_the_reader(suc
     assert {row['id'] for row in assessment['obligations']
             if row['state'] == 'implementation_dependency'} == {
         m['id'] for row in original['occurrences']
-        if row['dependency_kind'] in {'batch', 'music'} for m in row['members']}
+        if row['dependency_kind'] == 'music' for m in row['members']}
     mapping = json.loads((destination / 'mapping.json').read_bytes())
     # The Audio override occurrence and every other row stay byte-for-data equal.
     assert {row['occurrence_id']: row for row in mapping['occurrences']
-            if 'source_structure' not in row} == {
+            if 'source_structure' not in row and 'approved_exclusion' not in row} == {
         row['occurrence_id']: row for row in original['occurrences']
-        if row['dependency_kind'] != 'fieldless'}
+        if row['dependency_kind'] not in {'fieldless', 'batch'}}
 
 
 @pytest.mark.parametrize('damage', ['owned-field', 'inherited-field', 'list', 'identity',
@@ -132,7 +132,8 @@ def test_program_only_requirement_cannot_move_between_evidence_scopes(successor,
     attachment = json.loads((successor / 'evidence-index.json').read_bytes())['condition_definition_attachments'][0]
     context = validate_mapping_attachment(attachment, successor, ROOT)
     row = next(r for r in context['mapping']['occurrences']
-               if ('source_structure' in r) == structural and not r['dependencies'])
+               if ('source_structure' in r) == structural and not r['dependencies']
+               and 'approved_exclusion' not in r)
     identity = row['members'][0]['id']
     branch = deepcopy(context['branches'][identity])
     requirements = json.loads((successor / 'requirements.json').read_bytes())

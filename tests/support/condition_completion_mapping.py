@@ -25,6 +25,47 @@ SOURCE_RECONCILIATION_PATH = 'tests/fixtures/metadata-conditions/condition-sourc
 SOURCE_RECONCILIATION_SHA256 = 'd1cfabad293db4bf1e36b5c4167b9dd8cab4dbd9a13ffe7068ef505d6b6ef6ef'
 FIELDLESS_REVIEW_PATH = 'tests/fixtures/metadata-conditions/condition-fieldless-structure-review.json'
 FIELDLESS_REVIEW_SHA256 = 'ad1abc319b41b1bfc157a09ed6630bd9af65d8a68cfe56a963a2d618c751d794'
+BATCH_EXCLUSION_REVIEW_PATH = 'tests/fixtures/metadata-conditions/batch-rename-settings-exclusion-review.json'
+BATCH_EXCLUSION_REVIEW_SHA256 = '40f248258e77b9216aea0608484299f9b021f34300b4bbcf6c7fdcc9892e2716'
+
+
+def _batch_exclusion_review(root):
+    raw = (root / BATCH_EXCLUSION_REVIEW_PATH).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != BATCH_EXCLUSION_REVIEW_SHA256:
+        raise ValueError('Exact Batch Rename window exclusion review differs')
+    review = json.loads(raw)
+    text = (root / review['authority_path']).read_text(encoding='utf-8')
+    heading = review['authority_heading'] + '\n'
+    if text.count(heading) != 1:
+        raise ValueError('Batch Rename window exclusion decision is missing or ambiguous')
+    section = heading + text.split(heading, 1)[1].split('\n## ', 1)[0].strip() + '\n'
+    if hashlib.sha256(section.encode('utf-8')).hexdigest() != review['authority_section_sha256']:
+        raise ValueError('Exact Batch Rename window exclusion decision differs')
+    return review
+
+
+def _map_batch_exclusions(rows, review):
+    """Apply the recorded scope decision only to the frozen window-setting rows."""
+    selected = {r['occurrence_id']: r for r in rows if r['dependency_kind'] == 'batch'}
+    if set(selected) != {r['occurrence_id'] for r in review['occurrences']}:
+        raise ValueError('Exact Batch Rename window exclusion roster differs')
+    members = sorted((m['id'], m['shape_sha256']) for r in selected.values() for m in r['members'])
+    if len(members) != review['member_count'] or digest(members) != review['members_sha256']:
+        raise ValueError('Exact Batch Rename window exclusion members differ')
+    for expected in review['occurrences']:
+        row = selected[expected['occurrence_id']]
+        if (digest(row) != expected['source_row_sha256']
+                or row['source_parent']['catalog'] != {'classId': 3342352, 'name': 'UserProjectSettings', 'type': 'WObject'}
+                or [c['catalog'] for c in row['consumers']] != [
+                    {'classId': 65011712, 'name': 'BatchRenameSettings', 'type': 'Inner'}]):
+            raise ValueError('Exact Batch Rename window exclusion identity/source differs')
+    for row in selected.values():
+        row['dependencies'] = []
+        row['approved_exclusion'] = {key: review[key] for key in (
+            'review_id', 'authority', 'decision_url', 'authority_section_sha256',
+            'settings_class_id', 'parent_class_id')}
+        row['approved_exclusion'].update(review_sha256=BATCH_EXCLUSION_REVIEW_SHA256,
+            execution_credit=False, native_absence_claim=False)
 
 
 def _fieldless_review(root):
@@ -91,6 +132,7 @@ def _map_fieldless_structure(rows, roots, review):
 
 def definition_mapping(root):
     fieldless_review = _fieldless_review(root)
+    batch_review = _batch_exclusion_review(root)
     scalar = reconcile_sources(root)
     scalar_rows = {r['occurrence_id']: r for r in scalar['occurrences']}
     source = load(root / 'docs/branch-coverage-condition-sources.json')
@@ -210,6 +252,7 @@ def definition_mapping(root):
     if len(pairs) != len(expected) or dict(pairs) != expected:
         raise ValueError('Exact full installed condition ID/shape roster differs')
     _map_fieldless_structure(rows, roots, fieldless_review)
+    _map_batch_exclusions(rows, batch_review)
     return {'contract': 'waapi-skill.condition-definition-mapping/v1', 'owner_issue': 177,
         'parent_issue': 174, 'source_manifest_sha256': hashlib.sha256((root / 'docs/branch-coverage-condition-sources.json').read_bytes()).hexdigest(),
         'members_sha256': digest(sorted(pairs)), 'recipes': sorted({r['recipe'] for r in rows}),
@@ -316,6 +359,7 @@ def validate_mapping_attachment(descriptor, base, root, *, selected_mapping=None
     from tests.support.condition_mechanism_reuse import _read
     review = _review(root); files = _proofs(str(root), REVIEW_SHA256)
     _fieldless_review(root)  # Recheck immutable inputs even after an expected-map cache hit.
+    _batch_exclusion_review(root)
     attachment = _read(descriptor, base)
     if (set(attachment) != {'contract', 'review', 'mapping'}
             or attachment['contract'] != 'waapi-skill.condition-definition-attachment/v1'
@@ -390,10 +434,13 @@ def witness_references(row, context):
 
 
 def _binding(row, member, attachment):
+    categories = (() if 'approved_exclusion' in row else ('program',) if 'source_structure' in row
+                  else ('program', 'native', 'live_metadata'))
     result = {'branch_id': member['id'], 'native_shape_sha256': member['shape_sha256'],
         'condition_source_mapping_attachment': attachment, 'definition_occurrence': row['occurrence_id'],
-        'evidence': {c: attachment for c in (('program',) if 'source_structure' in row
-                                          else ('program', 'native', 'live_metadata'))}}
+        'evidence': {c: attachment for c in categories}}
+    if 'approved_exclusion' in row:
+        return {**result, 'approved_exclusion': deepcopy(row['approved_exclusion'])}
     if 'source_structure' in row:
         return {**result, 'source_structure': deepcopy(row['source_structure'])}
     result['public_mechanism'] = {'entrypoint': 'skills/waapi-skill/scripts/run.py gateway.py',
@@ -422,6 +469,8 @@ def mapping_evidence_result(descriptor, branch, category, scope_kind, base, bind
             raise ValueError('Reviewed product source definition cannot change evidence scope')
         if row['dependencies']:
             return 'implementation_dependency', json.dumps(row['dependencies'], sort_keys=True)
+        if 'approved_exclusion' in row:
+            return 'missing', 'User-approved window-configuration exclusion supplies no execution or metadata evidence'
         if 'source_structure' in row:
             if category != 'program':
                 return 'missing', 'Structural source mapping supplies no native or recipient metadata evidence'
@@ -450,6 +499,7 @@ def export_mapping(root, destination):
     destination = Path(destination); destination.mkdir(parents=True, exist_ok=True)
     review = _review(root); _proofs(str(root), REVIEW_SHA256)
     _fieldless_review(root)
+    _batch_exclusion_review(root)
     mapping, branches = _expected(str(root), REVIEW_SHA256)
     def write(name, value):
         path = destination / name
@@ -467,13 +517,17 @@ def export_mapping(root, destination):
             identity = member['id']
             bindings[identity] = _binding(row, member, attachment)
             policies[identity] = {'native_shape_sha256': member['shape_sha256'],
-                'categories': (['program'] if 'source_structure' in row else
+                'categories': ([] if 'approved_exclusion' in row else ['program'] if 'source_structure' in row else
                     ['program', 'native', *(['live_metadata'] if observed else [])]),
-                'reason': ('Reviewed exact structural source group and shared scalar condition mechanism; no field, native effect or absence inferred.'
+                'reason': ('User-approved exclusion of exact internal Batch Rename window settings; object renaming remains in scope.'
+                    if 'approved_exclusion' in row else
+                    'Reviewed exact structural source group and shared scalar condition mechanism; no field, native effect or absence inferred.'
                     if 'source_structure' in row else
                     'Reviewed exact source definition and shared current public/native mechanism; no direct recipient observation inferred.'),
                 'definition_scope': 'source_definition', 'original_requirement_lineage': 'f72 pending proposal remains unchanged',
                 'implementation_dependencies': row['dependencies']}
+            if 'approved_exclusion' in row:
+                policies[identity]['approved_exclusion'] = deepcopy(row['approved_exclusion'])
     document = {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': bindings}
     write('bindings.json', document)
     # Preserve every pre-existing non-installed metadata/result/verification row.
@@ -502,6 +556,23 @@ def attach_definition_mappings(descriptors, bindings, base, root):
 
 def evaluate_definition_binding(branch, binding, policy, scope_kind, base, root, context):
     """Existing completion reader's source-specific category hook."""
+    row = context['members'][branch['id']]
+    if 'approved_exclusion' in row:
+        member = next(m for m in row['members'] if m['id'] == branch['id'])
+        expected = context['branches'][branch['id']]
+        if (scope_kind != 'product' or policy.get('categories') != []
+                or policy.get('native_shape_sha256') != branch['shape_sha256'] or not policy.get('reason')
+                or policy.get('definition_scope') != 'source_definition'
+                or policy.get('approved_exclusion') != row['approved_exclusion']
+                or any(branch.get(k) != v for k, v in expected.items() if k != 'state')
+                or binding != _binding(row, member, binding.get('condition_source_mapping_attachment'))):
+            branch.update(state='unresolved', reasons=['Exact user-approved window exclusion missing or stale'])
+            return
+        branch.update(state='approved_exclusion', requirements=[], evidence_results={},
+            exclusion=deepcopy(row['approved_exclusion']), metadata_scope='source_definition',
+            direct_recipient_class_metadata='not_observed', direct_recipient_instance_metadata='not_observed',
+            direct_recipient_native_effect='not_observed')
+        return
     structural = 'source_structure' in context['members'][branch['id']]
     allowed = (['program'],) if structural else (['program', 'native'], ['program', 'native', 'live_metadata'])
     if (policy.get('native_shape_sha256') != branch['shape_sha256']
