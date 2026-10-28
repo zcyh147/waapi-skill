@@ -132,7 +132,9 @@ def test_diagnostic_records_nine_independent_discriminators_with_exact_membershi
     assert evidence['selected_profiles'] == ['action', 'effect_slot', 'source']
     assert evidence['requested_discriminators'] == 9
     assert len(evidence['native_calls']) <= evidence['bounds']['native_calls']
-    assert json.loads((tmp_path / 'object-constructor-collisions.json').read_text())['status'] == 'PASS'
+    sealed = json.loads((tmp_path / 'object-constructor-collisions.json').read_text())
+    assert sealed == evidence and sealed['status'] == 'PENDING'
+    assert sealed['final_outcome'] == {'path': 'lifecycle.json', 'field': 'final_status'}
 
 
 @pytest.mark.parametrize('close_ok,expected', [(True, 'FAIL'), (False, 'BLOCKED')])
@@ -143,7 +145,8 @@ def test_indeterminate_call_stops_without_retry_and_still_finalizes_owned_host(t
     assert actor.closed and len(actor.calls) == 1 and not actor.writes
     assert lifecycle.finished[0][0] == expected
     evidence = json.loads((tmp_path / 'object-constructor-collisions.json').read_text())
-    assert evidence['status'] == expected and evidence['cases'] == []
+    assert evidence['status'] == 'PENDING' and evidence['collection_status'] == 'FAIL' and evidence['cases'] == []
+    assert evidence['final_outcome'] == {'path': 'lifecycle.json', 'field': 'final_status'}
 
 
 def test_remaining_profiles_issue_only_six_discriminators_without_action_setup(tmp_path):
@@ -188,8 +191,8 @@ def test_source_discriminator_requires_exact_two_language_seed_before_its_write(
     assert actor.closed and lifecycle.finished[0][0] == 'FAIL'
 
 
-@pytest.mark.parametrize('shutdown_error,expected', [(False, 'PASS'), (True, 'BLOCKED')])
-def test_real_lifecycle_persists_final_outcome_and_cleanup_after_collector(monkeypatch, tmp_path, shutdown_error, expected):
+@pytest.mark.parametrize('shutdown_error,evidence_error,expected', [(False, False, 'PASS'), (True, False, 'BLOCKED'), (False, True, 'BLOCKED')])
+def test_real_lifecycle_persists_final_outcome_and_cleanup_after_collector(monkeypatch, tmp_path, shutdown_error, evidence_error, expected):
     from tests.semantic.test_codex_scenario_lifecycle_v3 import _install_fakes
     from tests.semantic.support import codex_scenario_lifecycle_v3 as lifecycle_v3
     from tests.destructive.test_object_constructor_collision_diagnostic import make_collision_lifecycle
@@ -216,18 +219,39 @@ def test_real_lifecycle_persists_final_outcome_and_cleanup_after_collector(monke
     actor = FakeActor()
     root = tmp_path / 'scenario'
     lifecycle = make_collision_lifecycle(root, live_environment={'WWISE_TEST_CONFIG': 'unused'})
-    if shutdown_error:
+    write_bytes = Path.write_bytes
+    def persist_collector(path, payload):
+        if path == root / 'evidence/object-constructor-collisions.json':
+            if (root / 'evidence/lifecycle.json').exists():
+                raise OSError('required collector write attempted after lifecycle finalization')
+            if evidence_error:
+                raise OSError('required collector evidence unavailable')
+        return write_bytes(path, payload)
+    monkeypatch.setattr(Path, 'write_bytes', persist_collector)
+    if evidence_error:
+        with pytest.raises(OSError, match='required collector evidence unavailable'):
+            run_diagnostic(lifecycle, profiles=('source',), actor_factory=lambda **_: actor)
+    elif shutdown_error:
         with pytest.raises(AssertionError):
             run_diagnostic(lifecycle, profiles=('source',), actor_factory=lambda **_: actor)
     else:
         run_diagnostic(lifecycle, profiles=('source',), actor_factory=lambda **_: actor)
-    evidence = json.loads((root / 'evidence/object-constructor-collisions.json').read_text())
     finalized = json.loads((root / 'evidence/lifecycle.json').read_text())
-    assert evidence['status'] == finalized['final_status'] == expected
-    assert evidence['collection_status'] == 'PASS' and len(evidence['cases']) == 3
-    assert evidence['selected_profiles'] == ['source'] and evidence['requested_discriminators'] == 3
-    assert finalized['sandbox_retained'] is shutdown_error
-    assert (root / 'owned').exists() is shutdown_error
+    assert finalized['final_status'] == expected
+    retained = shutdown_error or evidence_error
+    if evidence_error:
+        assert finalized['requested_status'] == 'BLOCKED'
+        assert any('diagnostic evidence could not be sealed' in error for error in finalized['errors'])
+        assert Path(finalized['quarantine_path']).is_file()
+        assert not (root / 'evidence/object-constructor-collisions.json').exists()
+    else:
+        evidence = json.loads((root / 'evidence/object-constructor-collisions.json').read_text())
+        assert evidence['status'] == 'PENDING'
+        assert evidence['final_outcome'] == {'path': 'lifecycle.json', 'field': 'final_status'}
+        assert evidence['collection_status'] == 'PASS' and len(evidence['cases']) == 3
+        assert evidence['selected_profiles'] == ['source'] and evidence['requested_discriminators'] == 3
+    assert finalized['sandbox_retained'] is retained
+    assert (root / 'owned').exists() is retained
     assert copied_before_launch['languages'] == ['English(US)', 'External', 'Japanese', 'Mixed', 'SFX']
     assert source.read_bytes() == source_bytes and source.stat().st_mtime_ns == source_mtime
     assert actor.closed

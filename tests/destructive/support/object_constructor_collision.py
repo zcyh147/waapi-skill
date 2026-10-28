@@ -264,7 +264,7 @@ def collect_observations(actor, evidence):
 
 
 def run_diagnostic(lifecycle, *, actor_factory=None, profiles=PROFILES):
-    """Run once and seal collection/failure evidence before lifecycle shutdown."""
+    """Seal collection evidence before finish; lifecycle.json owns the final outcome."""
     profiles = _validate_profiles(profiles)
     if actor_factory is None:
         from tests.semantic.support.codex_heavy_project_runner_v3 import OwnedDirectWaapiCall
@@ -299,6 +299,7 @@ def run_diagnostic(lifecycle, *, actor_factory=None, profiles=PROFILES):
         if not closed:
             status, reason = 'BLOCKED', 'owned direct actor did not close'
         evidence['status'], evidence['reason'] = 'PENDING', reason
+        evidence['final_outcome'] = {'path': 'lifecycle.json', 'field': 'final_status'}
         if runtime is not None:
             try:
                 payload = _encoded(evidence)
@@ -308,16 +309,8 @@ def run_diagnostic(lifecycle, *, actor_factory=None, profiles=PROFILES):
                 status, reason = 'BLOCKED', 'diagnostic evidence could not be sealed'
                 raise
             finally:
-                try:
-                    finished = lifecycle.finish(status, reason=reason)
-                except BaseException as exc:
-                    evidence['status'] = 'BLOCKED'
-                    evidence['finalization_error'] = f'{type(exc).__name__}: {exc}'[:4096]
-                    (runtime.evidence_root / 'object-constructor-collisions.json').write_bytes(_encoded(evidence))
-                    raise
-                evidence['status'] = finished.final_status
-                evidence['lifecycle_final_status'] = finished.final_status
-                (runtime.evidence_root / 'object-constructor-collisions.json').write_bytes(_encoded(evidence))
+                # No required evidence writes may follow the authoritative final receipt.
+                finished = lifecycle.finish(status, reason=reason)
                 assert finished.final_status == status, finished
         if 'error' not in evidence:
             assert closed, reason
