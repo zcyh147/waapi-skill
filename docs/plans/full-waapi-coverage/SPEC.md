@@ -483,3 +483,26 @@ not infer a broader version exclusion. No further grammar research, native
 probe or compatibility implementation is required for these two exceptions.
 Close #182 under this scope. #194 and #195 still own the remaining acceptance
 and final coverage work; #174 remains incomplete.
+
+
+## User-approved Batch Rename window boundary — 2026-10-28
+
+The user explicitly excludes configuration of the Wwise Batch Rename window's
+internal settings, while retaining object renaming through the existing public
+object interface. This applies to Wwise 2021.1–2025.1. It covers the registered
+`BatchRenameSettings` Inner class (65011712) declared under `UserProjectSettings`
+(3342352), including the window's replace/remove/insert/regular-expression
+settings and their condition definitions. It does not exclude ordinary object
+renaming, multi-object rename workflows through supported operations, other
+Inner classes or general property/reference editing.
+
+Preserve the exact 240 existing condition members and their versioned source
+identities as an explicit user-approved exclusion. This is a scope decision,
+not evidence that native access is impossible, not native execution credit, and
+not permission to fabricate a settings-instance identity or command payload.
+No additional native accessor investigation or GUI QA is required for this
+window configuration. #195 must implement and validate the exact disposition
+in the existing coverage reader without hiding unrelated unresolved members.
+The separate MusicPlaylistItem controller question remains assigned. #174 and
+#195 remain open; #194 has completed its routing/harness closeout with zero
+additional Fresh runs.

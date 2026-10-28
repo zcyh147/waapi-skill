@@ -36,3 +36,8 @@ Complete only the exact branch scope and evidence owned by this ticket. A native
 Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
 
 For each settled integration batch, deduplicate the union of affected test nodes while retaining independent case results, source attribution and version scope. Reconcile only affected inventories and evidence dependencies. Run the required full Program/Non-live gates once on the stable candidate, expanding reruns only for new relevant changes or failures. Verify the complete parent scope across all five versions before final acceptance; neither a passing CI preflight nor a corrected report substitutes for missing business effects. Keep the PR draft and parent open while in-scope implementation or required evidence remains unfinished.
+
+
+## Current scope decision — 2026-10-28
+
+#194 is closed; final five-version mapping and stable combined gates remain here. Apply the [user-approved Batch Rename window boundary](../SPEC.md#user-approved-batch-rename-window-boundary--2026-10-28): retain the exact 240 internal settings condition members as approved exclusions, without excluding ordinary object renaming or unrelated Inner types. Preserve the 30 fieldless PositioningType declarations as exact source structure after their focused implementation is reviewed; this grants no native execution credit. MusicPlaylistItem's 15 controller dependency members remain unresolved until their actual contract or an explicit scope decision is established. No new Fresh run is planned or authorized.
