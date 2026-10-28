@@ -39,7 +39,7 @@ def soundengine_object_return_contract(version):
             "scope": "additional instance-specific and related reads outside the class-bound getter outputs",
             "native_getter_expression_equivalence": "not claimed for the separate read",
             "discovery": "query-schema exposes --include-field and closed related-output selectors",
-            "scope": "copy explicit platform/language to the later query when required",
+            "return_scope": "copy explicit platform/language to the later query when required",
             "observation": "separate current Authoring object read after runtime selection; no atomic snapshot or runtime-effect claim",
             "native_return_expression_input": "forbidden"},
     }

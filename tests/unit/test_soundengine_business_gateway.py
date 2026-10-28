@@ -2915,6 +2915,232 @@ def test_getter_custom_metadata_boundaries_fail_closed(tmp_path: Path, failure: 
     assert result.get("agent_result") is None
 
 
+def test_getter_related_projection_uses_the_final_native_getter_value(tmp_path: Path) -> None:
+    client = _SoundEngineDraftClient(tmp_path)
+    original = client.call
+    calls = []
+    parent = {"id": client.state_group_id, "name": "Weather"}
+
+    def observe(uri, args=None, options=None):
+        if uri == "ak.soundengine.getState":
+            calls.append(options)
+            row = {"id": client.state_id, "name": "Storm", "type": "State", "path": r"\States\Weather\Storm",
+                "classId": 123, "parent": parent, "parent.classId": 124, "parent.@Volume": -len(calls)}
+            return {"return": {field: row[field] for field in options["return"] if field in row}}
+        if uri.endswith("getPropertyAndReferenceNames"):
+            assert args == {"classId": 124}
+            return {"return": ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            assert args == {"classId": 124, "property": "Volume"}
+            return {"name": "Volume", "type": "Real32"}
+        return original(uri, args, options)
+
+    client.call = observe
+    code, result = gateway.execute_gateway(
+        ["core-call", "ak.soundengine.getState", "--state-group-id", client.state_group_id,
+         "--include-related-field", "parent", "Volume"],
+        env=_env(tmp_path), client_factory=lambda _url: client,
+    )
+    assert code == 0, result
+    assert len(calls) == 4
+    assert calls[-1] == {"return": ["id", "name", "type", "path", "classId", "parent", "parent.classId", "parent.@Volume"]}
+    assert result["agent_result"] == {"id": client.state_id, "name": "Storm",
+        "related": {"parent": {"object": parent, "properties": {"Volume": -4}}}}
+    assert result["related_projection"]["native_final_getter_values"] is True
+    assert result["related_projection"]["atomic_snapshot"] is False
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("subject", ("State", "Switch"))
+def test_getter_related_reference_hops_use_actual_metadata_and_final_native_values(tmp_path: Path, version: str, subject: str) -> None:
+    env = _env(tmp_path, version)
+    client = _SoundEngineDraftClient(tmp_path, version=version)
+    original = client.call
+    state_dir = tmp_path / "state"
+    declaration = []
+    if subject == "Switch" and version == "2022.1":
+        handle, _ = _register_game_object_for_test(tmp_path=tmp_path, state_dir=state_dir, env=env,
+            client=client, name="Player", version=version)
+        declaration = ["--game-object-handle", handle]
+    operation = "ak.soundengine.get" + subject
+    object_id = client.state_id if subject == "State" else client.switch_id
+    group_id = client.state_group_id if subject == "State" else client.switch_group_id
+    parent = {"id": group_id, "name": "Group"}
+    target = {"id": client.other_event_id, "name": "Actual", "extra": [None, False]}
+    calls = []
+
+    def observe(uri, args=None, options=None):
+        if uri == operation:
+            calls.append(options)
+            row = {"id": object_id, "name": "Active", "type": subject, "path": r"\Objects\Active", "classId": 123,
+                "parent": parent, "parent.classId": 124, "parent.Target": target,
+                "parent.Target.classId": 125, "parent.Target.@Volume": -len(calls), "parent.Target.@@Volume": None}
+            return {"return": {field: row[field] for field in options["return"] if field in row}}
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["Target"] if args == {"classId": 124} else ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            return ({"name": "Target", "type": "", "restriction": {"type": "reference"}}
+                if args["property"] == "Target" else {"name": "Volume", "type": "Real32"})
+        return original(uri, args, options)
+
+    client.call = observe
+    code, result = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "core-call", operation, "--" + subject.lower() + "-group-id", group_id,
+         *declaration, "--platform", "Windows", "--language", "中文",
+         "--include-related-field", "parent", "reference", "Target", "Volume",
+         "--include-related-override-source-value", "parent", "reference", "Target", "Volume"],
+        env=env, client_factory=lambda _url: client,
+    )
+    assert code == 0, result
+    assert all(options["platform"] == "Windows" and options["language"] == "中文" for options in calls)
+    actual = result["agent_result"]["related"]["parent"]["related"]["references"]["Target"]
+    assert actual == {"object": target, "properties": {"Volume": -len(calls)}, "override_source_values": {"Volume": None}}
+    assert "parent.Target.@Volume" in calls[-1]["return"]
+    assert result["related_projection"]["native_final_getter_values"] is True
+
+
+@pytest.mark.parametrize("failure", ("prepare-guid", "final-guid", "final-related-guid", "malformed-root", "malformed-hop", "missing-metadata", "bytes"))
+def test_getter_related_projection_rejects_drift_shapes_missing_metadata_and_aggregate_limit(tmp_path: Path, failure: str) -> None:
+    client = _SoundEngineDraftClient(tmp_path)
+    original = client.call
+    calls = []
+    parent = {"id": client.state_group_id, "name": "Weather"}
+
+    def observe(uri, args=None, options=None):
+        if uri == "ak.soundengine.getState":
+            calls.append(options)
+            if failure == "malformed-root":
+                return {"return": []}
+            row = {"id": client.state_id, "name": "Storm", "type": "State", "path": r"\States\Weather\Storm", "classId": 123}
+            for index in range(1, 13):
+                prefix = ".".join(["parent"] * index)
+                row[prefix], row[prefix + ".classId"], row[prefix + ".@Volume"] = parent, 124, -6
+            if (failure == "prepare-guid" and len(calls) == 2) or (failure == "final-guid" and len(calls) == 4):
+                row["id"] = client.switch_id
+            if failure == "final-related-guid" and len(calls) == 4:
+                row["parent"] = {"id": client.switch_group_id, "name": "Other"}
+            if failure == "malformed-hop":
+                row["parent"] = []
+            selected = {field: row[field] for field in options["return"] if field in row}
+            if failure == "bytes":
+                selected["nativeExtension"] = "x" * 200000
+            return {"return": selected}
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": [] if failure == "missing-metadata" else ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            return {"name": "Volume", "type": "Real32"}
+        return original(uri, args, options)
+
+    client.call = observe
+    path = ["parent"] * (12 if failure == "bytes" else 1)
+    code, result = gateway.execute_gateway(
+        ["core-call", "ak.soundengine.getState", "--state-group-id", client.state_group_id,
+         "--include-related-field", *path, "Volume"],
+        env=_env(tmp_path), client_factory=lambda _url: client,
+    )
+    assert code == 2, result
+    assert result["error_code"] not in {"AttributeError", "KeyError", "TypeError"}
+    assert result.get("agent_result") is None
+    if failure == "bytes":
+        assert result["error_code"] == "SOUNDENGINE_RELATED_OBSERVATION_LIMIT"
+    if failure in {"final-guid", "final-related-guid"}:
+        assert len(calls) == 4
+
+
+@pytest.mark.parametrize("declaration", [
+    ["--include-related-field", "parent", "@Volume"],
+    ["--include-related-field", "parent.Volume"],
+    ["--include-related-field", "parent", "Volume"] * 2,
+    ["--include-related", "parent", "notes"] * 5,
+])
+def test_getter_related_declarations_reject_raw_duplicate_and_oversized_input(tmp_path: Path, declaration: list[str]) -> None:
+    code, result = gateway.execute_gateway(
+        ["core-call", "ak.soundengine.getState", "--state-group-id", _SoundEngineDraftClient.state_group_id, *declaration],
+        env=_env(tmp_path), client_factory=lambda _url: pytest.fail("invalid related input connected"),
+    )
+    assert code == 2, result
+
+
+@pytest.mark.parametrize("nested", (False, True))
+def test_getter_metadata_preparation_cannot_follow_a_retired_runtime_generation(tmp_path: Path, nested: bool) -> None:
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    handle, _ = _register_game_object_for_test(tmp_path=tmp_path, state_dir=state_dir, env=env, client=client, name="Player")
+    preview, _ = _preview_soundengine_plan(tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.unregisterGameObj", declaration=["--game-object-handle", handle])
+    original = client.call
+    calls = []
+    retired = False
+
+    def observe(uri, args=None, options=None):
+        nonlocal retired
+        if uri.endswith("getTypes"):
+            return {"return": [{"name": "Switch", "classId": 123}]}
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            if not retired:
+                retired = True
+                _execute_and_verify_soundengine(state_dir=state_dir, env=env, client=client, previewed=preview)
+            return {"name": "Volume", "type": "Real32"}
+        if uri == "ak.soundengine.getSwitch":
+            calls.append(options)
+            row = {"id": client.switch_id, "name": "Metal", "type": "Switch", "path": r"\Switches\Surface\Metal", "classId": 123,
+                "parent": {"id": client.switch_group_id, "name": "Surface"}, "parent.classId": 124,
+                "@Volume": -6.0, "parent.@Volume": -6.0}
+            return {"return": {field: row[field] for field in options["return"] if field in row}}
+        return original(uri, args, options)
+
+    client.call = observe
+    selection = ["--include-related-field", "parent", "Volume"] if nested else ["--include-field", "Volume"]
+    code, result = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "core-call", "ak.soundengine.getSwitch", "--switch-group-id", client.switch_group_id,
+         "--game-object-handle", handle, *selection],
+        env=env, client_factory=lambda _url: client,
+    )
+    assert code == 2, result
+    assert retired is True
+    assert result["error_code"] == "GAME_OBJECT_HANDLE_NOT_AVAILABLE"
+    assert len(calls) == (2 if nested else 0)
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+def test_getter_existing_related_list_form_preserves_native_or_grouped_value_provenance(tmp_path: Path, version: str) -> None:
+    client = _SoundEngineDraftClient(tmp_path, version=version)
+    original = client.call
+    getter_calls = []
+    root = {"id": client.state_id, "name": "Storm", "type": "State", "path": r"\States\Weather\Storm", "classId": 123}
+    child = {"id": client.event_id, "name": "Child", "type": "Sound", "path": r"\States\Weather\Storm\Child", "classId": 125}
+    helper_reads = []
+
+    def observe(uri, args=None, options=None):
+        if uri == "ak.soundengine.getState":
+            getter_calls.append(options)
+            row = {field: root[field] for field in options["return"] if field in root}
+            for field in options["return"]:
+                if field.startswith("children.{"):
+                    row["related0"] = [{**child, **({"notes": "native-" + str(len(getter_calls))} if "notes" in field else {})}]
+            return {"return": row}
+        if uri == "ak.wwise.core.object.get" and "waql" in args:
+            helper_reads.append((args, options))
+            return {"return": [{**child, "notes": "helper-member"}]}
+        return original(uri, args, options)
+
+    client.call = observe
+    code, result = gateway.execute_gateway(
+        ["core-call", "ak.soundengine.getState", "--state-group-id", client.state_group_id,
+         "--include-related", "children", "notes"],
+        env=_env(tmp_path, version), client_factory=lambda _url: client,
+    )
+    assert code == 0, result
+    observed = result["agent_result"]["related"]["children"]["items"][0]
+    assert observed["notes"] == ("helper-member" if version == "2022.1" else "native-" + str(len(getter_calls)))
+    assert result["related_projection"]["native_final_getter_values"] is (version != "2022.1")
+    assert bool(helper_reads) is (version == "2022.1")
+    assert result["related_projection"]["atomic_snapshot"] is False
+
+
 @pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
 @pytest.mark.parametrize("subject", ("State", "Switch"))
 def test_state_switch_write_is_verified_by_independent_exact_scope_getter(tmp_path: Path, version: str, subject: str) -> None:

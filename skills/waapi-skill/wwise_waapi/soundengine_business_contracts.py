@@ -803,6 +803,12 @@ def soundengine_control_business_contract_data(
                 "language": {"flag": "--language", "repeatable": False},
                 **{name: {"flag": mode.option, "repeatable": True} for name, _, mode in SOUNDENGINE_FIELD_INPUTS}},
             "constraints": soundengine_object_return_contract(version)}
+    if row.get("execution_shape") == "bounded_read":
+        from .soundengine_related_outputs import RELATED_INPUTS, soundengine_related_contract
+        optional_fields = (*optional_fields, *(name for name, _, _ in RELATED_INPUTS))
+        row = {**row, "field_types": {**row["field_types"], **{name: "closed_related_output_declarations" for name, _, _ in RELATED_INPUTS}},
+            "input_forms": {**row["input_forms"], **{name: {"flag": option, "repeatable": True} for name, _, option in RELATED_INPUTS}},
+            "constraints": {**row["constraints"], "related_outputs": soundengine_related_contract(version)}}
     exposed_fields = set(required_fields) | set(optional_fields)
     roles = tuple(row.get("roles", ()))
     optional_roles = set(row.get("optional_roles", ()))
