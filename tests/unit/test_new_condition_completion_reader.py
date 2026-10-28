@@ -121,8 +121,9 @@ def test_non_object_condition_attachment_fails_closed(tmp_path):
         validate_mapping_attachment(descriptor, tmp_path, ROOT)
 
 
-def test_changed_selected_constructor_helper_invalidates_program_proof(tmp_path):
-    from tests.support.new_condition_completion import review
+@pytest.mark.parametrize('dependency', ['constructor-helper', 'primary-source'])
+def test_changed_selected_constructor_helper_invalidates_program_proof(tmp_path, dependency):
+    from tests.support.new_condition_completion import review, MEDIA_POOL_PRIMARY_SOURCE
     create_symlink_or_skip(tmp_path / 'tests', ROOT / 'tests', target_is_directory=True)
     create_symlink_or_skip(tmp_path / 'docs', ROOT / 'docs', target_is_directory=True)
     for directory in ('scripts', 'wwise_waapi'):
@@ -132,11 +133,17 @@ def test_changed_selected_constructor_helper_invalidates_program_proof(tmp_path)
                 continue
             target = tmp_path / source.relative_to(ROOT)
             target.parent.mkdir(parents=True, exist_ok=True)
-            if source.name == 'new_object_defaults.py':
+            if dependency == 'constructor-helper' and source.name == 'new_object_defaults.py':
                 target.write_bytes(source.read_bytes() + b'\n# changed constructor dependency\n')
             else:
                 create_symlink_or_skip(target, source)
     create_symlink_or_skip(tmp_path / 'skills/waapi-skill/resources', ROOT / 'skills/waapi-skill/resources', target_is_directory=True)
+    primary = tmp_path / MEDIA_POOL_PRIMARY_SOURCE
+    primary.parent.mkdir(parents=True, exist_ok=True)
+    if dependency == 'primary-source':
+        primary.write_bytes((ROOT / MEDIA_POOL_PRIMARY_SOURCE).read_bytes() + b'\nchanged primary source\n')
+    else:
+        create_symlink_or_skip(primary, ROOT / MEDIA_POOL_PRIMARY_SOURCE)
     with pytest.raises(ValueError, match='source closure'):
         review(tmp_path)
 
@@ -146,12 +153,16 @@ def test_changed_selected_constructor_helper_invalidates_program_proof(tmp_path)
 @pytest.mark.parametrize('damage', ['missing', 'changed'])
 def test_existing_reader_rejects_changed_selected_resource(bundle, tmp_path, resource, damage):
     from tests.maintenance.branch_audit_completion import evidence_result
+    from tests.support.new_condition_completion import MEDIA_POOL_PRIMARY_SOURCE
     base, exported = bundle
     for name in ('tests', 'docs'):
         create_symlink_or_skip(tmp_path / name, ROOT / name, target_is_directory=True)
     package = tmp_path / 'skills/waapi-skill'; package.mkdir(parents=True)
     for name in ('scripts', 'wwise_waapi'):
         create_symlink_or_skip(package / name, ROOT / 'skills/waapi-skill' / name, target_is_directory=True)
+    primary = tmp_path / MEDIA_POOL_PRIMARY_SOURCE
+    primary.parent.mkdir(parents=True, exist_ok=True)
+    create_symlink_or_skip(primary, ROOT / MEDIA_POOL_PRIMARY_SOURCE)
     resources = package / 'resources'; resources.mkdir()
     for source in (ROOT / 'skills/waapi-skill/resources').iterdir():
         target = resources / source.name

@@ -18,7 +18,7 @@ from tests.maintenance.branch_coverage_audit import digest, load
 from tests.maintenance.branch_audit_completion import installed_obligations
 from tests.support.condition_source_resolution import reconcile_sources, _scope, _pointer, _catalog_identity
 
-NEW_OBJECT_PROOF_SHA256 = '23f291cd2417075ef624866fafbd3edfccfd33476c2a005f2535e45688fba2d8'
+NEW_OBJECT_PROOF_SHA256 = 'f8e1c64cae348dd48a6906b8789bdb1212595b5666038e97e935c6767e7a20f9'
 REVIEW_PATH = 'tests/fixtures/metadata-conditions/condition-completion-review.json'
 PROOF_PATH = 'tests/fixtures/metadata-conditions/condition-completion-proof-inputs.json.gz'
 REVIEW_SHA256 = '56fe04bfe969fdafa404184a1166002a827c702561918dcc03a7948605acff84'
