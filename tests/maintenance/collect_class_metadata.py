@@ -122,7 +122,8 @@ def collection_plan(version, *, cohort='r54'):
         if version in ('2023.1','2024.1'):pointers += [definition+'/anyOf/3/@boolean/true']
     prefix = version+'|wwise-console|'+BUILDS[version]+'|function|ak.wwise.core.object.getPropertyInfo|'
     identities = sorted(prefix+pointer for pointer in pointers)
-    requirements = json.loads((REPO/'docs/branch-coverage-requirements.json').read_bytes())['branches']
+    from tests.maintenance.branch_coverage_audit import load
+    requirements = load(REPO/'docs/branch-coverage-requirements.json')['branches']
     if any(requirements.get(identity,{}).get('categories') != ['program','live_metadata'] for identity in identities):
         raise ValueError('Exact default requirement assignment changed')
     return {**({'cohort':'r55'} if cohort == 'r55' else {}),'kind':'class_metadata_only','agent_started':False,'project_mutation_commands':0,

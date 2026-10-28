@@ -129,6 +129,7 @@
     "tests/unit/test_ci_batch.py": "Developer batch tooling: public launcher, nested pytest retention, injected native-process scheduling and original-result reuse. Selected explicitly for Non-live framework acceptance; not an API-route Program promotion.",
     "tests/unit/test_condition_batch_settings_exclusion.py": "Coverage-accounting source and approved-scope checks through the existing condition exporter and completion reader; no public runtime route change or native execution.",
     "tests/unit/test_condition_fieldless_source_mapping.py": "Exact installed source-structure mapping and evidence-scope controls through the existing exporter and completion reader; no public runtime route change or native execution.",
-    "tests/unit/test_test_admission.py": "Preflight admission regression, selected explicitly by pure-code preflight in Non-live mode."
+    "tests/unit/test_test_admission.py": "Preflight admission regression, selected explicitly by pure-code preflight in Non-live mode.",
+    "tests/unit/test_requirements_parts.py": "Coverage-accounting packaging through the ordinary loader, audit CLI, metadata plan and candidate identity; no public Gateway or native execution change."
   }
 }
