@@ -1,0 +1,86 @@
+{
+  "added_source_equivalence": {
+    "pyproject.toml": {
+      "current_sha256": "c6b4c3708b11ad7d8215ca961df70531d21db960bd6434a77def49becff622b6",
+      "original_sha256": "c6b4c3708b11ad7d8215ca961df70531d21db960bd6434a77def49becff622b6",
+      "reviewed_reason": "Byte-identical relevant source"
+    },
+    "skills/waapi-skill/wwise_waapi/canonical.py": {
+      "current_sha256": "eff0fa33755499b29332979fa08fd0345f9601878bd9ca237747091e4ab37bb8",
+      "original_sha256": "eff0fa33755499b29332979fa08fd0345f9601878bd9ca237747091e4ab37bb8",
+      "reviewed_reason": "Byte-identical relevant source"
+    },
+    "skills/waapi-skill/wwise_waapi/console_project_operations.py": {
+      "current_sha256": "67ffd474726e80ea3b21e8c1561dbe330f23c1fa8f7ff73fa1f9c19fc8ad75ee",
+      "original_sha256": "67ffd474726e80ea3b21e8c1561dbe330f23c1fa8f7ff73fa1f9c19fc8ad75ee",
+      "reviewed_reason": "Byte-identical relevant source"
+    },
+    "skills/waapi-skill/wwise_waapi/filesystem_security.py": {
+      "current_sha256": "d284570865b57666bfeacc869600e6f0e7677689af46bec013ac6f16be1bc35d",
+      "original_sha256": "d284570865b57666bfeacc869600e6f0e7677689af46bec013ac6f16be1bc35d",
+      "reviewed_reason": "Byte-identical relevant source"
+    },
+    "skills/waapi-skill/wwise_waapi/host_paths.py": {
+      "current_sha256": "e70943b478d237eba3c0851f8b18881189f7132ccaf34d3b863f8f3aa3d594ea",
+      "original_sha256": "e70943b478d237eba3c0851f8b18881189f7132ccaf34d3b863f8f3aa3d594ea",
+      "reviewed_reason": "Byte-identical relevant source"
+    },
+    "skills/waapi-skill/wwise_waapi/operation_soundbank.py": {
+      "current_sha256": "fa910d40c2e88ecd56295ae5c56faa010680acddf0542edbcc6fb55cdfb07283",
+      "original_sha256": "fa910d40c2e88ecd56295ae5c56faa010680acddf0542edbcc6fb55cdfb07283",
+      "reviewed_reason": "Byte-identical relevant source"
+    },
+    "skills/waapi-skill/wwise_waapi/operation_tone.py": {
+      "current_sha256": "d8d28bc40021f7de7abe6690b417153088e36fba37308e0a78c578f8abaee120",
+      "original_sha256": "d8d28bc40021f7de7abe6690b417153088e36fba37308e0a78c578f8abaee120",
+      "reviewed_reason": "Byte-identical relevant source"
+    },
+    "tests/conftest.py": {
+      "current_sha256": "c9f13bdfb2450c025726c606b4f5d43b51d23cd165f5becc11a533bb5b561655",
+      "original_sha256": "c9f13bdfb2450c025726c606b4f5d43b51d23cd165f5becc11a533bb5b561655",
+      "reviewed_reason": "Byte-identical relevant source"
+    },
+    "tests/support/exact_evidence_finalization.py": {
+      "current_sha256": "af3f33ddd0cecb386620164900ec39544d0c72aa12b34dea1e15e913b305badc",
+      "original_sha256": "af3f33ddd0cecb386620164900ec39544d0c72aa12b34dea1e15e913b305badc",
+      "reviewed_reason": "Byte-identical relevant source"
+    }
+  },
+  "candidate_sha256": "5fac21cf64756fcd5fa769a0d52e6ea3a99f77226ba70269c3240a8d21ed90bc",
+  "original_artifacts": {
+    "exit": {
+      "artifact": "../export-r1/original/run.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    "log": {
+      "artifact": "../export-r1/original/run.log",
+      "sha256": "3ed46042952a238649ee827ae3f1458b2456ac81b832efbcae42866d76233e53"
+    },
+    "plan": {
+      "artifact": "../export-r1/original/run.plan.json",
+      "sha256": "1c93ebd34589832ffcc08123154ee4662150a057bc28a57826aa27c27767d4e4"
+    },
+    "result": {
+      "artifact": "../export-r1/original/run.result.json",
+      "sha256": "1199e65120b65f4afc8ca231213a309a10fd5ff3758d5916c17b86b97bb45540"
+    },
+    "summary": {
+      "artifact": "../export-r1/original/run.summary.json",
+      "sha256": "3f66a3f6f98a5e46e48a8e09f6e5e33b6b5b71e41469daeaebead7acd851162a"
+    }
+  },
+  "original_candidate": "727187ced057643927a6f692f66d4eabe86293dd",
+  "reasons": {
+    "canonical.py": "Canonical digest used by prepared verification and immutable bindings.",
+    "console_project_operations.py": "Exact project preparation and artifact verifier called by operation_registry.",
+    "filesystem_security.py": "Link/reparse checks used by file and project artifact verification.",
+    "host_paths.py": "Lexical path interpretation used by shared artifact-path proofs.",
+    "operation_soundbank.py": "Tone/project regular-file, containment and artifact snapshot helpers.",
+    "operation_tone.py": "Exact Tone preparation, binding and file-creation verifier called by operation_registry.",
+    "pyproject.toml": "Selected pytest collection and execution configuration.",
+    "tests/conftest.py": "Collection/phase hooks executed for the selected capture.",
+    "tests/support/exact_evidence_finalization.py": "Teardown phase hook helper imported by tests/conftest.py."
+  },
+  "reuse_limit": "Each standard program-anchor record is consumed by read_ordinary_test_run, which checks git show at the original candidate and current source seals. program_anchors refuses changed selected runtime sources. This review does not make stale mapping attachments current.",
+  "scope": "Seven exact selected aggregate CODE anchors only; original Host mapping packet and capture remain immutable. No sibling/native/Fresh/global completion claim. Final candidate join remains integration-owned."
+}

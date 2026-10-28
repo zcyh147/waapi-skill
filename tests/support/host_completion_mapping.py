@@ -25,7 +25,10 @@ EXCLUDED = frozenset({'ak.wwise.ui.cli.executeLuaScript','ak.wwise.ui.cli.launch
 SOURCES = [GATEWAY, *[LIB+n+'.py' for n in ('authoring_ui_business','authoring_ui_business_contracts',
  'host_ui_debug_business','host_ui_debug_business_contracts','exact_artifact_business','exact_artifact_business_contracts',
  'runtime_inspection_business','runtime_inspection_business_contracts','cli_console_business','cli_console_business_contracts',
- 'core_business','core_business_contracts','operation_ui_commands','operation_registry','builders/debug_lua','builders/schema','debug_business','wal_read_continuation','remote_transition')],
+ 'core_business','core_business_contracts','operation_ui_commands','operation_registry','builders/debug_lua','builders/schema','debug_business','wal_read_continuation','remote_transition',
+ # Exact Tone/project artifact preparation and verification, including their
+ # shared regular-file, path and digest helpers; importing registry is not closure.
+ 'operation_tone','console_project_operations','operation_soundbank','filesystem_security','host_paths','canonical')],
  'tests/support/host_completion_mapping.py','tests/support/ui_completion_mapping.py','tests/support/topic_completion_mapping.py',
  'tests/maintenance/map_host_completion.py', POLICY, BASE+'source-roster.json',BASE+'accepted-history.json']
 
@@ -387,6 +390,9 @@ SELECTED_TESTS = {
 
 RUNTIME_SOURCES = {name for name in SOURCES if name.startswith('skills/waapi-skill/')}
 RUNTIME_SOURCES.update({*(node.split('::')[0] for nodes in SELECTED_TESTS.values() for node in nodes),
+    # Collection configuration and the phase/finalization hook ran for every
+    # selected node even though this ordinary capture has no per-node receipts.
+    'pyproject.toml', 'tests/conftest.py', 'tests/support/exact_evidence_finalization.py',
     'tests/support/gateway_config.py', 'tests/support/riff_wave.py', 'tests/support/canonical_preview.py',
     'tests/support/operation_directory.py', 'tests/unit/test_transaction_gateway.py', 'tests/unit/test_runtime_business_gateway.py',
     'tests/unit/test_waapi_gateway.py', 'tests/unit/test_debug_read_gateway.py',

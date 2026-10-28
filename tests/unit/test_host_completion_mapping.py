@@ -80,3 +80,87 @@ def test_host_mapping_removed_source_fails_existing_reader(tmp_path,component):
     exported['index_path'].write_text(json.dumps(index))
     with pytest.raises(ValueError,match='source closure is incomplete'):
         audit.portable_binding_inputs(exported['index_path'],requirements)
+
+
+@pytest.fixture(scope='module')
+def selected_code_review(tmp_path_factory, component):
+    from tests.support.host_completion_mapping import BASE, host_bindings, program_anchors
+    destination = tmp_path_factory.mktemp('host-source-equivalence')
+    run = audit.ROOT / BASE / 'export-r1/original'
+    anchors = program_anchors(audit.ROOT, component, destination, run)
+    identity = next(key for key in anchors if 'generateToneWAV' in key)
+    binding = host_bindings(audit.ROOT, component)[identity]
+    binding.update(anchors[identity])
+    branch = next(row for row in component['native_coverage']['obligations'] if row['id'] == identity)
+    return destination, binding, branch, component['native_coverage']['candidate_sha256']
+
+
+@pytest.mark.parametrize('helper', [
+    'skills/waapi-skill/wwise_waapi/operation_tone.py',
+    'skills/waapi-skill/wwise_waapi/console_project_operations.py',
+    'skills/waapi-skill/wwise_waapi/operation_soundbank.py',
+    'skills/waapi-skill/wwise_waapi/filesystem_security.py',
+    'skills/waapi-skill/wwise_waapi/host_paths.py',
+    'skills/waapi-skill/wwise_waapi/canonical.py',
+    'tests/conftest.py',
+    'tests/support/exact_evidence_finalization.py',
+    'pyproject.toml',
+])
+def test_host_selected_code_reader_rejects_changed_execution_helper(selected_code_review, monkeypatch, helper):
+    from pathlib import Path
+    from tests.support.ordinary_test_run_evidence import read_ordinary_test_run, OUTCOME
+    destination, binding, branch, candidate = selected_code_review
+    arguments = (binding['evidence']['program'], branch, candidate, 'program', 'product',
+        destination, binding, audit.ROOT)
+    assert read_ordinary_test_run(*arguments) == (OUTCOME, None)
+    original = Path.read_bytes
+    changed = audit.ROOT / helper
+    def changed_bytes(path):
+        raw = original(path)
+        return raw + b'\n# changed executed helper\n' if path == changed else raw
+    monkeypatch.setattr(Path, 'read_bytes', changed_bytes)
+    with pytest.raises(ValueError, match='current relevant source changed'):
+        read_ordinary_test_run(*arguments)
+
+
+@pytest.fixture(scope='module')
+def mapping_review(tmp_path_factory, component):
+    from tests.support.host_completion_mapping import export_mapping
+    destination = tmp_path_factory.mktemp('host-mapping-source-review')
+    exported = export_mapping(audit.ROOT, destination, inventory=component)
+    return exported['index_path'], audit.load(exported['requirements_path'])
+
+
+@pytest.mark.parametrize('helper', [
+    'skills/waapi-skill/wwise_waapi/operation_tone.py',
+    'skills/waapi-skill/wwise_waapi/console_project_operations.py',
+])
+def test_host_mapping_reader_rejects_changed_verifier_helper(mapping_review, monkeypatch, helper):
+    from pathlib import Path
+    index, requirements = mapping_review
+    audit.portable_binding_inputs(index, requirements)
+    original = Path.read_bytes
+    changed = audit.ROOT / helper
+    def changed_bytes(path):
+        raw = original(path)
+        return raw + b'\n# changed artifact verifier\n' if path == changed else raw
+    monkeypatch.setattr(Path, 'read_bytes', changed_bytes)
+    with pytest.raises(ValueError, match='representative reviewed source changed'):
+        audit.portable_binding_inputs(index, requirements)
+
+
+def test_host_source_reconciliation_keeps_original_run_and_reads_seven_selected_anchors(component):
+    from tests.support.host_completion_mapping import BASE
+    from tests.support.ordinary_test_run_evidence import read_ordinary_test_run, OUTCOME
+    original = audit.ROOT / BASE / 'export-r1/original'
+    companion = audit.ROOT / BASE / 'source-repair-r1'
+    for name in ('run.plan.json', 'run.result.json', 'run.summary.json', 'run.log', 'run.exit'):
+        assert (companion / 'original' / name).read_bytes() == (original / name).read_bytes()
+    requirements = audit.load(companion / 'requirements.json')
+    bindings, base, _ = audit.portable_binding_inputs(companion / 'evidence-index.json', requirements)
+    rows = {row['id']: row for row in component['native_coverage']['obligations']}
+    assert len(bindings['bindings']) == 7
+    for identity, binding in bindings['bindings'].items():
+        assert read_ordinary_test_run(binding['evidence']['program'], rows[identity],
+            component['native_coverage']['candidate_sha256'], 'program', 'product', base,
+            binding, audit.ROOT) == (OUTCOME, None)

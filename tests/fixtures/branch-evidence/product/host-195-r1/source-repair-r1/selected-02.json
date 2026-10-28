@@ -1,0 +1,116 @@
+{
+  "bindings": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.getWalTree|/argsSchema": {
+      "branch_id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.getWalTree|/argsSchema",
+      "construction": {
+        "selector": "/argsSchema",
+        "source": "skills/waapi-skill/scripts/gateway.py#execute_gateway"
+      },
+      "evidence": {
+        "program": {
+          "artifact": "program-anchor-02.json",
+          "sha256": "3230e70f696db50359740fa4c8b10bd3c4938e245672dfad9152b127aeb668cb"
+        }
+      },
+      "input": {
+        "correspondence": {
+          "accepted_boundary": "existing closed internal Debug wrapper; no extra Debug/native availability claim or environment validation",
+          "contract_sha256": "56609928d11fece2643ba4249d6e2f9b77df8a4cf3d79494d2b71c8622779518",
+          "encoding": "closed typed values; absent optional fields retain native defaults; explicit false and empty collections remain distinct; exact authority and native serialization Gateway-owned",
+          "host_version": {
+            "build": "2023.1.19.8928",
+            "host": "wwise-authoring",
+            "version": "2023.1"
+          },
+          "native_addresses": [
+            {
+              "native_path": [],
+              "public_fields": [],
+              "rule": "closed_envelope"
+            }
+          ],
+          "native_effect": "not_claimed",
+          "public_fields": [],
+          "rule": "closed_envelope",
+          "safety": "configuration-bound; mutations require policy authorization, immutable preview, drift checks, single execution, bounded verification and cleanup"
+        },
+        "gateway_argv": [
+          "debug-wal-tree"
+        ],
+        "selector": "/argsSchema"
+      },
+      "native_shape_sha256": "d746974fa9afd5e951f76f9af38954b0ad7f436f2120dc974da65e5ee39f856f",
+      "ordinary_test_run_attachment": true,
+      "public_route": "2023.1|function|ak.wwise.debug.getWalTree",
+      "public_route_sha256": "1555a87dad61c6762080a0dd2f3ea09a6ee6c3d2074ca1da647c9ae0745d2e55",
+      "relevant_sources": [
+        "pyproject.toml",
+        "skills/waapi-skill/scripts/gateway.py",
+        "skills/waapi-skill/wwise_waapi/authoring_ui_business.py",
+        "skills/waapi-skill/wwise_waapi/authoring_ui_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/builders/debug_lua.py",
+        "skills/waapi-skill/wwise_waapi/builders/schema.py",
+        "skills/waapi-skill/wwise_waapi/business_adapters.py",
+        "skills/waapi-skill/wwise_waapi/business_declaration_state.py",
+        "skills/waapi-skill/wwise_waapi/business_declarations.py",
+        "skills/waapi-skill/wwise_waapi/canonical.py",
+        "skills/waapi-skill/wwise_waapi/capabilities.py",
+        "skills/waapi-skill/wwise_waapi/cli_console_business.py",
+        "skills/waapi-skill/wwise_waapi/cli_console_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/config.py",
+        "skills/waapi-skill/wwise_waapi/console_project_operations.py",
+        "skills/waapi-skill/wwise_waapi/core_business.py",
+        "skills/waapi-skill/wwise_waapi/core_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/debug_business.py",
+        "skills/waapi-skill/wwise_waapi/dispatcher.py",
+        "skills/waapi-skill/wwise_waapi/exact_artifact_business.py",
+        "skills/waapi-skill/wwise_waapi/exact_artifact_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/execution_contracts.py",
+        "skills/waapi-skill/wwise_waapi/filesystem_security.py",
+        "skills/waapi-skill/wwise_waapi/host_paths.py",
+        "skills/waapi-skill/wwise_waapi/host_ui_debug_business.py",
+        "skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/io_policy.py",
+        "skills/waapi-skill/wwise_waapi/operation_composer.py",
+        "skills/waapi-skill/wwise_waapi/operation_drafts.py",
+        "skills/waapi-skill/wwise_waapi/operation_registry.py",
+        "skills/waapi-skill/wwise_waapi/operation_soundbank.py",
+        "skills/waapi-skill/wwise_waapi/operation_tone.py",
+        "skills/waapi-skill/wwise_waapi/operation_ui_commands.py",
+        "skills/waapi-skill/wwise_waapi/remote_transition.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/transaction_cleanup.py",
+        "skills/waapi-skill/wwise_waapi/transaction_runtime.py",
+        "skills/waapi-skill/wwise_waapi/transactions.py",
+        "skills/waapi-skill/wwise_waapi/wal_read_continuation.py",
+        "tests/conftest.py",
+        "tests/support/canonical_preview.py",
+        "tests/support/exact_evidence_finalization.py",
+        "tests/support/gateway_config.py",
+        "tests/support/operation_directory.py",
+        "tests/support/riff_wave.py",
+        "tests/unit/test_authoring_core_gateway.py",
+        "tests/unit/test_authoring_project_workflows.py",
+        "tests/unit/test_authoring_ui_gateway.py",
+        "tests/unit/test_cli_console_business_adapter.py",
+        "tests/unit/test_debug_lua_gateway_full_chain.py",
+        "tests/unit/test_debug_read_gateway.py",
+        "tests/unit/test_host_ui_debug_business_adapter.py",
+        "tests/unit/test_runtime_business_gateway.py",
+        "tests/unit/test_transaction_gateway.py",
+        "tests/unit/test_waapi_gateway.py"
+      ],
+      "representative_mechanism": "host195-debug-read-v1",
+      "validation": {
+        "selector": "/argsSchema",
+        "source": "skills/waapi-skill/wwise_waapi/builders/schema.py#validate_semantic_payload"
+      },
+      "verifier": {
+        "selector": "/argsSchema",
+        "source": "skills/waapi-skill/scripts/gateway.py#execute_gateway"
+      }
+    }
+  },
+  "contract": "waapi-skill.branch-bindings/v1"
+}

@@ -1,0 +1,181 @@
+{
+  "base": ".",
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "entries": [
+    {
+      "bindings": {
+        "artifact": "selected-01.json",
+        "sha256": "34285d231b4076b77940690c344076e6a510880211ed8e272314a4f05a05822b"
+      },
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.ui.captureScreen|/argsSchema",
+      "origin": {
+        "bindings": {
+          "artifact": "selected-01.json",
+          "sha256": "34285d231b4076b77940690c344076e6a510880211ed8e272314a4f05a05822b"
+        },
+        "capture": {
+          "artifact": "source-review.json",
+          "sha256": "1e5f7c05dcfc40a6cb484b3a32d7672c21b789f189a2b17d8e82982d5558481b"
+        },
+        "program": {
+          "artifact": "program-anchor-01.json",
+          "sha256": "f5a061ab9ce8884588c50a17a6724c70d60c7a5cafa8cdfa23be4ba41a02667f"
+        },
+        "requirements": {
+          "artifact": "selected-policy-01.json",
+          "sha256": "5140a2c998924c21dde58d931670bc105c5972d353aa6b05bb7b5691503cb9e9"
+        }
+      }
+    },
+    {
+      "bindings": {
+        "artifact": "selected-02.json",
+        "sha256": "0e1b1e37f193bcd43f062442cdc5376c49138e99a232483d7edf794fcd770bd6"
+      },
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.getWalTree|/argsSchema",
+      "origin": {
+        "bindings": {
+          "artifact": "selected-02.json",
+          "sha256": "0e1b1e37f193bcd43f062442cdc5376c49138e99a232483d7edf794fcd770bd6"
+        },
+        "capture": {
+          "artifact": "source-review.json",
+          "sha256": "1e5f7c05dcfc40a6cb484b3a32d7672c21b789f189a2b17d8e82982d5558481b"
+        },
+        "program": {
+          "artifact": "program-anchor-02.json",
+          "sha256": "3230e70f696db50359740fa4c8b10bd3c4938e245672dfad9152b127aeb668cb"
+        },
+        "requirements": {
+          "artifact": "selected-policy-02.json",
+          "sha256": "5b930ee3cdcfef0afed7ef9857bede1f12c4a1768906fdfacd4e7512aa10e634"
+        }
+      }
+    },
+    {
+      "bindings": {
+        "artifact": "selected-03.json",
+        "sha256": "3d199926d612e6b0155212fa8196d8f03335509880df5407e94d87488857104e"
+      },
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.getInfo|/argsSchema",
+      "origin": {
+        "bindings": {
+          "artifact": "selected-03.json",
+          "sha256": "3d199926d612e6b0155212fa8196d8f03335509880df5407e94d87488857104e"
+        },
+        "capture": {
+          "artifact": "source-review.json",
+          "sha256": "1e5f7c05dcfc40a6cb484b3a32d7672c21b789f189a2b17d8e82982d5558481b"
+        },
+        "program": {
+          "artifact": "program-anchor-03.json",
+          "sha256": "796bcb7dd1e7b7016e4670cbe05de341152d36dee53e80a6de4fa91c3dc1f0ce"
+        },
+        "requirements": {
+          "artifact": "selected-policy-03.json",
+          "sha256": "06f816a6abe501cd250e205f1ee3255a6a22c0acab7e15d03cbbd6de295d6213"
+        }
+      }
+    },
+    {
+      "bindings": {
+        "artifact": "selected-04.json",
+        "sha256": "d90bd13d5735c106ea9cee32d2356450891ce939f4f262d283405077af987f66"
+      },
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.cli.waapiServer|/argsSchema",
+      "origin": {
+        "bindings": {
+          "artifact": "selected-04.json",
+          "sha256": "d90bd13d5735c106ea9cee32d2356450891ce939f4f262d283405077af987f66"
+        },
+        "capture": {
+          "artifact": "source-review.json",
+          "sha256": "1e5f7c05dcfc40a6cb484b3a32d7672c21b789f189a2b17d8e82982d5558481b"
+        },
+        "program": {
+          "artifact": "program-anchor-04.json",
+          "sha256": "7375bea7c4453f1fc920cfd4844235907052251e0382c5214196a9a7cc6d52c6"
+        },
+        "requirements": {
+          "artifact": "selected-policy-04.json",
+          "sha256": "40ac4ea56c90c69a1a3d81fd2db20df545eaf2ad69b471f46b5ed36d4e475f70"
+        }
+      }
+    },
+    {
+      "bindings": {
+        "artifact": "selected-05.json",
+        "sha256": "556bbc47d82814ed0c5153ee962bf7abac3df66aa1f0152cab6da8352c2f1225"
+      },
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.project.save|/argsSchema",
+      "origin": {
+        "bindings": {
+          "artifact": "selected-05.json",
+          "sha256": "556bbc47d82814ed0c5153ee962bf7abac3df66aa1f0152cab6da8352c2f1225"
+        },
+        "capture": {
+          "artifact": "source-review.json",
+          "sha256": "1e5f7c05dcfc40a6cb484b3a32d7672c21b789f189a2b17d8e82982d5558481b"
+        },
+        "program": {
+          "artifact": "program-anchor-05.json",
+          "sha256": "a8181ab36bec8e5301d1ee98120be2e4a7cb2b0885f3fa04b0ed84159063c56b"
+        },
+        "requirements": {
+          "artifact": "selected-policy-05.json",
+          "sha256": "99a9e863beb3f8c9a8e82467f12dd50d9dee1ab443915946c106e41405c6ea3f"
+        }
+      }
+    },
+    {
+      "bindings": {
+        "artifact": "selected-06.json",
+        "sha256": "b0f29fe4809e90c636e3055cb66a25506bd69789671a9e55085695e96347c0aa"
+      },
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.remote.connect|/argsSchema",
+      "origin": {
+        "bindings": {
+          "artifact": "selected-06.json",
+          "sha256": "b0f29fe4809e90c636e3055cb66a25506bd69789671a9e55085695e96347c0aa"
+        },
+        "capture": {
+          "artifact": "source-review.json",
+          "sha256": "1e5f7c05dcfc40a6cb484b3a32d7672c21b789f189a2b17d8e82982d5558481b"
+        },
+        "program": {
+          "artifact": "program-anchor-06.json",
+          "sha256": "f810550284b7c7461faf6d0eaab1319ae7f3050fb5ac8f605e4e621d50314c87"
+        },
+        "requirements": {
+          "artifact": "selected-policy-06.json",
+          "sha256": "5ba1a7fe1c7bb71e1f0e9cd6fabc7d2342581978b6f4bbfdd16c61ce83a111f0"
+        }
+      }
+    },
+    {
+      "bindings": {
+        "artifact": "selected-07.json",
+        "sha256": "bc84b1493226cb21902ad9783c3ea47468a801f0048f3f956e577c7e95217d10"
+      },
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.generateToneWAV|/argsSchema",
+      "origin": {
+        "bindings": {
+          "artifact": "selected-07.json",
+          "sha256": "bc84b1493226cb21902ad9783c3ea47468a801f0048f3f956e577c7e95217d10"
+        },
+        "capture": {
+          "artifact": "source-review.json",
+          "sha256": "1e5f7c05dcfc40a6cb484b3a32d7672c21b789f189a2b17d8e82982d5558481b"
+        },
+        "program": {
+          "artifact": "program-anchor-07.json",
+          "sha256": "a1f48b9b3c7532af40fd8bf6d83cdebc6f9b96f75df878471a7e29bbb8132db0"
+        },
+        "requirements": {
+          "artifact": "selected-policy-07.json",
+          "sha256": "12e4fc11422b81d579dc394997bb9991a654c1995d4773d472fd830559a355e1"
+        }
+      }
+    }
+  ]
+}
