@@ -527,6 +527,7 @@ def portable_binding_inputs(index_path, requirements):
     original_policies = {}
     bindings, names = {}, set()
     source_capture_origins = {}
+    source_origin_descriptors = {}
     for entry in index['entries']:
         if (set(entry) != {'id', 'bindings', 'origin'} or not isinstance(entry['id'], str)
                 or not entry['id'] or entry['id'] in names):
@@ -577,6 +578,7 @@ def portable_binding_inputs(index_path, requirements):
         bindings.update(projected['bindings'])
         for identity in projected['bindings']:
             source_capture_origins[identity] = originals['capture']
+            source_origin_descriptors[identity] = deepcopy(origin)
     attachments = index.get('metadata_attachments', [])
     if not isinstance(attachments, list):
         raise ValueError('closed metadata attachment list required')
@@ -704,7 +706,7 @@ def portable_binding_inputs(index_path, requirements):
     if 'source_native_attachments' in index:
         from tests.support.source_copy_native_evidence import portable_source_native_attachments
         portable_source_native_attachments(index['source_native_attachments'], bindings, read, base,
-            capture_origins=source_capture_origins)
+            capture_origins=source_capture_origins, origin_descriptors=source_origin_descriptors)
     condition_mechanism_reuse = []
     if 'runtime_observation_attachments' in index:
         from tests.support.runtime_observation_evidence import attach_runtime_observations

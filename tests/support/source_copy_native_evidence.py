@@ -8,6 +8,132 @@ from tests.support.source_copy_branch_evidence import dependency_review
 
 SUCCESSOR_REVIEW_PATH = 'tests/fixtures/source-copy/branch-successor-review-195.json'
 SUCCESSOR_REVIEW_SHA256 = '4cd9a81b3d413f46d7ecca6eec191984e338c5b3657b0d4e6955a167dac09a9b'
+ACCOUNTING_REVIEW_PATH = 'tests/fixtures/source-copy/branch-accounting-review-195.json'
+ACCOUNTING_REVIEW_SHA256 = '982f14224bad63b9713682080a4956c2298a2138545bda94b7261e096d61c442'
+ACCOUNTING_READER = 'tests/support/source_copy_native_evidence.py'
+ACCOUNTING_DEPENDENCIES = (
+    'tests/support/new_condition_completion.py',
+    'tests/unit/test_new_condition_completion_reader.py',
+    'tests/support/condition_completion_mapping.py',
+    'tests/fixtures/metadata-conditions/new-condition-current-program-r3.json.gz',
+)
+
+
+def accounting_source_seals(names):
+    """Seal every byte, normalizing only this review's single digest literal."""
+    import ast
+    import hashlib
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.support.source_copy_branch_evidence import source_seals
+    names = set(names)
+    result = source_seals(names)
+    if ACCOUNTING_READER not in names:
+        raise ValueError('Source accounting closure omits its reader')
+    raw = (audit.ROOT / ACCOUNTING_READER).read_bytes()
+    tree = ast.parse(raw)
+    assignments = [node for node in ast.walk(tree) if isinstance(node, ast.Name)
+                   and isinstance(node.ctx, ast.Store) and node.id == 'ACCOUNTING_REVIEW_SHA256']
+    matches = [node for node in tree.body if isinstance(node, ast.Assign)
+               and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+               and node.targets[0].id == 'ACCOUNTING_REVIEW_SHA256']
+    if (len(assignments) != 1 or len(matches) != 1
+            or not isinstance(matches[0].value, ast.Constant)
+            or not isinstance(matches[0].value.value, str)
+            or matches[0].value.value != ACCOUNTING_REVIEW_SHA256
+            or len(ACCOUNTING_REVIEW_SHA256) != 64
+            or any(char not in '0123456789abcdef' for char in ACCOUNTING_REVIEW_SHA256)):
+        raise ValueError('Source accounting pin requires exactly one digest literal assignment')
+    literal = matches[0].value
+    lines = raw.splitlines(keepends=True)
+    if literal.lineno != literal.end_lineno:
+        raise ValueError('Source accounting pin requires one single-line literal')
+    line = lines[literal.lineno - 1]
+    token = line[literal.col_offset:literal.end_col_offset]
+    if token not in {b"'" + ACCOUNTING_REVIEW_SHA256.encode() + b"'",
+                     b'"' + ACCOUNTING_REVIEW_SHA256.encode() + b'"'}:
+        raise ValueError('Source accounting pin requires one plain digest literal')
+    lines[literal.lineno - 1] = (line[:literal.col_offset + 1] + b'0' * 64
+                                + line[literal.end_col_offset - 1:])
+    result[ACCOUNTING_READER] = hashlib.sha256(b''.join(lines)).hexdigest()
+    return result
+
+
+def accounting_dependency_review():
+    """An exact reviewed accounting delta; execution sources never get an exemption."""
+    import hashlib
+    import json
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.support.source_copy_branch_evidence import source_seals
+    raw = (audit.ROOT / ACCOUNTING_REVIEW_PATH).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != ACCOUNTING_REVIEW_SHA256:
+        raise ValueError('Reviewed Source accounting delta changed')
+    review = json.loads(raw)
+    fields = {'contract', 'scope', 'captured_git_candidate', 'captured_candidate_sha256',
+              'relevant_sources', 'captured_capture_sources', 'current_accounting_sources',
+              'source_changes', 'additional_sources', 'pin_normalization', 'packets', 'causal_review'}
+    if (set(review) != fields or review['contract'] != 'waapi-skill.source-copy-accounting-review/v1'
+            or review['scope'] != 'retained-source-program-and-native-accounting-only'
+            or review['captured_git_candidate'] != '88a6cbbeccee1b8f5934f61f7b75503e2a084073'
+            or review['captured_candidate_sha256'] != '0383d01b4b400a52c94b1f3924a9234915e32a06583c89cd9aaaf8cb628ebdc3'
+            or review['relevant_sources'] != successor_dependency_review()['current_sources']
+            or set(review['additional_sources']) != set(ACCOUNTING_DEPENDENCIES)
+            or len(review['additional_sources']) != len(ACCOUNTING_DEPENDENCIES)
+            or review['pin_normalization'] != {'path': ACCOUNTING_READER,
+                'assignment': 'ACCOUNTING_REVIEW_SHA256', 'normalized_value': '0' * 64}
+            or not review['causal_review']
+            or not isinstance(review['packets'], list) or len(review['packets']) != 5):
+        raise ValueError('Complete reviewed Source accounting closure differs')
+    captured = review['captured_capture_sources']
+    current = review['current_accounting_sources']
+    if set(current) != set(captured) | set(ACCOUNTING_DEPENDENCIES):
+        raise ValueError('Complete reviewed Source accounting dependency set differs')
+    expected = {name: {'captured_sha256': captured.get(name), 'current_sha256': seal}
+                for name, seal in current.items() if captured.get(name) != seal}
+    changes = review['source_changes']
+    if (set(changes) != set(expected) or any(not isinstance(changes[name], dict)
+            or set(changes[name]) != {'captured_sha256', 'current_sha256', 'reason'}
+            or not changes[name]['reason']
+            or any(changes[name][key] != value for key, value in row.items())
+            for name, row in expected.items())):
+        raise ValueError('Source accounting delta is not exact and complete')
+    if (accounting_source_seals(current) != current
+            or source_seals(review['relevant_sources']) != review['relevant_sources']):
+        raise ValueError('Source accounting current dependency changed')
+    return review
+
+
+def _accounting_context(context, base, candidate):
+    """Resolve the old execution context separately from its new admission target."""
+    fields = {'contract', 'review', 'previous_index', 'current_candidate_sha256'}
+    if (set(context) != fields or not isinstance(context['current_candidate_sha256'], str)
+            or len(context['current_candidate_sha256']) != 64
+            or candidate is not None and context['current_candidate_sha256'] != candidate):
+        raise ValueError('Source accounting admitted candidate differs')
+    review = accounting_dependency_review()
+    if (context['review'].get('sha256') != ACCOUNTING_REVIEW_SHA256
+            or _portable_source_document(context['review'], base) != review
+            or context['previous_index'] not in review['packets']):
+        raise ValueError('Source accounting reviewed predecessor differs')
+    index = _portable_source_document(context['previous_index'], base)
+    if len(index['entries']) != 1 or len(index['source_native_attachments']) != 1:
+        raise ValueError('Source accounting requires one complete original packet')
+    origin = index['entries'][0]['origin']
+    program = _portable_source_document(origin['program'], base)
+    if (program.get('candidate_sha256') != review['captured_candidate_sha256']
+            or program.get('git_candidate') != review['captured_git_candidate']
+            or program.get('relevant_sources') != review['relevant_sources']
+            or program.get('capture_sources') != review['captured_capture_sources']):
+        raise ValueError('Source accounting retained program sources or candidate differ')
+    previous = _portable_source_document(index['source_native_attachments'][0], base)
+    if previous.get('contract') != 'waapi-skill.source-copy-native-attachment/v2':
+        raise ValueError('Source accounting requires its preserved v2 attachment')
+    old, predecessor = validate_successor_context(previous['successor_context'], base,
+        candidate=review['captured_candidate_sha256'])
+    if any(previous[name] != predecessor[name] for name in ('proof', 'evidence', 'branch_ids', 'business_fact_id')):
+        raise ValueError('Source accounting original native attribution differs')
+    return {**old, 'current_candidate_sha256': context['current_candidate_sha256'],
+        'captured_candidate_sha256': review['captured_candidate_sha256'], 'accounting_origin': origin,
+        'accounting_attachment': previous}, predecessor
 
 
 def successor_dependency_review():
@@ -52,6 +178,8 @@ def _portable_source_document(descriptor, base):
 def validate_successor_context(descriptor, base, *, candidate=None):
     """Bind a new current closure to the exact untouched original attachment."""
     context = _portable_source_document(descriptor, base)
+    if context.get('contract') == 'waapi-skill.source-copy-successor-context/v2':
+        return _accounting_context(context, base, candidate)
     fields = {'contract', 'review', 'predecessor', 'original_source_context',
               'current_candidate_sha256', 'current_sources'}
     if (not isinstance(context, dict) or set(context) != fields or context['contract'] != 'waapi-skill.source-copy-successor-context/v1'
@@ -82,6 +210,18 @@ def validate_successor_context(descriptor, base, *, candidate=None):
             or original['current_sources'] != reviewed['historical_current_sources']):
         raise ValueError('Source successor original context differs')
     return context, predecessor
+
+
+def source_program_equivalence(binding, descriptor, record, candidate, base):
+    """A separate generic program bridge is owned by the validated accounting context."""
+    context, predecessor = validate_successor_context(binding['source_copy_successor_context'], base, candidate=candidate)
+    origin = context.get('accounting_origin')
+    if (origin is None or {key: descriptor[key] for key in ('artifact', 'sha256')} != origin['program']
+            or record != _portable_source_document(origin['program'], base)
+            or binding.get('source_copy_native_proof') != predecessor['proof']
+            or record['candidate_sha256'] != context['captured_candidate_sha256']):
+        raise ValueError('Unbound Source accounting program equivalence')
+    return binding['source_copy_program_equivalence']
 
 
 def read_source_native_run(category, receipt, config, base):
@@ -219,7 +359,7 @@ def validate_source_native(record, binding, branch, base):
             raise ValueError('Original Source four-transaction category binding differs')
 
 
-def portable_source_native_attachments(descriptors, bindings, read, base, *, capture_origins=None):
+def portable_source_native_attachments(descriptors, bindings, read, base, *, capture_origins=None, origin_descriptors=None):
     """Attach only reviewed Source native records to existing program bindings."""
     from copy import deepcopy
     from tests.support.source_copy_branch_evidence import source_facts, native_route, pointer_contract, PUBLIC_NODES
@@ -228,15 +368,20 @@ def portable_source_native_attachments(descriptors, bindings, read, base, *, cap
     for descriptor in descriptors:
         attachment = read(descriptor)
         fields = {'contract', 'branch_ids', 'business_fact_id', 'proof', 'evidence', 'equivalence', 'native_equivalence'}
-        successor = attachment.get('contract') == 'waapi-skill.source-copy-native-attachment/v2'
+        accounting = attachment.get('contract') == 'waapi-skill.source-copy-native-attachment/v3'
+        successor = accounting or attachment.get('contract') == 'waapi-skill.source-copy-native-attachment/v2'
         if successor:
             fields |= {'predecessor', 'successor_context'}
+        if accounting:
+            fields.add('program_equivalence')
         if set(attachment) != fields or attachment['contract'] not in {
-                'waapi-skill.source-copy-native-attachment/v1', 'waapi-skill.source-copy-native-attachment/v2'}:
+                'waapi-skill.source-copy-native-attachment/v1', 'waapi-skill.source-copy-native-attachment/v2',
+                'waapi-skill.source-copy-native-attachment/v3'}:
             raise ValueError('Closed Source native attachment required')
         if successor:
             successor_context, predecessor = validate_successor_context(attachment['successor_context'], base)
-            if (successor_context['predecessor'] != attachment['predecessor']
+            if (accounting != ('accounting_origin' in successor_context)
+                    or successor_context['predecessor'] != attachment['predecessor']
                     or any(attachment[name] != predecessor[name]
                            for name in ('branch_ids', 'business_fact_id', 'proof', 'evidence'))):
                 raise ValueError('Source successor changed original native attribution')
@@ -245,7 +390,8 @@ def portable_source_native_attachments(descriptors, bindings, read, base, *, cap
         expected = {native_route(facts['version']) + '|' + pointer for pointer in pointer_contract(facts['version'])}
         if (not isinstance(ids, list) or len(ids) != len(set(ids)) or set(ids) != expected
                 or attachment['business_fact_id'] != facts['business_fact_id']
-                or set(attachment['equivalence']) != expected or set(attachment['native_equivalence']) != expected):
+                or set(attachment['equivalence']) != expected or set(attachment['native_equivalence']) != expected
+                or accounting and set(attachment['program_equivalence']) != expected):
             raise ValueError('Source native exact leaf or scoped business set differs')
         for identity in ids:
             if identity in attached or identity not in bindings: raise ValueError('Conflicting Source native attachment')
@@ -253,13 +399,22 @@ def portable_source_native_attachments(descriptors, bindings, read, base, *, cap
             binding = bindings[identity]
             program = completion.read_sealed_artifact(binding['evidence']['program'], base)
             if successor:
-                if (program.get('candidate_sha256') != successor_context['current_candidate_sha256']
+                captured_candidate = successor_context.get('captured_candidate_sha256', successor_context['current_candidate_sha256'])
+                if (program.get('candidate_sha256') != captured_candidate
                         or program.get('relevant_sources') != successor_context['current_sources']
                         or program.get('invocation', {}).get('outcome') != 'PASS'):
                     raise ValueError('Source successor requires its current complete product program')
                 # The generic importer already read this sealed origin receipt.
                 # Only v2 reuse requires the complete Source product finalizer.
                 capture = (capture_origins or {}).get(identity)
+                origin = successor_context.get('accounting_origin')
+                if origin is not None:
+                    if (origin_descriptors or {}).get(identity) != origin:
+                        raise ValueError('Source accounting changed retained origin descriptors')
+                    if ({key: binding['evidence']['program'][key] for key in ('artifact', 'sha256')} != origin['program']
+                            or any(attachment[name] != successor_context['accounting_attachment'][name]
+                                   for name in ('branch_ids', 'business_fact_id', 'proof', 'evidence', 'predecessor'))):
+                        raise ValueError('Source accounting changed retained program/capture/native descriptors')
                 node = PUBLIC_NODES[facts['version']]
                 if (not isinstance(capture, dict)
                         or set(capture) != {'contract', 'candidate_sha256', 'git_candidate', 'native_credit',
@@ -275,6 +430,8 @@ def portable_source_native_attachments(descriptors, bindings, read, base, *, cap
                             'node_outcomes': [{'nodeid': node, 'outcome': 'PASS'}]}):
                     raise ValueError('Source successor requires complete successful capture phases')
                 binding['source_copy_successor_context'] = deepcopy(attachment['successor_context'])
+                if accounting:
+                    binding['source_copy_program_equivalence'] = deepcopy(attachment['program_equivalence'][identity])
             if (set(binding['evidence']) != {'program'} or program.get('scope_kind') != 'product'
                     or binding.get('source_business_fact') != facts['business_fact_id']
                     or binding.get('dispatch_pointer') != '/observations/source/native_call'
@@ -401,7 +558,7 @@ def attach_original_source_native(program_index, *, category, receipt_path, conf
     return attachment_descriptor
 
 
-def publish_source_native_successor(program_index, *, predecessor, inventory, product_base, destination):
+def publish_source_native_successor(program_index, *, predecessor, inventory, product_base, destination, accounting=False):
     """Transport a new program bundle; reference original native bytes in place."""
     from copy import deepcopy
     import hashlib
@@ -416,6 +573,8 @@ def publish_source_native_successor(program_index, *, predecessor, inventory, pr
     if (destination.exists() or not destination.resolve().is_relative_to(product_base)
             or any(parent.is_symlink() for parent in destination.parents)):
         raise ValueError('Source successor needs a new owned product destination')
+    if accounting:
+        return _publish_source_accounting_successor(program_index, predecessor, inventory, product_base, destination)
     requirements = json.loads((program_index.parent / 'requirements.json').read_bytes())
     program_bindings, _, _ = audit.portable_binding_inputs(program_index, requirements)
     candidate = inventory['native_coverage']['candidate_sha256']
@@ -499,4 +658,82 @@ def publish_source_native_successor(program_index, *, predecessor, inventory, pr
                 category, 'product', product_base, binding, source_root=audit.ROOT, reference_edges=references)
             if result != ('passed', None):
                 raise ValueError('Source successor reader rejected published evidence: ' + str(result))
+    return index_path
+
+
+def _publish_source_accounting_successor(program_index, predecessor, inventory, product_base, destination):
+    """Write only reviewed admission sidecars; never copy or restamp captured facts."""
+    from copy import deepcopy
+    import hashlib
+    import os
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.support.source_copy_branch_evidence import write_json
+    review = accounting_dependency_review()
+    previous_index = {'artifact': program_index.relative_to(product_base).as_posix(),
+                      'sha256': hashlib.sha256(program_index.read_bytes()).hexdigest()}
+    if previous_index not in review['packets']:
+        raise ValueError('Source accounting requires its exact reviewed packet')
+    old_index = _portable_source_document(previous_index, product_base)
+    old_native = _portable_source_document(old_index['source_native_attachments'][0], product_base)
+    if predecessor != old_native['predecessor']:
+        raise ValueError('Source accounting original predecessor differs')
+    requirements = _portable_source_document(old_index['entries'][0]['origin']['requirements'], product_base)
+    old_bindings, base, _ = audit.portable_binding_inputs(program_index, requirements)
+    if base != product_base:
+        raise ValueError('Source accounting original product boundary differs')
+    candidate = inventory['native_coverage']['candidate_sha256']
+    branches = {row['id']: row for row in inventory['native_coverage']['obligations']}
+    references = {key: row for key, row in branches.items() if row['kind'] == 'reference'}
+    for identity, binding in old_bindings['bindings'].items():
+        for category in ('program', 'native'):
+            if completion.evidence_result(binding['evidence'][category], branches[identity],
+                    review['captured_candidate_sha256'], category, 'product', product_base,
+                    binding, source_root=audit.ROOT, reference_edges=references) != ('passed', None):
+                raise ValueError('Source accounting retained evidence is incomplete')
+    portable = destination / 'portable'
+    portable.mkdir(parents=True, exist_ok=False)
+    def emit(name, value):
+        path = portable / name
+        return {**write_json(path, value), 'artifact': path.relative_to(product_base).as_posix()}
+    review_descriptor = emit('accounting-review.json', review)
+    if review_descriptor['sha256'] != ACCOUNTING_REVIEW_SHA256:
+        raise ValueError('Source accounting review transport changed bytes')
+    context_descriptor = emit('accounting-context.json', {
+        'contract': 'waapi-skill.source-copy-successor-context/v2',
+        'review': review_descriptor, 'previous_index': previous_index,
+        'current_candidate_sha256': candidate})
+    successor = {**deepcopy(old_native), 'contract': 'waapi-skill.source-copy-native-attachment/v3',
+        'successor_context': context_descriptor, 'equivalence': {}, 'native_equivalence': {}, 'program_equivalence': {}}
+    for ordinal, (identity, old_binding) in enumerate(old_bindings['bindings'].items()):
+        binding = deepcopy(old_binding)
+        binding['source_copy_successor_context'] = context_descriptor
+        semantics = audit.digest(completion.binding_semantics(binding))
+        program = _portable_source_document({key: binding['evidence']['program'][key]
+                                            for key in ('artifact', 'sha256')}, product_base)
+        branch = branches[identity]
+        successor['program_equivalence'][identity] = emit('program-equivalence-' + str(ordinal) + '.json', {
+            'contract': 'waapi-skill.branch-evidence-equivalence/v1',
+            'from_candidate': program['candidate_sha256'], 'to_candidate': candidate,
+            'branch_id': identity, 'native_shape_sha256': branch['shape_sha256'], 'native_route': branch['route'],
+            'evidence_sha256': binding['evidence']['program']['sha256'], 'binding_semantics_sha256': semantics,
+            'sources': program['relevant_sources'],
+            'reviewed_reason': 'Retained 88a6 program; exact unchanged execution sources and separately reviewed accounting delta.'})
+        for kind in ('equivalence', 'native_equivalence'):
+            proof = _portable_source_document(old_native[kind][identity], product_base)
+            successor[kind][identity] = emit(kind + '-' + str(ordinal) + '.json', {
+                **proof, 'to_candidate': candidate, 'binding_semantics_sha256': semantics,
+                'source_copy_successor_context': context_descriptor})
+    native_descriptor = emit('native-successor.json', successor)
+    index = {**deepcopy(old_index), 'base': os.path.relpath(product_base, portable),
+             'source_native_attachments': [native_descriptor]}
+    index['entries'][0]['id'] = destination.name
+    index_path = portable / 'index.json'
+    write_json(index_path, index)
+    imported, _, _ = audit.portable_binding_inputs(index_path, requirements)
+    for identity, binding in imported['bindings'].items():
+        for category in ('program', 'native'):
+            result = completion.evidence_result(binding['evidence'][category], branches[identity], candidate,
+                category, 'product', product_base, binding, source_root=audit.ROOT, reference_edges=references)
+            if result != ('passed', None):
+                raise ValueError('Source accounting reader rejected published evidence: ' + str(result))
     return index_path
