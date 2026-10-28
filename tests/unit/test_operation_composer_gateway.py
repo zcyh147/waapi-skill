@@ -340,12 +340,25 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Control Surface construction adds only these two typed parent relations
+    # to the five create contracts; live role admission remains a separate gate.
+    assert canonical_sha256(non_object_set_digests) == "d24d5eab62367ec9f14a3cca0bd258b2755c8cffc9ff4f972e779a729617f394"
+    def before_control_surface_parents(operation, version):
+        contract = operation_request_machine_contract(operation, version)
+        if operation == "object.create":
+            assert contract["parent_child_contract"].pop("ControlSurfaceSession") == ["ControlSurfaceBindingGroup"]
+            assert contract["parent_child_contract"].pop("ControlSurfaceBindingGroup") == [
+                "ControlSurfaceBinding", "ControlSurfaceBindingGroup"]
+        return contract
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(
+            before_control_surface_parents("object.create", version))
     # Saved Query construction adds only Query -> SearchCriteria to the five
     # create contracts. The older SDK refusal remains a separate runtime gate;
     # this class placement relation does not grant version availability.
     assert canonical_sha256(non_object_set_digests) == "776100a86b9d21a241290cc823cc147155372ffc264acf3f7c33e3604b7276f1"
     def before_saved_query_parent(operation, version):
-        contract = operation_request_machine_contract(operation, version)
+        contract = before_control_surface_parents(operation, version)
         if operation == "object.create":
             assert contract["parent_child_contract"].pop("Query") == ["SearchCriteria"]
         return contract
