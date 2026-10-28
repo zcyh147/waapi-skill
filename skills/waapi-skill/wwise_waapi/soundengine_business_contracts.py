@@ -688,7 +688,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "versions": ("2022.1", "2023.1", "2024.1", "2025.1"),
         "execution_shape": "bounded_read",
         "required_fields": ("state_group_id",),
-        "optional_fields": ("outputs", "platform", "language"),
+        "optional_fields": ("outputs", "platform", "language", "fields", "override_source_values", "local_references"),
         "field_types": {"state_group_id": "exact_state_group_guid"},
         "input_forms": {
             "state_group_id": {"flag": "--state-group-id", "repeatable": False},
@@ -701,8 +701,8 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "required_fields_by_version": {
             "2022.1": ("switch_group_id", "game_object_handle"),
         },
-        "optional_fields": ("game_object_handle", "outputs", "platform", "language"),
-        "optional_fields_by_version": {"2022.1": ("outputs", "platform", "language")},
+        "optional_fields": ("game_object_handle", "outputs", "platform", "language", "fields", "override_source_values", "local_references"),
+        "optional_fields_by_version": {"2022.1": ("outputs", "platform", "language", "fields", "override_source_values", "local_references")},
         "field_types": {
             "switch_group_id": "exact_switch_group_guid",
             "game_object_handle": "gateway_runtime_game_object_handle",
@@ -794,12 +794,14 @@ def soundengine_control_business_contract_data(
         )
     )
     if row.get("execution_shape") == "bounded_read":
-        from .soundengine_object_returns import soundengine_object_return_contract
+        from .soundengine_object_returns import soundengine_object_return_contract, SOUNDENGINE_FIELD_INPUTS
         row = {**row, "field_types": {**row["field_types"], "outputs": "closed_object_output_list",
-            "platform": "literal_name_or_guid", "language": "literal_name_or_guid"},
+            "platform": "literal_name_or_guid", "language": "literal_name_or_guid",
+            **{name: "live_class_bound_field_meanings" for name, _, _ in SOUNDENGINE_FIELD_INPUTS}},
             "input_forms": {**row["input_forms"], "outputs": {"flag": "--include", "repeatable": True},
                 "platform": {"flag": "--platform", "repeatable": False},
-                "language": {"flag": "--language", "repeatable": False}},
+                "language": {"flag": "--language", "repeatable": False},
+                **{name: {"flag": mode.option, "repeatable": True} for name, _, mode in SOUNDENGINE_FIELD_INPUTS}},
             "constraints": soundengine_object_return_contract(version)}
     exposed_fields = set(required_fields) | set(optional_fields)
     roles = tuple(row.get("roles", ()))
