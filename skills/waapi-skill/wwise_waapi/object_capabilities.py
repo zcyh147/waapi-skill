@@ -135,6 +135,8 @@ OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
     }
 )
 OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT = {
+    "ControlSurfaceSession": frozenset({"ControlSurfaceBindingGroup"}),
+    "ControlSurfaceBindingGroup": frozenset({"ControlSurfaceBindingGroup", "ControlSurfaceBinding"}),
     "Query": frozenset({"SearchCriteria"}),
     "Event": frozenset({"Action"}),
     "Bus": frozenset({"Bus", "AuxBus"}),
@@ -149,6 +151,8 @@ _OBJECT_CREATE_REQUIRED_PARENT_TYPES_BY_CHILD = {
     "WorkUnit": frozenset({"WorkUnit", "Folder"}),
     "Query": frozenset({"WorkUnit", "Folder"}),
     "SearchCriteria": frozenset({"Query"}),
+    "ControlSurfaceBindingGroup": frozenset({"ControlSurfaceSession", "ControlSurfaceBindingGroup"}),
+    "ControlSurfaceBinding": frozenset({"ControlSurfaceBindingGroup"}),
     "Action": frozenset({"Event"}),
     "State": frozenset({"StateGroup"}),
     "Switch": frozenset({"SwitchGroup"}),
@@ -250,6 +254,10 @@ def object_child_capability(
 
 def object_transfer_parent_compatible(*, version: str, parent_type: object, child_type: object) -> bool:
     """Transfer admission is distinct from creating an object of this class."""
+    if parent_type in {"ControlSurfaceSession", "ControlSurfaceBindingGroup"}:
+        # Constructor role admission does not grant copy/move authority on
+        # reserved or user groups; those operations need their own role proof.
+        return False
     if child_type in {"Source", "SourcePlugin", "AudioFileSource"}:
         # Existing Source identity carries the plugin/file class. The public
         # preparation seam separately certifies that class and the Sound owner.

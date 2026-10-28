@@ -272,6 +272,35 @@ def _music_transition_correspondence(root, version, class_id, build):
         'other_roles': 'older 2021.1/2022.1 constructors remain separately assigned to #195/#174; fade lifecycle/resolver remains separate; unordered membership gives no priority proof; no arbitrary class/custom-reference framework'}
 
 
+def _control_surface_correspondence(root, version, name, class_id, build):
+    """Exactly ten NEW rows join the finite constructor; no hardware credit."""
+    from wwise_waapi.control_surface_construction import authority, declaration_contract
+    path = 'skills/waapi-skill/resources/metadata/control-surface-constructor-sources.json'
+    current = authority(version)
+    source = load(root / path)
+    from wwise_waapi.canonical import canonical_sha256
+    lane = source['versions'][version]
+    if (source['sha256'] != canonical_sha256({key: value for key, value in source.items() if key != 'sha256'})
+            or source['sha256'] != current['source_sha256'] or lane['build'] != build
+            or lane['classes'].get(name) != class_id or lane != {key: value for key, value in current.items() if key not in {'version', 'source_sha256'}}):
+        raise ValueError('Exact installed applicability Control Surface constructor source differs')
+    return {'implementation_issue': 195, 'path': 'control_surface_role_guarded_named_children',
+        'operations': ['object.create', *([] if version == '2021.1' else ['object.set'])],
+        'source': {'path': path, **current}, 'declaration': declaration_contract(version),
+        'mechanism_sources': {'runtime': ['skills/waapi-skill/wwise_waapi/control_surface_construction.py',
+            'skills/waapi-skill/wwise_waapi/object_capabilities.py', 'skills/waapi-skill/wwise_waapi/operation_registry.py'],
+            'test_nodes': ['tests/unit/test_control_surface_constructor_gateway.py::' + node for node in (
+                'test_user_group_creation_preserves_selected_root_and_verifies_once',
+                'test_user_group_with_binding_uses_live_fields_and_retains_unrequested_peers',
+                'test_five_version_definitions_disclose_source_roles_and_precise_boundaries',
+                'test_constructor_preview_binds_parent_role_class_metadata_source_and_config',
+                'test_constructor_independent_state_and_result_faults_fail_without_retry')],
+            'strength': 'matching five-version source and representative public persisted Python mechanism; no per-class native execution inferred'},
+        'admission': 'explicit role2 user group under selected exact live role3 root; Binding under selected or planned exact role0/2/4 group; source class and live Field Handles; no default0 user group, reserved-role construction, arbitrary parent or invented hardware encoding',
+        'verification': 'stored independent GUID/class/parent/membership/role/requested-field outcome; policy/configuration/source/metadata/role drift and one execution; hardware effect and reserved automatic birth not claimed',
+        'other_roles': 'existing object fields stay separate; reserved group construction is a scoped interface boundary, not native absence or a new exclusion'}
+
+
 def definition_mapping(root):
     """Keep every independent ID/shape and join only source-supported paths."""
     root = Path(root)
@@ -382,6 +411,8 @@ def definition_mapping(root):
                     'operations': ['object.setProperty', 'object.setReference'],
                     'admission': 'read candidates, select exact identity, bind exact GUID, discover object-scoped fields; missing identities/fields/hidden controllers remain explicit boundaries, never invented',
                     'independent_constructibility': 'not_claimed'}
+            elif name in {'ControlSurfaceBindingGroup', 'ControlSurfaceBinding'}:
+                row['correspondence'] = _control_surface_correspondence(root, version, name, d['class_id'], row['build'])
             elif name in {'WorkUnit', 'Query', 'SearchCriteria'}:
                 row['correspondence'] = _saved_constructor_correspondence(root, sdk, version, name, d['class_id'], row['build'])
             elif name == 'MusicPlaylistItem' and version in {'2023.1', '2024.1', '2025.1'}:
