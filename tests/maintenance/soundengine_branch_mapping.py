@@ -21,7 +21,8 @@ VERSIONS = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
 GROUPS = {
     'registration': ('registerGameObj', 'unregisterGameObj'),
     'playback': ('postEvent', 'executeActionOnEvent', 'seekOnEvent', 'stopAll', 'stopPlayingID'),
-    'state-switch': ('setState', 'setSwitch', 'getState', 'getSwitch'),
+    'state-switch': ('setState', 'setSwitch'),
+    'getter-projection': ('getState', 'getSwitch'),
     'values-trigger': ('setRTPCValue', 'resetRTPCValue', 'postTrigger'),
     'listener-spatial': ('setDefaultListeners', 'setListeners', 'setPosition', 'setMultiplePositions',
         'setObjectObstructionAndOcclusion', 'setScalingFactor', 'setGameObjectOutputBusVolume',
@@ -191,16 +192,38 @@ def _nested_value_paths(name, pointer):
 
 
 def _getter_correspondence(row, version):
-    """Finite getter options are forwarded; arbitrary paths stay unresolved."""
+    """Join concrete compilers and rejection, never full-language equivalence."""
     from wwise_waapi.soundengine_object_returns import soundengine_object_outputs
     pointer = row['pointer']
     section = pointer.split('/')[1]
     outputs = soundengine_object_outputs(version)
     if section == 'optionsSchema' and '/definitions/returnExpression/items/anyOf/1' in pointer:
-        # This single native string branch admits both direct metadata fields
-        # and dot-reference paths. A separate Authoring read hop does not
-        # establish equivalent native getter projection for all such strings.
-        return None
+        # 2022 has a nonempty accessor/function regex (a constraint node),
+        # whereas later schemas merely describe dot property/reference reads.
+        # A string schema does not enumerate every possible caller program.
+        # Map the delivered closed positive mechanisms and the rejected empty
+        # input separately, without inventing native absence or a language gap.
+        rule = ('gateway_empty_accessor_rejection' if row['kind'] == 'empty_string'
+            else 'native_accessor_grammar_constraint' if row['kind'] == 'constraint'
+            else 'metadata_compiled_getter_accessor')
+        return {'rule': rule, 'native_pointer': pointer, 'native_fields': ['return'],
+            'public_fields': ['fields', 'override_source_values', 'local_references',
+                'related_outputs', 'related_fields', 'related_override_source_values', 'related_local_references'],
+            'value_paths': [], 'native_language_equivalence': 'not_claimed',
+            'helper_values_are_native_getter_values': False,
+            'native_constraint': row.get('value') if row['kind'] == 'constraint' else None,
+            'encoding': ('empty meanings and caller raw accessor/function grammar are rejected before connection; this is a Gateway input boundary, not native absence'
+                if row['kind'] == 'empty_string' else
+                'live exact State/Switch class metadata owns @property, @@property and resolved/local reference tokens; '
+                'closed related paths compile through existing RelatedListPlan.render (for example parent.@Volume); '
+                '2022 generated native tokens retain its pinned nonempty accessor/function regex; '
+                'each preparation/final getter guards exact identity and runtime generation; '
+                'final getter supplies singleton/native-composed values; grouped/sequence/context helper values remain separately observed and non-atomic'),
+            'mechanisms': {'direct': LIB + 'soundengine_object_returns.py#compile_soundengine_field_meanings',
+                'metadata': GATEWAY + '#_bind_query_custom_fields_from_live_metadata',
+                'related': LIB + 'soundengine_related_outputs.py#SoundEngineRelatedProjection',
+                'native_render': LIB + 'object_query_related_lists.py#RelatedListPlan',
+                'input_rejection': LIB + 'object_query_related.py#_meaning'}}
     native = row.get('value') if row['kind'] == 'enum_value' and section == 'optionsSchema' else None
     choices = [name for name, (token, output) in outputs.items() if token == native] if native else []
     if native is not None and not choices:
@@ -210,7 +233,9 @@ def _getter_correspondence(row, version):
         choices = [name for name, (token, output) in outputs.items() if token == native]
         if not choices:
             raise ValueError('Unhandled SoundEngine native getter result accessor: ' + native)
-    fields = ['outputs', 'platform', 'language'] if section == 'optionsSchema' else ['outputs']
+    fields = ['outputs', 'platform', 'language'] if section == 'optionsSchema' else ['outputs', 'fields',
+        'override_source_values', 'local_references', 'related_outputs', 'related_fields',
+        'related_override_source_values', 'related_local_references']
     if section == 'optionsSchema':
         if '/properties/platform' in pointer:
             fields = ['platform']
@@ -227,12 +252,13 @@ def _getter_correspondence(row, version):
             if section == 'optionsSchema' else
             'requested fixed accessor values are preserved under disclosed business keys; absent requested values remain unavailable_fields; '
             'null stays null; declared-return observations retain actual raw keys and values without alias-equivalence claims; '
-            'schema/result shape proves no runtime setter effect'),
+            'metadata-compiled fields and final native singleton/composed related values use the existing projector; '
+            'grouped/sequence/context helper values keep separate provenance; schema/result shape proves no runtime setter effect'),
         **({'native_choice': row['value']} if row['kind'] in {'enum_value', 'boolean_value', 'optional_presence', 'default', 'collection_cardinality'} else {})}
 
 
 def soundengine_bindings(root, inventory):
-    """Exact field joins; omit unresolved getter projection/option members."""
+    """Exact field joins for the reviewed closed business surface."""
     from wwise_waapi.soundengine_business_contracts import soundengine_control_business_contract_data
     public = {row['id']: row for row in inventory['routes']}
     branches = inventory['native_coverage']['obligations']
@@ -273,8 +299,8 @@ def soundengine_bindings(root, inventory):
             pointer = row['pointer']
             section = pointer.split('/')[1]
             getter = _getter_correspondence(row, version) if name in GETTERS and section in {'optionsSchema', 'resultSchema'} else None
-            if name in GETTERS and section in {'optionsSchema', 'resultSchema'} and getter is None:
-                continue
+            if getter and set(getter['public_fields']) - exposed:
+                raise ValueError('SoundEngine mapped getter field/choice is not disclosed')
             fields = sorted(origins[row['id']])
             if section == 'argsSchema':
                 fields = fields or sorted(rules)
@@ -308,24 +334,24 @@ def soundengine_gaps(inventory, bindings):
     """Retain every unresolved field as assigned work, with no exclusion credit."""
     missing = [row for row in inventory['native_coverage']['obligations'] if row['id'] not in bindings]
     return {'contract': 'waapi-skill.soundengine-mapping-gaps/v1', 'owner_issue': 195,
-        'reason': 'Native getter returnExpression string alternatives include arbitrary nested dot-reference paths. Fixed business outputs and platform/language are forwarded; a separate exact-ID Authoring read hop does not establish native getter expression equivalence. Remaining native expression members stay assigned until closed projection support or an explicit decision.',
-        'disposition': 'unresolved_public_support_not_native_absence_or_approved_exclusion',
+        'reason': 'Exact source review found no concrete legitimate documented getter field/path missing from finite, live-metadata or existing related mechanisms; generic string schemas are not an infinite caller-language requirement. Bounded raw/empty-input rejection and helper-value provenance remain explicit in each mapping.',
+        'disposition': 'no_concrete_functional_gap_found' if not missing else 'unresolved_public_support_not_native_absence_or_approved_exclusion',
         'counts': dict(Counter(row['id'].split('|')[0] for row in missing)),
         'members': {row['id']: row['shape_sha256'] for row in missing}}
 
 
 SELECTED_TESTS = {
-    'registration': ['test_register_game_object_derives_native_id_and_binds_cleanup',
-        'test_unregister_all_prevents_late_publication_of_pending_registration'],
-    'playback': ['test_seek_event_compiles_business_position_and_opaque_playing_target',
-        'test_stop_all_prevents_late_publication_of_pending_playing_authority'],
-    'state-switch': ['test_state_switch_write_is_verified_by_independent_exact_scope_getter',
-        'test_state_read_selects_closed_object_outputs_and_literal_scopes'],
-    'values-trigger': ['test_game_parameter_explicit_global_scope_is_distinct_from_transport_default',
-        'test_state_switch_and_trigger_compile_only_from_bound_business_roles'],
-    'listener-spatial': ['test_listener_spatialization_compiles_every_valid_channel_config_family',
-        'test_output_bus_all_listeners_supports_exact_silence_and_full_native_gain'],
-    'banks': ['test_bank_runtime_lifecycle_uses_bound_soundbank_not_native_identifier'],
+    # #185 already accepted the family field/lifetime controls. The new capture
+    # establishes their unchanged shared Draft/registration seam, rather than
+    # repeating twelve family functions or implying leaf execution receipts.
+    **{group: ['test_monitor_message_uses_one_business_draft_and_seals_native_preview',
+        'test_register_game_object_derives_native_id_and_binds_cleanup']
+        for group in ('registration', 'playback', 'values-trigger', 'listener-spatial', 'banks')},
+    'state-switch': ['test_state_switch_write_is_verified_by_independent_exact_scope_getter'],
+    'getter-projection': ['test_getter_binds_custom_field_meanings_to_live_state_class_before_one_dispatch',
+        'test_getter_related_projection_uses_the_final_native_getter_value',
+        'test_getter_existing_related_list_form_preserves_native_or_grouped_value_provenance',
+        'test_getter_custom_fields_reject_raw_meanings_duplicates_limits_and_unrelated_options[extra3]'],
     'monitor': ['test_monitor_message_uses_one_business_draft_and_seals_native_preview'],
 }
 TEST_FILE = 'tests/unit/test_soundengine_business_gateway.py'
@@ -337,7 +363,9 @@ RUNTIME_SOURCES = {
         'operation_registry', 'operation_drafts', 'operation_composer', 'transactions',
         'transaction_runtime', 'transaction_cleanup', 'dispatcher', 'config',
         'capabilities', 'execution_contracts', 'builders/schema', 'io_policy',
-        'soundengine_object_returns', 'object_query_outputs', 'builders/query')),
+        'soundengine_object_returns', 'soundengine_related_outputs', 'object_query_outputs', 'builders/query',
+        'metadata_discovery', 'builders/metadata', 'object_query_related', 'object_query_related_lists',
+        'object_query_related_metadata', 'object_query_related_runtime', 'reference_kind_evidence')),
 }
 
 
@@ -402,7 +430,7 @@ def soundengine_export(root, output, run):
             'candidate_sha256': inventory['native_coverage']['candidate_sha256'], 'original_candidate': plan['candidate'],
             'files': files, 'original_sources': original_sources,
             'review': {'reason': 'Current selected SoundEngine sources exactly match this actual focused code run; no native or per-node observation is inferred',
-                'selection_reason': 'One or two existing public Gateway mechanisms for this finite business family; legal choices are source mappings, not execution quotas',
+                'selection_reason': 'Existing shared Draft/registration controls plus selected getter compiler/provenance/rejection controls; accepted #185 family construction/lifetime history is retained, not rerun per field/API; no per-member execution quota',
                 'sources': {name: {'original_sha256': original_sources[name], 'current_sha256': original_sources[name],
                     'reviewed_reason': 'Byte-identical relevant source'} for name in sorted(sources)}, 'skip_attribution': {}},
             'mechanism': {'branch_id': anchor, 'native_route': rows[anchor]['route'], 'native_shape_sha256': rows[anchor]['shape_sha256'],
@@ -444,7 +472,7 @@ def soundengine_export(root, output, run):
     gaps = soundengine_gaps(inventory, bindings)
     write('gaps.json', gaps)
     write('acceptance.json', {'contract': 'waapi-skill.soundengine-acceptance-attribution/v1',
-        'authority': TICKET, 'scope': '26 URIs / 124 version rows; seven accepted shared mechanisms',
+        'authority': TICKET, 'scope': '26 URIs / 124 version rows; seven accepted business families plus the reviewed getter-projection extension',
         'historical_native': {'records': ['https://github.com/zcyh147/waapi-skill/issues/88#issuecomment-5465036074',
             'https://github.com/zcyh147/waapi-skill/issues/59#issuecomment-5470272661'],
             'observed_candidate': 'ea36a60', 'versions': ['2022.1', '2025.1'], 'hosts': ['macOS', 'Windows'],

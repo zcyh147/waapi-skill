@@ -86,6 +86,23 @@ def test_soundengine_getter_maps_forwarded_scope_and_exact_declared_spelling(com
     assert platform['input']['correspondence']['rule'] == 'forwarded_closed_getter_return_options'
 
 
+def test_soundengine_string_nodes_map_compilers_constraints_and_input_rejection(component):
+    from tests.maintenance.soundengine_branch_mapping import soundengine_bindings, soundengine_gaps
+    bindings = soundengine_bindings(ROOT, component)
+    rows = [row for row in component['native_coverage']['obligations']
+        if '/optionsSchema/@definition/waapi_definitions.json/definitions/returnExpression/items/anyOf/1' in row['id']]
+    assert len(rows) == 32
+    rules = {}
+    for row in rows:
+        correspondence = bindings[row['id']]['input']['correspondence']
+        rules[correspondence['rule']] = rules.get(correspondence['rule'], 0) + 1
+        assert correspondence['native_language_equivalence'] == 'not_claimed'
+        assert correspondence['helper_values_are_native_getter_values'] is False
+    assert rules == {'metadata_compiled_getter_accessor': 16,
+        'native_accessor_grammar_constraint': 4, 'gateway_empty_accessor_rejection': 12}
+    assert soundengine_gaps(component, bindings)['members'] == {}
+
+
 @pytest.mark.parametrize('damage', ['missing-choice', 'wrong-choice', 'missing-version'])
 def test_soundengine_component_rejects_native_choice_and_version_drift(component, monkeypatch, damage):
     import tests.maintenance.soundengine_branch_mapping as mapping
