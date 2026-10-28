@@ -1,0 +1,75 @@
+{
+  "canonical_publication": false,
+  "completion": {
+    "by_owner": {
+      "190": {
+        "approved_exclusion": 116,
+        "mapped_with_representative_proof": 6965,
+        "verified": 3
+      },
+      "193": {
+        "mapped_with_representative_proof": 3859,
+        "verified": 4
+      }
+    },
+    "complete": true,
+    "obligations": 10947,
+    "routes": 211,
+    "states": {
+      "approved_exclusion": 116,
+      "mapped_with_representative_proof": 10824,
+      "verified": 7
+    }
+  },
+  "new_fresh_execution": false,
+  "new_native_execution": false,
+  "program_outcomes": {
+    "reviewed_aggregate_code_mechanism": 7,
+    "reviewed_representative_mechanism": 10824
+  },
+  "states": {
+    "approved_exclusion": 116,
+    "mapped_with_representative_proof": 10824,
+    "verified": 7
+  },
+  "summary": {
+    "approved_exclusion_members": 116,
+    "approved_exclusion_routes": 4,
+    "candidate_sha256": "9934ae8f12916d45968b6623034338aceb44e4d6416908b9ab88ff6434dcd7e6",
+    "canonical_import_pending": true,
+    "catalogs": {
+      "2021.1|wwise-authoring|2021.1.14.8108": "237c92402a950df73a75cb15a5ad2fc48fbfeadef311053afea846632996ec7b",
+      "2021.1|wwise-console|2021.1.14.8108": "1095c5d28b63fa0c36da6bf7a970462e979d72d03b24444d51061a5c703501c8",
+      "2022.1|wwise-authoring|2022.1.19.8584": "b04cb8629b2f26a69e827bb6957885685dc61b8bd6ea95df2949f9ec2cbe6df1",
+      "2022.1|wwise-console|2022.1.19.8584": "a01fdc6d252579c8c4a83ed9423850efe6a70dc83b2882f8a7e49eca5032bdae",
+      "2023.1|wwise-authoring|2023.1.19.8928": "e2b9eca52f6b57622253b3d937fb7974dc9ec9176fb7cfe7d1b64dc3e63ea9b1",
+      "2023.1|wwise-console|2023.1.19.8928": "d5990c1eab159c8ab86d168777265f6f4d6531ea84891e3d569be29ad9668841",
+      "2024.1|wwise-authoring|2024.1.13.9056": "32d68574fe0f41a4ee70bb1c6098f5ecdac434d6f6e00bbb237cba4aa28f7fd9",
+      "2024.1|wwise-console|2024.1.13.9056": "7f7e2f12e5a6fa369d33edc24f4aaa5dcf7fcaa48d5a357d7ddec33481840b89",
+      "2025.1|wwise-authoring|2025.1.7.9143": "411c83c1e9b0d8d1fcb0fa82242e1a47728525379dfca93d1c4c40a9325679b5",
+      "2025.1|wwise-console|2025.1.7.9143": "7b3e3bc255bbc425bde6820e44bfdda6302a42da623e987e9ab4414651a36dc8"
+    },
+    "component": "host-195-r1",
+    "mapped_members": 10831,
+    "mapping_is_not_execution_credit": true,
+    "mechanisms": {
+      "host195-commands-v1": 1692,
+      "host195-debug-read-v1": 220,
+      "host195-fixed-read-v1": 6036,
+      "host195-lua-server-v1": 1007,
+      "host195-project-v1": 696,
+      "host195-remote-v1": 708,
+      "host195-tone-v1": 472
+    },
+    "native_effect_credit": false,
+    "native_members": 10947,
+    "native_routes": 211,
+    "public_routes": 119,
+    "requirements_parts": [
+      {
+        "path": "requirements.part-0001.json",
+        "sha256": "a5214f3c7c0e34cc2d83fe18f24e912faeebd2daeab1188775751dce7f16d9c3"
+      }
+    ]
+  }
+}
