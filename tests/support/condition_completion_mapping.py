@@ -23,9 +23,74 @@ PROOF_PATH = 'tests/fixtures/metadata-conditions/condition-completion-proof-inpu
 REVIEW_SHA256 = '56fe04bfe969fdafa404184a1166002a827c702561918dcc03a7948605acff84'
 SOURCE_RECONCILIATION_PATH = 'tests/fixtures/metadata-conditions/condition-source-reconciliation.json'
 SOURCE_RECONCILIATION_SHA256 = 'd1cfabad293db4bf1e36b5c4167b9dd8cab4dbd9a13ffe7068ef505d6b6ef6ef'
+FIELDLESS_REVIEW_PATH = 'tests/fixtures/metadata-conditions/condition-fieldless-structure-review.json'
+FIELDLESS_REVIEW_SHA256 = 'ad1abc319b41b1bfc157a09ed6630bd9af65d8a68cfe56a963a2d618c751d794'
+
+
+def _fieldless_review(root):
+    raw = (root / FIELDLESS_REVIEW_PATH).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != FIELDLESS_REVIEW_SHA256:
+        raise ValueError('Exact fieldless source structure review differs')
+    review = json.loads(raw)
+    for key in ('original_mapping', 'source_snapshot'):
+        source = review[key]
+        if hashlib.sha256((root / source['path']).read_bytes()).hexdigest() != source['sha256']:
+            raise ValueError('Reviewed fieldless source structure input differs: ' + key)
+    return review
+
+
+def _map_fieldless_structure(rows, roots, review):
+    """Account for exact source groups without asserting a field or UI effect."""
+    by_id = {row['occurrence_id']: row for row in rows}
+    selected = {row['occurrence_id'] for row in rows if row['dependency_kind'] == 'fieldless'}
+    if selected != {row['occurrence_id'] for row in review['occurrences']}:
+        raise ValueError('Exact fieldless source structure roster differs')
+    pending = []
+    for expected in review['occurrences']:
+        row = by_id[expected['occurrence_id']]
+        if digest(row) != expected['source_row_sha256'] or row['members'] != expected['members']:
+            raise ValueError('Exact fieldless source structure identity/controller/consumer differs')
+        source = roots['|'.join((row['build'], 'condition', row['source_file']))]
+        def node(pointer):
+            matches = [n for n in source if _pointer(source, n) == pointer]
+            if len(matches) != 1:
+                raise ValueError('Fieldless source structure node is missing or ambiguous')
+            return matches[0]
+        group = node(expected['group_pointer'])
+        wrapper = node(expected['wrapper_pointer'])
+        peer_node = node(expected['peer_pointer'])
+        for item, key in ((group, 'group_node_sha256'), (wrapper, 'wrapper_node_sha256'),
+                          (peer_node, 'peer_node_sha256')):
+            if hashlib.sha256(ET.tostring(item)).hexdigest() != expected[key]:
+                raise ValueError('Exact fieldless source structure node differs')
+        # No base edges means no fields can be inherited into this group.
+        # Siblings in the wrapper retain their own fields and conditions.
+        if (group.findall('./Properties/*') or group.findall('./ObjectBaseRef')
+                or group.findall('./ObjectLists/*') or row['source_fields']):
+            raise ValueError('Fieldless source structure gained owned/inherited fields or lists')
+        if (row['source_attributes'] != {'Name': 'ListenerRelativeRouting', 'Action': 'Enable'}
+                or row['predicate'] != {'kind': 'enum', 'type': 'bool', 'values': [True]}
+                or any(c['controller']['state'] != 'declared'
+                       or c['controller']['type'] != 'bool' for c in row['consumers'])):
+            raise ValueError('Fieldless source structure controller or predicate differs')
+        peer = by_id.get(expected['peer_occurrence_id'])
+        if (peer is None or digest(peer) != expected['peer_mapping_sha256']
+                or peer['dependencies'] or not peer['source_fields']
+                or peer['recipe'] != row['recipe'] or peer['predicate'] != row['predicate']):
+            raise ValueError('Fieldless source structure lacks its mapped real-field peer')
+        pending.append((row, {'review_id': review['review_id'],
+            'review_sha256': FIELDLESS_REVIEW_SHA256,
+            'source_node_sha256': expected['group_node_sha256'],
+            'declared_fields': [], 'inherited_fields': [], 'object_lists': [],
+            'peer_occurrence_id': peer['occurrence_id'], 'shared_recipe': row['recipe'],
+            'native_absence_claim': False, 'ui_effect': 'not_inferred_from_source_definition'}))
+    for row, structure in pending:
+        row['dependencies'] = []
+        row['source_structure'] = structure
 
 
 def definition_mapping(root):
+    fieldless_review = _fieldless_review(root)
     scalar = reconcile_sources(root)
     scalar_rows = {r['occurrence_id']: r for r in scalar['occurrences']}
     source = load(root / 'docs/branch-coverage-condition-sources.json')
@@ -144,6 +209,7 @@ def definition_mapping(root):
     pairs = [(m['id'], m['shape_sha256']) for r in rows for m in r['members']]
     if len(pairs) != len(expected) or dict(pairs) != expected:
         raise ValueError('Exact full installed condition ID/shape roster differs')
+    _map_fieldless_structure(rows, roots, fieldless_review)
     return {'contract': 'waapi-skill.condition-definition-mapping/v1', 'owner_issue': 177,
         'parent_issue': 174, 'source_manifest_sha256': hashlib.sha256((root / 'docs/branch-coverage-condition-sources.json').read_bytes()).hexdigest(),
         'members_sha256': digest(sorted(pairs)), 'recipes': sorted({r['recipe'] for r in rows}),
@@ -249,6 +315,7 @@ def _expected(root_string, review_sha):
 def validate_mapping_attachment(descriptor, base, root, *, selected_mapping=None):
     from tests.support.condition_mechanism_reuse import _read
     review = _review(root); files = _proofs(str(root), REVIEW_SHA256)
+    _fieldless_review(root)  # Recheck immutable inputs even after an expected-map cache hit.
     attachment = _read(descriptor, base)
     if (set(attachment) != {'contract', 'review', 'mapping'}
             or attachment['contract'] != 'waapi-skill.condition-definition-attachment/v1'
@@ -323,15 +390,19 @@ def witness_references(row, context):
 
 
 def _binding(row, member, attachment):
-    return {'branch_id': member['id'], 'native_shape_sha256': member['shape_sha256'],
+    result = {'branch_id': member['id'], 'native_shape_sha256': member['shape_sha256'],
         'condition_source_mapping_attachment': attachment, 'definition_occurrence': row['occurrence_id'],
-        'evidence': {c: attachment for c in ('program', 'native', 'live_metadata')},
-        'public_mechanism': {'entrypoint': 'skills/waapi-skill/scripts/run.py gateway.py',
+        'evidence': {c: attachment for c in (('program',) if 'source_structure' in row
+                                          else ('program', 'native', 'live_metadata'))}}
+    if 'source_structure' in row:
+        return {**result, 'source_structure': deepcopy(row['source_structure'])}
+    result['public_mechanism'] = {'entrypoint': 'skills/waapi-skill/scripts/run.py gateway.py',
             'operations': ['object.setProperty', 'object.setReference'],
             'identity': 'selected existing object and live discovered field handles; no invented recipient GUID',
             'construction': 'operation_registry.py#_apply_reference_activation_dependencies',
             'verification': 'operation_registry.py#verify_prepared_operation',
-            'source_definition_only': True}}
+            'source_definition_only': True}
+    return result
 
 
 def mapping_evidence_result(descriptor, branch, category, scope_kind, base, binding, root, *, context=None):
@@ -351,6 +422,12 @@ def mapping_evidence_result(descriptor, branch, category, scope_kind, base, bind
             raise ValueError('Reviewed product source definition cannot change evidence scope')
         if row['dependencies']:
             return 'implementation_dependency', json.dumps(row['dependencies'], sort_keys=True)
+        if 'source_structure' in row:
+            if category != 'program':
+                return 'missing', 'Structural source mapping supplies no native or recipient metadata evidence'
+            return 'reviewed_source_definition_and_public_mechanism', json.dumps({
+                'metadata_scope': 'source_definition', 'source_structure': row['source_structure'],
+                'direct_recipient_native_effect': 'not_observed', 'new_native_runs': 0}, sort_keys=True)
         if category == 'live_metadata':
             observed = _class_metadata(row, context)
             if observed is None:
@@ -372,6 +449,7 @@ def export_mapping(root, destination):
     """Add this exact source scope to existing accounting; never run a recipient."""
     destination = Path(destination); destination.mkdir(parents=True, exist_ok=True)
     review = _review(root); _proofs(str(root), REVIEW_SHA256)
+    _fieldless_review(root)
     mapping, branches = _expected(str(root), REVIEW_SHA256)
     def write(name, value):
         path = destination / name
@@ -389,8 +467,11 @@ def export_mapping(root, destination):
             identity = member['id']
             bindings[identity] = _binding(row, member, attachment)
             policies[identity] = {'native_shape_sha256': member['shape_sha256'],
-                'categories': ['program', 'native', *(['live_metadata'] if observed else [])],
-                'reason': 'Reviewed exact source definition and shared current public/native mechanism; no direct recipient observation inferred.',
+                'categories': (['program'] if 'source_structure' in row else
+                    ['program', 'native', *(['live_metadata'] if observed else [])]),
+                'reason': ('Reviewed exact structural source group and shared scalar condition mechanism; no field, native effect or absence inferred.'
+                    if 'source_structure' in row else
+                    'Reviewed exact source definition and shared current public/native mechanism; no direct recipient observation inferred.'),
                 'definition_scope': 'source_definition', 'original_requirement_lineage': 'f72 pending proposal remains unchanged',
                 'implementation_dependencies': row['dependencies']}
     document = {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': bindings}
@@ -421,9 +502,11 @@ def attach_definition_mappings(descriptors, bindings, base, root):
 
 def evaluate_definition_binding(branch, binding, policy, scope_kind, base, root, context):
     """Existing completion reader's source-specific category hook."""
+    structural = 'source_structure' in context['members'][branch['id']]
+    allowed = (['program'],) if structural else (['program', 'native'], ['program', 'native', 'live_metadata'])
     if (policy.get('native_shape_sha256') != branch['shape_sha256']
             or not policy.get('reason') or policy.get('definition_scope') != 'source_definition'
-            or policy.get('categories') not in (['program', 'native'], ['program', 'native', 'live_metadata'])):
+            or policy.get('categories') not in allowed):
         branch.update(state='unresolved', reasons=['Exact final source-definition requirements missing or stale'])
         return
     branch['requirements'] = policy['categories'][:]
