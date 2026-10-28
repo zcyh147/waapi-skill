@@ -9,7 +9,7 @@ from tests.support.source_copy_branch_evidence import dependency_review
 SUCCESSOR_REVIEW_PATH = 'tests/fixtures/source-copy/branch-successor-review-195.json'
 SUCCESSOR_REVIEW_SHA256 = '4cd9a81b3d413f46d7ecca6eec191984e338c5b3657b0d4e6955a167dac09a9b'
 ACCOUNTING_REVIEW_PATH = 'tests/fixtures/source-copy/branch-accounting-review-195.json'
-ACCOUNTING_REVIEW_SHA256 = 'abd4c2b449ad9a8407865a09b38e16e4ac55cf79803b22105f89bfd84266daba'
+ACCOUNTING_REVIEW_SHA256 = '982f14224bad63b9713682080a4956c2298a2138545bda94b7261e096d61c442'
 ACCOUNTING_READER = 'tests/support/source_copy_native_evidence.py'
 ACCOUNTING_DEPENDENCIES = (
     'tests/support/new_condition_completion.py',
@@ -359,7 +359,7 @@ def validate_source_native(record, binding, branch, base):
             raise ValueError('Original Source four-transaction category binding differs')
 
 
-def portable_source_native_attachments(descriptors, bindings, read, base, *, capture_origins=None):
+def portable_source_native_attachments(descriptors, bindings, read, base, *, capture_origins=None, origin_descriptors=None):
     """Attach only reviewed Source native records to existing program bindings."""
     from copy import deepcopy
     from tests.support.source_copy_branch_evidence import source_facts, native_route, pointer_contract, PUBLIC_NODES
@@ -409,8 +409,9 @@ def portable_source_native_attachments(descriptors, bindings, read, base, *, cap
                 capture = (capture_origins or {}).get(identity)
                 origin = successor_context.get('accounting_origin')
                 if origin is not None:
+                    if (origin_descriptors or {}).get(identity) != origin:
+                        raise ValueError('Source accounting changed retained origin descriptors')
                     if ({key: binding['evidence']['program'][key] for key in ('artifact', 'sha256')} != origin['program']
-                            or capture != _portable_source_document(origin['capture'], base)
                             or any(attachment[name] != successor_context['accounting_attachment'][name]
                                    for name in ('branch_ids', 'business_fact_id', 'proof', 'evidence', 'predecessor'))):
                         raise ValueError('Source accounting changed retained program/capture/native descriptors')

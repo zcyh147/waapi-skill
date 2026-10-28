@@ -115,6 +115,7 @@
   "captured_git_candidate": "88a6cbbeccee1b8f5934f61f7b75503e2a084073",
   "causal_review": {
     "accounting_reader": "Only a reviewed Source v3 attachment can separate the 88a6 program candidate from its final admission candidate. Every original origin/native descriptor remains exact. Generic program equivalence and existing specialized native checks both remain required.",
+    "exact_origin_identity": "Accounting admission compares the importing program/capture/bindings/requirements origin descriptors exactly to the pinned prior packet. Equal parsed JSON or a different artifact locator cannot replace those identities. Candidate-aligned program/native-proof controls reach the ownership guard.",
     "new_condition_integration": "d2607a17c6bfcbc49312c5d918b9a400a6fd76d3",
     "scope": "All 689 Source execution dependencies unchanged. The retained 104-entry capture map is historical evidence; the distinct current accounting map seals every selected reader/test byte except one review SHA literal. Source runtime, producers, oracle, native effects and scope do not change."
   },
@@ -204,7 +205,7 @@
     "tests/maintenance/__init__.py": "93f800e18500f291b23ed63fc6eb6a36245cd75a3605534a564c4913e05c1104",
     "tests/maintenance/branch_audit_completion.py": "2cb57fc398eb4817c8012d2151baa4baf93e8f6f618e6bc2a55e416519772034",
     "tests/maintenance/branch_audit_mapping.py": "b69341d96185b92127751aafd3bcdf3914be391660c46af8c61dae1b2facd4ea",
-    "tests/maintenance/branch_coverage_audit.py": "6a7046d2b66fdeb8718b870e85457d59043e3deaf66f46f4f4ef09a2d5543a39",
+    "tests/maintenance/branch_coverage_audit.py": "ab17355ade04950095fbd8da7f936aa7e03f83f77aca6f39f882dbf50e9cbbc8",
     "tests/maintenance/interface_depth_inventory.py": "212ca04d24244e043898656332db0a73d0d207058f7d26c9cbfb633c20a83280",
     "tests/maintenance/source_identity.py": "14d65a3c776f4d18a52e5d525b58bec55b1fd4710c7870ff1bbbbe3ce4cb9d45",
     "tests/support/condition_completion_mapping.py": "68ee0fbe9c682480ef74ce06162d9c289c508c2272adb71e7245d038b18a843a",
@@ -213,7 +214,7 @@
     "tests/support/new_condition_completion.py": "ee989f858d4ccacb6b8328ee7b114b4cbbb463f844f950f43fa7665506eda912",
     "tests/support/platform_filesystem.py": "827467a6bb7af0fb74827841fbf8c67b79a020bc0563b4f73504b64fbfb7b95d",
     "tests/support/source_copy_branch_evidence.py": "de255dc11e0cb81e625eb23b1a4c63ac61f61529673b8bf1f609988470ee974a",
-    "tests/support/source_copy_native_evidence.py": "f4d1a7dc6547c56bcfacb02b35ba86068ef6cbdabab4d521a58d949acf5a963c",
+    "tests/support/source_copy_native_evidence.py": "e266f0286f33ab80e22652c17841ef5ab47a0c86b75e5e14e582f12fc28c0165",
     "tests/unit/test_conditional_reference_gateway.py": "a6802e122c7893936d5aa66e73a68605825416d62baf32b97b3e8f3d9c5a14b6",
     "tests/unit/test_field_interface_closure_gateway.py": "12743d4ff7c31a2f05644f60b82a942c423c6b0e30db2147f686bef44467bf10",
     "tests/unit/test_gameparameter_class_fields_gateway.py": "92f81472bba7ff5006bffd170e6d502b56ff03ae12dd0d00ed717657830bcada",
@@ -959,6 +960,11 @@
       "current_sha256": "2cb57fc398eb4817c8012d2151baa4baf93e8f6f618e6bc2a55e416519772034",
       "reason": "Retain NEW r3 candidate roster and route only a validated Source accounting program descriptor; exclude exactly that descriptor self-reference from binding semantics."
     },
+    "tests/maintenance/branch_coverage_audit.py": {
+      "captured_sha256": "6a7046d2b66fdeb8718b870e85457d59043e3deaf66f46f4f4ef09a2d5543a39",
+      "current_sha256": "ab17355ade04950095fbd8da7f936aa7e03f83f77aca6f39f882dbf50e9cbbc8",
+      "reason": "Existing portable importer carries each exact four-descriptor importing origin into Source accounting admission; legacy lanes keep their existing capture content."
+    },
     "tests/support/condition_completion_mapping.py": {
       "captured_sha256": null,
       "current_sha256": "68ee0fbe9c682480ef74ce06162d9c289c508c2272adb71e7245d038b18a843a",
@@ -971,7 +977,7 @@
     },
     "tests/support/source_copy_native_evidence.py": {
       "captured_sha256": "94b2dfca59e04a63c5e986c620412a9616fba060d482dccaed58e77611788111",
-      "current_sha256": "f4d1a7dc6547c56bcfacb02b35ba86068ef6cbdabab4d521a58d949acf5a963c",
+      "current_sha256": "e266f0286f33ab80e22652c17841ef5ab47a0c86b75e5e14e582f12fc28c0165",
       "reason": "Same-reader accounting context, complete source-delta validation, single-literal self-pin seal and sidecar-only publisher; native ownership and effect checks remain."
     },
     "tests/unit/test_new_condition_completion_reader.py": {
