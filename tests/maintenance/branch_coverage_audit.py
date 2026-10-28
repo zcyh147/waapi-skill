@@ -107,6 +107,10 @@ REQUIREMENTS_MAX_PARTS = 256
 REQUIREMENTS_MAX_PART_BYTES = 64 * 1024 * 1024
 REQUIREMENTS_MAX_TOTAL_BYTES = 1024 * 1024 * 1024
 REQUIREMENTS_MAX_INDEX_BYTES = 1024 * 1024
+# All root JSON documents share this pre-decode raw byte limit. Keep large
+# legacy flat requirements/inventories valid; the smaller index-only limit is
+# a structural check after the contract can be recognized by ordinary JSON.
+AUDIT_MAX_DOCUMENT_BYTES = 1024 * 1024 * 1024
 
 
 def _unique_json(pairs):
@@ -224,7 +228,12 @@ def write_requirements(path, document, *, max_part_bytes=REQUIREMENTS_MAX_PART_B
 
 def load(path):
     path = Path(path)
-    raw = path.read_bytes()
+    if path.stat().st_size > AUDIT_MAX_DOCUMENT_BYTES:
+        raise ValueError('audit document byte bound exceeded')
+    with path.open('rb') as stream:
+        raw = stream.read(AUDIT_MAX_DOCUMENT_BYTES + 1)
+    if len(raw) > AUDIT_MAX_DOCUMENT_BYTES:
+        raise ValueError('audit document byte bound exceeded')
     document = json.loads(raw)
     if isinstance(document, dict) and document.get('contract') == REQUIREMENTS_INDEX_CONTRACT:
         if len(raw) > REQUIREMENTS_MAX_INDEX_BYTES:

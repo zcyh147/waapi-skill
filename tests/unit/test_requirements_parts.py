@@ -232,3 +232,52 @@ def test_candidate_semantics_do_not_depend_on_format_without_mechanisms(tmp_path
     audit.write_requirements(path, document)
     assert audit.load(path) == document
     assert completion.candidate_identity(tmp_path, {'sources': {}}, {}, digest=audit.digest) == flat
+
+
+def test_loader_rejects_oversized_source_before_open_or_decode(tmp_path, monkeypatch):
+    path = tmp_path / 'oversized.json'
+    path.write_bytes(b'invalid JSON beyond bound')
+    monkeypatch.setattr(audit, 'AUDIT_MAX_DOCUMENT_BYTES', 8, raising=False)
+    def forbidden(*args, **kwargs):
+        pytest.fail('oversized source reached file open or JSON decoding')
+    monkeypatch.setattr(Path, 'open', forbidden)
+    monkeypatch.setattr(audit.json, 'loads', forbidden)
+    with pytest.raises(ValueError, match='audit document byte bound exceeded'):
+        audit.load(path)
+
+
+def test_loader_bounded_read_rejects_growth_after_size_check(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    path = tmp_path / 'grown.json'
+    path.write_bytes(b'invalid JSON beyond bound')
+    monkeypatch.setattr(audit, 'AUDIT_MAX_DOCUMENT_BYTES', 8, raising=False)
+    original_stat = Path.stat
+    monkeypatch.setattr(Path, 'stat', lambda self, **kwargs:
+        SimpleNamespace(st_size=1) if self == path else original_stat(self, **kwargs))
+    original_open = Path.open
+    requests = []
+    class BoundedStream:
+        def __enter__(self):
+            self.stream = original_open(path, 'rb')
+            return self
+        def __exit__(self, *args):
+            self.stream.close()
+        def read(self, size=-1):
+            requests.append(size)
+            assert size == 9
+            return self.stream.read(size)
+    monkeypatch.setattr(Path, 'open', lambda self, *args, **kwargs: BoundedStream())
+    monkeypatch.setattr(audit.json, 'loads', lambda *args, **kwargs: pytest.fail('oversized read reached JSON decoding'))
+    with pytest.raises(ValueError, match='audit document byte bound exceeded'):
+        audit.load(path)
+    assert requests == [9]
+
+
+@pytest.mark.parametrize('contract', [audit.REQUIREMENTS_CONTRACT, 'waapi-skill.branch-audit/v2'])
+def test_loader_keeps_legacy_flat_documents_above_index_ceiling(tmp_path, contract):
+    document = {'contract': contract, 'branches': {
+        'legacy': {'reason': 'x' * (audit.REQUIREMENTS_MAX_INDEX_BYTES + 1)}}}
+    path = tmp_path / 'legacy-flat.json'
+    write(path, document)
+    assert path.stat().st_size > audit.REQUIREMENTS_MAX_INDEX_BYTES
+    assert audit.load(path) == document
