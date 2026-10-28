@@ -340,11 +340,22 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Event -> Action is the sole machine-contract delta for this constructor
+    # increment. Keep all 149 older rows and historical seals intact.
+    assert canonical_sha256(non_object_set_digests) == "1a71f79d0b2c8ad0b2962dfdb14b7dd8e4c9d78df5bf3f70e76c0dca16d3f04f"
+    def before_action_parent(operation, version):
+        contract = operation_request_machine_contract(operation, version)
+        if operation == "object.create":
+            assert contract["parent_child_contract"].pop("Event") == ["Action"]
+        return contract
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(
+            before_action_parent("object.create", version))
     # Explicit all-configured-platform generation changes only five SoundBank
     # contracts. Invert each exact disclosed field before every older seal.
     assert canonical_sha256(non_object_set_digests) == "09dfebe34fd1e9db9accff64413e0637447f9893da7246a37817ac34f66eb0ad"
     def before_all_platforms(operation, version):
-        contract = operation_request_machine_contract(operation, version)
+        contract = before_action_parent(operation, version)
         if operation == "soundbank.generate":
             assert contract["required_arguments"] == ["soundbanks", "io_root"]
             contract["required_arguments"] = ["soundbanks", "platforms", "io_root"]

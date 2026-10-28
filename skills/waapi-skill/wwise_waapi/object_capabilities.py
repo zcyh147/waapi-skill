@@ -135,6 +135,7 @@ OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
     }
 )
 OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT = {
+    "Event": frozenset({"Action"}),
     "Bus": frozenset({"Bus", "AuxBus"}),
     "AuxBus": frozenset({"Bus", "AuxBus"}),
     "StateGroup": frozenset({"State"}),
@@ -144,6 +145,7 @@ OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT = {
 # Bus/AuxBus may also be created under a WorkUnit. Only these game-sync children
 # require their dedicated group; preserve that restriction independently.
 _OBJECT_CREATE_REQUIRED_PARENT_TYPES_BY_CHILD = {
+    "Action": frozenset({"Event"}),
     "State": frozenset({"StateGroup"}),
     "Switch": frozenset({"SwitchGroup"}),
 }

@@ -291,6 +291,7 @@ tests/unit/test_sound_voice_creation_gateway.py
 tests/unit/test_generic_object_class_gateway.py
 tests/unit/test_action_reference_history_gateway.py
 tests/unit/test_action_reference_kind_gateway.py
+tests/unit/test_action_creation_gateway.py
 tests/unit/test_active_source_recorded_observations.py
 tests/unit/test_blend_assignment_fixture.py
 tests/unit/test_condition_completion_mapping.py

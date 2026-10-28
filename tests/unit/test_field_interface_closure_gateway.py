@@ -259,10 +259,11 @@ def test_create_replace_without_owner_cannot_produce_a_preview(
     *((version, "object.create") for version in VERSIONS),
     *((version, "object.set") for version in VERSIONS[1:]),
 ])
-def test_action_creation_has_explicit_boundary_without_writing(
+def test_action_creation_requires_discovered_constructor_fields_without_writing(
     tmp_path: Path, version: str, operation: str,
 ) -> None:
     task = CreateTask(tmp_path, version, operation)
+    task.types[-1]["classId"] = 327696
     parent = task.bind(SECOND)
     kind = task.discover_kind("Action")
     before = deepcopy(task.objects)
@@ -271,10 +272,9 @@ def test_action_creation_has_explicit_boundary_without_writing(
         "draft-declare-new", "--declaration-id", "play", "--parent-handle", parent,
         "--name", "Play", "--kind", kind,
     )
-    # This is boundary evidence, not positive Action-creation timing coverage.
-    # Event parenting and Action derived identity need a separate runtime repair.
+    # The selected type alone never invents ActionType or Target inputs.
     assert code == 2, declared
-    assert declared["error_code"] == "ACTION_CREATION_UNAVAILABLE"
+    assert declared["error_code"] == "ACTION_CONSTRUCTOR_FIELDS_REQUIRED"
     assert declared["details"]["repair"]["draft_changed"] is False
     assert "transaction_id" not in declared
     assert task.objects == before
@@ -291,11 +291,11 @@ def test_create_schema_does_not_advertise_unavailable_action_durations(
     declaration = schema["business_adapter"]["declaration"]
     for key in ("stable_fields", "field_value_types", "field_semantics"):
         assert not {"fade_time_ms", "delay_ms"}.intersection(declaration.get(key, {}))
-    assert schema["business_adapter"]["creation_boundaries"]["Action"] == {
-        "status": "unsupported_by_skill_interface",
-        "reason": "event_parent_and_derived_action_identity_require_a_dedicated_creation_contract",
-        "existing_object_edits": "supported_through_object_set_or_metadata_operations",
-    }
+    action = schema["business_adapter"]["creation_boundaries"]["Action"]
+    assert action['status'] == 'supported_targeted_fail_mode'
+    assert action['required_class_fields'] == ['ActionType', 'Target']
+    assert action['native_execution'] == 'not_claimed_from_SDK_example'
+
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])

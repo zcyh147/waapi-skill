@@ -1,0 +1,219 @@
+{
+  "contract": "waapi-skill.action-constructor-source/v1",
+  "class_id": 327696,
+  "native_type": "Action",
+  "parent_type": "Event",
+  "versions": {
+    "2021.1": {
+      "build": "2021.1.14.8108",
+      "sdk_member": "ak_wwise_core_object_create_example_creating_a_play_event_on_a_sound.html",
+      "sdk_sha256": "0b725c50a00f255dd742546f0db91e07788aaad8bb06fdc7358e0f387040c6c5",
+      "request": {
+        "parent": "\\Events\\Default Work Unit",
+        "type": "Folder",
+        "name": "WAAPI",
+        "onNameConflict": "merge",
+        "children": [
+          {
+            "type": "Event",
+            "name": "Play_SFX",
+            "children": [
+              {
+                "name": "",
+                "type": "Action",
+                "@ActionType": 1,
+                "@Target": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SFX"
+              }
+            ]
+          }
+        ]
+      },
+      "result": {
+        "id": "{6114659F-9274-4031-B90E-F369568532E0}",
+        "name": "WAAPI",
+        "children": [
+          {
+            "id": "{F546017D-201A-49BD-8D4E-0A28F5DBB28D}",
+            "name": "Play_SFX",
+            "children": [
+              {
+                "id": "{400D0354-0FDB-48B4-B341-9DFA0B76078D}",
+                "name": ""
+              }
+            ]
+          }
+        ]
+      },
+      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution"
+    },
+    "2022.1": {
+      "build": "2022.1.19.8584",
+      "sdk_member": "ak_wwise_core_object_create_example_creating_a_play_event_on_a_sound.html",
+      "sdk_sha256": "4d44f93de183c67f781d9e9603970c44097dc16eaff5e62f97650f1668183800",
+      "request": {
+        "parent": "\\Events\\Default Work Unit",
+        "type": "Folder",
+        "name": "WAAPI",
+        "onNameConflict": "merge",
+        "children": [
+          {
+            "type": "Event",
+            "name": "Play_SFX",
+            "children": [
+              {
+                "name": "",
+                "type": "Action",
+                "@ActionType": 1,
+                "@Target": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SFX"
+              }
+            ]
+          }
+        ]
+      },
+      "result": {
+        "id": "{6114659F-9274-4031-B90E-F369568532E0}",
+        "name": "WAAPI",
+        "children": [
+          {
+            "id": "{F546017D-201A-49BD-8D4E-0A28F5DBB28D}",
+            "name": "Play_SFX",
+            "children": [
+              {
+                "id": "{400D0354-0FDB-48B4-B341-9DFA0B76078D}",
+                "name": ""
+              }
+            ]
+          }
+        ]
+      },
+      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution"
+    },
+    "2023.1": {
+      "build": "2023.1.19.8928",
+      "sdk_member": "ak_wwise_core_object_create_example_creating_a_play_event_on_a_sound.html",
+      "sdk_sha256": "abdd1ee2a154efc859550487b6e7ceef5e3e5a583e7370ad9343097113131843",
+      "request": {
+        "parent": "\\Events\\Default Work Unit",
+        "type": "Folder",
+        "name": "WAAPI",
+        "onNameConflict": "merge",
+        "children": [
+          {
+            "type": "Event",
+            "name": "Play_SFX",
+            "children": [
+              {
+                "name": "",
+                "type": "Action",
+                "@ActionType": 1,
+                "@Target": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SFX"
+              }
+            ]
+          }
+        ]
+      },
+      "result": {
+        "id": "{6114659F-9274-4031-B90E-F369568532E0}",
+        "name": "WAAPI",
+        "children": [
+          {
+            "id": "{F546017D-201A-49BD-8D4E-0A28F5DBB28D}",
+            "name": "Play_SFX",
+            "children": [
+              {
+                "id": "{400D0354-0FDB-48B4-B341-9DFA0B76078D}",
+                "name": ""
+              }
+            ]
+          }
+        ]
+      },
+      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution"
+    },
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "sdk_member": "ak_wwise_core_object_create_example_creating_a_play_event_on_a_sound.html",
+      "sdk_sha256": "d18aa99c1b323f68ac845bc73f2eb2edd8cd100c161f2a26659d12e8f5f5656b",
+      "request": {
+        "parent": "\\Events\\Default Work Unit",
+        "type": "Folder",
+        "name": "WAAPI",
+        "onNameConflict": "merge",
+        "children": [
+          {
+            "type": "Event",
+            "name": "Play_SFX",
+            "children": [
+              {
+                "name": "",
+                "type": "Action",
+                "@ActionType": 1,
+                "@Target": "\\Actor-Mixer Hierarchy\\Default Work Unit\\SFX"
+              }
+            ]
+          }
+        ]
+      },
+      "result": {
+        "id": "{6114659F-9274-4031-B90E-F369568532E0}",
+        "name": "WAAPI",
+        "children": [
+          {
+            "id": "{F546017D-201A-49BD-8D4E-0A28F5DBB28D}",
+            "name": "Play_SFX",
+            "children": [
+              {
+                "id": "{400D0354-0FDB-48B4-B341-9DFA0B76078D}",
+                "name": ""
+              }
+            ]
+          }
+        ]
+      },
+      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution"
+    },
+    "2025.1": {
+      "build": "2025.1.7.9143",
+      "sdk_member": "ak_wwise_core_object_create_example_creating_a_play_event_on_a_sound.html",
+      "sdk_sha256": "4c468f6bf1066d485ce429c18f52ead5c9b6c874dc78b1ae52ef75023b2861ac",
+      "request": {
+        "parent": "\\Events\\Default Work Unit",
+        "type": "Folder",
+        "name": "WAAPI",
+        "onNameConflict": "merge",
+        "children": [
+          {
+            "type": "Event",
+            "name": "Play_SFX",
+            "children": [
+              {
+                "name": "",
+                "type": "Action",
+                "@ActionType": 1,
+                "@Target": "\\Containers\\Default Work Unit\\SFX"
+              }
+            ]
+          }
+        ]
+      },
+      "result": {
+        "id": "{6114659F-9274-4031-B90E-F369568532E0}",
+        "name": "WAAPI",
+        "children": [
+          {
+            "id": "{F546017D-201A-49BD-8D4E-0A28F5DBB28D}",
+            "name": "Play_SFX",
+            "children": [
+              {
+                "id": "{400D0354-0FDB-48B4-B341-9DFA0B76078D}",
+                "name": ""
+              }
+            ]
+          }
+        ]
+      },
+      "claim": "Event owns Action child; native input and returned Action names are empty; selected ActionType and Target belong to the same constructor; primary example is source evidence, not native execution"
+    }
+  },
+  "sha256": "fecb6fcdc9bfc3022e0310b2d48746058f28658b9ebf60437debbdb165e95661"
+}

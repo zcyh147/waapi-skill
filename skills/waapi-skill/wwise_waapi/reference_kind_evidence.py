@@ -65,6 +65,31 @@ def certify(info, *, version, object_id, read):
     return replace(info, reference_kind_evidence=proof)
 
 
+def certify_class(info, *, version, class_id, read):
+    """Use the same exact SDK field-kind authority for a selected Action class."""
+    if (class_id != 327696 or info.name != 'Target' or info.type not in (None, '')
+            or info.restriction):
+        return info
+    source = json.loads(_SOURCE.read_text(encoding='utf-8'))
+    if canonical_sha256({k: v for k, v in source.items() if k != 'sha256'}) != source.get('sha256'):
+        raise ValueError('Reference-kind source seal changed')
+    lane = source['versions'].get(version)
+    if lane is None: return info
+    raw = (_SOURCE.parent / version / 'object-types.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest() != lane['types_sha256']:
+        raise ValueError('Reference-kind class source changed')
+    matches = [row for row in json.loads(raw)['types'] if row['classId'] == class_id and row['name'] == 'Action']
+    if len(matches) != 1: raise ValueError('Action reference-kind class contradicts pinned catalog')
+    from .builders.metadata import parse_get_types_result
+    current = [row for row in parse_get_types_result(read('ak.wwise.core.object.getTypes', {}, {}))
+        if row.class_id == class_id]
+    if len(current) != 1 or current[0].name != 'Action': return info
+    proof = {'kind': 'documented-class-reference-kind', 'version': version, 'class_id': class_id,
+        'field': info.name, 'value_kind': 'reference', 'source_sha256': source['sha256'], 'sdk': lane['sdk'],
+        'restrictions_authority': 'native_getPropertyInfo', 'native_metadata_sha256': canonical_sha256(info.raw)}
+    return replace(info, reference_kind_evidence=proof)
+
+
 def certify_query_candidate(candidate, *, version, object_id, read, class_id=None):
     """Certify the one legacy read field after exact-object metadata fallback.
 
