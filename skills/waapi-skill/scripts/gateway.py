@@ -18142,7 +18142,13 @@ def _parse_object_graph_business_fields(
             )
         if name in fields:
             raise GatewayInputError(f"Business field {name!r} was supplied twice")
-        fields[name] = _parse_business_value(value_type, raw, field=name)
+        if name == "music_playlist" and value_type == "music_playlist":
+            from wwise_waapi.music_playlist import MAX_BYTES
+            if len(raw.encode("utf-8")) > MAX_BYTES:
+                raise GatewayInputError("music_playlist exceeds its UTF-8 byte limit")
+            fields[name] = parse_json_object(raw, "music_playlist")
+        else:
+            fields[name] = _parse_business_value(value_type, raw, field=name)
     if field_value_pairs:
         dynamic: dict[str, Any] = {}
         for pair in field_value_pairs:

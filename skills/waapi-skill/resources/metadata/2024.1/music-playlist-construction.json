@@ -1,0 +1,27 @@
+{
+  "contract": "waapi-skill.music-playlist-construction-source/v1",
+  "version": "2024.1",
+  "build": "2024.1.13.9056",
+  "sources": [
+    {
+      "member": "wwiseobject_musicplaylistitem.html",
+      "sha256": "ed6ce04c586d3dd5faed4e608d2ad1bb7bf30770a3870676547e8d051fbbdd91",
+      "archive_sha256": "aa6b467caae07c2363806adc1dadeed8df7a29c4bdf2d23fd629126208054364"
+    },
+    {
+      "member": "ak_wwise_core_object_set_example_create_a_music_playlist_container_with_segment_and_playlist.html",
+      "sha256": "71decf0495bb28ab251ec457ea3f056e5bb7c195260b742d26c3897fec4c2ab1",
+      "archive_sha256": "aa6b467caae07c2363806adc1dadeed8df7a29c4bdf2d23fd629126208054364"
+    }
+  ],
+  "manifest_sha256": "45e1f3cd2e18f0c9d6b86adcc5ce5823a05bb059c26a6713c6c99e9461aa0f68",
+  "item_class": 2359312,
+  "source_enum": {
+    "Group": 0,
+    "Segment": 1
+  },
+  "native_root": "PlaylistRoot",
+  "native_segment": "Segment",
+  "intrinsic_name": "",
+  "ordered_getter_native_evidence": "pending_parent_owned_discriminator"
+}
