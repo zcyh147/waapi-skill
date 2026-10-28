@@ -1481,7 +1481,6 @@ def _materialize_set(
         rtpc_args = _materialize_set_rtpc(replace(session, declarations=(row,)), planned_owners=new_by_result)["arguments"]
         node = {"rtpc": {key: rtpc_args[key] for key in ("property", "control_input", "points", "notes") if key in rtpc_args},
             "rtpc_mode": rtpc_args["mode"]}
-        _compile_action_constructor(session, row, node)
         node_result_handles[id(node)] = row.result_handle
         new_input = node["rtpc"]["control_input"].get("new_control_input")
         if new_input is not None:
@@ -1492,7 +1491,6 @@ def _materialize_set(
     def compile_node(row: BusinessDeclaration) -> tuple[dict[str, Any], str | None, str | None]:
         assert isinstance(row.target, NewDescendantTarget)
         node, object_list, list_behavior = _compile_set_new_node(session, row)
-        _compile_action_constructor(session, row, node)
         node_result_handles[id(node)] = row.result_handle
         descendants = planned_children.get(row.result_handle, [])
         if descendants:
