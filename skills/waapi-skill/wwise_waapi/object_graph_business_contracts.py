@@ -5,6 +5,7 @@ from __future__ import annotations
 from .documented_list_fields import discovery_contract as documented_list_discovery_contract, manual_marker_profile
 from .anonymous_list_construction import authority as anonymous_list_mode_authority
 from .effect_render_conditions import CLEAR_SUFFIX_OBSERVATIONS
+from .saved_object_construction import declaration_contract as saved_constructor_contract
 
 from typing import Any
 
@@ -499,7 +500,8 @@ def object_graph_business_contract_data(
                 "planned_target": "Gateway_derives_native_path_from_exact_root_and_normalized_graph_occurrence;_verify_actual_result_GUID_and_independent_class_parent_readback",
                 "planned_target_rename": "Gateway_discloses_a_proved_unoccupied_candidate_name_for_referenced_rename_collisions;_native_rename_policy_preserved_and_collision_state_revalidated",
             },
-            "creation_boundaries": {"Action": dict(ACTION_CREATION_BOUNDARY)},
+            "creation_boundaries": {"Action": dict(ACTION_CREATION_BOUNDARY),
+                **saved_constructor_contract(version)},
             "safety": {
                 "immutable_preview": True,
                 "single_execute": True,
@@ -573,7 +575,8 @@ def object_graph_business_contract_data(
             "continuation",
         ],
         "legacy_shallow_composer_public": False,
-        "creation_boundaries": {"Action": dict(ACTION_CREATION_BOUNDARY)},
+        "creation_boundaries": {"Action": dict(ACTION_CREATION_BOUNDARY),
+            **saved_constructor_contract(version)},
         "safety": {
             "immutable_preview": True,
             "single_execute": True,
