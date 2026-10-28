@@ -1964,6 +1964,7 @@ def apply_representative_mechanisms(native, bindings, requirements, root, *, dig
                          for category, selected in review['selected_proofs'].items() for key in selected))
         if not ready:
             continue
+        review_sha256 = digest(review)
         for identity in members:
             row, binding = rows[identity], bindings[identity]
             reused = []
@@ -1974,7 +1975,7 @@ def apply_representative_mechanisms(native, bindings, requirements, root, *, dig
                     reused.append(category)
             if reused:
                 row['representative_proof'] = {'mechanism_id': mechanism_id,
-                    'review_sha256': digest(review), 'selected_proofs': review['selected_proofs'],
+                    'review_sha256': review_sha256, 'selected_proofs': review['selected_proofs'],
                     'reused_categories': reused, 'verification_strength': 'reviewed_shared_mechanism',
                     'direct_member_execution': 'not_observed'}
                 if all(result['outcome'] in ADMITTED_EVIDENCE_OUTCOMES | {'reviewed_representative_mechanism'}
