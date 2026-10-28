@@ -4931,7 +4931,7 @@ def _prepare_action_collision(spec, conflict, *, read, replacement_snapshots, sp
         raise OperationContractError('ACTION_COLLISION_PARENT_REQUIRED',
             'Action merge/replace needs one proven fresh Event occurrence or a sealed exact existing Event roster. For multiple new Actions, create the Event first, then use a separate Action Preview or rename.')
     before = snapshot['rows']
-    if len(before) > 1 or before and snapshot['new_occurrences'] != 1:
+    if len(before) > 1 or snapshot['new_occurrences'] != 1:
         raise OperationContractError('AMBIGUOUS_ACTION_COLLISION',
             'Blank Action names do not identify one collision. Select the exact existing Action GUID to configure it, or use rename to append fresh Actions.')
     if not before:
@@ -8724,7 +8724,7 @@ def _resolve_merge_node_target(
         snapshot = spec.get('action_parent_snapshot')
         if snapshot is None:
             return None
-        if len(snapshot['rows']) > 1 or snapshot['rows'] and snapshot['new_occurrences'] != 1:
+        if len(snapshot['rows']) > 1 or snapshot['new_occurrences'] != 1:
             raise OperationContractError('AMBIGUOUS_ACTION_COLLISION', 'Choose the exact existing Action GUID; multiple blank names cannot select one merge collision.')
         if not snapshot['rows']:
             return None

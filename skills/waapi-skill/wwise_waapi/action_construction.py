@@ -38,7 +38,7 @@ def declaration_contract():
         'name_conflict': {'fail': 'fresh_creation', 'rename': 'append_fresh_occurrences_and_preserve_existing_Event_roster',
             'merge': 'one_unique_empty_name_collision_and_one_declaration; exact_existing_object_metadata; preserve_existing_notes',
             'replace': 'one_unique_empty_name_collision_and_one_declaration; exact_old_subtree_absence_and_fresh_GUID; object.create_requires_reviewed_replacement_owner'},
-        'ambiguity': 'multiple_empty_name_collisions_refused; use_exact_existing_Action_GUID_for_configuration',
+        'ambiguity': 'merge_replace_require_one_declaration_even_if_Event_initially_empty; multiple_existing_empty_name_collisions_refused; use_exact_existing_Action_GUID_for_configuration_or_rename_for_fresh_occurrences',
         'planned_Event_parent': 'one_Action_under_proven_fresh_Event_is_creation; nested_merged_existing_Event_uses_complete_exact_roster',
         'remaining_same_parent_work': ['multiple_Actions_under_planned_Event_with_merge_replace_require_separate_Event_Preview_or_rename'],
         'native_execution': 'not_claimed_from_SDK_example', 'tracking_issue': 180}

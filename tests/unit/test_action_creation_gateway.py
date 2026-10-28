@@ -409,3 +409,33 @@ def test_nested_event_ambiguous_blank_action_scope_stops_before_write(tmp_path, 
     assert code == 2 and rejected['error_code'] == ('AMBIGUOUS_ACTION_COLLISION' if existing_event else 'ACTION_COLLISION_PARENT_REQUIRED'), rejected
     assert not any(uri.endswith(('object.create', 'object.set')) for uri, _, _ in task.calls)
     assert not (task.path / 'state' / 'transactions').exists()
+
+
+@pytest.mark.parametrize('nested,conflict', [(False, 'merge'), (False, 'replace'), (True, 'merge'), (True, 'replace')])
+def test_two_new_actions_under_empty_existing_event_reject_before_preview_or_write(tmp_path, nested, conflict):
+    task = ActionCreateTask(tmp_path, '2025.1', 'object.set')
+    del task.objects[OLD]
+    if nested:
+        event_id = '{77777777-7777-7777-7777-777777777777}'
+        task.objects[event_id] = {'id': event_id, 'name': 'Empty Event', 'type': 'Event', 'classId': 131088,
+            'path': task.objects[FIRST]['path'] + r'\Empty Event', 'parent': {'id': FIRST}, 'notes': 'preserve Event'}
+        parent, kind = task.bind(FIRST), task.discover_kind('Event')
+        code, event = task.step('draft-declare-new', '--declaration-id', 'event', '--parent-handle', parent,
+            '--name', 'Empty Event', '--kind', kind)
+        assert code == 0, event
+        handle = event['draft']['declared_object']['result_handle']
+    else:
+        handle = task.bind(SECOND)
+    task.declare_action(parent_handle=handle)
+    task.declare_action(parent_handle=handle, targetless=True, declaration_id='stop-all')
+    code, configured = task.step('draft-business-configure', '--name-conflict', conflict)
+    assert code == 0, configured
+    before = deepcopy(task.objects)
+    expected_error = 'ACTION_COLLISION_PARENT_REQUIRED' if nested and conflict == 'replace' else 'AMBIGUOUS_ACTION_COLLISION'
+    for command in ('draft-check', 'preview-from-draft'):
+        code, rejected = task.step(command)
+        assert code == 2 and rejected['error_code'] == (expected_error if command == 'draft-check' else 'OPERATION_DRAFT_CHECK_REQUIRED'), rejected
+        assert 'transaction_id' not in rejected
+    assert task.objects == before
+    assert not any(uri.endswith(('object.create', 'object.set')) for uri, _, _ in task.calls)
+    assert not (task.path / 'state' / 'transactions').exists()
