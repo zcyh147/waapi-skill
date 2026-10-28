@@ -1743,6 +1743,9 @@ def build_parser() -> argparse.ArgumentParser:
     core_call.add_argument("--state-group-id")
     core_call.add_argument("--switch-group-id")
     core_call.add_argument("--game-object-handle")
+    core_call.add_argument("--include", dest="soundengine_outputs", action="append", default=[])
+    core_call.add_argument("--platform", dest="soundengine_platform")
+    core_call.add_argument("--language", dest="soundengine_language")
     add_media_build_read_arguments(core_call)
     core_call.add_argument("--project-file", action="append", default=[])
     core_call.add_argument("--originals-file", action="append", default=[])
@@ -5341,6 +5344,8 @@ def preflight_core_business_input(
         raise GatewayInputError("Source-control file locators apply only to the getStatus read alternative")
     if (args.runtime_observation is not None or args.runtime_page is not None) and args.api not in runtime_inspection_business_read_operations():
         raise GatewayInputError("Runtime observation continuation is valid only for its original runtime-inspection operation")
+    if (args.soundengine_outputs or args.soundengine_platform is not None or args.soundengine_language is not None) and args.api not in soundengine_control_business_read_operations():
+        raise GatewayInputError("--include, --platform and --language apply only to SoundEngine getState/getSwitch")
     if args.api in soundengine_control_business_read_operations():
         contract = soundengine_control_business_contract_data(args.api, versions[0])
         identity_field = (
@@ -5368,8 +5373,18 @@ def preflight_core_business_input(
             validate_runtime_game_object_handle(args.game_object_handle)
             if args.api != GET_SWITCH_URI:
                 raise GatewayInputError("getState does not accept a game object handle")
+        from wwise_waapi.soundengine_object_returns import compile_soundengine_object_returns
+        try:
+            args.soundengine_return_options, args.query_output_bindings = compile_soundengine_object_returns(
+                versions[0], args.soundengine_outputs, platform=args.soundengine_platform, language=args.soundengine_language)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        args.query_related_version = versions[0]
         args.soundengine_read_business_request = {
             identity_field: identity.upper(),
+            **({"outputs": list(args.soundengine_outputs)} if args.soundengine_outputs else {}),
+            **({"platform": args.soundengine_platform} if args.soundengine_platform is not None else {}),
+            **({"language": args.soundengine_language} if args.soundengine_language is not None else {}),
             **(
                 {"game_object_handle": args.game_object_handle}
                 if args.game_object_handle is not None
@@ -12158,7 +12173,7 @@ def dispatch_soundengine_business_read(
     request_validation = validate_semantic_payload(
         args.api,
         native_args,
-        {},
+        args.soundengine_return_options,
         version=detected_version,
     )
     capability = live_capability(
@@ -12172,7 +12187,7 @@ def dispatch_soundengine_business_read(
         connection=connection,
         version=detected_version,
         args=native_args,
-        options={},
+        options=args.soundengine_return_options,
         allow_destructive=True,
         result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         operation_timeout=float(capability.execution_contract["timeout_seconds"]),
@@ -12206,7 +12221,7 @@ def dispatch_soundengine_business_read(
             error_code="SOUNDENGINE_READ_RESULT_INVALID",
         )
     agent_result = (
-        {"id": returned_object["id"], "name": returned_object["name"]}
+        _project_query_business_rows(args, [returned_object], identity_fields=("id", "name"))[0]
         if result.get("ok")
         else None
     )
@@ -25574,16 +25589,19 @@ def _prepare_query_related_outputs(args, *, build_preview, connection, detected_
 def _project_query_business_rows(
     args: argparse.Namespace,
     rows: Sequence[Mapping[str, Any]],
+    *,
+    identity_fields: Sequence[str] = SELECTED_REQUIRED_RETURN_FIELDS,
 ) -> list[dict[str, Any]]:
     """Rename Gateway-compiled native accessors into stable business fields."""
 
+    result_page = getattr(args, "result_page", None)
     root_conditions = getattr(args,'query_root_condition_plan',None)
     if root_conditions is not None:
         from wwise_waapi.object_query_related_runtime import RelatedQueryError
         try:
             root_conditions.validate(rows)
         except RelatedQueryError as exc:
-            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
             raise GatewayResultShapeError(str(exc),details=exc.details,error_code=code) from exc
     bindings = tuple(getattr(args, "query_output_bindings", ()) or ())
     proof = getattr(args, "query_related_scope_binding", None)
@@ -25595,7 +25613,7 @@ def _project_query_business_rows(
             related_rows = list_plan.project(rows)
             args.query_related_scope_binding = list_plan.proof()
         except RelatedQueryError as exc:
-            code = "QUERY_RESULT_CONTINUATION_CHANGED" if args.result_page is not None else exc.code
+            code = "QUERY_RESULT_CONTINUATION_CHANGED" if result_page is not None else exc.code
             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
     elif proof is not None:
         from wwise_waapi.object_query_related_runtime import RelatedQueryError, validate_related_observation
@@ -25605,8 +25623,8 @@ def _project_query_business_rows(
             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
     projected: list[dict[str, Any]] = []
     for row_index, row in enumerate(rows):
-        item = {field: row[field] for field in SELECTED_REQUIRED_RETURN_FIELDS if field in row}
-        missing_identity = [field for field in SELECTED_REQUIRED_RETURN_FIELDS if field not in row]
+        item = {field: row[field] for field in identity_fields if field in row}
+        missing_identity = [field for field in identity_fields if field not in row]
         unavailable = list(missing_identity)
         grouped: dict[str, dict[str, Any]] = {}
         related_groups: dict[str, dict[str, Any]] = {}
@@ -25649,7 +25667,7 @@ def _project_query_business_rows(
                         try:
                             validate_randomizer_value(output['randomizer_value'], row[native], RelatedQueryError)
                         except RelatedQueryError as exc:
-                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
                             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
                     if 'function_value' in output:
                         from wwise_waapi.object_query_functions import validate_function_value
@@ -25657,7 +25675,7 @@ def _project_query_business_rows(
                         try:
                             validate_function_value(output['function_value'], row[native], RelatedQueryError)
                         except RelatedQueryError as exc:
-                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
                             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
                     if group is None and field == 'curve_points':
                         from wwise_waapi.object_query_local_lists import validate_curve_points
@@ -25665,7 +25683,7 @@ def _project_query_business_rows(
                         try:
                             validate_curve_points(args.query_related_version, row[native], RelatedQueryError)
                         except RelatedQueryError as exc:
-                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
                             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
                     target = context.setdefault(group, {}) if group else context
                     target[field] = row[native]
@@ -25685,7 +25703,7 @@ def _project_query_business_rows(
                     try:
                         validate_marker_records(row[native])
                     except ValueError as exc:
-                        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else 'QUERY_MARKER_RECORDS_SHAPE'
+                        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else 'QUERY_MARKER_RECORDS_SHAPE'
                         raise GatewayResultShapeError(str(exc),details={'id':row.get('id'),'output':'marker_records','native_key':native},error_code=code) from exc
             if native not in row:
                 unavailable.append(f"{group}.{output}" if group else output)
@@ -25699,7 +25717,7 @@ def _project_query_business_rows(
                     try:
                         validate_curve_points(args.query_related_version, row[native], RelatedQueryError)
                     except RelatedQueryError as exc:
-                        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+                        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
                         raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
                 item[output] = row[native]
         declared = [native for kind, native, _ in bindings if kind == "declared_return"]
@@ -25707,7 +25725,7 @@ def _project_query_business_rows(
             item["declared_return_observation"] = {
                 "selected_spellings": declared,
                 "returned_values": {key: value for key, value in row.items()
-                                    if key not in SELECTED_REQUIRED_RETURN_FIELDS},
+                                    if key not in identity_fields},
             }
         for group in QUERY_FIELD_OUTPUT_GROUPS.values():
             if group in grouped:

@@ -688,7 +688,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "versions": ("2022.1", "2023.1", "2024.1", "2025.1"),
         "execution_shape": "bounded_read",
         "required_fields": ("state_group_id",),
-        "optional_fields": (),
+        "optional_fields": ("outputs", "platform", "language"),
         "field_types": {"state_group_id": "exact_state_group_guid"},
         "input_forms": {
             "state_group_id": {"flag": "--state-group-id", "repeatable": False},
@@ -701,8 +701,8 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "required_fields_by_version": {
             "2022.1": ("switch_group_id", "game_object_handle"),
         },
-        "optional_fields": ("game_object_handle",),
-        "optional_fields_by_version": {"2022.1": ()},
+        "optional_fields": ("game_object_handle", "outputs", "platform", "language"),
+        "optional_fields_by_version": {"2022.1": ("outputs", "platform", "language")},
         "field_types": {
             "switch_group_id": "exact_switch_group_guid",
             "game_object_handle": "gateway_runtime_game_object_handle",
@@ -793,6 +793,14 @@ def soundengine_control_business_contract_data(
             row["optional_fields"],
         )
     )
+    if row.get("execution_shape") == "bounded_read":
+        from .soundengine_object_returns import soundengine_object_return_contract
+        row = {**row, "field_types": {**row["field_types"], "outputs": "closed_object_output_list",
+            "platform": "literal_name_or_guid", "language": "literal_name_or_guid"},
+            "input_forms": {**row["input_forms"], "outputs": {"flag": "--include", "repeatable": True},
+                "platform": {"flag": "--platform", "repeatable": False},
+                "language": {"flag": "--language", "repeatable": False}},
+            "constraints": soundengine_object_return_contract(version)}
     exposed_fields = set(required_fields) | set(optional_fields)
     roles = tuple(row.get("roles", ()))
     optional_roles = set(row.get("optional_roles", ()))
