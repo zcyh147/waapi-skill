@@ -340,11 +340,41 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    # Explicit all-configured-platform generation changes only five SoundBank
+    # contracts. Invert each exact disclosed field before every older seal.
+    assert canonical_sha256(non_object_set_digests) == "09dfebe34fd1e9db9accff64413e0637447f9893da7246a37817ac34f66eb0ad"
+    def before_all_platforms(operation, version):
+        contract = operation_request_machine_contract(operation, version)
+        if operation == "soundbank.generate":
+            assert contract["required_arguments"] == ["soundbanks", "io_root"]
+            contract["required_arguments"] = ["soundbanks", "platforms", "io_root"]
+            assert contract["optional_arguments"][:2] == ["platforms", "all_platforms"]
+            contract["optional_arguments"] = contract["optional_arguments"][2:]
+            arguments = contract["argument_contract"]
+            assert arguments["required"] == ["soundbanks", "io_root"]
+            arguments["required"] = ["soundbanks", "platforms", "io_root"]
+            assert arguments["optional"][:2] == ["platforms", "all_platforms"]
+            arguments["optional"] = arguments["optional"][2:]
+            assert arguments.pop("oneOf") == [
+                {"not": {"required": ["all_platforms"]}, "required": ["platforms"]},
+                {"not": {"required": ["platforms"]}, "required": ["all_platforms"]},
+            ]
+            assert arguments["properties"].pop("all_platforms") == {"const": True}
+            assert contract["constraints"][0] == (
+                "SoundBank scope is selected or explicitly all-user; platform scope is one explicit list or all_platforms=true with bounded live enumeration; missing/contradictory selection fails; omitted languages mean all live project languages; Init is an automatic by-product"
+            )
+            contract["constraints"][0] = (
+                "SoundBank scope is selected or explicitly all-user; platforms remain bounded and explicit; omitted languages mean all live project languages; Init is an automatic by-product"
+            )
+        return contract
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"soundbank.generate@{version}"] = canonical_sha256(
+            before_all_platforms("soundbank.generate", version))
     # Older Metadata uses the matching direct List constructor rather than the
     # newer Inner slot. Preserve this exact disclosure before earlier seals.
     assert canonical_sha256(non_object_set_digests) == "4ef502f260478a80dd07e5ee7f3c57fa9fa02f711b363947bfae32240f8de923"
     def before_direct_metadata_placement(operation, version):
-        contract = operation_request_machine_contract(operation, version)
+        contract = before_all_platforms(operation, version)
         if operation == "object.createPlugin":
             assert contract["constraints"].pop(7) == (
                 "Wwise 2022.1-2024.1 Metadata appends one selected-class direct List member with exact ordered preservation and field checks; intrinsic owner/parent readback remains observation-only and is disclosed before authorization"
