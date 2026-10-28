@@ -1197,6 +1197,9 @@ def bind_live_field(
     if scope_kind == "object":
         from .reference_kind_evidence import certify
         info = certify(info, version=registry.context.wwise_version, object_id=normalized_scope, read=read_call)
+    elif scope_kind == "class":
+        from .reference_kind_evidence import certify_class
+        info = certify_class(info, version=registry.context.wwise_version, class_id=normalized_scope, read=read_call)
     _require_available_field_value_type(info, token)
     field_kind = (
         "reference"
@@ -1403,6 +1406,9 @@ def revalidate_live_field(
     if field.scope_kind == "object":
         from .reference_kind_evidence import certify
         info = certify(info, version=registry.context.wwise_version, object_id=field.scope_value, read=read_call)
+    elif field.scope_kind == "class":
+        from .reference_kind_evidence import certify_class
+        info = certify_class(info, version=registry.context.wwise_version, class_id=field.scope_value, read=read_call)
     _require_available_field_value_type(info, field.token)
     dependency_fields = _dependency_field_tokens(info.dependencies)
     enabled_dependency_fields = (

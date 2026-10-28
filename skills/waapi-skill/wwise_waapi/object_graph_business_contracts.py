@@ -27,11 +27,8 @@ OBJECT_CREATE_BUSINESS_VALUE_TYPES = {
     if name not in ACTION_DURATION_FIELDS
 }
 
-ACTION_CREATION_BOUNDARY = {
-    "status": "unsupported_by_skill_interface",
-    "reason": "event_parent_and_derived_action_identity_require_a_dedicated_creation_contract",
-    "existing_object_edits": "supported_through_object_set_or_metadata_operations",
-}
+from .action_construction import declaration_contract
+ACTION_CREATION_BOUNDARY = declaration_contract()
 
 RTPC_PROPERTY_CARDINALITY = {
     "metadata_source": "selected_owner_property_supports.rtpc",
@@ -425,10 +422,14 @@ def object_graph_business_contract_data(
                 "subcommand": "draft-add-media",
                 "source_forms": ["media-file", "inline-wav"],
                 "optional_fields": [
+                    "add_to_source_control",
                     "kind",
                     "language",
                     "originals_subfolder",
                 ],
+                "add_to_source_control": {"type": "boolean", "scope": "one_import_group_for_this_declaration",
+                    "omitted": "preserve_native_default", "explicit_false": "preserved", "explicit_true": "preserved",
+                    "repeated_explicit_choices": "must_agree; conflicts_reject_atomically"},
                 "exact_user_artifacts": ["media_file", "inline_wav"],
                 "native_import_fragment_input": "forbidden",
                 "supported_versions": ["2023.1", "2024.1", "2025.1"],

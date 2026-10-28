@@ -65,7 +65,7 @@ def graph_result_bindings(roots, result_handles, *, retain_created_results=False
     if not targets and not any("rtpc" in node for node, _ in roots):
         # Nested unnamed outcomes also require stable result bindings.
         def has_rtpc(node):
-            return "rtpc" in node or node.get("anonymous") is True or any(isinstance(ref["target"], Mapping) and "new_control_input" in ref["target"] for ref in node.get("references", [])) or any(has_rtpc(child) for child in node.get("children", [])) or any(
+            return node.get("type") == "Action" or "rtpc" in node or node.get("anonymous") is True or any(isinstance(ref["target"], Mapping) and "new_control_input" in ref["target"] for ref in node.get("references", [])) or any(has_rtpc(child) for child in node.get("children", [])) or any(
                 has_rtpc(child) for descriptor in node.get("lists", []) for child in descriptor["objects"])
         def has_duplicate_children(node):
             if "plugin" in node or "rtpc" in node or node.get("anonymous") is True:
@@ -175,14 +175,14 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, refere
             parent_native_path, parent_identity = parent["path"], parent["result_handle"]
         else:
             parent_native_path, parent_identity = root_path(prefix, root), root[0].object
-        if node.rtpc is not None or node.anonymous or node.collection == "ControlInput" or (node.plugin is not None and node.plugin.kind == "effect" and node.plugin.placement == "owner"):
+        if node.type == "Action" or node.rtpc is not None or node.anonymous or node.collection == "ControlInput" or (node.plugin is not None and node.plugin.kind == "effect" and node.plugin.placement == "owner"):
             if path in selected:
                 raise ObjectOperationContractError("PLANNED_REFERENCE_TARGET_UNAVAILABLE", "Unnamed RTPC result has no source-proven native reference expression")
             info = resolve_type(node)
             fact = {"result_handle": paths[path], "request_path": path, "path": None, "name": node.name,
                 "type": node.plugin.object_type if node.plugin is not None else info.name, "class_name": info.name,
                 "class_id": info.class_id, "parent_identity": parent_identity,
-                "relation": "owner", **({"rtpc_property": node.rtpc.property} if node.rtpc is not None else {})}
+                "relation": "parent" if node.type == "Action" else "owner", **({"rtpc_property": node.rtpc.property} if node.rtpc is not None else {})}
             facts[path] = fact
             return fact
         name, native_path, rows = node.name, parent_native_path.rstrip("\\") + "\\" + node.name, []
@@ -210,7 +210,7 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, refere
     sibling_names = {}
     for path in paths:
         node = by_path[path]
-        if node.collection == "children" and node.plugin is None and node.rtpc is None and not node.anonymous:
+        if node.type != "Action" and node.collection == "children" and node.plugin is None and node.rtpc is None and not node.anonymous:
             key = (root_for(path)[0], node.parent_request_path, node.name.casefold())
             sibling_names.setdefault(key, []).append(path)
         resolve(path)

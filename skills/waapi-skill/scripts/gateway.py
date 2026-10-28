@@ -3215,6 +3215,10 @@ def build_parser() -> argparse.ArgumentParser:
     draft_add_media.add_argument("--kind")
     draft_add_media.add_argument("--language")
     draft_add_media.add_argument("--originals-subfolder")
+    media_source_control = draft_add_media.add_mutually_exclusive_group()
+    media_source_control.add_argument("--add-to-source-control", dest="media_add_to_source_control", action="store_true")
+    media_source_control.add_argument("--no-add-to-source-control", dest="media_add_to_source_control", action="store_false")
+    draft_add_media.set_defaults(media_add_to_source_control=None)
 
     draft_clear_object_list = subparsers.add_parser(
         "draft-clear-object-list",
@@ -18465,6 +18469,7 @@ def dispatch_offline_business_draft_update(
                 ("kind", args.kind),
                 ("language", args.language),
                 ("originals_subfolder", args.originals_subfolder),
+                ("add_to_source_control", args.media_add_to_source_control),
             )
             if value is not None
         }
@@ -20734,6 +20739,15 @@ def dispatch_business_field_discovery(
             info = bind_get_property_info_result(native_info, field_token=str(candidate["name"]),
                 available_names=(str(candidate["name"]),))
             info = certify(info, version=detected_version, object_id=scope_value, read=read_call)
+            if info.reference_kind_evidence:
+                candidate = {**candidate, "kind": "reference", "kind_evidence": dict(info.reference_kind_evidence)}
+                kind = "reference"
+        if binding.record.operation in {"object.create", "object.set"} and scope_kind == "class" and kind == "unknown":
+            from wwise_waapi.reference_kind_evidence import certify_class
+            from wwise_waapi.builders.metadata import bind_get_property_info_result, GET_PROPERTY_INFO_URI
+            native_info = read_call(GET_PROPERTY_INFO_URI, {"classId": scope_value, "property": candidate["name"]}, {})
+            info = bind_get_property_info_result(native_info, field_token=str(candidate["name"]), available_names=(str(candidate["name"]),))
+            info = certify_class(info, version=detected_version, class_id=scope_value, read=read_call)
             if info.reference_kind_evidence:
                 candidate = {**candidate, "kind": "reference", "kind_evidence": dict(info.reference_kind_evidence)}
                 kind = "reference"
@@ -30285,9 +30299,11 @@ def _business_next_action_binding(
                                 "[--kind <stable-semantic-kind-or-selected-type-handle>]",
                                 "[--language <exact-project-language>]",
                                 "[--originals-subfolder <exact-relative-subfolder>]",
+                                "[--add-to-source-control|--no-add-to-source-control]",
                             ],
                             "supported_versions": ["2023.1", "2024.1", "2025.1"],
                             "native_import_fragment_input": "forbidden",
+                            "source_control_scope": "one_import_group_for_this_declaration; repeated_explicit_choices_must_agree",
                             "repeat_for_each_media_artifact": True,
                         }
                     }

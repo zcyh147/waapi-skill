@@ -1893,9 +1893,10 @@ def test_object_set_batch_keeps_disclosed_stable_fields_out_of_metadata(
     }
 
 
+@pytest.mark.parametrize("source_control", (None, False, True), ids=("omitted", "disabled", "enabled"))
 @pytest.mark.parametrize("source_form", ("inline-wav", "media-file"))
 def test_gateway_adds_subordinate_media_without_model_authored_json(
-    tmp_path: Path, source_form: str,
+    tmp_path: Path, source_form: str, source_control: bool | None,
 ) -> None:
     start_code, started = _offline(tmp_path, "draft-start", "object.set")
     assert start_code == 0, started
@@ -2018,6 +2019,7 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
         "English(US)",
         "--originals-subfolder",
         "Weather/Warnings",
+        *([] if source_control is None else ["--add-to-source-control" if source_control else "--no-add-to-source-control"]),
     )
     assert media_code == 0, added
     serialized_session = json.dumps(added["draft"])
@@ -2035,6 +2037,16 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
     )
     assert "media_files" in json.dumps(stored.composition)
 
+    if source_control is not None:
+        before_bytes = {path: path.read_bytes() for path in (tmp_path / "state" / "drafts").rglob("*") if path.is_file()}
+        code, rejected = _offline(tmp_path, "draft-add-media", draft_id,
+            "--task-authority", authority, "--expected-revision", "4", "--declaration-id", "voice",
+            "--inline-wav", "Other.wav|UklGRgAAAAAA",
+            "--no-add-to-source-control" if source_control else "--add-to-source-control")
+        assert code == 2 and rejected["error_code"] == "OBJECT_SET_IMPORT_SOURCE_CONTROL_CONFLICT", rejected
+        assert {path: path.read_bytes() for path in before_bytes} == before_bytes
+
+
     materialized = OperationDraftStore(tmp_path / "state").materialize_request(
         draft_id,
         task_authority=authority,
@@ -2050,6 +2062,7 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
     )
     child = materialized.request["arguments"]["objects"][0]["children"][0]
     assert child["import"] == {
+        **({} if source_control is None else {"auto_add_to_source_control": source_control}),
         "files": [
             {
                 ("audio_file_base64" if source_form == "inline-wav" else "audio_file"): source_value,

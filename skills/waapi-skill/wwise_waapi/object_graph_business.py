@@ -240,7 +240,9 @@ def _compile_object_set_import(
             action="provide a bounded non-empty media file list",
         )
     files: list[dict[str, Any]] = []
+    source_control: bool | None = None
     allowed = {
+        "add_to_source_control",
         "inline_wav",
         "kind",
         "language",
@@ -256,6 +258,17 @@ def _compile_object_set_import(
                 choices=sorted(allowed),
                 action="provide only the disclosed exact media artifact and business fields",
             )
+        if "add_to_source_control" in raw:
+            choice = raw["add_to_source_control"]
+            if not isinstance(choice, bool):
+                raise _repair(session, "FIELD_VALUE_TYPE_MISMATCH",
+                    field=f"media_files[{index}].add_to_source_control",
+                    action="choose whether this declaration's media import adds to source control")
+            if source_control is not None and source_control != choice:
+                raise _repair(session, "OBJECT_SET_IMPORT_SOURCE_CONTROL_CONFLICT",
+                    field="media_files.add_to_source_control",
+                    action="use one consistent source-control choice for this declaration's import group")
+            source_control = choice
         has_file = "media_file" in raw
         has_inline = "inline_wav" in raw
         if has_file == has_inline:
@@ -300,7 +313,7 @@ def _compile_object_set_import(
                 )
             compiled["object_type"] = _resolve_native_object_type(session, kind)
         files.append(compiled)
-    return {"files": files}
+    return {"files": files, **({} if source_control is None else {"auto_add_to_source_control": source_control})}
 
 
 def _compile_list_name(session, value, *, owner_handle):
@@ -339,6 +352,7 @@ def _compile_set_new_node(
             allow_reference_arrays=session.context.wwise_version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
             allow_inline_curve=True),
     }
+    _compile_action_constructor(session, declaration, node)
     placement = extension_fields.get("plugin_placement")
     if placement is not None:
         kind = session.handles.resolve_type(declaration.target.kind)
@@ -485,17 +499,6 @@ def _resolve_native_object_type(
 ) -> str:
     if kind_name.startswith("bth1-"):
         native_type = session.handles.resolve_type(kind_name).name
-        if native_type == "Action":
-            raise _repair(
-                session,
-                "ACTION_CREATION_UNAVAILABLE",
-                field="kind",
-                action=(
-                    "Action creation requires a dedicated Event-parent and derived-identity "
-                    "contract; existing Actions can still be edited through object.set "
-                    "or the metadata operations"
-                ),
-            )
         bound = session.handles.resolve_type(kind_name)
         return {"effect": "Effect", "source": "Source"}.get(bound.type_category.casefold(), native_type)
     version = session.context.wwise_version
@@ -503,6 +506,31 @@ def _resolve_native_object_type(
     if kind.name in {"sound-sfx", "sound-voice"}:
         return "Sound"
     return kind.native_object_type
+
+
+def _compile_action_constructor(session, declaration, node):
+    if node['type'] != 'Action': return
+    from .action_construction import authority
+    kind = session.handles.resolve_type(declaration.target.kind)
+    if kind.name != 'Action' or kind.class_id != authority(session.context.wwise_version)['class_id']:
+        raise _repair(session, 'ACTION_CLASS_UNPROVEN', field='kind', action='select the exact live Action Type Handle')
+    if session.settings.get('name_conflict', 'fail') != 'fail':
+        raise _repair(session, 'ACTION_COLLISION_SEMANTICS_UNRESOLVED', field='name_conflict',
+            action='use a separately previewed fail-mode Action constructor; other modes remain assigned implementation work')
+    siblings = [row for row in session.declarations if isinstance(row.target, NewDescendantTarget)
+        and row.target.parent_handle == declaration.target.parent_handle
+        and row.target.kind.startswith('bth1-') and session.handles.resolve_type(row.target.kind).name == 'Action']
+    if len(siblings) > 1:
+        raise _repair(session, 'ACTION_OCCURRENCE_BINDING_UNRESOLVED', field='declarations',
+            action='create each Action in a separate Preview until equivalent unnamed occurrence binding is implemented')
+    properties = {row['name']: row['value'] for row in node.get('properties', [])}
+    references = {row['name']: row['target'] for row in node.get('references', [])}
+    target = references.get('Target')
+    if (type(properties.get('ActionType')) is not int or not isinstance(target, dict)
+            or target.get('kind') != 'id' or not str(target.get('value', '')).startswith('{')):
+        raise _repair(session, 'ACTION_CONSTRUCTOR_FIELDS_REQUIRED', field='field_values',
+            action='discover ActionType and Target on the selected Action Type Handle; choose one live enum value and one bound existing target')
+    node['name'] = ''
 
 
 def _compile_graph_field_reference(session: BusinessDeclarationSession, field: Any, value: Any, *,
@@ -909,6 +937,7 @@ def _materialize_create(
             "name": row.target.name,
             **_compile_create_fields(session, base),
         }
+        _compile_action_constructor(session, row, node)
         node_result_handles[id(node)] = row.result_handle
         if object_list is not None:
             try:
@@ -1452,6 +1481,7 @@ def _materialize_set(
         rtpc_args = _materialize_set_rtpc(replace(session, declarations=(row,)), planned_owners=new_by_result)["arguments"]
         node = {"rtpc": {key: rtpc_args[key] for key in ("property", "control_input", "points", "notes") if key in rtpc_args},
             "rtpc_mode": rtpc_args["mode"]}
+        _compile_action_constructor(session, row, node)
         node_result_handles[id(node)] = row.result_handle
         new_input = node["rtpc"]["control_input"].get("new_control_input")
         if new_input is not None:
@@ -1462,6 +1492,7 @@ def _materialize_set(
     def compile_node(row: BusinessDeclaration) -> tuple[dict[str, Any], str | None, str | None]:
         assert isinstance(row.target, NewDescendantTarget)
         node, object_list, list_behavior = _compile_set_new_node(session, row)
+        _compile_action_constructor(session, row, node)
         node_result_handles[id(node)] = row.result_handle
         descendants = planned_children.get(row.result_handle, [])
         if descendants:

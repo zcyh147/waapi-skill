@@ -5030,7 +5030,7 @@ def _prepare_object_create(
         )
     root_path = (
         _child_path(parent.row.get("path"), normalized.root.name, field="parent.path")
-        if list_name is None
+        if list_name is None and normalized.root.type != "Action"
         else None
     )
     conflict = normalized.on_name_conflict
@@ -5166,6 +5166,9 @@ def _prepare_object_create(
                         merge_field_snapshots.append({"object_id": spec["preexisting_id"], "fields": fields, "platform": platform, "rows": observed})
         if conflict == "rename":
             node_specs[0]["rename_collision_rows"] = collisions
+    elif node_specs[0].get('action_constructor'):
+        if conflict != 'fail':
+            raise OperationContractError('ACTION_COLLISION_SEMANTICS_UNRESOLVED', 'Unnamed Action collision modes remain assigned implementation work')
     elif conflict == "fail":
         assert isinstance(root_path, str)
         rows = _read_object_path_rows(root_path, fields=IDENTITY_RETURN_FIELDS, read=read)
@@ -6653,6 +6656,10 @@ def _prepare_object_set(
                 if child_spec["parent_request_path"] is None
                 else child_spec["parent_request_path"]
             )
+            if child_spec.get('action_constructor'):
+                if row_conflict != 'fail':
+                    raise OperationContractError('ACTION_COLLISION_SEMANTICS_UNRESOLVED', 'Unnamed Action collision modes remain assigned implementation work')
+                continue
             if child_spec.get("collection") != "children":
                 continue
             parent_spec = child_spec_by_path.get(str(child_spec.get("parent_request_path")))
@@ -8898,6 +8905,29 @@ def _prepare_object_node_specs(
             "references": [],
             "collection": root_collection if node.request_path == "$" else node.collection,
         }
+        if type_info.name == "Action":
+            from .action_construction import authority
+            source = authority(version)
+            if (type_info.class_id != source['class_id'] or node.name != '' or node.children
+                    or type(next((field.value for field in node.properties if field.name == 'ActionType'), None)) is not int
+                    or not any(field.name == 'Target' and field.target is not None for field in node.references)):
+                raise OperationContractError('ACTION_CONSTRUCTOR_FIELDS_REQUIRED', 'Action construction requires its exact class, empty native name, selected ActionType and bound Target')
+            spec['action_constructor'] = source
+            if node.parent_request_path is None and root_parent is not None:
+                fields = ['id', 'name', 'type', 'path', 'classId', 'parent', 'notes', 'ActionType', 'Target']
+                parent_fields = ['id', 'name', 'type', 'path', 'classId']
+                parent_rows = _read_object_id_rows(root_parent.object, fields=parent_fields, read=read)
+                event_classes = [item.class_id for item in type_catalog if item.name == 'Event']
+                if (len(parent_rows) != 1 or not _same_identity(parent_rows[0].get('id'), root_parent.object)
+                        or parent_rows[0].get('type') != 'Event' or event_classes != [parent_rows[0].get('classId')]):
+                    raise OperationContractError('ACTION_PARENT_CLASS_UNPROVEN', 'Action constructor requires its exact live Event parent class')
+                before = _read_direct_children(root_parent.object, fields=fields, read=read)
+                if any(row.get('type') != 'Action' or row.get('classId') != source['class_id']
+                        or row.get('name') != '' or type(_field_value(row, 'ActionType')) is not int for row in before):
+                    raise OperationContractError('ACTION_PARENT_ROSTER_INVALID', 'Event children require exact Action identities and typed ActionType')
+                spec['action_parent_snapshot'] = {'object_id': root_parent.object, 'fields': fields, 'rows': before,
+                    'parent_fields': parent_fields, 'parent': parent_rows[0]}
+
         if node.plugin is not None and node.plugin.kind == "source":
             spec["structural_class_id"] = type_info.class_id
         if result_context and node.request_path in result_context["target_paths"]:
@@ -9095,6 +9125,7 @@ def _prepare_object_node_specs(
                 cache=property_info_cache,
                 **metadata_scope,
                 name=descriptor.name,
+                reference_kind_version=version if type_info.name == "Action" else None,
             )
             _require_object_reference_metadata(info, allow_hierarchy=True)
             if descriptor.target is None and "notNull" in (info.restriction.get("restrictions") or []):
@@ -9535,6 +9566,9 @@ def _read_property_info(
     if reference_kind_version is not None and object_id is not None:
         from .reference_kind_evidence import certify
         info = certify(info, version=reference_kind_version, object_id=object_id, read=read)
+    if reference_kind_version is not None and class_id is not None:
+        from .reference_kind_evidence import certify_class
+        info = certify_class(info, version=reference_kind_version, class_id=class_id, read=read)
     if info.type is None and not info.is_reference:
         raise OperationContractError("FIELD_TYPE_UNAVAILABLE", "Native metadata does not certify a scalar value type.", details={"property": name, "unavailable_facts": ["type"]})
     return info
@@ -9547,6 +9581,7 @@ def _read_property_info_cached(
     name: str,
     object_id: Any | None = None,
     class_id: int | None = None,
+    reference_kind_version: str | None = None,
 ) -> PropertyInfoMetadataRecord:
     """Read property metadata once per exact prepare-local object/class scope."""
 
@@ -9579,6 +9614,7 @@ def _read_property_info_cached(
         name=name,
         object_id=object_id,
         class_id=class_id,
+        reference_kind_version=reference_kind_version,
     )
     cache[cache_key] = info
     return info
@@ -9667,8 +9703,7 @@ def _is_finite_waapi_number(value: Any) -> bool:
 
 
 def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord, *, allow_hierarchy=False) -> None:
-    restriction_type = metadata.restriction.get("type")
-    reference = restriction_type == "reference" or (isinstance(metadata.type, str) and metadata.type.casefold() in {"reference", "objectreference"})
+    reference = metadata.is_reference
     if not reference:
         raise OperationContractError(
             "INVALID_REFERENCE",
@@ -9783,7 +9818,7 @@ def _append_association_condition(requirements, *, source, owner, property_name,
         raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Related condition count exceeds 16.")
 
 
-def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
+def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None, after_write=False):
     """Revalidate selected class identities and field/default facts once per phase."""
     if not isinstance(pre_state, Mapping):
         return []
@@ -9816,6 +9851,24 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
                     {expected.get("classId") for expected in expected_classes.values()}]}})
     from .constructor_inputs import authority as constructor_authority, complete as constructor_complete, public_requirements
     for node in nodes:
+        if node.get('action_constructor'):
+            from .action_construction import authority
+            proof = node['action_constructor']
+            assertions.append({'name': 'Action constructor source remains bound',
+                'passed': authority(proof['version']) == proof, 'evidence': proof})
+            snapshot = node.get('action_parent_snapshot')
+            if snapshot is not None:
+                parents = _read_object_id_rows(snapshot['object_id'], fields=snapshot['parent_fields'], read=read)
+                actual = _read_direct_children(snapshot['object_id'], fields=snapshot['fields'], read=read)
+                before = {row['id'].casefold(): row for row in snapshot['rows']}
+                now = {row['id'].casefold(): row for row in actual}
+                same = all(key in now and _native_snapshot_equal(now[key], row) for key, row in before.items())
+                complete = (len(now) == len(actual) and set(before) <= set(now)
+                    and (len(set(now) - set(before)) == 1 if after_write else set(now) == set(before)))
+                assertions.append({'name': 'Action Event retains its exact previous children and constructor occurrence count',
+                    'passed': bool(same and complete and _native_snapshot_equal(parents, [snapshot['parent']])),
+                    'evidence': {'before': snapshot, 'actual': actual, 'parents': parents, 'after_write': after_write}})
+
         try:
             required = constructor_authority(node)
             valid = constructor_complete(node)
@@ -9834,7 +9887,12 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
                 seen.add(key)
                 args = {**scope, "property": field}
                 result = read(GET_PROPERTY_INFO_URI, args, {})
-                actual = parse_get_property_info_result(result).as_dict()
+                actual_info = parse_get_property_info_result(result)
+                proof = expected.get('reference_kind_evidence', {})
+                if proof.get('kind') == 'documented-class-reference-kind':
+                    from .reference_kind_evidence import certify_class
+                    actual_info = certify_class(actual_info, version=proof['version'], class_id=scope['classId'], read=read)
+                actual = actual_info.as_dict()
                 if readbacks is not None:
                     readbacks.append({"role": "new-object-class-default", "uri": GET_PROPERTY_INFO_URI,
                         "args": args, "options": {}, "result": dict(result)})
@@ -9847,7 +9905,7 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=(), compound_path_context=None):
     """Keep the exact selected condition metadata valid through verification."""
-    assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
+    assertions = _new_object_class_metadata_assertions(pre_state, read=read, after_write=True) if after_write else []
     if pre_state.get("inner_name_scope") is not None:
         assertions.append(_inner_name_scope_assertion(pre_state["inner_name_scope"], read=read, after_write=after_write))
     declared_notes = {_identity_key(node["target_id"]): node["requested_notes"]
@@ -22941,6 +22999,13 @@ def verify_prepared_operation(
                         "evidence": {"old_id": proof["old_control_input"], "rows": old_rows, "failure": failure,
                             "scope": "verified_postcondition_not_a_native_lifetime_guarantee"}})
             expected_path = spec.get("expected_path")
+            if spec.get('action_constructor'):
+                before_ids = {item['id'].casefold() for item in spec.get('action_parent_snapshot', {}).get('rows', [])}
+                check('created Action GUID is outside the sealed Event pre-state', object_id.casefold() not in before_ids,
+                    {'actual': object_id, 'before_ids': sorted(before_ids)})
+                check('created Action uses its source-certified empty name and actual derived display path',
+                    row.get('name') == '' and isinstance(row.get('path'), str) and row['path'].startswith('\\'),
+                    {'actual': row.get('path'), 'constructor': spec['action_constructor']})
             if owned_stage_identities and not spec.get('existing_target'):
                 from .object_graph_paths import project_compound_path
                 expected_path = project_compound_path(owned_stage_identities[request_path]['path'], compound_path_context)
@@ -22993,7 +23058,8 @@ def verify_prepared_operation(
                     and _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")) and name_ok
                     and _same_identity(_reference_identity(row.get(relation)), expected_parent_id)
                     and (expected_path is None or row.get("path") == expected_path)
-                    and all(isinstance(identity[key], str) and identity[key] for key in ("name", "type", "path"))
+                    and all(isinstance(identity[key], str) and identity[key] for key in ("type", "path"))
+                    and (isinstance(identity["name"], str) and bool(identity["name"]) or spec.get("action_constructor") and identity["name"] == "")
                 )
                 assertions.append({"name": "created root identity is independently verified",
                     "kind": "verified_created_root_identity", "passed": bool(identity_ok), "evidence": identity})
