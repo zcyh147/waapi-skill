@@ -469,6 +469,169 @@ def test_current_source_successor_reuses_unchanged_original_native_through_impor
                 binding,source_root=audit.ROOT, reference_edges={k:v for k,v in rows.items() if v['kind']=='reference'})==('passed',None)
 
 
+@pytest.fixture(scope='module')
+def source_accounting_case(inventory):
+    """Only sidecars are new; all five program/native packets are committed inputs."""
+    import tempfile
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_native_evidence import publish_source_native_successor
+    product = audit.ROOT / 'tests/fixtures/branch-evidence/product'
+    with tempfile.TemporaryDirectory(prefix='.source-accounting-', dir=product) as temporary:
+        output = Path(temporary)
+        cases = {}
+        for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'):
+            packet = product / ('source-195-current-88a6cbbe-' + version)
+            old_index = packet / 'portable/index.json'
+            old = json.loads(old_index.read_bytes())
+            native = completion.read_sealed_artifact(old['source_native_attachments'][0], product)
+            requirements = completion.read_sealed_artifact(old['entries'][0]['origin']['requirements'], product)
+            index = publish_source_native_successor(old_index, predecessor=native['predecessor'],
+                inventory=inventory, product_base=product, destination=output / version, accounting=True)
+            cases[version] = {'index': index, 'old_index': old_index, 'requirements': requirements}
+        yield {'cases': cases, 'inventory': inventory, 'product': product, 'output': output}
+
+
+def test_accounting_successor_admits_five_retained_programs_without_recapture(source_accounting_case):
+    from tests.maintenance import branch_audit_completion as completion
+    case = source_accounting_case
+    rows = {row['id']: row for row in case['inventory']['native_coverage']['obligations']}
+    references = {key: row for key, row in rows.items() if row['kind'] == 'reference'}
+    total = 0
+    for version, packet in case['cases'].items():
+        old = json.loads(packet['old_index'].read_bytes())
+        new = json.loads(packet['index'].read_bytes())
+        assert new['entries'][0]['origin'] == old['entries'][0]['origin']
+        assert new['source_attachments'] == old['source_attachments']
+        old_native = completion.read_sealed_artifact(old['source_native_attachments'][0], case['product'])
+        new_native = completion.read_sealed_artifact(new['source_native_attachments'][0], case['product'])
+        for field in ('branch_ids', 'business_fact_id', 'proof', 'evidence', 'predecessor'):
+            assert new_native[field] == old_native[field]
+        for index, candidate in ((packet['old_index'], '0383d01b4b400a52c94b1f3924a9234915e32a06583c89cd9aaaf8cb628ebdc3'),
+                                 (packet['index'], case['inventory']['native_coverage']['candidate_sha256'])):
+            document, base, projection = audit.portable_binding_inputs(index, packet['requirements'])
+            assert projection['source_business_facts'] == [version + '|source-copy-synth-owned-graph']
+            for identity, binding in document['bindings'].items():
+                program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+                assert program['git_candidate'] == '88a6cbbeccee1b8f5934f61f7b75503e2a084073'
+                assert program['candidate_sha256'] == '0383d01b4b400a52c94b1f3924a9234915e32a06583c89cd9aaaf8cb628ebdc3'
+                for category in ('program', 'native'):
+                    assert completion.evidence_result(binding['evidence'][category], rows[identity], candidate,
+                        category, 'product', base, binding, source_root=audit.ROOT,
+                        reference_edges=references) == ('passed', None)
+            if index == packet['index']:
+                total += len(document['bindings'])
+    assert total == 26
+
+
+@pytest.mark.parametrize('damage', ('missing-review', 'wrong-candidate', 'wrong-descriptor',
+    'cross-version', 'native-credit', 'escaping-review', 'missing-program-bridge',
+    'wrong-program-candidate', 'wrong-program-evidence'))
+def test_accounting_successor_rejects_changed_attribution_through_ordinary_reader(source_accounting_case, damage):
+    from copy import deepcopy
+    import os
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_branch_evidence import write_json
+    case = source_accounting_case
+    packet = case['cases']['2022.1']
+    product = case['product']
+    output = case['output'] / ('control-' + damage)
+    output.mkdir()
+    def emit(name, value):
+        return {**write_json(output / name, value), 'artifact': (output / name).relative_to(product).as_posix()}
+    index = json.loads(packet['index'].read_bytes())
+    native = completion.read_sealed_artifact(index['source_native_attachments'][0], product)
+    context = completion.read_sealed_artifact(native['successor_context'], product)
+    identity = native['branch_ids'][0]
+    if damage == 'missing-review':
+        del context['review']
+    elif damage == 'wrong-candidate':
+        context['current_candidate_sha256'] = '0' * 64
+    elif damage == 'wrong-descriptor':
+        context['previous_index']['sha256'] = '0' * 64
+    elif damage == 'cross-version':
+        other = case['cases']['2023.1']['old_index']
+        import hashlib
+        context['previous_index'] = {'artifact': other.relative_to(product).as_posix(),
+                                     'sha256': hashlib.sha256(other.read_bytes()).hexdigest()}
+    elif damage == 'native-credit':
+        origin = index['entries'][0]['origin']
+        capture = completion.read_sealed_artifact(origin['capture'], product)
+        capture['native_credit'] = True
+        origin['capture'] = emit('capture.json', capture)
+    elif damage == 'escaping-review':
+        context['review']['artifact'] = '../outside-review.json'
+    elif damage == 'missing-program-bridge':
+        del native['program_equivalence'][identity]
+    else:
+        proof = completion.read_sealed_artifact(native['program_equivalence'][identity], product)
+        proof['from_candidate' if damage == 'wrong-program-candidate' else 'evidence_sha256'] = '0' * 64
+        native['program_equivalence'][identity] = emit('program-equivalence.json', proof)
+    # Re-seal the changed context only when it is itself the damaged input.
+    # Other controls retain the valid binding semantics and reach their intended check.
+    if damage in {'missing-review', 'wrong-candidate', 'wrong-descriptor', 'cross-version', 'escaping-review'}:
+        native['successor_context'] = emit('context.json', context)
+    index['source_native_attachments'] = [emit('native.json', native)]
+    index['base'] = os.path.relpath(product, output)
+    path = output / 'index.json'
+    write_json(path, index)
+    if damage in {'wrong-candidate', 'wrong-program-candidate', 'wrong-program-evidence'}:
+        document, base, _ = audit.portable_binding_inputs(path, packet['requirements'])
+        binding = document['bindings'][identity]
+        branch = next(row for row in case['inventory']['native_coverage']['obligations'] if row['id'] == identity)
+        result = completion.evidence_result(binding['evidence']['program'], branch,
+            case['inventory']['native_coverage']['candidate_sha256'], 'program', 'product', base,
+            binding, source_root=audit.ROOT)
+        assert result[0] == 'missing'
+        assert ('admitted candidate' if damage == 'wrong-candidate' else 'stale or nonexact') in result[1]
+    else:
+        with pytest.raises(ValueError, match='Source|[Ss]ource|relative|archive'):
+            audit.portable_binding_inputs(path, packet['requirements'])
+
+
+@pytest.mark.parametrize('damage', ('second-pin-assignment', 'altered-pin-assignment',
+    'other-reader-byte', 'unlisted-audit-change', 'runtime-effect-change', 'new-condition-proof'))
+def test_accounting_successor_rejects_unreviewed_source_changes(source_accounting_case, monkeypatch, damage):
+    from tests.support.source_copy_native_evidence import ACCOUNTING_READER, ACCOUNTING_REVIEW_SHA256
+    packet = source_accounting_case['cases']['2022.1']
+    names = {
+        'unlisted-audit-change': 'tests/maintenance/branch_audit_completion.py',
+        'runtime-effect-change': 'skills/waapi-skill/wwise_waapi/source_copy_proof.py',
+        'new-condition-proof': 'tests/fixtures/metadata-conditions/new-condition-current-program-r3.json.gz'}
+    target = audit.ROOT / names.get(damage, ACCOUNTING_READER)
+    read_bytes = Path.read_bytes
+    def damaged_bytes(path):
+        raw = read_bytes(path)
+        if path != target:
+            return raw
+        assignment = b"ACCOUNTING_REVIEW_SHA256 = '" + ACCOUNTING_REVIEW_SHA256.encode() + b"'"
+        if damage == 'second-pin-assignment':
+            return raw + b'\n' + assignment + b'\n'
+        if damage == 'altered-pin-assignment':
+            return raw.replace(assignment, assignment.replace(b' = ', b': str = '))
+        return raw + b'\n# unreviewed dependency change\n'
+    monkeypatch.setattr(Path, 'read_bytes', damaged_bytes)
+    expected = 'digest literal assignment' if damage in {'second-pin-assignment', 'altered-pin-assignment'} else 'current dependency changed'
+    with pytest.raises(ValueError, match=expected):
+        audit.portable_binding_inputs(packet['index'], packet['requirements'])
+
+
+def test_unbound_source_program_equivalence_cannot_borrow_valid_old_context(source_accounting_case):
+    from copy import deepcopy
+    from tests.maintenance import branch_audit_completion as completion
+    case = source_accounting_case
+    packet = case['cases']['2022.1']
+    old, base, _ = audit.portable_binding_inputs(packet['old_index'], packet['requirements'])
+    current, _, _ = audit.portable_binding_inputs(packet['index'], packet['requirements'])
+    identity = next(iter(old['bindings']))
+    binding = deepcopy(old['bindings'][identity])
+    binding['source_copy_program_equivalence'] = current['bindings'][identity]['source_copy_program_equivalence']
+    branch = next(row for row in case['inventory']['native_coverage']['obligations'] if row['id'] == identity)
+    result = completion.evidence_result(binding['evidence']['program'], branch,
+        case['inventory']['native_coverage']['candidate_sha256'], 'program', 'product', base,
+        binding, source_root=audit.ROOT)
+    assert result == ('missing', 'Unbound Source accounting program equivalence')
+
+
 def test_source_successor_rejects_resigned_predecessor_substitution(source_successor_case):
     """Equal parsed v1 JSON is not permission to substitute its original bytes."""
     import hashlib

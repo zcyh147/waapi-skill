@@ -976,7 +976,8 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
 
 
 def binding_semantics(binding):
-    return {k: v for k, v in binding.items() if k not in ('evidence', 'equivalence', 'native_equivalence')}
+    return {k: v for k, v in binding.items() if k not in ('evidence', 'equivalence', 'native_equivalence',
+                                                       'source_copy_program_equivalence')}
 
 
 def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate, binding, base, root):
@@ -1714,7 +1715,11 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             from tests.support.runtime_observation_evidence import validate_runtime_evidence
             validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges)
         if record.get('candidate_sha256') != candidate and retained_member is None:
-            validate_equivalence((binding or {}).get('equivalence', {}), descriptor, record, branch, candidate, binding or {}, base, root)
+            equivalence = (binding or {}).get('equivalence', {})
+            if category == 'program' and 'source_copy_program_equivalence' in (binding or {}):
+                from tests.support.source_copy_native_evidence import source_program_equivalence
+                equivalence = source_program_equivalence(binding, descriptor, record, candidate, base)
+            validate_equivalence(equivalence, descriptor, record, branch, candidate, binding or {}, base, root)
         if record.get('scope_kind', 'product') != scope_kind:
             raise ValueError('controlled evidence cannot grant product credit')
         binding = binding or {}
