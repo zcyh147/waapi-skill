@@ -136,6 +136,7 @@
     "tests/unit/test_files_completion_mapping.py": "Exact #183/#184 native-to-public field, choice, result and accepted-boundary accounting through the existing attachment exporter, parts loader and completion consumer. Maintainer Non-live checks only; existing Program Gateway tests retain runtime coverage.",
     "tests/unit/test_query_completion_mapping.py": "Exact nine-route owner #181 native-to-public query/metadata/media/peak correspondence and missing route, choice, source and evidence controls through the existing exporter and completion reader; accounting only, no native or Fresh execution credit.",
     "tests/unit/test_condition_music_hidden_dependency.py": "Exact accepted Music LoopCount hidden-controller scope and public Gateway read/refusal regressions; no native mutation evidence.",
+    "tests/unit/test_imports_completion_mapping.py": "Exact owner #182 five-version native row/default/source/language/replacement/option mapping and representative aggregate CODE attachments through standard parts and completion readers; accounting only, no native, Fresh or public runtime changes.",
     "tests/unit/test_ui_completion_mapping.py": "Exact #188/#189 lightweight layout/model/window/signal source correspondence and missing native choice, public constructor, source and selected proof controls through the ordinary completion consumer; accounting only, no native, Fresh or public runtime change."
   }
 }
