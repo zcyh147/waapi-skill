@@ -276,6 +276,110 @@ def test_playlist_condition_reads_retain_exact_inventory_and_native_state_withou
     assert compare_music_read_receipts(witness, report['receipts']) == []
 
 
+@pytest.mark.parametrize('outcome', ('disabled', 'native-error', 'owned-readback-failure'))
+def test_actual_playlist_maintenance_report_persists_condition_read_outcomes(tmp_path, monkeypatch, outcome):
+    import json
+    from types import SimpleNamespace
+    from tests.unit.test_metadata_discovery_gateway import (
+        FakeClient, _gateway_env, _metadata_responses, waapi_gateway,
+        GET_PROPERTY_INFO_URI, IS_PROPERTY_ENABLED_URI,
+    )
+    monkeypatch.setenv('WWISE_LIVE', '1')
+    monkeypatch.setenv('WWISE_DESTRUCTIVE', '1')
+    from tests.maintenance import probe_music_expansion_oracles as node
+    from tests.destructive.support.category_evidence import append_category_evidence
+
+    version = '2025.1'
+    owned = tmp_path / 'project'
+    relative = Path('Containers/Music/Music.wwu')
+    music = owned / relative
+    music.parent.mkdir(parents=True)
+    music.write_bytes((ROOT / 'tests/_org' / version / relative).read_bytes())
+    project = owned / 'SampleProject.wproj'
+    project.write_bytes((ROOT / 'tests/_org' / version / 'SampleProject.wproj').read_bytes())
+    names = ('Color', 'LoopCount', 'NormalOrShuffle', 'OverrideColor', 'PlayMode',
+             'PlaylistItemType', 'RandomAvoidRepeatingCount', 'Weight', 'Segment')
+    responses = _metadata_responses(tmp_path, version=version, names=names)
+    responses[GET_PROPERTY_INFO_URI] = {
+        'name': 'LoopCount', 'type': 'int16', 'default': 1,
+        'restriction': {'type': 'range', 'min': 0, 'max': 32767},
+        'dependencies': [{'type': 'property', 'action': 'Enable', 'context': 'Self',
+            'property': 'IsLoopingInfinite', 'conditions': [{'restriction': {
+                'type': 'enum', 'values': [{'displayName': 'False', 'value': False}]}}]}],
+        'ui': {'value': {'infinity': 0}},
+    }
+    responses[IS_PROPERTY_ENABLED_URI] = {'return': False}
+    errors = ({IS_PROPERTY_ENABLED_URI: RuntimeError('native LoopCount state unavailable')}
+              if outcome == 'native-error' else {})
+    client = FakeClient(responses, errors=errors)
+    env = _gateway_env(tmp_path, version=version)
+    condition_replies = []
+
+    def raw_gateway(argv):
+        if argv[:2] in (['metadata', 'list'], ['metadata', 'property-state']):
+            result = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+            condition_replies.append(result)
+            return result
+        # Unrelated external reads remain bounded diagnostic rejections. The
+        # changed reads above use the actual Gateway with external WAAPI faked.
+        if (outcome == 'owned-readback-failure' and argv[:2] == ['metadata', 'discover']
+                and argv[3] == '{898C3D43-E6A9-4327-8029-61E657048399}'):
+            music.write_bytes(music.read_bytes() + b'\n')
+        return 2, {'ok': False, 'status': 'error', 'agent_result': None,
+                   'error_code': 'unrelated_fake_read_unavailable'}
+
+    runtime = SimpleNamespace(version=version,
+        sandbox=SimpleNamespace(sandbox_path=owned, sandbox_project=project),
+        category_results=[], raw_gateway=raw_gateway, port=31337,
+        lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'))
+    if outcome == 'owned-readback-failure':
+        with pytest.raises(AssertionError, match='read-only probe changed its owned WWU'):
+            node.test_music_complete_oracle_public_read_investigation(runtime, 'playlist')
+    else:
+        node.test_music_complete_oracle_public_read_investigation(runtime, 'playlist')
+    failed = outcome == 'owned-readback-failure'
+    nodeid = ('tests/maintenance/probe_music_expansion_oracles.py::'
+              'test_music_complete_oracle_public_read_investigation[playlist]')
+    target = tmp_path / 'category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    append_category_evidence(repo_root=tmp_path, candidate='a' * 40, version=version,
+        host={'display_name': 'fake-only'}, categories=runtime.category_results,
+        source={'hash_before': 'same', 'hash_after': 'same'},
+        residual_state={'residual_processes': [], 'sandbox': 'retained' if failed else 'deleted'},
+        invocation={'selected_test_nodeids': [nodeid], 'started_at_unix_ns': 1,
+            'finished_at_unix_ns': 2, 'outcome': 'FAIL' if failed else 'PASS',
+            'node_outcomes': [{'nodeid': nodeid, 'outcome': 'FAIL' if failed else 'PASS'}],
+            'phase': 'final'}, transactions=[])
+    persisted = json.loads(target.read_text())
+    assert persisted['contract'] == 'waapi-skill.host-category-evidence/v3'
+    assert persisted['invocation']['phase'] == 'final'
+    assert persisted['transactions'] == []
+    sealed, = persisted['categories']
+    assert sealed['status'] == ('FAIL' if failed else 'PASS')
+    assert sealed['category'] == 'music-complete-oracle-read-playlist'
+    assert sealed['verifier_strength'] == 'bounded_public_read_findings_not_music_configuration_acceptance'
+    assert sealed['agent_pass'] is False and sealed['business_effect_verified'] is False
+    assert sealed['complete_order_or_unit_oracle_proven'] is False
+    assert sealed['transaction_ids'] == []
+    assert len(sealed['receipts']) == 13
+    assert any(row['finding'] == 'gateway_rejected' for row in sealed['receipts'])
+    inventory, state = [row for row in sealed['receipts'] if row['argv'][:2] in (
+        ['metadata', 'list'], ['metadata', 'property-state'])]
+    assert [(row['exit_code'], row['payload']) for row in (inventory, state)] == condition_replies
+    fields = inventory['payload']['agent_result']['fields']
+    assert len(fields) == 9 and {row['name'] for row in fields} == set(names)
+    assert inventory['payload']['agent_result']['complete'] is True
+    if outcome == 'native-error':
+        assert state['finding'] == 'gateway_rejected' and state['exit_code'] == 2
+        assert state['payload']['call']['api'] == IS_PROPERTY_ENABLED_URI
+    else:
+        assert state['finding'] == 'read_returned' and state['exit_code'] == 0
+        assert state['payload']['agent_result'] == {
+            'meaning': 'LoopCount', 'platform': 'Mac', 'enabled': False}
+    if not failed:
+        assert sealed['scope'] == 'read_transport_and_retained_findings_only_not_complete_oracle_or_mutation_pass'
+
+
 @pytest.mark.parametrize('damage', ('missing', 'duplicate', 'entity', 'oversized', 'too_many'))
 def test_project_platform_binding_rejects_unproven_or_unbounded_xml(tmp_path, damage):
     project = tmp_path / 'SampleProject.wproj'
