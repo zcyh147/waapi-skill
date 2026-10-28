@@ -18,6 +18,7 @@ from tests.maintenance.branch_coverage_audit import digest, load
 from tests.maintenance.branch_audit_completion import installed_obligations
 from tests.support.condition_source_resolution import reconcile_sources, _scope, _pointer, _catalog_identity
 
+NEW_OBJECT_PROOF_SHA256 = 'f19e45ba8e04a97d5ce8fdfb9f97d2e3567e75f11547d7baf5869149a9aa65cd'
 REVIEW_PATH = 'tests/fixtures/metadata-conditions/condition-completion-review.json'
 PROOF_PATH = 'tests/fixtures/metadata-conditions/condition-completion-proof-inputs.json.gz'
 REVIEW_SHA256 = '56fe04bfe969fdafa404184a1166002a827c702561918dcc03a7948605acff84'
@@ -172,7 +173,12 @@ def _map_fieldless_structure(rows, roots, review):
         row['source_structure'] = structure
 
 
-def definition_mapping(root):
+def definition_mapping(root, *, operation_mode='existing-object'):
+    if operation_mode == 'new-object':
+        from tests.support.new_condition_completion import expected as new_expected
+        return deepcopy(new_expected(str(root))[0])
+    if operation_mode != 'existing-object':
+        raise ValueError('Unknown installed-condition operation mode')
     fieldless_review = _fieldless_review(root)
     batch_review = _batch_exclusion_review(root)
     music_review = _music_limit_review(root)
@@ -401,6 +407,12 @@ def _expected(root_string, review_sha):
 
 def validate_mapping_attachment(descriptor, base, root, *, selected_mapping=None):
     from tests.support.condition_mechanism_reuse import _read
+    attachment = _read(descriptor, base)
+    if not isinstance(attachment, dict):
+        raise ValueError('Closed condition definition attachment must be an object')
+    if attachment.get('operation_mode') == 'new-object':
+        from tests.support.new_condition_completion import validate_attachment
+        return validate_attachment(attachment, base, root, selected_mapping=selected_mapping)
     review = _review(root); files = _proofs(str(root), REVIEW_SHA256)
     _fieldless_review(root)  # Recheck immutable inputs even after an expected-map cache hit.
     _batch_exclusion_review(root)
@@ -471,6 +483,8 @@ def _class_metadata(row, context):
 
 def witness_references(row, context):
     """Stable original proof identities, never a fabricated per-member run ID."""
+    if row.get('operation_mode') == 'new-object':
+        return []
     names = [n for n in context['review']['recipe_public_proofs'][row['recipe']]
              if n in {'time', 'bed', 'weight', 'association', 'action', 'eq', 'system-reference'}]
     return [{'original_proof_id': n + ':' + context['review']['anchors'][n]['sha256'],
@@ -479,7 +493,7 @@ def witness_references(row, context):
 
 
 def _binding(row, member, attachment):
-    categories = (() if 'approved_exclusion' in row else ('program',) if 'source_structure' in row
+    categories = (() if 'approved_exclusion' in row else ('program',) if 'source_structure' in row or row.get('operation_mode') == 'new-object'
                   else ('program', 'native', 'live_metadata'))
     result = {'branch_id': member['id'], 'native_shape_sha256': member['shape_sha256'],
         'condition_source_mapping_attachment': attachment, 'definition_occurrence': row['occurrence_id'],
@@ -488,6 +502,10 @@ def _binding(row, member, attachment):
         return {**result, 'approved_exclusion': deepcopy(row['approved_exclusion'])}
     if 'source_structure' in row:
         return {**result, 'source_structure': deepcopy(row['source_structure'])}
+    if row.get('operation_mode') == 'new-object':
+        result['public_mechanism'] = deepcopy(row['construction_correspondence'])
+        result['applicability_obligations'] = deepcopy(row['applicability_obligations'])
+        return result
     result['public_mechanism'] = {'entrypoint': 'skills/waapi-skill/scripts/run.py gateway.py',
             'operations': ['object.setProperty', 'object.setReference'],
             'identity': 'selected existing object and live discovered field handles; no invented recipient GUID',
@@ -512,6 +530,8 @@ def mapping_evidence_result(descriptor, branch, category, scope_kind, base, bind
             raise ValueError('Exact source branch owner/type/version/controller/shape differs')
         if scope_kind != 'product':
             raise ValueError('Reviewed product source definition cannot change evidence scope')
+        if row.get('operation_mode') == 'new-object' and category != 'program':
+            return 'missing', 'New-object correspondence supplies no native or recipient metadata observation'
         if row['dependencies']:
             return 'implementation_dependency', json.dumps(row['dependencies'], sort_keys=True)
         if 'approved_exclusion' in row:
@@ -527,6 +547,13 @@ def mapping_evidence_result(descriptor, branch, category, scope_kind, base, bind
             if observed is None:
                 return 'missing', 'Source definition supplies no observed recipient class or instance metadata'
             return 'reviewed_class_metadata_and_object_scope_mechanism', json.dumps(observed, sort_keys=True)
+        if category == 'program' and row.get('operation_mode') == 'new-object':
+            return 'reviewed_source_definition_and_public_mechanism', json.dumps({
+                'metadata_scope': 'source_definition',
+                'representative_public_mechanism': row['representative_public_mechanism'],
+                'program_proof': context['review']['program_proof'],
+                'applicability_obligations': row['applicability_obligations'],
+                'direct_recipient_native_effect': 'not_observed', 'new_native_runs': 0}, sort_keys=True)
         if category == 'program':
             return 'reviewed_source_definition_and_public_mechanism', ('metadata_scope=source_definition; '
                 'direct_recipient_class_metadata=not_observed; direct_recipient_instance_metadata=not_observed; '
@@ -539,14 +566,21 @@ def mapping_evidence_result(descriptor, branch, category, scope_kind, base, bind
         return 'missing', str(exc)
 
 
-def export_mapping(root, destination):
+def export_mapping(root, destination, *, operation_mode='existing-object'):
     """Add this exact source scope to existing accounting; never run a recipient."""
     destination = Path(destination); destination.mkdir(parents=True, exist_ok=True)
-    review = _review(root); _proofs(str(root), REVIEW_SHA256)
+    if operation_mode == 'new-object':
+        from tests.support.new_condition_completion import review as new_review, expected as new_expected
+        review = new_review(root)
+        mapping, branches = new_expected(str(root))
+    elif operation_mode == 'existing-object':
+        review = _review(root); _proofs(str(root), REVIEW_SHA256)
+        mapping, branches = _expected(str(root), REVIEW_SHA256)
+    else:
+        raise ValueError('Unknown installed-condition operation mode')
     _fieldless_review(root)
     _batch_exclusion_review(root)
     _music_limit_review(root)
-    mapping, branches = _expected(str(root), REVIEW_SHA256)
     def write(name, value):
         path = destination / name
         if path.exists():
@@ -554,16 +588,17 @@ def export_mapping(root, destination):
         path.write_text(json.dumps(value, sort_keys=True, indent=2) + '\n')
         return {'artifact': name, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
     attachment = write('attachment.json', {'contract': 'waapi-skill.condition-definition-attachment/v1',
+        **({'operation_mode': operation_mode} if operation_mode == 'new-object' else {}),
         'review': write('review.json', review), 'mapping': write('mapping.json', mapping)})
     bindings, policies = {}, {}
-    context = {'review': review, 'files': _proofs(str(root), REVIEW_SHA256)}
+    context = {'review': review, 'files': {} if operation_mode == 'new-object' else _proofs(str(root), REVIEW_SHA256)}
     for row in mapping['occurrences']:
-        observed = _class_metadata(row, context)
+        observed = None if operation_mode == 'new-object' else _class_metadata(row, context)
         for member in row['members']:
             identity = member['id']
             bindings[identity] = _binding(row, member, attachment)
             policies[identity] = {'native_shape_sha256': member['shape_sha256'],
-                'categories': ([] if 'approved_exclusion' in row else ['program'] if 'source_structure' in row else
+                'categories': ([] if 'approved_exclusion' in row else ['program'] if 'source_structure' in row or operation_mode == 'new-object' else
                     ['program', 'native', *(['live_metadata'] if observed else [])]),
                 'reason': ('User-approved conditional refusal of MusicPlaylistItem LoopCount when its controller is not exposed; reads and exposed-controller paths remain in scope.'
                     if row['dependency_kind'] == 'music' else
@@ -571,6 +606,8 @@ def export_mapping(root, destination):
                     if 'approved_exclusion' in row else
                     'Reviewed exact structural source group and shared scalar condition mechanism; no field, native effect or absence inferred.'
                     if 'source_structure' in row else
+                    'Exact new-object source correspondence and shared public condition mechanism; independent target/plugin applicability stays assigned; no recipient-native effect inferred.'
+                    if operation_mode == 'new-object' else
                     'Reviewed exact source definition and shared current public/native mechanism; no direct recipient observation inferred.'),
                 'definition_scope': 'source_definition', 'original_requirement_lineage': 'f72 pending proposal remains unchanged',
                 'implementation_dependencies': row['dependencies']}
@@ -586,19 +623,23 @@ def export_mapping(root, destination):
 
 
 def attach_definition_mappings(descriptors, bindings, base, root):
-    """One portable attachment adds the exact source scope, atomically."""
-    if not isinstance(descriptors, list) or len(descriptors) != 1:
-        raise ValueError('One exact complete condition definition attachment required')
-    descriptor = descriptors[0]
-    context = validate_mapping_attachment(descriptor, base, root)
+    """Import one complete attachment per mode atomically, preserving both scopes."""
+    if not isinstance(descriptors, list) or not 1 <= len(descriptors) <= 2:
+        raise ValueError('One exact complete condition definition attachment per mode required')
+    contexts = [validate_mapping_attachment(d, base, root) for d in descriptors]
+    modes = [c['mapping'].get('operation_mode', 'existing-object') for c in contexts]
+    if len(set(modes)) != len(modes):
+        raise ValueError('Duplicate condition definition operation mode')
     pending = {}
-    for row in context['mapping']['occurrences']:
-        for member in row['members']:
-            if member['id'] in bindings:
-                raise ValueError('Conflicting condition definition binding; original evidence must remain separate')
-            pending[member['id']] = _binding(row, member, descriptor)
+    for descriptor, context in zip(descriptors, contexts):
+        for row in context['mapping']['occurrences']:
+            for member in row['members']:
+                if member['id'] in bindings or member['id'] in pending:
+                    raise ValueError('Conflicting condition definition binding; original evidence must remain separate')
+                pending[member['id']] = _binding(row, member, descriptor)
     bindings.update(pending)
-    return {'review_id': context['review']['review_id'], 'exact_source_members': len(pending),
+    return {'review_id': contexts[0]['review']['review_id'] if len(contexts) == 1 else
+            [c['review']['review_id'] for c in contexts], 'exact_source_members': len(pending),
         'metadata_scope': 'source_definition', 'new_native_runs': 0}
 
 
@@ -622,7 +663,7 @@ def evaluate_definition_binding(branch, binding, policy, scope_kind, base, root,
             direct_recipient_native_effect='not_observed')
         return
     structural = 'source_structure' in context['members'][branch['id']]
-    allowed = (['program'],) if structural else (['program', 'native'], ['program', 'native', 'live_metadata'])
+    allowed = (['program'],) if structural or row.get('operation_mode') == 'new-object' else (['program', 'native'], ['program', 'native', 'live_metadata'])
     if (policy.get('native_shape_sha256') != branch['shape_sha256']
             or not policy.get('reason') or policy.get('definition_scope') != 'source_definition'
             or policy.get('categories') not in allowed):
