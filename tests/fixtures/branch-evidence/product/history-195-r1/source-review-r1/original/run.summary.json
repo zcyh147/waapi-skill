@@ -1,0 +1,12 @@
+{
+  "candidate": "59daee38fa92f4ad6610a5698be464334718585c",
+  "exit_code": 0,
+  "log_sha256": "a9e2661fe6994f9cf68a22fdf881e43f05af34a898163a888221fbd98ce5a847",
+  "original_receipt": "run.result.json",
+  "owned_processes_remaining": [],
+  "passed": 56,
+  "pytest_seconds": 47.35,
+  "skipped": 0,
+  "source_unchanged": true,
+  "status": "PASS"
+}
