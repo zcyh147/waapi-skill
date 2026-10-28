@@ -190,6 +190,47 @@ def _nested_value_paths(name, pointer):
     return []
 
 
+def _getter_correspondence(row, version):
+    """Finite getter options are forwarded; arbitrary paths stay unresolved."""
+    from wwise_waapi.soundengine_object_returns import soundengine_object_outputs
+    pointer = row['pointer']
+    section = pointer.split('/')[1]
+    outputs = soundengine_object_outputs(version)
+    if section == 'optionsSchema' and '/definitions/returnExpression/items/anyOf/1' in pointer:
+        # This single native string branch admits both direct metadata fields
+        # and dot-reference paths. A separate Authoring read hop does not
+        # establish equivalent native getter projection for all such strings.
+        return None
+    native = row.get('value') if row['kind'] == 'enum_value' and section == 'optionsSchema' else None
+    choices = [name for name, (token, output) in outputs.items() if token == native] if native else []
+    if native is not None and not choices:
+        raise ValueError('Unhandled SoundEngine native getter return choice: ' + str(native))
+    if '/definitions/objectReturn/properties/' in pointer:
+        native = pointer.split('/definitions/objectReturn/properties/', 1)[1].split('/')[0]
+        choices = [name for name, (token, output) in outputs.items() if token == native]
+        if not choices:
+            raise ValueError('Unhandled SoundEngine native getter result accessor: ' + native)
+    fields = ['outputs', 'platform', 'language'] if section == 'optionsSchema' else ['outputs']
+    if section == 'optionsSchema':
+        if '/properties/platform' in pointer:
+            fields = ['platform']
+        elif '/properties/language' in pointer:
+            fields = ['language']
+        elif '/properties/return' in pointer or '/definitions/returnExpression' in pointer:
+            fields = ['outputs']
+    return {'rule': 'forwarded_closed_getter_return_options' if section == 'optionsSchema' else 'selected_getter_result_projection',
+        'native_pointer': pointer, 'native_fields': [native] if native else [], 'public_fields': fields,
+        'public_choices': choices, 'value_paths': [],
+        'encoding': ('--include selects only versioned business choices; compiler forwards fixed native return spellings, always retains id/name; '
+            '--platform/--language forward validated literal names or GUIDs; omitted scopes preserve native defaults; '
+            'no arbitrary caller-authored return expression'
+            if section == 'optionsSchema' else
+            'requested fixed accessor values are preserved under disclosed business keys; absent requested values remain unavailable_fields; '
+            'null stays null; declared-return observations retain actual raw keys and values without alias-equivalence claims; '
+            'schema/result shape proves no runtime setter effect'),
+        **({'native_choice': row['value']} if row['kind'] in {'enum_value', 'boolean_value', 'optional_presence', 'default', 'collection_cardinality'} else {})}
+
+
 def soundengine_bindings(root, inventory):
     """Exact field joins; omit unresolved getter projection/option members."""
     from wwise_waapi.soundengine_business_contracts import soundengine_control_business_contract_data
@@ -231,9 +272,8 @@ def soundengine_bindings(root, inventory):
         for row in rows:
             pointer = row['pointer']
             section = pointer.split('/')[1]
-            if name in GETTERS and section in {'optionsSchema', 'resultSchema'}:
-                # Full options and arbitrary return accessors are not currently
-                # constructible through the closed State/Switch reader.
+            getter = _getter_correspondence(row, version) if name in GETTERS and section in {'optionsSchema', 'resultSchema'} else None
+            if name in GETTERS and section in {'optionsSchema', 'resultSchema'} and getter is None:
                 continue
             fields = sorted(origins[row['id']])
             if section == 'argsSchema':
@@ -253,7 +293,7 @@ def soundengine_bindings(root, inventory):
                 'public_route': route['public_route'], 'public_route_sha256': digest(public[route['public_route']]),
                 'input': {'gateway_argv': ['core-call' if read else 'draft-start', route['uri']],
                     'declaration': 'core-call' if read else 'draft-declare-soundengine-plan', 'selector': pointer,
-                    'correspondence': {'rule': rule, 'native_pointer': pointer, 'native_fields': fields,
+                    'correspondence': getter or {'rule': rule, 'native_pointer': pointer, 'native_fields': fields,
                         'public_fields': public_fields, 'value_paths': _nested_value_paths(name, pointer), 'encoding': encoding,
                         **({'native_choice': row['value']} if row['kind'] in {'enum_value', 'boolean_value', 'optional_presence', 'default', 'collection_cardinality'} else {})}},
                 'construction': {'source': source, 'selector': pointer},
@@ -268,7 +308,7 @@ def soundengine_gaps(inventory, bindings):
     """Retain every unresolved field as assigned work, with no exclusion credit."""
     missing = [row for row in inventory['native_coverage']['obligations'] if row['id'] not in bindings]
     return {'contract': 'waapi-skill.soundengine-mapping-gaps/v1', 'owner_issue': 195,
-        'reason': 'getState/getSwitch send options={} and project id/name only; platform/language/return options and full versioned return accessors have no closed public inputs/projection',
+        'reason': 'Native getter returnExpression string alternatives include arbitrary nested dot-reference paths. Fixed business outputs and platform/language are forwarded; a separate exact-ID Authoring read hop does not establish native getter expression equivalence. Remaining native expression members stay assigned until closed projection support or an explicit decision.',
         'disposition': 'unresolved_public_support_not_native_absence_or_approved_exclusion',
         'counts': dict(Counter(row['id'].split('|')[0] for row in missing)),
         'members': {row['id']: row['shape_sha256'] for row in missing}}
@@ -279,7 +319,8 @@ SELECTED_TESTS = {
         'test_unregister_all_prevents_late_publication_of_pending_registration'],
     'playback': ['test_seek_event_compiles_business_position_and_opaque_playing_target',
         'test_stop_all_prevents_late_publication_of_pending_playing_authority'],
-    'state-switch': ['test_state_switch_write_is_verified_by_independent_exact_scope_getter'],
+    'state-switch': ['test_state_switch_write_is_verified_by_independent_exact_scope_getter',
+        'test_state_read_selects_closed_object_outputs_and_literal_scopes'],
     'values-trigger': ['test_game_parameter_explicit_global_scope_is_distinct_from_transport_default',
         'test_state_switch_and_trigger_compile_only_from_bound_business_roles'],
     'listener-spatial': ['test_listener_spatialization_compiles_every_valid_channel_config_family',
@@ -295,7 +336,8 @@ RUNTIME_SOURCES = {
         'business_adapters', 'business_declaration_state', 'business_declarations',
         'operation_registry', 'operation_drafts', 'operation_composer', 'transactions',
         'transaction_runtime', 'transaction_cleanup', 'dispatcher', 'config',
-        'capabilities', 'execution_contracts', 'builders/schema', 'io_policy')),
+        'capabilities', 'execution_contracts', 'builders/schema', 'io_policy',
+        'soundengine_object_returns', 'object_query_outputs', 'builders/query')),
 }
 
 
