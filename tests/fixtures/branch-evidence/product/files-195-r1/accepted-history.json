@@ -1,0 +1,54 @@
+{
+  "contract": "waapi-skill.files-accepted-history/v1",
+  "records": [
+    {
+      "artifact": "historical/console184-native-batch-r1.json",
+      "sha256": "c648e9ce03837f3bc75dae22aa57f79a8cb6c71c953c2a4092c4768009b95cad",
+      "original": ".waapi-skill-state/full-coverage/console184-native-batch-r1/main-assessment.json",
+      "original_candidate": "92105b3a55a48b93173c7b7e143e6026507ed9cf",
+      "use": "retained exact scope only; original verdicts and failures preserved; not a current-candidate native receipt"
+    },
+    {
+      "artifact": "historical/console184-native-batch-r2.json",
+      "sha256": "3884119bb5cc6d280aef9f899b9ff6d2942cd452f6ab5cc147252eed3006d302",
+      "original": ".waapi-skill-state/full-coverage/console184-native-batch-r2/main-assessment.json",
+      "original_candidate": "9bf7f656ed98c9af0b2f1eff71a51e7a3ec69795",
+      "use": "retained exact scope only; original verdicts and failures preserved; not a current-candidate native receipt"
+    },
+    {
+      "artifact": "historical/console184-native-batch-r3.json",
+      "sha256": "c5f2d03c685cd04c96e8b76e7ac8a3b78804eff50819793dfeed7d95ca7e04d9",
+      "original": ".waapi-skill-state/full-coverage/console184-native-batch-r3/main-assessment.json",
+      "original_candidate": "c3451e5e64b68c62e9a238bf146be40514d0f45b",
+      "use": "retained exact scope only; original verdicts and failures preserved; not a current-candidate native receipt"
+    },
+    {
+      "artifact": "historical/soundbank183-core-files-2025-r1.json",
+      "sha256": "c7ef0fef57138bed1ef499b817c08fcc533431eb2374a7eda867e9832fa4b2e2",
+      "original": ".waapi-skill-state/full-coverage/soundbank183-core-files-2025-r1/main-assessment.json",
+      "original_candidate": "e6bb933f6e8b73b097febc9ee0b06cee29e9fac0",
+      "use": "retained exact scope only; original verdicts and failures preserved; not a current-candidate native receipt"
+    },
+    {
+      "artifact": "historical/soundbank183-external-fixed-2025-r1.json",
+      "sha256": "54d5002af82f6779fa062227a06831bbd75504ff2ebdb57675694f62680cefe5",
+      "original": ".waapi-skill-state/full-coverage/soundbank183-external-fixed-2025-r1/main-assessment.json",
+      "original_candidate": "451647cde62ee84b49cab7e8c4f674fc14dbb788",
+      "use": "retained exact scope only; original verdicts and failures preserved; not a current-candidate native receipt"
+    }
+  ],
+  "authority": [
+    "docs/plans/full-waapi-coverage/SPEC.md",
+    "docs/plans/full-waapi-coverage/tickets/09-complete-soundbank-definition-conversion-and-build-options.md",
+    "docs/plans/full-waapi-coverage/tickets/10-complete-console-project-and-file-operation-alternatives.md",
+    "docs/research/soundbank183-lightweight-closeout.md"
+  ],
+  "accepted_limits": {
+    "create": "wrapper/code-only; no further crash QA",
+    "tables": "Definition and audio TSV wrapper/code-only; retained GUID guards still required",
+    "migration": "Soundcaster audition-state reference loss accepted; original FAIL/conservative production result retained; no narrower verifier implemented",
+    "conversion": "setter/getter ambiguity and result-schema-only effects accepted; no codec GUID association or automatic scalar continuation"
+  },
+  "new_native_or_fresh": false,
+  "global_completion": false
+}
