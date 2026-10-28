@@ -156,6 +156,7 @@ def read_mapping_attachments(descriptors, requirements, read, root):
     if not isinstance(descriptors, list):
         raise ValueError('closed mapping attachment list required')
     pending, predecessors = {}, {}
+    requirements_sha256 = digest(requirements)
     for descriptor in descriptors:
         attachment = read(descriptor)
         if (not isinstance(attachment, dict)
@@ -163,7 +164,7 @@ def read_mapping_attachments(descriptors, requirements, read, root):
                                       'mechanisms', 'bindings', 'predecessors'}
                 or attachment['contract'] != 'waapi-skill.branch-mapping-attachment/v1'
                 or attachment['scope_kind'] not in {'product', 'controlled'}
-                or attachment['requirements_sha256'] != digest(requirements)
+                or attachment['requirements_sha256'] != requirements_sha256
                 or not isinstance(attachment['mechanisms'], list) or not attachment['mechanisms']
                 or len(set(attachment['mechanisms'])) != len(attachment['mechanisms'])
                 or not isinstance(attachment['bindings'], dict) or not attachment['bindings']
