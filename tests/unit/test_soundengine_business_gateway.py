@@ -108,7 +108,7 @@ def test_operations_catalog_lists_all_soundengine_business_routes(
         "post one exact message to the runtime Profiler Capture Log"
     )
     assert all_rows["ak.wwise.core.log.addItem"]["intent"] == (
-        "add one message to a named Authoring Log view"
+        "add one message to a named Wwise Log view"
     )
     assert payload["request_schema_command_template"] == [
         "request-schema",
