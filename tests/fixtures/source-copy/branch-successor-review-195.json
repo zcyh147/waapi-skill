@@ -2810,7 +2810,7 @@
         ],
         "path": "skills/waapi-skill/wwise_waapi/object_capabilities.py",
         "prior_causal_sha256": "174edce4089ae486b1acff3bcafbf3b7134b033105e32a741c6c910051eb394f",
-        "source_relevance": "Parent compatibility gains source-backed ControlSurfaceSession/SidechainMix and display-only predicates are exact four-class/version/shape checks. Source/Sound identity and Source transfer parent compatibility retain their old branch; no generic NEW class factory authority inferred."
+        "source_relevance": "Parent admission adds ControlSurfaceSession\u2192ControlSurfaceBindingGroup and ControlSurfaceBindingGroup\u2192BindingGroup/Binding placement, Query\u2192SearchCriteria and Event\u2192Action, plus inverse WorkUnit/Query/SearchCriteria/ControlSurfaceBindingGroup/ControlSurfaceBinding/Action parent constraints. Copy/move explicitly refuses ControlSurfaceSession/BindingGroup parents. Bounded display-only predicates select exactly Language/UserProjectSettings/MidiParameter/2025MediaPoolQuery shapes. Source/Sound identity and Source-transfer parent compatibility retain their existing branch; no generic NEW-class factory authority or SidechainMix delta is inferred."
       },
       {
         "admission_basis": "Retained0991 causal chain plus inspected finite incremental diff0991\u2192386 and relevant reviewed implementation provenance; no historical execution restamp.",
