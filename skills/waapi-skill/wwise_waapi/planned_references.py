@@ -179,7 +179,7 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, refere
             if path in selected:
                 raise ObjectOperationContractError("PLANNED_REFERENCE_TARGET_UNAVAILABLE", "Unnamed RTPC result has no source-proven native reference expression")
             info = resolve_type(node)
-            fact = {"result_handle": paths[path], "request_path": path, "path": None, "name": node.name,
+            fact = {"result_handle": paths[path], "request_path": path, "path": None, "name": "" if node.type == "Action" else node.name,
                 "type": node.plugin.object_type if node.plugin is not None else info.name, "class_name": info.name,
                 "class_id": info.class_id, "parent_identity": parent_identity,
                 "relation": "parent" if node.type == "Action" else "owner", **({"rtpc_property": node.rtpc.property} if node.rtpc is not None else {})}

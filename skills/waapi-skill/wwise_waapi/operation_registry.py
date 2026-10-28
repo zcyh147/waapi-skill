@@ -8908,11 +8908,13 @@ def _prepare_object_node_specs(
         if type_info.name == "Action":
             from .action_construction import authority
             source = authority(version)
-            if (type_info.class_id != source['class_id'] or node.name != '' or node.children
+            if (type_info.class_id != source['class_id'] or node.children
                     or type(next((field.value for field in node.properties if field.name == 'ActionType'), None)) is not int
                     or not any(field.name == 'Target' and field.target is not None for field in node.references)):
                 raise OperationContractError('ACTION_CONSTRUCTOR_FIELDS_REQUIRED', 'Action construction requires its exact class, empty native name, selected ActionType and bound Target')
             spec['action_constructor'] = source
+            spec['action_declaration_label'] = node.name
+            spec['requested_name'] = ''
             if node.parent_request_path is None and root_parent is not None:
                 fields = ['id', 'name', 'type', 'path', 'classId', 'parent', 'notes', 'ActionType', 'Target']
                 parent_fields = ['id', 'name', 'type', 'path', 'classId']
@@ -10637,6 +10639,11 @@ def _materialize_canonical_object_node(
         if native_nodes is not None:
             native_nodes[current.request_path] = row
         row["type"] = canonical_types[current.request_path]
+        if row['type'] == 'Action':
+            # The source-certified constructor owns this name. The canonical
+            # request retains its nonempty task-local declaration label.
+            row['name'] = ''
+
         if current.language is not None and current.import_arg is None and row["type"] == "Sound":
             # A no-media Voice language is a validated Gateway context, not a
             # native Sound field. 2025.1 rejects it here: "Language can only be

@@ -95,6 +95,9 @@ def test_new_action_uses_discovered_fields_empty_name_and_exact_parent(tmp_path,
     tx = previewed['transaction_id']
     code, shown = task.run('transaction-show', tx)
     assert code == 0, shown
+    request = shown['artifact']['request']['arguments']
+    request_node = request if operation == 'object.create' else request['objects'][0]['children'][0]
+    assert request_node['name'] == 'play-rain-local-label'
     dispatch = shown['artifact']['prepared_operation']['dispatch']
     node = dispatch['args'] if operation == 'object.create' else dispatch['args']['objects'][0]['children'][0]
     assert node['name'] == '' and node['type'] == 'Action'

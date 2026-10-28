@@ -1387,7 +1387,7 @@ class _NormalizationState:
         anonymous = mapping.get("anonymous", False)
         if type(anonymous) is not bool or (anonymous and ((collection, object_type) not in {("Effects", "EffectSlot"), ("Markers", "Marker")} or mapping.get("name") != "")):
             raise ObjectOperationContractError("ANONYMOUS_LIST_PLACEMENT_INVALID", "Blank names require a certified anonymous List member placement")
-        name = "" if anonymous or object_type == "Action" and mapping.get("name") == "" else _bounded_token(
+        name = "" if anonymous else _bounded_token(
             mapping.get("name"),
             path=f"{request_path}.name",
             max_length=self.limits.max_name_length,

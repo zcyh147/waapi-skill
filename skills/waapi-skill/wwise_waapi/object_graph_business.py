@@ -530,7 +530,7 @@ def _compile_action_constructor(session, declaration, node):
             or target.get('kind') != 'id' or not str(target.get('value', '')).startswith('{')):
         raise _repair(session, 'ACTION_CONSTRUCTOR_FIELDS_REQUIRED', field='field_values',
             action='discover ActionType and Target on the selected Action Type Handle; choose one live enum value and one bound existing target')
-    node['name'] = ''
+    # Keep the task-local label in the canonical request; Registry owns the native empty name.
 
 
 def _compile_graph_field_reference(session: BusinessDeclarationSession, field: Any, value: Any, *,
