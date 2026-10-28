@@ -506,3 +506,28 @@ in the existing coverage reader without hiding unrelated unresolved members.
 The separate MusicPlaylistItem controller question remains assigned. #174 and
 #195 remain open; #194 has completed its routing/harness closeout with zero
 additional Fresh runs.
+
+## User-approved Music Playlist hidden-dependency boundary — 2026-10-28
+
+For a MusicPlaylistItem LoopCount change, retain reads but clearly refuse the
+change when the required condition controller is not exposed by the applicable
+metadata. Do not invent IsLoopingInfinite or infer its value from LoopCount.
+The user accepts this bounded interface limitation and requests no further
+underlying accessor investigation or native experiments for it.
+
+The retained Wwise 2025.1.7.9143 observation establishes that LoopCount is
+readable, its metadata requires IsLoopingInfinite=false, the exact instance
+field inventory omits that controller, and isPropertyEnabled returns false.
+This observation is not a claim that all other versions reject the field.
+Apply the missing-dependency refusal conditionally in each supported version;
+preserve any version's exposed, supported path. Ordinary Sound looping and
+other Music Playlist fields remain in scope.
+
+Reconcile the 15 existing MusicPlaylistItem condition members against this
+explicit limitation while preserving their exact versioned definitions and
+the original diagnostic records. Record accepted limitation coverage separately
+from native absence, writable-field proof and successful mutation evidence.
+#195 must verify the public refusal and retained read behavior through focused
+code tests. No new Fresh or native run is authorized or required for this
+decision. This resolves the Music controller question left open above; the
+remaining integrated coverage and final gates are still required.
