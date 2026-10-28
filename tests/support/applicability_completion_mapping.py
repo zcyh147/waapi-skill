@@ -16,10 +16,10 @@ from tests.maintenance.branch_coverage_audit import digest, load
 from tests.maintenance.branch_audit_completion import installed_obligations
 
 VERSIONS = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
-PROOF_PATH = 'tests/fixtures/metadata-conditions/applicability-current-program-r3.json.gz'
-PROOF_SHA256 = 'c64be70da744547e538f3faccac069ce04e4d4ea7c2239c6baf43f9cb508dec7'
-PREVIOUS_PROOF = {'path': 'tests/fixtures/metadata-conditions/applicability-current-program-r2.json.gz',
-    'sha256': 'b9c02c7d9e3752dd4c99472cd63365798f3ae6782e603af76ae9fc38e6b0e09d'}
+PROOF_PATH = 'tests/fixtures/metadata-conditions/applicability-current-program-r4.json.gz'
+PROOF_SHA256 = '4bbd106619b52f5dc916d4b64617d8286f1fe9911ab2ef62ffdd8ff888d39bcd'
+PREVIOUS_PROOF = {'path': 'tests/fixtures/metadata-conditions/applicability-current-program-r3.json.gz',
+    'sha256': 'c64be70da744547e538f3faccac069ce04e4d4ea7c2239c6baf43f9cb508dec7'}
 SNAPSHOT = 'tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz'
 SDK_PATH = 'tests/fixtures/metadata-conditions/applicability-sdk-sources.json.gz'
 SDK_SHA256 = '646336b2e4cb7324831d6a8b5c4be5b00417764eaf044adeccb6719ddd2a771b'
@@ -94,7 +94,7 @@ def sdk_sources(root):
 def definition_mapping(root):
     """Keep every independent ID/shape and join only source-supported paths."""
     root = Path(root)
-    from wwise_waapi.documented_list_fields import load_catalog
+    from wwise_waapi.documented_list_fields import field_evidence, load_catalog
     from wwise_waapi.object_graph_business_contracts import object_graph_business_contract_data
     from wwise_waapi.operation_plugin import PLUGIN_TYPE_CATEGORIES, PLUGIN_SHARESET_HIERARCHIES
     trees = _sources(root)
@@ -131,9 +131,11 @@ def definition_mapping(root):
         published_lists = defaultdict(list)
         for owner in catalog['classes']:
             for field in owner['lists']:
+                source = field_evidence(catalog, owner, {'scope_kind': 'class',
+                    'scope_value': owner['class_id'], 'class_id': owner['class_id']}, field)
                 for element in field['element_classes']:
                     published_lists[element['class_id']].append({'owner': owner['name'], 'owner_class_id': owner['class_id'],
-                        'list': field['name'], 'source_member': owner['source_member'], 'source_sha256': owner['source_sha256'],
+                        'list': field['name'], 'source_member': source['source_member'], 'source_sha256': source['source_sha256'],
                         'catalog_sha256': catalog['catalog_sha256'], 'element_class': element})
         branches = [b for b in installed_obligations(root, digest=digest, load=load)
             if b['kind'] in {'target_applicability', 'plugin_topology'} and b['version'] == version]
@@ -205,7 +207,7 @@ def definition_mapping(root):
             elif published_lists.get(d.get('class_id')):
                 row['correspondence'] = {'path': 'owned_list_constructor', 'operations': ['object.create', *([] if version == '2021.1' else ['object.set'])],
                     'owners': published_lists[d['class_id']],
-                    'admission': 'exact scoped List Field Handle, allowed element class, explicit constructor fields and actual owner/membership verification; no hierarchy inference'}
+                    'admission': 'exact existing owner and scoped List Field Handle, allowed element class, explicit constructor fields and actual owner/membership verification; no arbitrary hierarchy or nested planned-owner construction inferred'}
             elif name in {'AudioSource', 'AudioFileSource', 'MidiFileSource'}:
                 row['correspondence'] = {'path': 'media_import_created_source', 'operations': ['audio.import'],
                     'admission': 'closed import destination and owned media; selected language/owner identity and exact source verification, not an ordinary empty hierarchy constructor'}
@@ -287,7 +289,7 @@ def program_review(root):
     if hashlib.sha256(raw).hexdigest() != PROOF_SHA256:
         raise ValueError('Exact installed applicability public program proof differs')
     proof = json.loads(gzip.decompress(raw))
-    expected = {'existing-fields', 'list-2021', 'list-2025', 'rtpc', 'randomizer', 'plugin-factory-boundary-2021',
+    expected = {'existing-fields', 'list-2021', 'list-2025', 'list-set-2022', 'list-set-2025', 'rtpc', 'randomizer', 'plugin-factory-boundary-2021',
         'source-2022.1', 'source-2025.1', 'local-metadata-2022', 'local-metadata-2025',
         *['hierarchy-' + v for v in VERSIONS], *['media-' + v for v in ('2021.1', '2025.1')],
         *[kind + '-' + v for kind in ('effect-shareset', 'effect-owner', 'sink', 'metadata') for v in ('2022.1', '2025.1')],
@@ -314,6 +316,7 @@ def program_review(root):
     return {'review_id': 'installed-class-mode-applicability-r1', 'program_proof': {'path': PROOF_PATH, 'sha256': PROOF_SHA256},
         'current_sources': proof['sources'], 'strength': 'source_definition_and_representative_public_code_mechanism',
         'native_effect': 'not_observed', 'per_class_execution': False,
+        'classification_validation': 'current definition_mapping and portable reader validation; not executed by the historical public-runtime producer',
         'predecessor': PREVIOUS_PROOF,
         'owner_effect_strength': proof['owner_effect_strength'], 'codec_strength': proof['codec_strength']}
 

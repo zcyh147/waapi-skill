@@ -126,3 +126,28 @@ def test_attachment_import_is_atomic_and_never_grants_native_credit(tmp_path):
         with pytest.raises(ValueError):
             attach_mappings(descriptors, retained, tmp_path, ROOT)
         assert retained == before
+
+
+def test_overlaid_list_correspondence_cites_exact_installed_xml_field():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    source = json.loads((ROOT / 'skills/waapi-skill/resources/metadata/2021.1/installed-owned-list-fields.json').read_bytes())
+    mapping = definition_mapping(ROOT)
+    music = next(r for r in mapping['rows'] if r['version'] == '2021.1'
+        and r['class_name'] == 'MusicClipMidi' and r['operation_mode'] == 'new-object')
+    owner, = music['correspondence']['owners']
+    declaration, = [r for r in source['rows'] if r['owner_class_id'] == owner['owner_class_id']
+        and r['field']['name'] == owner['list']]
+    assert owner['source_member'] == declaration['source_member']
+    assert owner['source_sha256'] == source['source']['sha256']
+    assert not owner['source_member'].endswith('.html')
+
+
+def test_shared_program_source_closure_includes_invoked_gateway_helpers():
+    from tests.support.applicability_program import program_sources
+    sources = program_sources(ROOT)
+    assert {'tests/conftest.py', 'tests/unit/test_legacy_owned_list_gateway.py',
+        'tests/unit/test_new_object_conditions_gateway.py',
+        'tests/unit/test_object_graph_owned_choices_gateway.py',
+        'tests/unit/test_field_interface_closure_gateway.py',
+        'tests/unit/test_plugin_shareset_gateway.py',
+        'tests/unit/test_plugin_kind_placements_gateway.py'} <= sources.keys()

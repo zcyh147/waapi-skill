@@ -1,4 +1,11 @@
-"""Sealed selected public code mechanisms; no native recipient credit."""
+"""Sealed selected public runtime mechanisms; no native recipient credit.
+
+The producer imports only PREVIOUS_PROOF data from the mapper. It does not call
+installed_obligations, the accounting digest or portable _read to select inputs.
+That classifier/consumer runs separately against current sources in the ordinary
+portable-join tests; this historical capture does not certify its execution.
+The mapper file is retained as an extra sealed source, not an executed reader.
+"""
 import ast
 import hashlib
 from pathlib import Path
@@ -16,17 +23,25 @@ def program_sources(root):
         'tests/fixtures/metadata-conditions/applicability-sdk-sources.json.gz',
         'tests/fixtures/metadata-conditions/applicability-current-program.json.gz',
         'tests/fixtures/metadata-conditions/applicability-current-program-r2.json.gz',
+        'tests/fixtures/metadata-conditions/applicability-current-program-r3.json.gz',
         *['tests/_org/' + v + '/SampleProject.wproj' for v in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')]})
-    pending = ['tests/unit/test_applicability_public_program.py']
+    pending = ['tests/unit/test_applicability_public_program.py', 'tests/conftest.py']
     while pending:
         name = pending.pop()
         if name in selected:
             continue
         selected.add(name)
         for node in ast.walk(ast.parse((root / name).read_bytes())):
+            modules = []
             if isinstance(node, ast.ImportFrom) and node.module:
-                dependency = (node.module.replace('.', '/') + '.py' if node.module.startswith('tests.')
-                    else 'tests/unit/' + node.module + '.py' if node.module.startswith('test_') else None)
+                # Both `from tests.unit import helper` and imports of one
+                # concrete module execute helper code in the selected flows.
+                modules = [node.module, *[node.module + '.' + alias.name for alias in node.names]]
+            elif isinstance(node, ast.Import):
+                modules = [alias.name for alias in node.names]
+            for module in modules:
+                dependency = (module.replace('.', '/') + '.py' if module.startswith('tests.')
+                    else 'tests/unit/' + module + '.py' if module.startswith('test_') else None)
                 if dependency and (root / dependency).is_file():
                     pending.append(dependency)
     result = {}

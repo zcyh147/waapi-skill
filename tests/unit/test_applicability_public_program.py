@@ -74,6 +74,10 @@ def test_representative_applicability_public_mechanisms(tmp_path, monkeypatch, r
             version, 'ModulatorTime', 50)
     run('list-2021', legacy_lists.test_legacy_source_list_create_verifies_actual_class_owner_and_membership,
         'MusicSegment', 'MusicCue', 'Cues')
+    for version, owner, member, collection in [('2022.1', 'MusicTrackSequence', 'MusicClipMidi', 'Clips'),
+            ('2025.1', 'MusicSegment', 'MusicStinger', 'Stingers')]:
+        run('list-set-' + version[:4], legacy_lists.test_source_owned_music_set_reaches_verified_exact_list_insertion,
+            version, owner, member, collection)
     run('list-2025', lists.test_documented_list_handle_places_created_root_and_verifies_native_class_owner_and_preservation,
         'fail', None)
     run('existing-fields', existing.test_property_draft_discovers_opaque_field_and_materializes_business_value, 'meaning')
