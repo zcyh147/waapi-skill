@@ -1,0 +1,135 @@
+{
+  "candidate": "92105b3a55a48b93173c7b7e143e6026507ed9cf",
+  "raw_outcomes": {
+    "FAIL": 5,
+    "BLOCKED": 1
+  },
+  "cases": [
+    {
+      "case": "A-cli-create",
+      "raw_outcome": "FAIL",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r1/A-cli-create/pytest/gateway-workflows-2024-10/state/console184-cli-create.json",
+      "receipt_sha256": "6804709bab1e53167d8d49929a25fab536b38ecd109ad1030ea5def17f4545ea",
+      "receipt_hash_matches": true,
+      "transaction_states": [
+        {
+          "artifact_hash": "ec6da4750cee983b566e9f17b1a434045d9d9fdc2437bd6df37d8a306025daf7",
+          "event_sequence": 5,
+          "state": "indeterminate",
+          "transaction_id": "tx1-bhpe3zxxysameqb1tnnc"
+        }
+      ],
+      "source_unchanged": true,
+      "process_cleanup": "cleaned",
+      "residual_processes": [],
+      "quarantine": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-f58f33f1bc7748ba91a262b57d6e01b6"
+    },
+    {
+      "case": "B-create-close",
+      "raw_outcome": "FAIL",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r1/B-create-close/pytest/gateway-workflows-2025-10/state/console184-create-close.json",
+      "receipt_sha256": "591d77f402abe3ff162c5f7e715c633be66753bed1994627f31af5b5c657c5b1",
+      "receipt_hash_matches": true,
+      "transaction_states": [
+        {
+          "artifact_hash": "fa573aa289a60d3f784724ff2a5a392e14df46baa70de16cbbd32738ec0e4c57",
+          "event_sequence": 6,
+          "state": "verification_failed",
+          "transaction_id": "tx1-84rradjqbt7gq93kpzs8"
+        }
+      ],
+      "source_unchanged": true,
+      "process_cleanup": "cleaned",
+      "residual_processes": [],
+      "quarantine": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-ea02157132a047d6bb9f4548a96c8b4d"
+    },
+    {
+      "case": "C-add-copy",
+      "raw_outcome": "FAIL",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r1/C-add-copy/pytest/gateway-workflows-2025-10/state/console184-add-copy.json",
+      "receipt_sha256": "35768a9afb010d7403aca3b03172a71eecd9937f755a5a599d242d6663a39057",
+      "receipt_hash_matches": true,
+      "transaction_states": [
+        {
+          "artifact_hash": "0820d66bbe97e2e2a9d59bfb4a847ba2a1b18fc42fe429d137e85b1546ab3629",
+          "event_sequence": 6,
+          "state": "verification_failed",
+          "transaction_id": "tx1-a2pjy4fy3wmd6je634r3"
+        },
+        {
+          "artifact_hash": "09838fd3136fb25d709461676a022fc3b46676e026ff8f27582242dd72911b5f",
+          "event_sequence": 6,
+          "state": "result_schema_checked",
+          "transaction_id": "tx1-pke5fwbr3gnns6g73axp"
+        }
+      ],
+      "source_unchanged": true,
+      "process_cleanup": "cleaned",
+      "residual_processes": [],
+      "quarantine": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-183b6d8117de4699bd1b3691d7fef38e"
+    },
+    {
+      "case": "E-media-back",
+      "raw_outcome": "FAIL",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r1/E-media-back/pytest/gateway-workflows-2025-10/state/console184-media-back.json",
+      "receipt_sha256": "1785b559fdf0be2d3dd29c67cb8092cb11595bc0a40808043f622275a0489359",
+      "receipt_hash_matches": true,
+      "transaction_states": [
+        {
+          "artifact_hash": "b4e9454a51f80d5846fa0b29ffc93d692970736cd5d2fd0b831e5c67a1c105e9",
+          "event_sequence": 6,
+          "state": "result_schema_checked",
+          "transaction_id": "tx1-bbr2x60hy0j06eeqere2"
+        },
+        {
+          "artifact_hash": "086aae49e7952ceea7007e809665eedcb664cfd168bcf2bf18623b4f62833264",
+          "event_sequence": 6,
+          "state": "verification_failed",
+          "transaction_id": "tx1-m91shhyzds1kzdt1yfd6"
+        }
+      ],
+      "source_unchanged": true,
+      "process_cleanup": "cleaned",
+      "residual_processes": [],
+      "quarantine": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-7bed4afae460466f80358655f388413c"
+    },
+    {
+      "case": "F-media-refresh",
+      "raw_outcome": "FAIL",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r1/F-media-refresh/pytest/gateway-workflows-2025-10/state/console184-media-refresh.json",
+      "receipt_sha256": "b71106c05ead1c745413857e4d760302677a8eb713a93a6e432932fde82f1389",
+      "receipt_hash_matches": true,
+      "transaction_states": [
+        {
+          "artifact_hash": "3f2e1109a80a7bfa039292962923670b3b267cb0d56e330dae23aa3854e5da9c",
+          "event_sequence": 6,
+          "state": "result_schema_checked",
+          "transaction_id": "tx1-gmhgwt9jtm1b5h993cr4"
+        },
+        {
+          "artifact_hash": "8537bfcdc28a1f88097f734b6269b54f6fa4a60956b088b8a2ae67e911374693",
+          "event_sequence": 5,
+          "state": "indeterminate",
+          "transaction_id": "tx1-wk7zhfgmz2y2tjnr62k1"
+        }
+      ],
+      "source_unchanged": true,
+      "process_cleanup": "cleaned",
+      "residual_processes": [],
+      "quarantine": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-df0ebd028af24a818ab1c82f3be5507e"
+    }
+  ],
+  "blocked_case": {
+    "case": "D",
+    "candidate": "92105b3a55a48b93173c7b7e143e6026507ed9cf",
+    "status": "BLOCKED",
+    "native_started": false,
+    "reason": "A CLI creation ended in indeterminate execution/FAIL; no finalized PASS donor manifest is available. No reuse or regrading of A.",
+    "depends_on": "A-cli-create/category.jsonl"
+  },
+  "transactions_executed": 8,
+  "target_attempts": 5,
+  "setup_saves": 3,
+  "no_regrading": true,
+  "next_action": "Consolidated read-only failure diagnosis; repair proven wrapper/oracle and evidence-retention defects before any new targeted native attempt. No table-import native or Fresh tests."
+}

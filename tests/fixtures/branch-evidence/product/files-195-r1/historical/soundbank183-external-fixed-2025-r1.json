@@ -1,0 +1,60 @@
+{
+  "candidate": "451647cde62ee84b49cab7e8c4f674fc14dbb788",
+  "raw_outcome": "PASS",
+  "pytest": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "1",
+    "time": "4.762",
+    "timestamp": "2026-10-27T05:50:35.745973+08:00",
+    "hostname": "xiyes-Mac-mini.local"
+  },
+  "native_host": "macOS WwiseConsole 2025.1.7.9143",
+  "transaction_id": "tx1-bbdzr3ypf6wndr8b83rf",
+  "transaction_count": 1,
+  "gateway_status": "verified",
+  "independent_effect_verified": true,
+  "artifact": {
+    "contract": "waapi-skill.regular-file-proof/v1",
+    "path": "/private/tmp/sb183fx/gateway-workflows-16e1f925fa2340c3866c5d0db0bddef9/prelaunch-io/external/Windows/CoreWitness/external.wem",
+    "size": 1696,
+    "sha256": "765f0b49ad5beb63011b7bf4f996a780dbe4dff0dd24a6bbfa0fc649c7081c5b",
+    "mtime_ns": 1793051440025316227,
+    "device": 16777232,
+    "inode": 343317393,
+    "proof_sha256": "8c78df9be384c411a17df1043e4fa11296d21667ade07836f56f395c895ef686"
+  },
+  "diagnostics_complete": true,
+  "capture_errors": [],
+  "expected_relative_path": "prelaunch-io/external/Windows/CoreWitness/external.wem",
+  "changed_wem_files": [
+    {
+      "relative_path": "prelaunch-io/external/Windows/CoreWitness/external.wem",
+      "file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/private/tmp/sb183fx/gateway-workflows-16e1f925fa2340c3866c5d0db0bddef9/prelaunch-io/external/Windows/CoreWitness/external.wem",
+        "size": 1696,
+        "sha256": "765f0b49ad5beb63011b7bf4f996a780dbe4dff0dd24a6bbfa0fc649c7081c5b",
+        "mtime_ns": 1793051440025316227,
+        "device": 16777232,
+        "inode": 343317393,
+        "proof_sha256": "8c78df9be384c411a17df1043e4fa11296d21667ade07836f56f395c895ef686"
+      }
+    }
+  ],
+  "source_hash_unchanged": true,
+  "source_tree_metadata_unchanged": true,
+  "source_project_mtime_unchanged": true,
+  "input_preservation_verified": true,
+  "residual_state": {
+    "process_cleanup": "cleaned",
+    "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-1c5f14446e73405f917a60847a43ddd1",
+    "residual_processes": [],
+    "sandbox": "deleted",
+    "sandbox_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-1c5f14446e73405f917a60847a43ddd1"
+  },
+  "observation_sha256": "8ccd32a36183f03b4859cbf30d82dac4292f7eb9f7bdc70977301c5bcb473047",
+  "scope": "One omitted-output external-source conversion at configured Project platform output path. No rerun of earlier audio.convert/temporary-bank effects. No blank/default/custom-platform native claim; prior FAILs remain unchanged."
+}

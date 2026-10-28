@@ -1,0 +1,74 @@
+{
+  "candidate": "e6bb933f6e8b73b097febc9ee0b06cee29e9fac0",
+  "native_host": "macOS WwiseConsole 2025.1.7.9143",
+  "raw_pytest_outcome": "FAIL",
+  "pytest": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "1",
+    "skipped": "0",
+    "tests": "1",
+    "time": "7.686",
+    "timestamp": "2026-10-27T05:17:36.347576+08:00",
+    "hostname": "xiyes-Mac-mini.local"
+  },
+  "phase_outcomes": [
+    {
+      "phase": "configured_audio_conversion",
+      "transaction_id": "tx1-exynm7d0hygz3gtp0vrp",
+      "executed": true,
+      "gateway_status": "result_schema_checked",
+      "independent_effect_verified": true,
+      "artifact": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/private/tmp/sb183cf/gateway-workflows-2054e8fbde684906a336c7f4931d1e89/prelaunch-io/cache/7B/{7BD5FEC6-1C3C-CA71-CEDA-00BDD9925EED}.wem",
+        "size": 11230,
+        "sha256": "56fa957ec1c90b60d78e19e7078d1a55a52da3a00f810a151c706ba3e81a8b0c",
+        "mtime_ns": 1793049462323021106,
+        "device": 16777232,
+        "inode": 343163794,
+        "proof_sha256": "f353dc5e2dc458fd7e3052c879285202445dbfee810024c18de3d1eca24c9f6f"
+      }
+    },
+    {
+      "phase": "temporary_bank_file",
+      "transaction_id": "tx1-2hf12vg4581chhn9henq",
+      "executed": true,
+      "gateway_status": "verified",
+      "independent_effect_verified": true,
+      "artifact": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/private/tmp/sb183cf/gateway-workflows-2054e8fbde684906a336c7f4931d1e89/prelaunch-io/soundbanks/Windows/Core_Witness_8cf94c035275.bnk",
+        "size": 34308,
+        "sha256": "4a1e6d5d246bf139e0bae09841059563d994c65335c538df98cee0fc83abfe5c",
+        "mtime_ns": 1793049462816185530,
+        "device": 16777232,
+        "inode": 343163848,
+        "proof_sha256": "cb6edde6a8f848097626dddadaea00a4c6034fe4b704d5114c207f964a8935b7"
+      }
+    },
+    {
+      "phase": "external_conversion_native_output_default",
+      "transaction_id": "tx1-ke2kdxxxrjv8qhbj9tj7",
+      "executed": true,
+      "gateway_status": "verification_failed",
+      "independent_effect_verified": false,
+      "artifact": null
+    }
+  ],
+  "source_hash_unchanged": true,
+  "source_tree_metadata_unchanged": true,
+  "source_project_mtime_unchanged": true,
+  "input_preservation_verified": true,
+  "residual_state": {
+    "process_cleanup": "cleaned",
+    "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-a0e4618e64274fd982fdde12618775b4",
+    "residual_processes": [],
+    "sandbox": "quarantined",
+    "sandbox_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-a0e4618e64274fd982fdde12618775b4"
+  },
+  "observation_sha256": "ac7541f885fa4048c245b11566341daf4b2d2147e0d59f7dea839bbff1819d09",
+  "original_category_rows_sha256": "1ef051e6de1523301b8e4c786739dfecacf896232891324dc406a2e063e29bee",
+  "acceptance": "First two independent effect categories retain their scoped PASS facts; whole selected node remains FAIL. External omitted-output conversion executed but business effect not verified. No replay or regrading.",
+  "next_action": "Read-only retained-evidence diagnosis; if a repair requires native validation, select only the external conversion mechanism in a fresh root."
+}

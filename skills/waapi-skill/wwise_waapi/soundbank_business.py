@@ -194,8 +194,10 @@ def _materialize_generate(
 ) -> dict[str, Any]:
     source = _exact_fields(
         plan,
-        required={"soundbanks", "platforms", "io_root"},
+        required={"soundbanks", "io_root"},
         optional={
+            "platforms",
+            "all_platforms",
             "write_to_disk",
             "skip_languages",
             "all_user_soundbanks",
@@ -299,17 +301,20 @@ def _materialize_generate(
                 )
             ]
         banks.append(row)
-    platforms = [
-        _text(value, field="platforms")
-        for value in _bounded_sequence(
-            source["platforms"],
-            field="platforms",
-            maximum=16,
-        )
-    ]
+    if "all_platforms" in source:
+        if source["all_platforms"] is not True or "platforms" in source:
+            _error("BUSINESS_VALUE_INVALID", "all_platforms", "choose all configured platforms or one explicit platform list")
+        platform_scope: dict[str, Any] = {"all_platforms": True}
+    else:
+        if "platforms" not in source:
+            _error("BUSINESS_VALUE_INVALID", "platforms", "select platforms or explicitly choose all configured platforms")
+        platform_scope = {"platforms": [
+            _text(value, field="platforms")
+            for value in _bounded_sequence(source["platforms"], field="platforms", maximum=16)
+        ]}
     arguments: dict[str, Any] = {
         "soundbanks": banks,
-        "platforms": platforms,
+        **platform_scope,
         "io_root": _text(source["io_root"], field="io_root"),
     }
     overrides = []

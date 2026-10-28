@@ -58,6 +58,7 @@ def add_soundbank_plan_arguments(parser: argparse.ArgumentParser) -> None:
         metavar=("SOUNDBANK_HANDLE", "TRUE_OR_FALSE"),
     )
     parser.add_argument("--platform", action="append", default=[])
+    parser.add_argument("--all-platforms", action="store_true", default=None)
     parser.add_argument("--temporary-soundbank", action="append", nargs=2, default=[],
                         metavar=("NAME", "ARTIFACT_EXPECTATION"))
     parser.add_argument("--all-user-soundbanks", choices=("nonlocalized", "localized", "mixed"))
@@ -115,6 +116,7 @@ def soundbank_plan_from_namespace(
         "generation_inclusion",
         "soundbank_rebuild",
         "platform",
+        "all_platforms",
         "language",
         "rebuild_soundbanks",
         "clear_audio_file_cache",
@@ -145,6 +147,7 @@ def soundbank_plan_from_namespace(
             "generation_inclusion",
             "soundbank_rebuild",
             "platform",
+            "all_platforms",
             "language",
             "rebuild_soundbanks",
             "clear_audio_file_cache",
@@ -270,6 +273,11 @@ def soundbank_plan_from_namespace(
             "platforms": list(args.platform),
             "io_root": args.io_root,
         }
+        if args.all_platforms:
+            if args.platform:
+                raise SoundBankBusinessCliError("all-platforms cannot be combined with selected platforms")
+            del plan["platforms"]
+            plan["all_platforms"] = True
         if args.language:
             plan["languages"] = list(args.language)
         if args.all_languages:

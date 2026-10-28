@@ -1,0 +1,202 @@
+{
+  "candidate": "9bf7f656ed98c9af0b2f1eff71a51e7a3ec69795",
+  "raw_outcomes": {
+    "PASS": 3,
+    "FAIL": 2,
+    "BLOCKED": 1
+  },
+  "target_attempts": 5,
+  "setup_saves": 3,
+  "transactions_executed": 8,
+  "cases": [
+    {
+      "case": "A-cli-create",
+      "raw_outcome": "FAIL",
+      "seconds": "18.506",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r2/A-cli-create/pytest/gateway-workflows-2024-10/state/console184-cli-create.json",
+      "receipt_sha256": "3fe73b52dea9295e9b5f7ca43fb1b2cbef4abdda7cf441d31c2376fab3e325a0",
+      "receipt_hash_matches": true,
+      "transactions": [
+        {
+          "artifact_hash": "de5043d28af9556d0e97067b7a1db2eac79fdbd927728a46d1bfeda00f083d15",
+          "event_sequence": 5,
+          "state": "indeterminate",
+          "transaction_id": "tx1-ge4enx6qe6xwvyc14bpk"
+        }
+      ],
+      "source_unchanged": true,
+      "cleanup": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-80427ad28df9446e89248eab8da52a55",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-80427ad28df9446e89248eab8da52a55"
+      },
+      "created_output": {
+        "requested_project": "/private/tmp/c184ar2/gateway-workflows-23c3ea5f93214ed7a0142d9581963dd9/Blank2024/Blank2024.wproj",
+        "api": "ak.wwise.cli.createNewProject",
+        "transaction_id": "tx1-ge4enx6qe6xwvyc14bpk",
+        "captured_before_verification": true,
+        "target_tree": {
+          "manifest_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r2/A-cli-create/pytest/gateway-workflows-2024-10/state/console184-created-output/target-tree.json",
+          "manifest_sha256": "651e955f68e2a03f5b29d1216696904b717a895fec8fa45d798a3069dd36485c",
+          "complete": true,
+          "file_count": 32,
+          "total_bytes": 1763586
+        },
+        "index_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r2/A-cli-create/pytest/gateway-workflows-2024-10/state/console184-created-output/after/index.json",
+        "sha256": "f5bb9048c6e00badea3e4b4c957597f4d40b09a16fb96ef64be3e033003eddd6",
+        "size": 1675,
+        "complete": true,
+        "file_count": 1,
+        "total_bytes": 459018
+      }
+    },
+    {
+      "case": "B-create-close",
+      "raw_outcome": "FAIL",
+      "seconds": "18.025",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r2/B-create-close/pytest/gateway-workflows-2025-10/state/console184-create-close.json",
+      "receipt_sha256": "cb3e81542dd395be9010e54bfe6c85e09d53a2c971e8dd99e386b5b1eddbe15b",
+      "receipt_hash_matches": true,
+      "transactions": [
+        {
+          "artifact_hash": "8e40950a7b02f7183c615d2a7866abd2778a3a0364573ba8f83ad43a98578375",
+          "event_sequence": 6,
+          "state": "verification_failed",
+          "transaction_id": "tx1-w2fq3z1gtrykafeh9d24"
+        }
+      ],
+      "source_unchanged": true,
+      "cleanup": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-9c043f2add164aee915c4afb40f35756",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-9c043f2add164aee915c4afb40f35756"
+      },
+      "created_output": {
+        "requested_project": "/private/tmp/c184br2/gateway-workflows-dd29a73a90694100b9d1abbef56f938c/ConsoleCreated/ConsoleCreated.wproj",
+        "api": "ak.wwise.console.project.create",
+        "transaction_id": "tx1-w2fq3z1gtrykafeh9d24",
+        "captured_before_verification": true,
+        "target_tree": {
+          "manifest_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r2/B-create-close/pytest/gateway-workflows-2025-10/state/console184-created-output/target-tree.json",
+          "manifest_sha256": "1357aef919aab6bc0726095f91dea544f35afc2918acb5ea0aa4f51a6b05dd5a",
+          "complete": true,
+          "file_count": 27,
+          "total_bytes": 1367906
+        },
+        "index_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r2/B-create-close/pytest/gateway-workflows-2025-10/state/console184-created-output/after/index.json",
+        "sha256": "aa35e27034350c7e001608a0befbcb05a7bfa86fac8eafddaf29afcdcef7202e",
+        "size": 1702,
+        "complete": true,
+        "file_count": 1,
+        "total_bytes": 296632
+      }
+    },
+    {
+      "case": "C-add-copy",
+      "raw_outcome": "PASS",
+      "seconds": "7.812",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r2/C-add-copy/pytest/gateway-workflows-2025-10/state/console184-add-copy.json",
+      "receipt_sha256": "f965629f748bfc75f44f6029f8d88a09d5c97c22b191ca3a07644e32cbc1769f",
+      "receipt_hash_matches": true,
+      "transactions": [
+        {
+          "artifact_hash": "918aaa857c19c9a6a2208e28cef5efd2da3cefc922db2d9010f1941ce6a506bc",
+          "event_sequence": 6,
+          "state": "verified",
+          "transaction_id": "tx1-nhnfbsyfjp2tz12s3erq"
+        },
+        {
+          "artifact_hash": "e148fb6ee01944aa062c59f64de41ae4944764c513f14f3fcab59c0763c7162a",
+          "event_sequence": 6,
+          "state": "result_schema_checked",
+          "transaction_id": "tx1-rbyv11fwnz9mxkc7cn79"
+        }
+      ],
+      "source_unchanged": true,
+      "cleanup": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-ac62e429005d4264a64e7b1dbdac3378",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-ac62e429005d4264a64e7b1dbdac3378"
+      },
+      "created_output": null
+    },
+    {
+      "case": "E-media-back",
+      "raw_outcome": "PASS",
+      "seconds": "8.085",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r2/E-media-back/pytest/gateway-workflows-2025-10/state/console184-media-back.json",
+      "receipt_sha256": "84f0196ff5a01ae076307f5c41deba5f383f4911a5901ef7ff4f171b86c76953",
+      "receipt_hash_matches": true,
+      "transactions": [
+        {
+          "artifact_hash": "f23f1aa495813344c41ba1def36c3b273264da5b44de79296402bcd3d917a555",
+          "event_sequence": 6,
+          "state": "result_schema_checked",
+          "transaction_id": "tx1-860e7qmjkdcvc9ebf3x7"
+        },
+        {
+          "artifact_hash": "5e4d1df319ce82178b6c39475a0cf7846b27dae8548f7a537461599af656de2d",
+          "event_sequence": 6,
+          "state": "verified",
+          "transaction_id": "tx1-krfwpgkpz912t7532x9j"
+        }
+      ],
+      "source_unchanged": true,
+      "cleanup": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-8c6319ab964b4c9a88e37943dc89655c",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-8c6319ab964b4c9a88e37943dc89655c"
+      },
+      "created_output": null
+    },
+    {
+      "case": "F-media-refresh",
+      "raw_outcome": "PASS",
+      "seconds": "8.107",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r2/F-media-refresh/pytest/gateway-workflows-2025-10/state/console184-media-refresh.json",
+      "receipt_sha256": "8aa96cac9beac70fd243dea3fa5cd0d3d05dba6026c77754fbbf941db90f1b33",
+      "receipt_hash_matches": true,
+      "transactions": [
+        {
+          "artifact_hash": "7f501abbda2816090d18d7afca6375b5713d058e09fae57ee771de01cb3d813f",
+          "event_sequence": 6,
+          "state": "result_schema_checked",
+          "transaction_id": "tx1-n0wc91x0v3wqy8kzznf4"
+        },
+        {
+          "artifact_hash": "f4440333e5ff2f215074fca21ccadbe0b8564c8a4a6e043cb2405e5b06943d31",
+          "event_sequence": 6,
+          "state": "verified",
+          "transaction_id": "tx1-v8yzhbfwnssfxdqb4wax"
+        }
+      ],
+      "source_unchanged": true,
+      "cleanup": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-1821c32790cb4db1884d0e47a88ae0bf",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-1821c32790cb4db1884d0e47a88ae0bf"
+      },
+      "created_output": null
+    }
+  ],
+  "blocked_case": {
+    "case": "D",
+    "candidate": "9bf7f656ed98c9af0b2f1eff71a51e7a3ec69795",
+    "status": "BLOCKED",
+    "native_started": false,
+    "reason": "A remains indeterminate/FAIL. Captured output is diagnostic evidence, not a finalized PASS donor. No donor promotion or reuse.",
+    "depends_on": "A-cli-create/category.jsonl"
+  },
+  "no_regrading": true,
+  "next_action": "Reuse C/E/F PASS; read-only diagnosis of captured A/B output before any further implementation or new failed-only native attempt. No table import native, Fresh or whole gates."
+}
