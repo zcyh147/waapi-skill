@@ -1,4 +1,4 @@
-"""Finite source-backed TransitionRoot/rule construction on two music owners.
+"""Finite source-backed TransitionRoot/rule construction on source-certified music owners.
 
 The children collection certifies membership only: this adapter claims neither
 rule priority nor automatic fade allocation/configuration or playback quality.
@@ -19,7 +19,7 @@ from .builders.metadata import parse_get_property_info_result
 
 VERSIONS = ('2023.1', '2024.1', '2025.1')
 CLASS = 2424848
-OWNERS = {'MusicSwitchContainer': 2293776, 'MusicPlaylistContainer': 2228240}
+OWNERS = {'MusicSwitchContainer': 2293776, 'MusicPlaylistContainer': 2228240, 'MusicTrack': 1835024}
 MAX_ITEMS, MAX_BYTES = 64, 32768
 ROOT = Path(__file__).resolve().parents[1]
 BUILDS = {'2023.1': '2023.1.19.8928', '2024.1': '2024.1.13.9056', '2025.1': '2025.1.7.9143'}
@@ -40,9 +40,10 @@ SCOPE = 'stored_root_rule_membership_and_selected_fields; priority_not_verified;
 
 def declaration_contract(version):
     return {'field': 'music_transitions', 'available': version in VERSIONS, 'supported_versions': list(VERSIONS),
-        'scope': 'one_exact_existing_MusicSwitchContainer_or_MusicPlaylistContainer; standalone_object.set',
+        'scope': 'one_exact_existing_MusicSwitchContainer_MusicPlaylistContainer_or_MusicTrack; standalone_object.set',
         'required': ['kind_handle', 'root_field_handle', 'mode', 'entries'],
         'kind_handle': 'live_discovered_MusicTransition_Type_Handle',
+        'owner_classes': dict(OWNERS),
         'root_field_handle': 'TransitionRoot_Reference_Field_Handle_for_exact_existing_owner',
         'mode': ['append-rules', 'replace-entire-root'],
         'entries': 'bounded_array_of_rule_objects_with_only_optional_field_values',
@@ -86,13 +87,26 @@ def authority(version, *, root=None):
             or reference.find('Restrictions/NotNullRestriction') is None
             or [e.get('Name') for e in reference.findall('Restrictions/TypeEnumerationRestriction/Type')] != ['MusicTransition']):
         fail('MUSIC_TRANSITION_SOURCE_DRIFT', 'TransitionRoot must remain custom-only, non-null and exactly MusicTransition')
-    for owner in OWNERS:
-        if tree.find(".//WwiseObject[@Name='%s']/ObjectBaseRef[@Name='Common_TransitionNode']" % owner) is None:
-            fail('MUSIC_TRANSITION_SOURCE_DRIFT', 'Music owner no longer inherits TransitionRoot')
+    definitions = {node.get('Name'): {ref.get('Name') for ref in node.findall('ObjectBaseRef')}
+        for node in tree.iter() if node.tag in {'ObjectBase', 'WwiseObject'}}
+    def inherits_transition(name):
+        pending, visited = [name], set()
+        while pending:
+            current = pending.pop()
+            if current == 'Common_TransitionNode':
+                return True
+            if current not in visited:
+                visited.add(current)
+                pending.extend(definitions.get(current, ()))
+        return False
+    inheritors = {node.get('Name') for node in tree.iter()
+        if node.tag == 'WwiseObject' and inherits_transition(node.get('Name'))}
+    if inheritors != set(OWNERS):
+        fail('MUSIC_TRANSITION_SOURCE_DRIFT', 'Exact transitive TransitionRoot owner roster differs from matching source')
     prop = tree.find(".//WwiseObject[@Name='MusicTransition']/Properties/Property[@Name='IsFolder']")
     if prop.get('Type') != 'bool' or prop.findtext('DefaultValue') != 'false':
         fail('MUSIC_TRANSITION_SOURCE_DRIFT', 'Transition rule structural default changed')
-    return {'version': version, 'build': BUILDS[version], 'source_sha256': list(SOURCES[version]),
+    return {'version': version, 'build': BUILDS[version], 'owner_classes': dict(OWNERS), 'source_sha256': list(SOURCES[version]),
         'source_contract_sha256': sha256(record_bytes).hexdigest(), 'manifest_sha256': manifest_sha,
         'source_contract': 'custom_only_non_null_TransitionRoot_MusicTransition_recursive_children',
         'evidence': 'matching_primary_source_and_program_mechanism_only; no_new_native_execution'}
@@ -126,7 +140,7 @@ def compile_business(session, owner, payload):
     if session.context.wwise_version not in VERSIONS:
         reject('MUSIC_TRANSITION_VERSION_BOUNDARY', 'Use the separately assigned older-version role; this source-backed constructor covers 2023.1–2025.1 only')
     if owner.object_type not in OWNERS or owner.class_id not in (None, OWNERS[owner.object_type]):
-        reject('MUSIC_TRANSITION_OWNER_REQUIRED', 'Bind an exact existing MusicSwitchContainer or MusicPlaylistContainer')
+        reject('MUSIC_TRANSITION_OWNER_REQUIRED', 'Bind an exact existing MusicSwitchContainer, MusicPlaylistContainer or MusicTrack')
     if (not isinstance(payload, Mapping) or set(payload) != {'kind_handle', 'root_field_handle', 'mode', 'entries'}
             or payload['mode'] not in ('append-rules', 'replace-entire-root') or len(canonical_json_bytes(payload)) > MAX_BYTES):
         reject('MUSIC_TRANSITION_DECLARATION_INVALID', 'Choose append-rules or replace-entire-root explicitly and provide only the disclosed fields')
@@ -209,9 +223,14 @@ def snapshot(read, object_id, tokens):
     fields = list(dict.fromkeys([*IDENTITY, 'children', *tokens]))
     result = {}
     for start in range(0, len(fields), 32):
-        found = rows(read, [object_id], list(dict.fromkeys(['id', *fields[start:start + 32]])))
+        page = list(dict.fromkeys(['id', *fields[start:start + 32]]))
+        found = rows(read, [object_id], page)
         if len(found) != 1 or guid(found[0].get('id')) != guid(object_id):
             fail('INVALID_TRANSITION_READBACK', 'Exact transition GUID must resolve once')
+        missing = [token for token in tokens if token in page and token not in {'parent', 'owner', 'children'}
+            and token not in found[0] and '@' + token not in found[0]]
+        if missing:
+            fail('INVALID_TRANSITION_READBACK', 'Transition snapshot omitted disclosed fields: ' + ', '.join(missing))
         if any(result[key] != value for key, value in found[0].items() if key in result):
             fail('INVALID_TRANSITION_READBACK', 'Object changed during bounded snapshot')
         result.update(found[0])

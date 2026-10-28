@@ -17,6 +17,6 @@
     "packaged_member": "ak_wwise_core_object_set.html.gz"
   },
   "manifest_sha256": "1d6d6e32ec042c19c5ebd99b7b964c88410f9b90d26b073eb0869950b1a39c60",
-  "derivation": "Common_TransitionNode.TransitionRoot: custom-only, non-null MusicTransition; exact two inheriting owners; SDK custom-object and recursive children grammar; rename mode creates fresh children rather than merging; no dedicated class example prerequisite",
+  "derivation": "Common_TransitionNode.TransitionRoot: custom-only, non-null MusicTransition; exact three transitive inheriting owners (MusicPlaylistContainer, MusicSwitchContainer, MusicTrack); SDK custom-object and recursive children grammar; rename mode creates fresh children rather than merging; no dedicated class example prerequisite",
   "evidence_strength": "source_and_program_only; no_new_native_or_Fresh; no_priority_or_fade_allocation_or_playback_claim"
 }

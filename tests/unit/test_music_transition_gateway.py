@@ -6,7 +6,7 @@ from copy import deepcopy
 import json
 import pytest
 
-from tests.unit.test_music_playlist_gateway import MusicPlaylistTask, FIRST, SECOND, OLD, A
+from tests.unit.test_music_playlist_gateway import MusicPlaylistTask, FIRST, SECOND, OLD, A, B
 
 CLASS = 2424848
 EXISTING = '{DDDDDDDD-1111-1111-1111-111111111111}'
@@ -15,16 +15,20 @@ class TransitionTask(MusicPlaylistTask):
     def __init__(self, path, version='2025.1', owner='MusicSwitchContainer', mode='replace-entire-root'):
         super().__init__(path, version)
         self.mode = mode
-        self.types = [{'name': owner, 'classId': 2293776 if owner == 'MusicSwitchContainer' else 2228240, 'type': 'WObject'},
+        self.types = [{'name': owner, 'classId': {'MusicSwitchContainer': 2293776, 'MusicPlaylistContainer': 2228240, 'MusicTrack': 1835024}[owner], 'type': 'WObject'},
             {'name': 'MusicTransition', 'classId': CLASS, 'type': 'WObject'},
             {'name': 'MusicSegment', 'classId': 1769488, 'type': 'WObject'},
             {'name': 'WorkUnit', 'classId': 1638416, 'type': 'WObject'}]
         self.objects[FIRST].update(type=owner, classId=self.types[0]['classId'])
+        if owner == 'MusicTrack':
+            for identity in (A, B):
+                self.objects[identity]['parent'] = {'id': SECOND}
+                self.objects[identity]['path'] = self.objects[SECOND]['path'] + '\\' + self.objects[identity]['name']
         del self.objects[FIRST]['@PlaylistRoot']
         self.objects[FIRST]['@TransitionRoot'] = {'id': OLD}
         self.objects[OLD] = {'id': OLD, 'name': 'Root', 'type': 'MusicTransition', 'classId': CLASS,
             'path': r'\opaque-root', 'owner': {'id': FIRST}, 'parent': None, 'notes': '',
-            '@IsFolder': True, 'children': []}
+            '@IsFolder': True, '@SourceContextType': 0, '@SourceContextObject': None, 'children': []}
         self.objects[OLD]['children'] = [{'id': EXISTING}]
         self.objects[EXISTING] = {**deepcopy(self.objects[OLD]), 'id': EXISTING, 'name': 'Transition',
             'owner': None, 'parent': {'id': OLD}, '@IsFolder': False, 'children': [],
@@ -38,6 +42,16 @@ class TransitionTask(MusicPlaylistTask):
             'SourceContextObject': {'name': 'SourceContextObject', 'type': 'Reference',
                 'restriction': {'type': 'reference', 'restrictions': [{'type': ['MusicSegment', 'MusicPlaylistContainer', 'MusicSwitchContainer', 'Folder']}]}},
         }
+
+    def scoped_field_names(self, scope):
+        class_id = scope.get('classId')
+        if 'object' in scope:
+            class_id = self.objects[scope['object']]['classId']
+        if class_id == CLASS:
+            return [name for name in self.metadata if name != 'TransitionRoot']
+        if class_id in (2293776, 2228240, 1835024):
+            return ['TransitionRoot']
+        return []
 
     def call(self, uri, args=None, options=None):
         if uri.endswith('object.set'):
@@ -58,8 +72,10 @@ class TransitionTask(MusicPlaylistTask):
                 row = {'id': guid, 'name': node['name'], 'type': 'MusicTransition', 'classId': CLASS,
                     'path': '\\opaque-' + str(self.next_id), 'notes': '', 'parent': None if root else {'id': parent},
                     'owner': {'id': parent} if root else None, 'children': [{'id': child['id']} for child in children],
+                    '@SourceContextType': 0, '@SourceContextObject': None,
+                    **({'@ExitSourceAt': 7, '@ExitSourceCustomCueMatchName': ''} if 'ExitSourceAt' in self.metadata else {}),
                     **{key: deepcopy(value) for key, value in node.items() if key.startswith('@')}}
-                if '@SourceContextObject' in row:
+                if row.get('@SourceContextObject') is not None:
                     row['@SourceContextObject'] = {'id': row['@SourceContextObject']}
                 self.objects[guid] = row
                 return {'id': guid, 'name': node['name'], 'children': children}
@@ -103,7 +119,7 @@ class TransitionTask(MusicPlaylistTask):
         assert code == 0, result
         return self
 
-@pytest.mark.parametrize('version,owner', [('2023.1', 'MusicPlaylistContainer'), ('2025.1', 'MusicSwitchContainer')])
+@pytest.mark.parametrize('version,owner', [('2023.1', 'MusicPlaylistContainer'), ('2024.1', 'MusicTrack'), ('2025.1', 'MusicSwitchContainer')])
 def test_transition_root_replacement_is_reviewable_and_verified_once(tmp_path, version, owner):
     task = TransitionTask(tmp_path, version, owner).declare()
     preserved = deepcopy(task.objects[A])
@@ -137,6 +153,14 @@ def test_transition_independent_result_faults_fail_without_retry(tmp_path, mode,
 
 def test_append_transition_rules_preserves_root_and_every_existing_rule(tmp_path):
     task = TransitionTask(tmp_path, mode='append-rules').declare()
+    project = task.project_rows
+    def prefixed_reference(rows, options):
+        projected = project(rows, options)
+        for row in projected:
+            if 'SourceContextObject' in row:
+                row['@SourceContextObject'] = row.pop('SourceContextObject')
+        return projected
+    task.project_rows = prefixed_reference
     existing = '{DDDDDDDD-1111-1111-1111-111111111111}'
     task.objects[OLD]['children'] = [{'id': existing}]
     task.objects[existing] = {**deepcopy(task.objects[OLD]), 'id': existing, 'name': 'Transition',
@@ -193,7 +217,11 @@ def test_transition_preview_rejects_drift_without_dispatch(tmp_path, monkeypatch
 def test_transition_declaration_rejects_unbound_or_uncontrolled_construction(tmp_path, fault):
     task = TransitionTask(tmp_path).declare()
     payload = deepcopy(task.payload)
-    if fault == 'root-handle': payload['root_field_handle'] = task.discover(task.bind(A), 'TransitionRoot')
+    if fault == 'root-handle':
+        other_root = '{EEEEEEEE-1111-1111-1111-111111111111}'
+        task.objects[B].update(type='MusicSwitchContainer', classId=2293776, **{'@TransitionRoot': {'id': other_root}})
+        task.objects[other_root] = {**deepcopy(task.objects[OLD]), 'id': other_root, 'owner': {'id': B}, 'children': []}
+        payload['root_field_handle'] = task.discover(task.bind(B), 'TransitionRoot')
     elif fault == 'kind': payload['kind_handle'] = task.discover_kind('MusicSegment')
     elif fault == 'raw-field': payload['entries'][0]['@SourceContextObject'] = A
     elif fault == 'folder-field':
@@ -238,6 +266,9 @@ def test_transition_new_rule_uses_existing_condition_default_validator(tmp_path,
     task.metadata['ExitSourceCustomCueMatchName'] = {'name': 'ExitSourceCustomCueMatchName', 'type': 'string', 'default': '',
         'dependencies': [{'type': 'property', 'action': 'Enable', 'context': 'Self', 'property': 'ExitSourceAt',
             'conditions': [{'restriction': {'type': 'enum', 'values': [{'value': 4}, {'value': 5}]}}]}]}
+    for row in task.objects.values():
+        if row.get('classId') == CLASS:
+            row.update({'@ExitSourceAt': 7, '@ExitSourceCustomCueMatchName': ''})
     task.declare()
     values = {}
     for name, value in [('ExitSourceCustomCueMatchName', 'Outro'), *([('ExitSourceAt', 5)] if choose_prerequisite else [])]:
@@ -257,3 +288,47 @@ def test_transition_new_rule_uses_existing_condition_default_validator(tmp_path,
         code, result = task.step('draft-check')
         assert code == 2 and 'REFERENCE_ACTIVATION_REQUIRED' in json.dumps(result), result
         assert task.writes == []
+
+
+@pytest.mark.parametrize('phase', ['preview', 'verify'])
+def test_transition_snapshot_refuses_missing_disclosed_rule_field(tmp_path, phase):
+    task = TransitionTask(tmp_path, mode='append-rules').declare()
+    original = task.project_rows
+    old_ids = set(task.objects)
+    def project(rows, options):
+        projected = original(rows, options)
+        for row in projected:
+            missing = (row.get('id') == EXISTING if phase == 'preview'
+                else row.get('id') not in old_ids and row.get('id') in task.objects
+                and task.objects[row['id']].get('@IsFolder') is False
+                and task.objects[row['id']].get('@SourceContextType', 0) == 0)
+            if missing and 'SourceContextObject' in options['return']:
+                row.pop('SourceContextObject', None)
+                row.pop('@SourceContextObject', None)
+        return projected
+    if phase == 'preview':
+        task.project_rows = project
+        code, result = task.step('draft-check')
+        assert code == 2 and 'INVALID_TRANSITION_READBACK' in json.dumps(result), result
+        assert task.writes == []
+    else:
+        tx, shown = task.preview()
+        task.project_rows = project
+        code, result = task.finish(tx, shown)
+        assert code == 2 and result['verified'] is False, result
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and len(task.writes) == 1, rejected
+
+
+def test_transition_source_authority_rejects_dropped_source_owner(tmp_path, monkeypatch):
+    from wwise_waapi import music_transitions
+    monkeypatch.setattr(music_transitions, 'OWNERS', {'MusicSwitchContainer': 2293776})
+    task = TransitionTask(tmp_path)
+    owner = task.bind(FIRST)
+    kind = task.discover_kind('MusicTransition')
+    root = task.discover(owner, 'TransitionRoot')
+    payload = {'kind_handle': kind, 'root_field_handle': root, 'mode': 'append-rules', 'entries': [{}]}
+    code, result = task.step('draft-declare-existing', '--declaration-id', 'transitions', '--object-handle', owner,
+        '--field', 'music_transitions', json.dumps(payload))
+    assert code == 2 and result['error_code'] == 'MUSIC_TRANSITION_SOURCE_DRIFT', result
+    assert task.writes == []

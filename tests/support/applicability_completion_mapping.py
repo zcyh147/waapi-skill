@@ -267,7 +267,7 @@ def _music_transition_correspondence(root, version, class_id, build):
                 'test_transition_declaration_rejects_unbound_or_uncontrolled_construction',
                 'test_transition_schema_and_older_version_limit_do_not_claim_native_absence')],
             'strength': 'matching primary source plus representative persisted public Python mechanism; no per-class native execution inferred'},
-        'admission': 'one exact existing MusicSwitchContainer or MusicPlaylistContainer; live MusicTransition Type Handle and exact owner TransitionRoot Reference Field Handle; bounded class scalar/reference Field Handles; explicit append-rules preserving current root/rules or replace-entire-root disclosing full removal; Gateway owns structural IsFolder and role naming; immutable policy/configuration/source/identity/metadata drift checks and execute once',
+        'admission': 'one exact existing MusicSwitchContainer, MusicPlaylistContainer or MusicTrack; live MusicTransition Type Handle and exact owner TransitionRoot Reference Field Handle; bounded class scalar/reference Field Handles; explicit append-rules preserving current root/rules or replace-entire-root disclosing full removal; Gateway owns structural IsFolder and role naming; immutable policy/configuration/source/identity/metadata drift checks and execute once',
         'verification_scope': declaration['verification_scope'],
         'other_roles': 'older 2021.1/2022.1 constructors remain separately assigned to #195/#174; fade lifecycle/resolver remains separate; unordered membership gives no priority proof; no arbitrary class/custom-reference framework'}
 

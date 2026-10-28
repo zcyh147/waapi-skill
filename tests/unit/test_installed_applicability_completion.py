@@ -392,6 +392,7 @@ def test_modern_transition_births_join_owned_append_and_explicit_replacement_onl
         assert role['path'] == 'music_owner_transition_root_and_rule_construction'
         assert role['operations'] == ['object.set']
         assert role['declaration']['mode'] == ['append-rules', 'replace-entire-root']
+        assert role['declaration']['owner_classes'] == {'MusicSwitchContainer': 2293776, 'MusicPlaylistContainer': 2228240, 'MusicTrack': 1835024}
         assert len(role['source']['members']) == 3
         assert 'priority_not_verified' in role['verification_scope']
         assert row['native_effect'] == 'not_claimed' and row['direct_recipient_execution'] == 'not_observed'
