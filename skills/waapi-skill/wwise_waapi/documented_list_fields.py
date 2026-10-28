@@ -13,6 +13,7 @@ from .canonical import canonical_sha256
 CATALOG_ROOT = Path(__file__).resolve().parents[1] / "resources" / "metadata"
 VERSIONS = frozenset({"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"})
 MAX_CATALOG_BYTES = 2 * 1024 * 1024
+INSTALLED_2021_LIST_SHA256 = 'bdbc5b33059de0b86bb8f1fd8b791a8dd738a03546e241fa4a9e7f6b222e4e6b'
 PLAYLIST_BOUNDARY_SHA256 = {
     "2021.1": "3d6e9034576e9f601a6df4d0b33fe4890200bbcc9d582d51c5e7a396ac0ef301",
     "2022.1": "76ddb7909a6c7770c2e8eb772cc86f1552359a69c9e1683a879d2ab09bbe5295",
@@ -67,10 +68,11 @@ def discovery_contract():
         "absent_source": "unresolved_not_native_unavailable", "maximum_page_size": 64}
 
 
-def load_catalog(version):
+def load_catalog(version, *, catalog_root=None):
     if version not in VERSIONS:
         raise ValueError("No pinned documented-list source for this Wwise lane")
-    with (CATALOG_ROOT / version / "documented-list-fields.json").open("rb") as source:
+    root = CATALOG_ROOT if catalog_root is None else Path(catalog_root)
+    with (root / version / "documented-list-fields.json").open("rb") as source:
         raw = source.read(MAX_CATALOG_BYTES + 1)
     if len(raw) > MAX_CATALOG_BYTES:
         raise ValueError("Documented-list source exceeds its byte bound")
@@ -106,6 +108,39 @@ def load_catalog(version):
                 if set(element) != {"name", "class_id"} or not any(
                         element["class_id"] == selected["class_id"] and element["name"] == selected["name"] for selected in rows):
                     raise ValueError("List element class is not proved by the matching per-type index")
+    return _with_installed_owned_lists(payload, root)
+
+
+def _with_installed_owned_lists(payload, root):
+    """2021 has root List CREATE despite missing SDK List tables.
+
+    Keep the published HTML catalog intact. The separate installed XML overlay
+    supplies exact owner/List/member sources, never a general constructor claim.
+    """
+    if payload['version'] != '2021.1':
+        return payload
+    path = root / '2021.1' / 'installed-owned-list-fields.json'
+    with path.open('rb') as stream:
+        raw = stream.read(64 * 1024 + 1)
+    if len(raw) > 64 * 1024 or hashlib.sha256(raw).hexdigest() != INSTALLED_2021_LIST_SHA256:
+        raise ValueError('Pinned 2021 installed owned-list source changed')
+    source = json.loads(raw)
+    if (source['contract'] != 'waapi-skill.installed-owned-list-fields/v1'
+            or source['version'] != '2021.1' or source['build'] != payload['source']['build']):
+        raise ValueError('Installed owned-list source has another version/build')
+    classes = {row['class_id']: row for row in payload['classes']}
+    for selected in source['rows']:
+        owner = classes[selected['owner_class_id']]
+        if owner['name'] != selected['owner'] or any(f['name'] == selected['field']['name'] for f in owner['lists']):
+            raise ValueError('Installed owned-list owner/source conflicts with published catalog')
+        for element in selected['field']['element_classes']:
+            if classes[element['class_id']]['name'] != element['name']:
+                raise ValueError('Installed owned-list element class differs from matching type index')
+        owner['lists'].append(selected['field'])
+    payload['source']['installed_owned_lists'] = {'sha256': INSTALLED_2021_LIST_SHA256,
+        'source': source['source'], 'rows': source['rows'], 'limits': source['limits']}
+    payload['coverage']['installed_owned_list_declarations'] = len(source['rows'])
+    payload['catalog_sha256'] = canonical_sha256({key: value for key, value in payload.items() if key != 'catalog_sha256'})
     return payload
 
 
@@ -133,6 +168,13 @@ def scope_evidence(version, *, scope_kind, scope_value, read):
 
 
 def field_evidence(catalog, row, scope, field):
+    supplement = catalog['source'].get('installed_owned_lists')
+    selected = ([item for item in supplement['rows'] if item['owner_class_id'] == row['class_id']
+        and item['field'] == field] if supplement else [])
+    if selected:
+        return {'kind': 'documented-list', 'version': catalog['version'], 'catalog_sha256': catalog['catalog_sha256'],
+            'source_member': selected[0]['source_member'], 'source_sha256': supplement['source']['sha256'],
+            'scope': scope, 'declaration': field}
     return {"kind": "documented-list", "version": catalog["version"], "catalog_sha256": catalog["catalog_sha256"],
         "source_member": row["source_member"], "source_sha256": row["source_sha256"],
         "scope": scope, "declaration": field}
@@ -249,6 +291,29 @@ def resolve_class_list_evidence(version, class_id, name):
             action="choose one documented List of this exact planned class; unlisted source remains unresolved",
             choices=[field["name"] for field in fields])
     return field_evidence(catalog, row, scope, matches[0])
+
+
+def source_owned_music_type(requested, *, version, binding, catalog):
+    """Admit an owned music constructor only through its exact List source.
+
+    These classes remain forbidden as arbitrary hierarchy children. Metadata
+    and plug-in classes have separate factory/placement contracts.
+    """
+    names = {'MusicCue', 'MusicStinger', 'MusicTrackSequence', 'MusicClip', 'MusicClipMidi', 'MusicEventCue'}
+    token = re.sub(r'[^a-z0-9]', '', str(requested).casefold())
+    matches = [row for row in catalog if row.name in names
+        and token == re.sub(r'[^a-z0-9]', '', row.name.casefold())]
+    if not matches:
+        return None
+    scope = binding.get('scope', {})
+    expected = resolve_class_list_evidence(version, scope.get('class_id'), binding.get('declaration', {}).get('name'))
+    if (binding.get('version') != version or len(matches) != 1 or matches[0].type != 'WObject'
+            or any(binding.get(key) != expected[key] for key in
+                ('kind', 'version', 'catalog_sha256', 'source_member', 'source_sha256', 'declaration'))
+            or binding['declaration']['unresolved_element_types']
+            or {'name': matches[0].name, 'class_id': matches[0].class_id} not in binding['declaration']['element_classes']):
+        raise ValueError('The requested music class is not certified by this exact owner/List/version source')
+    return matches[0]
 
 
 def resolve_planned_list_evidence(session, value, *, owner_handle):
