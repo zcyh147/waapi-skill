@@ -229,6 +229,9 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/unit/test_condition_mechanism_reuse.py', 'tests/unit/test_condition_source_resolution.py',
                  'tests/support/condition_completion_mapping.py', 'tests/maintenance/map_condition_completion.py',
                  'tests/unit/test_condition_completion_mapping.py', 'tests/unit/test_condition_completion_reader.py',
+                 'tests/support/new_condition_completion.py', 'tests/unit/test_new_condition_completion_reader.py',
+                 'tests/fixtures/metadata-conditions/new-condition-current-program.json.gz',
+                 'tests/fixtures/metadata-conditions/new-condition-current-program-r2.json.gz',
                  'tests/fixtures/metadata-conditions/condition-completion-review.json',
                  'tests/fixtures/metadata-conditions/condition-completion-proof-inputs.json.gz'):
         path = root / name
@@ -2210,7 +2213,12 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
             'review_ids': sorted(condition_reuse_reviews), 'new_native_runs': 0}
     if definition_contexts:
         from tests.support.condition_completion_mapping import _review
-        _review(root)  # Source immutability also holds at the end of this batch.
+        for context in definition_contexts.values():
+            if context['mapping'].get('operation_mode') == 'new-object':
+                from tests.support.new_condition_completion import review as new_review
+                new_review(root)
+            else:
+                _review(root)  # Source immutability also holds at the end of this batch.
         native['condition_source_definition_reuse'] = {
             'original_native_witness_proofs': [definition_proofs[k] for k in sorted(definition_proofs)],
             'original_run_count': 'not_summed_from_member_bindings; original identities retained inside exact proofs',
