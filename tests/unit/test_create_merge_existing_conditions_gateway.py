@@ -86,20 +86,23 @@ def test_ordinary_sound_merge_uses_actual_override_and_preserves_unrequested_fie
     assert task.objects[FIRST]['notes'] == before[FIRST]['notes']
 
 
-def test_existing_merge_allows_explicit_notes_under_actual_applicability(tmp_path):
+@pytest.mark.parametrize('overwrite_existing_notes', [False, True])
+def test_existing_merge_constructor_notes_preserve_actual_existing_notes(tmp_path, overwrite_existing_notes):
     task, writes = merge_task(tmp_path)
+    before_notes = task.objects[FIRST]['notes']
     original = task.call
     def call(uri, args=None, options=None):
         result = original(uri, args, options)
-        if uri.endswith('object.create'):
+        if uri.endswith('object.create') and overwrite_existing_notes:
             task.objects[FIRST]['notes'] = args['notes']
         return result
     task.call = call
     declare_merge(task, notes='Requested notes')
     tx, shown = task.preview()
     code, verified = task.finish(tx, shown)
-    assert code == 0 and verified.get('verified') is True, verified
-    assert len(writes) == 1 and task.objects[FIRST]['notes'] == 'Requested notes'
+    assert code == (2 if overwrite_existing_notes else 0), verified
+    assert (verified.get('verified') is True) is (not overwrite_existing_notes)
+    assert len(writes) == 1 and task.objects[FIRST]['notes'] == ('Requested notes' if overwrite_existing_notes else before_notes)
 
 
 def add_child(task):

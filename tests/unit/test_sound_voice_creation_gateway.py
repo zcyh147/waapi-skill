@@ -684,13 +684,14 @@ def test_planned_source_invalid_placement_or_drift_cannot_write(tmp_path, fault)
     assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
 
 
-def test_planned_source_constructor_cannot_adopt_an_existing_merged_source_guid(tmp_path):
+@pytest.mark.parametrize('lose_notes', [False, True])
+def test_planned_source_merge_preserves_unselected_notes_on_exact_existing_guid(tmp_path, lose_notes):
     task = planned_source_task(tmp_path)
     voice_id = '{99999999-9999-9999-9999-999999999999}'
     task.objects[voice_id] = {'id': voice_id, 'name': 'Rain', 'type': 'Sound', 'classId': 65552,
         'path': task.objects[SECOND]['path'] + r'\Rain', 'parent': {'id': SECOND},
         'notes': 'Keep voice', '@IsVoice': True, '@Volume': -6}
-    task.objects[SOURCE] = {'id': SOURCE, 'name': 'Tone', 'type': 'Source', 'classId': SOURCE_CLASS,
+    task.objects[SOURCE] = {'id': SOURCE, 'name': 'Tone', 'type': 'SourcePlugin', 'classId': SOURCE_CLASS,
         'path': task.objects[voice_id]['path'] + r'\Tone', 'parent': {'id': voice_id},
         'notes': 'Retain source', '@Frequency': 220, 'audioSource:language': {'name': 'Japanese'}}
     task.bind(SECOND)
@@ -701,9 +702,24 @@ def test_planned_source_constructor_cannot_adopt_an_existing_merged_source_guid(
     code, source = declare_planned_source(task, voice['draft']['declared_object']['result_handle'])
     assert code == 0, source
     code, checked = task.step('draft-check')
-    assert code == 2 and checked['details']['issues'][0]['error_code'] == 'TARGET_EXISTS', checked
-    assert task.objects[SOURCE]['@Frequency'] == 220 and task.objects[SOURCE]['notes'] == 'Retain source'
-    assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
+    assert code == 0, checked
+    tx, shown = task.preview()
+    create = task._create
+    def merged(node, parent, *, owned=False):
+        if node['type'] == 'Source':
+            task.objects[SOURCE].update({key: value for key, value in node.items() if key.startswith('@')})
+            if lose_notes: task.objects[SOURCE]['notes'] = ''
+            return {'id': SOURCE, 'name': 'Tone'}
+        return create(node, parent, owned=owned)
+    task._create = merged
+    code, executed = execute_voice(task, tx, shown)
+    assert code == 0, executed
+    code, verified = task.run('verify', tx)
+    assert code == (2 if lose_notes else 0), verified
+    assert (verified.get('verified') is True) is (not lose_notes), verified
+    assert task.objects[SOURCE]['@Frequency'] == 440
+    assert task.objects[SOURCE]['notes'] == ('' if lose_notes else 'Retain source')
+    assert sum(uri.endswith('object.set') for uri, _, _ in task.calls) == 1
 
 
 def test_planned_source_return_cannot_reclassify_a_retained_child_as_new(tmp_path):

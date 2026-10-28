@@ -292,7 +292,7 @@ def test_create_schema_does_not_advertise_unavailable_action_durations(
     for key in ("stable_fields", "field_value_types", "field_semantics"):
         assert not {"fade_time_ms", "delay_ms"}.intersection(declaration.get(key, {}))
     action = schema["business_adapter"]["creation_boundaries"]["Action"]
-    assert action['status'] == 'supported_targeted_fail_mode'
+    assert action['status'] == 'supported_fail_mode'
     assert action['required_class_fields'] == ['ActionType', 'Target']
     assert action['native_execution'] == 'not_claimed_from_SDK_example'
 

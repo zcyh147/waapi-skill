@@ -609,6 +609,7 @@ def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
         "parent": {"kind": "id", "value": PARENT_ID},
         "type": "Event",
         "name": "Play_Weather",
+        "graph_result_bindings": [{"request_path": "$", "result_handle": declared["draft"]["declared_object"]["result_handle"]}],
     }
 
 
@@ -1073,6 +1074,7 @@ def test_gateway_compiles_object_create_settings_and_stable_fields(
             }
         ],
         "auto_add_to_source_control": True,
+        "graph_result_bindings": [{"request_path": "$", "result_handle": declared["draft"]["declared_object"]["result_handle"]}],
     }
 
 

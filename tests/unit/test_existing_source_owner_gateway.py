@@ -12,7 +12,7 @@ from tests.unit.test_field_interface_closure_gateway import FIRST, SECOND
 RETAINED = '{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}'
 
 
-def existing_source_task(tmp_path, workflow, *, voice=True, version='2025.1'):
+def existing_source_task(tmp_path, workflow, *, voice=True, version='2025.1', source_notes='New Source'):
     runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow, version=version)
     if version != '2025.1':
         captured = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/tone-source-existing-owner-2022-2024.json').read_text())[version]
@@ -36,7 +36,7 @@ def existing_source_task(tmp_path, workflow, *, voice=True, version='2025.1'):
     extra = ('--field', 'language', 'English(US)') if voice else ()
     code, declared = task.step('draft-declare-new', '--declaration-id', 'source', '--parent-handle', owner,
         '--name', 'Tone', '--kind', kind, '--field', 'plugin_placement', 'owner',
-        '--field', 'notes', 'New Source', '--field-value', field, '440', *extra)
+        '--field', 'notes', source_notes, '--field-value', field, '440', *extra)
     assert code == 0, declared
     return task, writes
 
@@ -99,7 +99,7 @@ def test_source_owner_or_retained_state_drift_stops_before_write(tmp_path, workf
     assert writes == []
 
 
-@pytest.mark.parametrize('fault', ['numeric-voice', 'missing-voice', 'sfx-locale', 'arbitrary-child', 'source-conflict'])
+@pytest.mark.parametrize('fault', ['numeric-voice', 'missing-voice', 'sfx-locale', 'arbitrary-child'])
 def test_existing_source_owner_rejects_invalid_or_unresolved_intent_without_write(tmp_path, workflow, fault):
     task, writes = existing_source_task(tmp_path, workflow)
     if fault == 'numeric-voice':
@@ -115,14 +115,10 @@ def test_existing_source_owner_rejects_invalid_or_unresolved_intent_without_writ
         assert code == 2 and declared['error_code'] == 'INVALID_CREATE_PARENT_TYPE', declared
         assert writes == []
         return
-    else:
-        code, result = task.step('draft-business-configure', '--name-conflict', 'merge')
-        assert code == 0, result
     code, rejected = task.step('draft-check')
     assert code == 2 and rejected['ok'] is False, rejected
     expected = {'numeric-voice': 'INVALID_READBACK', 'missing-voice': 'INVALID_READBACK',
-        'sfx-locale': 'PLUGIN_LANGUAGE_UNAVAILABLE', 'arbitrary-child': 'INVALID_CREATE_PARENT_TYPE',
-        'source-conflict': 'SOURCE_CONFLICT_UNRESOLVED'}[fault]
+        'sfx-locale': 'PLUGIN_LANGUAGE_UNAVAILABLE', 'arbitrary-child': 'INVALID_CREATE_PARENT_TYPE'}[fault]
     assert any(row['error_code'] == expected for row in rejected.get('details', {}).get('issues', [])), rejected
     assert writes == []
 
@@ -199,3 +195,187 @@ def test_retained_source_fields_use_bounded_projection_pages(tmp_path, workflow,
     assert {'@' + name for name in fixture['property_names']['return']} <= projected
     first_field = fixture['property_names']['return'][0]
     assert any('@' + last_field in fields and '@' + first_field not in fields for fields in projections)
+
+
+def test_named_source_rename_creates_a_fresh_child_and_preserves_collision(tmp_path, workflow):
+    task, writes = existing_source_task(tmp_path, workflow, voice=False)
+    task.objects[RETAINED].update(name='Tone', path=task.objects[FIRST]['path'] + r'\Tone')
+    before = deepcopy(task.objects[RETAINED])
+    create = task._create
+    def renamed(node, parent, *, owned=False):
+        # Documented rename outcome: native chooses a unique numeric suffix.
+        # The Gateway must verify the actual identity/name, not predict it.
+        if node['type'] == 'Source':
+            node = {**node, 'name': 'Tone_01'}
+        return create(node, parent, owned=owned)
+    task._create = renamed
+    code, configured = task.step('draft-business-configure', '--name-conflict', 'rename')
+    assert code == 0, configured
+    tx, shown = task.preview()
+    finish(task, tx, shown)
+    assert len(writes) == 1 and task.objects[RETAINED] == before
+    created, = [row for key, row in task.objects.items() if key not in {FIRST, SECOND, RETAINED} and row['type'] == 'SourcePlugin']
+    assert created['name'] == 'Tone_01' and created['@StartFreq'] == 440.0
+
+
+def test_named_source_merge_reuses_exact_source_and_preserves_unselected_fields(tmp_path, workflow):
+    task, writes = existing_source_task(tmp_path, workflow)
+    task.objects[RETAINED].update(name='Tone', path=task.objects[FIRST]['path'] + r'\Tone')
+    before = deepcopy(task.objects[RETAINED])
+    create = task._create
+    def merged(node, parent, *, owned=False):
+        if node['type'] == 'Source':
+            row = task.objects[RETAINED]
+            assert row['parent'] == {'id': parent} and row['name'] == node['name']
+            row.update({key: deepcopy(value) for key, value in node.items() if key.startswith('@')})
+            return {'id': RETAINED, 'name': row['name']}
+        return create(node, parent, owned=owned)
+    task._create = merged
+    code, configured = task.step('draft-business-configure', '--name-conflict', 'merge')
+    assert code == 0, configured
+    tx, shown = task.preview()
+    finish(task, tx, shown)
+    assert len(writes) == 1
+    expected = {**before, '@StartFreq': 440.0}
+    assert task.objects[RETAINED] == expected
+    assert shown['artifact']['prepared_operation']['semantic_preview']['envelope']['metadata']['constructor_notes']['merged_existing'] == 'preserve_existing_notes'
+    assert len([row for row in task.objects.values() if row['type'] == 'SourcePlugin']) == 1
+
+
+def test_named_source_replace_retires_collision_and_preserves_other_source(tmp_path, workflow):
+    task, writes = existing_source_task(tmp_path, workflow, voice=False)
+    task.objects[RETAINED].update(name='Tone', path=task.objects[FIRST]['path'] + r'\Tone')
+    peer = '{ACACACAC-ACAC-ACAC-ACAC-ACACACACACAC}'
+    task.objects[peer] = {**deepcopy(task.objects[RETAINED]), 'id': peer, 'name': 'Peer',
+        'path': task.objects[FIRST]['path'] + r'\Peer'}
+    before = deepcopy(task.objects[peer])
+    create = task._create
+    def replaced(node, parent, *, owned=False):
+        if node['type'] == 'Source':
+            del task.objects[RETAINED]
+        return create(node, parent, owned=owned)
+    task._create = replaced
+    code, configured = task.step('draft-business-configure', '--name-conflict', 'replace')
+    assert code == 0, configured
+    tx, shown = task.preview()
+    finish(task, tx, shown)
+    assert len(writes) == 1 and RETAINED not in task.objects and task.objects[peer] == before
+    created, = [row for key, row in task.objects.items() if key != peer and row['type'] == 'SourcePlugin']
+    assert created['name'] == 'Tone' and created['@StartFreq'] == 440.0
+
+
+@pytest.mark.parametrize('conflict', ['merge', 'replace'])
+def test_named_source_collision_drift_stops_before_write(tmp_path, workflow, conflict):
+    task, writes = existing_source_task(tmp_path, workflow)
+    task.objects[RETAINED].update(name='Tone', path=task.objects[FIRST]['path'] + r'\Tone')
+    code, configured = task.step('draft-business-configure', '--name-conflict', conflict)
+    assert code == 0, configured
+    tx, shown = task.preview()
+    task.objects[RETAINED]['@WaveType'] = 1
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, stopped = task.run('execute', tx)
+    assert code == 2 and stopped.get('executed') is not True, stopped
+    assert writes == []
+
+
+@pytest.mark.parametrize('conflict', ['merge'])
+def test_named_source_collision_cannot_retarget_existing_language(tmp_path, workflow, conflict):
+    task, writes = existing_source_task(tmp_path, workflow)
+    task.objects[RETAINED].update(name='Tone', path=task.objects[FIRST]['path'] + r'\Tone',
+        **{'audioSource:language': {'name': 'French'}})
+    code, configured = task.step('draft-business-configure', '--name-conflict', conflict)
+    assert code == 0, configured
+    code, rejected = task.step('draft-check')
+    assert code == 2 and 'SOURCE_LANGUAGE_COLLISION_MISMATCH' in json.dumps(rejected), rejected
+    assert writes == []
+
+
+@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
+def test_source_replace_can_retire_other_language_and_create_selected_language(tmp_path, workflow, version):
+    task, writes = existing_source_task(tmp_path, workflow, version=version)
+    task.objects[RETAINED].update(name='Tone', path=task.objects[FIRST]['path'] + r'\Tone',
+        **{'audioSource:language': {'name': 'French'}})
+    create = task._create
+    def replace(node, parent, *, owned=False):
+        if node['type'] == 'Source': del task.objects[RETAINED]
+        return create(node, parent, owned=owned)
+    task._create = replace
+    code, result = task.step('draft-business-configure', '--name-conflict', 'replace')
+    assert code == 0, result
+    tx, shown = task.preview()
+    finish(task, tx, shown)
+    created, = [row for row in task.objects.values() if row['type'] == 'SourcePlugin']
+    assert len(writes) == 1 and RETAINED not in task.objects
+    assert created['audioSource:language']['name'] == 'English(US)' and created['notes'] == 'New Source'
+    collision, = shown['artifact']['prepared_operation']['semantic_preview']['envelope']['metadata']['source_language_collisions']
+    assert collision['source_id'] == RETAINED and collision['existing_language']['name'] == 'French'
+    assert collision['selected_language']['name'] == 'English(US)' and collision['effect'] == 'retire_collision_and_create_selected_language'
+
+
+def test_source_constructor_merge_does_not_verify_overwritten_existing_notes(tmp_path, workflow):
+    task, writes = existing_source_task(tmp_path, workflow)
+    task.objects[RETAINED].update(name='Tone', path=task.objects[FIRST]['path'] + r'\Tone')
+    code, result = task.step('draft-business-configure', '--name-conflict', 'merge')
+    assert code == 0, result
+    create = task._create
+    def wrongly_overwritten(node, parent, *, owned=False):
+        if node['type'] == 'Source':
+            task.objects[RETAINED].update({'@StartFreq': 440.0, 'notes': node['notes']})
+            return {'id': RETAINED, 'name': 'Tone'}
+        return create(node, parent, owned=owned)
+    task._create = wrongly_overwritten
+    tx, shown = task.preview()
+    code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, result
+    code, result = task.run('execute', tx)
+    assert code == 0, result
+    code, rejected = task.run('verify', tx)
+    assert code == 2 and rejected.get('verified') is not True, rejected
+    assert len(writes) == 1
+
+
+@pytest.mark.parametrize('wrong_language_id', [False, True])
+def test_cross_language_source_rename_can_keep_native_name_but_must_match_exposed_language_guid(tmp_path, workflow, wrong_language_id):
+    task, writes = existing_source_task(tmp_path, workflow)
+    task.objects[RETAINED].update(name='Tone', path=task.objects[FIRST]['path'] + r'\Tone',
+        **{'audioSource:language': {'name': 'French'}})
+    before = deepcopy(task.objects[RETAINED])
+    create = task._create
+    language = next(row for row in task.languages if row['name'] == 'English(US)')
+    def native_same_name(node, parent, *, owned=False):
+        result = create(node, parent, owned=owned)
+        if node['type'] == 'Source':
+            task.objects[result['id']]['audioSource:language'] = {'name': 'English(US)',
+                'id': '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}' if wrong_language_id else language['id']}
+        return result
+    task._create = native_same_name
+    code, result = task.step('draft-business-configure', '--name-conflict', 'rename')
+    assert code == 0, result
+    tx, shown = task.preview()
+    code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, result
+    code, result = task.run('execute', tx)
+    assert code == 0, result
+    code, verified = task.run('verify', tx)
+    assert code == (2 if wrong_language_id else 0), verified
+    assert len(writes) == 1 and task.objects[RETAINED] == before
+
+
+def test_source_collision_cannot_choose_between_same_names_in_two_languages(tmp_path, workflow):
+    task, writes = existing_source_task(tmp_path, workflow)
+    task.objects[RETAINED].update(name='Tone', path=task.objects[FIRST]['path'] + r'\Tone')
+    peer = '{ACACACAC-ACAC-ACAC-ACAC-ACACACACACAC}'
+    task.objects[peer] = {**deepcopy(task.objects[RETAINED]), 'id': peer, 'audioSource:language': {'name': 'French'}}
+    original = task.call
+    def native_path_selects_one(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.get') and args.get('from', {}).get('path') == [task.objects[RETAINED]['path']]:
+            result['return'] = result['return'][:1]
+        return result
+    task.call = native_path_selects_one
+    code, result = task.step('draft-business-configure', '--name-conflict', 'replace')
+    assert code == 0, result
+    code, rejected = task.step('draft-check')
+    assert code == 2 and 'AMBIGUOUS_SOURCE_COLLISION' in json.dumps(rejected), rejected
+    assert writes == []

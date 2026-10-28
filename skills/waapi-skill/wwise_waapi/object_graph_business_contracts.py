@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .documented_list_fields import discovery_contract as documented_list_discovery_contract, manual_marker_profile
+from .anonymous_list_construction import authority as anonymous_list_mode_authority
 from .effect_render_conditions import CLEAR_SUFFIX_OBSERVATIONS
 
 from typing import Any
@@ -51,6 +52,7 @@ _SUPPORTED_VERSIONS = {
 
 def _sound_semantics(operation):
     return {
+        "constructor_notes": "apply_to_new_objects_only; merge_preserves_existing_notes; configure_exact_existing_GUID_to_edit_notes",
         "sound_voice": {"native_class": "Sound", "initial_fields": {"IsVoice": True}, "empty_container": True},
         "explicit_flag_conflict": "reject_before_dispatch",
         "generic_Sound_Type_Handle": "explicit_class_fields_remain_available",
@@ -317,9 +319,11 @@ def object_graph_business_contract_data(
                     "profiles": {"effect_slot": {"class": "EffectSlot", "collection": "Effects"},
                         "manual_marker": manual_marker_profile(version)},
                     "native_name": "Gateway_owned_empty_string",
-                    "on_name_conflict": {"supported": ["fail"],
-                        "pending_source_native_proof": ["rename", "merge", "replace"],
-                        "pending_behavior": "reject_before_dispatch_without_selecting_old_blank_name_members_or_changing_policy"},
+                    "on_name_conflict": {"supported": ["fail", "rename", "merge", "replace"],
+                        "scope": "source_certified_anonymous_profiles_only; List_mode_controls_new_member_population; existing_Render_and_Marker_prerequisites_apply",
+                        "list_modes": ["append", "replaceAll"],
+                        "duplicate_restrictions": "per_List_metadata_and_profile_restrictions_remain_authoritative",
+                        "source": anonymous_list_mode_authority(version)},
                     "result_binding": "independent_ordered_owner_membership_then_exact_GUID_class_owner_and_values",
                     "render_conditions": {
                         "applies_to": "EffectSlot",
@@ -341,7 +345,9 @@ def object_graph_business_contract_data(
                         "retained_children": "complete_GUID_childset_plus_observed_plugin_and_file_Source_class_notes_language_original_path_and_live_discovered_fields_preserved",
                         "retained_field_reads": "all_discovered_fields_in_Gateway_bounded_projection_pages; existing_result_bytes_and_deadline_limits_apply",
                         "explicit_locale": "nonSFX_Project_locale_requires_actual_Voice; explicit_SFX_is_not_an_admitted_declaration",
-                        "name_conflict": "fail; other_Source_collision_modes_remain_unresolved"},
+                        "name_conflict": {"fail": "absent_exact_name", "rename": "fresh_native_named_GUID_and_preserved_collision",
+                            "merge": "same_exact_class_GUID_and_selected_language; unselected_fields_preserved",
+                            "replace": "exact_old_subtree_absent; fresh_GUID_selected_language_and_other_children_preserved; existing_collision_language_may_differ"}},
                     "source_verification": "actual_graph_GUID_class_parent_owner_fields_and_requested_language; closed_declared_childset",
                     "native_class_id": "Gateway_owned_from_Type_Handle"},
                 "optional_fields": [

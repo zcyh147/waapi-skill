@@ -1839,12 +1839,21 @@ def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(
                 assert args == {'objects': [{'object': sound_id, '@OutputBus': prepared_bus_path}]}
                 task.objects[sound_id]['@OutputBus'] = {'id': bus_id}
                 return {'objects': []}
-            assert args["objects"] == expected_creation
+            if target_collision and receiver == 'new':
+                expected_stage = [expected_creation[0]] if bus_id not in task.objects else [expected_creation[1]]
+                assert args['objects'] == expected_stage
+                if bus_id in task.objects:
+                    task.objects[sound_id] = {"id": sound_id, "name": sound_name, "type": "Sound", "classId": 65552,
+                        "path": task.objects[SECOND]["path"] + "\\" + sound_name, "parent": {"id": SECOND}, "notes": ""}
+                    return {'objects': [{'id': SECOND, 'name': task.objects[SECOND]['name'],
+                        'children': [{'id': sound_id, 'name': sound_name}]}]}
+            else:
+                assert args["objects"] == expected_creation
             if parent_rename:
                 task.objects[bus_parent].update(name=prepared_parent_name, path=prepared_parent_path)
             task.objects[bus_id] = {"id": bus_id, "name": prepared_bus_name, "type": "Bus", "classId": 1376272,
                 "path": prepared_bus_path, "parent": {"id": bus_parent}, "notes": ""}
-            if receiver == "new":
+            if receiver == "new" and not target_collision:
                 task.objects[sound_id] = {"id": sound_id, "name": sound_name, "type": "Sound", "classId": 65552,
                     "path": task.objects[SECOND]["path"] + "\\" + sound_name, "parent": {"id": SECOND}, "notes": ""}
             if not target_collision:
@@ -1853,7 +1862,8 @@ def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(
                 task.objects[CHILD]["notes"] = "Unexpected"
             source_result = {"id": FIRST, "name": sound_name} if receiver == "existing" else {
                 "id": SECOND, "name": "Default Work Unit", "children": [{"id": sound_id, "name": sound_name}]}
-            return {"objects": [{"id": bus_parent, "name": prepared_parent_name if parent_rename else "Default Work Unit", "children": [{"id": bus_id, "name": prepared_bus_name}]}, source_result]}
+            bus_result = {"id": bus_parent, "name": prepared_parent_name if parent_rename else "Default Work Unit", "children": [{"id": bus_id, "name": prepared_bus_name}]}
+            return {"objects": [bus_result] if target_collision and receiver == 'new' else [bus_result, source_result]}
         return original(uri, args, options)
     task.call = call
     kinds = {}
@@ -1911,6 +1921,11 @@ def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(
         assert len([row for row in task.calls if row[0].endswith('object.set')]) == 1
         return
     code, verified = task.finish(tx, shown)
+    if target_collision and receiver == 'new':
+        writes = [args for uri, args, _ in task.calls if uri.endswith('object.set')]
+        assert [args['objects'] for args in writes] == [[expected_creation[0]], [expected_creation[1]],
+            [{'object': sound_id, '@OutputBus': prepared_bus_path}]]
+        assert task.objects[sound_id]['@OutputBus'] == {'id': bus_id}
     assert code == 0, json.dumps(verified)
     assert (verified.get("verified") is True) == (rename_case != "old-notes-effect"), verified
     if rename_case == "collision":

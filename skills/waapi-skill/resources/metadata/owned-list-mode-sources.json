@@ -1,0 +1,44 @@
+{
+  "contract": "waapi-skill.owned-list-mode-source/v1",
+  "rule": {
+    "append": "add_new_objects_keep_existing",
+    "replaceAll": "remove_all_existing_then_add_new",
+    "duplicate_restrictions": "per_list_restrictions_remain_authoritative"
+  },
+  "excerpt": "Understanding lists and list modes Lists are generic containers for storing objects. The objects in a given list are typically of the same type. Lists provide a convenient mechanism for populating and retrieving objects through WAAPI that are \"owned\" by another object. For example, the RTPCs for a given object are contained in the \"RTPC\" list of that object. When calling ak.wwise.core.object.set , it is possible to specify one of two list modes. If a list already contains objects: append: Add the new objects to the list if possible, keeping existing objects. Some lists might not permit duplicate equivalent objects: e.g., some properties of RTPCs in the RTPC list are exclusive so there can only be one RTPC with that property. replaceAll: Remove all existing objects and add the new objects, with the duplicate restriction. For empty lists the behavior is to append.",
+  "versions": {
+    "2022.1": {
+      "build": "2022.1.19.8584",
+      "archive": "WwiseSDK-Windows.chm",
+      "archive_sha256": "b080d8847f785e98d9d0ccd31ddd2f2a799d49f9ef1ab0effdd12aa53ecd8b8e",
+      "member": "waapi_import.html",
+      "member_sha256": "111ac18590e5be81f1373fe6116cac29cc1fa230191e7c75292dda4ba184622e",
+      "anchor": "waapi_set_lists_modes"
+    },
+    "2023.1": {
+      "build": "2023.1.19.8928",
+      "archive": "WwiseSDK-Windows.chm",
+      "archive_sha256": "fa5e37e8adacc33cf9189be46a4bdbb7f780ebf776429154fddc0ae2df303415",
+      "member": "waapi_import.html",
+      "member_sha256": "96997a6fa963564b399a58f4d3c4b4837e63d542d1dda2d4cec44539bb6846de",
+      "anchor": "waapi_set_lists_modes"
+    },
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "archive": "WwiseSDK-Windows.chm",
+      "archive_sha256": "aa6b467caae07c2363806adc1dadeed8df7a29c4bdf2d23fd629126208054364",
+      "member": "waapi_import.html",
+      "member_sha256": "ab0aabe558e36b94a4ea4339a59d2c9b09c5f0ad3d706062f2f9bbfd024ee0fd",
+      "anchor": "waapi_set_lists_modes"
+    },
+    "2025.1": {
+      "build": "2025.1.7.9143",
+      "archive": "WwiseSDK-Windows.chm",
+      "archive_sha256": "c54b729388040e9df540a2f58d0d0eda966ac5da6410d3cd715ae256d898166d",
+      "member": "waapi_import.html",
+      "member_sha256": "25eb2daa89d49f4383ed04af215597cdaadae764584c177cfddc20890dd85e95",
+      "anchor": "waapi_set_lists_modes"
+    }
+  },
+  "sha256": "78ce496038c8d7a3415f2f32c0ff2e68ec1e3bb4e6960db00fdcdd486024a3e2"
+}
