@@ -5,6 +5,7 @@ from __future__ import annotations
 from .documented_list_fields import discovery_contract as documented_list_discovery_contract, manual_marker_profile
 from .anonymous_list_construction import authority as anonymous_list_mode_authority
 from .effect_render_conditions import CLEAR_SUFFIX_OBSERVATIONS
+from .music_playlist import declaration_contract as music_playlist_contract
 from .saved_object_construction import declaration_contract as saved_constructor_contract
 
 from typing import Any
@@ -358,6 +359,7 @@ def object_graph_business_contract_data(
                     "loop",
                     "max_instances",
                     "media_files",
+                    "music_playlist",
                     "name_conflict",
                     "new_name",
                     "notes",
@@ -378,6 +380,7 @@ def object_graph_business_contract_data(
                     "object_list": "string",
                     "platform": "string",
                     "plugin_placement": "string",
+                    "music_playlist": "music_playlist",
                 },
                 "field_semantics": ACTION_DURATION_SEMANTICS,
                 "existing_target_choices": {
@@ -387,6 +390,7 @@ def object_graph_business_contract_data(
                     "overrides": "batch_name_conflict",
                 },
             },
+            "music_playlist": music_playlist_contract(version),
             "rtpc_declaration": {
                 "subcommand": "draft-declare-rtpc", "supported_versions": ["2022.1", "2023.1", "2024.1", "2025.1"],
                 "required_fields": ["declaration_id", "object_handle", "field_handle", "curve_points"],

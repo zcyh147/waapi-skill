@@ -6135,18 +6135,20 @@ def _prepare_object_set(
     all_documented_bindings = list(arguments.get("documented_list_bindings", []))
     planned_bindings = [binding for binding in all_documented_bindings if "planned_owner" in binding]
     documented_bindings = [binding for binding in all_documented_bindings if "planned_owner" not in binding]
+    music_playlists = []
     planned_guards = []
     saved_constructor_batches = []
     early_merge_guards = []
     rtpc_snapshots = {}
     raw_objects = _mapping_sequence(arguments.get("objects"), field="objects")
-    conflict = str(arguments.get("on_name_conflict", "fail"))
+    playlist_constructor = len(raw_objects) == 1 and "music_playlist" in raw_objects[0]
+    conflict = "merge" if playlist_constructor else str(arguments.get("on_name_conflict", "fail"))
     global_platform = (
         _non_empty_string(arguments.get("platform"), field="platform")
         if "platform" in arguments
         else None
     )
-    global_list_mode = str(arguments.get("list_mode", "append"))
+    global_list_mode = "replaceAll" if playlist_constructor else str(arguments.get("list_mode", "append"))
     auto_add_to_source_control = arguments.get(
         "auto_add_to_source_control",
         False,
@@ -6433,6 +6435,18 @@ def _prepare_object_set(
             )
             trusted["import"] = trusted_import
             target_spec["import"] = import_spec
+        if "music_playlist" in item:
+            from .music_playlist import prepare as prepare_music_playlist
+            def resolve_playlist_segment(identity, role):
+                resolved = _resolve_identity(identity, role=role, read=read, identity_cache=identity_cache)
+                roles[role] = resolved
+                return resolved
+            native_playlist, playlist_proof = prepare_music_playlist(item["music_playlist"], version=request.version,
+                owner=target, catalog=type_catalog, read=read, resolve_segment=resolve_playlist_segment,
+                validate_scalar=_require_object_property_value)
+            trusted["@PlaylistRoot"] = native_playlist
+            trusted["listMode"] = "replaceAll"
+            music_playlists.append(playlist_proof)
         if "platform" in item:
             trusted["platform"] = platform
         if "on_name_conflict" in item:
@@ -7497,6 +7511,11 @@ def _prepare_object_set(
         family="object-mutation",
         metadata={
             "closed_object_batch": True,
+            **({"music_playlist_replacements": [{"owner_id": proof["owner_id"],
+                "owner_name": proof["owner_snapshot"]["name"], "owner_path": proof["owner_snapshot"]["path"],
+                "intent": proof["replacement_intent"], "old_tree": proof["old_tree"],
+                "requested_tree": proof["requested_tree"], "ordered_getter_evidence": proof["ordered_getter_evidence"],
+                "verification_scope": proof["verification_scope"]} for proof in music_playlists]} if music_playlists else {}),
             "action_collisions": _action_collision_preview(node_specs, conflict),
             "fresh_action_parents": [node['fresh_action_parent'] for node in node_specs if node.get('fresh_action_parent')],
             "constructor_notes": {"new_objects": "apply_requested_notes", "merged_existing": "preserve_existing_notes", "edit_existing_notes": "configure_exact_existing_GUID"},
@@ -7582,6 +7601,7 @@ def _prepare_object_set(
     state: dict[str, Any] = {
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
+        **({"music_playlists": music_playlists} if music_playlists else {}),
         **({"saved_object_constructor_batches": saved_constructor_batches} if saved_constructor_batches else {}),
         "existing_field_observations": existing_field_history,
         "effect_render_chains": effect_render_chains,
@@ -19546,6 +19566,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 ]
             )
 
+    from .music_playlist import guard_assertions as music_playlist_guard_assertions
+    for proof in pre_state.get("music_playlists", []):
+        assertions.extend(music_playlist_guard_assertions(proof, read=read_call))
+
     # Class defaults authorize only genuinely new objects. Re-read the exact
     # metadata sealed at Preview before dispatching their single creation call.
     assertions.extend(_new_object_class_metadata_assertions(pre_state, read=read_call, readbacks=readbacks))
@@ -22955,6 +22979,17 @@ def verify_prepared_operation(
                 version=version,
             )
         payload = _execution_payload(execution_result)
+        if pre_state.get("music_playlists"):
+            from .music_playlist import verify as verify_music_playlist, without_result_tree
+            for proof in pre_state["music_playlists"]:
+                try:
+                    playlist_checks, playlist_identities = verify_music_playlist(proof, payload, read=read_call)
+                    assertions.extend(playlist_checks)
+                    readbacks.append({"role": "music-playlist-verified-occurrences", "identities": playlist_identities,
+                        "scope": proof["verification_scope"], "native_order_evidence": proof["ordered_getter_evidence"]})
+                except OperationContractError as exc:
+                    check("Music Playlist exact ordered tree is independently readable", False, exc.as_dict())
+            payload = without_result_tree(payload)
         result_nodes: tuple[ObjectResultNode, ...] = ()
         result_by_path: dict[str, ObjectResultNode] = {}
         try:
@@ -27904,6 +27939,7 @@ def _validate_nested_request_shape(
                     "import",
                     "children",
                     "lists",
+                    "music_playlist",
                 ),
                 context=f"object.set objects[{index}]",
             )
@@ -27930,12 +27966,19 @@ def _validate_nested_request_shape(
                     "import",
                     "children",
                     "lists",
+                    "music_playlist",
                 )
             ):
                 raise OperationContractError(
                     "NO_OP",
                     f"object.set objects[{index}] must request at least one field, child, or list change.",
                 )
+            if "music_playlist" in item:
+                if len(raw_objects) != 1 or set(item) != {"object", "music_playlist"} or set(arguments) != {"objects"}:
+                    raise OperationContractError("MUSIC_PLAYLIST_STANDALONE_REQUIRED",
+                        "A complete Music Playlist declaration requires one existing owner and its own transaction.")
+                from .music_playlist import validate_descriptor
+                total_nodes += validate_descriptor(item["music_playlist"], version)
             try:
                 normalize_property_descriptors(
                     item.get("properties", []),

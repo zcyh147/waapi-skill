@@ -1252,7 +1252,8 @@ def bind_live_field(
         enabled_dependency_fields = ()
     class_default_evidence = None
     if enabled_dependency_fields and scope_kind == "class":
-        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call)
+        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call,
+                                                         available_names=exact_names)
         if class_default_evidence is not None:
             enabled_dependency_fields = ()
     if enabled_dependency_fields and scope_kind != "object":
@@ -1418,7 +1419,8 @@ def revalidate_live_field(
         enabled_dependency_fields = ()
     class_default_evidence = None
     if enabled_dependency_fields and field.scope_kind == "class":
-        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call)
+        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call,
+                                                         available_names=tuple(row.name for row in names))
         if class_default_evidence is not None:
             enabled_dependency_fields = ()
     if enabled_dependency_fields and field.scope_kind != "object":
@@ -1896,7 +1898,7 @@ def _is_boolean_override_terminal(info):
     )
 
 
-def _new_class_field_evidence(registry, info, live_scope, read_call):
+def _new_class_field_evidence(registry, info, live_scope, read_call, *, available_names):
     from .new_object_defaults import class_default_evidence, NewObjectDefaultError
     # Semantic-kind browsing need not have issued a Type Handle. The exact
     # connected class inventory, not prior discovery order, certifies scope.
@@ -1904,9 +1906,18 @@ def _new_class_field_evidence(registry, info, live_scope, read_call):
     matches = [row for row in rows if row.class_id == live_scope.get("classId")]
     if len(matches) != 1:
         return None
+    def scoped_read(uri, args, options):
+        if (matches[0].name == "MusicPlaylistItem" and uri == GET_PROPERTY_INFO_URI
+                and args.get("property") not in available_names):
+            raise _error(
+                "MUSIC_PLAYLIST_HIDDEN_DEPENDENCY", field=info.name,
+                controller=args.get("property"),
+                action="The required playlist controller is not exposed; retain reads and omit this field from changes",
+            )
+        return read_call(uri, args, options)
     try:
         return class_default_evidence(infos=(info,), scope=live_scope,
-                                      read_call=read_call, discovery=True, version=registry.context.wwise_version)
+                                      read_call=scoped_read, discovery=True, version=registry.context.wwise_version)
     except NewObjectDefaultError:
         return None
 

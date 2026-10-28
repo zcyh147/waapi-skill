@@ -1200,6 +1200,7 @@ def _compile_existing_set_fields(
         "clear_object_lists",
         "list_behavior",
         "media_files",
+        "music_playlist",
         "name_conflict",
         "new_name",
         "platform",
@@ -1221,6 +1222,7 @@ def _compile_existing_set_fields(
             "field_values",
             "list_behavior",
             "media_files",
+            "music_playlist",
             "name_conflict",
             "new_name",
             "platform",
@@ -1436,6 +1438,12 @@ def _compile_existing_set_fields(
         compiled["properties"] = properties
     if references:
         compiled["references"] = references
+    if "music_playlist" in fields:
+        from .music_playlist import compile_business
+        if set(fields) != {"music_playlist"} or session.settings or len(session.declarations) != 1:
+            raise _repair(session, "MUSIC_PLAYLIST_STANDALONE_REQUIRED", field="music_playlist",
+                action="declare one existing container's complete playlist in its own transaction")
+        compiled["music_playlist"] = compile_business(session, source, fields["music_playlist"])
     return compiled
 
 

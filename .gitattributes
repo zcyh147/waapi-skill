@@ -24,3 +24,6 @@ tests/fixtures/runtime-qualified-reads/** -text
 tests/fixtures/runtime-loaded-media/** -text
 # Verbatim CHM pages retain source whitespace as part of their provenance.
 tests/fixtures/runtime-loaded-media/composite-*.html -whitespace
+# Runtime Music Playlist authority uses verbatim, hash-bound installed SDK pages.
+skills/waapi-skill/references/semantic/*/music-playlist-sources/*.html -text -whitespace
+skills/waapi-skill/references/semantic/*/music-playlist-sources/*.original.json -text

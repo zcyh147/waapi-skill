@@ -18142,7 +18142,13 @@ def _parse_object_graph_business_fields(
             )
         if name in fields:
             raise GatewayInputError(f"Business field {name!r} was supplied twice")
-        fields[name] = _parse_business_value(value_type, raw, field=name)
+        if name == "music_playlist" and value_type == "music_playlist":
+            from wwise_waapi.music_playlist import MAX_BYTES
+            if len(raw.encode("utf-8")) > MAX_BYTES:
+                raise GatewayInputError("music_playlist exceeds its UTF-8 byte limit")
+            fields[name] = parse_json_object(raw, "music_playlist")
+        else:
+            fields[name] = _parse_business_value(value_type, raw, field=name)
     if field_value_pairs:
         dynamic: dict[str, Any] = {}
         for pair in field_value_pairs:
@@ -32954,6 +32960,10 @@ def transaction_show_summary(
     owned_replacements = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("owned_control_input_replacements")
     if owned_replacements:
         derived_notice["owned_control_input_replacements"] = owned_replacements
+    playlist_replacements = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("music_playlist_replacements")
+    if playlist_replacements:
+        from wwise_waapi.music_playlist import replacement_notice
+        derived_notice["music_playlist_replacements"] = [replacement_notice(row) for row in playlist_replacements]
     paste_selection = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("paste_selection")
     if isinstance(paste_selection, Mapping):
         derived_notice["paste_selection"] = dict(paste_selection)
