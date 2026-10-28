@@ -172,6 +172,7 @@ def _copy_review_inputs(destination):
     ('current', 'Reviewed current public condition mechanism source changed'),
     ('original', 'Exact reviewed condition completion proof differs'),
     ('added-resource', 'Reviewed current public condition mechanism source changed'),
+    ('added-python', 'Reviewed current public condition mechanism source changed'),
     ('reconciliation', 'Exact condition source reconciliation differs'),
 ])
 def test_condition_source_successor_rejects_changed_inputs(tmp_path, damage, error):
@@ -182,6 +183,7 @@ def test_condition_source_successor_rejects_changed_inputs(tmp_path, damage, err
         'current': 'skills/waapi-skill/wwise_waapi/operation_registry.py',
         'original': REVIEW_PATH,
         'added-resource': 'skills/waapi-skill/resources/metadata/reference-master-sink-capabilities.json',
+        'added-python': 'skills/waapi-skill/wwise_waapi/control_surface_construction.py',
         'reconciliation': SOURCE_RECONCILIATION_PATH,
     }
     target = root / names[damage]

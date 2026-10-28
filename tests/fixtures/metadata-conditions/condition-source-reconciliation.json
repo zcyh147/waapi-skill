@@ -9,6 +9,179 @@
     },
     "current_package": "0586b6d467bdf1461b6adc3c92f4dd253d35d187",
     "dependencies_retained": 285,
+    "final_existing_condition_source_successor": {
+      "import_closure_spec_review_fix": {
+        "exact_added_python_sources": [
+          "skills/waapi-skill/wwise_waapi/action_construction.py",
+          "skills/waapi-skill/wwise_waapi/anonymous_list_construction.py",
+          "skills/waapi-skill/wwise_waapi/control_surface_construction.py",
+          "skills/waapi-skill/wwise_waapi/media_pool_database.py",
+          "skills/waapi-skill/wwise_waapi/music_playlist.py",
+          "skills/waapi-skill/wwise_waapi/music_transitions.py",
+          "skills/waapi-skill/wwise_waapi/saved_object_construction.py"
+        ],
+        "predecessor_commit": "7e951fcd8ad13c0abda9ca6b5889afa71140dbe7",
+        "predecessor_reconciliation_sha256": "750d0aa1f8fb2530bd223965679a8476ad6a6e32ecae20c0d4535fba5860d2ea",
+        "review": "Confirmed SPEC P2: selected function not called does not exclude eager import-time Python code. Finite reviewer closure is 54 local modules, other 47 already sealed. Action declaration_contract returns constants; no additional eager resource read.",
+        "runtime_candidate": "8e32450372867bad2b7b669f92c645ebfe8968df",
+        "scope": "Import-time source integrity only; original source changes/before hashes, proof archive/program/native bytes and verdicts retained. No additional constructor/condition execution evidence.",
+        "superseded_exclusion_rationale": "None. New ControlSurface module has definitions only at import and its preparation returns before source/reads for no selected constructor nodes. Its authority resource is read by constructor/schema branches, not the retained named existing-field condition mechanism. Existing master-sink addition remains sealed."
+      },
+      "incremental_review": {
+        "control_surface_candidate": "7d65e8de1d813f97f1724342397adfee037a4210",
+        "display_identity_candidate": "1849c95c1e2c4b772e3b9f95b1177e984b3b2959",
+        "final_integration": "8e32450372867bad2b7b669f92c645ebfe8968df",
+        "state_guidance_candidate": "79055fcf3308c7ee7dde139f01335c0e0b361ce3"
+      },
+      "integration_candidate": "8e32450372867bad2b7b669f92c645ebfe8968df",
+      "new_fresh_runs": 0,
+      "new_functional_condition_runs": 0,
+      "new_native_runs": 0,
+      "predecessor_reconciliation_sha256": "4fe41e4bcef2a4d2ffc2f9e0ff484ea61c6616fd067ed5efb236c57069dc4882",
+      "prior_d4_causal_review": {
+        "candidate": "d4e12fad17f451240bf0ff5a7457d9440f665d82",
+        "json_sha256": "2a199fb59a65e523164a8b21b461a5cf6bb3b471d9001b938440ff9e5137b75c",
+        "report_sha256": "6b9218cc8ec49fb56e5df85eba9ebeab1d57c51ff101235fdcf12e73faecb708",
+        "transitions": 21
+      },
+      "producer_recaptures": 0,
+      "scope": "Existing-object source-definition and retained representative-mechanism admission only. Historical program sources/results/native facts and all original before hashes retained; no current-candidate functional/native effect or NEW-role credit.",
+      "source_additions": "Seven exact current Python import-closure dependencies are added with null original predecessors. Eager module import executes code even when constructor functions are unselected. The original Master Sink resource remains unchanged. No extra constructor resource seal is required for this narrow eager-import chain; resource reads remain inside unselected functions.",
+      "updates": {
+        "skills/waapi-skill/scripts/gateway.py": {
+          "causal_finding": "Adds per-declaration media source-control flags, explicit all-platform notice, bounded JSON parsing only for music_playlist/music_transitions, and transition/playlist replacement notice only when sealed metadata exists. The extra unknown-kind discovery read requires operation object.create/object.set, class scope, and unknown kind; certify_class then restricts it to exact Action.Target. Existing object-scoped single-field discovery and setter dispatch do not select this arm. No ordinary scalar parser/value rule changes. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "045a61aa50047aefd5e0544122fcba4d0cf4be2811cf3a8e4a3027684f38e6b3",
+          "d4_sha256": "045a61aa50047aefd5e0544122fcba4d0cf4be2811cf3a8e4a3027684f38e6b3",
+          "previous_effective_sha256": "c9cb83e6c53ccf6049e8e1f37e1bb6a9f75a229ea99f0ed8125beb184223c6b2"
+        },
+        "skills/waapi-skill/wwise_waapi/business_declaration_state.py": {
+          "causal_finding": "Only AnonymousListTarget gains the source-certified MediaPoolDatabasePath alternative via is_path_class. Empty name, modern-version and selected type requirements remain. Ordinary bound existing-object targets and condition Field Handles retain their branches. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "0d7720ca41ff9e497c620c30502f8650a3344c065d629e4bc3a2e4cbdc8a121c",
+          "d4_sha256": "0d7720ca41ff9e497c620c30502f8650a3344c065d629e4bc3a2e4cbdc8a121c",
+          "previous_effective_sha256": "bd3139219be1b200fccc0f022b0cace14dc2bcdcececc2325b4e7344f4d29484"
+        },
+        "skills/waapi-skill/wwise_waapi/business_declarations.py": {
+          "causal_finding": "Existing scope_kind=object still calls the unchanged certify path. New elif scope_kind=class calls exact Action.Target certify_class. Class-default evidence now receives the exact field-name roster; only MusicPlaylistItem blocks an undisclosed required controller before attempting getPropertyInfo, retaining the accepted missing-controller refusal and exposed path. The scalar field bind/resolve/value/restriction/dependency helpers are AST-identical. This is a real class-discovery change, not whole-file equivalence and not a new existing-recipient effect. After 634 only normalize_live_object_identity adds bounded comparison-only display admission for four exact types/lanes; canonical GUID/type/name/path byte bounds and equality remain. SourcePlugin/AudioDevice do not match the predicate. Existing object Field Handle bind/resolve/value/revalidation functions remain AST-identical.",
+          "current_sha256": "8e3988f7111099d0680a290663a682f59f4e3e386496354178d9a9d69c04c229",
+          "d4_sha256": "f44c15aa34a4330293200f22fdac10db7ee0ab70020d6f40d9ae2960afb48c97",
+          "previous_effective_sha256": "ab1e210628551a70251ac51a7c0b2afbb10ef8e27bfb422e5665b53bcd987f13"
+        },
+        "skills/waapi-skill/wwise_waapi/core_business.py": {
+          "causal_finding": "Moves the unchanged replace/merge-replace/merge-keep and none/manual/automatic mappings into core_business_contracts and imports them. No compiler function or ordinary condition operation changes. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "cabc1d46de13fbb3f7700a348f9441ecc0cb9d0ebca3a754dd014b56bd17e09f",
+          "d4_sha256": "cabc1d46de13fbb3f7700a348f9441ecc0cb9d0ebca3a754dd014b56bd17e09f",
+          "previous_effective_sha256": "d2d1353a5d72c4a2f0061a6bea4ade8d35f7d13e52b4060aaed21122c846b080"
+        },
+        "skills/waapi-skill/wwise_waapi/core_business_contracts.py": {
+          "causal_finding": "Owns the same relocated constants and adds value_domains only for pasteProperties and blendContainer.addAssignment. No existing condition field types, literal grammar, metadata refresh or setter declaration changes. After d4 only StateProperties catalog intent text clarifies States-tab column selection; no constructor, field grammar, condition planning or dispatch change.",
+          "current_sha256": "c527ce24a9e33478808fa60309f166b191e265892cfcf312e4665fbb7d274ffa",
+          "d4_sha256": "db65cea0270a72733501659f63005c98917c640d43704d2bd106b2200ab6e234",
+          "previous_effective_sha256": "63dcf1b255798ff7eac88373c6e3e3e56866981c165f13309cfc067c19f06f2d"
+        },
+        "skills/waapi-skill/wwise_waapi/creation_observations.py": {
+          "causal_finding": "Rejects nodes carrying saved_constructor from optional ordinary creation-history observation. This prevents saved WorkUnit/Query effects borrowing ordinary history claims. Named existing field plans do not call ordinary_creation_graph; no old condition receipt gains constructor credit. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "b9ee038d56b0e395d16ff9b4eb386023695164794b6872d0efb9b5bc85b45392",
+          "d4_sha256": "b9ee038d56b0e395d16ff9b4eb386023695164794b6872d0efb9b5bc85b45392",
+          "previous_effective_sha256": "03a55fbba8783ce7d5838baf51626d663289d8cb86ed3282f0f7288c0a894e33"
+        },
+        "skills/waapi-skill/wwise_waapi/documented_list_fields.py": {
+          "causal_finding": "Adds a bounded hash-pinned 2021 installed-owned-List overlay to the unchanged published catalog, checks exact owner/member identities, recomputes the derived catalog seal, and gives overlay fields exact XML provenance. load_catalog gains an internal catalog_root injection. source_owned_music_type admits only six named music WObjects with exact matching owner/List/version evidence; it is not a hierarchy bypass. This changes 2021 List catalog output and source seals. Ordinary scalar/reference field metadata does not use that catalog; any existing List guard remains exact and cannot silently accept a stale derived catalog. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "ac7a5155d51874f85498c470dab71fc4d2a9cd1de7e611d7b480c767055257c2",
+          "d4_sha256": "ac7a5155d51874f85498c470dab71fc4d2a9cd1de7e611d7b480c767055257c2",
+          "previous_effective_sha256": "09c28f7a49f22dd6eb825c20ea546468d4f2a09eb2921f3d92c663ccba3017f5"
+        },
+        "skills/waapi-skill/wwise_waapi/object_capabilities.py": {
+          "causal_finding": "Adds Query->SearchCriteria and Event->Action specialized parents, and WorkUnit/Query/SearchCriteria/Action required-parent constraints. Existing State/Switch/Bus rules retain their exact entries. Only create/tree placement and consumers of this shared relationship helper change; a single existing-object scalar/reference edit is not reparented or reconstructed. After 634 ControlSurfaceSession/BindingGroup parent and role-class placement entries affect constructors/transfers only. Display comparison predicate admits exactly Language/MidiParameter/UserProjectSettings in pinned lanes and MediaPoolQuery in 2025; its name-boundary predicate preserves already-admitted 2021 Language name preparation. Source/AudioDevice identity semantics and condition roles remain unchanged.",
+          "current_sha256": "00659f9b2a51bfe8f058010a9077f57c5c0bb2a0c58168cf3ebb3648dcc6d509",
+          "d4_sha256": "5ec5c872255f8813f1bc7e0c2d3045c74b7c99e70c2effe93b215038a1dae180",
+          "previous_effective_sha256": "174edce4089ae486b1acff3bcafbf3b7134b033105e32a741c6c910051eb394f"
+        },
+        "skills/waapi-skill/wwise_waapi/object_graph_business.py": {
+          "causal_finding": "Adds a Boolean per-import-group add_to_source_control choice with atomic disagreement rejection. Removes the old Action blanket rejection only behind the new exact class/ActionType/Target constructor. Existing object.set accepts explicit standalone music_playlist/music_transitions and rejects mixing them with other declarations/settings/fields. Generic existing field compilation and ordinary scalar declaration values otherwise retain their path; new tree fields cannot be implicitly synthesized. After 634 only explicit new_name requests on newly admitted display identities get a name-authority refusal; legacy 2021 Language exception is centralized. Existing scalar/reference graph fields do not enter this name branch.",
+          "current_sha256": "c58e3eae8673ffb1e73dc556de0198c8bb00c400820179f24b3461d3ed45f4cd",
+          "d4_sha256": "71768e8512fa91b80f655295bb164b39b38caa5e9ca5a61fd0283417094dc442",
+          "previous_effective_sha256": "281557a1dfc1c78a2ae62cc3c356c9a19ddb9fc335ee50b5d95d317027e95825"
+        },
+        "skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py": {
+          "causal_finding": "Discloses Action and saved constructors, creation-only notes, source collision modes, certified anonymous List policies, the 2025 Media Pool directory profile, standalone music trees and per-import-group source-control option. Calls their authority/declaration helpers only while constructing the relevant graph schema. Existing setProperty/setReference metadata contracts are not replaced. Schema changes require their own graph evidence and do not prove existing-condition recipient effects. After 634 only object graph creation_boundaries gain the ControlSurface declaration. Selected named existing-field condition contracts do not invoke that constructor authority; no scalar/reference condition grammar change.",
+          "current_sha256": "9dda16f652f9d04e083d20ae2adbf8d4bd7be36d43ce6475887bc27edf80b577",
+          "d4_sha256": "1c94cc65dfb16f31bea8887bc9f5e34435eee7515346aa80706209b565ed1462",
+          "previous_effective_sha256": "219d75b7fa994731230505e7269e948931708bb92150967361c617ce6c4ff3bd"
+        },
+        "skills/waapi-skill/wwise_waapi/object_graph_paths.py": {
+          "causal_finding": "Applies requested notes to the expected retained row only when existing_target is True. A constructor merge into a preexisting GUID now preserves its old notes; configuring an exact existing object still verifies requested notes. This is a material graph expectation change, not a change to standalone same-guid notes/property/reference verifiers. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "346758989e4be60466d75ece2b6ded8956ddffb6db7bb4911df63e0d7ac2d0e4",
+          "d4_sha256": "346758989e4be60466d75ece2b6ded8956ddffb6db7bb4911df63e0d7ac2d0e4",
+          "previous_effective_sha256": "91ca2e00a557ba48e46871674f4fa16c6ba405bbed654a0c1423c27fb6cc16c9"
+        },
+        "skills/waapi-skill/wwise_waapi/operation_object.py": {
+          "causal_finding": "Only the anonymous placement tuple set gains Paths/MediaPoolDatabasePath with an empty native name. The Boolean anonymous marker, all other tuple restrictions and ordinary descriptor normalization remain. No raw field/predicate grammar is opened. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "73599eea347430340950db5c753700db24410e6a85877f419101a8c84307c080",
+          "d4_sha256": "73599eea347430340950db5c753700db24410e6a85877f419101a8c84307c080",
+          "previous_effective_sha256": "a1272754c7d6ad8a1c7f4b7f3da195727d8b88d1e4aad1495ea275be5bc8d1e2"
+        },
+        "skills/waapi-skill/wwise_waapi/operation_registry.py": {
+          "causal_finding": "The full 1263-line diff was read. Constructor changes cover Action collision/occurrence binding and Event preservation, Source merge/replace/language/preservation, anonymous/List source admission, saved WorkUnit/Query scope and weaker result, Media Pool directory, standalone transition/playlist preparation/guards/verification, and explicit all-platform generation. New checks require their selected node flags, sealed pre_state keys, or operation/kind. Shared exceptions are reviewed separately below: metadata.is_reference evidence, class-only Action.Target certification, and graph postwrite ActionType proof update. Full named single-field preparation and both same-GUID verifier branch bodies are AST-identical; recursive closure/activation/Parent/association and target-condition routines are AST-identical. New music guard imports have only definitions/constants at module import, and empty proof lists add no read/assertion. Whole-function equivalence is not claimed. After 634 ControlSurface preparation requires object.create/object.set and selected new Binding/Group nodes; revalidation/verification and rename association require sealed constructor flags. With no such flags new exact-name ordering is a stable all-equal-key sort and old associations retain their candidates. Name/topology guards add versioned comparison-shape refusal only for setName/copy/move/graph name changes. Full named setProperty/setReference preparation arm, same-GUID property/reference verifier bodies, recursive closure/activation/Parent/association/target checks and _condition_metadata_assertions are AST-identical to 634. No Source/AudioDevice condition target selects the four-type display predicate.",
+          "current_sha256": "3e95fe543c5ba7d8cf3f4e69f69b6ea140070ae6ddf2f10f1b8caaf3f3f72596",
+          "d4_sha256": "1bd9a1e3ba037d63157f64e12ba7164ea306bcd6742380dea7ace40032f8d159",
+          "previous_effective_sha256": "5ab7666497f7780ee290258472c1e58f1e1c910293f437d13092030e077ba23c"
+        },
+        "skills/waapi-skill/wwise_waapi/operation_soundbank.py": {
+          "causal_finding": "Adds deliberate allPlatforms=True, mutually exclusive with platforms, materialized from the bounded live project platform inventory. The plan stores its scope strategy and exact resolved platforms; the existing explicit-list branch retains its validation. Neither metadata condition discovery nor object field writes call this builder. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "fa910d40c2e88ecd56295ae5c56faa010680acddf0542edbcc6fb55cdfb07283",
+          "d4_sha256": "fa910d40c2e88ecd56295ae5c56faa010680acddf0542edbcc6fb55cdfb07283",
+          "previous_effective_sha256": "502324a2d51390441bb75013e8655c6eb68f2366e7bbd82bfbbf6a4a353c66f7"
+        },
+        "skills/waapi-skill/wwise_waapi/planned_references.py": {
+          "causal_finding": "Actions now force retained result bindings, have no synthesized path, retain native empty name, and use parent rather than owner relation. They are excluded from ordinary sibling name-collision grouping and cannot be used as planned reference targets. These branches require Action graph nodes; existing GUID condition binding and unrelated planned results retain their branches. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "1d0539d23a7ea4f027d8e20c4f11dcec8e3835cf9c26397392fe879e9d5bd715",
+          "d4_sha256": "1d0539d23a7ea4f027d8e20c4f11dcec8e3835cf9c26397392fe879e9d5bd715",
+          "previous_effective_sha256": "1d33b44430c5d70f9dfe4eb0dd57e9e65989c160bf6d80dca324450bd7a33525"
+        },
+        "skills/waapi-skill/wwise_waapi/project_setting_business.py": {
+          "causal_finding": "Imports the unchanged stretch/preserve-x mapping from the contract module rather than defining a duplicate. Existing functions and condition preparation are unchanged. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "82d8bf1bf744264ca0da5d294f402f4d3b557c683c101cda7d8091bfbed14152",
+          "d4_sha256": "82d8bf1bf744264ca0da5d294f402f4d3b557c683c101cda7d8091bfbed14152",
+          "previous_effective_sha256": "87e116602cdc4c1b7ad58f6bf4405c4dd6d2cdea4c9e353e8276b7bd9cf84c70"
+        },
+        "skills/waapi-skill/wwise_waapi/project_setting_business_contracts.py": {
+          "causal_finding": "Adds the same mapping and exposes its public choices only for gameParameter.setRange. No ordinary field-controller normalization or condition value changes. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "a8e459df9ff091446bbf6cb1a05e8a273761fd8f8256392e5d668c172939cc09",
+          "d4_sha256": "a8e459df9ff091446bbf6cb1a05e8a273761fd8f8256392e5d668c172939cc09",
+          "previous_effective_sha256": "5b94b93d61193b1ba69fc06e4d0bc1edee246854b2328e0cd13135ce2ff1df90"
+        },
+        "skills/waapi-skill/wwise_waapi/reference_kind_evidence.py": {
+          "causal_finding": "Adds certify_class only for Action class 327696 / Target with absent native type and no restriction. It verifies the sealed SDK/type index plus fresh live class and retains raw metadata identity in evidence; contradictory scalar/restricted metadata is returned unchanged. Existing object-scoped certify and query certifiers are AST-identical. Thus no new type inference enters the ordinary exact-object Action condition route. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "eee039338379022e2935d5acfe7fef8ca5ca601abe10bc14b7129944e57d2065",
+          "d4_sha256": "eee039338379022e2935d5acfe7fef8ca5ca601abe10bc14b7129944e57d2065",
+          "previous_effective_sha256": "749cdfbc16af4a09e63a71e6c10f66dd2925f0f5a05c0fdfdd400a84d5f2cb3a"
+        },
+        "skills/waapi-skill/wwise_waapi/selection_guidance.py": {
+          "causal_finding": "The only d4-to-634 delta clarifies StateProperties as States-tab property-column selection and directs exact existing CustomState scalar editing to instance live Field Handles. Guidance strings/alternates only; no field normalization, condition evaluator, dispatch, policy or verifier change.",
+          "current_sha256": "b311c0334783e180ff85b17d3539518356ef466af459d66a2a51dd668506133d",
+          "d4_sha256": "ea220a6f814a44002c1d25d22936dd28f2707d6dcc7f644a297afbc7206f22a3",
+          "previous_effective_sha256": "ea220a6f814a44002c1d25d22936dd28f2707d6dcc7f644a297afbc7206f22a3"
+        },
+        "skills/waapi-skill/wwise_waapi/soundbank_business.py": {
+          "causal_finding": "Replaces mandatory platforms with exactly one explicit platforms list or all_platforms=True. False/combined/missing intent rejects; the existing explicit-list normalization remains. Only soundbank.generate business materialization changes. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "c37058559c63051bc4a167c93635351a01db81d7564f59569411a5b6622989ec",
+          "d4_sha256": "c37058559c63051bc4a167c93635351a01db81d7564f59569411a5b6622989ec",
+          "previous_effective_sha256": "24bbeb066c0bf8d960a1a61f6c37d6972139d8342d1f92567a777ef2c7a53ac6"
+        },
+        "skills/waapi-skill/wwise_waapi/soundbank_business_cli.py": {
+          "causal_finding": "Adds --all-platforms and its selected-plan propagation, rejects combining it with --platform, and ensures the new option is excluded from unrelated SoundBank plan families. No object condition parser is shared with this option. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "3ff1d1cc2ac16611d98fbb0b68a7370c7fb7380c939a55c2f9b716ff393a5a69",
+          "d4_sha256": "3ff1d1cc2ac16611d98fbb0b68a7370c7fb7380c939a55c2f9b716ff393a5a69",
+          "previous_effective_sha256": "b211fe50551bb5235a47f8e3b7461d254eb08ffa4db6ec3d4c55cbe3e6cb3317"
+        },
+        "skills/waapi-skill/wwise_waapi/soundbank_business_contracts.py": {
+          "causal_finding": "Discloses platforms or true-only all_platforms with exclusive oneOf and retains bounded list shape and explanatory Preview/drift/native-enumeration semantics. No existing object mutation schema changes. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+          "current_sha256": "ab8fe493deb40548e6d385d0201a257a4275bd9c8450df61ef30e6eccabdbe4d",
+          "d4_sha256": "ab8fe493deb40548e6d385d0201a257a4275bd9c8450df61ef30e6eccabdbe4d",
+          "previous_effective_sha256": "c40a6d9dd37befad6e766660c8446ac58682f9d4fc66a8180da2e5ad9af93c37"
+        }
+      }
+    },
     "finite_condition_supplement_sha256": "046bd375353d5798f322b999bbbdb40c684599518337fe1bd58e4ce38e8fcf5c",
     "historical_core": "f846906633e5ce145941c94281927418d78ebdce",
     "music_boundary_source_successor": {
@@ -51,14 +224,49 @@
       "before_sha256": null,
       "current_sha256": "0c2567a74adcc562b96bb02faf9ad28ede9ef239d768b1b112bb405d6adbad34",
       "reason": "Exact Bus AudioDevice target guard consumes the sealed five-version explicit No Output denial and fresh installed class proof; unspecified capabilities remain unspecified."
+    },
+    "skills/waapi-skill/wwise_waapi/action_construction.py": {
+      "before_sha256": null,
+      "current_sha256": "d61a807d6ad0a16c6b56bd341a90f85da247ad44c9e0517718317520ebccb19d",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/anonymous_list_construction.py": {
+      "before_sha256": null,
+      "current_sha256": "a177b225e60e96f8a3389cdbc415f4defdcbab63e4d88d397f8a9811991c055f",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/control_surface_construction.py": {
+      "before_sha256": null,
+      "current_sha256": "db975c21bd063e2c124e10854abdb627768fcf005b5b66d480ba50b96c871e8e",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/media_pool_database.py": {
+      "before_sha256": null,
+      "current_sha256": "eff48f7a6403c0e11807cc35c2d611ac7200414a8545d3d999d9962653d3675b",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/music_playlist.py": {
+      "before_sha256": null,
+      "current_sha256": "3b45e8dca7934c61d08541aeab1ae3c3e3b2d0bdf04258e249cc0b2ce632be72",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/music_transitions.py": {
+      "before_sha256": null,
+      "current_sha256": "475f6086162f3a99b312e10cc40481d1b7e61cb7350c195b5dc5517c1c641726",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
+    },
+    "skills/waapi-skill/wwise_waapi/saved_object_construction.py": {
+      "before_sha256": null,
+      "current_sha256": "d1a7da145b00c0c3360fd08b363b31102f73ea29e1749acee67ab2cf4e39f605",
+      "reason": "Eager local Python import in Gateway -> business_adapters -> object_graph_business_contracts transitive closure. Seal current import-time code dependency separately from unselected constructor/authority function effects; no constructor, resource read, native or functional execution credit."
     }
   },
   "source_changes": {
     "skills/waapi-skill/scripts/gateway.py": {
       "before_sha256": "349291ffc29ee65dd70c61e084fca65e28d8c632a88077d9d9f58de633ad11ea",
-      "current_sha256": "c9cb83e6c53ccf6049e8e1f37e1bb6a9f75a229ea99f0ed8125beb184223c6b2",
-      "reason": "Existing GUID binding optionally captures exact owned-empty identity and expected class. New List discovery requires class-scoped planned Playlist. Draft-check delta is audio.import-only. Named field edits still run ordinary validate_prepared_roles and one ordinary dispatch; log observer requires LOG_ADD_ITEM and staged dispatch requires pre_state.owned_result_stages. Created-node continuations do not grant creation evidence. Reviewed 8e5189b4 getter changes touch only core-call parser inputs, preflight_core_business_input, dispatch_soundengine_business_read and shared result projection. Existing Draft field preparation/check/Preview/authorization/execute/verify functions are AST-identical to the sealed gateway successor. Query projection now has optional identity_fields defaulting to the same SELECTED_REQUIRED_RETURN_FIELDS and result_page=getattr(...,None), preserving ordinary query identity/continuation semantics. Focused Music reads plus existing class-field and controller-chain checks cover the retained condition path.",
-      "review_basis": "condition-path supplement"
+      "current_sha256": "045a61aa50047aefd5e0544122fcba4d0cf4be2811cf3a8e4a3027684f38e6b3",
+      "reason": "Existing GUID binding optionally captures exact owned-empty identity and expected class. New List discovery requires class-scoped planned Playlist. Draft-check delta is audio.import-only. Named field edits still run ordinary validate_prepared_roles and one ordinary dispatch; log observer requires LOG_ADD_ITEM and staged dispatch requires pre_state.owned_result_stages. Created-node continuations do not grant creation evidence. Reviewed 8e5189b4 getter changes touch only core-call parser inputs, preflight_core_business_input, dispatch_soundengine_business_read and shared result projection. Existing Draft field preparation/check/Preview/authorization/execute/verify functions are AST-identical to the sealed gateway successor. Query projection now has optional identity_fields defaulting to the same SELECTED_REQUIRED_RETURN_FIELDS and result_page=getattr(...,None), preserving ordinary query identity/continuation semantics. Focused Music reads plus existing class-field and controller-chain checks cover the retained condition path. Final 8e324503 causal successor: Adds per-declaration media source-control flags, explicit all-platform notice, bounded JSON parsing only for music_playlist/music_transitions, and transition/playlist replacement notice only when sealed metadata exists. The extra unknown-kind discovery read requires operation object.create/object.set, class scope, and unknown kind; certify_class then restricts it to exact Action.Target. Existing object-scoped single-field discovery and setter dispatch do not select this arm. No ordinary scalar parser/value rule changes. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "condition-path supplement; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/audio_import_business.py": {
       "before_sha256": "e70d09d520b08d275bf56af8718af40aa9733b2fc9e9b405f84229bdba39bb32",
@@ -116,15 +324,15 @@
     },
     "skills/waapi-skill/wwise_waapi/business_declaration_state.py": {
       "before_sha256": "e8711554962a107b18367e73e9a18aed5963a8cef22682ac4ec7c5942e7a695a",
-      "current_sha256": "bd3139219be1b200fccc0f022b0cace14dc2bcdcececc2325b4e7344f4d29484",
-      "reason": "Layout depth route requires exactly layout plan/binding plus blueprint. Anonymous Marker extension requires selected constructor target. Ordinary existing-object target and field normalization retain old branches.",
-      "review_basis": "condition-path supplement"
+      "current_sha256": "0d7720ca41ff9e497c620c30502f8650a3344c065d629e4bc3a2e4cbdc8a121c",
+      "reason": "Layout depth route requires exactly layout plan/binding plus blueprint. Anonymous Marker extension requires selected constructor target. Ordinary existing-object target and field normalization retain old branches. Final 8e324503 causal successor: Only AnonymousListTarget gains the source-certified MediaPoolDatabasePath alternative via is_path_class. Empty name, modern-version and selected type requirements remain. Ordinary bound existing-object targets and condition Field Handles retain their branches. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "condition-path supplement; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/business_declarations.py": {
       "before_sha256": "6fd0f8a08d952a0093d02a8400111aa82ea6718eb0458f7f84461299d6e4baab",
-      "current_sha256": "ab1e210628551a70251ac51a7c0b2afbb10ef8e27bfb422e5665b53bcd987f13",
-      "reason": "Additional empty identities require validated exact owned proof, stored in binding digests and freshly recaptured. Added relative displays are version/type-bound with GUID identity. Context comparison changes to exact UTF-8 bytes. mustChildOf change adds class-scope discovery; existing-object branch remains. Field restriction/bind/resolve/value/refresh bodies are unchanged.",
-      "review_basis": "condition-path supplement"
+      "current_sha256": "8e3988f7111099d0680a290663a682f59f4e3e386496354178d9a9d69c04c229",
+      "reason": "Additional empty identities require validated exact owned proof, stored in binding digests and freshly recaptured. Added relative displays are version/type-bound with GUID identity. Context comparison changes to exact UTF-8 bytes. mustChildOf change adds class-scope discovery; existing-object branch remains. Field restriction/bind/resolve/value/refresh bodies are unchanged. Final 8e324503 causal successor: Existing scope_kind=object still calls the unchanged certify path. New elif scope_kind=class calls exact Action.Target certify_class. Class-default evidence now receives the exact field-name roster; only MusicPlaylistItem blocks an undisclosed required controller before attempting getPropertyInfo, retaining the accepted missing-controller refusal and exposed path. The scalar field bind/resolve/value/restriction/dependency helpers are AST-identical. This is a real class-discovery change, not whole-file equivalence and not a new existing-recipient effect. After 634 only normalize_live_object_identity adds bounded comparison-only display admission for four exact types/lanes; canonical GUID/type/name/path byte bounds and equality remain. SourcePlugin/AudioDevice do not match the predicate. Existing object Field Handle bind/resolve/value/revalidation functions remain AST-identical.",
+      "review_basis": "condition-path supplement; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/cli_console_business_contracts.py": {
       "before_sha256": "79f3d510a26539b703cff4118baec4adb185e9d87e86ecd7f7747315f51795fa",
@@ -158,27 +366,27 @@
     },
     "skills/waapi-skill/wwise_waapi/core_business.py": {
       "before_sha256": "62e361dd638a53af8b62455ec5c414bff7e5e9a9fdf6a2a419edb44a6f970bb6",
-      "current_sha256": "d2d1353a5d72c4a2f0061a6bea4ade8d35f7d13e52b4060aaed21122c846b080",
-      "reason": "Changes concern empty state groups/properties, paste include+exclude, Conversion TypeHandle and Blend index. Named object.setProperty/object.setReference do not enter those Core business arms; default allow_empty=False stays.",
-      "review_basis": "condition-path supplement"
+      "current_sha256": "cabc1d46de13fbb3f7700a348f9441ecc0cb9d0ebca3a754dd014b56bd17e09f",
+      "reason": "Changes concern empty state groups/properties, paste include+exclude, Conversion TypeHandle and Blend index. Named object.setProperty/object.setReference do not enter those Core business arms; default allow_empty=False stays. Final 8e324503 causal successor: Moves the unchanged replace/merge-replace/merge-keep and none/manual/automatic mappings into core_business_contracts and imports them. No compiler function or ordinary condition operation changes. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "condition-path supplement; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/core_business_contracts.py": {
       "before_sha256": "f9fe51a42199b137420dc906e3ceea57a64e6f3d302940887747d7616f61d61a",
-      "current_sha256": "63dcf1b255798ff7eac88373c6e3e3e56866981c165f13309cfc067c19f06f2d",
-      "reason": "Only separate state, Conversion and Blend inputs/disclosures change; no existing condition literal/type/field-handle contract changes.",
-      "review_basis": "condition-path supplement"
+      "current_sha256": "c527ce24a9e33478808fa60309f166b191e265892cfcf312e4665fbb7d274ffa",
+      "reason": "Only separate state, Conversion and Blend inputs/disclosures change; no existing condition literal/type/field-handle contract changes. Final 8e324503 causal successor: Owns the same relocated constants and adds value_domains only for pasteProperties and blendContainer.addAssignment. No existing condition field types, literal grammar, metadata refresh or setter declaration changes. After d4 only StateProperties catalog intent text clarifies States-tab column selection; no constructor, field grammar, condition planning or dispatch change.",
+      "review_basis": "condition-path supplement; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/creation_observations.py": {
       "before_sha256": "c8a5da2830733c713601d3f6eafe01da82b304e6e99366d3ccd65369425adf82",
-      "current_sha256": "03a55fbba8783ce7d5838baf51626d663289d8cb86ed3282f0f7288c0a894e33",
-      "reason": "Compound source projections require compound children/staged Lists and are not entered. Retained ordinary created occurrence projection is shared with destination result; current capture checks actual independently verified destination and exact copy parent.",
-      "review_basis": "exact common source transition; accepted condition mechanism scope retained"
+      "current_sha256": "b9ee038d56b0e395d16ff9b4eb386023695164794b6872d0efb9b5bc85b45392",
+      "reason": "Compound source projections require compound children/staged Lists and are not entered. Retained ordinary created occurrence projection is shared with destination result; current capture checks actual independently verified destination and exact copy parent. Final 8e324503 causal successor: Rejects nodes carrying saved_constructor from optional ordinary creation-history observation. This prevents saved WorkUnit/Query effects borrowing ordinary history claims. Named existing field plans do not call ordinary_creation_graph; no old condition receipt gains constructor credit. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "exact common source transition; accepted condition mechanism scope retained; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/documented_list_fields.py": {
       "before_sha256": "bbdaf4d69c02ea9dfadaf7b95e4ed8627484493eb284aca4613751d770bc284f",
-      "current_sha256": "09c28f7a49f22dd6eb825c20ea546468d4f2a09eb2921f3d92c663ccba3017f5",
-      "reason": "Capture returns None unless exact empty MetadataSlot2025 or certified Marker candidate. Admission checks source/class/owner/live getTypes and complete ordered typed roster. BatchRenameSettings65011712 is absent from profiles. List/Playlist/empty-list changes require selected List contracts; no ordinary scalar authority is inferred.",
-      "review_basis": "condition-path supplement"
+      "current_sha256": "ac7a5155d51874f85498c470dab71fc4d2a9cd1de7e611d7b480c767055257c2",
+      "reason": "Capture returns None unless exact empty MetadataSlot2025 or certified Marker candidate. Admission checks source/class/owner/live getTypes and complete ordered typed roster. BatchRenameSettings65011712 is absent from profiles. List/Playlist/empty-list changes require selected List contracts; no ordinary scalar authority is inferred. Final 8e324503 causal successor: Adds a bounded hash-pinned 2021 installed-owned-List overlay to the unchanged published catalog, checks exact owner/member identities, recomputes the derived catalog seal, and gives overlay fields exact XML provenance. load_catalog gains an internal catalog_root injection. source_owned_music_type admits only six named music WObjects with exact matching owner/List/version evidence; it is not a hierarchy bypass. This changes 2021 List catalog output and source seals. Ordinary scalar/reference field metadata does not use that catalog; any existing List guard remains exact and cannot silently accept a stale derived catalog. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "condition-path supplement; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py": {
       "before_sha256": "ce27359dbfb4414bcc9b96e51c271036206f773e78ee22dc8b3b52fcec56da33",
@@ -194,27 +402,27 @@
     },
     "skills/waapi-skill/wwise_waapi/object_capabilities.py": {
       "before_sha256": "75e8605fd1e435ea5df6b152a36d1d9adeaca197ab2dee2454bc8caf071374c1",
-      "current_sha256": "174edce4089ae486b1acff3bcafbf3b7134b033105e32a741c6c910051eb394f",
-      "reason": "Only ConversionPlugin gains opaque_display_path=True; all selected Source roles and ordinary Sound identity records retain prior semantics.",
-      "review_basis": "exact common source transition; accepted condition mechanism scope retained"
+      "current_sha256": "00659f9b2a51bfe8f058010a9077f57c5c0bb2a0c58168cf3ebb3648dcc6d509",
+      "reason": "Only ConversionPlugin gains opaque_display_path=True; all selected Source roles and ordinary Sound identity records retain prior semantics. Final 8e324503 causal successor: Adds Query->SearchCriteria and Event->Action specialized parents, and WorkUnit/Query/SearchCriteria/Action required-parent constraints. Existing State/Switch/Bus rules retain their exact entries. Only create/tree placement and consumers of this shared relationship helper change; a single existing-object scalar/reference edit is not reparented or reconstructed. After 634 ControlSurfaceSession/BindingGroup parent and role-class placement entries affect constructors/transfers only. Display comparison predicate admits exactly Language/MidiParameter/UserProjectSettings in pinned lanes and MediaPoolQuery in 2025; its name-boundary predicate preserves already-admitted 2021 Language name preparation. Source/AudioDevice identity semantics and condition roles remain unchanged.",
+      "review_basis": "exact common source transition; accepted condition mechanism scope retained; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/object_graph_business.py": {
       "before_sha256": "e09f5e21f17bb1f167b6fad0846a3daa572ee68fc413c0a7471dd426bcd4761b",
-      "current_sha256": "281557a1dfc1c78a2ae62cc3c356c9a19ddb9fc335ee50b5d95d317027e95825",
-      "reason": "New List result references require bnh1 List plus legacy_playlist_authority; inner rename requires exact2025 PluginInnerObject. Ordinary CREATE now retains graph_result_bindings even without a dependency; this changes destination request metadata/result projection and needs current full-chain fake capture.",
-      "review_basis": "exact common source transition; accepted condition mechanism scope retained"
+      "current_sha256": "c58e3eae8673ffb1e73dc556de0198c8bb00c400820179f24b3461d3ed45f4cd",
+      "reason": "New List result references require bnh1 List plus legacy_playlist_authority; inner rename requires exact2025 PluginInnerObject. Ordinary CREATE now retains graph_result_bindings even without a dependency; this changes destination request metadata/result projection and needs current full-chain fake capture. Final 8e324503 causal successor: Adds a Boolean per-import-group add_to_source_control choice with atomic disagreement rejection. Removes the old Action blanket rejection only behind the new exact class/ActionType/Target constructor. Existing object.set accepts explicit standalone music_playlist/music_transitions and rejects mixing them with other declarations/settings/fields. Generic existing field compilation and ordinary scalar declaration values otherwise retain their path; new tree fields cannot be implicitly synthesized. After 634 only explicit new_name requests on newly admitted display identities get a name-authority refusal; legacy 2021 Language exception is centralized. Existing scalar/reference graph fields do not enter this name branch.",
+      "review_basis": "exact common source transition; accepted condition mechanism scope retained; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py": {
       "before_sha256": "487422db65a32cedb157a4e5d3cd5865688a4e5dff3b529a6e95d8250792882f",
-      "current_sha256": "219d75b7fa994731230505e7269e948931708bb92150967361c617ce6c4ff3bd",
-      "reason": "Changes disclose separate Metadata placement, owned-input replacement/continuation and source-certified Inner/Marker construction. They do not rewrite existing scalar/reference declarations or prove new-object rows.",
-      "review_basis": "condition-path supplement"
+      "current_sha256": "9dda16f652f9d04e083d20ae2adbf8d4bd7be36d43ce6475887bc27edf80b577",
+      "reason": "Changes disclose separate Metadata placement, owned-input replacement/continuation and source-certified Inner/Marker construction. They do not rewrite existing scalar/reference declarations or prove new-object rows. Final 8e324503 causal successor: Discloses Action and saved constructors, creation-only notes, source collision modes, certified anonymous List policies, the 2025 Media Pool directory profile, standalone music trees and per-import-group source-control option. Calls their authority/declaration helpers only while constructing the relevant graph schema. Existing setProperty/setReference metadata contracts are not replaced. Schema changes require their own graph evidence and do not prove existing-condition recipient effects. After 634 only object graph creation_boundaries gain the ControlSurface declaration. Selected named existing-field condition contracts do not invoke that constructor authority; no scalar/reference condition grammar change.",
+      "review_basis": "condition-path supplement; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/object_graph_paths.py": {
       "before_sha256": "5599f8a3ff5742af0fee883ec28b27dd980876e0217e6cebce165f42298e9075",
-      "current_sha256": "91ca2e00a557ba48e46871674f4fa16c6ba405bbed654a0c1423c27fb6cc16c9",
-      "reason": "Only prepare_compound_path_context and compound_created_child_roots change. No grouped child/ancestor rename in the four separate Source transactions.",
-      "review_basis": "exact common source transition; accepted condition mechanism scope retained"
+      "current_sha256": "346758989e4be60466d75ece2b6ded8956ddffb6db7bb4911df63e0d7ac2d0e4",
+      "reason": "Only prepare_compound_path_context and compound_created_child_roots change. No grouped child/ancestor rename in the four separate Source transactions. Final 8e324503 causal successor: Applies requested notes to the expected retained row only when existing_target is True. A constructor merge into a preexisting GUID now preserves its old notes; configuring an exact existing object still verifies requested notes. This is a material graph expectation change, not a change to standalone same-guid notes/property/reference verifiers. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "exact common source transition; accepted condition mechanism scope retained; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/object_lifecycle_business.py": {
       "before_sha256": "852f45ff852507f183e2d0e2599c03a7c04333469d2c0d630360d76e19223f1a",
@@ -284,9 +492,9 @@
     },
     "skills/waapi-skill/wwise_waapi/operation_object.py": {
       "before_sha256": "1363573af0e4249edb9d6d3968a969c09ee88e0a4c89ae4730621a1aa7c240bb",
-      "current_sha256": "a1272754c7d6ad8a1c7f4b7f3da195727d8b88d1e4aad1495ea275be5bc8d1e2",
-      "reason": "Reference associations require passed sealed reference_lists names and never create identities; default empty keeps old interpretation. Anonymous Marker requires exact collection/type/empty name. Named single-field setters do not use graph flattening.",
-      "review_basis": "condition-path supplement"
+      "current_sha256": "73599eea347430340950db5c753700db24410e6a85877f419101a8c84307c080",
+      "reason": "Reference associations require passed sealed reference_lists names and never create identities; default empty keeps old interpretation. Anonymous Marker requires exact collection/type/empty name. Named single-field setters do not use graph flattening. Final 8e324503 causal successor: Only the anonymous placement tuple set gains Paths/MediaPoolDatabasePath with an empty native name. The Boolean anonymous marker, all other tuple restrictions and ordinary descriptor normalization remain. No raw field/predicate grammar is opened. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "condition-path supplement; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/operation_plugin.py": {
       "before_sha256": "a7440c8fdd24b8ddbda4509ea6e6c100d8e8d828c28b88524a95d6be8f231d39",
@@ -296,15 +504,15 @@
     },
     "skills/waapi-skill/wwise_waapi/operation_registry.py": {
       "before_sha256": "2d8c26f100194adc7081c27aa04d8207c654f420c6a77e1bb29206a2c5e53023",
-      "current_sha256": "5ab7666497f7780ee290258472c1e58f1e1c910293f437d13092030e077ba23c",
-      "reason": "Single-field preparation adds exact retained MetadataSlot identity/local getter. Recursive closure/activation/Parent/association metadata routines and same-guid-property verifier branch are unchanged. same-guid-reference only changes guarded local getter/value. New Master Sink proof binds exact Bus/reference and fresh target class, denies explicit false before Preview and revalidates before write/verify. Other new branches require distinct API/kind/import/graph state. Music hidden-dependency successor changes only the failed required-controller metadata-read branch of _collect_existing_condition_closure: preserve original error code/cause and disclose selected field/controller/reason. Successful metadata reads, recursive traversal, selected values, prepare-time cache, dispatch, drift validation and verification are unchanged. No extra read or write, no inferred missing-controller value; exposed supported controller path is retained.",
-      "review_basis": "condition-path supplement"
+      "current_sha256": "3e95fe543c5ba7d8cf3f4e69f69b6ea140070ae6ddf2f10f1b8caaf3f3f72596",
+      "reason": "Single-field preparation adds exact retained MetadataSlot identity/local getter. Recursive closure/activation/Parent/association metadata routines and same-guid-property verifier branch are unchanged. same-guid-reference only changes guarded local getter/value. New Master Sink proof binds exact Bus/reference and fresh target class, denies explicit false before Preview and revalidates before write/verify. Other new branches require distinct API/kind/import/graph state. Music hidden-dependency successor changes only the failed required-controller metadata-read branch of _collect_existing_condition_closure: preserve original error code/cause and disclose selected field/controller/reason. Successful metadata reads, recursive traversal, selected values, prepare-time cache, dispatch, drift validation and verification are unchanged. No extra read or write, no inferred missing-controller value; exposed supported controller path is retained. Final 8e324503 causal successor: The full 1263-line diff was read. Constructor changes cover Action collision/occurrence binding and Event preservation, Source merge/replace/language/preservation, anonymous/List source admission, saved WorkUnit/Query scope and weaker result, Media Pool directory, standalone transition/playlist preparation/guards/verification, and explicit all-platform generation. New checks require their selected node flags, sealed pre_state keys, or operation/kind. Shared exceptions are reviewed separately below: metadata.is_reference evidence, class-only Action.Target certification, and graph postwrite ActionType proof update. Full named single-field preparation and both same-GUID verifier branch bodies are AST-identical; recursive closure/activation/Parent/association and target-condition routines are AST-identical. New music guard imports have only definitions/constants at module import, and empty proof lists add no read/assertion. Whole-function equivalence is not claimed. After 634 ControlSurface preparation requires object.create/object.set and selected new Binding/Group nodes; revalidation/verification and rename association require sealed constructor flags. With no such flags new exact-name ordering is a stable all-equal-key sort and old associations retain their candidates. Name/topology guards add versioned comparison-shape refusal only for setName/copy/move/graph name changes. Full named setProperty/setReference preparation arm, same-GUID property/reference verifier bodies, recursive closure/activation/Parent/association/target checks and _condition_metadata_assertions are AST-identical to 634. No Source/AudioDevice condition target selects the four-type display predicate.",
+      "review_basis": "condition-path supplement; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/operation_soundbank.py": {
       "before_sha256": "cbc517977a4d9a3b42cfb051631a62bc40977da2eb4a6c81d26c01bf57cea044",
-      "current_sha256": "502324a2d51390441bb75013e8655c6eb68f2366e7bbd82bfbbf6a4a353c66f7",
-      "reason": "SoundBank generate/process definitions/external conversion only; top-level constants/imports do not observe Source files. prove_artifact_path used by workflow remains unchanged.",
-      "review_basis": "exact common source transition; accepted condition mechanism scope retained"
+      "current_sha256": "fa910d40c2e88ecd56295ae5c56faa010680acddf0542edbcc6fb55cdfb07283",
+      "reason": "SoundBank generate/process definitions/external conversion only; top-level constants/imports do not observe Source files. prove_artifact_path used by workflow remains unchanged. Final 8e324503 causal successor: Adds deliberate allPlatforms=True, mutually exclusive with platforms, materialized from the bounded live project platform inventory. The plan stores its scope strategy and exact resolved platforms; the existing explicit-list branch retains its validation. Neither metadata condition discovery nor object field writes call this builder. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "exact common source transition; accepted condition mechanism scope retained; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/operation_tone.py": {
       "before_sha256": "231521ce3931ed2f1cbde931ef21e8db4c582af2718f38f4765a239c5e908550",
@@ -326,9 +534,9 @@
     },
     "skills/waapi-skill/wwise_waapi/planned_references.py": {
       "before_sha256": "c0baa1a41fe9349885673a7acbc63ffc75431d2467478bdbad7dcbe4a9ec5c1a",
-      "current_sha256": "1d33b44430c5d70f9dfe4eb0dd57e9e65989c160bf6d80dca324450bd7a33525",
-      "reason": "retain_created_results causes ordinary CREATE result bindings to persist; new target arrays source-guarded. Current public captures must retain destination root GUID and no duplicate/extra creation before copy.",
-      "review_basis": "exact common source transition; accepted condition mechanism scope retained"
+      "current_sha256": "1d0539d23a7ea4f027d8e20c4f11dcec8e3835cf9c26397392fe879e9d5bd715",
+      "reason": "retain_created_results causes ordinary CREATE result bindings to persist; new target arrays source-guarded. Current public captures must retain destination root GUID and no duplicate/extra creation before copy. Final 8e324503 causal successor: Actions now force retained result bindings, have no synthesized path, retain native empty name, and use parent rather than owner relation. They are excluded from ordinary sibling name-collision grouping and cannot be used as planned reference targets. These branches require Action graph nodes; existing GUID condition binding and unrelated planned results retain their branches. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "exact common source transition; accepted condition mechanism scope retained; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/platform_paths.py": {
       "before_sha256": "00149d5c4213da5d76d748ef21607051677f6364625853e7838c75701693a527",
@@ -342,6 +550,18 @@
       "reason": "New prospective constructor proof exact2025 class5636096 PlaylistObject restriction and RandomSequenceContainer owner; selected Source roles have no PlaylistObject field.",
       "review_basis": "exact common source transition; accepted condition mechanism scope retained"
     },
+    "skills/waapi-skill/wwise_waapi/project_setting_business.py": {
+      "before_sha256": "87e116602cdc4c1b7ad58f6bf4405c4dd6d2cdea4c9e353e8276b7bd9cf84c70",
+      "current_sha256": "82d8bf1bf744264ca0da5d294f402f4d3b557c683c101cda7d8091bfbed14152",
+      "reason": "Imports the unchanged stretch/preserve-x mapping from the contract module rather than defining a duplicate. Existing functions and condition preparation are unchanged. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "final State-guidance-only source transition"
+    },
+    "skills/waapi-skill/wwise_waapi/project_setting_business_contracts.py": {
+      "before_sha256": "5b94b93d61193b1ba69fc06e4d0bc1edee246854b2328e0cd13135ce2ff1df90",
+      "current_sha256": "a8e459df9ff091446bbf6cb1a05e8a273761fd8f8256392e5d668c172939cc09",
+      "reason": "Adds the same mapping and exposes its public choices only for gameParameter.setRange. No ordinary field-controller normalization or condition value changes. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "final State-guidance-only source transition"
+    },
     "skills/waapi-skill/wwise_waapi/reference_applicability.py": {
       "before_sha256": "3a9571f4698daf895366365595760cd4edaa54e7f199afa72a5eed7bd308e9eb",
       "current_sha256": "2c1eef23f7f4d0b7535fea4fb883bd55cf9242df0e9861411c996cc14e2ed6ee",
@@ -350,9 +570,9 @@
     },
     "skills/waapi-skill/wwise_waapi/reference_kind_evidence.py": {
       "before_sha256": "5946afdf13883dca749645916320942bfebc92671b3feca882b8721494d1f860",
-      "current_sha256": "749cdfbc16af4a09e63a71e6c10f66dd2925f0f5a05c0fdfdd400a84d5f2cb3a",
-      "reason": "Mutation certify is unchanged. Added read exception requires2021 RTPC1441808/ControlInput unknown kind, empty native type/restriction, exact source/catalog and current object inventory/metadata/identity. Proof says mutation_authority=False and revalidates observations.",
-      "review_basis": "condition-path supplement"
+      "current_sha256": "eee039338379022e2935d5acfe7fef8ca5ca601abe10bc14b7129944e57d2065",
+      "reason": "Mutation certify is unchanged. Added read exception requires2021 RTPC1441808/ControlInput unknown kind, empty native type/restriction, exact source/catalog and current object inventory/metadata/identity. Proof says mutation_authority=False and revalidates observations. Final 8e324503 causal successor: Adds certify_class only for Action class 327696 / Target with absent native type and no restriction. It verifies the sealed SDK/type index plus fresh live class and retains raw metadata identity in evidence; contradictory scalar/restricted metadata is returned unchanged. Existing object-scoped certify and query certifiers are AST-identical. Thus no new type inference enters the ordinary exact-object Action condition route. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "condition-path supplement; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
       "before_sha256": "ee10e4ab4c1f9b6214286d70addc03ed5ed85f3864461cdc36237d6cfd731390",
@@ -366,23 +586,29 @@
       "reason": "Changes disclose fixed Profiler/log/transport routes; no condition grammar change or implicit runtime read in ordinary edits. Reuse runtime successor.",
       "review_basis": "condition-path supplement"
     },
+    "skills/waapi-skill/wwise_waapi/selection_guidance.py": {
+      "before_sha256": "ea220a6f814a44002c1d25d22936dd28f2707d6dcc7f644a297afbc7206f22a3",
+      "current_sha256": "b311c0334783e180ff85b17d3539518356ef466af459d66a2a51dd668506133d",
+      "reason": "The only d4-to-634 delta clarifies StateProperties as States-tab property-column selection and directs exact existing CustomState scalar editing to instance live Field Handles. Guidance strings/alternates only; no field normalization, condition evaluator, dispatch, policy or verifier change.",
+      "review_basis": "final State-guidance-only source transition"
+    },
     "skills/waapi-skill/wwise_waapi/soundbank_business.py": {
       "before_sha256": "a4f6e0938b6167420d5e58fb5fdcfcc97c1770770dfb0ef00233c18520a4c056",
-      "current_sha256": "24bbeb066c0bf8d960a1a61f6c37d6972139d8342d1f92567a777ef2c7a53ac6",
-      "reason": "Only SoundBank generate/external-source declaration compiler; Source Save is not SoundBank generation.",
-      "review_basis": "exact common source transition; accepted condition mechanism scope retained"
+      "current_sha256": "c37058559c63051bc4a167c93635351a01db81d7564f59569411a5b6622989ec",
+      "reason": "Only SoundBank generate/external-source declaration compiler; Source Save is not SoundBank generation. Final 8e324503 causal successor: Replaces mandatory platforms with exactly one explicit platforms list or all_platforms=True. False/combined/missing intent rejects; the existing explicit-list normalization remains. Only soundbank.generate business materialization changes. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "exact common source transition; accepted condition mechanism scope retained; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/soundbank_business_cli.py": {
       "before_sha256": "709e0be0ba845f882e09962ab2b330308232bdf469ba35953ed18adee6f5bf0f",
-      "current_sha256": "b211fe50551bb5235a47f8e3b7461d254eb08ffa4db6ec3d4c55cbe3e6cb3317",
-      "reason": "SoundBank-specific parser inputs and namespace plan; selected Source argv lacks soundbank plan commands.",
-      "review_basis": "exact common source transition; accepted condition mechanism scope retained"
+      "current_sha256": "3ff1d1cc2ac16611d98fbb0b68a7370c7fb7380c939a55c2f9b716ff393a5a69",
+      "reason": "SoundBank-specific parser inputs and namespace plan; selected Source argv lacks soundbank plan commands. Final 8e324503 causal successor: Adds --all-platforms and its selected-plan propagation, rejects combining it with --platform, and ensures the new option is excluded from unrelated SoundBank plan families. No object condition parser is shared with this option. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "exact common source transition; accepted condition mechanism scope retained; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/soundbank_business_contracts.py": {
       "before_sha256": "68cff30fc77a78c220fdcd08c6051fb35e08409f3f01e5a322d06d91a96ac6ca",
-      "current_sha256": "c40a6d9dd37befad6e766660c8446ac58682f9d4fc66a8180da2e5ad9af93c37",
-      "reason": "SoundBank generation/definition contracts; no selected operation route.",
-      "review_basis": "exact common source transition; accepted condition mechanism scope retained"
+      "current_sha256": "ab8fe493deb40548e6d385d0201a257a4275bd9c8450df61ef30e6eccabdbe4d",
+      "reason": "SoundBank generation/definition contracts; no selected operation route. Final 8e324503 causal successor: Discloses platforms or true-only all_platforms with exclusive oneOf and retains bounded list shape and explanatory Preview/drift/native-enumeration semantics. No existing object mutation schema changes. This source is byte-identical to the reviewed d4 successor; no later runtime delta.",
+      "review_basis": "exact common source transition; accepted condition mechanism scope retained; d4 finite causal review plus final State/ControlSurface/display increment"
     },
     "skills/waapi-skill/wwise_waapi/soundengine_business_contracts.py": {
       "before_sha256": "b851a92ba25e3509304a99ba2912dc456564ff1d98cf9963cee8ccd5d8268070",
