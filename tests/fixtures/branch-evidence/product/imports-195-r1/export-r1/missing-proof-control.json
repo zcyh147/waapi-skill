@@ -1,0 +1,22 @@
+{
+  "assessment_scope": "negative control through actual persisted standard packet/parts and evaluator; remove one required selected ordinary-import CODE proof only",
+  "completion": {
+    "by_owner": {
+      "182": {
+        "implemented_unverified": 1730,
+        "mapped_with_representative_proof": 11254,
+        "verified": 6
+      }
+    },
+    "complete": false,
+    "obligations": 12990,
+    "routes": 28,
+    "states": {
+      "implemented_unverified": 1730,
+      "mapped_with_representative_proof": 11254,
+      "verified": 6
+    }
+  },
+  "native_or_fresh_started": false,
+  "removed_program_branch": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.audio.import|/argsSchema"
+}

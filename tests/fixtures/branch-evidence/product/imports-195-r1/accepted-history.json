@@ -1,0 +1,15 @@
+{
+  "contract": "waapi-skill.imports-accepted-history/v1",
+  "authority": ["docs/plans/full-waapi-coverage/SPEC.md", "tests/TEST_INVENTORY.md"],
+  "retained_ordinary_native": [
+    {"root": "import182-mixed-2025-r1", "candidate": "eb3b0e29", "raw_outcome": "PASS", "scope": "mixed creation/replacement; two verified transactions"},
+    {"root": "import182-localized-2025-r3", "candidate": "b3b7a644", "raw_outcome": "PASS", "scope": "localized reuse; three verified transactions"},
+    {"root": "import182-owner-source-2025-r4", "candidate": "d6c63639b7b48bbc4b629f374953b8d49408c496", "raw_outcome": "PASS", "scope": "distinct Japanese Source, inline media/Notes/Originals and owner Volume/OutputBus/OverrideOutput; English and unrelated/input preservation"},
+    {"root": "import182-switch-2025-r2", "raw_outcome": "PASS", "scope": "ordinary Switch association, exact owned pair and unrelated preservation"}
+  ],
+  "preserved_raw_failures": ["import182-owner-source-2025-r1", "import182-owner-source-2025-r2", "import182-owner-source-2025-r3", "import182-tsv-source-2025-r1", "import182-tsv-source-2025-r2", "import182-tsv-combined-2025-r1", "import182-tsv-distinct-source-2025-r1", "import182-tsv-guid-2025-r1", "import182-switch-2025-r1"],
+  "source_copy_and_native_reconciliation": "Main-owned; these are inventory pointers, not copied native receipts or current-candidate native evidence",
+  "table_acceptance": "code-only including multilingual; preserve exact Console 2025.1.7.9143 duplicate-Source guard and original FAILs",
+  "new_native_or_fresh": false,
+  "global_completion": false
+}
