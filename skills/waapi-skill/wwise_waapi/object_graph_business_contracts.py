@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .documented_list_fields import discovery_contract as documented_list_discovery_contract, manual_marker_profile
 from .anonymous_list_construction import authority as anonymous_list_mode_authority
+from .media_pool_database import authority as media_pool_database_authority
 from .effect_render_conditions import CLEAR_SUFFIX_OBSERVATIONS
 from .music_playlist import declaration_contract as music_playlist_contract
 from .saved_object_construction import declaration_contract as saved_constructor_contract
@@ -319,7 +320,11 @@ def object_graph_business_contract_data(
                     "requires": ["selected_profile_Type_Handle", "source_proven_owner_List_Field_Handle"],
                     "versions": ["2023.1", "2024.1", "2025.1"],
                     "profiles": {"effect_slot": {"class": "EffectSlot", "collection": "Effects"},
-                        "manual_marker": manual_marker_profile(version)},
+                        "manual_marker": manual_marker_profile(version),
+                        "media_pool_directory": media_pool_database_authority(version)},
+                    "media_pool_directory_version_scope": {"supported_versions": ["2025.1"],
+                        "other_versions": "matching_source_unproved; constructor_not_admitted",
+                        "native_absence_claim": False},
                     "native_name": "Gateway_owned_empty_string",
                     "on_name_conflict": {"supported": ["fail", "rename", "merge", "replace"],
                         "scope": "source_certified_anonymous_profiles_only; List_mode_controls_new_member_population; existing_Render_and_Marker_prerequisites_apply",
