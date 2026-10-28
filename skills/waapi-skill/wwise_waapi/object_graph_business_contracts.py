@@ -51,6 +51,7 @@ _SUPPORTED_VERSIONS = {
 
 def _sound_semantics(operation):
     return {
+        "constructor_notes": "apply_to_new_objects_only; merge_preserves_existing_notes; configure_exact_existing_GUID_to_edit_notes",
         "sound_voice": {"native_class": "Sound", "initial_fields": {"IsVoice": True}, "empty_container": True},
         "explicit_flag_conflict": "reject_before_dispatch",
         "generic_Sound_Type_Handle": "explicit_class_fields_remain_available",
@@ -317,8 +318,10 @@ def object_graph_business_contract_data(
                     "profiles": {"effect_slot": {"class": "EffectSlot", "collection": "Effects"},
                         "manual_marker": manual_marker_profile(version)},
                     "native_name": "Gateway_owned_empty_string",
-                    "on_name_conflict": {"supported": ["fail"],
-                        "pending_source_native_proof": ["rename", "merge", "replace"],
+                    "on_name_conflict": {"supported": ["fail", "rename", "merge", "replace"],
+                        "non_fail_scope": "EffectSlot_in_source_proven_Effects_append_only; all_modes_append_fresh_GUIDs; existing_Render_chain_semantics_apply",
+                        "other_profiles_supported": ["fail"],
+                        "pending_source_native_proof": {"manual_marker_and_replace_all": ["rename", "merge", "replace"]},
                         "pending_behavior": "reject_before_dispatch_without_selecting_old_blank_name_members_or_changing_policy"},
                     "result_binding": "independent_ordered_owner_membership_then_exact_GUID_class_owner_and_values",
                     "render_conditions": {
@@ -343,7 +346,7 @@ def object_graph_business_contract_data(
                         "explicit_locale": "nonSFX_Project_locale_requires_actual_Voice; explicit_SFX_is_not_an_admitted_declaration",
                         "name_conflict": {"fail": "absent_exact_name", "rename": "fresh_native_named_GUID_and_preserved_collision",
                             "merge": "same_exact_class_GUID_and_selected_language; unselected_fields_preserved",
-                            "replace": "exact_old_subtree_absent; fresh_GUID_and_other_children_preserved"}},
+                            "replace": "exact_old_subtree_absent; fresh_GUID_selected_language_and_other_children_preserved; existing_collision_language_may_differ"}},
                     "source_verification": "actual_graph_GUID_class_parent_owner_fields_and_requested_language; closed_declared_childset",
                     "native_class_id": "Gateway_owned_from_Type_Handle"},
                 "optional_fields": [

@@ -44,7 +44,7 @@ def expected_snapshot(snapshot, *, edits, read_row):
         before = node['pre_state']
         target_id = node.get('target_id', node.get('preexisting_id'))
         same = target_id.casefold() == row['id'].casefold()
-        if same and node.get('notes_supplied') is True:
+        if same and node.get('notes_supplied') is True and node.get('existing_target') is True:
             row['notes'] = node['requested_notes']
         name = node.get('requested_name')
         old_path = before.get('path')

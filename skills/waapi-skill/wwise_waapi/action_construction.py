@@ -29,11 +29,15 @@ def authority(version):
 
 
 def declaration_contract():
-    return {'status': 'supported_fail_mode', 'parent': 'exact_Event_parent_handle',
+    return {'status': 'supported', 'parent': 'exact_Event_parent_handle',
         'kind': 'selected_Action_Type_Handle', 'name': 'local_declaration_label; Gateway_emits_source_certified_empty_native_name',
         'required_class_fields': ['ActionType', 'Target'],
         'values': 'selected_live_ActionType_enum_value_and_bound_existing_Target_Object_Handle_or_explicit_null',
         'occurrences': 'multiple_new_Actions_bind_by_exact_ID_full_requested_fields_and_complete_Event_population; no_association_order_authority',
-        'verification': 'fresh_actual_GUID_class_Event_parent_empty_name_and_requested_fields; derived_path_observed_not_synthesized',
-        'remaining_same_parent_work': ['non_fail_collision_semantics'],
+        'verification': 'fresh_or_sealed_unique_merge_GUID_class_Event_parent_empty_name_and_requested_fields; derived_path_observed_not_synthesized',
+        'name_conflict': {'fail': 'fresh_creation', 'rename': 'append_fresh_occurrences_and_preserve_existing_Event_roster',
+            'merge': 'one_unique_empty_name_collision_and_one_declaration; exact_existing_object_metadata; preserve_existing_notes',
+            'replace': 'one_unique_empty_name_collision_and_one_declaration; exact_old_subtree_absence_and_fresh_GUID; object.create_requires_reviewed_replacement_owner'},
+        'ambiguity': 'multiple_empty_name_collisions_refused; use_exact_existing_Action_GUID_for_configuration',
+        'remaining_same_parent_work': ['planned_parent_merge_replace_requires_separate_existing_Event_preview'],
         'native_execution': 'not_claimed_from_SDK_example', 'tracking_issue': 180}

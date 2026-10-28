@@ -514,9 +514,6 @@ def _compile_action_constructor(session, declaration, node):
     kind = session.handles.resolve_type(declaration.target.kind)
     if kind.name != 'Action' or kind.class_id != authority(session.context.wwise_version)['class_id']:
         raise _repair(session, 'ACTION_CLASS_UNPROVEN', field='kind', action='select the exact live Action Type Handle')
-    if session.settings.get('name_conflict', 'fail') != 'fail':
-        raise _repair(session, 'ACTION_COLLISION_SEMANTICS_UNRESOLVED', field='name_conflict',
-            action='use a separately previewed fail-mode Action constructor; other modes remain assigned implementation work')
     properties = {row['name']: row['value'] for row in node.get('properties', [])}
     references = {row['name']: row['target'] for row in node.get('references', [])}
     target = references.get('Target')

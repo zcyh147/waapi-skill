@@ -71,13 +71,66 @@ class ActionCreateTask(CreateTask):
 
 def preview(task):
     code, checked = task.step('draft-check')
-    assert code == 0, checked
+    assert code == 0, json.dumps(checked)
     code, shown = task.step('preview-from-draft')
     assert code == 0, shown
     tx = shown['transaction_id']
     code, shown = task.run('transaction-show', tx)
     assert code == 0, shown
     return tx, shown
+
+
+@pytest.mark.parametrize('version,operation', [(version, 'object.create') for version in VERSIONS] + [('2025.1', 'object.set')])
+@pytest.mark.parametrize('conflict', ['rename', 'merge', 'replace'])
+def test_action_collision_policies_bind_one_exact_event_occurrence(tmp_path, version, operation, conflict):
+    task = ActionCreateTask(tmp_path, version, operation)
+    task.declare_action(notes='new Action notes')
+    old = deepcopy(task.objects[OLD])
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri in {'ak.wwise.core.object.create', 'ak.wwise.core.object.set'} and conflict != 'rename':
+            if conflict == 'replace':
+                del task.objects[OLD]
+                return original(uri, args, options)
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            node = args if uri.endswith('.create') else args['objects'][0]['children'][0]
+            task.objects[OLD].update(ActionType=node['@ActionType'], Target={'id': node['@Target']},
+                path=task.objects[SECOND]['path'] + r'\[Play - Rain]')
+            result = {'id': OLD, 'name': ''}
+            return result if uri.endswith('.create') else {'objects': [{'id': SECOND, 'name': task.objects[SECOND]['name'], 'children': [result]}]}
+        return original(uri, args, options)
+    task.call = call
+    settings = ['--name-conflict', conflict]
+    if operation == 'object.create' and conflict == 'replace': settings += ['--replace-owner-handle', task.action_handles[0]]
+    code, configured = task.step('draft-business-configure', *settings)
+    assert code == 0, configured
+    tx, shown = preview(task)
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, executed = task.run('execute', tx)
+    assert code == 0, json.dumps(executed)
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, json.dumps([row for row in verified.get('verification', {}).get('assertions', []) if row.get('passed') is False])
+    if conflict == 'merge':
+        assert CREATED not in task.objects and task.objects[OLD]['notes'] == old['notes']
+        assert task.objects[OLD]['ActionType'] == 1
+    elif conflict == 'replace':
+        assert OLD not in task.objects and task.objects[CREATED]['notes'] == 'new Action notes'
+    else:
+        assert task.objects[OLD] == old and task.objects[CREATED]['notes'] == 'new Action notes'
+
+
+@pytest.mark.parametrize('conflict', ['merge', 'replace'])
+def test_action_collision_cannot_choose_between_multiple_empty_name_actions(tmp_path, conflict):
+    task = ActionCreateTask(tmp_path, '2025.1', 'object.set')
+    extra = '{88888888-8888-8888-8888-888888888888}'
+    task.objects[extra] = {**deepcopy(task.objects[OLD]), 'id': extra, 'path': r'\Other Action display path'}
+    task.declare_action()
+    code, configured = task.step('draft-business-configure', '--name-conflict', conflict)
+    assert code == 0, configured
+    code, rejected = task.step('draft-check')
+    assert code == 2 and 'AMBIGUOUS_ACTION_COLLISION' in json.dumps(rejected), rejected
+    assert not any(uri in {'ak.wwise.core.object.create', 'ak.wwise.core.object.set'} for uri, _, _ in task.calls)
 
 
 @pytest.mark.parametrize('fault', ['type', 'target', 'parent', 'class', 'recycled', 'retained'])

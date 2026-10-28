@@ -4902,6 +4902,52 @@ def _omit_new_sound_null_reference_assignments(*, version, conflict, root_path, 
     return omissions
 
 
+def _action_collision_preview(nodes, conflict):
+    return [{'event_id': node['action_parent_snapshot']['object_id'],
+        'mode': node.get('on_name_conflict', conflict),
+        'previous_action_ids': [row['id'] for row in node['action_parent_snapshot']['rows']],
+        'merged_action_id': node.get('preexisting_id'),
+        'retired_action_ids': node['action_parent_snapshot'].get('retired_ids', []),
+        'new_occurrences': node['action_parent_snapshot']['new_occurrences'],
+        'notes': 'preserve_existing' if node.get('preexisting_id') else 'apply_to_new_occurrences'}
+        for node in nodes if node.get('action_constructor') and node.get('action_parent_snapshot')]
+
+
+def _prepare_action_collision(spec, conflict, *, read, replacement_snapshots):
+    """Bind a blank-name collision only from the complete exact Event roster."""
+    spec['on_name_conflict'] = conflict
+    if conflict in {'fail', 'rename'}:
+        return
+    snapshot = spec.get('action_parent_snapshot')
+    if snapshot is None:
+        raise OperationContractError('ACTION_COLLISION_PARENT_REQUIRED',
+            'Action merge/replace requires a bound existing Event; create a new Event separately before configuring its Actions.')
+    before = snapshot['rows']
+    if len(before) > 1 or before and snapshot['new_occurrences'] != 1:
+        raise OperationContractError('AMBIGUOUS_ACTION_COLLISION',
+            'Blank Action names do not identify one collision. Select the exact existing Action GUID to configure it, or use rename to append fresh Actions.')
+    if not before:
+        return
+    old = before[0]
+    if conflict == 'merge':
+        fields = _object_spec_return_fields(spec)
+        rows = _read_object_id_rows(old['id'], fields=fields, read=read)
+        if len(rows) != 1 or not _object_spec_row_matches(rows[0], spec, old['id']):
+            raise OperationContractError('INVALID_READBACK', 'The unique Action collision lost its exact identity/class.')
+        spec['preexisting_id'], spec['pre_state'] = old['id'], rows[0]
+        snapshot['merged_id'] = old['id']
+        snapshot['new_occurrences'] = 0
+    else:
+        rows = _read_object_id_rows(old['id'], fields=OBJECT_REPLACE_SNAPSHOT_FIELDS, read=read)
+        if len(rows) != 1 or not _same_identity(rows[0].get('id'), old['id']):
+            raise OperationContractError('INVALID_READBACK', 'The Action replacement root must retain its exact GUID.')
+        collision = ResolvedObject(identity=ObjectIdentity(id=old['id']), object=old['id'],
+            resolution='live-unique-Action-collision', row=rows[0])
+        replacement_snapshots.append({'root_id': old['id'], 'root_path': old['path'],
+            'fields': list(OBJECT_REPLACE_SNAPSHOT_FIELDS), 'rows': _capture_replace_subtree_snapshot(collision, read=read)})
+        snapshot['retired_ids'] = [old['id']]
+
+
 def _prepare_object_create(
     request: OperationRequest,
     *,
@@ -5167,8 +5213,10 @@ def _prepare_object_create(
         if conflict == "rename":
             node_specs[0]["rename_collision_rows"] = collisions
     elif node_specs[0].get('action_constructor'):
-        if conflict != 'fail':
-            raise OperationContractError('ACTION_COLLISION_SEMANTICS_UNRESOLVED', 'Unnamed Action collision modes remain assigned implementation work')
+        _prepare_action_collision(node_specs[0], conflict, read=read, replacement_snapshots=replace_subtree_snapshots)
+        if conflict == 'replace' and any(not _is_strict_descendant_object_path(row['path'], replace_owned_root.row['path'])
+                for row in node_specs[0]['action_parent_snapshot']['rows']):
+            raise OperationContractError('REPLACE_TARGET_OUTSIDE_OWNED_ROOT', 'The exact Action collision must be below the reviewed replacement owner.')
     elif conflict == "fail":
         assert isinstance(root_path, str)
         rows = _read_object_path_rows(root_path, fields=IDENTITY_RETURN_FIELDS, read=read)
@@ -5342,6 +5390,8 @@ def _prepare_object_create(
         family="object-mutation",
         metadata={
             "closed_object_tree": True,
+            "action_collisions": _action_collision_preview(node_specs, conflict),
+            "constructor_notes": {"new_objects": "apply_requested_notes", "merged_existing": "preserve_existing_notes", "edit_existing_notes": "configure_exact_existing_GUID"},
             **({"native_default_reference_omissions": null_reference_omissions} if null_reference_omissions else {}),
             "native_name_bindings": result_context["renames"] if result_context else [],
             **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
@@ -6655,8 +6705,7 @@ def _prepare_object_set(
                 else child_spec["parent_request_path"]
             )
             if child_spec.get('action_constructor'):
-                if row_conflict != 'fail':
-                    raise OperationContractError('ACTION_COLLISION_SEMANTICS_UNRESOLVED', 'Unnamed Action collision modes remain assigned implementation work')
+                _prepare_action_collision(child_spec, row_conflict, read=read, replacement_snapshots=replace_subtree_snapshots)
                 continue
             if child_spec.get("collection") != "children":
                 continue
@@ -6906,7 +6955,7 @@ def _prepare_object_set(
             collisions_by_name: dict[str, list[dict[str, Any]]] = {}
             for root_spec in root_specs:
                 if root_spec.get("anonymous_list_member"):
-                    if row_conflict != "fail":
+                    if row_conflict != "fail" and not (root_spec['class_id'] == 5505040 and descriptor.name == 'Effects' and row_list_mode == 'append'):
                         raise OperationContractError("ANONYMOUS_LIST_CONFLICT_UNRESOLVED", "Anonymous nondefault name conflict semantics remain pending exact source/native proof")
                     continue
                 if root_spec.get("rtpc_binding"):
@@ -7105,7 +7154,7 @@ def _prepare_object_set(
                         # RTPC preparation already bound or admitted this row.
                         continue
                     if member.anonymous:
-                        if row_conflict != "fail":
+                        if row_conflict != "fail" and not (spec['class_id'] == 5505040 and descriptor.name == 'Effects' and row_list_mode == 'append'):
                             raise OperationContractError("ANONYMOUS_LIST_CONFLICT_UNRESOLVED", "Anonymous nondefault name conflict semantics remain pending exact source/native proof")
                         continue
                     collisions = [row for row in before_rows if str(row.get("name", "")).casefold() == member.name.casefold()]
@@ -7290,6 +7339,13 @@ def _prepare_object_set(
         ids = [row.get("id") for row in parent_spec.get("preexisting_children", [])]
         if any(not _valid_object_id(value) for value in ids) or len({_identity_key(value) for value in ids}) != len(ids):
             raise OperationContractError("INVALID_READBACK", "Source construction requires the complete unique pre-existing parent child GUID set.")
+        collision_id = spec.get('source_collision_id', spec.get('preexisting_id'))
+        if collision_id is not None:
+            candidates = [row for row in parent_spec.get('preexisting_children', [])
+                if str(row.get('name', '')).casefold() == spec['requested_name'].casefold()]
+            if len(candidates) != 1 or not _same_identity(candidates[0]['id'], collision_id):
+                raise OperationContractError('AMBIGUOUS_SOURCE_COLLISION',
+                    'The complete Voice child roster must identify one same-name collision across languages. Configure an exact existing Source GUID, or use rename for fresh construction.')
         spec["source_plugin"]["preexisting_plugin_ids"] = ids
         owner_id = parent_spec.get('target_id', parent_spec.get('preexisting_id'))
         if owner_id is not None and not any(_same_identity(snapshot.get('source_owner_id'), owner_id) for snapshot in field_snapshots):
@@ -7313,10 +7369,15 @@ def _prepare_object_set(
         if spec.get('source_plugin') and source_collision is not None and 'source_language' in spec:
             rows = _read_object_id_rows(source_collision, fields=['id', 'audioSource:language'], read=read)
             selected = spec['source_language']['selected']
-            if (len(rows) != 1 or not _same_identity(rows[0].get('id'), source_collision)
-                    or _import_language_name(rows[0].get('audioSource:language')) != selected['name']):
+            if len(rows) != 1 or not _same_identity(rows[0].get('id'), source_collision):
+                raise OperationContractError('INVALID_READBACK', 'The sealed named Source collision must resolve exactly once.')
+            actual_language = rows[0].get('audioSource:language')
+            spec['source_collision_language'] = actual_language
+            if (spec.get('preexisting_id') is not None
+                    and (_import_language_name(actual_language) != selected['name']
+                        or isinstance(actual_language, Mapping) and 'id' in actual_language and not _same_identity(actual_language['id'], selected['id']))):
                 raise OperationContractError('SOURCE_LANGUAGE_COLLISION_MISMATCH',
-                    'The exact named Source collision must retain the selected language; cross-language name-conflict identity needs source/native evidence.')
+                    'Source merge preserves the existing language. Select that exact existing Source GUID to configure it in its actual language, or choose rename/replace to create a Source in the selected language.')
         if "construction_language" in spec:
             spec["construction_language"]["expected_sources"] = [child["request_path"] for child in node_specs
                 if "source_plugin" in child and child["parent_request_path"] == spec["request_path"]]
@@ -7376,6 +7437,12 @@ def _prepare_object_set(
         family="object-mutation",
         metadata={
             "closed_object_batch": True,
+            "action_collisions": _action_collision_preview(node_specs, conflict),
+            "constructor_notes": {"new_objects": "apply_requested_notes", "merged_existing": "preserve_existing_notes", "edit_existing_notes": "configure_exact_existing_GUID"},
+            "source_language_collisions": [{'source_id': spec.get('source_collision_id', spec.get('preexisting_id')),
+                'existing_language': spec['source_collision_language'], 'selected_language': spec['source_language']['selected'],
+                'effect': 'preserve_existing_language' if spec.get('preexisting_id') else 'retire_collision_and_create_selected_language'}
+                for spec in node_specs if 'source_collision_language' in spec],
             "native_name_bindings": result_context["renames"] if result_context else [],
             **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
                 "dependent_write": "after actual GUID/class/parent/membership binding" if deferred_reference_stage else "none",
@@ -8633,7 +8700,18 @@ def _resolve_merge_node_target(
     fields = _dedupe_fields([*IDENTITY_RETURN_FIELDS, "classId",
         *(descriptor.name for descriptor in (*node.properties, *node.references))])
     expected_path = None
-    if collection == "children":
+    expected_name = node.name
+    if spec.get('action_constructor'):
+        snapshot = spec.get('action_parent_snapshot')
+        if snapshot is None:
+            return None
+        if len(snapshot['rows']) > 1 or snapshot['rows'] and snapshot['new_occurrences'] != 1:
+            raise OperationContractError('AMBIGUOUS_ACTION_COLLISION', 'Choose the exact existing Action GUID; multiple blank names cannot select one merge collision.')
+        if not snapshot['rows']:
+            return None
+        rows = _read_object_id_rows(snapshot['rows'][0]['id'], fields=fields, read=read)
+        expected_name = ''
+    elif collection == "children":
         expected_path = _child_path(owner_row.get("path"), node.name, field="merge_parent.path")
         rows = _read_object_path_rows(expected_path, fields=fields, read=read)
     else:
@@ -8667,7 +8745,7 @@ def _resolve_merge_node_target(
         return None
     row = rows[0]
     relation = "parent" if collection == "children" else "owner"
-    if (not _valid_object_id(row.get("id")) or row.get("name") != node.name
+    if (not _valid_object_id(row.get("id")) or row.get("name") != expected_name
             or not isinstance(row.get("path"), str) or not row["path"].startswith("\\")
             or (expected_path is not None and row["path"] != expected_path)
             or type(row.get("classId")) is not int or row["classId"] != spec["class_id"]
@@ -9893,9 +9971,17 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None, af
                 actual = _read_direct_children(snapshot['object_id'], fields=snapshot['fields'], read=read)
                 before = {row['id'].casefold(): row for row in snapshot['rows']}
                 now = {row['id'].casefold(): row for row in actual}
-                same = all(key in now and _native_snapshot_equal(now[key], row) for key, row in before.items())
-                complete = (len(now) == len(actual) and set(before) <= set(now)
-                    and (len(set(now) - set(before)) == snapshot['new_occurrences'] if after_write else set(now) == set(before)))
+                retired = {identity.casefold() for identity in snapshot.get('retired_ids', [])} if after_write else set()
+                merged = snapshot.get('merged_id', '').casefold() if after_write else ''
+                def retained_action_matches(key, row):
+                    if key not in now: return False
+                    omitted = {'path', 'ActionType', '@ActionType', 'Target', '@Target'} if key == merged else set()
+                    return _native_snapshot_equal({field: value for field, value in now[key].items() if field not in omitted},
+                        {field: value for field, value in row.items() if field not in omitted})
+                retained = set(before) - retired
+                same = all(retained_action_matches(key, before[key]) for key in retained)
+                complete = (len(now) == len(actual) and retained <= set(now) and not retired & set(now)
+                    and (len(set(now) - retained) == snapshot['new_occurrences'] if after_write else set(now) == set(before)))
                 assertions.append({'name': 'Action Event retains its exact previous children and constructor occurrence count',
                     'passed': bool(same and complete and _native_snapshot_equal(parents, [snapshot['parent']])),
                     'evidence': {'before': snapshot, 'actual': actual, 'parents': parents, 'after_write': after_write}})
@@ -10071,6 +10157,15 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferr
             name = expected.get("field_binding", {}).get("token", expected["name"])
             kind_version = expected.get("reference_kind_evidence", {}).get("version")
             observed = observed_field(condition_metadata["object_id"], name, kind_version).as_dict()
+            proof = expected.get('reference_kind_evidence', {})
+            if after_write and proof.get('kind') == 'documented-reference-kind' and proof.get('identity', {}).get('type') == 'Action':
+                edits = pre_state.get('object_set_nodes', pre_state.get('object_create_nodes', []))
+                values = [prop['value'] for node in edits
+                    if node.get('class_id') == 327696 and _same_identity(node.get('target_id', node.get('preexisting_id')), condition_metadata['object_id'])
+                    for prop in node.get('properties', []) if prop['name'] == 'ActionType']
+                if len(values) == 1:
+                    expected = {**expected, 'reference_kind_evidence': {**proof,
+                        'identity': {**proof['identity'], 'ActionType': values[0]}}}
             assertions.append({"name": f"condition metadata {name} unchanged",
                                "passed": _native_snapshot_equal(observed, expected),
                                "evidence": {"expected": expected, "actual": observed}})
@@ -20351,7 +20446,7 @@ def _bind_object_set_result_nodes(
             return (node.name == '' and actual.get('name') == ''
                 and _object_spec_row_matches(actual, spec, node.object)
                 and _same_identity(_parent_value(actual.get('parent')), owner_id)
-                and (not spec.get('notes_supplied') or actual.get('notes') == spec.get('requested_notes'))
+                and (not spec.get('notes_supplied') or spec.get('preexisting_id') is not None or actual.get('notes') == spec.get('requested_notes'))
                 and all(_has_field(actual, prop['name']) and condition_values_equal(_field_value(actual, prop['name']), prop['value'])
                     for prop in spec.get('properties', []))
                 and all(_reference_requirement_matches(actual, ref['name'], ref.get('target_id'))
@@ -23090,7 +23185,8 @@ def verify_prepared_operation(
             expected_path = spec.get("expected_path")
             if spec.get('action_constructor'):
                 before_ids = {item['id'].casefold() for item in spec.get('action_parent_snapshot', {}).get('rows', [])}
-                check('created Action GUID is outside the sealed Event pre-state', object_id.casefold() not in before_ids,
+                check('Action GUID matches its sealed creation or unique merge identity',
+                    _same_identity(object_id, spec['preexisting_id']) if spec.get('preexisting_id') else object_id.casefold() not in before_ids,
                     {'actual': object_id, 'before_ids': sorted(before_ids)})
                 check('created Action uses its source-certified empty name and actual derived display path',
                     row.get('name') == '' and isinstance(row.get('path'), str) and row['path'].startswith('\\'),
@@ -23174,7 +23270,7 @@ def verify_prepared_operation(
                            else {"parent_id": expected_parent_id})}})
                 if identity_ok and history_fields and history_graph:
                     created_history_metadata.append((spec, object_id))
-            if spec.get("notes_supplied") is True:
+            if spec.get("notes_supplied") is True and (spec.get('existing_target') is True or spec.get('preexisting_id') is None):
                 check(
                     f"{request_path} notes match",
                     row.get("notes") == spec.get("requested_notes"),
@@ -23271,6 +23367,8 @@ def verify_prepared_operation(
             if "source_plugin" in spec:
                 source_plan = spec["source_plugin"]
                 descriptor_row = dict(source_plan["descriptor"])
+                if spec.get('preexisting_id') is not None:
+                    descriptor_row['notes'] = spec['pre_state']['notes']
                 if spec.get('on_name_conflict') == 'rename':
                     # The ordinary graph name/path checks bind native's actual
                     # renamed occurrence; plugin verification retains that name.
@@ -23279,6 +23377,11 @@ def verify_prepared_operation(
                     descriptor_row["platform"] = platform
                 if "source_language" in spec:
                     descriptor_row["language"] = source_read_language
+                    actual_language = row.get('audioSource:language')
+                    if isinstance(actual_language, Mapping) and 'id' in actual_language:
+                        check(f"{request_path} exposed Source language GUID matches the selected Project language",
+                            _same_identity(actual_language['id'], spec['source_language']['selected']['id']),
+                            {'expected': spec['source_language']['selected'], 'actual': actual_language})
                 descriptor = normalize_plugin_creation(descriptor_row)
                 projection = plugin_verification_fields(descriptor)
                 try:

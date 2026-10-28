@@ -526,8 +526,8 @@ def test_public_schema_and_continuation_disclose_source_owned_blank_name(tmp_pat
     contract = find(schema)
     assert contract['omit'] == ['name']
     assert contract['versions'] == ['2023.1', '2024.1', '2025.1']
-    assert contract['on_name_conflict']['supported'] == ['fail']
-    assert contract['on_name_conflict']['pending_source_native_proof'] == ['rename', 'merge', 'replace']
+    assert contract['on_name_conflict']['supported'] == ['fail', 'rename', 'merge', 'replace']
+    assert contract['on_name_conflict']['other_profiles_supported'] == ['fail']
     task.bind(FIRST)
     code, found = task.step('draft-discover-types', '--role', 'object', '--meaning', 'EffectSlot')
     assert code == 0, found
@@ -621,15 +621,31 @@ def test_anonymous_append_rejects_aggregate_population_beyond_complete_read_boun
     assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('conflict', ['rename', 'merge', 'replace'])
-def test_anonymous_nondefault_conflict_policy_is_explicitly_pending_before_dispatch(tmp_path, conflict):
-    task = anonymous_task(tmp_path)
+@pytest.mark.parametrize('version,conflict', [('2023.1', 'rename'), ('2024.1', 'merge'), ('2025.1', 'replace')])
+def test_anonymous_effect_append_ignores_name_policy_and_preserves_independent_fields(tmp_path, version, conflict):
+    task = anonymous_task(tmp_path, version)
+    before = deepcopy(task.objects)
     declare_slots(task)
     code, configured = task.step('draft-business-configure', '--name-conflict', conflict)
     assert code == 0, configured
-    code, checked = task.step('draft-check')
-    assert code == 2 and 'ANONYMOUS_LIST_CONFLICT_UNRESOLVED' in json.dumps(checked), checked
-    assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            assert args['onNameConflict'] == conflict and args['listMode'] == 'append'
+            for identity, descriptor in zip((SLOT_A, SLOT_B), args['objects'][0]['@Effects']):
+                task.objects[identity] = {'id': identity, 'name': '', 'type': 'EffectSlot', 'classId': 5505040,
+                    'owner': {'id': FIRST}, 'path': '\\Opaque ' + identity, 'notes': '',
+                    '@Effect': {'id': descriptor['@Effect']}, '@Bypass': descriptor['@Bypass'], '@Render': False}
+                task.objects[FIRST]['@Effects'].append({'id': identity})
+            return {'objects': [{'id': FIRST, 'name': 'Sender', '@Effects': [{'id': SLOT_B, 'name': ''}, {'id': SLOT_A, 'name': ''}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, json.dumps(verified)
+    assert len(writes) == 1
+    assert all(task.objects[identity] == before[identity] for identity in (ROOT, CHILD, EFFECT, EFFECT_B))
 
 
 def test_explicit_render_false_before_later_true_is_rejected_before_any_write(tmp_path):
@@ -657,10 +673,12 @@ def test_omitted_new_predecessor_render_is_derived_in_preview(tmp_path):
     assert 'Bypass takes precedence' in chain['bypass_policy']
 
 
-@pytest.mark.parametrize('version,fault', [('2025.1', fault) for fault in [None, 'ignored-derived', 'metadata-drift', 'member-drift']] + [('2023.1', None), ('2024.1', None)])
-def test_render_prefix_append_verifies_derived_old_and_new_predecessors(tmp_path, version, fault):
+@pytest.mark.parametrize('version,fault,conflict', [('2025.1', fault, 'fail') for fault in [None, 'ignored-derived', 'metadata-drift', 'member-drift']] + [('2023.1', None, 'merge'), ('2024.1', None, 'rename'), ('2025.1', None, 'replace')])
+def test_render_prefix_append_verifies_derived_old_and_new_predecessors(tmp_path, version, fault, conflict):
     task = anonymous_task(tmp_path, version)
     declare_slots(task, renders=(None, 'true'))
+    code, configured = task.step('draft-business-configure', '--name-conflict', conflict)
+    assert code == 0, configured
     original, writes = task.call, []
     def call(uri, args=None, options=None):
         if uri.endswith('object.set'):
