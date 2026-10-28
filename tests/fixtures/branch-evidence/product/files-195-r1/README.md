@@ -1,7 +1,11 @@
 # #195 SoundBank / Console project and file mapping
 
-`export-r3` is the current component successor after merging integration
-`441c5093`. It maps the exact twenty owner #183/#184 URIs against all ten pinned
+`export-r3` is the historical component predecessor after merging integration
+`441c5093`. A later P2 review found that native all-platform omission lacked a
+public semantic choice. The subsequent runtime repair adds explicit
+`--all-platforms` with bounded live enumeration; these old export/103-run source
+seals are intentionally not treated as current proof after that repair.
+Current source reconciliation/publication remains pending. It maps the exact twenty owner #183/#184 URIs against all ten pinned
 native catalogs: 85 public version rows, 144 actual native host/version routes,
 and 10,868 expanded obligations. #183 owns 37 public rows / 70 native routes /
 8,938 obligations; #184 owns 48 / 74 / 1,930. The later Authoring catalogs do not
@@ -46,5 +50,9 @@ successful and unaffected. Local paths are now resolved before the canonical
 archive-path helper. `export-r2` preserves the first successful component export;
 `export-r3` changes only component candidate attribution after integration.
 
-No public runtime code or API capability changed. The finite source pass found
-no concrete legitimate normal-user field/choice omission in this owned cohort.
+The predecessor source pass originally claimed no concrete input omission.
+P2 corrected that claim: all five generation lanes needed a deliberate
+all-configured-platform choice. The runtime and exact omission mapping are now
+repaired in separate commits. Historical artifacts and their original machine
+completion flags remain unchanged; they confer no current-candidate completion
+after the runtime repair.

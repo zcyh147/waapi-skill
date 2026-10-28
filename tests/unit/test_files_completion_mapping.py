@@ -192,17 +192,50 @@ def test_files_retained_history_preserves_original_failed_outcomes():
     assert 'original FAIL' in manifest['accepted_limits']['migration']
 
 
-def test_files_maintenance_entrypoint_consumes_original_code_proof_and_persists_completion(tmp_path, monkeypatch):
+def test_files_maintenance_entrypoint_rejects_old_code_proof_after_generation_scope_fix(tmp_path, monkeypatch):
     from tests.maintenance.map_files_completion import main
     from tests.support.files_completion_mapping import BASE
-    # Exercise the real CLI, source-seal reader, requirements parts, mapping
-    # attachment merger, ordinary reader and persisted assessment together.
+    # The runtime P2 repair invalidates byte-identity reuse of this original
+    # aggregate capture. Preserve the original export and fail closed until the
+    # changed mechanism receives separately reviewed current CODE support.
     run = ROOT / BASE / 'export-r2/original'
     monkeypatch.chdir(tmp_path)
-    assert main(['--output-directory', 'relative-output', '--ordinary-run', str(run)]) == 0
-    report = json.loads((tmp_path / 'relative-output/assessment.json').read_bytes())
-    assert report['completion']['complete'] is True
-    assert report['completion']['states'] == {'mapped_with_representative_proof': 10860, 'verified': 8}
-    assert report['evidence_outcomes'] == ['reviewed_aggregate_code_mechanism', 'reviewed_representative_mechanism']
-    assert report['summary']['native_or_fresh_started'] is False
-    assert report['summary']['canonical_import_pending'] is True
+    with pytest.raises(ValueError, match='selected source changed'):
+        main(['--output-directory', 'relative-output', '--ordinary-run', str(run)])
+    assert not (tmp_path / 'relative-output/assessment.json').exists()
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'))
+def test_files_generation_native_omission_maps_only_explicit_all_platform_choice(component, version):
+    from tests.support.files_completion_mapping import files_bindings
+    bindings = files_bindings(ROOT, component)
+    selected = [binding for identity, binding in bindings.items() if identity.startswith(version + '|')
+        and '|ak.wwise.core.soundbank.generate|' in identity
+        and identity.endswith('/argsSchema/properties/platforms/@presence/absent')]
+    assert len(selected) == 2
+    for binding in selected:
+        correspondence = binding['input']['correspondence']
+        assert correspondence['public_fields'] == ['all_platforms']
+        assert correspondence['rule'] == 'explicit_all_platforms_native_omission_equivalent'
+        assert correspondence['native_omission_equivalent'] == {
+            'public_field': 'all_platforms', 'required_value': True,
+            'selection': 'all_configured_at_preview', 'dispatch': 'explicit_captured_GUID_list',
+            'implicit_omission_allowed': False, 'prewrite': 'full_plan_replay_configuration_and_owned_IO_guards'}
+
+
+@pytest.mark.parametrize('damage', ['missing-field', 'changed-choice'])
+def test_files_generation_mapping_rejects_removal_of_deliberate_all_platform_choice(component, monkeypatch, damage):
+    import tests.support.files_completion_mapping as mapping
+    from wwise_waapi import soundbank_business_contracts
+    original = soundbank_business_contracts.soundbank_business_contract_data
+    def removed(operation, version):
+        contract = original(operation, version)
+        if operation == 'soundbank.generate':
+            if damage == 'missing-field':
+                contract['declaration']['optional_fields'].remove('all_platforms')
+            else:
+                contract['declaration']['schema']['properties']['all_platforms']['const'] = False
+        return contract
+    monkeypatch.setattr(soundbank_business_contracts, 'soundbank_business_contract_data', removed)
+    with pytest.raises(ValueError, match='public.*not disclosed'):
+        mapping.files_bindings(ROOT, component)

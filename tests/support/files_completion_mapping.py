@@ -139,7 +139,7 @@ CLI_FIELDS = {
 }
 HOOKS = {'custom-global-opening-cmd', 'custom-global-closing-cmd', 'custom-pre-gen-cmd', 'custom-post-gen-cmd'}
 CORE_FIELDS = {
-    'generate': {'soundbanks': ['soundbanks', 'all_user_soundbanks'], 'platforms': ['platforms'], 'languages': ['languages'],
+    'generate': {'soundbanks': ['soundbanks', 'all_user_soundbanks'], 'platforms': ['platforms', 'all_platforms'], 'languages': ['languages'],
         'writeToDisk': ['write_to_disk'], 'skipLanguages': ['skip_languages'], 'rebuildSoundBanks': ['rebuild_soundbanks'],
         'clearAudioFileCache': ['clear_audio_file_cache'], 'rebuildInitBank': ['rebuild_init_bank']},
     'setInclusions': {'soundbank': ['soundbank_handle'], 'operation': ['mode'], 'inclusions': ['inclusions']},
@@ -227,6 +227,8 @@ def _validate_disclosure(declaration, field, row, uri, address):
             node = node['properties'][key]
             if array:
                 node = node['items']
+        if field == 'all_platforms' and node.get('const') is not True:
+            raise ValueError('Files deliberate public all-platform choice is not disclosed')
         if row['kind'] == 'enum_value' and node.get('type') == 'array':
             node = node.get('items', {})
         if row['kind'] == 'enum_value' and 'enum' in node:
@@ -277,6 +279,10 @@ def _encoding(uri, fields, path, version):
         return ('bound bank name or noncolliding temporary name; events/AuxBusses resolve exact GUIDs; '
             'events=event, structures=structure, media=media; explicit empty nested choices retained; '
             'all_user_soundbanks uses empty list in 2023+ and exact live enumeration in 2021/2022')
+    if name == 'generate' and top == 'platforms':
+        return ('explicit platform list resolves exact configured GUIDs; all_platforms=true deliberately selects all configured platforms '
+            'using at most 16 captured GUIDs, names and owned output paths; native omission is represented by this bounded live enumeration, '
+            'not implicit input omission; missing or contradictory selection fails; configuration and full plan replay reject drift before execution')
     if top == 'writeToDisk':
         return 'public default true; explicit false selects result-only memory generation; native-default omits field (native false); Topic data requires subscription before generation'
     if top == 'skipLanguages':
@@ -395,6 +401,9 @@ def files_bindings(root, inventory):
         for address in addresses:
             fields, rule = _input_fields(uri, address) if section == 'argsSchema' else ([],
                 'fixed_empty_options' if section == 'optionsSchema' else 'bounded_native_result')
+            if (uri == 'ak.wwise.core.soundbank.generate' and section == 'argsSchema'
+                    and address == ['platforms'] and row['kind'] == 'optional_presence' and row['value'] == 'absent'):
+                fields, rule = ['all_platforms'], 'explicit_all_platforms_native_omission_equivalent'
             if {field.split('[')[0] for field in fields} - exposed:
                 raise ValueError('Files mapped public field/choice is not disclosed: ' + uri + ' ' + repr(fields))
             for field in fields:
@@ -409,6 +418,10 @@ def files_bindings(root, inventory):
             **({'output_projection': [_result_projection(uri, address, route['version']) for address in addresses]}
                 if section == 'resultSchema' else {}),
             'choice': {'kind': row['kind'], **({'value': row['value']} if 'value' in row else {})}}
+        if correspondence['rule'] == 'explicit_all_platforms_native_omission_equivalent':
+            correspondence['native_omission_equivalent'] = {'public_field': 'all_platforms', 'required_value': True,
+                'selection': 'all_configured_at_preview', 'dispatch': 'explicit_captured_GUID_list',
+                'implicit_omission_allowed': False, 'prewrite': 'full_plan_replay_configuration_and_owned_IO_guards'}
         if row['kind'] == 'enum_value' and section == 'argsSchema':
             native_choice = row['value']
             correspondence['public_choice'] = ({'event': 'events', 'structure': 'structures'}.get(native_choice, native_choice)
