@@ -205,6 +205,14 @@ def reviewed_existing_display_identity(*, version: str | None, object_type: str,
     return False
 
 
+def display_identity_requires_name_boundary(*, version: str | None, object_type: str,
+                                           name: object, path: object) -> bool:
+    """Withhold new name authority without regressing the old 2021 Language rule."""
+    return (reviewed_existing_display_identity(version=version, object_type=object_type,
+                name=name, path=path)
+            and not (version == "2021.1" and object_type == "Language"))
+
+
 def object_child_capability(
     *,
     version: str,

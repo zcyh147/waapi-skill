@@ -29563,8 +29563,8 @@ def _reject_non_intrinsic_object_name_operation(
     """Fail when rename or collision proof needs a mutable intrinsic name."""
 
     object_type = target.row.get("type")
-    from .object_capabilities import reviewed_existing_display_identity
-    if reviewed_existing_display_identity(version=version, object_type=object_type,
+    from .object_capabilities import display_identity_requires_name_boundary
+    if display_identity_requires_name_boundary(version=version, object_type=object_type,
             name=target.row.get("name"), path=target.row.get("path")):
         raise OperationContractError("DISPLAY_IDENTITY_NAME_BOUNDARY",
             f"{operation} requires name/topology authority not established by exact display-identity admission.")

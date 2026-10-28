@@ -160,14 +160,44 @@ def test_existing_display_field_preview_stops_on_identity_readback_drift(tmp_pat
     assert not any(uri.endswith("setProperty") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("row", [EXISTING_DISPLAY_ROWS_2025[i] for i in (0, 4, 5, 7)])
-def test_existing_display_admission_does_not_authorize_rename(tmp_path, row):
-    task = existing_display_task(tmp_path, row, operation="object.setName")
-    task.bind(row["id"])
-    code, declared = task.step("draft-declare-object-change", "--new-name", "Renamed")
-    assert code == 0, declared
-    code, rejected = task.step("draft-check")
+@pytest.mark.parametrize("version,row,operation", [
+    (version, EXISTING_DISPLAY_ROWS_2025[index], operation)
+    for index in (0, 4, 5, 7) for version in VERSIONS
+    for operation in ("object.setName", "object.set")
+    if not (index == 0 and version == "2021.1")
+    and (index != 4 or version == "2025.1")
+    and (operation != "object.set" or version != "2021.1")
+])
+def test_existing_display_admission_does_not_authorize_rename(tmp_path, version, row, operation):
+    task = existing_display_task(tmp_path, row, version=version, operation=operation)
+    target = task.bind(row["id"])
+    if operation == "object.set":
+        code, rejected = task.step("draft-declare-existing", "--declaration-id", "selected",
+            "--object-handle", target, "--field", "new_name", "Renamed")
+    else:
+        code, declared = task.step("draft-declare-object-change", "--new-name", "Renamed")
+        assert code == 0, declared
+        code, rejected = task.step("draft-check")
     assert code == 2 and rejected["error_code"] == "DISPLAY_IDENTITY_NAME_BOUNDARY", rejected
+    assert not any(uri.endswith("setName") for uri, _, _ in task.calls)
+
+
+def test_legacy_2021_language_name_preparation_remains_available(tmp_path):
+    row = EXISTING_DISPLAY_ROWS_2025[0]
+    task = existing_display_task(tmp_path, row, version="2021.1", operation="object.setName")
+    task.bind(row["id"])
+    code, declared = task.step("draft-declare-object-change", "--new-name", "EnglishAlt")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    code, shown = task.run("transaction-show", preview["transaction_id"])
+    assert code == 0, shown
+    prepared = shown["artifact"]["prepared_operation"]
+    assert prepared["dispatch"]["uri"] == "ak.wwise.core.object.setName"
+    assert prepared["dispatch"]["args"] == {"object": row["id"], "value": "EnglishAlt"}
+    assert task.objects[row["id"]]["name"] == "English(US)"
     assert not any(uri.endswith("setName") for uri, _, _ in task.calls)
 
 

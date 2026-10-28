@@ -1267,8 +1267,8 @@ def _compile_existing_set_fields(
                     "their existing contracts. This graph boundary does not establish native absence."
                 ),
             )
-        from .object_capabilities import reviewed_existing_display_identity
-        if reviewed_existing_display_identity(version=session.context.wwise_version,
+        from .object_capabilities import display_identity_requires_name_boundary
+        if display_identity_requires_name_boundary(version=session.context.wwise_version,
                 object_type=source.object_type, name=source.name, path=source.path):
             raise _repair(session, "DISPLAY_IDENTITY_NAME_BOUNDARY", field="new_name",
                 object_type=source.object_type,
