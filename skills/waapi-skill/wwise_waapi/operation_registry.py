@@ -20840,6 +20840,15 @@ def _bind_object_set_result_nodes(
                 identity, name = observe_owned_reference(node.object, "ControlInput")
                 returned.append(ObjectResultNode(node.request_path + ".@ControlInput[0]", node.request_path,
                     identity, name, 0, "ControlInput"))
+        def exact_control_name(child, candidate):
+            return (candidate.get("control_surface_constructor") and candidate.get("preexisting_id") is None
+                and candidate.get("on_name_conflict", on_name_conflict) == "rename"
+                and child.collection == candidate.get("collection", "children")
+                and child.name == candidate.get("requested_name"))
+        # Reserve exact declaration names before considering unrelated native
+        # names. Remaining fallbacks must still have one independent match;
+        # association array order never chooses between ambiguous candidates.
+        returned = sorted(returned, key=lambda child: not any(exact_control_name(child, candidate) for candidate in available))
         for child in returned:  # result-relative parent path
             collection_matches = [
                 candidate
@@ -20853,9 +20862,10 @@ def _bind_object_set_result_nodes(
                 if candidate.get("preexisting_id") is not None
                 and _same_identity(child.object, candidate.get("preexisting_id"))
             ]
+            exact_names = [candidate for candidate in collection_matches if exact_control_name(child, candidate)]
             matches = sealed_matches or [
                 candidate
-                for candidate in collection_matches
+                for candidate in (exact_names or collection_matches)
                 if (name_matches(child, candidate, owner_id=node.object)
                     and (not candidate.get('action_constructor')
                         or action_assignment.get(candidate['request_path']) == _identity_key(child.object)))

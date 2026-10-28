@@ -370,3 +370,55 @@ def test_genuine_merge_retains_bound_guid_notes_and_empty_notes_peer(tmp_path):
     assert code == 0 and result['verified'] is True, json.dumps([check for check in result.get('verification', {}).get('assertions', []) if not check.get('passed')])
     assert all(task.objects[key] == row for key, row in before.items())
     assert task.objects[CHILD]['parent'] == {'id': ROOT}
+
+
+@pytest.mark.parametrize('native_names', ['exact', 'one-unrelated', 'ambiguous'])
+def test_set_rename_binds_two_exact_named_siblings_before_native_name_fallback(tmp_path, native_names):
+    task = SurfaceTask(tmp_path, '2022.1', 'object.set')
+    owner = task.bind(FIRST)
+    code, result = task.step('draft-business-configure', '--name-conflict', 'rename')
+    assert code == 0, result
+    code, result = task.group(parent=owner)
+    assert code == 0, result
+    kind = task.kind('ControlSurfaceBindingGroup')
+    code, result = task.step('draft-declare-new', '--declaration-id', 'rain-group', '--parent-handle', owner,
+        '--name', 'Rain', '--kind', kind, '--field-value', task.field(kind, 'GroupType'), '2')
+    assert code == 0, result
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.set'):
+            children = result['objects'][0]['children']
+            changes = ({CHILD: 'Native User Group 6'} if native_names == 'one-unrelated' else
+                {ROOT: 'Native User Group 5', CHILD: 'Native User Group 6'} if native_names == 'ambiguous' else {})
+            for child in children:
+                if child['id'] in changes:
+                    name = changes[child['id']]
+                    child['name'] = name
+                    task.objects[child['id']].update(name=name, path=task.objects[FIRST]['path'] + '\\' + name)
+            # Put any unrelated native name first: array order cannot reserve
+            # the other declaration when its exact requested name is present.
+            children.reverse()
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    assert not shown['artifact']['prepared_operation']['pre_state'].get('owned_result_stages')
+    code, result = task.finish(tx, shown)
+    if native_names == 'ambiguous':
+        assert code == 2 and result.get('verified') is not True, result
+        code, result = task.run('execute', tx)
+        assert code == 2, result
+        assert len([uri for uri, _, _ in task.calls if uri.endswith('object.set')]) == 1
+        return
+    assert code == 0 and result['verified'] is True, json.dumps([check for check in result.get('verification', {}).get('assertions', []) if not check.get('passed')])
+    code, stored = task.run('transaction-show', tx)
+    assert code == 0, stored
+    verification = next(event['details']['verification'] for event in reversed(stored['events'])
+        if event['event_type'] == 'verification_recorded')
+    names = {check['evidence']['requested']: check['evidence']['actual']
+        for check in verification['assertions'] if isinstance(check.get('evidence'), dict)
+        and check['evidence'].get('requested') in ('Layers', 'Rain') and 'actual' in check['evidence']}
+    expected = {'Layers': 'Layers', 'Rain': 'Rain' if native_names == 'exact' else 'Native User Group 6'}
+    assert names == expected
+    assert {task.objects[identity]['name'] for identity in (ROOT, CHILD)} == set(expected.values())
+    assert len([uri for uri, _, _ in task.calls if uri.endswith('object.set')]) == 1
