@@ -490,4 +490,3 @@ def program_anchors(root, inventory, destination, run):
             'sha256': hashlib.sha256(target.read_bytes()).hexdigest()}
         anchors[identity] = anchor
     return anchors
-
