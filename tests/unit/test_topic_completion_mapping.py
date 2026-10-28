@@ -111,3 +111,27 @@ def test_topic_program_anchor_rejects_an_unfinalized_run(topic_inventory, tmp_pa
         'scope_kind': 'product', 'files': {}}, 'selected_tests': ['unobserved']}))
     with pytest.raises(ValueError, match='original finalized ordinary run'):
         program_anchors(audit.ROOT, topic_inventory, tmp_path / 'output', review)
+
+
+def test_topic_ordinary_copy_preserves_the_original_finalizer_receipt_name(topic_inventory, tmp_path):
+    import hashlib
+    import json
+    from pathlib import Path
+    from tests.support.topic_completion_mapping import program_anchors
+    files = {}
+    for name in ('plan', 'result', 'summary', 'log', 'exit'):
+        path = tmp_path / ('run.' + name)
+        path.write_text(json.dumps({'original_receipt': 'run.result'}) if name == 'summary' else '{}')
+        files[name] = {'artifact': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    review = tmp_path / 'review.json'
+    review.write_text(json.dumps({'record': {'contract': 'waapi-skill.ordinary-test-run-attachment/v1',
+        'scope_kind': 'product', 'files': files, 'review': {'sources': {}}},
+        'selected_tests': ['controlled-copy-fixture-never-executed']}))
+    output = tmp_path / 'bundle'
+    anchors = program_anchors(audit.ROOT, topic_inventory, output, review)
+    proof = json.loads((output / next(iter(anchors.values()))['evidence']['program']['artifact']).read_text())
+    assert Path(proof['files']['result']['artifact']).name == 'run.result'
+    summary = json.loads((output / proof['files']['summary']['artifact']).read_text())
+    assert summary['original_receipt'] == Path(proof['files']['result']['artifact']).name
+    for name, descriptor in proof['files'].items():
+        assert (output / descriptor['artifact']).read_bytes() == Path(files[name]['artifact']).read_bytes()

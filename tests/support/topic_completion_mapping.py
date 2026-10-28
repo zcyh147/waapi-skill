@@ -311,9 +311,12 @@ def program_anchors(root, inventory, destination, review_path):
         raw = (source if source.is_absolute() else review_path.parent / source).read_bytes()
         if hashlib.sha256(raw).hexdigest() != descriptor['sha256']:
             raise ValueError('Topic original program file seal differs')
-        path = destination / ('original-' + name)
+        # The existing finalizer binds summary.original_receipt to the result
+        # basename. Relocation preserves that name and all original bytes.
+        path = destination / 'original' / source.name
+        path.parent.mkdir(exist_ok=True)
         path.write_bytes(raw)
-        copied[name] = {'artifact': path.name, 'sha256': descriptor['sha256']}
+        copied[name] = {'artifact': str(path.relative_to(destination)), 'sha256': descriptor['sha256']}
     bindings = topic_bindings(root, inventory)
     selected = {}
     for identity, binding in sorted(bindings.items()):
