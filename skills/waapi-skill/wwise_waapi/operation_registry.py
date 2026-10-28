@@ -5028,6 +5028,12 @@ def _prepare_object_create(
         spec["collection"] = (
             list_name if index == 0 and list_name is not None else "children"
         )
+    from .saved_object_construction import graph_boundary, SavedConstructorError
+    try:
+        saved_constructors = graph_boundary(node_specs, parent=parent, version=request.version,
+            conflict=requested_conflict, read=read)
+    except SavedConstructorError as exc:
+        raise OperationContractError(exc.code, str(exc)) from exc
     root_path = (
         _child_path(parent.row.get("path"), normalized.root.name, field="parent.path")
         if list_name is None and normalized.root.type != "Action"
@@ -5309,6 +5315,8 @@ def _prepare_object_create(
         resolved_references=resolved_references,
         derived_properties=derived_properties,
         native_nodes=render_native_nodes,
+        constructor_names={spec["request_path"]: spec["saved_constructor"]["native_name"] for spec in node_specs
+            if spec.get("saved_constructor", {}).get("object_type") == "SearchCriteria"},
         prepared_names=result_context["prepared_names"] if result_context else None,
     )
     if node_specs[0].get("inner_identity", {}).get("collection") == "Playlist":
@@ -5421,6 +5429,8 @@ def _prepare_object_create(
             "irreversible_preexisting_changes": conflict == "merge",
         }
     state = {"object_graph_guard": graph_guard, "object_create_nodes": node_specs, "effect_render_chains": effect_render_chains}
+    if saved_constructors:
+        state["saved_object_constructors"] = saved_constructors
     from .creation_observations import ordinary_creation_fields, ordinary_creation_graph
     try:
         ordinary_creation_graph(verification, state, parent=parent.row)
@@ -6055,6 +6065,7 @@ def _prepare_object_set(
     planned_bindings = [binding for binding in all_documented_bindings if "planned_owner" in binding]
     documented_bindings = [binding for binding in all_documented_bindings if "planned_owner" not in binding]
     planned_guards = []
+    saved_constructor_batches = []
     early_merge_guards = []
     rtpc_snapshots = {}
     raw_objects = _mapping_sequence(arguments.get("objects"), field="objects")
@@ -6553,6 +6564,13 @@ def _prepare_object_set(
             live_source_parent=live_source_parent,
             playlist_mode=row_list_mode,
         )
+        from .saved_object_construction import graph_boundary, SavedConstructorError
+        try:
+            saved_boundary = graph_boundary(child_specs, parent=target, version=request.version, conflict=row_conflict, read=read)
+        except SavedConstructorError as exc:
+            raise OperationContractError(exc.code, str(exc)) from exc
+        if saved_boundary:
+            saved_constructor_batches.append(saved_boundary)
         child_spec_by_path = {
             str(spec["request_path"]): spec for spec in child_specs
         }
@@ -6583,6 +6601,8 @@ def _prepare_object_set(
                     derived_properties=derived_child_properties,
                     native_nodes=render_native_nodes,
                     materialized_imports=materialized_imports,
+                    constructor_names={spec["request_path"]: spec["saved_constructor"]["native_name"] for spec in child_specs
+                        if spec.get("saved_constructor", {}).get("object_type") == "SearchCriteria"},
                     prepared_names=result_context["prepared_names"] if result_context else None,
                     rtpc_updates={spec["request_path"]: spec for spec in child_specs if spec.get("rtpc_update")},
                     plugin_materializations={spec["request_path"]: spec["graph_plugin_native"] for spec in child_specs if "graph_plugin_native" in spec},
@@ -7428,6 +7448,7 @@ def _prepare_object_set(
     state: dict[str, Any] = {
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
+        **({"saved_object_constructor_batches": saved_constructor_batches} if saved_constructor_batches else {}),
         "existing_field_observations": existing_field_history,
         "effect_render_chains": effect_render_chains,
         "graph_rtpc_guards": [spec for spec in node_specs if spec.get("rtpc_binding")],
@@ -8807,6 +8828,16 @@ def _effect_shareset_placement_assertions(pre_state, *, read, after_write=False)
 
 
 def _resolve_graph_node_type(node, *, catalog, version):
+    if node.plugin is None and node.type in {"WorkUnit", "Query", "SearchCriteria"}:
+        from .saved_object_construction import authority, SavedConstructorError
+        try:
+            proof = authority(version, node.type)
+        except SavedConstructorError as exc:
+            raise OperationContractError(exc.code, str(exc)) from exc
+        matches = [row for row in catalog if row.name == node.type and row.class_id == proof["class_id"]]
+        if len(matches) != 1:
+            raise OperationContractError("SAVED_CONSTRUCTOR_CLASS_UNPROVEN", "Saved object constructor requires its exact fresh source-proven class.")
+        return matches[0]
     if node.plugin is None:
         return _resolve_object_type("PropertyContainer" if version == "2025.1" and node.type == "ActorMixer" else node.type, catalog=catalog)
     matches = [row for row in catalog if row.class_id == node.plugin.class_id and row.type == node.plugin.object_type]
@@ -8905,6 +8936,14 @@ def _prepare_object_node_specs(
             "references": [],
             "collection": root_collection if node.request_path == "$" else node.collection,
         }
+        if type_info.name in {"WorkUnit", "Query", "SearchCriteria"}:
+            from .saved_object_construction import authority, criterion, SavedConstructorError
+            try:
+                proof = criterion(version, node.name) if type_info.name == "SearchCriteria" else authority(version, type_info.name)
+            except SavedConstructorError as exc:
+                raise OperationContractError(exc.code, str(exc)) from exc
+            spec["saved_constructor"] = proof
+            spec["structural_class_id"] = type_info.class_id
         if type_info.name == "Action":
             from .action_construction import authority
             source = authority(version)
@@ -9851,6 +9890,10 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None, af
             "evidence": {"expected": list(expected_classes.values()),
                 "actual": [row for row in actual_classes if row.get("classId") in
                     {expected.get("classId") for expected in expected_classes.values()}]}})
+    for boundary in ([pre_state["saved_object_constructors"]] if pre_state.get("saved_object_constructors") else []) + pre_state.get("saved_object_constructor_batches", []):
+        from .saved_object_construction import guard_matches
+        assertions.append({"name": "saved constructor source and exact project owner remain bound",
+            "passed": guard_matches(boundary, read), "evidence": boundary})
     from .constructor_inputs import authority as constructor_authority, complete as constructor_complete, public_requirements
     for node in nodes:
         if node.get('action_constructor'):
@@ -10610,6 +10653,7 @@ def _materialize_canonical_object_node(
     rtpc_update_rows: list[dict[str, Any]] | None = None,
     plugin_materializations: Mapping[str, Mapping[str, Any]] | None = None,
     native_nodes: dict[str, dict[str, Any]] | None = None,
+    constructor_names: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     try:
         subtree_import_paths = {
@@ -10656,6 +10700,8 @@ def _materialize_canonical_object_node(
             row.update(payload)
         if prepared_names and current.request_path in prepared_names:
             row["name"] = prepared_names[current.request_path]
+        if constructor_names and current.request_path in constructor_names:
+            row["name"] = constructor_names[current.request_path]
         for property_name, value in derived_properties.get(current.request_path, {}).items():
             if (
                 not isinstance(property_name, str)
@@ -12960,6 +13006,16 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             raise OperationContractError('INVALID_SOURCE_COPY_SAVE', 'Generated Save cannot alter the fixed versioned request')
         revalidate_origin(origin, copy_proof_context, read=read)
         metadata[ORIGIN] = origin
+    saved_boundaries = ([metadata["saved_object_constructors"]] if metadata.get("saved_object_constructors") else []) + metadata.get("saved_object_constructor_batches", [])
+    if saved_boundaries:
+        from .saved_object_construction import verification_scope
+        verification["verification_scope"] = verification_scope(saved_boundaries)
+    if compound_child and any(boundary["workunit_effects"] for boundary in saved_boundaries):
+        raise OperationContractError("WORKUNIT_UNDO_GROUP_UNSUPPORTED", "Work Unit creation clears history and cannot be composed inside an undo group; use a standalone immutable Preview.")
+    if any(boundary["workunit_effects"] for boundary in saved_boundaries):
+        warnings.append("Creating a Work Unit clears undo/redo history and the clipboard and saves a corresponding WWU file in the active project. Verification checks object identity and requested fields; history, clipboard contents and saved WWU bytes remain unobserved.")
+    if any(proof["object_type"] == "SearchCriteria" for boundary in saved_boundaries for proof in boundary["sources"]):
+        warnings.append("Saved Query criteria use source-owned SearchOperationID names. Verification checks returned GUID/class/parent and requested fields; SearchOperationID and Query matches are not independently observed.")
     return PreparedOperation(
         request=request,
         semantic_preview=preview,
@@ -26576,6 +26632,12 @@ def verify_prepared_operation(
         from .existing_field_observations import capture_after
         for proof in (pre_state or {}).get("existing_field_observations", []):
             readbacks.append(capture_after(proof, read=read_call))
+    if (kind in {"object-create-graph", "object-set-batch"}
+            and plan.get("verification_scope", {}).get("mode") == "saved_object_identity_and_fields"
+            and not plan["verification_scope"]["complete_business_verification"]):
+        success_status = "result_schema_checked"
+        business_state_verified = False
+        verification_strength = "saved_object_identity_and_field_readback"
     outcome = _verification(
         operation,
         assertions,
@@ -26586,6 +26648,11 @@ def verify_prepared_operation(
         verification_scope=plan.get("verification_scope") if plan.get("source_copy_live_fields") is True or kind in {"blend-assignment", "soundbank-definition-exact", "object-plugin-created"} else None,
     )
 
+    if kind in {"object-create-graph", "object-set-batch"} and plan.get("verification_scope", {}).get("mode") == "saved_object_identity_and_fields":
+        scope = plan["verification_scope"]
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
+            "Saved object identity, topology and requested fields were checked. The disclosed history/clipboard/file and criterion evaluation effects remain unobserved where listed; do not replay the executed constructor.",
+            outcome.verification_strength, outcome.business_state_verified and scope["complete_business_verification"], scope)
     if kind == "object-plugin-created" and plan.get("verification_scope", {}).get("mode") == "direct_metadata_list_association_and_fields":
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
             "The new Metadata GUID/class/fields and ordered direct List association were checked; intrinsic owner/parent values are observations, not proof of local ownership. Do not replay the executed constructor.",
@@ -29092,7 +29159,8 @@ def _require_object_create_writable_parent(
     if (
         object_type == "Project"
         or path in {"\\", ""}
-        or (isinstance(path, str) and path.count("\\") <= 1)
+        or (isinstance(path, str) and path.count("\\") <= 1
+            and not (object_type == "WorkUnit" and tuple(child_types) == ("WorkUnit",)))
     ):
         raise OperationContractError(
             "PROTECTED_CREATE_PARENT",

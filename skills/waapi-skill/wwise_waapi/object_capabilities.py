@@ -135,6 +135,7 @@ OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
     }
 )
 OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT = {
+    "Query": frozenset({"SearchCriteria"}),
     "Event": frozenset({"Action"}),
     "Bus": frozenset({"Bus", "AuxBus"}),
     "AuxBus": frozenset({"Bus", "AuxBus"}),
@@ -142,9 +143,12 @@ OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT = {
     "SwitchGroup": frozenset({"Switch"}),
 }
 # A parent's child allowlist is not the inverse of a child's required parent:
-# Bus/AuxBus may also be created under a WorkUnit. Only these game-sync children
-# require their dedicated group; preserve that restriction independently.
+# Bus/AuxBus may also be created under a WorkUnit. Inverse child placement
+# requirements remain independent from each specialized parent's allowlist.
 _OBJECT_CREATE_REQUIRED_PARENT_TYPES_BY_CHILD = {
+    "WorkUnit": frozenset({"WorkUnit", "Folder"}),
+    "Query": frozenset({"WorkUnit", "Folder"}),
+    "SearchCriteria": frozenset({"Query"}),
     "Action": frozenset({"Event"}),
     "State": frozenset({"StateGroup"}),
     "Switch": frozenset({"SwitchGroup"}),
