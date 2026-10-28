@@ -199,6 +199,83 @@ def test_transition_property_state_plan_passes_public_preflight_and_live_metadat
     assert client.calls[-1] == (IS_PROPERTY_ENABLED_URI, {'object': FADE, 'platform': 'Mac', 'property': field}, {})
 
 
+@pytest.mark.parametrize('version', ('2022.1', '2025.1'))
+@pytest.mark.parametrize('enabled', (False, True, 'native-error'))
+def test_playlist_condition_reads_retain_exact_inventory_and_native_state_without_business_credit(tmp_path, version, enabled):
+    from tests.unit.test_metadata_discovery_gateway import (
+        FakeClient, _gateway_env, _metadata_responses, waapi_gateway,
+        GET_NAMES_URI, GET_PROPERTY_INFO_URI, IS_PROPERTY_ENABLED_URI,
+    )
+    relative = (Path('Interactive Music Hierarchy/Music.wwu') if version == '2022.1'
+        else Path('Containers/Music/Music.wwu'))
+    witness = xml_music_witness(ROOT / 'tests/_org' / version / relative, version)
+    plan = music_read_plan('playlist', witness, version)
+    identifier = '{DE090E27-2F5C-436F-A239-D02F8D5016B2}'
+    commands = [argv for argv in plan if argv[:2] in {
+        ('metadata', 'list'), ('metadata', 'property-state')}]
+    assert commands == [
+        ('metadata', 'list', '--exact-id', identifier, '--page-size', '64'),
+        ('metadata', 'property-state', '--exact-id', identifier,
+         '--meaning', 'LoopCount', '--platform', 'Mac'),
+    ]
+    # Existing controller-discovery attempts are not duplicated or replaced.
+    assert sum(argv[:2] == ('metadata', 'discover') for argv in plan) == 3
+    names = ('Color', 'LoopCount', 'NormalOrShuffle', 'OverrideColor', 'PlayMode',
+             'PlaylistItemType', 'RandomAvoidRepeatingCount', 'Weight', 'Segment')
+    responses = _metadata_responses(tmp_path, version=version, names=names)
+    # Retained 2025 metadata names an unavailable controller; the test does
+    # not supply controller metadata or derive a Boolean from UI infinity.
+    responses[GET_PROPERTY_INFO_URI] = {
+        'name': 'LoopCount', 'type': 'int16', 'default': 1,
+        'display': {'name': 'No. of Loops'},
+        'restriction': {'type': 'range', 'min': 0, 'max': 32767},
+        'dependencies': [{'type': 'property', 'action': 'Enable', 'context': 'Self',
+            'property': 'IsLoopingInfinite',
+            'conditions': [{'restriction': {'type': 'enum',
+                'values': [{'displayName': 'False', 'value': False}]}}]}],
+        'ui': {'value': {'infinity': 0}},
+    }
+    responses[IS_PROPERTY_ENABLED_URI] = {'return': enabled}
+    errors = ({IS_PROPERTY_ENABLED_URI: RuntimeError('native LoopCount state unavailable')}
+              if enabled == 'native-error' else {})
+    client = FakeClient(responses, errors=errors)
+    env = _gateway_env(tmp_path, version=version)
+    returned = []
+
+    def gateway(argv):
+        code, payload = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+        returned.append((code, payload))
+        return code, payload
+
+    report = run_music_read_plan(commands, gateway)
+    inventory, state = report['receipts']
+    fields = inventory['payload']['agent_result']['fields']
+    assert len(fields) == 9
+    assert {row['name'] for row in fields} == set(names)
+    assert inventory['payload']['agent_result']['complete'] is True
+    assert 'IsLoopingInfinite' not in {row['name'] for row in fields}
+    assert all(args == {'object': identifier} for uri, args, _ in client.calls if uri == GET_NAMES_URI)
+    assert all(args == {'object': identifier, 'property': 'LoopCount'}
+               for uri, args, _ in client.calls if uri == GET_PROPERTY_INFO_URI)
+    assert client.calls[-1] == (IS_PROPERTY_ENABLED_URI,
+        {'object': identifier, 'platform': 'Mac', 'property': 'LoopCount'}, {})
+    assert [(row['exit_code'], row['payload']) for row in report['receipts']] == returned
+    if enabled == 'native-error':
+        assert state['exit_code'] == 2
+        assert state['finding'] == 'gateway_rejected'
+        assert state['payload']['ok'] is False
+        assert state['payload']['call']['api'] == IS_PROPERTY_ENABLED_URI
+    else:
+        assert state['exit_code'] == 0
+        assert state['finding'] == 'read_returned'
+        assert state['payload']['agent_result'] == {
+            'meaning': 'LoopCount', 'platform': 'Mac', 'enabled': enabled}
+    assert report['agent_pass'] is False
+    assert report['business_effect_verified'] is False
+    assert report['complete_order_or_unit_oracle_proven'] is False
+    assert compare_music_read_receipts(witness, report['receipts']) == []
+
+
 @pytest.mark.parametrize('damage', ('missing', 'duplicate', 'entity', 'oversized', 'too_many'))
 def test_project_platform_binding_rejects_unproven_or_unbounded_xml(tmp_path, damage):
     project = tmp_path / 'SampleProject.wproj'
