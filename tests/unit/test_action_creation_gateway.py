@@ -134,3 +134,20 @@ def test_action_class_reference_evidence_never_overrides_contradictory_scalar_ki
     assert code == 0, fields
     field, = fields['meaning_results'][0]['candidates']
     assert field['field_kind'] == 'property' and 'kind_evidence' not in field
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1'])
+def test_action_constructor_preserves_retained_native_unknown_kind_metadata(tmp_path, version):
+    from pathlib import Path
+    samples = json.loads((Path(__file__).parents[1] / 'fixtures/metadata-conditions/action-target-class-unknown.json').read_bytes())['samples']
+    task = ActionCreateTask(tmp_path, version)
+    task.metadata['Target'] = deepcopy(samples[version]['metadata'])
+    original = deepcopy(task.metadata['Target'])
+    task.declare_action()
+    tx, shown = preview(task)
+    assert task.metadata['Target'] == original
+    node, = shown['artifact']['prepared_operation']['pre_state']['object_create_nodes']
+    normalized = node['new_object_default_evidence'][0]['metadata']['Target']
+    assert normalized['type'] == original['type'] == ''
+    assert normalized['reference_kind_evidence']['kind'] == 'documented-class-reference-kind'
+    assert normalized['restriction'] == original['restriction']

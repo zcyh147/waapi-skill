@@ -197,13 +197,13 @@ def _graph_fields(route, address, contract):
             'files': 'media_files', '*': 'media_files'}
         field = next((mapping[token] for token in reversed(tail) if token in mapping), 'media_files')
         return [field], 'owned_media_import'
+    leaf = path[-1]
+    if leaf == 'id' and not {'object', 'parent'} & set(path):
+        return [], 'native_internal_id_prohibited'
     if '*' in path:
         # The native @ token is issued by exact metadata/List discovery. The
         # whole union (scalar/null/reference array/owned object/Curve) stays here.
         return ['field_values'], 'metadata_authorized_native_value_union'
-    leaf = path[-1]
-    if leaf == 'id' and not {'object', 'parent'} & set(path):
-        return [], 'native_internal_id_prohibited'
     if route['uri'].endswith('.create'):
         mapping = {'parent': 'parent_handle', 'type': 'kind', 'name': 'name', 'notes': 'notes',
             'list': 'object_list', 'platform': 'platform', 'autoAddToSourceControl': 'add_to_source_control',
