@@ -1,6 +1,7 @@
 """The accepted #192 correspondence reaches the ordinary completion reader."""
 from copy import deepcopy
 import json
+import subprocess
 import pytest
 from tests.maintenance import branch_coverage_audit as audit
 from tests.maintenance.branch_audit_completion import evaluate_coverage
@@ -95,3 +96,72 @@ def test_history_mapping_missing_source_is_rejected_by_ordinary_reader(tmp_path,
     attachment['requirements_sha256'] = audit.digest(requirements)
     with pytest.raises(ValueError, match='source closure is incomplete'):
         read_mapping_attachments([{'fixture_only': True}], requirements, lambda _: attachment, audit.ROOT)
+
+
+@pytest.fixture(scope='module')
+def history_reviewed_anchors(tmp_path_factory, history_inventory):
+    from tests.support.history_completion_mapping import BASE, history_bindings, history_program_anchors
+    destination = tmp_path_factory.mktemp('history-direct-dependencies')
+    original = audit.ROOT / BASE / 'export-r1' / 'original'
+    anchors = history_program_anchors(audit.ROOT, history_inventory, destination, original)
+    bindings = history_bindings(audit.ROOT, history_inventory)
+    rows = {row['id']: row for row in history_inventory['native_coverage']['obligations']}
+    for identity, anchor in anchors.items():
+        bindings[identity].update(anchor)
+    return destination, {identity: bindings[identity] for identity in anchors}, rows
+
+
+def test_history_code_review_seals_original_and_current_direct_test_dependencies(history_inventory, history_reviewed_anchors):
+    from tests.support.ordinary_test_run_evidence import read_ordinary_test_run, OUTCOME
+    base, bindings, rows = history_reviewed_anchors
+    for identity, binding in bindings.items():
+        assert {'tests/unit/test_operation_input_gateway.py', 'tests/unit/test_object_graph_business_gateway.py',
+            'tests/conftest.py', 'tests/support/exact_evidence_finalization.py',
+            'pyproject.toml', 'ci/test_readiness.py'} <= set(binding['relevant_sources'])
+        assert read_ordinary_test_run(binding['evidence']['program'], rows[identity],
+            history_inventory['native_coverage']['candidate_sha256'], 'program', 'product', base, binding, audit.ROOT) == (OUTCOME, None)
+
+
+def test_history_source_review_companion_reaches_existing_portable_and_code_readers(history_inventory):
+    from tests.support.history_completion_mapping import BASE
+    from tests.support.ordinary_test_run_evidence import read_ordinary_test_run, OUTCOME
+    directory = audit.ROOT / BASE / 'source-review-r1'
+    # This fixture records a component review, not the later combined candidate.
+    # The ordinary reader still checks every reviewed source in the current tree.
+    reviewed_candidate = json.loads((directory / 'summary.json').read_bytes())['candidate_sha256']
+    requirements = audit.load(directory / 'requirements.json')
+    bindings, base, _ = audit.portable_binding_inputs(directory / 'evidence-index.json', requirements)
+    rows = {row['id']: row for row in history_inventory['native_coverage']['obligations']}
+    assert len(bindings['bindings']) == 4
+    for identity, binding in bindings['bindings'].items():
+        proof = json.loads((base / binding['evidence']['program']['artifact']).read_bytes())
+        assert proof['original_candidate'] == '59daee38fa92f4ad6610a5698be464334718585c'
+        for descriptor in proof['files'].values():
+            name = descriptor['artifact'].split('/')[-1]
+            assert (base / descriptor['artifact']).read_bytes() == (audit.ROOT / BASE / 'export-r1/original' / name).read_bytes()
+        assert read_ordinary_test_run(binding['evidence']['program'], rows[identity],
+            reviewed_candidate, 'program', 'product', base, binding, audit.ROOT) == (OUTCOME, None)
+
+
+@pytest.mark.parametrize('helper', ['tests/unit/test_operation_input_gateway.py',
+    'tests/unit/test_object_graph_business_gateway.py', 'tests/conftest.py',
+    'tests/support/exact_evidence_finalization.py', 'pyproject.toml', 'ci/test_readiness.py'])
+def test_history_code_reader_rejects_changed_direct_helper(tmp_path, history_inventory, history_reviewed_anchors, helper):
+    from tests.support.ordinary_test_run_evidence import read_ordinary_test_run
+    base, bindings, rows = history_reviewed_anchors
+    identity, binding = next(iter(bindings.items()))
+    root = tmp_path / 'current-sources'
+    root.mkdir()
+    # Original Git objects remain authoritative, while all reviewed current
+    # sources below this temporary root are real ordinary files.
+    git_directory = subprocess.check_output(['git', 'rev-parse', '--absolute-git-dir'], cwd=audit.ROOT, text=True).strip()
+    (root / '.git').write_text('gitdir: ' + git_directory + '\n', encoding='utf-8')
+    for name in binding['relevant_sources']:
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((audit.ROOT / name).read_bytes())
+    changed = root / helper
+    changed.write_bytes(changed.read_bytes() + b'\n# changed selected test helper\n')
+    with pytest.raises(ValueError, match='reviewed current relevant source changed'):
+        read_ordinary_test_run(binding['evidence']['program'], rows[identity],
+            history_inventory['native_coverage']['candidate_sha256'], 'program', 'product', base, binding, root)

@@ -102,7 +102,7 @@ def history_component(root):
     if {row['id'] for row in public} != wanted:
         raise ValueError('History current public route/version missing')
     sources = debug_control_component(root)['sources']
-    for name in [*TICKETS, POLICY, 'tests/support/history_completion_mapping.py',
+    for name in [*TICKETS, POLICY, *SELECTED_TEST_DEPENDENCIES, 'tests/support/history_completion_mapping.py',
             'tests/support/topic_completion_mapping.py', 'tests/maintenance/map_history_completion.py',
             'tests/semantic/support/codex_archive_paths.py', BASE + 'source-roster.json', BASE + 'accepted-history.json']:
         sources[name] = digest((root / name).read_text(encoding='utf-8'))
@@ -289,7 +289,16 @@ SELECTED_TESTS = {
         'tests/unit/test_compound_undo_business_gateway.py::test_standalone_history_without_expectation_still_requires_confirmation_and_valid_native_result',
         'tests/unit/test_compound_undo_business_gateway.py::test_standalone_history_ambiguous_native_failure_is_not_replayed_or_compensated'],
 }
-RUNTIME_SOURCES = {GATEWAY, 'tests/support/gateway_config.py',
+# These helpers execute the selected fake-client flows.  Keep the pytest
+# configuration/report finalizer and the nonlive launcher's readiness check in
+# the same reviewed closure; optional batch/live helpers are not invoked here.
+SELECTED_TEST_DEPENDENCIES = {
+    'tests/unit/test_operation_input_gateway.py',
+    'tests/unit/test_object_graph_business_gateway.py',
+    'tests/conftest.py', 'tests/support/exact_evidence_finalization.py',
+    'pyproject.toml', 'ci/test_readiness.py',
+}
+RUNTIME_SOURCES = {GATEWAY, 'tests/support/gateway_config.py', *SELECTED_TEST_DEPENDENCIES,
     *(node.split('::')[0] for nodes in SELECTED_TESTS.values() for node in nodes),
     *(LIB + name + '.py' for name in ('source_control_business', 'source_control_business_contracts',
         'source_control_business_cli', 'source_control_profiles', 'source_control_windows_permissions',
