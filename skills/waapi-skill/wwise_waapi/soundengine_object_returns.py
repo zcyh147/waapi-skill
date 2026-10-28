@@ -13,15 +13,10 @@ SOUNDENGINE_FIELD_INPUTS = (
     ("local_references", "include_local_reference", QUERY_FIELD_MODES[2]),
 )
 _IDENTITY = ("id", "name", "type", "path")
-# The pinned 2025 enum contains this exact spelling. It proves availability,
-# not equivalence to supportsRandomizer or a particular returned key/shape.
-_DECLARED_OUTPUT_VERSIONS = {"suppportsRandomizer": ("2025.1",)}
 
 
 def soundengine_object_outputs(version):
-    return {**{name: (name, name) for name in _IDENTITY}, **available_query_outputs(version),
-        **{name: (name, "declared_return_observation") for name, versions in _DECLARED_OUTPUT_VERSIONS.items()
-            if version in versions}}
+    return {**{name: (name, name) for name in _IDENTITY}, **available_query_outputs(version)}
 
 
 def soundengine_object_return_contract(version):
@@ -52,7 +47,7 @@ def compile_soundengine_object_returns(version, outputs, *, platform=None, langu
     if any(value not in available for value in outputs):
         raise ValueError("SoundEngine output must be one version-available disclosed business output")
     scope = query_return_scope_options(platform=platform, language=language)
-    bindings = tuple(("declared_return" if name in DECLARED_QUERY_RETURN_SPELLINGS or name in _DECLARED_OUTPUT_VERSIONS else "business", *available[name])
+    bindings = tuple(("declared_return" if name in DECLARED_QUERY_RETURN_SPELLINGS else "business", *available[name])
         for name in outputs)
     if outputs:
         scope = {"return": list(dict.fromkeys(["id", "name", *(native for _, native, _ in bindings)])), **scope}

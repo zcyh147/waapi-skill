@@ -164,11 +164,12 @@ _NAMED_OUTPUT_PAIRS = (
 # Exact, finite return choices disclosed by the pinned request enums. Their
 # membership proves request availability, not alias equivalence or result shape.
 # Do not derive this public vocabulary from an arbitrary reflected enum member.
+# suppportsRandomizer is the exact 2025.1 declaration, not an alias claim.
 DECLARED_QUERY_RETURN_SPELLINGS = (
     "sound:convertedWemFilePath", "sound:originalWavFilePath", "soundbank:bnkFilePath",
     "music:transitionRoot", "music:playlistRoot", "audioSource:maxDurationSource",
     "audioSource:trimValues", "workunit:isDefault", "workunit:type", "workunit:isDirty",
-    "switchContainerChild:context", "states",
+    "switchContainerChild:context", "states", "suppportsRandomizer",
 )
 
 QUERY_BUSINESS_OUTPUTS = {
