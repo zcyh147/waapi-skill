@@ -380,6 +380,8 @@ def portable_selected_native_packets():
             member = review['members'][identity]
             key = (member['base'], member['facts'].get('business_boundary'))
             representatives.setdefault(key, identity)
+            if member['facts'].get('original_public_complete') is False:
+                representatives[key] = identity
         inventory['native_coverage']['obligations'] = [row
             for row in inventory['native_coverage']['obligations']
             if row['id'] in representatives.values()]
