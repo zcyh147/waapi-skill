@@ -346,6 +346,11 @@ def test_guid_source_native_witness_reaches_persisted_final_writer(tmp_path, mon
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="guid-source-tsv")
 
 
+def test_guid_source_observed_host_boundary_reaches_persisted_final_writer(tmp_path, monkeypatch):
+    _assert_localized_native_witness_final_writer(tmp_path, monkeypatch,
+        fault="guid-identity-boundary", witness_kind="guid-source-tsv")
+
+
 @pytest.mark.parametrize("fault", (None, "ignored-reference", "indeterminate"))
 def test_owner_only_tsv_fields_native_witness_reaches_persisted_final_writer(tmp_path, monkeypatch, fault):
     _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, fault=fault, witness_kind="owner-fields-tsv")
@@ -616,6 +621,9 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
     monkeypatch.setenv("WWISE_LIVE", "1"); monkeypatch.setenv("WWISE_DESTRUCTIVE", "1")
     workflow = importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
     collector = importlib.import_module("tests.destructive.support.audio_import_acceptance")
+    # GUID success/fault transport is program-only on an explicitly unobserved
+    # fake build. The observed 9143 rejection has its own persisted-writer case.
+    host_build = (9142 if witness_kind == "guid-source-tsv" and fault != "guid-identity-boundary" else 9143)
 
     class Client(ImportFieldsClient):
         def __init__(self):
@@ -714,7 +722,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
             args, options = args or {}, options or {}
             if uri.endswith("getInfo"):
                 info = super().call(uri, args, options)
-                info["version"].update(minor=7, build=9143, displayName="v2025.1.7.9143")
+                info["version"].update(minor=7, build=host_build, displayName=f"v2025.1.7.{host_build}")
                 if witness_kind in {"explicit-source-tsv", "guid-source-tsv", "owner-fields-media-tsv", "distinct-owner-fields-media-tsv"} and os.name == "posix":
                     info.update(processPath=r"C:\Wwise\WwiseConsole.exe", platform="x64")
                 return info
@@ -835,7 +843,7 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
     metadata = sandbox_fixture.SandboxMetadata(str(source_file), str(source_root), str(tmp_path / "project"),
         str(tmp_path / "project/SampleProject.wproj"), "2025.1", 0, proof, sandbox_fixture.hash_project(tmp_path / "project"),
         source_file.stat().st_mtime, process_cleanup_result="cleaned", process_cleanup_details={"residual_processes": []})
-    metadata.get_info_version = {"year": 2025, "major": 1, "minor": 7, "build": 9143}
+    metadata.get_info_version = {"year": 2025, "major": 1, "minor": 7, "build": host_build}
     sandbox = sandbox_fixture.SandboxProject(source_file, source_root, tmp_path, tmp_path / "project", tmp_path / "project/SampleProject.wproj", metadata)
     runtime = SimpleNamespace(version="2025.1", candidate=workflow.exact_git_candidate(workflow.REPO_ROOT), sandbox=sandbox,
         state_dir=state, env=env, category_results=[], raw_gateway=raw,
@@ -854,16 +862,21 @@ def _assert_localized_native_witness_final_writer(tmp_path, monkeypatch, *, faul
     assert (error is None) == (fault is None), error
     category, = runtime.category_results
     body = Path(category["observation_path"]).read_bytes(); report = json.loads(body)
+    if fault in {"source-identity-boundary", "guid-identity-boundary"}:
+        # Read the unchanged user table before the finalizer moves quarantine.
+        assert report["table"]["sha256"] == hashlib.sha256(Path(report["table"]["path"]).read_bytes()).hexdigest()
     final = _finish((workflow, runtime, client, lock, proof), tmp_path, monkeypatch, [(node, error)])[-1]
     assert final["categories"][0]["observation_sha256"] == hashlib.sha256(body).hexdigest()
     assert final["invocation"]["outcome"] == ("PASS" if fault is None else "FAIL")
     assert report["business_effect_verified"] is (fault is None)
     assert report["transaction_budget"] == {"setup": 2, "witness": 1, "maximum_total": 3}
-    if fault == "source-identity-boundary":
+    if fault in {"source-identity-boundary", "guid-identity-boundary"}:
         assert len(final["transactions"]) == client.import_count == 2 and client.tab_count == 0
         assert all(phase["verify"]["state"] == "verified" for phase in report["setup"])
         assert report["calls"][-1]["argv"][0] == "draft-check"
-        assert report["calls"][-1]["payload"]["error_code"] == "TSV_COMBINED_SOURCE_IDENTITY_UNSAFE_ON_HOST"
+        expected_boundary = ("TSV_GUID_OBJECT_PATH_UNSAFE_ON_HOST" if fault == "guid-identity-boundary"
+            else "TSV_COMBINED_SOURCE_IDENTITY_UNSAFE_ON_HOST")
+        assert report["calls"][-1]["payload"]["error_code"] == expected_boundary
         assert not report["witness"] and "after" not in report["observations"]
         assert final["residual_state"]["sandbox"] == "quarantined"
         return

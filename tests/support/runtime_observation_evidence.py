@@ -1991,20 +1991,65 @@ def write_runtime_composition(output, components):
     index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': 'evidence', 'entries': []}
     policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
     entry_ids = set()
+    mapping_documents = []
     attachment_keys = ('metadata_attachments','source_attachments','source_native_attachments',
         'runtime_observation_attachments','qualified_runtime_read_attachments',
-        'condition_mechanism_attachments','condition_definition_attachments')
+        'condition_mechanism_attachments','condition_definition_attachments',
+        'installed_applicability_attachments','mapping_attachments')
     for index_path, original_policy in components:
         index_path = Path(index_path); document = json.loads(index_path.read_bytes())
         source = (index_path.parent / document['base']).resolve()
         if (set(document) - {'contract','base','entries',*attachment_keys}
                 or document['contract'] != index['contract'] or original_policy['contract'] != policy['contract']
-                or policy['branches'].keys() & original_policy['branches'].keys()):
+                or set(original_policy) - {'contract', 'branches', 'representative_mechanisms'}
+                or policy['branches'].keys() & original_policy['branches'].keys()
+                or policy.get('representative_mechanisms', {}).keys() & original_policy.get('representative_mechanisms', {}).keys()):
             raise ValueError('Runtime composition duplicates an exact branch or contract')
         for entry in document['entries']:
             if entry['id'] in entry_ids:
                 raise ValueError('Runtime composition duplicates an entry identity')
             entry_ids.add(entry['id'])
+        # Validate each source's complete mapping/policy binding before making a
+        # composition-owned document. Original mappings and predecessors are never
+        # upgraded by changing only the requirements digest.
+        from tests.maintenance.branch_audit_mapping import read_mapping_attachments
+        read_mapping_attachments(document.get('mapping_attachments', []), original_policy,
+            lambda descriptor: completion.read_sealed_artifact(descriptor, source), audit.ROOT)
+        if document.get('mapping_attachments'):
+            # The ordinary importer verifies the actual origin/predecessor and
+            # protected metadata links before any composed seal is published.
+            audit.portable_binding_inputs(index_path, original_policy)
+        mapping_documents.extend(completion.read_sealed_artifact(d, source)
+            for d in document.get('mapping_attachments', []))
+        packet_roots = set()
+        for entry in document['entries']:
+            original_bindings = completion.read_sealed_artifact(entry['bindings'], source)
+            for binding in original_bindings['bindings'].values():
+                name = binding.get('native_only_base')
+                if name is None:
+                    continue
+                if not isinstance(name, str):
+                    raise ValueError('Runtime native packet escapes its original base')
+                packet = (source / name).resolve()
+                if (Path(name).is_absolute() or not Path(name).parts
+                        or '..' in Path(name).parts or packet == source or not packet.is_relative_to(source)
+                        or not packet.is_dir()):
+                    raise ValueError('Runtime native packet escapes its original base')
+                if packet in packet_roots:
+                    continue
+                packet_roots.add(packet)
+                # The binding owns this packet namespace. Its assessment's local
+                # descriptors stay local; the existing qualified reader validates
+                # the selected original facts after transport.
+                for path in packet.rglob('*'):
+                    if path.is_file():
+                        if not path.resolve().is_relative_to(packet):
+                            raise ValueError('Runtime native packet file escapes its original packet')
+                        copy_runtime_common_base_file(path, base / path.relative_to(source))
+                review = binding.get('native_only_review')
+                if review:
+                    completion.read_sealed_artifact(review, source)
+                    copy_runtime_common_base_file(source / review['artifact'], base / review['artifact'])
         seen = {}
         def retain(value):
             if isinstance(value, dict):
@@ -2026,7 +2071,8 @@ def write_runtime_composition(output, components):
                         if name not in seen:
                             seen[name] = value['sha256']
                             copy_runtime_common_base_file(origin, base / name)
-                            if origin.suffix in {'.json', '.jsonl'}:
+                            if (origin.suffix in {'.json', '.jsonl'}
+                                    and not any(origin.resolve().is_relative_to(packet) for packet in packet_roots)):
                                 try: records = [json.loads(raw)]
                                 except json.JSONDecodeError as error:
                                     if error.msg != 'Extra data': raise
@@ -2038,9 +2084,23 @@ def write_runtime_composition(output, components):
         retain(document)
         index['entries'].extend(document['entries'])
         for key in attachment_keys:
-            if document.get(key): index.setdefault(key, []).extend(document[key])
+            if key != 'mapping_attachments' and document.get(key):
+                index.setdefault(key, []).extend(document[key])
         policy['branches'].update(original_policy['branches'])
-    write_json(output / 'requirements.json', policy)
+        if original_policy.get('representative_mechanisms'):
+            policy.setdefault('representative_mechanisms', {}).update(original_policy['representative_mechanisms'])
+    for original in mapping_documents:
+        composed = dict(original, requirements_sha256=audit.digest(policy))
+        name = 'composition-mappings/' + audit.digest(composed) + '.json'
+        path = base / name
+        raw = (json.dumps(composed, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
+        if path.exists() and path.read_bytes() != raw:
+            raise ValueError('Runtime common-base path collision')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            path.write_bytes(raw)
+        index.setdefault('mapping_attachments', []).append({'artifact': name, 'sha256': sha(raw)})
+    audit.write_requirements(output / 'requirements.json', policy)
     write_json(output / 'index.json', index)
     return output / 'index.json', policy
 
