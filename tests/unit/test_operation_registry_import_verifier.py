@@ -1124,7 +1124,7 @@ def test_use_existing_live_sfx_preserves_inline_base64_and_native_directives(tmp
     })
     with pytest.raises(OperationContractError) as rejected:
         prepare_operation(wrong_filename, read_call=client.call)
-    assert rejected.value.error_code == "SFX_SOURCE_FILENAME_MISMATCH"
+    assert rejected.value.error_code == "AMBIGUOUS_SFX_SOURCE"
     prepared = prepare_operation(request, read_call=client.call).as_dict()
     owner, source = prepared["dispatch"]["args"]["imports"]
     assert owner["objectPath"] == client.child["path"]
