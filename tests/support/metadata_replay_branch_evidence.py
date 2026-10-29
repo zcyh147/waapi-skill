@@ -1587,14 +1587,17 @@ def make_attachment_record(capture, field, replay_descriptor, replay_record, rep
 def validate_default_replay_requirements(inventory, policy):
     """Retain the complete exact default slice with only the reviewed decoder split."""
     from tests.support.metadata_read_branch_evidence import validate_selected_metadata_requirement
+    def default_pointer(pointer):
+        return (pointer.startswith('/resultSchema/properties/default')
+                or any(pointer.startswith('/resultSchema/@definition/' + document + '/definitions/propertyValue')
+                       for document in ('waapi_definitions.json', 'common_definitions.json')))
     defaults = {row['id']: row for row in inventory['native_coverage']['obligations']
         if row['route'] and '|wwise-console|' in row['route']
         and row['route'].endswith('|' + URI)
-        and (row['pointer'].startswith('/resultSchema/properties/default')
-             or any(row['pointer'].startswith('/resultSchema/@definition/' + document + '/definitions/propertyValue')
-                    for document in ('waapi_definitions.json', 'common_definitions.json')))}
+        and default_pointer(row['pointer'])}
     assigned = {identity for identity in policy['branches']
-        if '|wwise-console|' in identity and '|function|' + URI + '|' in identity}
+        if '|wwise-console|' in identity and '|function|' + URI + '|' in identity
+        and default_pointer(identity.partition('|function|' + URI + '|')[2])}
     if len(defaults) != 65 or assigned != set(defaults):
         raise ValueError('Original65 default requirements changed')
     for identity, branch in defaults.items():

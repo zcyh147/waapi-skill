@@ -18,11 +18,17 @@ APPROVED_ABSENT_DEFAULTS = {
 }
 
 
-def test_selected_metadata_policy_accepts_only_the_reviewed_decoder_split():
+@pytest.fixture(scope='module')
+def saved_default_inventory():
+    return audit.load(audit.ROOT / 'tests/fixtures/branch-evidence/product/canonical-195-d73-r1/'
+                      'current-structural-inventory-r1/structural-inventory.json')
+
+
+def test_selected_metadata_policy_accepts_only_the_reviewed_decoder_split(saved_default_inventory):
     from tests.support.metadata_read_branch_evidence import validate_selected_metadata_requirement
     policy = audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')
-    metadata = {identity: requirement for identity, requirement in policy['branches'].items()
-        if '|function|ak.wwise.core.object.getPropertyInfo|' in identity}
+    expected = {row['id'] for row in selected_defaults(saved_default_inventory['native_coverage']['obligations'])}
+    metadata = {identity: policy['branches'][identity] for identity in expected}
     assert len(metadata) == 65
     assert {identity for identity, requirement in metadata.items()
         if requirement['categories'] == ['program']} == APPROVED_ABSENT_DEFAULTS
@@ -189,9 +195,9 @@ def test_decoder_policy_does_not_exempt_a_changed_identity_or_shape(damage):
         validate_selected_metadata_requirement(branch, policy)
 
 
-def test_replay_preparation_requires_exact_default_membership_and_policies():
+def test_replay_preparation_requires_exact_default_membership_and_policies(saved_default_inventory):
     from tests.support.metadata_replay_branch_evidence import validate_default_replay_requirements
-    inventory = audit.build_inventory()
+    inventory = saved_default_inventory
     policy = audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')
     expected = {row['id'] for row in selected_defaults(inventory['native_coverage']['obligations'])}
     assert validate_default_replay_requirements(inventory, policy) == expected
@@ -206,6 +212,16 @@ def test_replay_preparation_requires_exact_default_membership_and_policies():
     substituted['branches'][identity.replace('/default/', '/type/')] = substituted['branches'].pop(identity)
     with pytest.raises(ValueError, match='default requirements changed'):
         validate_default_replay_requirements(inventory, substituted)
+    for damage in ('missing', 'unknown', 'shape'):
+        changed = deepcopy(policy)
+        if damage == 'missing':
+            del changed['branches'][identity]
+        elif damage == 'unknown':
+            changed['branches'][identity + '/unobserved-default'] = deepcopy(changed['branches'][identity])
+        else:
+            changed['branches'][identity]['native_shape_sha256'] = '0' * 64
+        with pytest.raises(ValueError):
+            validate_default_replay_requirements(inventory, changed)
 
 
 def test_portable_originals_reject_a_tampered_requirement(original_defaults):
