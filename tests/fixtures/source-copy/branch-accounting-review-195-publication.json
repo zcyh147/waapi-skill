@@ -204,7 +204,7 @@
     "tests/fixtures/source-copy/branch-successor-review-r123.json": "4f2ccb1aad3e3826b0db88e484919dce06b909d6136a5a3794dc8fc469c2f714",
     "tests/fixtures/source-copy/branch-successor-review-r92.json": "278fcf8f3f404aba71d12995a6e42cc447bdabb2606800f6456a2751f9bd032f",
     "tests/maintenance/__init__.py": "93f800e18500f291b23ed63fc6eb6a36245cd75a3605534a564c4913e05c1104",
-    "tests/maintenance/branch_audit_completion.py": "047f1987f5326a91d34d6ba5e247cd6ed52374c46c43c9570162b16e4b46f734",
+    "tests/maintenance/branch_audit_completion.py": "8fc5150f57e797f76131bb1fba588b830f21f26a77ff3355750b0094d33d13ab",
     "tests/maintenance/branch_audit_mapping.py": "c3966b611d0b70219967761d041cffff01500c96a573255a256bf908d6acc74e",
     "tests/maintenance/branch_coverage_audit.py": "c7ac210c0d642e1b238dc592f707eaa1496e8136beb528fdfcb6dcdda58b5c47",
     "tests/maintenance/interface_depth_inventory.py": "212ca04d24244e043898656332db0a73d0d207058f7d26c9cbfb633c20a83280",
@@ -1705,8 +1705,8 @@
     },
     "tests/maintenance/branch_audit_completion.py": {
       "captured_sha256": "e5ab72ba26cf4f392b8982120fb91bb1622241ee42afca8272453a524a9c20cf",
-      "current_sha256": "047f1987f5326a91d34d6ba5e247cd6ed52374c46c43c9570162b16e4b46f734",
-      "reason": "Candidate requirements source uses the shared semantic projection only; full category and representative completion checks retain their complete identities. Followup: Reviewed metadata8c5a50 current-only semantic requirements/Git ownership bridge preserves raw historical R51/R54/R55 maps, and keeps Source category and representative admission exact. Accounting helper change only. Final staging: Reviewed0c0d71f9 exact raw/semantic metadata selector view checks and strict canonical JSON comparisons; reviewed3e823374 new-condition-r4 candidate hook; prepared actual app-r8 candidate hook. No Source captured/native execution changed. Scoped performance fix: internally authenticated current LoadedMedia policy is reused only within an evidence/coverage operation, revalidated at exit; standalone reads remain fresh and raw historical/native/policy checks unchanged."
+      "current_sha256": "8fc5150f57e797f76131bb1fba588b830f21f26a77ff3355750b0094d33d13ab",
+      "reason": "Candidate requirements source uses the shared semantic projection only; full category and representative completion checks retain their complete identities. Followup: Reviewed metadata8c5a50 current-only semantic requirements/Git ownership bridge preserves raw historical R51/R54/R55 maps, and keeps Source category and representative admission exact. Accounting helper change only. Final staging: Reviewed0c0d71f9 exact raw/semantic metadata selector view checks and strict canonical JSON comparisons; reviewed3e823374 new-condition-r4 candidate hook; prepared actual app-r8 candidate hook. No Source captured/native execution changed. Scoped performance fix: internally authenticated current LoadedMedia policy is reused only within an evidence/coverage operation, revalidated at exit; standalone reads remain fresh and raw historical/native/policy checks unchanged. Genuine applicability r9 successor hook after independently reviewed exact R51 full-policy scope repair; r8 bytes and original facts remain immutable, no app/native credit until actual r9 producer finalizer."
     },
     "tests/maintenance/branch_audit_mapping.py": {
       "captured_sha256": "b69341d96185b92127751aafd3bcdf3914be391660c46af8c61dae1b2facd4ea",

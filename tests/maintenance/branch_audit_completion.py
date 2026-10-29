@@ -232,6 +232,7 @@ def candidate_identity(root, inventory, catalogs, *, digest, requirements_docume
                  'tests/fixtures/metadata-conditions/applicability-current-program-r5.json.gz',
                  'tests/fixtures/metadata-conditions/applicability-current-program-r7.json.gz',
                  'tests/fixtures/metadata-conditions/applicability-current-program-r8.json.gz',
+                 'tests/fixtures/metadata-conditions/applicability-current-program-r9.json.gz',
                  'tests/unit/test_condition_completion_mapping.py', 'tests/unit/test_condition_completion_reader.py',
                  'tests/support/new_condition_completion.py', 'tests/unit/test_new_condition_completion_reader.py',
                  'tests/fixtures/metadata-conditions/new-condition-current-program.json.gz',
