@@ -2,6 +2,7 @@
 from copy import deepcopy
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import pytest
@@ -193,9 +194,20 @@ def test_scoped_native_reuse_does_not_relax_legacy_source_or_cache_guards(select
     from tests.support import runtime_cursor_evidence as cursor
     old = audit.ROOT / runtime.RUNTIME_SOURCE_SUCCESSOR
     assert hashlib.sha256(old.read_bytes()).hexdigest() == 'da83fa524df905daf8b3ced0b83269777f085d7bb4d23f54b05f34a055cc7381'
-    # Existing legacy300 review is independently stale at this combined package.
-    with pytest.raises(ValueError, match='exact current source'):
-        runtime.runtime_source_successor()
+    review = runtime.runtime_source_successor()
+    assert len(review['members']) == 300
+    assert len(review['packaged_sources']) == 483
+    # Both finite reviews reject an actually unreviewed package change.
+    source = audit.ROOT / 'skills/waapi-skill/scripts/run.py'
+    original = source.read_bytes()
+    try:
+        source.write_bytes(original + b'\n# Unreviewed source change.\n')
+        with pytest.raises(ValueError, match='exact current source'):
+            runtime.runtime_source_successor()
+        with pytest.raises(ValueError, match='exact source/identity'):
+            runtime.selected_runtime_source_successor()
+    finally:
+        source.write_bytes(original)
     route = '2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime'
     with pytest.raises(ValueError, match='source delta'):
         cursor.original_cursor(route)
@@ -214,3 +226,88 @@ def test_selected_review_locator_and_scope_fail_closed(selected_native_inputs, d
         result = completion.evidence_result(binding['evidence']['native'], branches[identity], 'e' * 64,
             'native', 'controlled', audit.ROOT, binding=binding, source_root=audit.ROOT)
     assert result[0] == 'missing'
+
+
+@pytest.fixture(scope='module')
+def legacy_native_packet():
+    """Locator-only projection of two actual legacy packets, with original seals."""
+    product = audit.ROOT / 'tests/fixtures/branch-evidence/product'
+    packet = product / 'runtime-read-log-195-r1'
+    original = json.loads((packet / 'native-index.json').read_bytes())
+    entries = [original['entries'][number] for number in (0, 28)]
+    policies = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    reference_ids = set()
+    for entry in entries:
+        requirements = completion.read_sealed_artifact(entry['origin']['requirements'], product)
+        policies['branches'].update(requirements['branches'])
+        bindings = completion.read_sealed_artifact(entry['bindings'], product)
+        for binding in bindings['bindings'].values():
+            reference_ids.update(binding['reference_chain'])
+    identities = set(policies['branches'])
+    routes = [identity.rsplit('|', 1)[0] for identity in identities]
+    inventory = log_inventory(routes)
+    inventory['native_coverage']['obligations'] = [row for row in inventory['native_coverage']['obligations']
+        if row['id'] in identities or row['kind'] == 'reference' and row['id'] in reference_ids]
+    assert identities <= {row['id'] for row in inventory['native_coverage']['obligations']}
+    parent = audit.ROOT / '.waapi-skill-state'
+    parent.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='legacy-native-test-', dir=parent) as name:
+        index = Path(name) / 'index.json'
+        document = {'contract': original['contract'], 'base': os.path.relpath(product, index.parent),
+            'entries': entries,
+            'runtime_observation_attachments': original['runtime_observation_attachments'][:1],
+            'qualified_runtime_read_attachments': original['qualified_runtime_read_attachments'][:1]}
+        index.write_text(json.dumps(document))
+        yield {'index': index, 'requirements': policies, 'inventory': inventory}
+
+
+def test_reviewed_legacy_native_packets_reach_portable_completion_without_current_code(legacy_native_packet):
+    packet = legacy_native_packet
+    imported, base, _ = audit.portable_binding_inputs(packet['index'], packet['requirements'])
+    result = completion.evaluate_coverage(audit.ROOT, packet['inventory'], imported,
+        digest=audit.digest, evidence_base=base, requirements_document=packet['requirements'])
+    rows = [row for row in result['obligations'] if row['id'] in packet['requirements']['branches']]
+    assert len(rows) == 2
+    for row in rows:
+        assert row['evidence_results']['native']['outcome'] == 'passed', row['evidence_results']
+        assert row['evidence_results']['program']['outcome'] == 'missing'
+        assert row['state'] != 'verified'
+    from tests.support import runtime_observation_evidence as runtime
+    original = json.loads((audit.ROOT / runtime.RUNTIME_SOURCE_SUCCESSOR).read_bytes())
+    transitioned = runtime.runtime_source_successor()
+    for key in set(original) - {'packaged_sources'}:
+        assert transitioned[key] == original[key]
+
+
+@pytest.mark.parametrize('damage', ['seal', 'schema', 'original-locator', 'current-locator',
+    'missing-delta', 'wrong-before', 'missing-reason', 'original-bytes', 'current-bytes'])
+def test_legacy_transition_tampering_is_rejected_by_portable_import(legacy_native_packet, native_output, monkeypatch, damage):
+    from tests.support import runtime_observation_evidence as runtime
+    packet = legacy_native_packet
+    path = audit.ROOT / runtime.RUNTIME_SOURCE_TRANSITION
+    transition = json.loads(path.read_bytes())
+    if damage in {'original-bytes', 'current-bytes'}:
+        descriptor = transition['original' if damage == 'original-bytes' else 'current']
+        artifact = audit.ROOT / descriptor['artifact']
+        original = artifact.read_bytes()
+        try:
+            artifact.write_bytes(original + b' ')
+            with pytest.raises(ValueError, match='artifact digest mismatch'):
+                audit.portable_binding_inputs(packet['index'], packet['requirements'])
+        finally:
+            artifact.write_bytes(original)
+        return
+    if damage == 'schema': transition['unreviewed'] = True
+    elif damage == 'original-locator': transition['original']['artifact'] = '../source-successor.json'
+    elif damage == 'current-locator': transition['current']['artifact'] = 'other-selected-source-successor.json'
+    elif damage == 'missing-delta': transition['changed_files'].pop('skills/waapi-skill/scripts/gateway.py')
+    elif damage == 'wrong-before': transition['changed_files']['skills/waapi-skill/scripts/gateway.py']['before'] = '0' * 64
+    elif damage == 'missing-reason': next(iter(transition['reasons'].values()))['paths'].pop()
+    altered = native_output / 'transition.json'
+    altered.write_text(json.dumps(transition))
+    monkeypatch.setattr(runtime, 'RUNTIME_SOURCE_TRANSITION', altered.relative_to(audit.ROOT).as_posix())
+    # Resealing only the outer review tests semantic checks behind its byte seal.
+    if damage != 'seal':
+        monkeypatch.setattr(runtime, 'RUNTIME_SOURCE_TRANSITION_SHA', hashlib.sha256(altered.read_bytes()).hexdigest())
+    with pytest.raises(ValueError, match='artifact digest mismatch|transition descriptors|transition delta/reasons|transition reasons'):
+        audit.portable_binding_inputs(packet['index'], packet['requirements'])
