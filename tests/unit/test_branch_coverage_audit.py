@@ -357,6 +357,8 @@ def runtime_common_base_stage(tmp_path, portable_representative_case):
     reader_index, reader_policy = write_runtime_composition(stage / 'reader-control',
         [(case['index_path'], case['requirements'])])
     source_index, source_policy = write_runtime_composition(stage / 'source-control', [selected[0]])
+    freshness_index, freshness_policy = write_runtime_composition(stage / 'source-with-current-mapping',
+        [(case['index_path'], case['requirements']), selected[0]])
     global_index = audit.load(original)
     original_base = original.parent / global_index['base']
     seen = {path.relative_to(original_base).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -378,6 +380,7 @@ def runtime_common_base_stage(tmp_path, portable_representative_case):
         'component': component, 'base': base, 'old_index': global_index, 'original_index': original,
         'original_policy': original_policy, 'reader_index': reader_index, 'reader_policy': reader_policy,
         'source_index': source_index, 'source_policy': source_policy,
+        'freshness_index': freshness_index, 'freshness_policy': freshness_policy,
         'fixed_index': fixed_index, 'existing_closure': seen}
 
 
@@ -432,7 +435,7 @@ def test_runtime_common_base_preserves_existing_global_source_freshness(runtime_
     with pytest.raises(ValueError, match=reason):
         audit.portable_binding_inputs(stage['source_index'], stage['source_policy'])
     with pytest.raises(ValueError, match=reason):
-        audit.portable_binding_inputs(stage['index'], stage['policy'])
+        audit.portable_binding_inputs(stage['freshness_index'], stage['freshness_policy'])
 
 
 def test_runtime_prefixed_families_share_one_base_without_overwrite_or_duplicate_credit(tmp_path):
