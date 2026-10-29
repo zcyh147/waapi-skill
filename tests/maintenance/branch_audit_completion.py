@@ -659,9 +659,13 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
         if owned != after:
             raise ValueError('Product replay does not match its original committed source')
     field = producer.branch_case(branch)
-    inputs = binding.get('category_inputs', {}).get('live_metadata')
+    inputs = record['category_inputs']
+    bound_inputs = binding.get('category_inputs', {}).get('live_metadata')
+    semantic_inputs = producer.metadata_replay_category_inputs(record, replay, context)
+    # Retained bindings may carry the exact raw inputs; current portable imports
+    # use the semantic selector view. Neither form changes receipt validation.
     if (not isinstance(inputs, dict) or set(inputs) != {'historical','replay'}
-            or inputs != record['category_inputs'] or inputs['historical'] != context['gateway']['argv']
+            or bound_inputs not in (inputs, semantic_inputs) or inputs['historical'] != context['gateway']['argv']
             or inputs['replay'] != replay['gateway']['argv']
             or context['native_result']['name'] != field
             or record['replay']['nodeid'] != producer.NODE+'['+producer.CASES[field]+']'):
@@ -758,7 +762,10 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
         if owned!=after:
             raise ValueError('Current R54 replay Git/source ownership changed')
     inputs={'historical':context['gateway']['argv'],'replay':replay['gateway']['argv']}
-    if record['category_inputs']!=inputs or binding.get('category_inputs',{}).get('live_metadata')!=inputs:
+    semantic_inputs=producer.metadata_replay_category_inputs(record,replay,context)
+    # Both accepted binding forms still authenticate the same raw receipts.
+    if (record['category_inputs']!=inputs
+            or binding.get('category_inputs',{}).get('live_metadata') not in (inputs,semantic_inputs)):
         raise ValueError('R54 native and current inputs must bind their own receipts')
     def same(a,b):return json.dumps(a,sort_keys=True,allow_nan=False)==json.dumps(b,sort_keys=True,allow_nan=False)
     native=replay['native_call'];public=replay['gateway']['payload'];original=context['gateway']['payload']['agent_result']

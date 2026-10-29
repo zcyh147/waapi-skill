@@ -1259,6 +1259,53 @@ def r54_current_sources():
     return sources
 
 
+def metadata_replay_category_inputs(record, replay, context):
+    """Bind field meaning without promoting a current read-only locator to policy.
+
+    The caller authenticates the original context with read_metadata_run. Raw
+    receipt inputs and discovered selectors remain exact and independently read.
+    This view is accounting metadata, never executable Gateway argv.
+    """
+    class_replay = record.get('evidence_kind') == 'historical_class_metadata_current_program_replay'
+    if not class_replay and record.get('evidence_kind') != 'historical_metadata_current_program_replay':
+        raise ValueError('Historical/current metadata replay inputs required')
+    original = context['gateway']['payload']['agent_result']
+    field = context['native_result']['name']
+    prefix = (['metadata', 'detail', '--custom-kind', context['class_name'], '--selection']
+              if class_replay else ['metadata', 'detail', '--exact-id', OBJECT, '--selection'])
+    inputs = record['category_inputs']
+    argv = replay['gateway']['argv']
+    public = replay['gateway']['payload']['agent_result']
+    native = replay['native_call']
+    expected_args = ({'classId': context['class_id'], 'property': field} if class_replay
+                     else {'object': OBJECT, 'property': field})
+    if (not isinstance(inputs, dict) or set(inputs) != {'historical', 'replay'}
+            or inputs['historical'] != context['gateway']['argv'] or inputs['replay'] != argv
+            or not isinstance(argv, list) or len(argv) != len(prefix) + 1 or argv[:-1] != prefix
+            or not isinstance(argv[-1], str) or not argv[-1].startswith('mf1.')
+            or public['selection'] != argv[-1] or public['scope'] != original['scope']
+            or native['uri'] != URI or native['args'] != expected_args or native['options'] != {}
+            or replay['replayed_original_native_sha256'] != context['native_sha256']
+            or json.dumps(native['result'], sort_keys=True, allow_nan=False)
+                != json.dumps(context['native_result'], sort_keys=True, allow_nan=False)):
+        raise ValueError('Exact historical/current metadata selector facts differ')
+    pages = replay['discovery_pages'] if class_replay else [replay['discovery']]
+    if not isinstance(pages, list) or not 1 <= len(pages) <= 8:
+        raise ValueError('Bounded current metadata selector discovery required')
+    matches = []
+    for page in pages:
+        payload = page['payload']
+        if payload.get('ok') is not True or payload['agent_result']['scope'] != original['scope']:
+            raise ValueError('Current metadata selector discovery scope differs')
+        matches.extend(row for row in payload['agent_result']['fields'] if row['name'] == field)
+    if len(matches) != 1 or matches[0]['selection'] != argv[-1]:
+        raise ValueError('Current metadata selector must match its exact discovered field')
+    view = deepcopy(inputs)
+    view['replay'][-1] = {'contract': 'waapi-skill.metadata-replay-selection-identity/v1',
+        'scope': deepcopy(original['scope']), 'field': field, 'native_sha256': context['native_sha256']}
+    return view
+
+
 def make_r54_replay_receipt(capture,case,observed,reports):
     from tests.support.metadata_read_branch_evidence import _witness
     outcome='PASS' if all(reports.get(p)=='passed' for p in ('setup','call','teardown')) else 'FAIL'
