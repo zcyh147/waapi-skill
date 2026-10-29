@@ -7118,10 +7118,10 @@ def test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths(
         (
             "ak.wwise.cli.convertExternalSource",
             {
-                "project": expected_wine_dispatch_path(target_project, account_home=account_home),
+                "project": z_wire_path(target_project),
                 "platform": ["Windows"],
-                "source-file": expected_wine_dispatch_path(manifest, account_home=account_home),
-                "output": expected_wine_dispatch_path(output, account_home=account_home),
+                "source-file": z_wire_path(manifest),
+                "output": z_wire_path(output),
             },
             {},
         )

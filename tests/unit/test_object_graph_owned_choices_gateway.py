@@ -1183,14 +1183,14 @@ def test_documented_list_merge_uses_explicit_actual_class_projection_without_rew
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             assert args["objects"] == [{"object": FIRST,
                 "@Metadata": [{"type": "MetadataSlot", "name": "Metadata", "notes": "Updated slot"}]}]
-            task.objects[CHILD]["notes"] = "Updated slot"
+            # Nested constructor notes apply only when the member is new.
             return {"objects": [{"id": FIRST, "name": "Rain", "@Metadata": [{"id": CHILD, "name": "Metadata"}]}]}
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified["verified"] is True, verified
-    assert task.objects[CHILD]["type"] == "PluginInnerObject" and task.objects[CHILD]["notes"] == "Updated slot"
+    assert task.objects[CHILD]["type"] == "PluginInnerObject" and task.objects[CHILD]["notes"] == "Old slot"
 
 
 @pytest.mark.parametrize("fault", (None, "name", "notes", "path", "rename-owner-good-path", "rename-owner-bad-path"))

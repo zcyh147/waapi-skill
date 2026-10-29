@@ -135,12 +135,23 @@ def test_set_active_source_compiles_two_typed_roles_and_optional_platform() -> N
         },
         "options": {},
     }
+    reads = []
+    def source_identity_read(uri, args, options):
+        reads.append((uri, args, options))
+        assert uri == "ak.wwise.core.object.get"
+        assert args == {"from": {"id": [SOUND_ID, SOURCE_ID]}}
+        assert options == {"return": ["id", "name", "type", "path", "classId", "parent"]}
+        return {"return": [
+            {"id": SOUND_ID, "name": "Weather_Loop", "type": "Sound", "classId": 65552,
+             "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather_Loop", "parent": None},
+            {"id": SOURCE_ID, "name": "Weather_Loop_Alt", "type": "AudioFileSource", "classId": 16,
+             "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather_Loop\Weather_Loop_Alt", "parent": {"id": SOUND_ID}},
+        ]}
     prepared = prepare_operation(
         parse_operation_request(request),
-        read_call=lambda *_args, **_kwargs: pytest.fail(
-            "active-source preparation performed a read"
-        ),
+        read_call=source_identity_read,
     ).as_dict()
+    assert len(reads) == 1
     assert prepared["verification_plan"] == {
         "kind": "project-setting-state",
         "uri": SOUND_SET_ACTIVE_SOURCE_URI,
@@ -279,7 +290,7 @@ def test_project_setting_contracts_expose_only_business_fields() -> None:
 
     assert active["declaration"]["field_types"] == {
         "sound_handle": "bound_sound_handle",
-        "source_handle": "bound_audio_file_source_handle",
+        "source_handle": "bound_sound_source_handle",
         "platform_name": "platform_name",
     }
     assert range_contract["declaration"]["field_types"] == {
