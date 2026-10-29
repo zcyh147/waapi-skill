@@ -1,0 +1,101 @@
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.002937, "reason": "locked developer interpreter ready", "automatic_repair_attempted": false}
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.00038, "reason": "selected Non-live prerequisites ready", "automatic_repair_attempted": false}
+== Test Context ==
+version:      none
+mode:         nonlive
+console:      <unset>
+project:      <unset>
+sandbox_root: <unset>
+test_config:  <unset>
+pytest args:  -q -ra tests/unit/test_console_loaded_media_evidence.py::test_console_loaded_media_public_teardown_portable_consumer[2023.1] tests/unit/test_debug_lua_gateway_full_chain.py::test_automation_mode_runs_once_then_finishes_at_result_schema_only tests/unit/test_debug_lua_gateway_full_chain.py::test_host_controls_are_single_dispatch_terminal_and_never_retried tests/unit/test_debug_lua_operations.py::test_dangerous_debug_host_controls_are_explicit_terminal_nonretry_transactions tests/unit/test_debug_lua_operations.py::test_debug_mode_changes_are_closed_nonretry_transactions tests/unit/test_fixed_runtime_read_branch_evidence.py::test_explicit_fixed_fields_reach_consumer_with_exact_order_and_repetition[ordered-repeated] tests/unit/test_fixed_runtime_read_branch_evidence.py::test_opaque_metadata_successor_requires_same_route_native_and_whole_public_program tests/unit/test_loaded_media_composite_evidence.py::test_older_loaded_media_composite_public_teardown_consumer[2023.1] tests/unit/test_rtpc_field_branch_evidence.py::test_one_rtpc_cursor_flow_proves_normalized_construction_and_rejects_resealed_trace tests/unit/test_runtime_business_gateway.py::test_every_runtime_control_lane_exposes_one_business_draft_and_blocks_typed tests/unit/test_runtime_business_gateway.py::test_log_controls_are_runtime_mutations_not_project_mutations tests/unit/test_runtime_business_gateway.py::test_runtime_control_business_values_compile_to_exact_native_preview tests/unit/test_runtime_log_branch_evidence.py::test_log_control_all_public_input_branches[addItem-console-2025.1] tests/unit/test_runtime_log_branch_evidence.py::test_log_get_versioned_public_result_branches[authoring-2025.1] tests/unit/test_stable_read_adapters.py::test_game_objects_builder_and_projection_normalize_the_2022_field_names tests/unit/test_stable_read_adapters.py::test_gateway_game_objects_dispatches_one_closed_request_per_exact_lane
+
+F............E.......................................................... [ 91%]
+.......                                                                  [100%]
+==================================== ERRORS ====================================
+_ ERROR at teardown of test_older_loaded_media_composite_public_teardown_consumer[2023.1] _
+Exact evidence finalization failed:
+Traceback (most recent call last):
+  File "/private/tmp/waapi-195-publication-cycle/tests/support/exact_evidence_finalization.py", line 21, in finalize_reported_node_evidence
+    callback(dict(item._waapi_phase_reports))
+  File "/private/tmp/waapi-195-publication-cycle/tests/unit/test_loaded_media_composite_evidence.py", line 88, in finalize
+    write_composite_bundle(tmp_path / 'bundle', paths, inventory=inventory, version=version))
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/waapi-195-publication-cycle/tests/support/loaded_media_runtime_evidence.py", line 711, in write_composite_bundle
+    reviewed=composite_review(); profile=availability_observation(version); r=review(); original=original_observation()
+             ^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/waapi-195-publication-cycle/tests/support/loaded_media_runtime_evidence.py", line 502, in composite_review
+    published = json.loads((root / baseline['path']).read_bytes())['branches']
+                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+KeyError: 'branches'
+
+=================================== FAILURES ===================================
+_____ test_console_loaded_media_public_teardown_portable_consumer[2023.1] ______
+
+request = <FixtureRequest for <Function test_console_loaded_media_public_teardown_portable_consumer[2023.1]>>
+tmp_path = PosixPath('/private/var/folders/0g/wcnvwhx96wqd99gqw8t8hy040000gn/T/pytest-of-xiye/pytest-3260/test_console_loaded_media_publ0')
+inventory = {'native_coverage': {'candidate_sha256': 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'catalogs...e_waapi/runtime_inspection_business.py'], 'compiler_attribution': 'reviewed_family_entrypoint_not_branch_proof', ...}]}
+version = '2023.1', published = []
+
+    @pytest.mark.parametrize('version',('2023.1','2024.1','2025.1'))
+    def test_console_loaded_media_public_teardown_portable_consumer(request,tmp_path,inventory,version,published):
+        # Import before public dispatch: the initial missing-adapter RED creates no
+        # throwaway positive captures or duplicate Gateway transactions.
+        from tests.support.loaded_media_runtime_evidence import write_console_bundle, console_review, console_basis
+>       profile=console_review()['profiles'][version]
+                ^^^^^^^^^^^^^^^^
+
+tests/unit/test_console_loaded_media_evidence.py:62: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/support/loaded_media_runtime_evidence.py:845: in console_review
+    older=composite_review(root)
+          ^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+root = PosixPath('/private/tmp/waapi-195-publication-cycle')
+
+    def composite_review(root=audit.ROOT):
+        path = root / FIXTURE / 'composite-review.json'
+        if runtime.sha(path.read_bytes()) != COMPOSITE_REVIEW_SHA:
+            raise ValueError('Exact older LoadedMedia composite descriptor differs')
+        result = json.loads(path.read_bytes())
+        if (len(result['entries']) != 62 or set(result['profiles']) != set(COMPOSITE_ROUTES)
+                or result['positive_review_sha256'] != REVIEW_SHA):
+            raise ValueError('Exact older LoadedMedia composite scope differs')
+        positive_schema = _resolved_loaded_schema('2025.1',root)[1]
+        if positive_schema != result['positive_resolved_schema']:
+            raise ValueError('LoadedMedia positive resolved schema differs')
+        for version, profile in result['profiles'].items():
+            schema, resolved = _resolved_loaded_schema(version,root)
+            if (profile['route'] != COMPOSITE_ROUTES[version] or schema != profile['catalog_schema']
+                    or resolved != profile['resolved_schema']):
+                raise ValueError('Exact older LoadedMedia schema/reference mapping differs')
+            # Only this exact documented punctuation transition is admitted. All
+            # other resolved keys, descriptions, alternatives and fields stay equal.
+            changed = deepcopy(resolved)
+            field = changed['resultSchema']['properties']['return']['items']['properties']['mediaId']
+            if field['description'] != result['exact_resolved_difference']['older']:
+                raise ValueError('LoadedMedia reviewed older field meaning differs')
+            field['description'] = result['exact_resolved_difference']['positive']
+            if changed != positive_schema:
+                raise ValueError('LoadedMedia resolved semantic difference is unreviewed')
+            for name, document in profile['documents'].items():
+                raw = (root / FIXTURE / name).read_bytes()
+                if runtime.sha(raw) != document['sha256']:
+                    raise ValueError('LoadedMedia older primary documentation differs')
+            text = (root / FIXTURE / next(n for n in profile['documents'] if n.endswith('-api.html'))).read_text()
+            if not all(t in text for t in ('loaded media at a specific profiler capture time','PrepareEvent()','PrepareGameSyncs()','size (in bytes)')):
+                raise ValueError('LoadedMedia older documented business meaning differs')
+        import subprocess
+        baseline = result['prior_policy_absent']
+        prior = subprocess.check_output(['git','show',baseline['candidate']+':'+baseline['path']],cwd=root)
+        if runtime.sha(prior) != baseline['sha256'] or set(result['entries']) & set(json.loads(prior)['branches']):
+            raise ValueError('Older LoadedMedia immutable policy-absence baseline differs')
+>       published = json.loads((root / baseline['path']).read_bytes())['branches']
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'branches'
+
+tests/support/loaded_media_runtime_evidence.py:502: KeyError
+=========================== short test summary info ============================
+ERROR tests/unit/test_loaded_media_composite_evidence.py::test_older_loaded_media_composite_public_teardown_consumer[2023.1]
+FAILED tests/unit/test_console_loaded_media_evidence.py::test_console_loaded_media_public_teardown_portable_consumer[2023.1]
+1 failed, 77 passed, 1 error in 188.86s (0:03:08)

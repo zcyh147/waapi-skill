@@ -1,0 +1,31 @@
+{
+  "candidate": "3dbadbea2b6c35264db9f442c191e855a9f6a1b5",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_console_loaded_media_evidence.py::test_console_loaded_media_public_teardown_portable_consumer[2023.1]",
+    "tests/unit/test_loaded_media_composite_evidence.py::test_older_loaded_media_composite_public_teardown_consumer[2023.1]",
+    "tests/unit/test_loaded_media_composite_evidence.py::test_composite_review_reads_current_requirements_without_weakening_baseline"
+  ],
+  "cwd": "/private/tmp/waapi-195-publication-cycle",
+  "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+  "git_index_sha256": "e896f256a96e3157c7333cfcf53e81d9fab94aa9c05c7347522f2f85e746e912",
+  "git_status_before": "",
+  "started_unix": 1793281013.939008,
+  "head_after": "3dbadbea2b6c35264db9f442c191e855a9f6a1b5",
+  "candidate_unchanged": true,
+  "git_status": "",
+  "remaining_owned_processes": [],
+  "exit_code": 0,
+  "duration_seconds": 332.5356791249942,
+  "log_sha256": "efb803951bab59ddd860ba4a36b2b03bf2e798885005a7f69fe7cff38616f4ca",
+  "status": "PASS",
+  "passed": 3,
+  "skipped": 0,
+  "failed": 0,
+  "errors": 0
+}

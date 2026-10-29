@@ -1,0 +1,17 @@
+{
+  "candidate": "4ac005a6f20a9b900250476b930620aed7566e6b",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_contribution_branch_evidence.py::test_one_contribution_flow_reaches_final_consumer_and_binds_public_projection"
+  ],
+  "cwd": "/private/tmp/waapi-195-publication-cycle",
+  "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+  "git_index_sha256": "cd1020e1f0c23fe2b8acf0880088b0c36f4293e396697be20eb6f091e21bc628",
+  "git_status_before": "",
+  "started_unix": 1793278163.607588
+}

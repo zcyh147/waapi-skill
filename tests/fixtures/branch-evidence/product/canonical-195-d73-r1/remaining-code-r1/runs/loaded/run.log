@@ -1,0 +1,13 @@
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.002803, "reason": "locked developer interpreter ready", "automatic_repair_attempted": false}
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 9.1e-05, "reason": "selected Non-live prerequisites ready", "automatic_repair_attempted": false}
+== Test Context ==
+version:      none
+mode:         nonlive
+console:      <unset>
+project:      <unset>
+sandbox_root: <unset>
+test_config:  <unset>
+pytest args:  -q -ra tests/unit/test_console_loaded_media_evidence.py::test_console_loaded_media_public_teardown_portable_consumer[2023.1] tests/unit/test_loaded_media_composite_evidence.py::test_older_loaded_media_composite_public_teardown_consumer[2023.1] tests/unit/test_loaded_media_composite_evidence.py::test_composite_review_reads_current_requirements_without_weakening_baseline
+
+...                                                                      [100%]
+3 passed in 331.88s (0:05:31)
