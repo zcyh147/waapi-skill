@@ -36,6 +36,7 @@ def program_sources(root):
         'tests/fixtures/metadata-conditions/applicability-current-program-r2.json.gz',
         'tests/fixtures/metadata-conditions/applicability-current-program-r3.json.gz',
         'tests/fixtures/metadata-conditions/applicability-current-program-r4.json.gz',
+        'tests/fixtures/metadata-conditions/applicability-current-program-r5.json.gz',
         *['tests/_org/' + v + '/SampleProject.wproj' for v in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')]})
     pending = ['tests/unit/test_music_transition_gateway.py', 'tests/unit/test_applicability_public_program.py', 'tests/unit/test_music_playlist_gateway.py', 'tests/unit/test_media_pool_database_gateway.py',
         'tests/conftest.py']
