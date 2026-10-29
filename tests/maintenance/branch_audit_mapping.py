@@ -22,7 +22,7 @@ SOURCE_DERIVED_DESCRIPTORS = frozenset({'source_copy_successor_context',
     'source_copy_program_equivalence', 'equivalence', 'native_equivalence'})
 
 
-def requirements_identity_projection(document, mapping_bindings=None, *, root):
+def requirements_identity_projection(document, mapping_bindings=None, *, root, index_document=None):
     """Identify policy/current mappings without derived Source proof feedback.
 
     This is only a source-identity preimage. Ordinary admission still checks the
@@ -45,7 +45,7 @@ def requirements_identity_projection(document, mapping_bindings=None, *, root):
             raise ValueError('Requirements identity requires the exact original Source roster')
         roster = json.loads(raw)['selected_native_shapes']
     wanted = candidates & roster.keys()
-    bindings = (_requirements_source_bindings(root, document, wanted)
+    bindings = (_requirements_source_bindings(root, document, wanted, index_document=index_document)
                 if mapping_bindings is None and wanted else mapping_bindings or {})
     for review in projected.get('representative_mechanisms', {}).values():
         if 'candidate_sha256' in review:
@@ -72,7 +72,7 @@ def requirements_identity_projection(document, mapping_bindings=None, *, root):
     return {'contract': REQUIREMENTS_IDENTITY_KIND, 'requirements': projected}
 
 
-def _requirements_source_bindings(root, requirements, wanted):
+def _requirements_source_bindings(root, requirements, wanted, *, index_document=None):
     """Resolve the sealed Source prefix, never claim full-index admission.
 
     Assembly orders existing Source-containing whole-mechanism sidecars first.
@@ -84,7 +84,7 @@ def _requirements_source_bindings(root, requirements, wanted):
     from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
     root = Path(root).resolve()
     path = root / 'docs/branch-coverage-evidence-index.json'
-    index = json.loads(path.read_bytes())
+    index = json.loads(path.read_bytes()) if index_document is None else index_document
     allowed = {'contract', 'base', 'entries', 'metadata_attachments', 'source_attachments',
         'source_native_attachments', 'runtime_observation_attachments', 'qualified_runtime_read_attachments',
         'condition_mechanism_attachments', 'condition_definition_attachments',
