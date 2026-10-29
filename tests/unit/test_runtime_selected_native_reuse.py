@@ -480,3 +480,196 @@ def test_product_base_native_import_keeps_locator_origin_and_scope_guards(portab
             'native', 'controlled' if damage == 'scope' else 'product', base,
             binding=binding, source_root=audit.ROOT)
         assert result[0] == 'missing', (damage, result)
+
+
+def current_mapping_successor(index_path, policies, inventory, mapper, output, *, selected_code=None):
+    """Join real portable origins to actual current mapping through the standard reader."""
+    from tests.maintenance.branch_audit_mapping import MAPPING_FIELDS
+    original, base, _ = audit.portable_binding_inputs(index_path, policies)
+    bindings = (mapper.runtime_bindings(audit.ROOT, inventory) if hasattr(mapper, 'runtime_bindings')
+        else mapper.object_bindings(audit.ROOT, inventory))
+    requirements = deepcopy(policies)
+    requirements['representative_mechanisms'] = {}
+    rows = {row['id']: row for row in inventory['native_coverage']['obligations']}
+    proposed, predecessors, groups = {}, {}, {}
+    for identity, current in bindings.items():
+        old = original['bindings'].get(identity)
+        proposed[identity] = {**deepcopy(current), **({key: deepcopy(value) for key, value in old.items()
+            if key not in MAPPING_FIELDS | {'evidence'}} if old else {}), 'evidence': {}}
+        mechanism = current['representative_mechanism']
+        groups.setdefault(mechanism, []).append(identity)
+        requirements['branches'][identity] = {**deepcopy(policies['branches'].get(identity,
+            {'native_shape_sha256': rows[identity]['shape_sha256'], 'categories': ['program'],
+                'reason': 'Current interface requires its actual ordinary CODE anchor'})),
+            'representative_mechanism': mechanism}
+        predecessors[identity] = ({'binding_sha256': audit.digest(old),
+            'policy_sha256': audit.digest(policies['branches'][identity])} if old else None)
+    for mechanism, identities in groups.items():
+        categories = {category for identity in identities for category in requirements['branches'][identity]['categories']}
+        requirements['representative_mechanisms'][mechanism] = {
+            'contract': 'waapi-skill.representative-branch-mechanism/v1', 'scope_kind': 'product',
+            'candidate_sha256': inventory['native_coverage']['candidate_sha256'],
+            'reviewed_reason': 'Current mapping and separate retained category evidence; no current CODE receipt invented',
+            'sources': {name: hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() for name in mapper.SOURCES},
+            'members': {identity: {'native_route': rows[identity]['route'],
+                'native_shape_sha256': rows[identity]['shape_sha256'],
+                'mapping_sha256': audit.digest({key: value for key, value in proposed[identity].items() if key != 'evidence'})}
+                for identity in identities},
+            'selected_proofs': {category: [selected_code if category == 'program' and selected_code in identities
+                else min(identity for identity in identities if category in requirements['branches'][identity]['categories'])]
+                for category in categories}}
+    output.mkdir()
+    def emit(name, body):
+        path = output / name
+        path.write_text(json.dumps(body), encoding='utf-8')
+        return {'artifact': path.relative_to(base).as_posix(), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    attachment = {'contract': 'waapi-skill.branch-mapping-attachment/v1', 'scope_kind': 'product',
+        'requirements_sha256': audit.digest(requirements), 'mechanisms': sorted(groups),
+        'bindings': proposed, 'predecessors': predecessors}
+    index = json.loads(index_path.read_bytes())
+    index.update(base=os.path.relpath(base, output), mapping_attachments=[emit('mapping.json', attachment)])
+    emit('index.json', index)
+    return {'index': output / 'index.json', 'requirements': requirements, 'inventory': inventory,
+        'original': original, 'attachment': attachment, 'base': base, 'output': output, 'index_document': index}
+
+
+@pytest.fixture(scope='module')
+def native_current_mapping_case(portable_selected_native_packets):
+    from tests.support import runtime_remaining_completion_mapping as mapper
+    packet = portable_selected_native_packets
+    selected = packet['packets']['product']
+    ids = {identity for identity, member in packet['review']['members'].items()
+        if identity.startswith('2024.1|wwise-authoring|') and ('getCpuUsage|' in identity or
+            identity.endswith('transport.prepare|/resultSchema'))}
+    assert len(ids) == 2
+    directory = packet['output'] / 'current-native-origin'
+    directory.mkdir()
+    index = json.loads(selected['index'].read_bytes())
+    base = (selected['index'].parent / index['base']).resolve()
+    positions = [packet['review']['scope_ids'].index(identity) for identity in ids]
+    index.update(base=os.path.relpath(base, directory), entries=[index['entries'][n] for n in positions],
+        qualified_runtime_read_attachments=[index['qualified_runtime_read_attachments'][n] for n in positions])
+    path = directory / 'index.json'
+    path.write_text(json.dumps(index), encoding='utf-8')
+    policies = {**selected['requirements'], 'branches': {identity: selected['requirements']['branches'][identity] for identity in ids}}
+    inventory = log_inventory([identity.rsplit('|', 1)[0] for identity in ids], pointers={'/resultSchema'})
+    for route in inventory['routes']:
+        version, _, uri = route['id'].split('|')
+        route['public_contracts'] = [audit.digest(mapper.public_contract(uri, version))]
+    inventory['native_locations'] = dict.fromkeys(ids, [[]])
+    inventory['runtime_roster_sha256'] = audit.digest([(row['id'], row['shape_sha256']) for row in inventory['native_coverage']['obligations']])
+    inventory['runtime_routes_sha256'] = audit.digest(inventory['native_coverage']['routes'])
+    return current_mapping_successor(path, policies, inventory, mapper, packet['output'] / 'current-native')
+
+
+def test_current_runtime_mapping_retains_partial_cpu_and_transport_ack_without_code(native_current_mapping_case):
+    case = native_current_mapping_case
+    document, base, _ = audit.portable_binding_inputs(case['index'], case['requirements'])
+    assert all(binding['input'].get('correspondence') for binding in document['bindings'].values())
+    assert document['bindings'] != case['original']['bindings']
+    result = completion.evaluate_coverage(audit.ROOT, case['inventory'], document, digest=audit.digest,
+        evidence_base=base, requirements_document=case['requirements'])
+    rows = result['obligations']
+    assert len(rows) == 2
+    assert all(row['evidence_results']['native']['outcome'] == 'passed' for row in rows), {row['id']: row['evidence_results'] for row in rows}
+    assert all(row['evidence_results']['program']['outcome'] == 'missing' and row['state'] != 'verified' for row in rows)
+    from tests.support import runtime_observation_evidence as runtime
+    review = runtime.selected_runtime_source_successor()
+    cpu = next(review['members'][row['id']] for row in rows if 'getCpuUsage|' in row['id'])
+    assert (cpu['facts']['native_nonempty_rows'], cpu['facts']['original_public_complete'],
+        cpu['facts']['original_finalization']) == (34, False, 'BLOCKED')
+    capture = completion.read_sealed_artifact(cpu['capture'], audit.ROOT)
+    archive = runtime.archive_reader(capture['archive'], audit.ROOT)
+    report = json.loads(archive(capture['capture_original_path']))
+    public = report['outcomes']['profiler-cpu-observation']['evidence']['agent_result']
+    assert (len(public['return']), public['returned_count'], public['total_count'],
+        public['truncated'], public['complete']) == (16, 16, 34, True, False)
+    ack = next(review['members'][row['id']] for row in rows if 'transport.prepare|' in row['id'])
+    assert ack['facts']['business_boundary'] == 'acknowledgment_schema_only'
+    assert ack['facts']['acoustic_output_verified'] is False
+    assert ack['facts']['global_mode_restoration_verified'] is False
+    assert all('program' not in binding['evidence'] for binding in document['bindings'].values())
+    assert all({key: value for key, value in binding.items() if key != 'evidence'} ==
+        {key: value for key, value in case['attachment']['bindings'][identity].items() if key != 'evidence'}
+        for identity, binding in document['bindings'].items())
+
+
+def reject_current_mapping_damage(case, damage, identity):
+    """Re-sign outer transport while preserving the guard being challenged."""
+    import uuid
+    requirements = deepcopy(case['requirements'])
+    attachment = deepcopy(case['attachment'])
+    index = deepcopy(case['index_document'])
+    directory = case['output'] / ('negative-' + uuid.uuid4().hex)
+    directory.mkdir()
+    base = case['base']
+    def emit(name, body):
+        path = directory / name
+        path.write_text(json.dumps(body), encoding='utf-8')
+        return {'artifact': path.relative_to(base).as_posix(), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    binding = attachment['bindings'][identity]
+    review = requirements['representative_mechanisms'][binding['representative_mechanism']]
+    if damage == 'current-mapping':
+        binding['input']['selector'] = '/unreviewed-current-selector'
+    elif damage == 'current-review':
+        review['sources'][next(iter(review['sources']))] = '0' * 64
+    elif damage == 'predecessor':
+        attachment['predecessors'][identity]['binding_sha256'] = '0' * 64
+    elif damage == 'foreign-view':
+        binding['category_evidence_mapping'] = deepcopy(case['original']['bindings'][identity]['input'])
+        review['members'][identity]['mapping_sha256'] = audit.digest({key: value for key, value in binding.items() if key != 'evidence'})
+    elif damage in {'original-binding', 'capture'}:
+        entry = next(entry for entry in index['entries']
+            if identity in completion.read_sealed_artifact(entry['bindings'], base)['bindings'])
+        if damage == 'original-binding':
+            original = completion.read_sealed_artifact(entry['origin']['bindings'], base)
+            projected = completion.read_sealed_artifact(entry['bindings'], base)
+            for document in (original, projected):
+                document['bindings'][identity]['input']['selector'] = '/altered-original-selector'
+            entry['origin']['bindings'] = emit('altered-original.json', original)
+            entry['bindings'] = emit('altered-projection.json', projected)
+        else:
+            capture = completion.read_sealed_artifact(entry['origin']['capture'], base)
+            capture['candidate'] = '0' * 40
+            entry['origin']['capture'] = emit('altered-capture.json', capture)
+    else:
+        raise AssertionError(damage)
+    attachment['requirements_sha256'] = audit.digest(requirements)
+    index.update(base=os.path.relpath(base, directory), mapping_attachments=[emit('mapping.json', attachment)])
+    emit('index.json', index)
+    with pytest.raises((OSError, ValueError), match='differs|changed|source|original|metadata|exact'):
+        audit.portable_binding_inputs(directory / 'index.json', requirements)
+
+
+@pytest.mark.parametrize('damage', ['current-mapping', 'current-review', 'predecessor', 'foreign-view', 'original-binding', 'capture'])
+def test_current_native_mapping_cannot_bypass_review_or_original_guards(native_current_mapping_case, damage):
+    case = native_current_mapping_case
+    identity = next(identity for identity in case['original']['bindings'] if 'getCpuUsage|' in identity)
+    reject_current_mapping_damage(case, damage, identity)
+
+
+@pytest.mark.parametrize('damage', ['shape', 'qualification-seal', 'qualification-facts', 'foreign-category-view'])
+def test_current_native_category_keeps_exact_seals_and_partial_limits(native_current_mapping_case, damage):
+    case = native_current_mapping_case
+    document, base, _ = audit.portable_binding_inputs(case['index'], case['requirements'])
+    identity = next(identity for identity in document['bindings'] if 'getCpuUsage|' in identity)
+    binding = deepcopy(document['bindings'][identity])
+    branch = deepcopy(next(row for row in case['inventory']['native_coverage']['obligations'] if row['id'] == identity))
+    descriptor = deepcopy(binding['evidence']['native'])
+    if damage == 'shape':
+        branch['shape_sha256'] = '0' * 64
+    elif damage == 'qualification-seal':
+        descriptor['sha256'] = '0' * 64
+    elif damage == 'qualification-facts':
+        record = completion.read_sealed_artifact(descriptor, base)
+        record['retained_facts']['original_public_complete'] = True
+        path = case['output'] / 'false-complete-qualification.json'
+        path.write_text(json.dumps(record), encoding='utf-8')
+        descriptor = {'artifact': path.relative_to(base).as_posix(), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    else:
+        # An invented native view cannot replace the actual current mapping.
+        reject_current_mapping_damage(case, 'foreign-view', identity)
+        return
+    result = completion.evidence_result(descriptor, branch, case['inventory']['native_coverage']['candidate_sha256'],
+        'native', 'product', base, binding=binding, source_root=audit.ROOT)
+    assert result[0] == 'missing', result

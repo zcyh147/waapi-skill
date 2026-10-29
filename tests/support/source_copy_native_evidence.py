@@ -9,7 +9,7 @@ from tests.support.source_copy_branch_evidence import dependency_review
 SUCCESSOR_REVIEW_PATH = 'tests/fixtures/source-copy/branch-successor-review-195.json'
 SUCCESSOR_REVIEW_SHA256 = '4cd9a81b3d413f46d7ecca6eec191984e338c5b3657b0d4e6955a167dac09a9b'
 ACCOUNTING_REVIEW_PATH = 'tests/fixtures/source-copy/branch-accounting-review-195.json'
-ACCOUNTING_REVIEW_SHA256 = '63a6c4e6e3eb10156c68ec78636ae619d4eac291d6662a0427da372ec81d3c71'
+ACCOUNTING_REVIEW_SHA256 = 'a47f6f862d8e5027f1bcbde857e98326cdc037470b28354784ab5d6db4456473'
 ACCOUNTING_READER = 'tests/support/source_copy_native_evidence.py'
 ACCOUNTING_DEPENDENCIES = (
     'tests/support/new_condition_completion.py',
@@ -212,6 +212,33 @@ def validate_successor_context(descriptor, base, *, candidate=None):
     return context, predecessor
 
 
+def source_evidence_binding(binding, branch, candidate, base):
+    """Restore only the trusted captured mapping for Source category checks."""
+    from tests.maintenance.branch_audit_mapping import MAPPING_FIELDS
+    context, predecessor = validate_successor_context(binding['source_copy_successor_context'], base, candidate=candidate)
+    origin = context.get('accounting_origin')
+    if origin is None:
+        raise ValueError('Unbound Source accounting evidence mapping')
+    document = _portable_source_document(origin['bindings'], base)
+    original = document.get('bindings', {}).get(branch['id'])
+    if (document.get('contract') != 'waapi-skill.branch-bindings/v1' or original is None
+            or original.get('branch_id') != branch['id']
+            or original.get('native_shape_sha256') != branch['shape_sha256']
+            or binding.get('branch_id') != branch['id']
+            or binding.get('native_shape_sha256') != branch['shape_sha256']
+            or original.get('public_route') != '|'.join(branch['route'].split('|')[i] for i in (0, 3, 4))
+            or binding.get('source_copy_native_proof') != predecessor['proof']):
+        raise ValueError('Source accounting original mapping/branch differs')
+    evidence_binding = {key: value for key, value in binding.items() if key not in MAPPING_FIELDS}
+    evidence_binding.update({key: value for key, value in original.items() if key in MAPPING_FIELDS})
+    # Protected decoration is still part of the existing whole-binding seal.
+    proof = _portable_source_document(binding['source_copy_program_equivalence'], base)
+    from tests.maintenance.branch_coverage_audit import digest
+    if proof.get('binding_semantics_sha256') != digest(completion.binding_semantics(evidence_binding)):
+        raise ValueError('Source accounting original evidence mapping equivalence differs')
+    return evidence_binding
+
+
 def source_program_equivalence(binding, descriptor, record, candidate, base):
     """A separate generic program bridge is owned by the validated accounting context."""
     context, predecessor = validate_successor_context(binding['source_copy_successor_context'], base, candidate=candidate)
@@ -263,6 +290,8 @@ def validate_source_equivalence(proof, branch, binding, root, *, evidence_base):
     """Only the pinned five-version Source leaf bridge may cross changed bytes."""
     from tests.support.source_copy_branch_evidence import pointer_contract, native_route, REVIEW_SHA256
     import hashlib
+    if binding.get('source_copy_program_equivalence'):
+        binding = source_evidence_binding(binding, branch, proof['to_candidate'], evidence_base)
     review = dependency_review()
     from tests.support.source_copy_branch_evidence import PUBLIC_NODES
     versions = [version for version in PUBLIC_NODES if branch['route'] == native_route(version)]

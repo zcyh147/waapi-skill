@@ -203,9 +203,9 @@
     "tests/fixtures/source-copy/branch-successor-review-r123.json": "4f2ccb1aad3e3826b0db88e484919dce06b909d6136a5a3794dc8fc469c2f714",
     "tests/fixtures/source-copy/branch-successor-review-r92.json": "278fcf8f3f404aba71d12995a6e42cc447bdabb2606800f6456a2751f9bd032f",
     "tests/maintenance/__init__.py": "93f800e18500f291b23ed63fc6eb6a36245cd75a3605534a564c4913e05c1104",
-    "tests/maintenance/branch_audit_completion.py": "0ef5d98ad414861f1a3788c84e1ff7669f19df08086992417e086c71e2b88642",
+    "tests/maintenance/branch_audit_completion.py": "4e6c7098c14217f7b8d44031bb3d111a862822971d4712178587ccd10552736f",
     "tests/maintenance/branch_audit_mapping.py": "b69341d96185b92127751aafd3bcdf3914be391660c46af8c61dae1b2facd4ea",
-    "tests/maintenance/branch_coverage_audit.py": "ab17355ade04950095fbd8da7f936aa7e03f83f77aca6f39f882dbf50e9cbbc8",
+    "tests/maintenance/branch_coverage_audit.py": "3e82dfa6deefad025532628e48a1715ba621b7cc7bac41f9b5136d9f7107e2f5",
     "tests/maintenance/interface_depth_inventory.py": "212ca04d24244e043898656332db0a73d0d207058f7d26c9cbfb633c20a83280",
     "tests/maintenance/source_identity.py": "14d65a3c776f4d18a52e5d525b58bec55b1fd4710c7870ff1bbbbe3ce4cb9d45",
     "tests/support/condition_completion_mapping.py": "68ee0fbe9c682480ef74ce06162d9c289c508c2272adb71e7245d038b18a843a",
@@ -214,7 +214,7 @@
     "tests/support/new_condition_completion.py": "ee989f858d4ccacb6b8328ee7b114b4cbbb463f844f950f43fa7665506eda912",
     "tests/support/platform_filesystem.py": "827467a6bb7af0fb74827841fbf8c67b79a020bc0563b4f73504b64fbfb7b95d",
     "tests/support/source_copy_branch_evidence.py": "de255dc11e0cb81e625eb23b1a4c63ac61f61529673b8bf1f609988470ee974a",
-    "tests/support/source_copy_native_evidence.py": "e266f0286f33ab80e22652c17841ef5ab47a0c86b75e5e14e582f12fc28c0165",
+    "tests/support/source_copy_native_evidence.py": "aaff8836e6dc9550ea57d3e35fb084353d58b54cd6874501c42ee95fbc69e1e5",
     "tests/unit/test_conditional_reference_gateway.py": "a6802e122c7893936d5aa66e73a68605825416d62baf32b97b3e8f3d9c5a14b6",
     "tests/unit/test_field_interface_closure_gateway.py": "12743d4ff7c31a2f05644f60b82a942c423c6b0e30db2147f686bef44467bf10",
     "tests/unit/test_gameparameter_class_fields_gateway.py": "92f81472bba7ff5006bffd170e6d502b56ff03ae12dd0d00ed717657830bcada",
@@ -224,7 +224,7 @@
     "tests/unit/test_object_graph_owned_choices_gateway.py": "5930214aa36f90792c135815226c6f8b4c703a9774c62e38b1084e66b3917e61",
     "tests/unit/test_plugin_shareset_gateway.py": "12b278738bb4f4d2b789d41e3734e4b4654313b52bf76cf384a80c5d2d79b9ff",
     "tests/unit/test_source_copy_branch_evidence.py": "f6e6efdf7a359b6a575badf36668782a790bef311265089b3128ed36af6667d6",
-    "tests/unit/test_source_copy_capture.py": "bfa24a7ce0017bedbb27f9e38929adaa9ae19464a3135f7ed6bad83f5c1ecaa3",
+    "tests/unit/test_source_copy_capture.py": "fef530eb3c670d79d3fab7c369f9bf37f6cf0fe23e3f8557d6513152af1c71c9",
     "tests/unit/test_source_copy_modern_collector.py": "bb57de305574935a7a0ca80bbe85aa5fc2d135fca37f7ef176b74bce908db3e2",
     "tests/unit/test_source_copy_repeated_fixture.py": "e581b38eb4e89720e90b618c0bed05e788af5f7995f013b3a60be12877e82ee6",
     "tests/unit/test_source_copy_saved_continuation_gateway.py": "c06386ee2205bc1c06925aa4f11a74c4437585bda111a5b0849a3662c53732f3",
@@ -957,13 +957,13 @@
     },
     "tests/maintenance/branch_audit_completion.py": {
       "captured_sha256": "e5ab72ba26cf4f392b8982120fb91bb1622241ee42afca8272453a524a9c20cf",
-      "current_sha256": "0ef5d98ad414861f1a3788c84e1ff7669f19df08086992417e086c71e2b88642",
-      "reason": "Retain NEW r3 candidate roster and route only a validated Source accounting program descriptor; exclude exactly that descriptor self-reference from binding semantics. Since integration 2bbea8b6, the sole additional change passes retained_member only on the native qualified_runtime_read_attachment branch. Source source_copy_native_proof accounting does not enter that branch; original88 execution, program/native facts and receipts are unchanged. Applicability r5 preparation additionally adds only applicability-current-program-r5.json.gz to candidate_identity membership before capture. This is candidate accounting membership, not Source execution or a change to Source evidence admission; original 88a6 facts, 104 capture sources and 689 execution sources remain exact."
+      "current_sha256": "4e6c7098c14217f7b8d44031bb3d111a862822971d4712178587ccd10552736f",
+      "reason": "Retain NEW r3 candidate roster and route only a validated Source accounting program descriptor; exclude exactly that descriptor self-reference from binding semantics. Since integration 2bbea8b6, the sole additional change passes retained_member only on the native qualified_runtime_read_attachment branch. Source source_copy_native_proof accounting does not enter that branch; original88 execution, program/native facts and receipts are unchanged. Applicability r5 preparation additionally adds only applicability-current-program-r5.json.gz to candidate_identity membership before capture. This is candidate accounting membership, not Source execution or a change to Source evidence admission; original 88a6 facts, 104 capture sources and 689 execution sources remain exact. Category readers use only trusted original native/Source mapping views after the existing current public mapping, predecessor and protected metadata checks. This changes accounting interpretation, never captured execution or current CODE credit."
     },
     "tests/maintenance/branch_coverage_audit.py": {
       "captured_sha256": "6a7046d2b66fdeb8718b870e85457d59043e3deaf66f46f4f4ef09a2d5543a39",
-      "current_sha256": "ab17355ade04950095fbd8da7f936aa7e03f83f77aca6f39f882dbf50e9cbbc8",
-      "reason": "Existing portable importer carries each exact four-descriptor importing origin into Source accounting admission; legacy lanes keep their existing capture content."
+      "current_sha256": "3e82dfa6deefad025532628e48a1715ba621b7cc7bac41f9b5136d9f7107e2f5",
+      "reason": "Existing portable importer carries each exact four-descriptor importing origin into Source accounting admission; legacy lanes keep their existing capture content. Current retained native importer forwards the reviewed portable evidence base; original proof identity and source guards remain exact."
     },
     "tests/support/condition_completion_mapping.py": {
       "captured_sha256": null,
@@ -977,8 +977,8 @@
     },
     "tests/support/source_copy_native_evidence.py": {
       "captured_sha256": "94b2dfca59e04a63c5e986c620412a9616fba060d482dccaed58e77611788111",
-      "current_sha256": "e266f0286f33ab80e22652c17841ef5ab47a0c86b75e5e14e582f12fc28c0165",
-      "reason": "Same-reader accounting context, complete source-delta validation, single-literal self-pin seal and sidecar-only publisher; native ownership and effect checks remain."
+      "current_sha256": "aaff8836e6dc9550ea57d3e35fb084353d58b54cd6874501c42ee95fbc69e1e5",
+      "reason": "Same-reader accounting context, complete source-delta validation, single-literal self-pin seal and sidecar-only publisher; native ownership and effect checks remain. Source category equivalence reconstructs only original MAPPING_FIELDS from validated accounting_origin bindings and retains validated decorated protected metadata, without changing original program/native facts."
     },
     "tests/unit/test_new_condition_completion_reader.py": {
       "captured_sha256": null,
@@ -987,8 +987,8 @@
     },
     "tests/unit/test_source_copy_capture.py": {
       "captured_sha256": "ceece769cefd6af10803de9247689571ae878041a0e06fea15ec5701d98a0e95",
-      "current_sha256": "bfa24a7ce0017bedbb27f9e38929adaa9ae19464a3135f7ed6bad83f5c1ecaa3",
-      "reason": "Ordinary portable-import/evidence_result controls reuse the five committed packets; no producer/native execution."
+      "current_sha256": "fef530eb3c670d79d3fab7c369f9bf37f6cf0fe23e3f8557d6513152af1c71c9",
+      "reason": "Ordinary portable-import/evidence_result controls reuse the five committed packets; no producer/native execution. Adds bounded cached Source portable-origin to current Object mapping to ordinary completion coverage and fail-closed controls; no Source collector or native/Fresh execution changes."
     }
   }
 }

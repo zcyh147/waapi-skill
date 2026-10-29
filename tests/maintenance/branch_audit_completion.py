@@ -1650,7 +1650,7 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                     raise ValueError('Retained native descriptor leaves its original packet')
                 return {**item, 'artifact': target.relative_to(packet).as_posix()}
             descriptor = local(descriptor)
-            binding = dict(binding)
+            binding = dict(retained_member.get('evidence_binding', binding))
             for key in ('runtime_observation_attachment', 'qualified_runtime_read_attachment'):
                 if binding.get(key): binding[key] = local(binding[key])
             base = packet
@@ -1672,6 +1672,9 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                                          root, reference_edges or {}, historical_sources,
                                          retained_member=retained_member if retained_member and 'assessment' in retained_member else None)
         record = read_sealed_artifact(descriptor, base)
+        if category in {'program', 'native'} and (binding or {}).get('source_copy_program_equivalence'):
+            from tests.support.source_copy_native_evidence import source_evidence_binding
+            binding = source_evidence_binding(binding, branch, candidate, base)
         from tests.support.empty_candidate_evidence import classify_empty_candidate, validate_counterexample
         empty = classify_empty_candidate(root, branch)
         if empty is not None and empty['status'] == 'rejected':

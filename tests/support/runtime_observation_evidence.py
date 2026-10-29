@@ -2261,7 +2261,8 @@ def retained_runtime_native(binding, branch, root, base):
     review = selected_runtime_source_successor(root) if selected else runtime_source_successor(root)
     member = review['members'].get(branch['id'])
     if (member is None or binding.get('native_shape_sha256') != branch['shape_sha256']
-            or audit.digest(retained_runtime_mapping(binding)) != member['mapping_sha256']
+            or (audit.digest(retained_runtime_mapping(binding)) != member['mapping_sha256']
+                and (not selected or not binding.get('representative_mechanism')))
             or (not selected and binding.get('native_only_base') != member.get('base'))):
         raise ValueError('Runtime native-only exact branch/public mapping differs')
     if selected:
@@ -2269,7 +2270,35 @@ def retained_runtime_native(binding, branch, root, base):
         # stored descriptor seals before scoped historical checks are enabled.
         records = {key: completion.read_sealed_artifact(member[key], root)
             for key in ('assessment', 'capture', 'program', 'qualification', *(['binding'] if 'binding' in member else []))}
-        original_binding = records.get('binding', {}).get('bindings', {}).get(branch['id'], binding)
+        # The reviewed packet owns the original mapping. Locator-only converters
+        # may transport the same sealed facts under a distinct current packet;
+        # evidence_result separately confines those descriptors to that packet.
+        packet = (root / member['base']).resolve()
+        if not packet.is_relative_to(root.resolve()):
+            raise ValueError('Selected runtime original packet differs')
+        original_binding = records.get('binding', {}).get('bindings', {}).get(branch['id'])
+        if original_binding is None:
+            # Some reviewed originals predate a separate binding descriptor.
+            # Their bounded packet index binds the exact reviewed program/capture
+            # pair; the immutable member mapping seal still owns its semantics.
+            index = json.loads((packet / 'index.json').read_bytes())
+            original_base = (packet / index['base']).resolve()
+            if (index.get('contract') != 'waapi-skill.branch-evidence-index/v1'
+                    or not original_base.is_relative_to(root.resolve())
+                    or not isinstance(index.get('entries'), list) or len(index['entries']) > 64):
+                raise ValueError('Selected runtime original packet index differs')
+            matches = []
+            for entry in index['entries']:
+                origin = entry['origin']
+                if all(origin[key]['sha256'] == member[key]['sha256']
+                        and (original_base / origin[key]['artifact']).resolve() == (root / member[key]['artifact']).resolve()
+                        for key in ('program', 'capture')):
+                    document = completion.read_sealed_artifact(origin['bindings'], original_base)
+                    if branch['id'] in document.get('bindings', {}):
+                        matches.append(document['bindings'][branch['id']])
+            if len(matches) != 1:
+                raise ValueError('Selected runtime original binding is not exact')
+            original_binding, = matches
         assessment = records['assessment']
         native = records['qualification']
         if (member['sources'] not in review['historical_packaged_sources']
@@ -2277,7 +2306,10 @@ def retained_runtime_native(binding, branch, root, base):
                 or audit.digest(records['capture']) != member['capture_sha256']
                 or (not member.get('original_report') and records['capture'].get('source_context') != member['captured_context'])
                 or (member.get('original_report') and records['capture'].get('candidate') != member['native_source_candidate'])
-                or original_binding is None
+                or original_binding.get('branch_id') != branch['id']
+                or original_binding.get('native_shape_sha256') != branch['shape_sha256']
+                or member['native_shape_sha256'] != branch['shape_sha256']
+                or original_binding.get('public_route') != '|'.join(branch['id'].split('|')[i] for i in (0, 3, 4))
                 or audit.digest(retained_runtime_mapping(original_binding)) != member['mapping_sha256']
                 or native['candidate_sha256'] != member['native_evidence_candidate']
                 or native['branch_id'] != branch['id']
@@ -2288,7 +2320,10 @@ def retained_runtime_native(binding, branch, root, base):
                 or member['qualification']['sha256'] != member['native_evidence_sha256']
                 or assessment['branch_id'] != branch['id']):
             raise ValueError('Selected runtime original/capture/qualification binding differs')
-        member = dict(member, base=binding['native_only_base'])
+        from tests.maintenance.branch_audit_mapping import MAPPING_FIELDS
+        evidence_binding = {key: value for key, value in binding.items() if key not in MAPPING_FIELDS}
+        evidence_binding.update({key: value for key, value in original_binding.items() if key in MAPPING_FIELDS})
+        member = dict(member, base=binding['native_only_base'], evidence_binding=evidence_binding)
     return member
 
 
