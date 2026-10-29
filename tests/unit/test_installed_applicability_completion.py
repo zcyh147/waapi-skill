@@ -339,7 +339,12 @@ def test_portable_applicability_join_keeps_approved_limits_separate_from_executi
     assessment = evaluate_coverage(ROOT, {'routes': [], 'native_coverage': {
         'candidate_sha256': 'c' * 64, 'catalogs': {}, 'routes': [], 'obligations': result['branches']}},
         imported, digest=digest, evidence_base=base, requirements_document=subset)
-    assert assessment['completion']['complete'] is False
+    # Completion here covers this source-applicability subset only. Accepted
+    # creation limits resolve its remaining scope without granting execution.
+    assert assessment['completion']['complete'] is True
+    assert assessment['completion']['routes'] == 0
+    assert assessment['installed_applicability']['native_runs'] == 0
+    assert assessment['installed_applicability']['direct_recipient_execution'] == 'not_observed'
     assert assessment['completion']['obligations'] == 1664
     pending = [r for r in assessment['obligations'] if r['state'] == 'implementation_dependency']
     assert pending == []
@@ -348,6 +353,16 @@ def test_portable_applicability_join_keeps_approved_limits_separate_from_executi
     assert len(limits) == 66
     assert all(r['exclusion']['native_absence_claim'] is False and
         r['exclusion']['execution_credit'] is False for r in limits)
+    mixed = [r for r in assessment['obligations'] if
+        'approved_creation_boundary' in r['applicability_correspondence']]
+    assert {(r['version'], r['business_dimensions']['class_name']) for r in mixed} == {
+        ('2021.1', 'Curve'), ('2021.1', 'MultiSwitchEntry'), ('2022.1', 'MultiSwitchEntry'),
+        ('2023.1', 'CustomState'), ('2024.1', 'CustomState'), ('2025.1', 'CustomState'),
+        ('2025.1', 'StateGroupInfo')}
+    assert all(r['state'] == 'source_definition_verified' and r['requirements'] == ['program']
+        and r['applicability_correspondence']['operations'] for r in mixed)
+    assert all(r['applicability_correspondence']['approved_creation_boundary']['native_absence_claim'] is False
+        and r['applicability_correspondence']['approved_creation_boundary']['execution_credit'] is False for r in mixed)
     assert all(r.get('direct_recipient_native_effect') == 'not_observed' for r in assessment['obligations'])
     assert not any(r['state'] in {'verified', 'proven_native_absence'} for r in assessment['obligations'])
     assert load(base / 'assessment.json')['completion'] == assessment['completion']
