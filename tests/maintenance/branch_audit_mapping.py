@@ -17,6 +17,111 @@ MAPPING_FIELDS = frozenset({'branch_id', 'native_shape_sha256', 'public_route',
     'public_route_sha256', 'input', 'construction', 'validation', 'verifier',
     'representative_mechanism'})
 
+REQUIREMENTS_IDENTITY_KIND = 'waapi-skill.requirements-publication-identity/v1'
+SOURCE_DERIVED_DESCRIPTORS = frozenset({'source_copy_successor_context',
+    'source_copy_program_equivalence', 'equivalence', 'native_equivalence'})
+
+
+def requirements_identity_projection(document, mapping_bindings=None, *, root):
+    """Identify policy/current mappings without derived Source proof feedback.
+
+    This is only a source-identity preimage. Ordinary admission still checks the
+    complete requirements, member hashes, descriptors and historical origins.
+    """
+    import hashlib
+    import json
+    import re
+    from copy import deepcopy
+    from tests.maintenance.branch_coverage_audit import digest
+    projected = deepcopy(document)
+    candidates = {identity for review in document.get('representative_mechanisms', {}).values()
+                  for identity in review.get('members', {})
+                  if '|function|ak.wwise.core.object.copy|' in identity}
+    roster = {}
+    if candidates:
+        from tests.support.source_copy_branch_evidence import REVIEW_PATH, REVIEW_SHA256
+        raw = (Path(root) / REVIEW_PATH).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != REVIEW_SHA256:
+            raise ValueError('Requirements identity requires the exact original Source roster')
+        roster = json.loads(raw)['selected_native_shapes']
+    wanted = candidates & roster.keys()
+    bindings = (_requirements_source_bindings(root, document, wanted)
+                if mapping_bindings is None and wanted else mapping_bindings or {})
+    for review in projected.get('representative_mechanisms', {}).values():
+        if 'candidate_sha256' in review:
+            review['candidate_sha256'] = 'waapi-skill.candidate-self-attestation/v1'
+        for identity in set(review['members']) & wanted:
+            binding = bindings.get(identity)
+            member = review['members'][identity]
+            if (not isinstance(binding, dict) or binding.get('branch_id') != identity
+                    or binding.get('native_shape_sha256') != roster[identity]
+                    or member.get('native_shape_sha256') != roster[identity]
+                    or member.get('mapping_sha256') != digest({key: value for key, value in binding.items() if key != 'evidence'})):
+                raise ValueError('Requirements identity Source member/mapping differs')
+            semantic = {key: deepcopy(value) for key, value in binding.items() if key != 'evidence'}
+            for key in SOURCE_DERIVED_DESCRIPTORS & semantic.keys():
+                descriptor = semantic[key]
+                if (not isinstance(descriptor, dict) or set(descriptor) != {'artifact', 'sha256'}
+                        or not isinstance(descriptor['artifact'], str)
+                        or not re.fullmatch('[0-9a-f]{64}', descriptor.get('sha256', ''))):
+                    raise ValueError('Requirements identity needs closed Source derived descriptors')
+                from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
+                parse_archive_relative_path(descriptor['artifact'])
+                semantic[key] = REQUIREMENTS_IDENTITY_KIND + ':' + key
+            member['mapping_sha256'] = digest(semantic)
+    return {'contract': REQUIREMENTS_IDENTITY_KIND, 'requirements': projected}
+
+
+def _requirements_source_bindings(root, requirements, wanted):
+    """Resolve sealed canonical mapping bytes, never category/candidate admission."""
+    import json
+    from tests.maintenance.branch_coverage_audit import digest
+    from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
+    root = Path(root).resolve()
+    path = root / 'docs/branch-coverage-evidence-index.json'
+    index = json.loads(path.read_bytes())
+    allowed = {'contract', 'base', 'entries', 'metadata_attachments', 'source_attachments',
+        'source_native_attachments', 'runtime_observation_attachments', 'qualified_runtime_read_attachments',
+        'condition_mechanism_attachments', 'condition_definition_attachments',
+        'installed_applicability_attachments', 'mapping_attachments'}
+    if (not isinstance(index, dict) or not {'contract', 'base', 'entries'} <= set(index)
+            or set(index) - allowed or index['contract'] != 'waapi-skill.branch-evidence-index/v1'
+            or not isinstance(index['base'], str) or Path(index['base']).is_absolute()
+            or not isinstance(index['entries'], list)):
+        raise ValueError('Requirements identity needs a closed canonical evidence index')
+    base = (path.parent / index['base']).resolve(strict=True)
+    if not base.is_relative_to(root):
+        raise ValueError('Requirements identity evidence base escapes repository')
+    def read(descriptor):
+        from tests.maintenance.branch_audit_completion import read_sealed_artifact
+        if not isinstance(descriptor, dict) or set(descriptor) != {'artifact', 'sha256'}:
+            raise ValueError('Requirements identity needs closed sealed descriptors')
+        name = parse_archive_relative_path(descriptor['artifact']).canonical
+        target = base / name
+        if target.is_symlink() or not target.resolve(strict=True).is_relative_to(base):
+            raise ValueError('Requirements identity descriptor escapes bundle')
+        return read_sealed_artifact(descriptor, base)
+    found = {}
+    descriptors = index.get('mapping_attachments', [])
+    if not isinstance(descriptors, list):
+        raise ValueError('Requirements identity needs closed mapping sidecars')
+    for descriptor in descriptors:
+        attachment = read(descriptor)
+        if (not isinstance(attachment, dict) or set(attachment) != {'contract', 'scope_kind',
+                'requirements_sha256', 'mechanisms', 'bindings', 'predecessors'}
+                or attachment['contract'] != 'waapi-skill.branch-mapping-attachment/v1'
+                or attachment['scope_kind'] != 'product'
+                or attachment['requirements_sha256'] != digest(requirements)
+                or not isinstance(attachment['bindings'], dict)):
+            raise ValueError('Requirements identity mapping document differs')
+        selected = wanted & attachment['bindings'].keys()
+        if found.keys() & selected:
+            raise ValueError('Requirements identity has duplicate Source mappings')
+        found.update({identity: attachment['bindings'][identity] for identity in selected})
+    if set(found) != wanted:
+        raise ValueError('Requirements identity Source mappings are missing')
+    return found
+
 
 def debug_control_component(root):
     """Read only the five accepted internal controls, never execute Debug APIs."""

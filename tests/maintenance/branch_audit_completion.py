@@ -151,7 +151,7 @@ def installed_obligations(root, *, digest, load):
     return records
 
 
-def candidate_identity(root, inventory, catalogs, *, digest):
+def candidate_identity(root, inventory, catalogs, *, digest, requirements_document=None, mapping_bindings=None):
     """Relevant source identity, independent of Git timestamps and local state."""
     import hashlib
     sources = dict(inventory['sources'])
@@ -168,16 +168,9 @@ def candidate_identity(root, inventory, catalogs, *, digest):
         path = 'docs/' + name
         if name == 'branch-coverage-requirements.json':
             from tests.maintenance.branch_coverage_audit import load
-            document = load(root / path)
-            mechanisms = document.get('representative_mechanisms', {})
-            if isinstance(mechanisms, dict) and mechanisms:
-                # Only self-attestation values are normalized. All policy,
-                # mapping, source and selected-proof semantics stay in identity;
-                # the final full requirements digest still includes each stamp.
-                for review in mechanisms.values():
-                    if isinstance(review, dict) and 'candidate_sha256' in review:
-                        review['candidate_sha256'] = 'waapi-skill.candidate-self-attestation/v1'
-            content = document
+            from tests.maintenance.branch_audit_mapping import requirements_identity_projection
+            document = load(root / path) if requirements_document is None else requirements_document
+            content = requirements_identity_projection(document, mapping_bindings, root=root)
         else:
             content = (root / path).read_text(encoding='utf-8')
         sources[path] = digest(content)
@@ -1003,6 +996,14 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
                         and set(sources) != set(binding.get('relevant_sources', [])))
             or not required <= set(sources) or sources != record.get('relevant_sources')):
         raise ValueError('equivalence omits original relevant source/behavior dependencies')
+    if proof_descriptor == binding.get('source_copy_program_equivalence'):
+        from tests.support.source_copy_native_evidence import source_program_equivalence
+        # This qualified accounting route checks the exact historical program
+        # origin and the separately reviewed live execution after-map. It never
+        # claims that the captured program executed the changed current bytes.
+        if source_program_equivalence(binding, descriptor, record, candidate, base) != proof_descriptor:
+            raise ValueError('Unbound Source accounting program transition')
+        return
     if proof.get('source_copy_review'):
         from tests.support.source_copy_native_evidence import validate_source_equivalence
         validate_source_equivalence(proof, branch, binding, root, evidence_base=base)
