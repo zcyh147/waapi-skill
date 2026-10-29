@@ -204,7 +204,7 @@ def test_scoped_native_reuse_does_not_relax_legacy_source_or_cache_guards(select
         source.write_bytes(original + b'\n# Unreviewed source change.\n')
         with pytest.raises(ValueError, match='exact current source'):
             runtime.runtime_source_successor()
-        with pytest.raises(ValueError, match='exact source/identity'):
+        with pytest.raises(ValueError, match='exact current source|exact source/identity'):
             runtime.selected_runtime_source_successor()
     finally:
         source.write_bytes(original)
@@ -311,6 +311,52 @@ def test_legacy_transition_tampering_is_rejected_by_portable_import(legacy_nativ
         monkeypatch.setattr(runtime, 'RUNTIME_SOURCE_TRANSITION_SHA', hashlib.sha256(altered.read_bytes()).hexdigest())
     with pytest.raises(ValueError, match='artifact digest mismatch|transition descriptors|transition delta/reasons|transition reasons'):
         audit.portable_binding_inputs(packet['index'], packet['requirements'])
+
+
+@pytest.mark.parametrize('lane', ['legacy', 'selected'])
+@pytest.mark.parametrize('damage', ['seal', 'original-locator', 'current-locator',
+    'missing-delta', 'wrong-before', 'missing-reason', 'duplicate-reason', 'current-map'])
+def test_current_package_transition_tampering_rejects_retained_native(
+        legacy_native_packet, native_output, monkeypatch, lane, damage):
+    """A resealed outer review cannot change the admitted sources or predecessor."""
+    from tests.support import runtime_observation_evidence as runtime
+    # Construct the real selected binding before damaging its admission inputs.
+    selected_binding, selected_branch = retained_input() if lane == 'selected' else (None, None)
+    transition = json.loads((audit.ROOT / runtime.CURRENT_RUNTIME_SOURCE_TRANSITION).read_bytes())
+    if damage == 'original-locator':
+        transition['original']['artifact'] = runtime.RUNTIME_SOURCE_SUCCESSOR
+    elif damage == 'current-locator':
+        transition['current']['artifact'] = REVIEW
+    elif damage == 'missing-delta':
+        transition['changed_files'].pop('skills/waapi-skill/wwise_waapi/operation_import.py')
+    elif damage == 'wrong-before':
+        transition['changed_files']['skills/waapi-skill/scripts/gateway.py']['before'] = '0' * 64
+    elif damage == 'missing-reason':
+        transition['reasons'].pop('registry_shared')
+    elif damage == 'duplicate-reason':
+        transition['reasons']['duplicate'] = deepcopy(transition['reasons']['registry_shared'])
+    elif damage == 'current-map':
+        sources = completion.read_sealed_artifact(transition['current'], audit.ROOT)
+        sources['skills/waapi-skill/scripts/run.py'] = '0' * 64
+        path = native_output / 'current-sources.json'
+        path.write_text(json.dumps(sources))
+        descriptor = {'artifact': path.relative_to(audit.ROOT).as_posix(),
+            'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+        transition['current'] = descriptor
+        monkeypatch.setattr(runtime, 'CURRENT_RUNTIME_PACKAGED_SOURCES', descriptor['artifact'])
+        monkeypatch.setattr(runtime, 'CURRENT_RUNTIME_PACKAGED_SOURCES_SHA', descriptor['sha256'])
+    altered = native_output / 'current-transition.json'
+    altered.write_text(json.dumps(transition))
+    monkeypatch.setattr(runtime, 'CURRENT_RUNTIME_SOURCE_TRANSITION', altered.relative_to(audit.ROOT).as_posix())
+    if damage != 'seal':
+        monkeypatch.setattr(runtime, 'CURRENT_RUNTIME_SOURCE_TRANSITION_SHA', hashlib.sha256(altered.read_bytes()).hexdigest())
+    if lane == 'legacy':
+        packet = legacy_native_packet
+        with pytest.raises(ValueError, match='artifact digest mismatch|transition descriptors|transition delta/reasons|transition reasons|exact current source'):
+            audit.portable_binding_inputs(packet['index'], packet['requirements'])
+    else:
+        result = native_result(selected_binding, selected_branch)
+        assert result[0] == 'missing', result
 
 
 @pytest.fixture(scope='module')
