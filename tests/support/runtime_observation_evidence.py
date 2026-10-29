@@ -1986,6 +1986,7 @@ def copy_runtime_common_base_file(source, destination):
 
 def write_runtime_composition(output, components):
     """Compose existing ordinary indices without changing nested descriptors."""
+    from tests.semantic.support.codex_archive_paths import ArchiveRelativePathError, parse_archive_relative_path
     output = Path(output); output.mkdir(parents=True, exist_ok=False)
     base = output / 'evidence'
     index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': 'evidence', 'entries': []}
@@ -2028,11 +2029,11 @@ def write_runtime_composition(output, components):
                 name = binding.get('native_only_base')
                 if name is None:
                     continue
-                if not isinstance(name, str):
-                    raise ValueError('Runtime native packet escapes its original base')
-                packet = (source / name).resolve()
-                if (Path(name).is_absolute() or not Path(name).parts
-                        or '..' in Path(name).parts or packet == source or not packet.is_relative_to(source)
+                identity = parse_archive_relative_path(name)
+                if identity.canonical != name:
+                    raise ArchiveRelativePathError('Runtime native packet must use its canonical POSIX archive identity')
+                packet = source.joinpath(*identity.parts).resolve()
+                if (packet == source or not packet.is_relative_to(source)
                         or not packet.is_dir()):
                     raise ValueError('Runtime native packet escapes its original base')
                 if packet in packet_roots:

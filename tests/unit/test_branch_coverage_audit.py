@@ -600,3 +600,40 @@ def test_runtime_composition_retains_sealed_applicability_transport_without_admi
     assert observed_policy == policy
     assert composed['installed_applicability_attachments'] == [descriptor]
     assert (target.parent / composed['base'] / PROOF_PATH).read_bytes() == original
+
+
+@pytest.mark.parametrize('locator', (
+    r'packets\packet-8',
+    r'packets/packet-8\proof',
+    'packets/../packet-8',
+    r'packets\..\packet-8',
+    r'C:\packets\packet-8',
+    r'C:packets\packet-8',
+    r'\\server\share\packet-8',
+    '/packets/packet-8',
+), ids=('backslash-relative', 'mixed-separators', 'posix-traversal', 'windows-traversal',
+        'drive-absolute', 'drive-relative', 'unc', 'posix-absolute'))
+def test_runtime_composition_rejects_noncanonical_native_packet_locator(tmp_path, locator):
+    """Portable packet identities reject before host filesystem interpretation."""
+    import json
+    from tests.semantic.support.codex_archive_paths import ArchiveRelativePathError
+    from tests.support.runtime_observation_evidence import write_json, write_runtime_composition
+    source = tmp_path / 'source'
+    source.mkdir()
+    packet = source / 'packets/packet-8'
+    packet.mkdir(parents=True)
+    (packet / 'proof.json').write_text('{"controlled_transport_only":true}', encoding='utf-8')
+    policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    binding = write_json(source / 'bindings.json', {'contract': 'waapi-skill.branch-bindings/v1',
+        'bindings': {'controlled-namespace': {'native_only_base': locator}}})
+    index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': 'source',
+        'entries': [{'id': 'controlled-namespace', 'bindings': binding,
+            'origin': {'bindings': binding,
+                'requirements': write_json(source / 'requirements.json', policy),
+                'program': write_json(source / 'program.json', {'controlled_transport_only': True}),
+                'capture': write_json(source / 'capture.json', {'controlled_transport_only': True})}}]}
+    index_path = tmp_path / 'index.json'
+    index_path.write_text(json.dumps(index), encoding='utf-8')
+    with pytest.raises(ArchiveRelativePathError):
+        write_runtime_composition(tmp_path / 'projection', [(index_path, policy)])
+    assert not (tmp_path / 'projection/index.json').exists()
