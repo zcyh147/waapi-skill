@@ -331,3 +331,27 @@ Generation and focused validation results for this reconciliation are recorded
 below only after the corresponding commands actually finish. Canonical branch
 coverage index/requirements, Source/native/applicability proofs, class-replay
 bridges and current CODE receipts are outside this publication slice.
+
+
+### #195 completed generation and focused validation
+
+The existing full-surface release writer and its `--check`, and the existing
+interface-depth generator and its `--check`, all returned 0. The release report
+changes only its typed `source_inventory` digest; all eight audit lists remain
+empty and construction counts are unchanged. The depth summary, all 897 native
+rows, all ownership/disposition/completed-family rules and all 218 interned
+field-contract records are unchanged. The 35-record named argument table
+replaces two records and retains 33 exact hashes; 45 existing operation rows
+update contract and/or argument-contract digests. No expected count was edited.
+
+On committed source `6bbe0448f194fb60a919afa084315adc0e23e487`, the exact nine
+previously failing typed/release/depth cases plus seven existing definition,
+reference/keyword, ownership, unfinished-layout and closed-child guards passed:
+**16 passed in 61.37 seconds**, exit 0. The two representative pre-publication
+controls had failed in 0.97 seconds with the original typed-surface/parser-seal
+errors. These focused checks used the locked Poetry interpreter through
+`ci/test.sh --mode nonlive` with exact node selection; they started neither
+Wwise nor Fresh. No full Program/Non-live gate, branch-coverage generation,
+canonical evidence import/evaluation, proof refresh or functional credit
+transfer is claimed. Current source admission and the original failed gates
+remain separate work under #195.
