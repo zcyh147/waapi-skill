@@ -1061,8 +1061,8 @@ def test_verification_rejects_unsealed_or_mismatched_property_validation() -> No
 
 
 def test_plugin_request_rejects_guessed_or_unbounded_fields() -> None:
+    assert normalize_plugin_creation({"kind": "metadata", "name": "X", "class_id": 1}).kind == "metadata"
     invalid_payloads = [
-        {"kind": "metadata", "name": "X", "class_id": 1},
         {"kind": "source", "name": "X", "class_id": True},
         {"kind": "source", "name": "X", "class_id": 0},
         {"kind": "source", "name": "X", "class_id": 2**32},

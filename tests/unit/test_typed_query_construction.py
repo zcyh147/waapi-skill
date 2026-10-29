@@ -1040,14 +1040,10 @@ def test_query_schema_covers_every_named_native_return_through_closed_outputs(tm
         assert client.calls == [("ak.wwise.core.object.get", {"waql": 'from object "{11111111-1111-1111-1111-111111111111}"'},
             {"return": ["id", "name", "type", "path", field]})]
         covered_enum.add(field)
-    # The remaining typo conflicts with the separately documented spelling;
-    # the twelve explicitly admitted enum choices above assert no equivalence.
-    pending_enum = {}
-    if version == "2025.1":
-        pending_enum.update(suppportsRandomizer="spelling_conflicts_with_documented_supportsRandomizer")
+    # Exact enum-declared spellings, including 2025.1 suppportsRandomizer,
+    # are finite selectable choices without an alias-equivalence claim.
     enum = set(definitions["documents"]["waapi_definitions.json"]["definitions"]["returnExpression"]["items"]["anyOf"][0]["enum"])
-    assert enum - (covered | covered_enum) == set(pending_enum)
-    assert not set(pending_enum).intersection(covered | covered_enum)
+    assert enum - (covered | covered_enum) == set()
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])

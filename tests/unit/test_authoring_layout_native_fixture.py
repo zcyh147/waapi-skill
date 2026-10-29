@@ -374,7 +374,8 @@ def _media_diagnostic_host(tmp_path, monkeypatch, *, names=None, fail_names=Fals
                 return {'return': [{'name': 'CrankcaseAudio REV', 'type': 'Source', 'classId': 27267154}]}
             if uri == 'ak.wwise.core.log.get':
                 self.calls.append((uri, args, options))
-                return {'items': [{'message': 'Retained diagnostic warning', 'severity': 'Warning'}]}
+                return {'items': [{'message': 'Retained diagnostic warning', 'severity': 'Warning',
+                    'time': 0, 'messageId': 'diagnostic-warning'}]}
             return super().call(uri, args, options)
     client = Client()
     project = tmp_path / 'project' / 'Sandbox.wproj'

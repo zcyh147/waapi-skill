@@ -415,8 +415,8 @@ def test_creation_recovery_rejects_an_older_live_authoring_version_before_contex
 
 
 @pytest.mark.parametrize(('version', 'digest'), [
-    ('2024.1', 'ef6edeaae18bf7b879acec3aca0f4353bdf220827791351203812d2ef922bf90'),
-    ('2025.1', 'b2bc3ec3e63e151ee0d52748b5b5a2f25fa7777179b0763669b2b2f76753fa50'),
+    ('2024.1', 'e15f1d2e6dbcd0fe78d6ef86fd4892e3e6c8bac77c906c9436d379589dd9f5a7'),
+    ('2025.1', '66f24416914c9649311d287a8289bf35683af5d45c2e26134a05914516ee6a01'),
 ])
 def test_wafm_public_schema_reuses_one_fresh_catalog_without_changing_content(tmp_path, monkeypatch, version, digest):
     from pathlib import Path
