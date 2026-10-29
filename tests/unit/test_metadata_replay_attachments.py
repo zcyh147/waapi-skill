@@ -521,9 +521,10 @@ def test_r54_historical_replay_controls_start_from_valid_original_and_current_fl
         binding['category_inputs']['live_metadata']=record['category_inputs']
     elif damage=='attribution':record['source_bridge']['attribution']='current_native'
     elif damage=='product-git':
-        # This committed source contains the newly added module too: rejection
-        # must prove different source bytes, not merely a missing historical file.
-        wrong='411e8173949020bad26e4302f1e9428a21bcac7d'
+        # The reviewed runtime pin contains the complete current roster, but
+        # predates this replay reader/producer repair. Prove different owned
+        # bytes rather than rejection caused by an absent historical filename.
+        wrong='8c912c50c18b88f90b46fb299a491b3b88233471'
         assert producer.git_source_seals(wrong,program['relevant_sources'])!=program['relevant_sources']
         record['scope_kind']=program['scope_kind']='product';program['git_candidate']=wrong
     elif damage=='teardown':
@@ -933,7 +934,8 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
         return completion.evidence_result(descriptor,branch,'c'*64,'live_metadata','controlled',tmp_path,binding,
             source_root=audit.ROOT,reference_edges=capture['edges'])
     assert result() == ('passed',None)
-    source_pin = '7346d2f0f22e799e5324ebaa00e6e80e3eb03180'
+    # Exact current packaged runtime; original R51 source/native maps stay raw.
+    source_pin = '8c912c50c18b88f90b46fb299a491b3b88233471'
     packets = {}
     for name in ('operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py',
                  'object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py',
