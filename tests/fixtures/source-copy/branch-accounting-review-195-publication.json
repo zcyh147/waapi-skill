@@ -126,7 +126,7 @@
     "docs/branch-coverage-condition-sources.json": "b51b1227a381938be503fb9065928a2fb8928808fe24a864679305c647bd0fcd",
     "docs/branch-coverage-current-business.json": "e8cef211be75c0435a0dafe7d7694043cfbe30256634a300da287192e0ee3e37",
     "docs/branch-coverage-ownership.json": "d4f55b82d8da83d18422aa027c3c134b6ab52d950827a7c3cc2aa50679859d9c",
-    "docs/branch-coverage-requirements.json": "e0b7ff81f7224ed23690048bd8df641dc520e17039a6b0175c2851a6ab0810f6",
+    "docs/branch-coverage-requirements.json": "15c4424bd0fe606773dd76fe766c54ee3a8aef31e8e973d11761a8d3b2055348",
     "docs/interface-depth-inventory.json": "619f5d540d0266a7fb1eb325ac8439781e32c1074b21419dbab185b67e74b374",
     "docs/interface-depth-review-policy.json": "1184a48181cc28c73c2168f5b375c5c014ba9144a78b7cbd44eb1f260355b70e",
     "skills/waapi-skill/resources/manifest/2021.1/authoring-ui-commands-supplement.json": "dc07c4bac1c90bc92bfecf59d12ddc39a0bf7aa95f502f6c576977cb7a9764b8",
@@ -204,15 +204,15 @@
     "tests/fixtures/source-copy/branch-successor-review-r123.json": "4f2ccb1aad3e3826b0db88e484919dce06b909d6136a5a3794dc8fc469c2f714",
     "tests/fixtures/source-copy/branch-successor-review-r92.json": "278fcf8f3f404aba71d12995a6e42cc447bdabb2606800f6456a2751f9bd032f",
     "tests/maintenance/__init__.py": "93f800e18500f291b23ed63fc6eb6a36245cd75a3605534a564c4913e05c1104",
-    "tests/maintenance/branch_audit_completion.py": "7ff5f378467f6b1b8dbcae9fd8d7c93019534979e48a4ea961a77c73c027e7d5",
+    "tests/maintenance/branch_audit_completion.py": "bb75b7f40bb8252574fa8b6d16fe751def3e3551317901b63031042896e4d9a0",
     "tests/maintenance/branch_audit_mapping.py": "c3966b611d0b70219967761d041cffff01500c96a573255a256bf908d6acc74e",
-    "tests/maintenance/branch_coverage_audit.py": "3e82dfa6deefad025532628e48a1715ba621b7cc7bac41f9b5136d9f7107e2f5",
+    "tests/maintenance/branch_coverage_audit.py": "c7ac210c0d642e1b238dc592f707eaa1496e8136beb528fdfcb6dcdda58b5c47",
     "tests/maintenance/interface_depth_inventory.py": "212ca04d24244e043898656332db0a73d0d207058f7d26c9cbfb633c20a83280",
     "tests/maintenance/source_identity.py": "14d65a3c776f4d18a52e5d525b58bec55b1fd4710c7870ff1bbbbe3ce4cb9d45",
-    "tests/support/condition_completion_mapping.py": "68ee0fbe9c682480ef74ce06162d9c289c508c2272adb71e7245d038b18a843a",
+    "tests/support/condition_completion_mapping.py": "454f2161ef805f1b61f72c0b49cf65b51cbfd27eea4ad1dece4e371a80e9be4d",
     "tests/support/gateway_config.py": "0958cead272816cf301248a8c024584765e2c28728ce57acad2374aaeff82b57",
     "tests/support/media_id_branch_evidence.py": "b52cc372d0462cb7a8cfc3a4656bb65524933d753a69ed8552e89ec01b2f6d77",
-    "tests/support/new_condition_completion.py": "ee989f858d4ccacb6b8328ee7b114b4cbbb463f844f950f43fa7665506eda912",
+    "tests/support/new_condition_completion.py": "6d4ef487d4cfcac624cb2f5a5a3f3bd013770b1076b5215dd93ff9c863313f3d",
     "tests/support/platform_filesystem.py": "827467a6bb7af0fb74827841fbf8c67b79a020bc0563b4f73504b64fbfb7b95d",
     "tests/support/source_copy_branch_evidence.py": "de255dc11e0cb81e625eb23b1a4c63ac61f61529673b8bf1f609988470ee974a",
     "tests/support/source_copy_native_evidence.py": "ed8c6998a997da60f8a9d862ee487c2ba4fceb4fa026994c8ffe881bbe8d7a04",
@@ -1670,8 +1670,8 @@
   "source_changes": {
     "docs/branch-coverage-requirements.json": {
       "captured_sha256": "f8743423b43e06eb07bfe383193a0adfa61b794bab3c2d91bffe04271d36b638",
-      "current_sha256": "e0b7ff81f7224ed23690048bd8df641dc520e17039a6b0175c2851a6ab0810f6",
-      "reason": "Current requirements after-seal is explicitly the shared requirements-publication-identity/v1 semantic projection; historical captured before-seal remains raw. Full final requirements/member/descriptor seals are independently enforced at ordinary consumer admission."
+      "current_sha256": "15c4424bd0fe606773dd76fe766c54ee3a8aef31e8e973d11761a8d3b2055348",
+      "reason": "Current requirements after-seal is explicitly the shared requirements-publication-identity/v1 semantic projection; historical captured before-seal remains raw. Full final requirements/member/descriptor seals are independently enforced at ordinary consumer admission. Final staging: Actual final272313 policy/member mapping staging includes all60 authenticated stable current metadata selection views and118 protected CODE identities. Shared requirements identity remains exact except already-approved four Source-derived descriptors/selfstamps; historical before-seal stays raw. Current13 retained CODE anchors still require their actual new receipts."
     },
     "docs/interface-depth-inventory.json": {
       "captured_sha256": "881b3737308e0654e0119a903a10e62e75a5d7ce15a5be8e8249ca9646d60636",
@@ -1705,8 +1705,8 @@
     },
     "tests/maintenance/branch_audit_completion.py": {
       "captured_sha256": "e5ab72ba26cf4f392b8982120fb91bb1622241ee42afca8272453a524a9c20cf",
-      "current_sha256": "7ff5f378467f6b1b8dbcae9fd8d7c93019534979e48a4ea961a77c73c027e7d5",
-      "reason": "Candidate requirements source uses the shared semantic projection only; full category and representative completion checks retain their complete identities. Followup: Reviewed metadata8c5a50 current-only semantic requirements/Git ownership bridge preserves raw historical R51/R54/R55 maps, and keeps Source category and representative admission exact. Accounting helper change only."
+      "current_sha256": "bb75b7f40bb8252574fa8b6d16fe751def3e3551317901b63031042896e4d9a0",
+      "reason": "Candidate requirements source uses the shared semantic projection only; full category and representative completion checks retain their complete identities. Followup: Reviewed metadata8c5a50 current-only semantic requirements/Git ownership bridge preserves raw historical R51/R54/R55 maps, and keeps Source category and representative admission exact. Accounting helper change only. Final staging: Reviewed0c0d71f9 exact raw/semantic metadata selector view checks and strict canonical JSON comparisons; reviewed3e823374 new-condition-r4 candidate hook; prepared actual app-r8 candidate hook. No Source captured/native execution changed."
     },
     "tests/maintenance/branch_audit_mapping.py": {
       "captured_sha256": "b69341d96185b92127751aafd3bcdf3914be391660c46af8c61dae1b2facd4ea",
@@ -1715,18 +1715,18 @@
     },
     "tests/maintenance/branch_coverage_audit.py": {
       "captured_sha256": "6a7046d2b66fdeb8718b870e85457d59043e3deaf66f46f4f4ef09a2d5543a39",
-      "current_sha256": "3e82dfa6deefad025532628e48a1715ba621b7cc7bac41f9b5136d9f7107e2f5",
-      "reason": "Existing portable importer carries each exact four-descriptor importing origin into Source accounting admission; legacy lanes keep their existing capture content. Current retained native importer forwards the reviewed portable evidence base; original proof identity and source guards remain exact."
+      "current_sha256": "c7ac210c0d642e1b238dc592f707eaa1496e8136beb528fdfcb6dcdda58b5c47",
+      "reason": "Existing portable importer carries each exact four-descriptor importing origin into Source accounting admission; legacy lanes keep their existing capture content. Current retained native importer forwards the reviewed portable evidence base; original proof identity and source guards remain exact. Final staging: Reviewed0c0d71f9 portable metadata import derives the exact authenticated stable CURRENT selection view; raw receipts/history and full source/origin checks remain separate and exact. No Source/category/general mapping relaxation."
     },
     "tests/support/condition_completion_mapping.py": {
       "captured_sha256": null,
-      "current_sha256": "68ee0fbe9c682480ef74ce06162d9c289c508c2272adb71e7245d038b18a843a",
-      "reason": "Exact actual NEW r3 program archive digest pin; parser/boundary function bytes unchanged."
+      "current_sha256": "454f2161ef805f1b61f72c0b49cf65b51cbfd27eea4ad1dece4e371a80e9be4d",
+      "reason": "Exact actual NEW r3 program archive digest pin; parser/boundary function bytes unchanged. Final staging: Reviewed3e823374 retains existing native review/archive while admitting exact three reviewed runtime deltas through existing source reconciliation; actual new-condition-r4 proof pin only. No original/native verdict restamp."
     },
     "tests/support/new_condition_completion.py": {
       "captured_sha256": null,
-      "current_sha256": "ee989f858d4ccacb6b8328ee7b114b4cbbb463f844f950f43fa7665506eda912",
-      "reason": "Reviewed NEW-condition r3 correspondence and explicit primary-source closure, independent of Source execution."
+      "current_sha256": "6d4ef487d4cfcac624cb2f5a5a3f3bd013770b1076b5215dd93ff9c863313f3d",
+      "reason": "Reviewed NEW-condition r3 correspondence and explicit primary-source closure, independent of Source execution. Final staging: Reviewed3e823374 actual current public r4 program successor with five-version268-source/55-resource closure; r1/r2/r3 preserved, no new native/Fresh evidence."
     },
     "tests/support/source_copy_native_evidence.py": {
       "captured_sha256": "94b2dfca59e04a63c5e986c620412a9616fba060d482dccaed58e77611788111",
