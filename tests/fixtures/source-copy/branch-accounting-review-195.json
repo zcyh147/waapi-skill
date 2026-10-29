@@ -203,7 +203,7 @@
     "tests/fixtures/source-copy/branch-successor-review-r123.json": "4f2ccb1aad3e3826b0db88e484919dce06b909d6136a5a3794dc8fc469c2f714",
     "tests/fixtures/source-copy/branch-successor-review-r92.json": "278fcf8f3f404aba71d12995a6e42cc447bdabb2606800f6456a2751f9bd032f",
     "tests/maintenance/__init__.py": "93f800e18500f291b23ed63fc6eb6a36245cd75a3605534a564c4913e05c1104",
-    "tests/maintenance/branch_audit_completion.py": "bc2cc61682ad5cda9748a57f3f91d1ec910d74fd88adf4c62e559f44ea8352cc",
+    "tests/maintenance/branch_audit_completion.py": "0ef5d98ad414861f1a3788c84e1ff7669f19df08086992417e086c71e2b88642",
     "tests/maintenance/branch_audit_mapping.py": "b69341d96185b92127751aafd3bcdf3914be391660c46af8c61dae1b2facd4ea",
     "tests/maintenance/branch_coverage_audit.py": "ab17355ade04950095fbd8da7f936aa7e03f83f77aca6f39f882dbf50e9cbbc8",
     "tests/maintenance/interface_depth_inventory.py": "212ca04d24244e043898656332db0a73d0d207058f7d26c9cbfb633c20a83280",
@@ -957,8 +957,8 @@
     },
     "tests/maintenance/branch_audit_completion.py": {
       "captured_sha256": "e5ab72ba26cf4f392b8982120fb91bb1622241ee42afca8272453a524a9c20cf",
-      "current_sha256": "bc2cc61682ad5cda9748a57f3f91d1ec910d74fd88adf4c62e559f44ea8352cc",
-      "reason": "Retain NEW r3 candidate roster and route only a validated Source accounting program descriptor; exclude exactly that descriptor self-reference from binding semantics. Since integration 2bbea8b6, the sole additional change passes retained_member only on the native qualified_runtime_read_attachment branch. Source source_copy_native_proof accounting does not enter that branch; original88 execution, program/native facts and receipts are unchanged."
+      "current_sha256": "0ef5d98ad414861f1a3788c84e1ff7669f19df08086992417e086c71e2b88642",
+      "reason": "Retain NEW r3 candidate roster and route only a validated Source accounting program descriptor; exclude exactly that descriptor self-reference from binding semantics. Since integration 2bbea8b6, the sole additional change passes retained_member only on the native qualified_runtime_read_attachment branch. Source source_copy_native_proof accounting does not enter that branch; original88 execution, program/native facts and receipts are unchanged. Applicability r5 preparation additionally adds only applicability-current-program-r5.json.gz to candidate_identity membership before capture. This is candidate accounting membership, not Source execution or a change to Source evidence admission; original 88a6 facts, 104 capture sources and 689 execution sources remain exact."
     },
     "tests/maintenance/branch_coverage_audit.py": {
       "captured_sha256": "6a7046d2b66fdeb8718b870e85457d59043e3deaf66f46f4f4ef09a2d5543a39",

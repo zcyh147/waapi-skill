@@ -16,10 +16,10 @@ from tests.maintenance.branch_coverage_audit import digest, load
 from tests.maintenance.branch_audit_completion import installed_obligations
 
 VERSIONS = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
-PROOF_PATH = 'tests/fixtures/metadata-conditions/applicability-current-program-r4.json.gz'
-PROOF_SHA256 = '4bbd106619b52f5dc916d4b64617d8286f1fe9911ab2ef62ffdd8ff888d39bcd'
-PREVIOUS_PROOF = {'path': 'tests/fixtures/metadata-conditions/applicability-current-program-r3.json.gz',
-    'sha256': 'c64be70da744547e538f3faccac069ce04e4d4ea7c2239c6baf43f9cb508dec7'}
+PROOF_PATH = 'tests/fixtures/metadata-conditions/applicability-current-program-r5.json.gz'
+PROOF_SHA256 = 'd226a3866aa532aff7266967c8a8d545acb7c22a88edf68a35e6b7c154c8c39e'
+PREVIOUS_PROOF = {'path': 'tests/fixtures/metadata-conditions/applicability-current-program-r4.json.gz',
+    'sha256': '4bbd106619b52f5dc916d4b64617d8286f1fe9911ab2ef62ffdd8ff888d39bcd'}
 SNAPSHOT = 'tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz'
 SDK_PATH = 'tests/fixtures/metadata-conditions/applicability-sdk-sources.json.gz'
 SDK_SHA256 = '646336b2e4cb7324831d6a8b5c4be5b00417764eaf044adeccb6719ddd2a771b'

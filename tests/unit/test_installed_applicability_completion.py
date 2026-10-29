@@ -339,7 +339,12 @@ def test_portable_applicability_join_keeps_approved_limits_separate_from_executi
     assessment = evaluate_coverage(ROOT, {'routes': [], 'native_coverage': {
         'candidate_sha256': 'c' * 64, 'catalogs': {}, 'routes': [], 'obligations': result['branches']}},
         imported, digest=digest, evidence_base=base, requirements_document=subset)
-    assert assessment['completion']['complete'] is False
+    # Completion here covers this source-applicability subset only. Accepted
+    # creation limits resolve its remaining scope without granting execution.
+    assert assessment['completion']['complete'] is True
+    assert assessment['completion']['routes'] == 0
+    assert assessment['installed_applicability']['native_runs'] == 0
+    assert assessment['installed_applicability']['direct_recipient_execution'] == 'not_observed'
     assert assessment['completion']['obligations'] == 1664
     pending = [r for r in assessment['obligations'] if r['state'] == 'implementation_dependency']
     assert pending == []
@@ -348,6 +353,16 @@ def test_portable_applicability_join_keeps_approved_limits_separate_from_executi
     assert len(limits) == 66
     assert all(r['exclusion']['native_absence_claim'] is False and
         r['exclusion']['execution_credit'] is False for r in limits)
+    mixed = [r for r in assessment['obligations'] if
+        'approved_creation_boundary' in r['applicability_correspondence']]
+    assert {(r['version'], r['business_dimensions']['class_name']) for r in mixed} == {
+        ('2021.1', 'Curve'), ('2021.1', 'MultiSwitchEntry'), ('2022.1', 'MultiSwitchEntry'),
+        ('2023.1', 'CustomState'), ('2024.1', 'CustomState'), ('2025.1', 'CustomState'),
+        ('2025.1', 'StateGroupInfo')}
+    assert all(r['state'] == 'source_definition_verified' and r['requirements'] == ['program']
+        and r['applicability_correspondence']['operations'] for r in mixed)
+    assert all(r['applicability_correspondence']['approved_creation_boundary']['native_absence_claim'] is False
+        and r['applicability_correspondence']['approved_creation_boundary']['execution_credit'] is False for r in mixed)
     assert all(r.get('direct_recipient_native_effect') == 'not_observed' for r in assessment['obligations'])
     assert not any(r['state'] in {'verified', 'proven_native_absence'} for r in assessment['obligations'])
     assert load(base / 'assessment.json')['completion'] == assessment['completion']
@@ -405,27 +420,28 @@ def test_changed_invoked_code_or_resource_invalidates_shared_proof(tmp_path, sou
     from tests.support.applicability_completion_mapping import program_review
     for directory in ('tests', 'docs'):
         create_symlink_or_skip(tmp_path / directory, ROOT / directory, target_is_directory=True)
-    for directory in ('scripts', 'wwise_waapi', 'resources'):
+    for directory in ('scripts', 'wwise_waapi', 'resources', 'references'):
         for original in (ROOT / 'skills/waapi-skill' / directory).rglob('*'):
             if not original.is_file() or '__pycache__' in original.parts:
                 continue
-            relative = original.relative_to(ROOT)
-            target = tmp_path / relative
+            target = tmp_path / original.relative_to(ROOT)
             target.parent.mkdir(parents=True, exist_ok=True)
-            if relative.as_posix() == source:
-                raw = original.read_bytes()
-                if damage == 'missing':
-                    continue
-                if damage == 'removed-route':
-                    lines = raw.splitlines(keepends=True)
-                    selected = [line for line in lines if line.startswith(b'    ("object.createPlugin",')]
-                    assert len(selected) == 1
-                    raw = raw.replace(selected[0], b'', 1)
-                else:
-                    raw += b'\nchanged-proof-input\n'
-                target.write_bytes(raw)
-            else:
-                create_symlink_or_skip(target, original)
+            create_symlink_or_skip(target, original)
+    # Establish a valid unchanged closure before introducing exactly one defect.
+    # Missing retained primary references must not make this negative pass.
+    program_review(tmp_path)
+    target = tmp_path / source
+    raw = target.read_bytes()
+    target.unlink()
+    if damage != 'missing':
+        if damage == 'removed-route':
+            lines = raw.splitlines(keepends=True)
+            selected = [line for line in lines if line.startswith(b'    ("object.createPlugin",')]
+            assert len(selected) == 1
+            raw = raw.replace(selected[0], b'', 1)
+        else:
+            raw += b'\nchanged-proof-input\n'
+        target.write_bytes(raw)
     with pytest.raises(ValueError, match='source closure'):
         program_review(tmp_path)
 
