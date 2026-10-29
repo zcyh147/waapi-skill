@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "829f71b2cca1e2779e14f7c681cc3802b94945f9a9a9e111c070c82478151150",
+  "inventory_sha256": "36bb15ba469c614c5428ef847214d1466d2b6ee49d012bd405936bc52a997edc",
   "lanes": [
     {
       "construction_shape": "inline",
@@ -29192,6 +29192,146 @@
           "roles": []
         },
         "blueprint_schema": {
+          "$defs": {
+            "data_value": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "string"
+                    },
+                    "value": {
+                      "maxLength": 4096,
+                      "pattern": "^[^\\u0000]*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "boolean"
+                    },
+                    "value": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "integer"
+                    },
+                    "value": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "number"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "null"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "entries": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "value": {
+                            "$ref": "#/$defs/data_value"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "value"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 128,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "const": "object"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "entries"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "$ref": "#/$defs/data_value"
+                      },
+                      "maxItems": 128,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "const": "array"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "$id": "urn:waapi-skill:layout-blueprint:v1",
           "additionalProperties": false,
           "gateway_bounds": {
             "draft_seal_frame_reserve_bytes": 32768,
@@ -29201,12 +29341,100 @@
             "maximum_rendered_terminal_request_utf8_bytes": 262144,
             "maximum_serialized_layout_utf8_bytes": 114688,
             "maximum_terminal_stdout_utf8_bytes": 286720,
+            "maximum_view_data_depth": 8,
+            "maximum_view_data_nodes": 4096,
             "readback_frame_reserve_bytes": 147456,
             "terminal_capacity_scope": "exact closed setLayout blueprint only; ordinary terminal budget remains 24 KiB"
           },
           "properties": {
             "contract": {
               "const": "waapi-skill.layout-blueprint/v1"
+            },
+            "floating_windows": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "placement": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "bottom": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "flags": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "left": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "maximum_x": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "maximum_y": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "minimum_x": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "minimum_y": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "right": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "state": {
+                        "enum": [
+                          "normal",
+                          "maximized",
+                          "minimized"
+                        ]
+                      },
+                      "top": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "flags",
+                      "minimum_x",
+                      "minimum_y",
+                      "maximum_x",
+                      "maximum_y",
+                      "left",
+                      "top",
+                      "right",
+                      "bottom"
+                    ],
+                    "type": "object"
+                  },
+                  "root": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "placement"
+                ],
+                "type": "object"
+              },
+              "maxItems": 128,
+              "type": "array"
             },
             "nodes": {
               "items": {
@@ -29227,6 +29455,9 @@
                         "maxLength": 4096,
                         "pattern": "^[^\\u0000]*$",
                         "type": "string"
+                      },
+                      "include_type": {
+                        "type": "boolean"
                       },
                       "key": {
                         "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
@@ -29264,10 +29495,35 @@
                   {
                     "additionalProperties": false,
                     "properties": {
+                      "data_entries": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "name": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "value": {
+                              "$ref": "#/$defs/data_value"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "value"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 128,
+                        "type": "array"
+                      },
                       "height": {
                         "maxLength": 4096,
                         "pattern": "^[^\\u0000]*$",
                         "type": "string"
+                      },
+                      "include_type": {
+                        "type": "boolean"
                       },
                       "key": {
                         "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
@@ -29300,12 +29556,893 @@
                       "selection_channel"
                     ],
                     "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "bottom_editor_state": {
+                        "enum": [
+                          "normal",
+                          "maximized",
+                          "minimized"
+                        ]
+                      },
+                      "editor_priority": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "effect_index": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "include_type": {
+                              "type": "boolean"
+                            },
+                            "plugin_identifier": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "view_identifier": {
+                              "description": "Serialized editor identifier, not authority to target a live view.",
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "view_identifier",
+                            "plugin_identifier",
+                            "effect_index"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 128,
+                        "type": "array"
+                      },
+                      "editor_state": {
+                        "enum": [
+                          "normal",
+                          "maximized",
+                          "minimized"
+                        ]
+                      },
+                      "height": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "key": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "object_panel"
+                      },
+                      "label": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "preferred_heights": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "effect_index": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "height": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "plugin_identifier": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "view_identifier": {
+                              "description": "Serialized editor identifier, not authority to target a live view.",
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "view_identifier",
+                            "plugin_identifier",
+                            "effect_index",
+                            "height"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 128,
+                        "type": "array"
+                      },
+                      "sidebar": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "collapse_state": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "width": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "width",
+                          "collapse_state"
+                        ],
+                        "type": "object"
+                      },
+                      "width": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "kind",
+                      "label"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "height": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "key": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "object_tabs"
+                      },
+                      "label": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "width": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "kind",
+                      "label"
+                    ],
+                    "type": "object"
                   }
                 ]
               },
               "maxItems": 128,
-              "minItems": 1,
+              "minItems": 0,
               "type": "array"
+            },
+            "position_history": {
+              "additionalProperties": false,
+              "properties": {
+                "audio_devices": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "effects": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "fallback": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "last_positions": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "metadata": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "object_types": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "plugin_inner_objects": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "source_plugins": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                }
+              },
+              "type": "object"
             },
             "root": {
               "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
@@ -29320,10 +30457,21 @@
           },
           "required": [
             "contract",
-            "root",
             "nodes"
           ],
-          "type": "object"
+          "source_interpretations": {
+            "Element": "The retained capital OneOf lists the supported element kinds; the source definition is not globally rewritten.",
+            "SideBar": "The reflected singular sidebar remains available. The 2024 enum is a malformed scalar SideBar; the local constructor uses that exact tag, without rewriting the source schema.",
+            "ViewHolder": "Floating windows follow the explicit ViewHolder fields; conflicting allOf Element is retained as unresolved source semantics.",
+            "native_acceptance": "Closed construction and retained read serialization do not prove native setLayout input acceptance."
+          },
+          "type": "object",
+          "unresolved_inputs": {
+            "object_panel.sidebar_left,sidebar_right": "Retained read-only rows contain SideBarLeft/SideBarRight and Visibility; the request definition exposes only SideBar. No input alternative is inferred.",
+            "object_tabs.children": "Retained read-only ObjectTabPanel rows contain @Children; the request definition forbids this property. No input alternative is inferred.",
+            "preferred_heights": "Requests use the reflected unprefixed editor identifiers. Readbacks may use the three retained Editor-prefixed aliases; this does not establish their request legality.",
+            "splitter": "The request definition requires @Children but declares no such property and forbids extra properties. Retained read-only childless @type/ID rows do not establish setLayout input legality."
+          }
         },
         "contract": "waapi-skill.authoring-layout-business/v1",
         "declaration": {
@@ -29925,7 +31073,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -30203,7 +31351,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -30509,7 +31657,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -33981,7 +35129,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -34433,7 +35581,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -34880,7 +36028,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -35158,7 +36306,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -35446,7 +36594,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -35725,7 +36873,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -46469,7 +47617,7 @@
         "selection_semantics": {
           "empty_selection": "send native layouts: []",
           "native_omission": "omit native layouts",
-          "resource_boundary": "at most 32 selected handle entries; larger native lists remain an implementation obligation",
+          "resource_boundary": "Gateway capacity limit: at most 32 selected handle entries; this is not a native capacity limit or a claim of unlimited native-input parity",
           "selected_layouts": "send exact discovered names in supplied order, preserving repeats",
           "unspecified_native_scope": "Matching native schema/docs do not define the omission/empty scope; neither is labelled all or none."
         },
@@ -46554,6 +47702,146 @@
           "roles": []
         },
         "blueprint_schema": {
+          "$defs": {
+            "data_value": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "string"
+                    },
+                    "value": {
+                      "maxLength": 4096,
+                      "pattern": "^[^\\u0000]*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "boolean"
+                    },
+                    "value": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "integer"
+                    },
+                    "value": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "number"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "null"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "entries": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "value": {
+                            "$ref": "#/$defs/data_value"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "value"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 128,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "const": "object"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "entries"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "$ref": "#/$defs/data_value"
+                      },
+                      "maxItems": 128,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "const": "array"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "$id": "urn:waapi-skill:layout-blueprint:v1",
           "additionalProperties": false,
           "gateway_bounds": {
             "draft_seal_frame_reserve_bytes": 32768,
@@ -46563,12 +47851,100 @@
             "maximum_rendered_terminal_request_utf8_bytes": 262144,
             "maximum_serialized_layout_utf8_bytes": 114688,
             "maximum_terminal_stdout_utf8_bytes": 286720,
+            "maximum_view_data_depth": 8,
+            "maximum_view_data_nodes": 4096,
             "readback_frame_reserve_bytes": 147456,
             "terminal_capacity_scope": "exact closed setLayout blueprint only; ordinary terminal budget remains 24 KiB"
           },
           "properties": {
             "contract": {
               "const": "waapi-skill.layout-blueprint/v1"
+            },
+            "floating_windows": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "placement": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "bottom": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "flags": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "left": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "maximum_x": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "maximum_y": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "minimum_x": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "minimum_y": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "right": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "state": {
+                        "enum": [
+                          "normal",
+                          "maximized",
+                          "minimized"
+                        ]
+                      },
+                      "top": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "flags",
+                      "minimum_x",
+                      "minimum_y",
+                      "maximum_x",
+                      "maximum_y",
+                      "left",
+                      "top",
+                      "right",
+                      "bottom"
+                    ],
+                    "type": "object"
+                  },
+                  "root": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "placement"
+                ],
+                "type": "object"
+              },
+              "maxItems": 128,
+              "type": "array"
             },
             "nodes": {
               "items": {
@@ -46589,6 +47965,9 @@
                         "maxLength": 4096,
                         "pattern": "^[^\\u0000]*$",
                         "type": "string"
+                      },
+                      "include_type": {
+                        "type": "boolean"
                       },
                       "key": {
                         "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
@@ -46626,10 +48005,35 @@
                   {
                     "additionalProperties": false,
                     "properties": {
+                      "data_entries": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "name": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "value": {
+                              "$ref": "#/$defs/data_value"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "value"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 128,
+                        "type": "array"
+                      },
                       "height": {
                         "maxLength": 4096,
                         "pattern": "^[^\\u0000]*$",
                         "type": "string"
+                      },
+                      "include_type": {
+                        "type": "boolean"
                       },
                       "key": {
                         "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
@@ -46662,12 +48066,893 @@
                       "selection_channel"
                     ],
                     "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "bottom_editor_state": {
+                        "enum": [
+                          "normal",
+                          "maximized",
+                          "minimized"
+                        ]
+                      },
+                      "editor_priority": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "effect_index": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "include_type": {
+                              "type": "boolean"
+                            },
+                            "plugin_identifier": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "view_identifier": {
+                              "description": "Serialized editor identifier, not authority to target a live view.",
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "view_identifier",
+                            "plugin_identifier",
+                            "effect_index"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 128,
+                        "type": "array"
+                      },
+                      "editor_state": {
+                        "enum": [
+                          "normal",
+                          "maximized",
+                          "minimized"
+                        ]
+                      },
+                      "height": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "key": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "object_panel"
+                      },
+                      "label": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "preferred_heights": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "effect_index": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "height": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "plugin_identifier": {
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            },
+                            "view_identifier": {
+                              "description": "Serialized editor identifier, not authority to target a live view.",
+                              "maxLength": 4096,
+                              "pattern": "^[^\\u0000]*$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "view_identifier",
+                            "plugin_identifier",
+                            "effect_index",
+                            "height"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 128,
+                        "type": "array"
+                      },
+                      "sidebar": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "collapse_state": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "width": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "width",
+                          "collapse_state"
+                        ],
+                        "type": "object"
+                      },
+                      "width": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "kind",
+                      "label"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "height": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "key": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "object_tabs"
+                      },
+                      "label": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "width": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "kind",
+                      "label"
+                    ],
+                    "type": "object"
                   }
                 ]
               },
               "maxItems": 128,
-              "minItems": 1,
+              "minItems": 0,
               "type": "array"
+            },
+            "position_history": {
+              "additionalProperties": false,
+              "properties": {
+                "audio_devices": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "effects": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "fallback": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "last_positions": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "metadata": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "object_types": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "plugin_inner_objects": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "source_plugins": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "placement": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bottom": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "flags": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "left": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "maximum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_x": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "minimum_y": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "right": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          },
+                          "state": {
+                            "enum": [
+                              "normal",
+                              "maximized",
+                              "minimized"
+                            ]
+                          },
+                          "top": {
+                            "maxLength": 4096,
+                            "pattern": "^[^\\u0000]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "flags",
+                          "minimum_x",
+                          "minimum_y",
+                          "maximum_x",
+                          "maximum_y",
+                          "left",
+                          "top",
+                          "right",
+                          "bottom"
+                        ],
+                        "type": "object"
+                      },
+                      "view_name": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "view_name",
+                      "placement"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                }
+              },
+              "type": "object"
             },
             "root": {
               "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
@@ -46682,10 +48967,21 @@
           },
           "required": [
             "contract",
-            "root",
             "nodes"
           ],
-          "type": "object"
+          "source_interpretations": {
+            "Element": "The retained capital OneOf lists the supported element kinds; the source definition is not globally rewritten.",
+            "SideBar": "The reflected singular sidebar remains available. The 2024 enum is a malformed scalar SideBar; the local constructor uses that exact tag, without rewriting the source schema.",
+            "ViewHolder": "Floating windows follow the explicit ViewHolder fields; conflicting allOf Element is retained as unresolved source semantics.",
+            "native_acceptance": "Closed construction and retained read serialization do not prove native setLayout input acceptance."
+          },
+          "type": "object",
+          "unresolved_inputs": {
+            "object_panel.sidebar_left,sidebar_right": "Retained read-only rows contain SideBarLeft/SideBarRight and Visibility; the request definition exposes only SideBar. No input alternative is inferred.",
+            "object_tabs.children": "Retained read-only ObjectTabPanel rows contain @Children; the request definition forbids this property. No input alternative is inferred.",
+            "preferred_heights": "Requests use the reflected unprefixed editor identifiers. Readbacks may use the three retained Editor-prefixed aliases; this does not establish their request legality.",
+            "splitter": "The request definition requires @Children but declares no such property and forbids extra properties. Retained read-only childless @type/ID rows do not establish setLayout input legality."
+          }
         },
         "contract": "waapi-skill.authoring-layout-business/v1",
         "declaration": {
@@ -47287,7 +49583,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -47565,7 +49861,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -47871,7 +50167,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -51977,7 +54273,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -52429,7 +54725,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -52876,7 +55172,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -53154,7 +55450,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -53442,7 +55738,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
@@ -53721,7 +56017,7 @@
         },
         "effect_verification": {
           "exact_topic_semantics": "native accepts or rejects the selected URI; no availability is inferred from its spelling",
-          "native_effect_evidence": "required_unfinished",
+          "native_effect_evidence": "not_independently_verified",
           "signal_delivery": "emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission",
           "window_effect": "native_result_does_not_establish_visible_or_closed_window"
         },
