@@ -289,12 +289,17 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract(
     # the closed RTPC List variant; b06dfe1c names its object.set owner inside
     # that machine schema (nested descriptions remain sealed).
     assert operation_request_schema_digest("object.set", "2022.1") == (
-        "6a85d5221d1589c6684226846b64d2ec9780b52d2c0514908b581479e8153e0c"
+        "da4de7f0296ca115972d15741e5effed9c9d8cf5ee47e93c6335c733b7ec0ee2"
     )
     # Invert only reviewed owned ControlInput construction (20cc2a6f), exact
     # existing-GUID rename semantics (17cfcdd7), and staged Voice provenance
-    # (74920639/5afb9669); retain the previous complete machine-contract seal.
+    # (74920639/5afb9669), then the reviewed Event/Action, Query/SearchCriteria
+    # and role-guarded Control Surface child pairs. Retain the previous full seal.
     previous_set = copy.deepcopy(contract_2022)
+    assert previous_set["parent_child_contract"].pop("Event") == ["Action"]
+    assert previous_set["parent_child_contract"].pop("Query") == ["SearchCriteria"]
+    assert previous_set["parent_child_contract"].pop("ControlSurfaceSession") == ["ControlSurfaceBindingGroup"]
+    assert previous_set["parent_child_contract"].pop("ControlSurfaceBindingGroup") == ["ControlSurfaceBinding", "ControlSurfaceBindingGroup"]
     assert previous_set["optional_arguments"].pop() == "voice_source_staging"
     assert previous_set["argument_contract"]["optional"].pop() == "voice_source_staging"
     set_fields = previous_set["argument_contract"]["properties"]
@@ -1135,11 +1140,15 @@ def test_audio_import_operation_schema_discloses_native_switch_assignment_usage(
     ]
 
     assert row_assignment == default_assignment
-    assert row_assignment["type"] == "string"
+    assert row_assignment["oneOf"][0]["type"] == "string"
+    group_branch = row_assignment["oneOf"][1]
+    assert group_branch["type"] == "object" and group_branch["additionalProperties"] is False
+    assert group_branch["required"] == ["group"]
+    assert set(group_branch["properties"]) == {"group", "value"}
     description = row_assignment["description"]
     assert "One exact Switch/State value name" in description
-    assert "Gateway resolves" in description
-    assert "complete assignment set and unchanged group" in description
+    assert "Gateway owns directive construction" in description
+    assert "group and full pair readback" in description
     assert "Native directive grammar" in description
     assert "not caller inputs" in description
 
@@ -4324,6 +4333,11 @@ def test_legacy_created_guid_present_prepared_preview_remains_verifiable_for_com
             ]
         }
     )
+    for malformed in ([], "invalid", 1, False):
+        with pytest.raises(OperationContractError, match="condition metadata must be an object"):
+            verify_prepared_operation({**prepared_create, "pre_state": malformed},
+                execution_result={"result": {"id": created_id}},
+                read_call=lambda *_: pytest.fail("Malformed state must fail before readback"))
     created = verify_prepared_operation(
         prepared_create,
         execution_result={"result": {"id": created_id}},

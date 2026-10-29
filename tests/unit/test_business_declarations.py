@@ -39,6 +39,7 @@ BUS_ID = "{22222222-2222-2222-2222-222222222222}"
 METADATA_DIGEST = "a" * 64
 
 EXPECTED_NON_INTRINSIC_NAME_OBJECT_TYPES = {
+    "ConversionPlugin",
     "Action",
     "Curve",
     "CustomState",
@@ -99,7 +100,9 @@ def test_reflected_sample_objects_with_empty_names_are_all_classified() -> None:
 
     # MusicTransition has an owned relative display identity with a nonempty
     # built-in label in these fixtures; it is not an empty-name fixture row.
-    assert empty_name_tags & reflected_wobjects == NON_INTRINSIC_NAME_OBJECT_TYPES - {"MusicTransition"}
+    # ConversionPlugin is source-backed owned codec data, absent from this
+    # sample project empty-name WObject inventory.
+    assert empty_name_tags & reflected_wobjects == NON_INTRINSIC_NAME_OBJECT_TYPES - {"MusicTransition", "ConversionPlugin"}
 
 
 def _context(**overrides: str) -> BusinessContext:

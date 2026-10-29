@@ -262,7 +262,7 @@ def test_audio_import_business_binds_user_path_segments_without_model_separators
     assert client.calls[-1] == (
         "ak.wwise.core.object.get",
         {"from": {"path": [object_path]}},
-        {"return": ["id", "name", "type", "path"]},
+        {"return": ["id", "name", "type", "path", "classId"]},
     )
 
 
@@ -3598,7 +3598,7 @@ def test_exact_table_guid_targets_reject_missing_wrong_class_and_language(tmp_pa
     else:
         client.sources[0]["parent"] = {"id": PARENT_ID}
     original = table.read_bytes()
-    command("draft-check", expected_error=error)
+    command("draft-check", expected_error="INVALID_READBACK" if fault == "foreign-parent" else error)
     assert table.read_bytes() == original and client.copied.read_bytes() == b"old English media"
     assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
     assert not list((tmp_path / "state/transactions").glob("tx1-*"))
@@ -3643,7 +3643,8 @@ def test_exact_table_source_admission_rejects_wrong_relationship_type_and_langua
         table.write_text(table.read_text().replace(r"<Sound Voice>Voice\<AudioFileSource>", r"<Sound SFX>Voice\<AudioFileSource>"), encoding="utf-8")
     else:
         table.write_text(table.read_text().replace("<AudioFileSource>Line", "<Sound Voice>NewVoice"), encoding="utf-8")
-    command("draft-check", expected_error="INVALID_TARGET_TYPE")
+    command("draft-check", expected_error=("INVALID_READBACK" if fault == "foreign-parent" else
+        "AMBIGUOUS_SOURCE_WIRE_PATH" if fault == "wrong-language" else "INVALID_TARGET_TYPE"))
     assert not any(uri == "ak.wwise.core.audio.importTabDelimited" for uri, _, _ in client.calls)
 
 

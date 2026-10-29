@@ -1086,7 +1086,7 @@ def test_exact_frozen_attenuation_role_has_resolved_live_class_comparison(versio
     assert "when_status_is_ambiguous_stop_only" in next_action["object_binding"]["result_validation_rule"]
     assert client.calls[-1] == (
         "ak.wwise.core.object.get", {"from": {scope: [ATTENUATION_ROW[scope]]}},
-        {"return": ["id", "name", "type", "path"]},
+        {"return": ["id", "name", "type", "path", "classId"]},
     )
 
 
