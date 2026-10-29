@@ -1184,7 +1184,7 @@ def test_source_projection_cannot_authorize_a_caller_invented_roster(source_curr
     assert identity() != before  # Foreign proof-like fields never receive the Source cut.
 
 
-@pytest.mark.parametrize('damage', ('mapping-seal', 'requirements-seal', 'duplicate', 'escape'))
+@pytest.mark.parametrize('damage', ('mapping-seal', 'requirements-seal', 'escape'))
 def test_source_identity_canonical_resolver_requires_sealed_current_mappings(source_current_mapping_case, tmp_path, monkeypatch, damage):
     import os
     from tests.maintenance import branch_audit_completion as completion
@@ -1200,7 +1200,6 @@ def test_source_identity_canonical_resolver_requires_sealed_current_mappings(sou
     index = json.loads(case['index'].read_bytes())
     index['base'] = os.path.relpath(case['base'], canonical_index.parent)
     if damage == 'mapping-seal': index['mapping_attachments'][0]['sha256'] = '0' * 64
-    elif damage == 'duplicate': index['mapping_attachments'] *= 2
     elif damage == 'escape': index['mapping_attachments'][0]['artifact'] = '../outside.json'
     elif damage == 'requirements-seal':
         mapping = json.loads((case['base'] / index['mapping_attachments'][0]['artifact']).read_bytes())
@@ -1215,6 +1214,56 @@ def test_source_identity_canonical_resolver_requires_sealed_current_mappings(sou
     with pytest.raises(ValueError, match='digest mismatch|mapping document differs|duplicate Source|archive|traversal'):
         completion.candidate_identity(audit.ROOT, {**case['inventory'], 'sources': {}},
             case['inventory']['native_coverage']['catalogs'], digest=audit.digest)
+
+
+@pytest.mark.parametrize('damage', ('duplicate', 'non-source-seal', 'non-source-contract'))
+def test_source_identity_lookup_stops_but_full_admission_checks_the_tail(source_current_mapping_case, tmp_path, monkeypatch, damage):
+    from copy import deepcopy
+    import os
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_branch_evidence import write_json
+    case = source_current_mapping_case
+    output = case['output'] / ('identity-tail-' + damage)
+    output.mkdir()
+    mapping = deepcopy(case['attachment'])
+    if damage != 'duplicate':
+        mapping['bindings'] = {case['anchor']: mapping['bindings'][case['anchor']]}
+        mapping['predecessors'] = {case['anchor']: mapping['predecessors'][case['anchor']]}
+        assert not set(mapping['bindings']) & case['source_ids']
+    if damage == 'non-source-contract': mapping['contract'] = 'foreign-mapping'
+    tail = output / 'tail.json'
+    descriptor = {**write_json(tail, mapping), 'artifact': tail.relative_to(case['base']).as_posix()}
+    if damage == 'non-source-seal': descriptor['sha256'] = '0' * 64
+    canonical = audit.ROOT / 'docs/branch-coverage-requirements.json'
+    canonical_index = audit.ROOT / 'docs/branch-coverage-evidence-index.json'
+    requirements_path = tmp_path / canonical.name
+    audit.write_requirements(requirements_path, case['requirements'])
+    view = {canonical: requirements_path}
+    for part in json.loads(requirements_path.read_bytes())['parts']:
+        view[canonical.parent / part['path']] = tmp_path / part['path']
+    index = json.loads(case['index'].read_bytes())
+    index['base'] = os.path.relpath(case['base'], canonical_index.parent)
+    index['mapping_attachments'].append(descriptor)
+    index_path = tmp_path / canonical_index.name
+    write_json(index_path, index)
+    view[canonical_index] = index_path
+    original_open = Path.open
+    monkeypatch.setattr(Path, 'open', lambda path, *args, **kwargs: original_open(view.get(path, path), *args, **kwargs))
+    read_bytes = Path.read_bytes
+    reads = []
+    def observed_read(path):
+        if path == tail: reads.append(path)
+        return read_bytes(path)
+    monkeypatch.setattr(Path, 'read_bytes', observed_read)
+    completion.candidate_identity(audit.ROOT, {**case['inventory'], 'sources': {}},
+        case['inventory']['native_coverage']['catalogs'], digest=audit.digest)
+    assert reads == []  # All required Source rows are in the first sealed map.
+    index['base'] = os.path.relpath(case['base'], output)
+    full_path = output / 'full-index.json'
+    write_json(full_path, index)
+    with pytest.raises(ValueError, match='conflicting members|digest mismatch|closed reviewed mapping'):
+        audit.portable_binding_inputs(full_path, case['requirements'])
+    assert reads == [tail]  # The ordinary admission reader owns the whole index.
 
 
 def test_direct_old_source_context_still_requires_current_execution_sources(source_current_mapping_case):

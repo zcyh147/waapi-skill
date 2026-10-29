@@ -73,7 +73,12 @@ def requirements_identity_projection(document, mapping_bindings=None, *, root):
 
 
 def _requirements_source_bindings(root, requirements, wanted):
-    """Resolve sealed canonical mapping bytes, never category/candidate admission."""
+    """Resolve the sealed Source prefix, never claim full-index admission.
+
+    Assembly orders existing Source-containing whole-mechanism sidecars first.
+    The ordinary importer independently owns every later descriptor, including
+    duplicate/invalid ones; identity lookup must not re-read that unrelated tail.
+    """
     import json
     from tests.maintenance.branch_coverage_audit import digest
     from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
@@ -119,6 +124,14 @@ def _requirements_source_bindings(root, requirements, wanted):
         if found.keys() & selected:
             raise ValueError('Requirements identity has duplicate Source mappings')
         found.update({identity: attachment['bindings'][identity] for identity in selected})
+        if set(found) == wanted:
+            members = {identity: member for review in requirements['representative_mechanisms'].values()
+                       for identity, member in review['members'].items() if identity in wanted}
+            for identity, binding in found.items():
+                if (not isinstance(binding, dict) or binding.get('branch_id') != identity
+                        or members[identity]['mapping_sha256'] != digest({key: value for key, value in binding.items() if key != 'evidence'})):
+                    raise ValueError('Requirements identity Source member/mapping differs')
+            break
     if set(found) != wanted:
         raise ValueError('Requirements identity Source mappings are missing')
     return found
