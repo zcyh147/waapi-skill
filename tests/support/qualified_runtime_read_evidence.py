@@ -435,7 +435,7 @@ def write_qualified_read_bundle(output, program_path, original, *, inventory, ve
     return index_path
 
 
-def attach_qualified_reads(descriptors, bindings, read, requirements, captures):
+def attach_qualified_reads(descriptors, bindings, read, requirements, captures, *, base=None):
     if not isinstance(descriptors, list):
         raise ValueError('Qualified retained read attachments must be a list')
     attached = set()
@@ -453,7 +453,8 @@ def attach_qualified_reads(descriptors, bindings, read, requirements, captures):
                 or (native_only and binding['evidence'])):
             raise ValueError('Qualified retained read needs exact existing program/native policy and capture')
         if native_only:
-            runtime.retained_runtime_native(binding, {'id': identity, 'shape_sha256': binding['native_shape_sha256']}, audit.ROOT, audit.ROOT)
+            runtime.retained_runtime_native(binding, {'id': identity, 'shape_sha256': binding['native_shape_sha256']},
+                audit.ROOT, audit.ROOT if base is None else base)
         attached.add(identity)
         binding['qualified_runtime_read_attachment'] = item['assessment']
         binding['evidence']['native'] = item['evidence']

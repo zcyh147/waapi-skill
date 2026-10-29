@@ -311,3 +311,170 @@ def test_legacy_transition_tampering_is_rejected_by_portable_import(legacy_nativ
         monkeypatch.setattr(runtime, 'RUNTIME_SOURCE_TRANSITION_SHA', hashlib.sha256(altered.read_bytes()).hexdigest())
     with pytest.raises(ValueError, match='artifact digest mismatch|transition descriptors|transition delta/reasons|transition reasons'):
         audit.portable_binding_inputs(packet['index'], packet['requirements'])
+
+
+@pytest.fixture(scope='module')
+def portable_selected_native_packets():
+    """Two locator namespaces over the same exact seven original packets."""
+    from tests.support import runtime_observation_evidence as runtime
+    product = audit.ROOT / 'tests/fixtures/branch-evidence/product'
+    review = runtime.selected_runtime_source_successor()
+    originals = {}
+    for prefix in sorted({member['base'] for member in review['members'].values()}):
+        path = audit.ROOT / prefix / 'index.json'
+        index = json.loads(path.read_bytes())
+        base = (path.parent / index['base']).resolve()
+        for entry in index['entries']:
+            bindings = completion.read_sealed_artifact(entry['origin']['bindings'], base)
+            policies = completion.read_sealed_artifact(entry['origin']['requirements'], base)
+            for identity, binding in bindings['bindings'].items():
+                if identity in review['members']:
+                    originals[identity] = (binding, policies['branches'][identity])
+    parent = product / '.waapi-skill-state'
+    parent.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='portable-native35-', dir=parent) as name:
+        output = Path(name)
+        packets = {}
+        for namespace, base in (('root', audit.ROOT), ('product', product)):
+            directory = output / namespace
+            directory.mkdir()
+            def locator(descriptor):
+                return {**descriptor, 'artifact': (audit.ROOT / descriptor['artifact']).relative_to(base).as_posix()}
+            def write(filename, value):
+                path = directory / filename
+                path.write_text(json.dumps(value), encoding='utf-8')
+                return {'artifact': path.relative_to(base).as_posix(),
+                    'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+            index = {'contract': 'waapi-skill.branch-evidence-index/v1',
+                'base': os.path.relpath(base, directory), 'entries': [],
+                'qualified_runtime_read_attachments': []}
+            requirements = {'contract': audit.REQUIREMENTS_CONTRACT, 'branches': {}}
+            for number, identity in enumerate(review['scope_ids']):
+                member = review['members'][identity]
+                original, policy = originals[identity]
+                binding = deepcopy(original)
+                binding['evidence'] = {}
+                binding['native_only_base'] = (audit.ROOT / member['base']).relative_to(base).as_posix()
+                binding['native_only_review'] = locator({'artifact': REVIEW,
+                    'sha256': runtime.SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA})
+                descriptor = write(f'{number:02}-bindings.json',
+                    {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': {identity: binding}})
+                requirements['branches'][identity] = deepcopy(policy)
+                policy_descriptor = write(f'{number:02}-requirements.json',
+                    {'contract': audit.REQUIREMENTS_CONTRACT, 'branches': {identity: policy}})
+                index['entries'].append({'id': f'native35-{number}', 'bindings': descriptor,
+                    'origin': {'bindings': descriptor, 'requirements': policy_descriptor,
+                        'program': locator(member['program']), 'capture': locator(member['capture'])}})
+                index['qualified_runtime_read_attachments'].append(write(f'{number:02}-attachment.json',
+                    {'contract': 'waapi-skill.qualified-retained-read-attachment/v1',
+                        'branch_id': identity, 'assessment': locator(member['assessment']),
+                        'evidence': locator(member['qualification'])}))
+            write('index.json', index)
+            packets[namespace] = {'index': directory / 'index.json', 'requirements': requirements}
+        routes = [identity.rsplit('|', 1)[0] for identity in review['scope_ids']]
+        inventory = log_inventory(routes, pointers={'/resultSchema'})
+        # One original validator from each packet family, plus the distinct ACK
+        # boundary. All 35 identities still pass ordinary portable admission.
+        representatives = {}
+        for identity in review['scope_ids']:
+            member = review['members'][identity]
+            key = (member['base'], member['facts'].get('business_boundary'))
+            representatives.setdefault(key, identity)
+        inventory['native_coverage']['obligations'] = [row
+            for row in inventory['native_coverage']['obligations']
+            if row['id'] in representatives.values()]
+        yield {'packets': packets, 'review': review, 'inventory': inventory, 'output': output}
+
+
+def test_selected_native35_product_base_matches_root_base_through_completion(portable_selected_native_packets):
+    packet = portable_selected_native_packets
+    expected = set(packet['review']['scope_ids'])
+    for namespace, selected in packet['packets'].items():
+        document, base, _ = audit.portable_binding_inputs(selected['index'], selected['requirements'])
+        assert set(document['bindings']) == expected
+        assert all(set(binding['evidence']) == {'native'} for binding in document['bindings'].values())
+        ids = {row['id'] for row in packet['inventory']['native_coverage']['obligations']}
+        bounded = {**document, 'bindings': {identity: document['bindings'][identity] for identity in ids}}
+        requirements = {**selected['requirements'], 'branches': {
+            identity: selected['requirements']['branches'][identity] for identity in ids}}
+        result = completion.evaluate_coverage(audit.ROOT, packet['inventory'], bounded,
+            digest=audit.digest, evidence_base=base, requirements_document=requirements)
+        path = packet['output'] / f'{namespace}-completion.json'
+        path.write_text(json.dumps(result), encoding='utf-8')
+        rows = json.loads(path.read_bytes())['obligations']
+        assert len(rows) == 8
+        assert all(row['evidence_results']['native']['outcome'] == 'passed'
+            and row['evidence_results']['program']['outcome'] == 'missing'
+            and row['state'] != 'verified' for row in rows), rows
+        if namespace == 'product':
+            # Canonical Source v3 originals already use this same namespace.
+            source_index = json.loads((base / 'source-195-current-88a6cbbe-2022.1/portable/index.json').read_bytes())
+            descriptor = source_index['entries'][0]['origin']['program']
+            assert completion.read_sealed_artifact(descriptor, base)
+    cpu = next(member for identity, member in packet['review']['members'].items()
+        if identity.startswith('2024.1|wwise-authoring|') and 'getCpuUsage|' in identity)
+    assert cpu['facts']['native_nonempty_rows'] == 34
+    assert cpu['facts']['original_public_complete'] is False
+    assert cpu['facts']['original_finalization'] == 'BLOCKED'
+    from tests.support import runtime_observation_evidence as runtime
+    capture = completion.read_sealed_artifact(cpu['capture'], audit.ROOT)
+    archive = runtime.archive_reader(capture['archive'], audit.ROOT)
+    report = json.loads(archive(capture['capture_original_path']))
+    public = report['outcomes']['profiler-cpu-observation']['evidence']['agent_result']
+    assert (len(public['return']), public['returned_count'], public['total_count'],
+        public['truncated'], public['complete']) == (16, 16, 34, True, False)
+    assert all(member['facts']['global_pass_transferred'] is False
+        for member in packet['review']['members'].values())
+
+
+def test_product_base_native_import_keeps_locator_origin_and_scope_guards(portable_selected_native_packets):
+    packet = portable_selected_native_packets
+    selected = packet['packets']['product']
+    index = json.loads(selected['index'].read_bytes())
+    base = (selected['index'].parent / index['base']).resolve()
+    identity = next(identity for identity in packet['review']['scope_ids']
+        if identity.startswith('2024.1|wwise-authoring|') and 'getCpuUsage|' in identity)
+    number = packet['review']['scope_ids'].index(identity)
+    entry = index['entries'][number]
+    attachment_descriptor = index['qualified_runtime_read_attachments'][number]
+    original = completion.read_sealed_artifact(entry['bindings'], base)
+    policy = {**selected['requirements'], 'branches': {identity: selected['requirements']['branches'][identity]}}
+    directory = packet['output'] / 'controls'
+    directory.mkdir()
+    def write(name, value):
+        path = directory / name
+        path.write_text(json.dumps(value), encoding='utf-8')
+        return {'artifact': path.relative_to(base).as_posix(), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    for damage in ('review-locator', 'review-seal', 'mapping', 'origin-capture', 'assessment-seal'):
+        binding = deepcopy(original)
+        changed_entry = deepcopy(entry)
+        attachment = completion.read_sealed_artifact(attachment_descriptor, base)
+        native = binding['bindings'][identity]
+        if damage == 'review-locator': native['native_only_review']['artifact'] = 'missing-selected-review.json'
+        elif damage == 'review-seal': native['native_only_review']['sha256'] = '0' * 64
+        elif damage == 'mapping': native['input']['selector'] = '/native_call/args'
+        elif damage == 'origin-capture': changed_entry['origin']['capture'] = index['entries'][0]['origin']['capture']
+        else: attachment['assessment']['sha256'] = '0' * 64
+        descriptor = write(f'{damage}-bindings.json', binding)
+        changed_entry['bindings'] = changed_entry['origin']['bindings'] = descriptor
+        thin = {**index, 'base': os.path.relpath(base, directory), 'entries': [changed_entry],
+            'qualified_runtime_read_attachments': [write(f'{damage}-attachment.json', attachment)]}
+        write(f'{damage}-index.json', thin)
+        with pytest.raises((OSError, ValueError), match='No such file|differs|digest mismatch'):
+            audit.portable_binding_inputs(directory / f'{damage}-index.json', policy)
+    thin = {**index, 'base': os.path.relpath(base, directory), 'entries': [entry],
+        'qualified_runtime_read_attachments': [attachment_descriptor]}
+    write('valid-index.json', thin)
+    imported, _, _ = audit.portable_binding_inputs(directory / 'valid-index.json', policy)
+    branch = next(row for row in packet['inventory']['native_coverage']['obligations'] if row['id'] == identity)
+    for damage in ('qualification-seal', 'partial-as-complete', 'scope'):
+        binding = deepcopy(imported['bindings'][identity])
+        if damage == 'qualification-seal': binding['evidence']['native']['sha256'] = '0' * 64
+        elif damage == 'partial-as-complete':
+            record = completion.read_sealed_artifact(binding['evidence']['native'], base)
+            record['retained_facts']['original_public_complete'] = True
+            binding['evidence']['native'] = write('false-complete.json', record)
+        result = completion.evidence_result(binding['evidence']['native'], branch, 'e' * 64,
+            'native', 'controlled' if damage == 'scope' else 'product', base,
+            binding=binding, source_root=audit.ROOT)
+        assert result[0] == 'missing', (damage, result)

@@ -554,7 +554,7 @@ def portable_binding_inputs(index_path, requirements):
                 raise ValueError('duplicate exact branch binding in portable evidence index')
             if not binding.get('evidence') and binding.get('native_only_base'):
                 from tests.support.runtime_observation_evidence import retained_runtime_origin
-                retained_runtime_origin(binding, branch_id, program, originals['capture'], ROOT)
+                retained_runtime_origin(binding, branch_id, program, originals['capture'], ROOT, base)
                 continue
             if (set(binding.get('evidence', {})) != {'program'}
                     or binding.get('equivalence') or binding.get('native_equivalence')
@@ -715,7 +715,7 @@ def portable_binding_inputs(index_path, requirements):
     if 'qualified_runtime_read_attachments' in index:
         from tests.support.qualified_runtime_read_evidence import attach_qualified_reads
         attach_qualified_reads(index['qualified_runtime_read_attachments'], bindings, read,
-                               attachment_requirements, source_capture_origins)
+                               attachment_requirements, source_capture_origins, base=base)
     if 'condition_mechanism_attachments' in index:
         from tests.support.condition_mechanism_reuse import attach_condition_mechanisms
         condition_mechanism_reuse = attach_condition_mechanisms(index['condition_mechanism_attachments'], bindings, read, base, ROOT)
