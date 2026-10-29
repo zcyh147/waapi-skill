@@ -405,27 +405,28 @@ def test_changed_invoked_code_or_resource_invalidates_shared_proof(tmp_path, sou
     from tests.support.applicability_completion_mapping import program_review
     for directory in ('tests', 'docs'):
         create_symlink_or_skip(tmp_path / directory, ROOT / directory, target_is_directory=True)
-    for directory in ('scripts', 'wwise_waapi', 'resources'):
+    for directory in ('scripts', 'wwise_waapi', 'resources', 'references'):
         for original in (ROOT / 'skills/waapi-skill' / directory).rglob('*'):
             if not original.is_file() or '__pycache__' in original.parts:
                 continue
-            relative = original.relative_to(ROOT)
-            target = tmp_path / relative
+            target = tmp_path / original.relative_to(ROOT)
             target.parent.mkdir(parents=True, exist_ok=True)
-            if relative.as_posix() == source:
-                raw = original.read_bytes()
-                if damage == 'missing':
-                    continue
-                if damage == 'removed-route':
-                    lines = raw.splitlines(keepends=True)
-                    selected = [line for line in lines if line.startswith(b'    ("object.createPlugin",')]
-                    assert len(selected) == 1
-                    raw = raw.replace(selected[0], b'', 1)
-                else:
-                    raw += b'\nchanged-proof-input\n'
-                target.write_bytes(raw)
-            else:
-                create_symlink_or_skip(target, original)
+            create_symlink_or_skip(target, original)
+    # Establish a valid unchanged closure before introducing exactly one defect.
+    # Missing retained primary references must not make this negative pass.
+    program_review(tmp_path)
+    target = tmp_path / source
+    raw = target.read_bytes()
+    target.unlink()
+    if damage != 'missing':
+        if damage == 'removed-route':
+            lines = raw.splitlines(keepends=True)
+            selected = [line for line in lines if line.startswith(b'    ("object.createPlugin",')]
+            assert len(selected) == 1
+            raw = raw.replace(selected[0], b'', 1)
+        else:
+            raw += b'\nchanged-proof-input\n'
+        target.write_bytes(raw)
     with pytest.raises(ValueError, match='source closure'):
         program_review(tmp_path)
 
