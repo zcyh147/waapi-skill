@@ -2234,9 +2234,10 @@ def retained_runtime_mapping(binding):
             if key in MAPPING_FIELDS - {'representative_mechanism'}}
 
 
-def retained_runtime_origin(binding, identity, program, capture, root=audit.ROOT):
+def retained_runtime_origin(binding, identity, program, capture, root=audit.ROOT, base=None):
     if binding.get('native_only_review', {}).get('sha256') == SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA:
-        member = retained_runtime_native(binding, {'id': identity, 'shape_sha256': binding['native_shape_sha256']}, root, root)
+        member = retained_runtime_native(binding, {'id': identity, 'shape_sha256': binding['native_shape_sha256']},
+            root, root if base is None else base)
     else:
         member = runtime_source_successor(root)['members'].get(identity)
     if (member is None or binding.get('branch_id') != identity
