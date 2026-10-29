@@ -9,7 +9,7 @@ from tests.support.source_copy_branch_evidence import dependency_review
 SUCCESSOR_REVIEW_PATH = 'tests/fixtures/source-copy/branch-successor-review-195.json'
 SUCCESSOR_REVIEW_SHA256 = '4cd9a81b3d413f46d7ecca6eec191984e338c5b3657b0d4e6955a167dac09a9b'
 ACCOUNTING_REVIEW_PATH = 'tests/fixtures/source-copy/branch-accounting-review-195-publication.json'
-ACCOUNTING_REVIEW_SHA256 = 'd8015509c0994ece40a458399fbacd2bdf8864fcd9c16831e2ae42e2c9e8c4fc'
+ACCOUNTING_REVIEW_SHA256 = '3ce084f5041a1a915c7e388744c19e56eeca60931cd3063d77aee1b01747cd97'
 ACCOUNTING_READER = 'tests/support/source_copy_native_evidence.py'
 REQUIREMENTS_SOURCE = 'docs/branch-coverage-requirements.json'
 ACCOUNTING_DEPENDENCIES = (
@@ -79,7 +79,7 @@ def accounting_dependency_review():
               'relevant_sources', 'captured_capture_sources', 'current_accounting_sources',
               'source_changes', 'additional_sources', 'pin_normalization', 'packets', 'causal_review',
               'current_execution_sources', 'execution_source_changes'}
-    if (set(review) != fields or review['contract'] != 'waapi-skill.source-copy-accounting-review/v1'
+    if (set(review) != fields or review['contract'] != 'waapi-skill.source-copy-accounting-review/v2'
             or review['scope'] != 'retained-source-program-and-native-accounting-only'
             or review['captured_git_candidate'] != '88a6cbbeccee1b8f5934f61f7b75503e2a084073'
             or review['captured_candidate_sha256'] != '0383d01b4b400a52c94b1f3924a9234915e32a06583c89cd9aaaf8cb628ebdc3'

@@ -120,7 +120,7 @@
     "new_condition_integration": "d2607a17c6bfcbc49312c5d918b9a400a6fd76d3",
     "scope": "Original88a6 program/native/captured before maps are immutable historical facts. Exact current execution after-map admits only the reviewed runtime deltas; selected current interface CODE remains separately required, not inferred from historical Source execution."
   },
-  "contract": "waapi-skill.source-copy-accounting-review/v1",
+  "contract": "waapi-skill.source-copy-accounting-review/v2",
   "current_accounting_sources": {
     "docs/branch-coverage-business-baseline.json": "7599ef462d2344d95da828ee7205a8dfd861823377d7b22ef3f431b14799f91a",
     "docs/branch-coverage-condition-sources.json": "b51b1227a381938be503fb9065928a2fb8928808fe24a864679305c647bd0fcd",
@@ -215,7 +215,7 @@
     "tests/support/new_condition_completion.py": "ee989f858d4ccacb6b8328ee7b114b4cbbb463f844f950f43fa7665506eda912",
     "tests/support/platform_filesystem.py": "827467a6bb7af0fb74827841fbf8c67b79a020bc0563b4f73504b64fbfb7b95d",
     "tests/support/source_copy_branch_evidence.py": "de255dc11e0cb81e625eb23b1a4c63ac61f61529673b8bf1f609988470ee974a",
-    "tests/support/source_copy_native_evidence.py": "05ec66719683541b1361dcc698b22b38b75e17c4f28f930a718194712e2fe923",
+    "tests/support/source_copy_native_evidence.py": "eacfac54551c5f969627b58b0f135d69d9034be7c417a09bd60bbf9945c8b64f",
     "tests/unit/test_conditional_reference_gateway.py": "a6802e122c7893936d5aa66e73a68605825416d62baf32b97b3e8f3d9c5a14b6",
     "tests/unit/test_field_interface_closure_gateway.py": "8c6d1fb76e830a0f1091f2bb9a178f86a4676fd12d5db150f01e8da073326371",
     "tests/unit/test_gameparameter_class_fields_gateway.py": "92f81472bba7ff5006bffd170e6d502b56ff03ae12dd0d00ed717657830bcada",
@@ -1710,7 +1710,7 @@
     },
     "tests/support/source_copy_native_evidence.py": {
       "captured_sha256": "94b2dfca59e04a63c5e986c620412a9616fba060d482dccaed58e77611788111",
-      "current_sha256": "05ec66719683541b1361dcc698b22b38b75e17c4f28f930a718194712e2fe923",
+      "current_sha256": "eacfac54551c5f969627b58b0f135d69d9034be7c417a09bd60bbf9945c8b64f",
       "reason": "Qualified accounting route separates immutable88a6 historical review/context from exact explained current execution after-map; direct/current successor guards unchanged. Publication requirements identity cut is limited to the declared derived descriptor fields; complete final admission seals remain."
     },
     "tests/unit/test_field_interface_closure_gateway.py": {
