@@ -1,0 +1,36 @@
+{
+  "contract": "waapi-skill.playlist-native-boundary/v1",
+  "version": "2021.1",
+  "class_id": 589840,
+  "class_name": "RandomSequenceContainer",
+  "field": "Playlist",
+  "status": "native_unavailable",
+  "introduced_in": "2023.1",
+  "scope": "Random/Sequence Container Playlist object-list access and editing; not MusicPlaylistContainer",
+  "source": {
+    "build": "2023.1.19.8928",
+    "archive": "SDK/Help/WwiseSDK-Windows.chm",
+    "archive_sha256": "fa5e37e8adacc33cf9189be46a4bdbb7f780ebf776429154fddc0ae2df303415",
+    "member": "whatsnew_2023_1_0.html",
+    "member_sha256": "84371706b26f09b7ddd83c68b6022d2107f8bd24c92e8185d38a865f7d5206bc",
+    "change_id": "WG-47295",
+    "excerpt": "(WAAPI) Rewrote the Sequence Container object model using object lists, which makes the sequence available through WAAPI.",
+    "feature_member": "whatsnew_2023_1_new_features.html",
+    "feature_member_sha256": "ab295251f12c58809e78a24691f4a0603034b8f7519f63f8aa52904295771c39",
+    "feature_section": "Object Model",
+    "feature": "Playlist in Random/Sequence Container",
+    "feature_statement": "The following elements have been refactored and are now accessible in WAAPI and WAQL:"
+  },
+  "observation": {
+    "build": "2021.1.14.8108",
+    "host": "wwise-console",
+    "candidate": "04bf7f8f65cc836b83ab6193d0c14be0efab5b60",
+    "root": ".waapi-skill-state/full-coverage/older-playlist178-2021-read-r1",
+    "observation_sha256": "6edc54987bd0882f12018dd2661a40ad500cda90dcda7ce1838983119f7100bb",
+    "native_error_uri": "ak.wwise.query.invalid_query",
+    "native_message": "Unknown property Playlist (61)",
+    "original_verdict": "SKIP",
+    "project_mutation_count": 0,
+    "interpretation": "Exact read path rejected; introduction history supplies the version boundary. Original verdict is unchanged."
+  }
+}

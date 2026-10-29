@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-attachment/v1",
+  "branch_id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+  "assessment": {
+    "artifact": "runtime-read-log-195-r1/packets/original-qualified-2021.1-profiler-busses-seed/195-assessment.json",
+    "sha256": "a1eea6957a0d33a36bf34f217d4eb9c792f3b8300ff3d4f462e26c85c91749b4"
+  },
+  "evidence": {
+    "artifact": "runtime-read-log-195-r1/packets/original-qualified-2021.1-profiler-busses-seed/195-native.json",
+    "sha256": "f72a61fbdd1c69e5bff152b3fa395fc8b04c0afeb2e6ed1f22814b00467adba3"
+  }
+}

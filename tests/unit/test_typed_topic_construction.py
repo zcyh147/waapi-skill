@@ -135,6 +135,83 @@ def _business_field_names(table: dict[str, object]) -> set[str]:
     return {str(row[field_column]) for row in table["rows"]}
 
 
+def test_structure_notes_schema_discloses_both_fixed_strings_and_retains_reflected_names(tmp_path):
+    topic = 'ak.wwise.core.object.structureChanged'
+    for field in ('notes-change-old-notes', 'notes-change-new-notes', 'notes-change-old-name', 'notes-change-new-name'):
+        code, payload = gateway.execute_gateway(['topic-schema', topic, '--row', 'objects-changes',
+            '--row-field-group', field], env=_env(tmp_path, '2025.1'),
+            client_factory=lambda _url: pytest.fail('offline disclosure connected'))
+        assert code == 0, payload
+        selected = payload['business_input']['event_rows']['selected']
+        assert _business_field_names(selected['fields']) == {field}
+        assert selected['fields']['rows'][0][1:] == ['gateway_derived', []]
+        assert payload['continuation']['contract_binding']['value'] != 'd5422d9d831fcc228cc674eaf724e45d1175d7c3bf68b2d9a7ba876852ed491f'
+    mapping = json.loads((SCRIPT_PATH.parents[1] / 'resources/semantic/2025.1/structure-changed-notes-compatibility.json').read_text())
+    assert (mapping['parent_issue'], mapping['owner_issue']) == (174, 187)
+    assert {row['public_field']: row['event_pointer'] for row in mapping['semantic_fields']} == {
+        'notes-change-old-notes': '/objects/0/changes/0/notesChange/oldNotes',
+        'notes-change-new-notes': '/objects/0/changes/0/notesChange/newNotes',
+    }
+    assert all(row['completion'] == 'required_evidence_pending' for row in mapping['semantic_fields'])
+
+
+def test_structure_notes_old_contract_digest_is_rejected_before_connection(tmp_path):
+    code, payload = gateway.execute_gateway(['stream-topic', 'ak.wwise.core.object.structureChanged',
+        '--topic-contract-digest', 'd5422d9d831fcc228cc674eaf724e45d1175d7c3bf68b2d9a7ba876852ed491f', '--event-count', '1'],
+        env=_env(tmp_path, '2025.1'), client_factory=lambda _url: pytest.fail('stale continuation connected'),
+        stream_sink=lambda _record: None)
+    assert code != 0 and 'digest' in payload['message'], payload
+
+
+@pytest.mark.parametrize('facts', [
+    ['--event-row', 'objects-changes', '0,0', 'notes-change-unknown', 'x'],
+    ['--event-entry', 'objects-changes-notes-change', '0,0', 'oldNotes', 'x'],
+])
+def test_structure_notes_rejects_unknown_fields_and_exact_entry_escape(tmp_path, facts):
+    topic = 'ak.wwise.core.object.structureChanged'
+    code, payload = gateway.execute_gateway(['stream-topic', topic, *_contract_binding(topic), '--event-count', '1', *facts],
+        env=_env(tmp_path, '2025.1'), client_factory=lambda _url: pytest.fail('unknown Notes predicate connected'),
+        stream_sink=lambda _record: None)
+    assert code != 0 and 'Unknown' in payload['message'], payload
+
+
+@pytest.mark.parametrize('host', ('wwise-console', 'wwise-authoring'))
+def test_structure_notes_compatibility_rejects_either_native_host_source_drift(tmp_path, monkeypatch, host):
+    source = SCRIPT_PATH.parents[1] / 'resources/native-catalog/2025.1' / (host + '.json')
+    original = Path.read_bytes
+    def changed(path):
+        raw = original(path)
+        return raw + b'\n' if path == source else raw
+    monkeypatch.setattr(Path, 'read_bytes', changed)
+    code, payload = gateway.execute_gateway(['topic-schema', 'ak.wwise.core.object.structureChanged'],
+        env=_env(tmp_path, '2025.1'), client_factory=lambda _url: pytest.fail('changed source connected'))
+    assert code != 0 and 'source changed' in payload['message'], payload
+
+
+def test_structure_notes_compatibility_rejects_changed_selected_schema(tmp_path, monkeypatch):
+    source = SCRIPT_PATH.parents[1] / 'resources/manifest/2025.1/schemas.json'
+    original = Path.read_text
+    def changed(path, *args, **kwargs):
+        raw = original(path, *args, **kwargs)
+        if path == source:
+            document = json.loads(raw)
+            row = next(row for row in document['schemas'] if row['uri'] == 'ak.wwise.core.object.structureChanged')
+            row['schema']['publishSchema']['description'] = 'Changed selected schema'
+            return json.dumps(document)
+        return raw
+    monkeypatch.setattr(Path, 'read_text', changed)
+    code, payload = gateway.execute_gateway(['topic-schema', 'ak.wwise.core.object.structureChanged'],
+        env=_env(tmp_path, '2025.1'), client_factory=lambda _url: pytest.fail('changed selected schema connected'))
+    assert code != 0 and 'exact pinned host schema' in payload['message'], payload
+
+
+@pytest.mark.parametrize('version', SUPPORTED_WWISE_VERSION_KEYS[:-1])
+def test_structure_notes_compatibility_does_not_add_older_version_topic(tmp_path, version):
+    code, payload = gateway.execute_gateway(['topic-schema', 'ak.wwise.core.object.structureChanged'],
+        env=_env(tmp_path, version), client_factory=lambda _url: pytest.fail('unreflected older Topic connected'))
+    assert code != 0, payload
+
+
 @pytest.mark.parametrize("version", ("2021.1", "2023.1", "2024.1"))
 def test_profile_soundbank_topic_rows_expose_copy_ready_handles(version: str) -> None:
     table = topic_match_contract(
@@ -498,14 +575,16 @@ def test_selection_topic_schema_is_available_offline_for_authoring(version: str,
     assert payload["continuation"]["subcommands"] == ["wait-topic", "stream-topic"]
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_soundbank_topic_schema_exposes_closed_business_shortcuts(
     tmp_path: Path,
+    version: str,
 ) -> None:
     topic = "ak.wwise.core.soundbank.generated"
 
     code, payload = gateway.execute_gateway(
         ["topic-schema", topic],
-        env=_env(tmp_path, "2025.1"),
+        env=_env(tmp_path, version),
         client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
     )
 
@@ -524,14 +603,20 @@ def test_soundbank_topic_schema_exposes_closed_business_shortcuts(
     assert payload["continuation"]["advanced_field_catalog"] == (
         "topic-schema <topic-uri> --catalog"
     )
+    assert "exact_entry" not in payload["continuation"]["business_fact_argv"]
+    assert "event_row" not in payload["continuation"]["business_fact_argv"]
+    assert payload["continuation"]["exact_entry_field_disclosure"] == "topic-schema <topic-uri> --entry <scope>"
+    assert payload["continuation"]["event_row_field_disclosure"] == "topic-schema <topic-uri> --row <collection> --row-field-group <group>"
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_soundbank_topic_schema_discloses_long_tail_catalog_only_on_request(
     tmp_path: Path,
+    version: str,
 ) -> None:
     code, payload = gateway.execute_gateway(
         ["topic-schema", "ak.wwise.core.soundbank.generated", "--catalog"],
-        env=_env(tmp_path, "2025.1"),
+        env=_env(tmp_path, version),
         client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
     )
 
@@ -543,6 +628,27 @@ def test_soundbank_topic_schema_discloses_long_tail_catalog_only_on_request(
     assert len(business["exact_entries"]["rows"]) == business["exact_entries"][
         "catalog_count"
     ]
+    assert {"event_row", "exact_entry", "exact_entry_object", "exact_entry_row"} <= set(payload["continuation"]["business_fact_argv"])
+    code, compact = gateway.execute_gateway(
+        ["topic-schema", "ak.wwise.core.soundbank.generated"], env=_env(tmp_path, version),
+        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+    )
+    assert code == 0, compact
+    assert compact["session_context"] == payload["session_context"]
+    assert compact["continuation"]["contract_binding"] == payload["continuation"]["contract_binding"]
+    for name, flag, selected_key in (("event_rows", "--row", "collection"), ("exact_entries", "--entry", "scope")):
+        for key in ("catalog_count", "catalog_digest", "catalog_disclosure", "field_disclosure"):
+            assert compact["business_input"][name][key] == business[name][key]
+        selected = business[name]["rows"][0][0]
+        code, disclosure = gateway.execute_gateway(
+            ["topic-schema", "ak.wwise.core.soundbank.generated", flag, selected], env=_env(tmp_path, version),
+            client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+        )
+        assert code == 0, disclosure
+        assert disclosure["business_input"][name]["selected"][selected_key] == selected
+        assert disclosure["continuation"]["contract_binding"] == payload["continuation"]["contract_binding"]
+        fact = "event_row" if flag == "--row" else "exact_entry"
+        assert disclosure["continuation"]["business_fact_argv"][fact] == payload["continuation"]["business_fact_argv"][fact]
 
 
 def test_soundbank_topic_business_shortcuts_compile_without_handles(

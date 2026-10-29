@@ -1,0 +1,37 @@
+{
+  "branch_ids": [
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name"
+  ],
+  "business_descriptor": {
+    "agent_evidence": "not_established",
+    "id": "2021.1|source-copy-synth-owned-graph",
+    "implementation": "version-matched saved-copy continuation; exact graph/value/saved-file proof",
+    "native_evidence": {
+      "build": "2021.1.14.8108",
+      "business_effect_verified": false,
+      "candidate": "6d4a35471bda04f76a4501e3b29a3a19cf5b4132",
+      "details": "docs/plans/full-waapi-coverage/SOURCE_COPY.md",
+      "diagnostic_only": true,
+      "host": "wwise-console",
+      "kind": "scoped_existing_source_copy_and_save",
+      "platform": "macos",
+      "receipt_sha256": "aa3151da06f49425a467e474cf23ce61e52d1401390a8d47098cc85b04524495",
+      "result": "native terminal PASS; raw category diagnostic",
+      "root_effect_assessment": "exact observed copied/saved graph supported by independent oracle; no generated branch credit"
+    },
+    "placement": "existing Wwise Synth One Source owned graph; native-loaded two-property fixture",
+    "program_result": "candidate-specific component evidence; no inherited current-program PASS",
+    "public_operation": "object.copy",
+    "remaining": "#180 requires existing-lane Source collector-to-exact-branch adapter. Other classes/topologies, constructors, media/audio, history, Windows and Fresh remain open.",
+    "version": "2021.1"
+  },
+  "business_fact_id": "2021.1|source-copy-synth-owned-graph",
+  "contract": "waapi-skill.source-copy-branch-attachment/v1",
+  "proof": {
+    "artifact": "source-r92-final-29b34d4c-2021.1/portable/program-proof.json",
+    "sha256": "8ba0a1a96272642f70d441aac69dbfe37e1e488e2305efa89371fbf9a740c22d"
+  }
+}

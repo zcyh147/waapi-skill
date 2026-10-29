@@ -1,0 +1,26 @@
+{
+  "version": "2023.1",
+  "wwise_build": "2023.1.19.8928",
+  "definitions_sha256": "39abb2ec5b02bb2758b1cf0bdce21ef6bfda7424b6b15d2b64ffbe018f8712e4",
+  "archive_sha256": "fa5e37e8adacc33cf9189be46a4bdbb7f780ebf776429154fddc0ae2df303415",
+  "page": "waql_reference.html",
+  "page_sha256": "0a1e191ebd047c4e18cbf1a019cdb8d9d2a5014eeb7cbd3a6090f90bbac0ca74",
+  "sections": {
+    "maximum-duration-source": {
+      "html_lines": [
+        365,
+        374
+      ],
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">maxDurationSourceObject</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the Audio Source object that has the maximum playback duration (in seconds) for all descendants of the current object.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with Actor-Mixer Hierarchy objects, Interactive-Music Hierarchy Object, and Events.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from object \"\\Actor-Mixer Hierarchy\" select <span style=\"color: rgb(23,43,77);\">maxDurationSource</span> </td></tr>\r\n",
+      "sha256": "30553c27569aa8f8751a9ba6efb9d64775a5dd83c6c407ede7c18e7fd9d0a37a"
+    },
+    "maximum-radius-attenuation": {
+      "html_lines": [
+        385,
+        394
+      ],
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">maxRadiusAttenuationObject</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the attenuation object that has the maximum radius distance in all descendants of the current objects.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with Actor-Mixer Hierarchy objects, Interactive-Music Hierarchy Object, and Events.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from type Sound select <span style=\"color: rgb(23,43,77);\">maxRadiusAttenuation</span> </td></tr>\r\n",
+      "sha256": "71cbc99bbcb13eb5c68259267c43fb67c6c199793c9ac3b71613b7e0ac7e7c8e"
+    }
+  }
+}

@@ -1,0 +1,576 @@
+"""Closed transport lifetime evidence; ACKs and state observations stay distinct."""
+from copy import deepcopy
+from functools import lru_cache
+import gzip
+import json
+from pathlib import Path
+import shutil
+
+from tests.maintenance import branch_coverage_audit as audit
+from tests.maintenance import branch_audit_completion as completion
+from tests.support import runtime_observation_evidence as runtime
+from tests.support import runtime_remaining_evidence as remaining
+from tests.support import fixed_runtime_read_evidence as fixed
+
+PREFIX='ak.wwise.core.transport.'
+URIS=frozenset(PREFIX+n for n in ('create','destroy','executeAction','prepare','useOriginals','getList','getState'))
+SUPPORT='tests/fixtures/runtime-transport/support-review.json'
+SUPPORT_SHA='23cfdb2072932511d7fd5893158261486602cfb3d471a6b170fe1c36527d6a96'
+CONTRACT='waapi-skill.retained-transport-assessment/v1'
+
+
+def review(root=audit.ROOT):
+    data=remaining._read_pin(root/SUPPORT,SUPPORT_SHA)
+    expected={k:v for k,v in remaining.review(root)['entries'].items()if v['route'].split('|')[-1]in URIS}
+    if (len(expected)!=1486 or data['entries']!=expected or len(data['profiles'])!=64
+            or data['policy_sha256']!=remaining.POLICY_SHA or len(data['normalized_identities'])!=144):
+        raise ValueError('Exact1486 transport roster/history differs')
+    return data
+
+
+def exact_entry(branch,root):
+    entry=remaining.exact_entry(branch,root)
+    if branch['id']not in review(root)['entries']:raise ValueError('Only exact1486 transport rows qualify')
+    return entry
+
+
+@lru_cache(maxsize=32)
+def _provider(label,root,signature):
+    data=review(root);p=data['providers'][label];probe=p['probe']
+    # Reuse the existing complete original-archive/context/source/cleanup validator.
+    # The cursor/diagnostic fact itself earns no transport credit.
+    if probe['kind']=='cursor':
+        from tests.support import runtime_cursor_evidence as cursor
+        original=cursor.original_cursor(probe['route'],root=root)
+        sources=cursor.review(root)['source_maps'][p['original_candidate']]['sources']
+    else:
+        from tests.support import extra_runtime_read_evidence as extra
+        original=extra.original(probe['identity'],root=root)
+        sources=original['descriptor']['sources']
+    path=root/p['archive_source'];encoded=json.loads(gzip.decompress(path.read_bytes()))['files']
+    if (runtime.sha(path.read_bytes())!=p['archive_sha256']or len(encoded)!=p['archive_files']
+            or audit.digest(encoded)!=p['archive_map_sha256']):raise ValueError('Exact whole transport original differs')
+    return original['read'],sources,original['facts']
+
+
+def original_transport(route,base=None,*,root=audit.ROOT):
+    data=review(root);profile=data['profiles'][route];p=data['providers'][profile['provider']]
+    source=root/p['archive_source'];stat=source.stat()
+    read,sources,facts=_provider(profile['provider'],root,(stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns,runtime.original_source_context_key()))
+    name='transport-origin-'+profile['provider']+'.json.gz'
+    archive={'artifact':name,'sha256':p['archive_sha256']}
+    if base is not None:
+        read=runtime.archive_reader(archive,Path(base))
+        encoded=json.loads(gzip.decompress((Path(base)/name).read_bytes()))['files']
+        if len(encoded)!=p['archive_files']or audit.digest(encoded)!=p['archive_map_sha256']:raise ValueError('Exact portable transport whole archive differs')
+    raw=read(profile['raw_path']);packet=json.loads(raw);locator=profile['request_source'];body=read(locator['path'])
+    doc=json.loads(body)if locator['line']is None else json.loads(body.splitlines()[locator['line']])
+    issued=completion.pointer_value(doc,locator['pointer'])
+    call=({'uri':issued['request']['arguments']['api'],'args':issued['request']['arguments']['args'],
+        'options':issued['request']['arguments']['options'],'result':issued['result']}if locator['kind']=='agent-result'else issued)
+    report=json.loads(read(p['report_path']));context=completion.native_host_context(report['host'],'isCommandLine')
+    if (runtime.sha(raw)!=profile['raw_sha256']or runtime.sha(body)!=locator['sha256']or call!=profile['call']
+            or packet['api']!=call['uri']or packet['ok']is not True or packet['dry_run']is not False
+            or packet['result']!=call['result']or context!={k:v for k,v in zip(('version','host','build'),route.split('|')[:3])}
+            or packet['version']!=context['version']or report['candidate']!=p['original_candidate']):
+        raise ValueError('Exact original transport request/result/session/route differs')
+    from wwise_waapi.builders.schema import validate_resolved_semantic_result
+    validate_resolved_semantic_result(call['uri'],call['result'],version=context['version'])
+    # prepare/useOriginals are actual accepted requests, never prepared-state/global-mode proof.
+    retained={'original_candidate':p['original_candidate'],'original_context':context,
+        'original_finalization':facts['original_finalization'],'physical_cleanup_complete':True,
+        'global_pass_transferred':False,'acoustic_output_verified':False,'global_mode_restoration_verified':False,
+        'business_boundary':'acknowledgment_schema_only'if call['uri']in {PREFIX+'prepare',PREFIX+'useOriginals'}else'owned_transport_identity_bounded_state_lifetime'}
+    return {'profile':profile,'provider':p,'archive':archive,'call':call,'read':read,'sources':sources,'facts':retained}
+
+
+def code_bindings(branch):
+    source='skills/waapi-skill/wwise_waapi/'
+    read=branch['route'].endswith(('.getState','.getList'))
+    return {key:{'source':source+symbol,'selector':branch['pointer']}for key,symbol in (
+        ('construction','runtime_inspection_business.py#materialize_runtime_inspection_business_request'if read else'runtime_inspection_business.py#materialize_runtime_control_business_request'),
+        ('validation','builders/schema.py#validate_resolved_semantic_result'),
+        ('verifier','runtime_transport_handles.py#RuntimeTransportHandleStore'))}
+
+
+def _call(row):return {k:row[k]for k in ('uri','args','options','result')}
+def _choice(argv,flag,default=None):return argv[argv.index(flag)+1]if flag in argv else default
+
+
+def _verification_reads(payload,call,trace):
+    """Tie structured verification to its actual independent read span."""
+    reads=[_call(r)for r in trace[call['native_start']:call['native_end']]if r['uri']in URIS]
+    verification=payload['verification']
+    if (verification.get('ok')is not True or verification.get('business_state_verified')is not True
+            or verification.get('status')!='verified'or any(a.get('passed')is not True for a in verification['assertions'])
+            or [r for r in verification['readbacks']if 'uri'in r]!=reads):
+        raise ValueError('Actual independent transport verification reads differ')
+    return reads
+
+
+def _verified_action(args,preview,preview_call,verified_call,payload,trace,owned,version):
+    from wwise_waapi.transport_action import snapshot,expected_state
+    def reader(rows):
+        remaining=list(rows)
+        def read(uri,args,options):
+            if not remaining:raise ValueError('Independent transport observation missing')
+            row=remaining.pop(0)
+            if {k:row[k]for k in ('uri','args','options')}!={'uri':uri,'args':args,'options':options}:
+                raise ValueError('Independent transport observation target differs')
+            return row['result']
+        return read,remaining
+    before_reads=[_call(r)for r in trace[preview_call['native_start']:preview_call['native_end']]if r['uri']in URIS]
+    read,left=reader(before_reads);before=snapshot(args,version=version,read=read)
+    if left or preview['preview_summary']['pre_state']['transport_action_before']!=before:
+        raise ValueError('Transport action Preview prestate differs from actual reads')
+    wanted={args['transport']}if 'transport'in args else set(owned)
+    if ({r['transport']for r in before['targets']}!=wanted or not wanted
+            or any({k:r[k]for k in ('transport','object','gameObject')}!=owned.get(r['transport'])for r in before['targets'])):
+        raise ValueError('Transport action scope/owned association differs')
+    reads=_verification_reads(payload,verified_call,trace);read,left=reader(reads)
+    current=snapshot({'action':'stop',**({'transport':args['transport']}if 'transport'in args else{})},version=version,read=read)
+    targets=[{k:r[k]for k in ('transport','object','gameObject')}for r in before['targets']]
+    if current!={'scope':before['scope'],'targets':targets}:raise ValueError('Transport verification association differs')
+    observation={'kind':'transport-action-observation','action':args['action'],'scope':before['scope'],'membership_matches':True,'targets':[]}
+    for target in before['targets']:
+        state=read(PREFIX+'getState',{'transport':target['transport']},{})['state']
+        expected,unresolved=expected_state(args['action'],target)
+        if unresolved or state!=expected:raise ValueError('Transport action state not independently matched')
+        observation['targets'].append({'transport':target['transport'],'before_state':target.get('state'),
+            'expected_state':expected,'observed_state':state,'outcome':'matched'})
+    verification=payload['verification'];scope=verification['verification_scope']
+    if (left or verification['readbacks']!=reads+[observation]or scope.get('observation')!=observation
+            or any(scope.get(k)is not False for k in ('continuous_state_verified','atomic_scope_verified','causality_verified'))):
+        raise ValueError('Structured bounded transport observation differs')
+
+
+@lru_cache(maxsize=64)
+def _session(encoded):
+    session=json.loads(encoded);trace=session['trace'];calls=session['calls'];stages=session['stages']
+    if not 1<=len(trace)<=2048 or not 1<=len(calls)<=128 or not 1<=len(stages)<=32:raise ValueError('Bounded transport lifecycle required')
+    allowed=URIS|{'ak.wwise.core.getInfo','ak.wwise.core.getProjectInfo','ak.wwise.core.object.get'}
+    if any(set(r)!={'ordinal','uri','args','options','result'}or type(r['ordinal'])is not int or r['ordinal']!=i or r['uri']not in allowed for i,r in enumerate(trace)):
+        raise ValueError('Exact finite transport trace differs')
+    contexts=[completion.native_host_context(r['result'],'isCommandLine')for r in trace if r['uri']=='ak.wwise.core.getInfo']
+    infos=[r['result']for r in trace if r['uri']=='ak.wwise.core.getInfo']
+    if not contexts or any(c!=contexts[0]for c in contexts)or any(x!=infos[0]for x in infos):raise ValueError('Transport live host/build/session drift')
+    context=contexts[0];cursor=0
+    for call in calls:
+        g=call['gateway'];end=call['native_end']
+        if (g['exit_code']!=0 or g['payload'].get('ok')is not True or type(call['native_start'])is not int or call['native_start']!=cursor
+                or type(end)is not int or not cursor<=end<=len(trace)
+                or 'agent_result'in g['payload']and list(g['payload'])[-1]!='agent_result'):raise ValueError('Actual public transport phase/span differs')
+        cursor=end
+    if cursor!=len(trace):raise ValueError('Unattributed transport native trace')
+    lifetimes={};owned={};cursor=0;selected=[]
+    for stage in stages:
+        start,end=stage['start'],stage['end'];uri=stage['uri'];part=calls[start:end]
+        if any(type(stage[k])is not int for k in ('start','end','receipt_index'))or start!=cursor or end<=start or stage['receipt_index']!=end-1 or uri not in URIS:raise ValueError('Transport stage partition differs')
+        cursor=end;argvs=[c['gateway']['argv']for c in part];commands=[a[0]for a in argvs];payload=part[-1]['gateway']['payload']
+        own=trace[part[0]['native_start']:part[-1]['native_end']]
+        if uri in {PREFIX+'getList',PREFIX+'getState'}:
+            if uri.endswith('.getList'):
+                if commands!=['request-schema','typed-zero-call']or argvs[0]!=['request-schema',uri]or argvs[1]!=['typed-zero-call',uri,'--schema-digest',part[0]['gateway']['payload']['schema_digest']]:raise ValueError('Exact getList managed read required')
+            elif commands!=['core-call']or len(argvs[0])!=4 or argvs[0][:3]!=['core-call',uri,'--transport-handle']:raise ValueError('Exact issued-handle getState required')
+            targets=[r for r in own if r['uri']==uri]
+            if len(targets)!=1:raise ValueError('One direct transport read required')
+            native=_call(targets[0])
+            if uri.endswith('.getList'):
+                if native['args']!={}or native['options']!={}or payload['agent_result']!=native['result']:raise ValueError('Whole getList result changed')
+            else:
+                handle=argvs[0][-1]
+                if handle not in lifetimes or native['args']!={'transport':lifetimes[handle]}or native['options']!={}or payload['agent_result']!={'transport_handle':handle,**native['result']}:raise ValueError('Exact live handle/state mapping differs')
+        else:
+            bind=uri.endswith(('.create','.prepare'));expected=['draft-start']+(['draft-bind-object']if bind else[])+['draft-declare-runtime-control-plan','draft-check','preview-from-draft','transaction-show','confirm','execute','verify']
+            if commands!=expected or argvs[0]!=['draft-start',uri]:raise ValueError('Complete public transport Draft/Preview/once execution required')
+            offset=int(bind);decl=argvs[1+offset];preview=part[3+offset]['gateway']['payload'];shown=part[4+offset]['gateway']['payload'];executed=part[6+offset]['gateway']['payload'];tx=preview['transaction_id'];seal=preview['artifact_hash']
+            if (argvs[4+offset]!=preview['next_command']['gateway_argv']or argvs[5+offset]!=shown['next_command']['gateway_argv']
+                    or argvs[6+offset]!=['execute',tx]or argvs[7+offset]!=executed['next_command']['gateway_argv']
+                    or any(x.get('transaction_id')!=tx or x.get('artifact_hash')!=seal for x in (shown,executed,payload))
+                    or payload.get('automatic_retry')is not False):raise ValueError('Sealed transport confirmation/continuation differs')
+            mutation=[r for r in own if r['uri']in URIS-{PREFIX+'getList',PREFIX+'getState'}]
+            if (len(mutation)!=1 or mutation[0]['uri']!=uri
+                    or not part[6+offset]['native_start']<=mutation[0]['ordinal']<part[6+offset]['native_end']):raise ValueError('Transport mutation must execute exactly once in its execute phase')
+            native=_call(mutation[0]);result=payload['agent_result']
+            if result['request']['arguments']!={'api':uri,'args':native['args'],'options':native['options']}or result['result']!=native['result']or result['executed']is not True:raise ValueError('Exact transport public request/result differs')
+            args={}
+            if bind:
+                bound=part[1]['gateway']['payload']['bound_object']['handle']
+                if _choice(decl,'--target-handle')!=bound:raise ValueError('Bound target handle substituted')
+                bind_rows=[r for r in trace[part[1]['native_start']:part[1]['native_end']]if r['uri']=='ak.wwise.core.object.get']
+                ids=[x['id']for r in bind_rows for x in r['result'].get('return',[])if x.get('id')==native['args'].get('object')]
+                if not ids:raise ValueError('Exact live target identity readback absent')
+                args['object']=ids[-1]
+                if uri.endswith('.create')and '--game-object-id'in decl:args['gameObject']=int(_choice(decl,'--game-object-id'))
+            elif uri.endswith('.useOriginals'):args={'enable':{'originals':True,'converted':False}[_choice(decl,'--audition-media')]}
+            else:
+                handle=_choice(decl,'--transport-handle')
+                if uri.endswith('.destroy')or _choice(decl,'--transport-scope')=='one-transport':
+                    if handle not in lifetimes:raise ValueError('Unknown or retired transport authority')
+                    args['transport']=lifetimes[handle]
+                elif _choice(decl,'--transport-scope')!='all-active'or handle is not None:raise ValueError('Unknown transport scope')
+                if uri.endswith('.executeAction'):args['action']={'play':'play','stop':'stop','pause':'pause','toggle-play-stop':'playStop','play-directly':'playDirectly'}[_choice(decl,'--audition-action')]
+            if native['args']!=args or native['options']!={}:raise ValueError('Disclosed transport choices/native compiler differ')
+            if uri.endswith(('.prepare','.useOriginals')):
+                if payload['status']!='result_schema_checked'or payload['verified']is not False:raise ValueError('ACK-only transport effect overclaim')
+            elif payload['verified']is not True:raise ValueError('Transport identity/state/lifetime not verified')
+            if uri.endswith('.create'):
+                handle=result['business_result']['transport_handle'];native_id=native['result']['transport']
+                if type(native_id)is not int or not 0<=native_id<=0xffffffff or not handle.startswith('trh1-')or handle in lifetimes:raise ValueError('Usable transport ID/handle required')
+                reads=_verification_reads(payload,part[-1],trace)
+                if (len(reads)!=2 or reads[0]['uri']!=PREFIX+'getList'or reads[0]['args']!={}or reads[0]['options']!={}
+                        or reads[1]['uri']!=PREFIX+'getState'or reads[1]['args']!={'transport':native_id}or reads[1]['options']!={}
+                        or reads[1]['result'].get('state')not in {'playing','paused','stopped'}):raise ValueError('Created transport independent list/state read missing')
+                rows=[x for x in reads[0]['result'].get('list',[])if x.get('transport')==native_id and x.get('object')==args['object']]
+                if len(rows)!=1 or 'gameObject'in args and any(r['gameObject']!=args['gameObject']for r in rows):raise ValueError('Created transport association missing')
+                lifetimes[handle]=native_id;owned[native_id]={k:rows[0][k]for k in ('transport','object','gameObject')}
+            elif uri.endswith('.executeAction'):
+                _verified_action(args,preview,part[3+offset],part[-1],payload,trace,owned,context['version'])
+            elif uri.endswith('.destroy'):
+                reads=_verification_reads(payload,part[-1],trace)
+                if (len(reads)!=1 or reads[0]['uri']!=PREFIX+'getList'or reads[0]['args']!={}or reads[0]['options']!={}
+                        or not isinstance(reads[0]['result'].get('list'),list)
+                        or any(type(r.get('transport'))is not int or not 0<=r['transport']<=0xffffffff or r['transport']==args['transport']for r in reads[0]['result']['list'])):
+                    raise ValueError('Destroyed transport is not independently absent')
+                lifetimes.pop(handle);owned.pop(args['transport'])
+        selected.append(native)
+    if cursor!=len(calls)or lifetimes:raise ValueError('Complete independent transport cleanup missing')
+    return context,selected
+
+
+def _uncertain_create(cap):
+    """The sole native-valid missing-ID outcome, not a generic failed-flow waiver."""
+    from wwise_waapi.canonical import canonical_sha256
+    from wwise_waapi.builders.schema import validate_resolved_semantic_result
+    trace=cap['native_reads'];calls=cap['public_calls'];native=cap['native_call'];gateway=cap['gateway']
+    if (set(cap['transport_preservation'])!={'kind','journal'}or cap['transport_preservation'].get('kind')!='native-valid-create-id-omitted'
+            or native['uri']!=PREFIX+'create'or native['result']!={}or len(calls)!=8 or not 1<=len(trace)<=128
+            or [c['gateway']['argv'][0]for c in calls]!=['draft-start','draft-bind-object','draft-declare-runtime-control-plan',
+                'draft-check','preview-from-draft','transaction-show','confirm','execute']):raise ValueError('Only exact missing-create-ID preservation qualifies')
+    infos=[r['result']for r in trace if r['uri']=='ak.wwise.core.getInfo']
+    if not infos or any(x!=infos[0]for x in infos):raise ValueError('Uncertain create live session drift')
+    context=completion.native_host_context(infos[0],'isCommandLine');cursor=0
+    for i,c in enumerate(calls):
+        g=c['gateway'];end=c['native_end']
+        if (type(c['native_start'])is not int or c['native_start']!=cursor or type(end)is not int or not cursor<=end<=len(trace)
+                or g['exit_code']!=(2 if i==7 else 0)or g['payload'].get('ok')is not (i!=7)):
+            raise ValueError('Exact uncertain create public span differs')
+        cursor=end
+    if cursor!=len(trace)or calls[-1]['gateway']!=gateway:raise ValueError('Uncertain create terminal packet differs')
+    allowed={PREFIX+'create','ak.wwise.core.getInfo','ak.wwise.core.getProjectInfo','ak.wwise.core.object.get'}
+    if any(set(r)!={'ordinal','uri','args','options','result'}or type(r['ordinal'])is not int or r['ordinal']!=i or r['uri']not in allowed for i,r in enumerate(trace)):
+        raise ValueError('Uncertain create may not retry/clean up an unknown ID')
+    create,=[r for r in trace if r['uri']==PREFIX+'create']
+    if _call(create)!=native or not calls[-1]['native_start']<=create['ordinal']<calls[-1]['native_end']:raise ValueError('One actual create execution required')
+    validate_resolved_semantic_result(PREFIX+'create',native['result'],version=context['version'])
+    preview=calls[4]['gateway']['payload'];shown=calls[5]['gateway']['payload'];payload=gateway['payload'];tx=preview['transaction_id'];seal=preview['artifact_hash']
+    if (calls[0]['gateway']['argv']!=['draft-start',PREFIX+'create']or calls[5]['gateway']['argv']!=preview['next_command']['gateway_argv']
+            or calls[6]['gateway']['argv']!=shown['next_command']['gateway_argv']or gateway['argv']!=['execute',tx]
+            or payload.get('transaction_id')!=tx or shown.get('artifact_hash')!=seal
+            or payload.get('state')!='indeterminate'or payload.get('status')!='transport_handle_persistence_failed'
+            or payload.get('error_code')!='TRANSPORT_HANDLE_RESULT_INVALID'or payload.get('executed')is not True
+            or payload.get('verified')is not False or payload.get('automatic_retry')is not False or payload.get('agent_result')
+            or payload['cleanup']['status']!='unknown'or payload['cleanup']['spec']['binding']['materialized']is not False):
+        raise ValueError('Missing native ID must retain uncertainty/no handle/unknown cleanup')
+    target=_choice(calls[1]['gateway']['argv'],'--object-id')
+    if (native['args']!={'object':target}or native['options']!={}
+            or _choice(calls[2]['gateway']['argv'],'--target-handle')!=calls[1]['gateway']['payload']['bound_object']['handle']
+            or not any(r.get('id')==target for c in trace if c['uri']=='ak.wwise.core.object.get'for r in c['result'].get('return',[]))):
+        raise ValueError('Uncertain create must retain its exact public target binding')
+    journal=cap['transport_preservation']['journal'];previous=''
+    if [e['event_type']for e in journal]!=['preview_created','confirmation_requested','confirmed','execution_started','execution_indeterminate']:
+        raise ValueError('Actual uncertain creation journal required')
+    transitions=[(None,'draft'),('draft','awaiting_confirmation'),('awaiting_confirmation','confirmed'),('confirmed','executing'),('executing','indeterminate')]
+    for i,event in enumerate(journal):
+        if ((event['from_state'],event['to_state'])!=transitions[i]or type(event['sequence'])is not int or event['transaction_id']!=tx or event['artifact_hash']!=seal or event['sequence']!=i+1
+                or event['previous_event_hash']!=previous or event['event_hash']!=canonical_sha256({k:v for k,v in event.items()if k!='event_hash'})):
+            raise ValueError('Uncertain creation durable journal chain differs')
+        previous=event['event_hash']
+    last=journal[-1];dispatch=last['details']['dispatch_result']
+    if (last['to_state']!='indeterminate'or last['details']['automatic_retry']is not False
+            or last['details']['phase']!='transport_lifetime_after_native_dispatch'or dispatch['api']!=native['uri']
+            or dispatch['version']!=context['version']or dispatch['ok']is not True or dispatch['dry_run']is not False
+            or dispatch['error_code']is not None or dispatch['result']!={}or payload['dispatch_result']!=dispatch):raise ValueError('Actual native-valid absent result not preserved')
+    return context
+
+
+def write_transport_preservation_receipt(path,gateway,native_call,*,nodeid,phase_reports,source_context,native_reads,public_calls,journal):
+    """Operation-local positive handling proof for exactly two conditional leaves."""
+    cap={'contract':'waapi-skill.runtime-read-program/v1','nodeid':nodeid,'phase_reports':phase_reports,
+        'source_context':source_context,'source_unchanged':True,'gateway':gateway,'native_call':native_call,
+        'native_reads':native_reads,'public_calls':public_calls,
+        'transport_preservation':{'kind':'native-valid-create-id-omitted','journal':journal}}
+    _capture(cap,audit.ROOT)
+    return runtime.write_json(path,cap)
+
+
+def _capture(cap,root):
+    uri=cap['native_call']['uri']
+    if (uri not in URIS or cap['contract']!='waapi-skill.runtime-read-program/v1'
+            or cap['phase_reports']!=dict.fromkeys(('setup','call','teardown'),'passed')or cap['source_unchanged']is not True
+            or cap['source_context']!=remaining._current_context(root,uri,cap['source_context'])):raise ValueError('Exact transport teardown/source required')
+    if cap.get('transport_preservation')is not None:return _uncertain_create(cap)
+    context,natives=_session(json.dumps({'calls':cap['public_calls'],'trace':cap['native_reads'],'stages':cap['transport_stages']}))
+    stage=cap['transport_stage']
+    if stage not in cap['transport_stages']or cap['gateway']!=cap['public_calls'][stage['receipt_index']]['gateway']or natives[cap['transport_stages'].index(stage)]!=cap['native_call']:
+        raise ValueError('Independent transport stage/native request differs')
+    return context
+
+
+def _normalized_identity(branch,cap,root):
+    """Exact business identity equivalence; never literal native text dispatch."""
+    approved=review(root)['normalized_identities'].get(branch['id'])
+    if approved is None:return None
+    stage=cap['transport_stage'];part=cap['public_calls'][stage['start']:stage['end']]
+    if len(part)!=9 or part[1]['gateway']['argv'][0]!='draft-bind-object':return None
+    argv=part[1]['gateway']['argv'];selector=approved['selector']
+    if selector=='qualified-name':
+        if '--exact-type-name'not in argv:return None
+        index=argv.index('--exact-type-name');kind,name=argv[index+1:index+3];spelling=kind+':'+name
+    else:
+        segments=[argv[i+1]for i,x in enumerate(argv)if x=='--object-path-segment']
+        if not segments:return None
+        spelling='\\'+'\\'.join(segments)
+    guid=cap['native_call']['args'].get('object')
+    before=part[1]['native_start'];after=part[1]['native_end'];trace=cap['native_reads']
+    matches=[row for call in trace[before:after]if call['uri']=='ak.wwise.core.object.get'
+        for row in call['result'].get('return',[])if row.get('id')==guid
+        and (row.get('type')==kind and row.get('name')==name if selector=='qualified-name'else row.get('path')==spelling)]
+    exact=[row for call in trace[after:]if call['uri']=='ak.wwise.core.object.get'and guid in call['args'].get('from',{}).get('id',[])
+        for row in call['result'].get('return',[])if row.get('id')==guid]
+    if not matches or not any(all(row.get(k)==matches[0].get(k)for k in ('id','name','type','path'))for row in exact):
+        raise ValueError('Normalized identity lacks exact public selector and later GUID readback')
+    version,host,_,_,uri=branch['route'].split('|')
+    catalog=remaining._log_catalog(root,version,host)
+    schema=catalog['schemas'][uri]['argsSchema']['properties']['object']
+    definition=catalog['definitions']['documents']['waapi_definitions.json']['definitions']
+    from wwise_waapi.schema_inventory import DefinitionGraph,resolve_schema_reference
+    graph=DefinitionGraph(**{k:catalog['definitions'][k]for k in ('contract','version','wwise_build','source_file_names','documents','inventory_sha256')})
+    resolved=resolve_schema_reference(schema.get('$ref',''),root_schema=catalog['schemas'][uri]['argsSchema'],graph=graph)
+    if (resolved.document_name!='waapi_definitions.json'or resolved.pointer!='/definitions/objectArg'
+            or resolved.target!=definition['objectArg']):raise ValueError('Native object identity reference differs')
+    pointer=branch['pointer'];target='uniqueQualifiedName'if selector=='qualified-name'else'objectPathArg'
+    if '/objectArg/anyOf/'in pointer:
+        index=int(pointer.split('/objectArg/anyOf/')[1].split('/')[0])
+        if definition['objectArg']['anyOf'][index].get('$ref')!='#/definitions/'+target:raise ValueError('Exact primary objectArg arm differs')
+    elif '/definitions/'+target not in pointer:raise ValueError('Exact primary object identity definition differs')
+    if not fixed.predicate(branch,fixed.schema_node(branch,root),spelling,root):raise ValueError('Public identity does not satisfy matching native identity meaning')
+    return {'selector':selector,'public_identity':spelling,'resolved_guid':guid,'native_pointer':'/native_call/args/object',
+        'meaning':'Exact live business identity to GUID; no literal name/path dispatch claim'}
+
+
+def validate_evidence(record,binding,branch,category,base,root,edges=None):
+    exact_entry(branch,root)
+    if category!='program':raise ValueError('Transport root requires closed retained native attachment')
+    if branch.get('approved_boundary',{}).get('kind')=='explicit_media_choice':
+        validate_media_boundary_receipt(record,branch,binding,record['branch_assertions'][branch['id']]['checks'],root)
+        return None
+    cap=record['runtime_read_program'];context=_capture(cap,root)
+    if (context!={k:v for k,v in zip(('version','host','build'),branch['route'].split('|')[:3])}
+            or cap['native_call']['uri']!=branch['route'].split('|')[-1]or record['gateway']!=cap['gateway']or record['native_call']!=cap['native_call']
+            or record['relevant_sources']!=cap['source_context']['packaged']or binding['input']['gateway_argv']!=cap['gateway']['argv']
+            or any(binding.get(k)!=v for k,v in code_bindings(branch).items())):raise ValueError('Exact transport branch/current public context differs')
+    if cap.get('transport_preservation')is not None and branch['pointer']not in {'/resultSchema/@empty/object','/resultSchema/properties/transport/@presence/absent'}:
+        raise ValueError('Uncertain create handling cannot grant another leaf or native root')
+    pointer=binding['observation_pointer']
+    if binding.get('normalized_identity')is not None:
+        normalized=_normalized_identity(branch,cap,root)
+        if normalized is None or binding['normalized_identity']!=normalized or pointer!=normalized['native_pointer']:
+            raise ValueError('Exact public identity normalization differs')
+        return {'observation_pointer':pointer}
+    completion.exact_observation_pointer(branch,binding,'/native_call',branch['pointer'].split('/')[1].removesuffix('Schema'),edges or{})
+    value=remaining._occurrence_value(record,pointer,branch)
+    if not fixed.predicate(branch,fixed.schema_node(branch,root),value,root):raise ValueError('Exact transport branch predicate absent')
+    if cap.get('transport_preservation')is not None:
+        return {'transport_create_omission_preserved':True}
+
+
+def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,binding,root,edges):
+    entry=exact_entry(branch,root)
+    if branch['pointer']!='/resultSchema'or entry['role']!='native_business_anchor'or scope_kind!='product':raise ValueError('Only exact transport root qualifies')
+    original=original_transport(branch['route'],base,root=root);cap=completion.read_sealed_artifact(assessment['program_capture'],base)
+    expected={'contract':CONTRACT,'branch_id':branch['id'],'profile':original['profile'],'support_review':assessment['support_review'],
+        'archive':original['archive'],'program_capture':assessment['program_capture'],'facts':original['facts']}
+    record=completion.read_sealed_artifact(descriptor,base)
+    if (assessment!=expected or not runtime.qualified_source_review_matches(assessment['support_review'],SUPPORT_SHA,review(root),base)
+            or record!={'candidate_sha256':candidate,'scope_kind':'product','evidence_kind':'qualified_retained_transport_fact','branch_id':branch['id'],
+                'native_shape_sha256':branch['shape_sha256'],'assessment_sha256':binding['qualified_runtime_read_attachment']['sha256'],
+                'relevant_sources':original['sources'],'retained_facts':original['facts']}
+            or cap['native_call']!=original['call']):raise ValueError('Exact original transport fact/current complete request replay differs')
+    if runtime.retained_qualified_capture(cap):
+        return 'passed',None
+    validate_evidence({'gateway':cap['gateway'],'native_call':cap['native_call'],'runtime_read_program':cap,'relevant_sources':cap['source_context']['packaged']},binding,branch,'program',base,root,edges)
+    return 'passed',None
+
+
+def write_transport_bundle(output,captures,*,inventory,name_prefix='',boundary_captures=()):
+    versions={r['version']for r in inventory['native_coverage']['routes']if r['uri']in URIS}
+    if (not isinstance(name_prefix,str)or name_prefix and (len(versions)!=1
+            or name_prefix!='transport-'+next(iter(versions))+'-')):
+        raise ValueError('Only the closed matching-version transport prefix qualifies')
+    output=Path(output);output.mkdir(parents=True,exist_ok=False)
+    shutil.copyfile(audit.ROOT/SUPPORT,output/'transport-support-review.json')
+    candidate=inventory['native_coverage']['candidate_sha256'];seen=set()
+    index={'contract':'waapi-skill.branch-evidence-index/v1','base':'.','entries':[],'qualified_runtime_read_attachments':[]}
+    requirements={'contract':'waapi-skill.branch-evidence-requirements/v1','branches':{}}
+    edges={b['id']:b for b in inventory['native_coverage']['obligations']if b['kind']=='reference'}
+    def write(name,value):return runtime.write_json(output/name,value)
+    def desc(name):return {'artifact':name,'sha256':runtime.sha((output/name).read_bytes())}
+    for number,path in enumerate(captures):
+        cap=json.loads(Path(path).read_bytes());context=_capture(cap,audit.ROOT)
+        route,=[r for r in inventory['native_coverage']['routes']if r['uri']==cap['native_call']['uri'] and all(r[k]==v for k,v in context.items())]
+        public,=[r for r in inventory['routes']if r['id']==route['public_route']]
+        mappings=[]
+        for branch in inventory['native_coverage']['obligations']:
+            if branch['id']in seen or branch['route']!=route['id']:continue
+            exact_entry(branch,audit.ROOT)
+            if cap.get('transport_preservation')and branch['pointer']not in {'/resultSchema/@empty/object','/resultSchema/properties/transport/@presence/absent'}:continue
+            normalized=_normalized_identity(branch,cap,audit.ROOT)
+            if normalized:
+                mappings.append((branch,[],normalized['native_pointer'],normalized));continue
+            for chain in runtime._contribution_chains(branch,edges):
+                hit=next(((p,v)for p,v in runtime._contribution_occurrences(cap,runtime._contribution_pattern(branch,chain,edges))
+                    if fixed.predicate(branch,fixed.schema_node(branch),v)),None)
+                if hit:mappings.append((branch,chain,hit[0],None));break
+        if not mappings:continue
+        prefix=(name_prefix or'transport-')+str(number)+'-';cp=write(prefix+'capture.json',cap)
+        program={'candidate_sha256':candidate,'scope_kind':'product','relevant_sources':cap['source_context']['packaged'],
+            'gateway':cap['gateway'],'native_call':cap['native_call'],'runtime_read_program':cap,
+            'invocation':{'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':cap['nodeid'],'outcome':'PASS'}]},'branch_assertions':{}}
+        bindings={'contract':'waapi-skill.branch-bindings/v1','bindings':{}};policies={'contract':requirements['contract'],'branches':{}}
+        for branch,chain,pointer,normalized in mappings:
+            identity=branch['id'];entry=exact_entry(branch,audit.ROOT);pp='/gateway/payload/dispatch_result/result'if cap.get('transport_preservation')else'/gateway/payload/agent_result'
+            program['branch_assertions'][identity]={'native_shape_sha256':branch['shape_sha256'],'native_route':branch['route'],
+                'checks':[({'pointer':pointer,'absent':True}if branch['kind']=='optional_presence'and branch['value']=='absent'
+                    else {'pointer':pointer,'cardinality':branch['value']}if branch['kind']=='collection_cardinality'
+                    else {'pointer':pointer,'equals':completion.pointer_value(program,pointer)}),{'pointer':pp,'equals':completion.pointer_value(program,pp)}]}
+            binding={'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'public_route':public['id'],'public_route_sha256':audit.digest(public),
+                'input':{'gateway_argv':cap['gateway']['argv'],'selector':pointer},'dispatch_pointer':'/native_call','observation_pointer':pointer,
+                'gateway_observation_pointer':pp,'reference_chain':chain,**({'normalized_identity':normalized}if normalized else{}),'relevant_sources':sorted(cap['source_context']['packaged']),'evidence':{},**code_bindings(branch)}
+            validate_evidence(program,binding,branch,'program',output,audit.ROOT,edges)
+            bindings['bindings'][identity]=binding;policies['branches'][identity]=remaining.policy(entry);seen.add(identity)
+            if entry['role']=='native_business_anchor':
+                original=original_transport(route['id']);p=original['profile'];provider=original['provider']
+                if cap['native_call']!=original['call']:
+                    raise ValueError('Transport native root requires actual original request/result replay first')
+                name=original['archive']['artifact'];shutil.copyfile(audit.ROOT/provider['archive_source'],output/name)
+                assessment=write(prefix+'assessment.json',{'contract':CONTRACT,'branch_id':identity,'profile':p,'support_review':desc('transport-support-review.json'),
+                    'archive':desc(name),'program_capture':cp,'facts':original['facts']})
+                evidence=write(prefix+'qualified.json',{'candidate_sha256':candidate,'scope_kind':'product','evidence_kind':'qualified_retained_transport_fact',
+                    'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'assessment_sha256':assessment['sha256'],
+                    'relevant_sources':original['sources'],'retained_facts':original['facts']})
+                index['qualified_runtime_read_attachments'].append(write(prefix+'attachment.json',{'contract':'waapi-skill.qualified-retained-read-attachment/v1',
+                    'branch_id':identity,'assessment':assessment,'evidence':evidence}))
+        pd={**write(prefix+'program.json',program),'nodeid':cap['nodeid']}
+        for b in bindings['bindings'].values():b['evidence']['program']=pd
+        bd=write(prefix+'bindings.json',bindings);rd=write(prefix+'requirements.json',policies)
+        index['entries'].append({'id':prefix,'bindings':bd,'origin':{'bindings':bd,'program':desc(prefix+'program.json'),'requirements':rd,'capture':cp}})
+        requirements['branches'].update(policies['branches'])
+    _write_media_boundaries(output,index,requirements,inventory,boundary_captures,seen,name_prefix)
+    if seen!={b['id']for b in inventory['native_coverage']['obligations']}:
+        raise ValueError('Missing exact transport branch occurrences: '+str(set(b['id']for b in inventory['native_coverage']['obligations'])-seen))
+    write('requirements.json',requirements);write('index.json',index)
+    return output/'index.json'
+
+
+def approved_media_boundary(root,branch,binding):
+    exact_entry(branch,root);authority=review(root)['explicit_media_choice_boundary']
+    if (branch['id']not in authority['ids']or binding.get('boundary')!={'kind':'explicit_media_choice','support_sha256':SUPPORT_SHA,'native_field':'enable'}):return None
+    version,host,build,_,uri=branch['route'].split('|')
+    if version!='2023.1'or host not in {'wwise-console','wwise-authoring'}or build!='2023.1.19.8928'or uri!=PREFIX+'useOriginals':return None
+    catalog=remaining._log_catalog(root,version,host);schema=catalog['schemas'][uri]['argsSchema']
+    if 'enable'in schema.get('required',[])or schema['properties']['enable']['type']!='boolean':raise ValueError('Media omission must remain schema-admitted')
+    completion.validate_native_alternative(root,{**branch,'pointer':'/argsSchema','shape_sha256':audit.digest(schema)}, {},catalog=catalog)
+    from wwise_waapi.runtime_inspection_business_contracts import runtime_inspection_business_contract_data
+    contract=runtime_inspection_business_contract_data(uri,version=version)['declaration']
+    if (list(contract['required_fields'])!=authority['required_fields']or contract['field_types']!=authority['field_types']
+            or contract['input_forms']!={'audition_media':{'flag':'--audition-media','repeatable':False}}):raise ValueError('Approved explicit media contract changed')
+    return {'kind':'explicit_media_choice','native_field':'enable','source_review_sha256':SUPPORT_SHA,'native_schema_classification':'accepted'}
+
+
+def media_boundary_code_bindings(branch):
+    prefix='skills/waapi-skill/wwise_waapi/'
+    return {key:{'source':prefix+symbol,'selector':branch['pointer']}for key,symbol in (
+        ('construction','runtime_inspection_business.py#materialize_runtime_control_business_request'),
+        ('validation','runtime_inspection_business.py#materialize_runtime_control_business_request'),
+        ('verifier','operation_registry.py#verify_prepared_operation'))}
+
+
+def write_media_boundary_capture(path,pairs,*,nodeid,phase_reports):
+    if phase_reports!=dict.fromkeys(('setup','call','teardown'),'passed'):raise ValueError('Media boundary requires successful actual teardown')
+    proof={'contract':'waapi-skill.explicit-media-boundary/v1','nodeid':nodeid,'phase_reports':phase_reports,
+        'pairs':[{'rejected':p['rejected'],'valid':json.loads(Path(p['valid_capture']).read_bytes())}for p in pairs]}
+    return runtime.write_json(path,proof)
+
+
+def validate_media_boundary_receipt(record,branch,binding,checks,root=None):
+    root=root or audit.ROOT
+    if approved_media_boundary(root,branch,binding)is None:raise ValueError('Unapproved explicit media boundary')
+    if any(binding.get(k)!=v for k,v in media_boundary_code_bindings(branch).items()):raise ValueError('Media boundary public implementation differs')
+    proof=record['explicit_media_boundary'];pairs=proof['pairs'];choices=set();expected={k:v for k,v in zip(('version','host','build'),branch['route'].split('|')[:3],strict=True)}
+    if proof['contract']!='waapi-skill.explicit-media-boundary/v1'or proof['phase_reports']!=dict.fromkeys(('setup','call','teardown'),'passed')or len(pairs)!=2:
+        raise ValueError('Media boundary actual complete finalization missing')
+    for pair in pairs:
+        cap=pair['valid'];context=_capture(cap,root);stage=cap['transport_stage'];part=cap['public_calls'][stage['start']:stage['end']]
+        rejected=pair['rejected'];gateway=rejected['gateway'];payload=gateway['payload'];accepted=part[1];decl=accepted['gateway']['argv'];flag=review(root)['explicit_media_choice_boundary']['public_flag']
+        if (context!=expected or cap['nodeid']!=proof['nodeid']or cap['phase_reports']!=proof['phase_reports']or stage['uri']!=PREFIX+'useOriginals'
+                or rejected['stage_index']!=cap['transport_stages'].index(stage)or decl.count(flag)!=1):raise ValueError('Exact same-route media counterpart differs')
+        started=part[0]['gateway']['payload'];draft=started['draft']['draft_id'];authority=started['task_authority'];revision=started['draft']['revision']
+        prefix=['draft-declare-runtime-control-plan',draft,'--task-authority',authority,'--expected-revision',str(revision)]
+        declared=accepted['gateway']['payload'];checked=part[2]['gateway']['payload']
+        if (decl[:len(prefix)]!=prefix or declared['draft']['draft_id']!=draft or declared['draft']['revision']!=revision+1
+                or part[2]['gateway']['argv']!=['draft-check',draft,'--task-authority',authority,'--expected-revision',str(declared['draft']['revision'])]
+                or part[3]['gateway']['argv']!=['preview-from-draft',draft,'--task-authority',authority,'--expected-revision',str(checked['draft']['revision'])]):
+            raise ValueError('Media boundary same-Draft authority/revision provenance differs')
+        position=decl.index(flag);choice=decl[position+1];choices.add(choice)
+        if (choice not in {'originals','converted'}or decl[position+2:]or gateway['argv']!=decl[:position]
+                or cap['native_call']!={'uri':PREFIX+'useOriginals','args':{'enable':choice=='originals'},'options':{},'result':{}}
+                or cap['gateway']['payload']['verified']is not False or cap['gateway']['payload']['status']!='result_schema_checked'):
+            raise ValueError('Same-Draft explicit media choice/ACK counterpart differs')
+        read_only=cap['native_reads'][accepted['native_start']:accepted['native_end']]
+        if ([r['uri']for r in read_only]!=['ak.wwise.core.getInfo','ak.wwise.core.getProjectInfo']
+                or any(r['args']is not None or r['options']is not None for r in read_only)
+                or audit.digest(rejected['native_calls'])!=audit.digest(read_only)
+                or any(payload.get(k)!=accepted['gateway']['payload'].get(k)for k in ('endpoint','detected_version','is_command_line'))):
+            raise ValueError('Rejected media choice exact read-only context differs')
+        repair=payload.get('details',{}).get('repair',{})
+        if (gateway['exit_code']!=2 or payload.get('ok')is not False or 'agent_result'in payload
+                or payload.get('error_code')!='RUNTIME_CONTROL_PLAN_FIELDS_INVALID'
+                or repair.get('error_code')!='RUNTIME_CONTROL_PLAN_FIELDS_INVALID'or repair.get('field')!='runtime_control_plan'
+                or repair.get('required')!=['audition_media']or repair.get('optional')!=[]or repair.get('draft_changed')is not False):
+            raise ValueError('Exact missing media choice rejection differs')
+        if record['relevant_sources']!=cap['source_context']['packaged']:raise ValueError('Media boundary source attribution differs')
+    if choices!={'originals','converted'}or record['gateway']!=pairs[0]['rejected']['gateway']or record['native_calls']!=pairs[0]['rejected']['native_calls']:
+        raise ValueError('Both explicit media choices and exact rejection receipt required')
+
+
+def _write_media_boundaries(output,index,requirements,inventory,paths,seen,name_prefix):
+    for number,path in enumerate(paths):
+        proof=json.loads(Path(path).read_bytes());cap=proof['pairs'][0]['valid'];context=_capture(cap,audit.ROOT)
+        route,=[r for r in inventory['native_coverage']['routes']if r['uri']==PREFIX+'useOriginals'and all(r[k]==v for k,v in context.items())]
+        selected=[b for b in inventory['native_coverage']['obligations']if b['route']==route['id']and b['id']in review()['explicit_media_choice_boundary']['ids']]
+        if not selected:raise ValueError('No exact approved media branch selected')
+        prefix=(name_prefix or'transport-')+'media-boundary-'+context['host']+'-'+str(number)+'-'
+        cp=runtime.write_json(output/(prefix+'capture.json'),proof);rejected=proof['pairs'][0]['rejected'];g=rejected['gateway']
+        record={'candidate_sha256':inventory['native_coverage']['candidate_sha256'],'scope_kind':'product','relevant_sources':cap['source_context']['packaged'],
+            'gateway':g,'native_calls':rejected['native_calls'],'explicit_media_boundary':proof,
+            'invocation':{'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':proof['nodeid'],'outcome':'PASS'}]},'branch_assertions':{}}
+        bindings={'contract':'waapi-skill.branch-bindings/v1','bindings':{}};policies={'contract':requirements['contract'],'branches':{}}
+        public,=[r for r in inventory['routes']if r['id']==route['public_route']]
+        for branch in selected:
+            identity=branch['id']
+            if identity in seen:raise ValueError('Duplicate explicit media boundary')
+            entry=exact_entry(branch,audit.ROOT);check={'pointer':'/gateway/payload/error_code','equals':g['payload']['error_code']}
+            record['branch_assertions'][identity]={'native_shape_sha256':branch['shape_sha256'],'native_route':branch['route'],'checks':[check]}
+            binding={'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'public_route':public['id'],'public_route_sha256':audit.digest(public),
+                'input':{'gateway_argv':g['argv'],'selector':'/gateway/argv'},'dispatch_pointer':'/explicit_media_boundary/pairs/0/valid/native_call',
+                'observation_pointer':'/gateway/payload/error_code','gateway_observation_pointer':'/gateway/payload/error_code','reference_chain':[],
+                'relevant_sources':sorted(cap['source_context']['packaged']),'disposition':'approved_boundary',
+                'boundary':{'kind':'explicit_media_choice','support_sha256':SUPPORT_SHA,'native_field':'enable'},**media_boundary_code_bindings(branch)}
+            validate_media_boundary_receipt(record,branch,binding,[check],audit.ROOT);bindings['bindings'][identity]=binding
+            policies['branches'][identity]=remaining.policy(entry);seen.add(identity)
+        pd={**runtime.write_json(output/(prefix+'program.json'),record),'nodeid':proof['nodeid']}
+        for b in bindings['bindings'].values():b['evidence']={'program':pd}
+        bd=runtime.write_json(output/(prefix+'bindings.json'),bindings);rd=runtime.write_json(output/(prefix+'requirements.json'),policies)
+        index['entries'].append({'id':prefix,'bindings':bd,'origin':{'bindings':bd,'program':{'artifact':pd['artifact'],'sha256':pd['sha256']},'requirements':rd,'capture':cp}})
+        requirements['branches'].update(policies['branches'])

@@ -1,0 +1,166 @@
+{
+  "contract": "waapi-skill.retained-cursor-assessment/v1",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime|/resultSchema",
+  "profile": {
+    "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+    "version": "2024.1",
+    "host": "wwise-authoring",
+    "build": "2024.1.13.9056",
+    "candidate": "a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8",
+    "archive_source": "tests/fixtures/runtime-qualified-reads/r104-2024.1-original.json.gz",
+    "archive_sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22",
+    "archive_files": 377,
+    "archive_map_sha256": "eb637204417efe17638a220b19057babe589c85b7615dbffa11171d398e2bfd4",
+    "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1",
+    "report_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/profiler-capture.json",
+    "report_sha256": "ae720a473275e7baf9e9cf3ec6a29ad6fac5e526a19779761b33562d67676f0a",
+    "node_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f.json",
+    "receipt": {
+      "argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getCursorTime",
+        "--profiler-cursor",
+        "capture-latest"
+      ],
+      "exit_code": 0,
+      "payload": {
+        "agent_result": {
+          "available": true,
+          "position_ms": 45621,
+          "profiler_cursor": "capture-latest"
+        },
+        "api_attempted": "ak.wwise.core.profiler.getCursorTime",
+        "business_request": {
+          "max_results": 1,
+          "operation": "ak.wwise.core.profiler.getCursorTime",
+          "profiler_cursor": "capture-latest"
+        },
+        "call": {
+          "api": "ak.wwise.core.profiler.getCursorTime",
+          "category": "core.profiler",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/owned/authoring-nodes/d87a1375cafae330c7be7f7f/native-evidence/1792789154368401000-6d199ddaabac40378f4e41de9eadf97f-ak_wwise_core_profiler_getCursorTime.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 10.0,
+          "version": "2024.1"
+        },
+        "command": "core-call",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2024.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 8080,
+          "url": "ws://127.0.0.1:8080/waapi"
+        },
+        "is_command_line": false,
+        "ok": true,
+        "schema_validation": {
+          "request": {
+            "required_families": [],
+            "required_fields": [
+              "cursor"
+            ],
+            "section": "request",
+            "unresolved_refs": [
+              "waapi_definitions.json#/definitions/profilerCursor"
+            ],
+            "uri": "ak.wwise.core.profiler.getCursorTime",
+            "validated_nodes": 3,
+            "version": "2024.1"
+          },
+          "result": {
+            "required_families": [],
+            "required_fields": [
+              "return"
+            ],
+            "section": "result",
+            "unresolved_refs": [],
+            "uri": "ak.wwise.core.profiler.getCursorTime",
+            "validated_nodes": 2,
+            "version": "2024.1"
+          }
+        },
+        "session_context": {
+          "adapter_version": "2024.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "url": "ws://127.0.0.1:8080/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2024.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:8080/waapi",
+              "project_modification_policy": "ask_before_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "ask_before_changes"
+        },
+        "status": "ok"
+      }
+    },
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789154368401000-6d199ddaabac40378f4e41de9eadf97f-ak_wwise_core_profiler_getCursorTime.json",
+    "raw_sha256": "a95ddc2cb45ba51d66b999038ea4fda040d9069354cf31d14144d5fa1e63701d",
+    "result": {
+      "return": 45621
+    },
+    "native_args": {
+      "cursor": "capture"
+    },
+    "native_options": {},
+    "catalog_sha256": "32d68574fe0f41a4ee70bb1c6098f5ecdac434d6f6e00bbb237cba4aa28f7fd9",
+    "schema_sha256": "810a67924500d3e2a813767aa459a16fd41803884975c091735ec71373636da6",
+    "original_finalization": "BLOCKED",
+    "claim": "same-target actual capture cursor scalar; public capture/user choices and -1 sentinel are program-proven using unchanged pinned meanings; no continuing position, capture completeness or other mode occurrence claim"
+  },
+  "support_review": {
+    "artifact": "tests/fixtures/runtime-cursor/support-review.json",
+    "sha256": "45ef526e06b725b4e00fe42b1edfd4a1e26346deb0fe160be927272d05ea535d"
+  },
+  "archive": {
+    "artifact": "tests/fixtures/runtime-qualified-reads/r104-2024.1-original.json.gz",
+    "sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22"
+  },
+  "program_capture": {
+    "artifact": "native-01-capture.json",
+    "sha256": "c58b78c4c17b239d48bc82cd86566c1bc0eae645a819e038fd85d435c1d523ba"
+  },
+  "facts": {
+    "original_candidate": "a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8",
+    "original_context": {
+      "version": "2024.1",
+      "build": "2024.1.13.9056",
+      "host": "wwise-authoring"
+    },
+    "original_finalization": "BLOCKED",
+    "actual_cursor": "capture",
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false,
+    "continuing_position_verified": false,
+    "capture_completeness_verified": false
+  }
+}

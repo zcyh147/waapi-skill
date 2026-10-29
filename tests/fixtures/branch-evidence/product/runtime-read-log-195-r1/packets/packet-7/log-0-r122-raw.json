@@ -1,0 +1,23 @@
+{
+  "api": "ak.wwise.core.log.get",
+  "category": "core.log",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792821462975907000-e9ca08bd201b4496a8b1935083548c33-ak_wwise_core_log_get.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "items": [
+      {
+        "message": "WAAPI owned Console addition 2c3d53909345442d977fc2d79c1d3c3e",
+        "messageId": "",
+        "severity": "Message",
+        "time": 1792821462
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 10.0,
+  "version": "2025.1"
+}

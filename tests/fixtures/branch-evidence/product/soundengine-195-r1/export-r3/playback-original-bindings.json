@@ -1,0 +1,95 @@
+{
+  "contract": "waapi-skill.branch-bindings/v1",
+  "bindings": {
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.soundengine.executeActionOnEvent|/argsSchema": {
+      "branch_id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.soundengine.executeActionOnEvent|/argsSchema",
+      "native_shape_sha256": "153a038cf0a774134e15a677345cce753bf4796912f7a98b1a5b9efefab5f873",
+      "public_route": "2021.1|function|ak.soundengine.executeActionOnEvent",
+      "public_route_sha256": "9aeda6b10f692ee375b7750aa941184ca54ec60bb40e9bd98ae9c7230b41e5f1",
+      "input": {
+        "gateway_argv": [
+          "draft-start",
+          "ak.soundengine.executeActionOnEvent"
+        ],
+        "declaration": "draft-declare-soundengine-plan",
+        "selector": "/argsSchema",
+        "correspondence": {
+          "rule": "closed_argument_envelope",
+          "native_pointer": "/argsSchema",
+          "native_fields": [
+            "actionType",
+            "event",
+            "fadeCurve",
+            "gameObject",
+            "transitionDuration"
+          ],
+          "public_fields": [
+            "action",
+            "event_handle",
+            "fade_curve",
+            "fade_duration_ms",
+            "game_object_handle"
+          ],
+          "value_paths": [],
+          "encoding": "Stop=0; Pause=1; Resume=2; Break=3; ReleaseEnvelope=4; bound exact role GUID; live identity/type/relationship revalidation; Log3=0; Sine=1; Log1=2; InvSCurve=3; Linear=4; SCurve=5; Exp1=6; SineRecip=7; Exp3=8; default Linear; SDK Constant=9 is invalid for fades; active generation or omitted public handle emits uint64 all-object sentinel; whole 0..2147483647 ms; default 0"
+        }
+      },
+      "construction": {
+        "source": "skills/waapi-skill/wwise_waapi/soundengine_business.py#materialize_soundengine_control_business_request",
+        "selector": "/argsSchema"
+      },
+      "validation": {
+        "source": "skills/waapi-skill/wwise_waapi/builders/schema.py#validate_semantic_payload",
+        "selector": "/argsSchema"
+      },
+      "verifier": {
+        "source": "skills/waapi-skill/wwise_waapi/operation_registry.py#verify_prepared_operation",
+        "selector": "/argsSchema"
+      },
+      "representative_mechanism": "soundengine195-playback-v1",
+      "evidence": {
+        "program": {
+          "artifact": "soundengine-195-r1/export-r3/playback-program.json",
+          "sha256": "b37132ccce7db53330caec044a05c7334c4b03ee0defbe12d1cd8acd5b1467bb"
+        }
+      },
+      "ordinary_test_run_attachment": true,
+      "relevant_sources": [
+        "skills/waapi-skill/scripts/gateway.py",
+        "skills/waapi-skill/wwise_waapi/builders/metadata.py",
+        "skills/waapi-skill/wwise_waapi/builders/query.py",
+        "skills/waapi-skill/wwise_waapi/builders/schema.py",
+        "skills/waapi-skill/wwise_waapi/business_adapters.py",
+        "skills/waapi-skill/wwise_waapi/business_declaration_state.py",
+        "skills/waapi-skill/wwise_waapi/business_declarations.py",
+        "skills/waapi-skill/wwise_waapi/capabilities.py",
+        "skills/waapi-skill/wwise_waapi/config.py",
+        "skills/waapi-skill/wwise_waapi/dispatcher.py",
+        "skills/waapi-skill/wwise_waapi/execution_contracts.py",
+        "skills/waapi-skill/wwise_waapi/io_policy.py",
+        "skills/waapi-skill/wwise_waapi/metadata_discovery.py",
+        "skills/waapi-skill/wwise_waapi/object_query_outputs.py",
+        "skills/waapi-skill/wwise_waapi/object_query_related.py",
+        "skills/waapi-skill/wwise_waapi/object_query_related_lists.py",
+        "skills/waapi-skill/wwise_waapi/object_query_related_metadata.py",
+        "skills/waapi-skill/wwise_waapi/object_query_related_runtime.py",
+        "skills/waapi-skill/wwise_waapi/operation_composer.py",
+        "skills/waapi-skill/wwise_waapi/operation_drafts.py",
+        "skills/waapi-skill/wwise_waapi/operation_registry.py",
+        "skills/waapi-skill/wwise_waapi/reference_kind_evidence.py",
+        "skills/waapi-skill/wwise_waapi/runtime_game_object_handles.py",
+        "skills/waapi-skill/wwise_waapi/runtime_playing_handles.py",
+        "skills/waapi-skill/wwise_waapi/soundengine_business.py",
+        "skills/waapi-skill/wwise_waapi/soundengine_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/soundengine_lifecycle.py",
+        "skills/waapi-skill/wwise_waapi/soundengine_object_returns.py",
+        "skills/waapi-skill/wwise_waapi/soundengine_related_outputs.py",
+        "skills/waapi-skill/wwise_waapi/transaction_cleanup.py",
+        "skills/waapi-skill/wwise_waapi/transaction_runtime.py",
+        "skills/waapi-skill/wwise_waapi/transactions.py",
+        "tests/support/gateway_config.py",
+        "tests/unit/test_soundengine_business_gateway.py"
+      ]
+    }
+  }
+}

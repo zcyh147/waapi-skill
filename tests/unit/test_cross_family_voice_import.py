@@ -47,7 +47,7 @@ class VoiceReader(ScriptedReader):
             ET.SubElement(languages, "Language", {"Name": "Japanese", "ID": JP_LANGUAGE})
             document.write(project_file, encoding="utf-8", xml_declaration=True)
         super().__init__(
-            [], project_root=project_root, originals_root=project_root / "Originals",
+            [], version=version, project_root=project_root, originals_root=project_root / "Originals",
             legacy_project_file=project_file,
             project_languages=[
                 {"id": EN_LANGUAGE, "name": "English(US)", "shortId": 1},
@@ -55,9 +55,9 @@ class VoiceReader(ScriptedReader):
             ],
         )
         self.root = r"\Containers\Default Work Unit" if version == "2025.1" else r"\Actor-Mixer Hierarchy\Default Work Unit"
-        self.owner = {"id": OWNER, "type": "Sound", "name": "Voice", "path": self.root + r"\Voice",
+        self.owner = {"id": OWNER, "type": "Sound", "classId": 65552, "name": "Voice", "path": self.root + r"\Voice",
                       "parent": {"id": PARENT}, "notes": "preserved"}
-        self.anchor = {"id": PARENT, "type": "WorkUnit", "name": "Default Work Unit", "path": self.root,
+        self.anchor = {"id": PARENT, "type": "WorkUnit", "classId": 1638416, "name": "Default Work Unit", "path": self.root,
                        "parent": {"id": OTHER_SOURCE}, "notes": ""}
         self.children = deepcopy(children)
         for child in self.children:
@@ -68,19 +68,19 @@ class VoiceReader(ScriptedReader):
             return super().__call__(uri, args, options)
         self.calls.append((uri, dict(args), dict(options)))
         if args.get("waql") == f'from object "{OWNER}" select children take 129':
-            return {"return": deepcopy(self.children)}
+            return self._class_projection({"return": deepcopy(self.children)}, options)
         identity = args.get("from", {})
         if "path" in identity:
             known = {self.root: self.anchor, self.owner["path"]: self.owner}
-            return {"return": [deepcopy(known[path]) for path in identity["path"] if path in known]}
+            return self._class_projection({"return": [deepcopy(known[path]) for path in identity["path"] if path in known]}, options)
         if "id" in identity:
             known = {PARENT: self.anchor, OWNER: self.owner}
-            return {"return": [deepcopy(known[guid]) for guid in identity["id"] if guid in known]}
+            return self._class_projection({"return": [deepcopy(known[guid]) for guid in identity["id"] if guid in known]}, options)
         raise AssertionError((uri, args, options))
 
 
 def source(guid: str, language: str) -> dict[str, Any]:
-    return {"id": guid, "name": "Line", "type": "AudioFileSource", "parent": {"id": OWNER},
+    return {"id": guid, "name": "Line", "type": "AudioFileSource", "classId": 16, "parent": {"id": OWNER},
             "audioSource:language": {"id": EN_LANGUAGE if language == "English(US)" else JP_LANGUAGE,
                                      "name": language}}
 

@@ -1,0 +1,127 @@
+{
+  "status": "PASS",
+  "host_failure": null,
+  "targets": [
+    {
+      "scope": "ObjectSettingAssoc",
+      "field": "ContinuePlay",
+      "status": "captured",
+      "list_receipt": "005",
+      "detail_receipt": "006",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "05a7e7b684023a3e9b7b88a8e64f34c851b28f9c3ee0519ca738ec769d322f98"
+    },
+    {
+      "scope": "Sound",
+      "field": "Weight",
+      "status": "captured",
+      "list_receipt": "009",
+      "detail_receipt": "010",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "65306159015dda3647d91c8d2f0c4d0bdb153997b73d12fae16d1de026317ae6"
+    },
+    {
+      "scope": "Sound",
+      "field": "UserAuxSendVolume0",
+      "status": "captured",
+      "list_receipt": "009",
+      "detail_receipt": "011",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "851088774e0801480e405fa3053842ec3ddbbd92ab58a16d35e40c901b3bd095"
+    },
+    {
+      "scope": "ModulatorTime",
+      "field": "EnvelopeStopPlayback",
+      "status": "captured",
+      "list_receipt": "013",
+      "detail_receipt": "014",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "130bb53abd16375d5ad20228ba290e9f8c9cbacb0c64b00dbcebb84c5a5d3234"
+    },
+    {
+      "scope": "ModulatorLfo",
+      "field": "LfoSmoothing",
+      "status": "captured",
+      "list_receipt": "016",
+      "detail_receipt": "017",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "5a86824e08eee7556ad359a730f5f0aabab913c44d0f573e7dee7704a8ae03c8"
+    },
+    {
+      "scope": "ModulatorLfo",
+      "field": "LfoPWM",
+      "status": "captured",
+      "list_receipt": "016",
+      "detail_receipt": "018",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "1e0b600887ec8dd3d2e75158144d521a3dd410e53d46b93677f954809dd3139c"
+    },
+    {
+      "scope": "GameParameter",
+      "field": "SlewRateUp",
+      "status": "captured",
+      "list_receipt": "020",
+      "detail_receipt": "021",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "aa9d811e34bfe47b9924c0f7376330277ef50b1b8e874ded7fb79b649080d71a"
+    },
+    {
+      "scope": "GameParameter",
+      "field": "RTPCRamping",
+      "status": "captured",
+      "list_receipt": "020",
+      "detail_receipt": "022",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "296e236f26580afa7c2b325b18b328a2c0dafb4258ad8f43b53fa57f122250d4"
+    },
+    {
+      "scope": "Action",
+      "field": "Target",
+      "status": "captured",
+      "list_receipt": "024",
+      "detail_receipt": "025",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "6be8fcda9b186e704b74aa479abab0273e4f66edc2f2dce10d71dbc774ca0df4"
+    },
+    {
+      "scope": "Action",
+      "field": "Scope",
+      "status": "captured",
+      "list_receipt": "024",
+      "detail_receipt": "026",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "87f45cca54e0cab11a3ac08fd018adb51024d771fdf8addfe7b9ca4a5b92f2cc"
+    }
+  ],
+  "gateway_invocations": 27,
+  "lifecycle": {
+    "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+    "scenario_id": "CONDITION-METADATA-2021.1",
+    "version": "2021.1",
+    "requested_status": "PASS",
+    "final_status": "PASS",
+    "sandbox_retained": false,
+    "source_hash_before": {
+      "algorithm": "sha256",
+      "strategy": "full",
+      "digest": "18515349f431a86c1d9956461d5b00bb5a86b26a49db24a535d3d3714dba42f1",
+      "file_count": 68,
+      "bytes_hashed": 4511191
+    },
+    "source_hash_after": {
+      "algorithm": "sha256",
+      "strategy": "full",
+      "digest": "18515349f431a86c1d9956461d5b00bb5a86b26a49db24a535d3d3714dba42f1",
+      "file_count": 68,
+      "bytes_hashed": 4511191
+    },
+    "source_mtime_before_ns": 1777658931409433523,
+    "source_mtime_after_ns": 1777658931409433523,
+    "errors": [],
+    "quarantine_path": null
+  },
+  "agent_started": false,
+  "project_mutation_commands": 0,
+  "scope": "Console class metadata reconciliation only; not implementation or business coverage",
+  "evidence_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/condition-metadata-2021-r1"
+}

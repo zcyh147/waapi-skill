@@ -1,0 +1,72 @@
+{
+  "selection": "mf1.1792523916.1.1e90c886768abd8005f7c6c391ce8ddd0042940bb192112681142f220c2242ca",
+  "scope": {
+    "kind": "object_type",
+    "requested": "EffectSlot",
+    "resolved": {
+      "classId": 5505040,
+      "name": "EffectSlot",
+      "type": "WObject"
+    }
+  },
+  "metadata": {
+    "name": "Effect",
+    "type": "",
+    "default": null,
+    "audioEngineId": 4294967295,
+    "supports": {
+      "rtpc": "None",
+      "randomizer": false,
+      "unlink": false
+    },
+    "display": {
+      "name": "Effect",
+      "index": 2055,
+      "group": ""
+    },
+    "dependencies": [],
+    "restriction": {
+      "type": "reference",
+      "restrictions": [
+        {
+          "type": [
+            "Effect"
+          ],
+          "sharedOnlyTypes": []
+        }
+      ]
+    },
+    "ui": {
+      "value": {
+        "min": 0.0,
+        "max": 0.0,
+        "decimals": 0,
+        "step": 0.0,
+        "fine": 0.0,
+        "infinity": 0
+      },
+      "displayAs": {
+        "lrMix": false,
+        "musicNote": false,
+        "bitfield": false,
+        "percentage": false
+      },
+      "dataMeaning": "None",
+      "autoUpdate": false
+    },
+    "unit": {
+      "status": "unknown",
+      "value": null
+    },
+    "availability": {
+      "type": "known",
+      "default": "known",
+      "restriction": "known",
+      "dependencies": "known",
+      "supports": "known",
+      "ui": "known"
+    }
+  },
+  "complete": true,
+  "mutation_authority": false
+}

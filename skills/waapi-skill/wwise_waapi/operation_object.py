@@ -15,6 +15,7 @@ already-resolved reference identities.
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from dataclasses import dataclass
@@ -22,6 +23,8 @@ from enum import Enum
 from typing import Any, Mapping, Sequence
 
 from .canonical import canonical_json_bytes
+from .operation_plugin import PluginCreationDescriptor, normalize_plugin_creation
+from .owned_control_inputs import OwnedControlInputDescriptor, CONTROL_INPUT_CLASSES
 
 
 JsonScalar = str | int | float | bool
@@ -39,10 +42,11 @@ DEFAULT_MAX_FIELD_NAME_LENGTH = 128
 DEFAULT_MAX_NOTES_LENGTH = 64 * 1024
 DEFAULT_MAX_RTPCS = 32
 DEFAULT_MAX_RTPC_POINTS = 256
+OBJECT_SET_REFERENCE_ARRAY_VERSIONS = frozenset({"2023.1", "2024.1", "2025.1"})
 DEFAULT_MAX_IMPORT_FILES = 16
 
 NODE_FIELDS = frozenset({"type", "name", "notes", "properties", "references", "children"})
-OBJECT_SET_NODE_FIELDS = NODE_FIELDS | {"platform", "language", "import"}
+OBJECT_SET_NODE_FIELDS = NODE_FIELDS | {"platform", "language", "import", "lists", "anonymous", "plugin"}
 LIST_FIELDS = frozenset({"name", "objects"})
 PROPERTY_FIELDS = frozenset({"name", "value"})
 REFERENCE_FIELDS = frozenset({"name", "target"})
@@ -208,13 +212,34 @@ class ObjectPropertyDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
+class ObjectCurveDescriptor:
+    points: tuple[RtpcCurvePoint, ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"curve_points": [point.as_dict() for point in self.points]}
+
+    def native_value(self) -> dict[str, Any]:
+        return {"type": "Curve", "points": [point.as_dict() for point in self.points]}
+
+
+@dataclass(frozen=True, slots=True)
 class ObjectReferenceDescriptor:
     request_path: str
     name: str
-    target: ObjectIdentityDescriptor
+    target: ObjectIdentityDescriptor | tuple[ObjectIdentityDescriptor, ...] | ObjectCurveDescriptor | OwnedControlInputDescriptor | None
+
+    @property
+    def targets(self) -> tuple[ObjectIdentityDescriptor, ...]:
+        if self.target is None or isinstance(self.target, (ObjectCurveDescriptor, OwnedControlInputDescriptor)):
+            return ()
+        return self.target if isinstance(self.target, tuple) else (self.target,)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "target": self.target.as_dict()}
+        target = None if self.target is None else (
+            [item.as_dict() for item in self.target]
+            if isinstance(self.target, tuple) else self.target.as_dict()
+        )
+        return {"name": self.name, "target": target}
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,7 +301,7 @@ class RtpcDescriptor:
 
     request_path: str
     property: str
-    control_input: ObjectIdentityDescriptor
+    control_input: ObjectIdentityDescriptor | OwnedControlInputDescriptor
     points: tuple[RtpcCurvePoint, ...]
     notes: str | None
 
@@ -306,9 +331,21 @@ class ObjectNodeDescriptor:
     properties: tuple[ObjectPropertyDescriptor, ...]
     references: tuple[ObjectReferenceDescriptor, ...]
     children: tuple[ObjectNodeDescriptor, ...]
+    lists: tuple[ObjectListDescriptor, ...] = ()
+    collection: str = "children"
+    rtpc: RtpcDescriptor | None = None
+    rtpc_mode: str | None = None
+    anonymous: bool = False
+    plugin: PluginCreationDescriptor | None = None
 
     def as_dict(self) -> dict[str, Any]:
+        if self.rtpc is not None:
+            return {"rtpc": self.rtpc.as_dict(), "rtpc_mode": self.rtpc_mode}
         result: dict[str, Any] = {"type": self.type, "name": self.name}
+        if self.anonymous:
+            result["anonymous"] = True
+        if self.plugin is not None:
+            result["plugin"] = self.plugin.as_dict()
         if self.notes is not None:
             result["notes"] = self.notes
         if self.platform is not None:
@@ -323,6 +360,8 @@ class ObjectNodeDescriptor:
             result["references"] = [item.as_dict() for item in self.references]
         if self.children:
             result["children"] = [item.as_dict() for item in self.children]
+        if self.lists:
+            result["lists"] = [item.as_dict() for item in self.lists]
         return result
 
 
@@ -372,6 +411,7 @@ class ObjectResultNode:
     name: str
     child_count: int
     collection: str | None = None
+    reference_lists: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -465,8 +505,10 @@ def normalize_object_tree(
     """Normalize one root and return its deterministic request-relative list."""
 
     request_size = _request_size(payload, limits=limits, path=base_path)
+    conflict = normalize_conflict_policy(on_name_conflict, replace_owned=replace_owned)
     state = _NormalizationState(
         limits,
+        on_name_conflict=conflict,
         allow_platform=allow_platform,
         allow_language=allow_language,
         allow_import=allow_import,
@@ -475,7 +517,7 @@ def normalize_object_tree(
     return NormalizedObjectTree(
         root=root,
         nodes=flatten_request_nodes((root,)),
-        on_name_conflict=normalize_conflict_policy(on_name_conflict, replace_owned=replace_owned),
+        on_name_conflict=conflict,
         request_size_bytes=request_size,
     )
 
@@ -511,6 +553,7 @@ def normalize_object_forest(
     allow_platform: bool = False,
     allow_language: bool = False,
     allow_import: bool = False,
+    root_collection: str = "children",
 ) -> NormalizedObjectForest:
     """Normalize sibling roots under one shared node/size budget."""
 
@@ -527,8 +570,10 @@ def normalize_object_forest(
             f"{base_path} exceeds the per-parent child limit.",
             details={"path": base_path, "count": len(payload), "limit": limits.max_children_per_node},
         )
+    conflict = normalize_conflict_policy(on_name_conflict, replace_owned=replace_owned)
     state = _NormalizationState(
         limits,
+        on_name_conflict=conflict if root_collection == "children" else "fail",
         allow_platform=allow_platform,
         allow_language=allow_language,
         allow_import=allow_import,
@@ -539,14 +584,15 @@ def normalize_object_forest(
             request_path=f"{base_path}[{index}]",
             parent_path=None,
             depth=1,
+            collection=root_collection,
         )
         for index, item in enumerate(payload)
     )
-    _reject_duplicate_sibling_names(roots, path=base_path)
+    _reject_duplicate_sibling_names(roots, path=base_path, on_name_conflict=conflict)
     return NormalizedObjectForest(
         roots=roots,
         nodes=flatten_request_nodes(roots),
-        on_name_conflict=normalize_conflict_policy(on_name_conflict, replace_owned=replace_owned),
+        on_name_conflict=conflict,
         request_size_bytes=request_size,
     )
 
@@ -601,6 +647,7 @@ def normalize_object_lists(
             allow_platform=allow_platform,
             allow_language=allow_language,
             allow_import=allow_import,
+            root_collection=name,
         )
         total_nodes += len(forest.nodes)
         if total_nodes > limits.max_nodes:
@@ -771,10 +818,60 @@ def normalize_reference_descriptors(
     *,
     request_path: str = "$.references",
     limits: ObjectTreeLimits = ObjectTreeLimits(),
+    allow_unions: bool = False,
 ) -> tuple[ObjectReferenceDescriptor, ...]:
     """Normalize reference descriptors without resolving their target identities."""
 
-    return _normalize_references(payload, request_path=request_path, limits=limits)
+    return _normalize_references(payload, request_path=request_path, limits=limits, allow_unions=allow_unions)
+
+
+def normalize_curve_points(points_payload: Any, *, request_path: str, maximum_points: int = DEFAULT_MAX_RTPC_POINTS,
+                           minimum_points: int = 0, require_increasing: bool = False, label: str = "CURVE") -> tuple[RtpcCurvePoint, ...]:
+    if not isinstance(points_payload, list):
+        raise ObjectOperationContractError(
+            f"INVALID_{label}_POINTS",
+            f"{request_path} must be an array.",
+            details={"path": f"{request_path}", "actual_type": type(points_payload).__name__},
+        )
+    if len(points_payload) < minimum_points or len(points_payload) > maximum_points:
+        raise ObjectOperationContractError(
+            f"{label}_POINT_LIMIT",
+            f"{request_path} must contain between {minimum_points} and {maximum_points} points.",
+            details={"path": f"{request_path}", "count": len(points_payload), "limit": maximum_points},
+        )
+
+    points: list[RtpcCurvePoint] = []
+    previous_x: int | float | None = None
+    for point_index, raw_point in enumerate(points_payload):
+        point_path = f"{request_path}[{point_index}]"
+        point = _mapping(raw_point, path=point_path)
+        _exact_fields(point, required=RTPC_POINT_FIELDS, optional=frozenset(), path=point_path)
+        x = _finite_number(point.get("x"), path=f"{point_path}.x")
+        y = _finite_number(point.get("y"), path=f"{point_path}.y")
+        shape = point.get("shape")
+        if shape not in RTPC_POINT_SHAPES:
+            raise ObjectOperationContractError(
+                f"INVALID_{label}_POINT_SHAPE",
+                f"{point_path}.shape is not a supported Wwise curve shape.",
+                details={
+                    "path": f"{point_path}.shape",
+                    "actual": shape,
+                    "allowed": sorted(RTPC_POINT_SHAPES),
+                },
+            )
+        if require_increasing and previous_x is not None and x <= previous_x:
+            raise ObjectOperationContractError(
+                f"INVALID_{label}_POINT_ORDER",
+                f"{request_path} x coordinates must be strictly increasing.",
+                details={
+                    "path": f"{point_path}.x",
+                    "previous_x": previous_x,
+                    "actual_x": x,
+                },
+            )
+        previous_x = x
+        points.append(RtpcCurvePoint(x=x, y=y, shape=shape))
+    return tuple(points)
 
 
 def normalize_rtpc_descriptors(
@@ -806,56 +903,9 @@ def normalize_rtpc_descriptors(
         path = f"{request_path}[{index}]"
         _exact_fields(item, required=RTPC_FIELDS, optional=RTPC_OPTIONAL_FIELDS, path=path)
         property_name = _field_name(item.get("property"), path=f"{path}.property", limits=limits)
-        control_input = _normalize_identity(
-            item.get("control_input"),
-            path=f"{path}.control_input",
-            limits=limits,
-        )
-        points_payload = item.get("points")
-        if not isinstance(points_payload, list):
-            raise ObjectOperationContractError(
-                "INVALID_RTPC_POINTS",
-                f"{path}.points must be an array.",
-                details={"path": f"{path}.points", "actual_type": type(points_payload).__name__},
-            )
-        if not points_payload or len(points_payload) > point_limit:
-            raise ObjectOperationContractError(
-                "RTPC_POINT_LIMIT",
-                f"{path}.points must contain between 1 and {point_limit} points.",
-                details={"path": f"{path}.points", "count": len(points_payload), "limit": point_limit},
-            )
-
-        points: list[RtpcCurvePoint] = []
-        previous_x: int | float | None = None
-        for point_index, raw_point in enumerate(points_payload):
-            point_path = f"{path}.points[{point_index}]"
-            point = _mapping(raw_point, path=point_path)
-            _exact_fields(point, required=RTPC_POINT_FIELDS, optional=frozenset(), path=point_path)
-            x = _finite_number(point.get("x"), path=f"{point_path}.x")
-            y = _finite_number(point.get("y"), path=f"{point_path}.y")
-            shape = point.get("shape")
-            if shape not in RTPC_POINT_SHAPES:
-                raise ObjectOperationContractError(
-                    "INVALID_RTPC_POINT_SHAPE",
-                    f"{point_path}.shape is not a supported Wwise curve shape.",
-                    details={
-                        "path": f"{point_path}.shape",
-                        "actual": shape,
-                        "allowed": sorted(RTPC_POINT_SHAPES),
-                    },
-                )
-            if previous_x is not None and x <= previous_x:
-                raise ObjectOperationContractError(
-                    "INVALID_RTPC_POINT_ORDER",
-                    f"{path}.points x coordinates must be strictly increasing.",
-                    details={
-                        "path": f"{point_path}.x",
-                        "previous_x": previous_x,
-                        "actual_x": x,
-                    },
-                )
-            previous_x = x
-            points.append(RtpcCurvePoint(x=x, y=y, shape=shape))
+        control_input = normalize_rtpc_control_input(item.get("control_input"), path=f"{path}.control_input", limits=limits)
+        points = normalize_curve_points(item.get("points"), request_path=f"{path}.points",
+            maximum_points=point_limit, minimum_points=1, require_increasing=True, label="RTPC")
 
         notes = item.get("notes")
         if notes is not None:
@@ -893,17 +943,32 @@ def normalize_rtpc_descriptors(
     return tuple(normalized)
 
 
+def normalize_rtpc_control_input(payload, *, path, limits=ObjectTreeLimits()):
+    if not isinstance(payload, Mapping) or set(payload) != {"new_control_input"}:
+        return _normalize_identity(payload, path=path, limits=limits)
+    node = _mapping(payload["new_control_input"], path=path)
+    _exact_fields(node, required={"type", "name", "properties"}, optional={"notes", "platform"}, path=path)
+    if node["type"] not in CONTROL_INPUT_CLASSES:
+        raise ObjectOperationContractError("INVALID_CONTROL_INPUT_TYPE", "Custom ControlInput requires LFO, Envelope, or Time.")
+    name = _bounded_token(node["name"], path=path + ".name", max_length=limits.max_name_length, disallow_path_separator=True)
+    properties = _normalize_properties(node["properties"], request_path=path + ".properties", limits=limits)
+    notes = node.get("notes")
+    if notes is not None and (not isinstance(notes, str) or len(notes) > limits.max_notes_length):
+        raise ObjectOperationContractError("INVALID_NOTES", "New ControlInput notes exceed the string contract.")
+    platform = (_bounded_import_text(node["platform"], path=path + ".platform", max_length=128)
+        if "platform" in node else None)
+    return OwnedControlInputDescriptor(node["type"], name, tuple((row.name, row.value) for row in properties), notes, platform)
+
+
 def materialize_waapi_rtpc(
     descriptor: RtpcDescriptor,
     *,
-    resolved_control_input: ObjectId,
+    resolved_control_input: ObjectId | Mapping[str, Any],
 ) -> dict[str, Any]:
     """Build the native ``@RTPC`` row from reviewed data and one resolved identity."""
 
-    _require_object_id(
-        resolved_control_input,
-        path=f"{descriptor.request_path}.control_input",
-    )
+    if not isinstance(descriptor.control_input, OwnedControlInputDescriptor):
+        _require_object_id(resolved_control_input, path=f"{descriptor.request_path}.control_input")
     result: dict[str, Any] = {
         "type": "RTPC",
         "name": "",
@@ -928,6 +993,9 @@ def flatten_request_nodes(roots: Sequence[ObjectNodeDescriptor]) -> tuple[Object
         result.append(node)
         for child in node.children:
             visit(child)
+        for descriptor in node.lists:
+            for child in descriptor.objects:
+                visit(child)
 
     for root in roots:
         visit(root)
@@ -947,7 +1015,7 @@ def request_topology_edges(nodes: Sequence[ObjectNodeDescriptor]) -> tuple[Objec
 def materialize_waapi_node(
     node: ObjectNodeDescriptor,
     *,
-    resolved_references: Mapping[str, ObjectId] | None = None,
+    resolved_references: Mapping[str, ObjectId | list[ObjectId] | None] | None = None,
     materialized_imports: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build one trusted native WAAPI child object from normalized descriptors.
@@ -993,6 +1061,10 @@ def materialize_waapi_node(
         )
 
     def build(current: ObjectNodeDescriptor) -> dict[str, Any]:
+        if current.rtpc is not None:
+            owned = isinstance(current.rtpc.control_input, OwnedControlInputDescriptor)
+            return materialize_waapi_rtpc(current.rtpc,
+                resolved_control_input=build(current.children[0]) if owned else resolved[current.references[0].request_path])
         result: dict[str, Any] = {"type": current.type, "name": current.name}
         if current.notes is not None:
             result["notes"] = current.notes
@@ -1006,10 +1078,28 @@ def materialize_waapi_node(
             result[f"@{prop.name}"] = prop.value
         for reference in current.references:
             target = resolved[reference.request_path]
-            _require_object_id(target, path=reference.request_path)
+            if isinstance(reference.target, ObjectCurveDescriptor):
+                if target != reference.target.native_value():
+                    raise ObjectOperationContractError("REFERENCE_BINDING_MISMATCH", "An inline curve requires its exact Gateway-owned points.")
+            elif reference.target is None:
+                if target is not None:
+                    raise ObjectOperationContractError("REFERENCE_BINDING_MISMATCH", "A clear reference requires native null.")
+            elif isinstance(reference.target, tuple):
+                if not isinstance(target, list) or len(target) != len(reference.target):
+                    raise ObjectOperationContractError("REFERENCE_BINDING_MISMATCH", "The reference array bindings are incomplete.")
+                for item in target:
+                    _require_object_id(item, path=reference.request_path)
+            else:
+                _require_object_id(target, path=reference.request_path)
             result[f"@{reference.name}"] = target
-        if current.children:
-            result["children"] = [build(child) for child in current.children]
+        ordinary = [child for child in current.children if child.collection == "children"]
+        if ordinary:
+            result["children"] = [build(child) for child in ordinary]
+        for child in current.children:
+            if child.collection == "Effect":
+                result["@Effect"] = build(child)
+        for descriptor in current.lists:
+            result["@" + descriptor.name] = [build(child) for child in descriptor.objects]
         return result
 
     return build(node)
@@ -1041,8 +1131,9 @@ def flatten_set_result(
     base_path: str = "$.objects",
     max_nodes: int = DEFAULT_MAX_NODES,
     allowed_lists: Sequence[str] = (),
+    reference_lists: Sequence[str] = (),
 ) -> tuple[ObjectResultNode, ...]:
-    """Flatten an ``object.set`` result body, including reviewed list fields."""
+    """Flatten created objects; sealed reference associations carry no new identities."""
 
     mapping = _mapping(payload, path="$result")
     unknown_root = set(mapping) - {"objects"}
@@ -1067,6 +1158,8 @@ def flatten_set_result(
         )
         for index, item in enumerate(allowed_lists)
     }
+    normalized_references = {normalize_object_list_name(item, request_path=f"$reference_lists[{index}]")
+        for index, item in enumerate(reference_lists)}
     counter = [0]
     result: list[ObjectResultNode] = []
     for index, item in enumerate(objects):
@@ -1077,7 +1170,8 @@ def flatten_set_result(
             for key in row
             if key.startswith("@")
         }
-        unexpected = sorted(set(dynamic_fields) - normalized_lists)
+        reference_fields = _reference_result_associations(row, normalized_references, request_path=request_path)
+        unexpected = sorted(set(dynamic_fields) - normalized_lists - normalized_references)
         if unexpected:
             raise ObjectOperationContractError(
                 "INVALID_RESULT_SHAPE",
@@ -1099,7 +1193,7 @@ def flatten_set_result(
                 request_path=f"{request_path}.{wire_name}",
                 allow_single=True,
             )
-            for list_name, wire_name in dynamic_fields.items()
+            for list_name, wire_name in dynamic_fields.items() if wire_name not in reference_fields
         }
         counter[0] += 1
         if counter[0] > limit:
@@ -1116,6 +1210,7 @@ def flatten_set_result(
                 name,
                 len(children) + sum(len(rows) for rows in list_rows.values()),
                 None,
+                tuple(sorted(key[1:] for key in reference_fields)),
             )
         )
         for child_index, child in enumerate(children):
@@ -1127,6 +1222,8 @@ def flatten_set_result(
                     max_nodes=limit,
                     counter=counter,
                     collection="children",
+                    allowed_lists=normalized_lists,
+                    reference_lists=normalized_references,
                 )
             )
         for list_name, rows in list_rows.items():
@@ -1139,6 +1236,8 @@ def flatten_set_result(
                         max_nodes=limit,
                         counter=counter,
                         collection=list_name,
+                        allowed_lists=normalized_lists,
+                    reference_lists=normalized_references,
                     )
                 )
     return tuple(result)
@@ -1195,11 +1294,13 @@ class _NormalizationState:
         self,
         limits: ObjectTreeLimits,
         *,
+        on_name_conflict: str,
         allow_platform: bool,
         allow_language: bool,
         allow_import: bool,
     ) -> None:
         self.limits = limits
+        self.on_name_conflict = on_name_conflict
         self.allow_platform = allow_platform
         self.allow_language = allow_language
         self.allow_import = allow_import
@@ -1212,7 +1313,10 @@ class _NormalizationState:
         request_path: str,
         parent_path: str | None,
         depth: int,
+        collection: str = "children",
+        on_name_conflict: str | None = None,
     ) -> ObjectNodeDescriptor:
+        conflict = self.on_name_conflict if on_name_conflict is None else on_name_conflict
         if depth > self.limits.max_depth:
             raise ObjectOperationContractError(
                 "DEPTH_LIMIT_EXCEEDED",
@@ -1227,6 +1331,33 @@ class _NormalizationState:
                 details={"path": request_path, "count": self.node_count, "limit": self.limits.max_nodes},
             )
         mapping = _mapping(payload, path=request_path)
+        if "rtpc" in mapping:
+            _exact_fields(mapping, required={"rtpc"}, optional={"rtpc_mode"}, path=request_path)
+            if collection != "RTPC" or not self.allow_platform:
+                raise ObjectOperationContractError("INVALID_RTPC_PLACEMENT", "An RTPC descriptor belongs only to an object.set RTPC List")
+            mode = mapping.get("rtpc_mode", "add_or_replace")
+            if mode not in {"add", "add_or_replace"}:
+                raise ObjectOperationContractError("INVALID_ARGUMENT", "RTPC mode must be add or add_or_replace")
+            descriptor = normalize_rtpc_descriptors([mapping["rtpc"]], request_path=request_path + ".rtpc", max_rtpcs=1)[0]
+            properties = (ObjectPropertyDescriptor(request_path + ".properties[0]", "PropertyName", descriptor.property),)
+            children = ()
+            references = (ObjectReferenceDescriptor(request_path + ".references[0]", "ControlInput", descriptor.control_input),)
+            if isinstance(descriptor.control_input, OwnedControlInputDescriptor):
+                new_input = descriptor.control_input
+                children = (self.node({"type": new_input.type, "name": new_input.name,
+                    **({"platform": new_input.platform} if new_input.platform is not None else {}),
+                    "properties": [{"name": name, "value": value} for name, value in new_input.properties],
+                    **({"notes": new_input.notes} if new_input.notes is not None else {})},
+                    request_path=request_path + ".control_input", parent_path=request_path, depth=depth + 1, collection="ControlInput"),)
+                references = ()
+            references += (ObjectReferenceDescriptor(request_path + ".references[1]", "Curve", ObjectCurveDescriptor(descriptor.points)),)
+            # Curve is an owned object even though its closed points descriptor
+            # does not need an ordinary graph occurrence/result handle.
+            self.node_count += 1
+            if self.node_count > self.limits.max_nodes or depth + 1 > self.limits.max_depth:
+                raise ObjectOperationContractError("NODE_LIMIT_EXCEEDED", "The RTPC/Curve/ControlInput graph exceeds its existing node/depth bound.")
+            return ObjectNodeDescriptor(request_path, parent_path, "RTPC", "", descriptor.notes,
+                None, None, None, properties, references, children, collection="RTPC", rtpc=descriptor, rtpc_mode=mode)
         allowed_fields = (
             OBJECT_SET_NODE_FIELDS
             if self.allow_platform or self.allow_language or self.allow_import
@@ -1250,7 +1381,13 @@ class _NormalizationState:
             max_length=self.limits.max_type_length,
             disallow_path_separator=False,
         )
-        name = _bounded_token(
+        plugin = normalize_plugin_creation(mapping["plugin"]) if "plugin" in mapping else None
+        if plugin is not None and (plugin.kind not in {"effect", "source"} or object_type != plugin.object_type or plugin.name != mapping.get("name")):
+            raise ObjectOperationContractError("INVALID_GRAPH_PLUGIN", "Typed graph plugins retain their selected kind and name")
+        anonymous = mapping.get("anonymous", False)
+        if type(anonymous) is not bool or (anonymous and ((collection, object_type) not in {("Effects", "EffectSlot"), ("Markers", "Marker"), ("Paths", "MediaPoolDatabasePath")} or mapping.get("name") != "")):
+            raise ObjectOperationContractError("ANONYMOUS_LIST_PLACEMENT_INVALID", "Blank names require a certified anonymous List member placement")
+        name = "" if anonymous else _bounded_token(
             mapping.get("name"),
             path=f"{request_path}.name",
             max_length=self.limits.max_name_length,
@@ -1305,6 +1442,7 @@ class _NormalizationState:
             mapping.get("references", []),
             request_path=f"{request_path}.references",
             limits=self.limits,
+            allow_unions=True,
         )
         if len(properties) + len(references) > self.limits.max_fields_per_node:
             raise ObjectOperationContractError(
@@ -1347,10 +1485,32 @@ class _NormalizationState:
                 request_path=f"{request_path}.children[{index}]",
                 parent_path=request_path,
                 depth=depth + 1,
+                on_name_conflict=conflict if plugin is None and not anonymous else "fail",
             )
             for index, child in enumerate(raw_children)
         )
-        _reject_duplicate_sibling_names(children, path=f"{request_path}.children")
+        owned = [child for child in children if child.plugin is not None and child.plugin.kind == "effect" and child.plugin.placement == "owner"]
+        if owned:
+            if not anonymous or object_type != "EffectSlot" or collection != "Effects" or len(owned) != 1 or any(ref.name == "Effect" for ref in references):
+                raise ObjectOperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "One new local Effect belongs to one new anonymous slot and cannot conflict with another Effect target")
+            from dataclasses import replace
+            children = tuple(replace(child, collection="Effect") if child in owned else child for child in children)
+        _reject_duplicate_sibling_names(children, path=f"{request_path}.children",
+            on_name_conflict=conflict if plugin is None and not anonymous else "fail")
+        lists: list[ObjectListDescriptor] = []
+        for index, raw_list in enumerate(_descriptor_rows(
+            mapping.get("lists", []), request_path=f"{request_path}.lists", limit=self.limits.max_children_per_node,
+        )):
+            list_path = f"{request_path}.lists[{index}]"
+            _exact_fields(raw_list, required=LIST_FIELDS, optional=frozenset(), path=list_path)
+            list_name = normalize_object_list_name(raw_list.get("name"), request_path=f"{list_path}.name", limits=self.limits)
+            if list_name.casefold() in field_names or list_name.casefold() in {item.name.casefold() for item in lists}:
+                raise ObjectOperationContractError("DUPLICATE_FIELD", "A nested list must not collide with another list, property or reference.")
+            members = _descriptor_rows(raw_list.get("objects"), request_path=f"{list_path}.objects", limit=self.limits.max_children_per_node)
+            objects = tuple(self.node(member, request_path=f"{list_path}.objects[{member_index}]", parent_path=request_path,
+                                      depth=depth + 1, collection=list_name, on_name_conflict="fail") for member_index, member in enumerate(members))
+            _reject_duplicate_sibling_names(objects, path=f"{list_path}.objects")
+            lists.append(ObjectListDescriptor(list_path, list_name, objects, flatten_request_nodes(objects)))
         return ObjectNodeDescriptor(
             request_path=request_path,
             parent_request_path=parent_path,
@@ -1363,6 +1523,10 @@ class _NormalizationState:
             properties=properties,
             references=references,
             children=children,
+            lists=tuple(lists),
+            collection=collection,
+            anonymous=anonymous,
+            plugin=plugin,
         )
 
 
@@ -1395,6 +1559,7 @@ def _normalize_references(
     *,
     request_path: str,
     limits: ObjectTreeLimits,
+    allow_unions: bool = False,
 ) -> tuple[ObjectReferenceDescriptor, ...]:
     rows = _descriptor_rows(payload, request_path=request_path, limit=limits.max_fields_per_node)
     result: list[ObjectReferenceDescriptor] = []
@@ -1402,7 +1567,20 @@ def _normalize_references(
         path = f"{request_path}[{index}]"
         _exact_fields(item, required=REFERENCE_FIELDS, optional=frozenset(), path=path)
         name = _field_name(item.get("name"), path=f"{path}.name", limits=limits)
-        target = _normalize_identity(item.get("target"), path=f"{path}.target", limits=limits)
+        raw_target = item.get("target")
+        if isinstance(raw_target, Mapping) and set(raw_target) == {"new_control_input"} and allow_unions:
+            target = normalize_rtpc_control_input(raw_target, path=f"{path}.target", limits=limits)
+        elif isinstance(raw_target, Mapping) and set(raw_target) == {"curve_points"} and allow_unions:
+            target = ObjectCurveDescriptor(normalize_curve_points(raw_target["curve_points"], request_path=f"{path}.target.curve_points"))
+        elif raw_target is None and allow_unions:
+            target = None
+        elif isinstance(raw_target, list) and allow_unions:
+            if len(raw_target) > limits.max_fields_per_node:
+                raise ObjectOperationContractError("REFERENCE_LIMIT_EXCEEDED", "A reference array exceeds its bound.")
+            target = tuple(_normalize_identity(value, path=f"{path}.target[{offset}]", limits=limits)
+                           for offset, value in enumerate(raw_target))
+        else:
+            target = _normalize_identity(raw_target, path=f"{path}.target", limits=limits)
         result.append(ObjectReferenceDescriptor(path, name, target))
     _reject_duplicate_descriptor_names(result, path=request_path)
     return tuple(result)
@@ -1632,6 +1810,22 @@ def normalize_object_identity(
     )
 
 
+def _reference_result_associations(row, names, *, request_path):
+    """Validate opaque reference occurrences without assigning object identities.
+
+    Matching object.set schemas admit empty occurrence objects. Their business
+    meaning is proved by the complete ordered reference readback, never by these
+    result fragments. Keep the original native payload unchanged.
+    """
+    fields = {key for key in row if key.startswith("@") and key[1:] in names}
+    for key in fields:
+        values = _result_collection_rows(row[key], request_path=f"{request_path}.{key}", allow_single=True)
+        if len(values) > 128:
+            raise ObjectOperationContractError("RESULT_NODE_LIMIT_EXCEEDED",
+                "Reference result associations exceed the complete reference roster bound.")
+    return fields
+
+
 def _flatten_result_node(
     payload: Any,
     *,
@@ -1640,6 +1834,8 @@ def _flatten_result_node(
     max_nodes: int,
     counter: list[int],
     collection: str = "children",
+    allowed_lists: Sequence[str] = (),
+    reference_lists: Sequence[str] = (),
 ) -> list[ObjectResultNode]:
     counter[0] += 1
     if counter[0] > max_nodes:
@@ -1650,7 +1846,8 @@ def _flatten_result_node(
         )
     mapping = _mapping(payload, path=request_path)
     dynamic_fields = sorted(key for key in mapping if key.startswith("@"))
-    if dynamic_fields:
+    reference_fields = _reference_result_associations(mapping, reference_lists, request_path=request_path)
+    if any(key[1:] not in allowed_lists and key[1:] not in reference_lists for key in dynamic_fields):
         raise ObjectOperationContractError(
             "INVALID_RESULT_SHAPE",
             "Nested object results contain an unreviewed object-list association.",
@@ -1661,14 +1858,19 @@ def _flatten_result_node(
         mapping.get("children", []),
         request_path=f"{request_path}.children",
     )
+    list_rows = {
+        key: _result_collection_rows(mapping[key], request_path=f"{request_path}.{key}", allow_single=True)
+        for key in dynamic_fields if key not in reference_fields
+    }
     result = [
         ObjectResultNode(
             request_path,
             parent_path,
             object_id,
             name,
-            len(children),
+            len(children) + sum(len(rows) for rows in list_rows.values()),
             collection,
+            tuple(sorted(key[1:] for key in reference_fields)),
         )
     ]
     for index, child in enumerate(children):
@@ -1680,8 +1882,14 @@ def _flatten_result_node(
                 max_nodes=max_nodes,
                 counter=counter,
                 collection="children",
+                allowed_lists=allowed_lists,
+                reference_lists=reference_lists,
             )
         )
+    for key, rows in list_rows.items():
+        for index, child in enumerate(rows):
+            result.extend(_flatten_result_node(child, request_path=f"{request_path}.{key}[{index}]", parent_path=request_path,
+                                              max_nodes=max_nodes, counter=counter, collection=key[1:], allowed_lists=allowed_lists, reference_lists=reference_lists))
     return result
 
 
@@ -1900,19 +2108,29 @@ def _require_object_id(value: Any, *, path: str) -> None:
         )
 
 
-def _reject_duplicate_sibling_names(nodes: Sequence[ObjectNodeDescriptor], *, path: str) -> None:
-    seen: dict[str, str] = {}
+def _reject_duplicate_sibling_names(
+    nodes: Sequence[ObjectNodeDescriptor], *, path: str, on_name_conflict: str = "fail",
+) -> None:
+    seen: dict[str, ObjectNodeDescriptor] = {}
     duplicates: list[str] = []
     for node in nodes:
-        key = node.name.casefold()
+        if node.anonymous or node.rtpc is not None and isinstance(node.rtpc.control_input, OwnedControlInputDescriptor):
+            continue
+        key = ("rtpc:" + json.dumps([node.rtpc.property, node.rtpc.control_input.as_dict()], sort_keys=True)
+               if node.rtpc is not None else node.name.casefold())
         if key in seen:
-            duplicates.append(node.name)
+            previous = seen[key]
+            if not (on_name_conflict == "rename" and all(
+                item.collection == "children" and item.plugin is None
+                and item.rtpc is None and not item.anonymous for item in (previous, node)
+            )):
+                duplicates.append(node.name)
         else:
-            seen[key] = node.name
+            seen[key] = node
     if duplicates:
         raise ObjectOperationContractError(
             "DUPLICATE_SIBLING_NAME",
-            "One request must not contain case-insensitive duplicate sibling names.",
+            "Duplicate sibling names require ordinary new children with rename conflict policy.",
             details={"path": path, "duplicates": duplicates},
         )
 

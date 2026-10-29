@@ -1,0 +1,17 @@
+{
+  "api": "ak.wwise.core.object.create",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r57-source-graph/.waapi-skill-state/full-coverage/r57-repeated-source-6d4a3547-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792539392260261000-94c767761cbb413ead8cec62a3274364-ak_wwise_core_object_create.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "id": "{CE3BAF62-1132-4D43-A524-1286DAD490CC}",
+    "name": "WAAPI_REPEATED_SOURCE_71813962f3"
+  },
+  "risk_level": "medium",
+  "timeout": 29.969501957995817,
+  "version": "2021.1"
+}

@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-fact/v1",
+  "assessment_sha256": "a05ac71e05bc1c62ef9cd3261b345f193914ecdef947ce7d51cd14a8980bb99e",
+  "branch_id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+  "native_shape_sha256": "5894f8029ee502ada64c74fb8aa8ad51b88d0d69b0056f040acf964393901e0e",
+  "native_route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects",
+  "program_pointer": "/native_call/result/return/0/busGUID",
+  "reference_chain": [
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/properties/return/items/$ref"
+  ],
+  "observed": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}"
+}

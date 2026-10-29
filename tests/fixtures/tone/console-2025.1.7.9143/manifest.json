@@ -1,0 +1,102 @@
+{
+  "contract": "waapi-skill.tone-native-regression/v1",
+  "original_candidate": "205097b6fa146fdd20e71352afa383f1b7be5a57",
+  "original_receipt_sha256": "1e5356a5be2ee71f0c0aa535c23c544643d1c8d8bc16ede14cc4c83bc9718593",
+  "get_info": {
+    "apiVersion": 1,
+    "branch": "wwise_v2025.1.7",
+    "configuration": "release",
+    "copyright": "(C) 2006-2026. Audiokinetic Inc. All rights reserved.",
+    "directories": {
+      "authoring": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\",
+      "bin": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\x64\\Release\\bin\\",
+      "help": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\Help\\",
+      "install": "Z:\\Applications\\Audiokinetic\\Wwise2025.1.7.9143\\",
+      "user": "Y:\\Library\\Application Support\\Audiokinetic\\WwiseConsole"
+    },
+    "displayName": "WwiseConsole",
+    "isCommandLine": true,
+    "platform": "x64",
+    "processId": 296,
+    "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+    "sessionId": "{B5FE3F82-4198-477A-A10A-D097AD011658}",
+    "version": {
+      "build": 9143,
+      "displayName": "v2025.1.7",
+      "major": 1,
+      "minor": 7,
+      "nickname": "",
+      "schema": 133,
+      "year": 2025
+    }
+  },
+  "native_business_acceptance": false,
+  "original_verification_state": "verification_failed",
+  "purpose": "Exact original native bytes for Tone format compatibility; signal acceptance remains partial.",
+  "files": {
+    "int16-0db.wav": {
+      "sha256": "e7ec523a75bd79788cc0c10a7f9abe75f82b46eadb1a70f335e7d31e071a93da",
+      "size": 24092,
+      "transaction_id": "tx1-wj81qvgfan365593ata7",
+      "bit_depth": "int16",
+      "sustain_db": 0,
+      "request": {
+        "waveform": "sine",
+        "frequency_hz": 440,
+        "channel_layout": "1.0",
+        "sample_rate_hz": 48000,
+        "attack_seconds": 0,
+        "sustain_seconds": 0.25,
+        "release_seconds": 0
+      }
+    },
+    "int16-6db.wav": {
+      "sha256": "478e11450ac678bed4df0f3017e32d533b9757d23a4ed38f2f93409bf3533481",
+      "size": 24092,
+      "transaction_id": "tx1-bw82n48vapkgx2k2kjp1",
+      "bit_depth": "int16",
+      "sustain_db": -6,
+      "request": {
+        "waveform": "sine",
+        "frequency_hz": 440,
+        "channel_layout": "1.0",
+        "sample_rate_hz": 48000,
+        "attack_seconds": 0,
+        "sustain_seconds": 0.25,
+        "release_seconds": 0
+      }
+    },
+    "float32-0db.wav": {
+      "sha256": "a43f4066cd959d29baeebb7ff7e5e2aa646908ad39b81a4a4c36df3694247b6d",
+      "size": 48092,
+      "transaction_id": "tx1-7e72rdt1s8qd42t5bnbf",
+      "bit_depth": "float32",
+      "sustain_db": 0,
+      "request": {
+        "waveform": "sine",
+        "frequency_hz": 440,
+        "channel_layout": "1.0",
+        "sample_rate_hz": 48000,
+        "attack_seconds": 0,
+        "sustain_seconds": 0.25,
+        "release_seconds": 0
+      }
+    },
+    "float32-6db.wav": {
+      "sha256": "45ac6e4d866e6eff1e2db40175e96e58ea493d220761af11830088a969b2bb8a",
+      "size": 48092,
+      "transaction_id": "tx1-6tgb5xmnzz8r2jf1ef4b",
+      "bit_depth": "float32",
+      "sustain_db": -6,
+      "request": {
+        "waveform": "sine",
+        "frequency_hz": 440,
+        "channel_layout": "1.0",
+        "sample_rate_hz": 48000,
+        "attack_seconds": 0,
+        "sustain_seconds": 0.25,
+        "release_seconds": 0
+      }
+    }
+  }
+}

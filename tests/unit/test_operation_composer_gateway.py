@@ -28,11 +28,13 @@ from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImp
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     BUSINESS_DECLARATION_INPUT_MODE,
+    IDENTITY_ARGUMENT_SCHEMA,
     COMPOSER_INPUT_MODE,
     INTERNAL_CANONICAL_INPUT_MODE,
     list_operation_specs,
     operation_input_mode,
     operation_request_schema_digest,
+    operation_request_machine_contract,
 )
 from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
     expand_gateway_field_table,
@@ -322,6 +324,7 @@ def _archive_test_object_set_composer_discloses_every_exact_typed_action_shape(
 
 
 def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
+    from copy import deepcopy
     non_object_set_digests = {
         f"{spec.name}@{version}": operation_request_schema_digest(spec.name, version)
         for spec in list_operation_specs()
@@ -330,9 +333,872 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
-    # Reviewed delta: explicit owner/ShareSet placement and Boolean reference
-    # dependency closure. Existing operation/version inventory remains unchanged.
+    # This inventory owns the exact seals for both import routes in all lanes;
+    # the Registry unit test separately checks version/prose/hash semantics.
+    assert {
+        f"{operation}@{version}"
+        for operation in ("audio.import", "audio.importTabDelimited")
+        for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+    } <= non_object_set_digests.keys()
+    # Control Surface construction adds only these two typed parent relations
+    # to the five create contracts; live role admission remains a separate gate.
+    assert canonical_sha256(non_object_set_digests) == "d24d5eab62367ec9f14a3cca0bd258b2755c8cffc9ff4f972e779a729617f394"
+    def before_control_surface_parents(operation, version):
+        contract = operation_request_machine_contract(operation, version)
+        if operation == "object.create":
+            assert contract["parent_child_contract"].pop("ControlSurfaceSession") == ["ControlSurfaceBindingGroup"]
+            assert contract["parent_child_contract"].pop("ControlSurfaceBindingGroup") == [
+                "ControlSurfaceBinding", "ControlSurfaceBindingGroup"]
+        return contract
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(
+            before_control_surface_parents("object.create", version))
+    # Saved Query construction adds only Query -> SearchCriteria to the five
+    # create contracts. The older SDK refusal remains a separate runtime gate;
+    # this class placement relation does not grant version availability.
+    assert canonical_sha256(non_object_set_digests) == "776100a86b9d21a241290cc823cc147155372ffc264acf3f7c33e3604b7276f1"
+    def before_saved_query_parent(operation, version):
+        contract = before_control_surface_parents(operation, version)
+        if operation == "object.create":
+            assert contract["parent_child_contract"].pop("Query") == ["SearchCriteria"]
+        return contract
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(
+            before_saved_query_parent("object.create", version))
+    # Retain the prior Event -> Action seal and invert that exact relation
+    # after Query's inverse in every independently reconstructed contract.
+    assert canonical_sha256(non_object_set_digests) == "1a71f79d0b2c8ad0b2962dfdb14b7dd8e4c9d78df5bf3f70e76c0dca16d3f04f"
+    def before_action_parent(operation, version):
+        contract = before_saved_query_parent(operation, version)
+        if operation == "object.create":
+            assert contract["parent_child_contract"].pop("Event") == ["Action"]
+        return contract
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(
+            before_action_parent("object.create", version))
+    # Explicit all-configured-platform generation changes only five SoundBank
+    # contracts. Invert each exact disclosed field before every older seal.
+    assert canonical_sha256(non_object_set_digests) == "09dfebe34fd1e9db9accff64413e0637447f9893da7246a37817ac34f66eb0ad"
+    def before_all_platforms(operation, version):
+        contract = before_action_parent(operation, version)
+        if operation == "soundbank.generate":
+            assert contract["required_arguments"] == ["soundbanks", "io_root"]
+            contract["required_arguments"] = ["soundbanks", "platforms", "io_root"]
+            assert contract["optional_arguments"][:2] == ["platforms", "all_platforms"]
+            contract["optional_arguments"] = contract["optional_arguments"][2:]
+            arguments = contract["argument_contract"]
+            assert arguments["required"] == ["soundbanks", "io_root"]
+            arguments["required"] = ["soundbanks", "platforms", "io_root"]
+            assert arguments["optional"][:2] == ["platforms", "all_platforms"]
+            arguments["optional"] = arguments["optional"][2:]
+            assert arguments.pop("oneOf") == [
+                {"not": {"required": ["all_platforms"]}, "required": ["platforms"]},
+                {"not": {"required": ["platforms"]}, "required": ["all_platforms"]},
+            ]
+            assert arguments["properties"].pop("all_platforms") == {"const": True}
+            assert contract["constraints"][0] == (
+                "SoundBank scope is selected or explicitly all-user; platform scope is one explicit list or all_platforms=true with bounded live enumeration; missing/contradictory selection fails; omitted languages mean all live project languages; Init is an automatic by-product"
+            )
+            contract["constraints"][0] = (
+                "SoundBank scope is selected or explicitly all-user; platforms remain bounded and explicit; omitted languages mean all live project languages; Init is an automatic by-product"
+            )
+        return contract
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"soundbank.generate@{version}"] = canonical_sha256(
+            before_all_platforms("soundbank.generate", version))
+    # Older Metadata uses the matching direct List constructor rather than the
+    # newer Inner slot. Preserve this exact disclosure before earlier seals.
+    assert canonical_sha256(non_object_set_digests) == "4ef502f260478a80dd07e5ee7f3c57fa9fa02f711b363947bfae32240f8de923"
+    def before_direct_metadata_placement(operation, version):
+        contract = before_all_platforms(operation, version)
+        if operation == "object.createPlugin":
+            assert contract["constraints"].pop(7) == (
+                "Wwise 2022.1-2024.1 Metadata appends one selected-class direct List member with exact ordered preservation and field checks; intrinsic owner/parent readback remains observation-only and is disclosed before authorization"
+            )
+        return contract
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.createPlugin@{version}"] = canonical_sha256(
+            before_direct_metadata_placement("object.createPlugin", version))
+    # Custom Metadata owner placement adds one exact version-qualified constraint
+    # to createPlugin. Retain its new seal and invert only this reviewed delta
+    # before every historical inventory and independently reconstructed contract.
+    assert canonical_sha256(non_object_set_digests) == "a258594257893545825465e00c8bd0da99fca888edfa9dc483e02f54edafadfb"
+    def before_local_metadata_placement(operation, version):
+        contract = before_direct_metadata_placement(operation, version)
+        if operation == "object.createPlugin":
+            assert contract["constraints"].pop(6) == (
+                "Wwise 2025.1 owner Metadata appends one source-certified MetadataSlot/custom reference; exact owner/class, ordered prior slots and references are revalidated and independently checked"
+            )
+        return contract
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.createPlugin@{version}"] = canonical_sha256(
+            before_local_metadata_placement("object.createPlugin", version))
+    # Switch assignment completion changes only the same-child constraint in
+    # five lanes. Restore that reviewed field before the historical seals.
+    assert canonical_sha256(non_object_set_digests) == "f25c13b39acb59aca80661038db7858f9ea685e4c5268239cf9c2ef30f442d8a"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("switchContainer.addAssignment", version)
+        assert contract["constraints"][-1] == "the exact child/state-or-switch pair must be absent; other pairs for that child are preserved"
+        contract["constraints"][-1] = "the closed add policy rejects a child that already has any assignment"
+        non_object_set_digests[f"switchContainer.addAssignment@{version}"] = canonical_sha256(contract)
+    # Definition completion changes exactly four constraints on four lanes.
+    # Reverse those fields before all historical checks, including later
+    # contracts rebuilt independently rather than using the current inventory.
+    assert canonical_sha256(non_object_set_digests) == "03eb91bf7009108273d838047a3cc5d12af2073527cfc3263661155e5da0be5c"
+    def before_definition_completion(operation, version):
+        contract = before_local_metadata_placement(operation, version)
+        if operation == "soundbank.processDefinitionFiles":
+            changes = {
+                0: ("SoundBank names and ordered inclusion/exclusion rows are derived only from hashed UTF-8 tab-delimited files within the declared owned I/O root",
+                    "SoundBank names and inclusion rows are derived only from hashed UTF-8 tab-delimited files"),
+                1: ("Wwise 2022.1 Definition inclusion identities are limited to GUIDs and supported uint32 Short IDs because quoted names can complete without applying inclusions; GameSync exclusion names remain available; 2023.1 and later retain the official quoted inclusion-name form",
+                    "Wwise 2022.1 Definition object identities are limited to GUIDs and supported uint32 Short IDs because quoted names can complete without applying inclusions; 2023.1 and later retain the official quoted-name form"),
+                2: ("documented State/Switch group-and-value or Trigger name exclusions and ordered repeated bank/object rows are accepted; unknown directives, unknown objects, and ambiguous identities fail before dispatch",
+                    "unsupported directives, duplicate rows, unknown objects, and ambiguous names fail before dispatch"),
+                4: ("execution replays file/project and SoundBank inclusion snapshots; only single-file empty-prestate unique-inclusion banks have exact target inclusion verification; repeated bank/object rows, nonempty prestate and GameSync exclusions disclose result-only verification before authorization, without inferring union/removal/exclusion effects",
+                    "execution replays file/project and SoundBank inclusion snapshots; verification checks exact target inclusions and one unrelated control Bank"),
+            }
+            for index, (current, previous) in changes.items():
+                assert contract["constraints"][index] == current
+                contract["constraints"][index] = previous
+        return contract
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"soundbank.processDefinitionFiles@{version}"] = canonical_sha256(
+            before_definition_completion("soundbank.processDefinitionFiles", version))
+    # Core generation and external-source output omission have separate,
+    # exact field inverses; retain both component and earlier aggregate seals.
+    assert canonical_sha256(non_object_set_digests) == "8093b7d95a13b3d6da49917b977c86df26b335a1a4c4707dd9d35339270c1128"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_definition_completion("soundbank.generate", version)
+        assert contract['argument_contract']['optional'] == ['all_user_soundbanks', 'all_user_bank_expectations', 'skip_languages', 'write_to_disk', 'languages', 'rebuild_soundbanks', 'clear_audio_file_cache', 'rebuild_init_bank']
+        contract['argument_contract']['optional'] = ['languages', 'rebuild_soundbanks', 'clear_audio_file_cache', 'rebuild_init_bank']
+        assert contract['argument_contract']['properties']['all_user_bank_expectations'] == {'type': 'array', 'maxItems': 64, 'items': {'type': 'object', 'additionalProperties': False, 'required': ['soundbank', 'artifact_expectation'], 'properties': {'soundbank': IDENTITY_ARGUMENT_SCHEMA, 'artifact_expectation': {'type': 'string', 'enum': ['nonlocalized', 'localized', 'mixed']}}}}
+        del contract['argument_contract']['properties']['all_user_bank_expectations']
+        assert contract['argument_contract']['properties']['all_user_soundbanks'] == {'type': 'string', 'enum': ['nonlocalized', 'localized', 'mixed']}
+        del contract['argument_contract']['properties']['all_user_soundbanks']
+        assert contract['argument_contract']['properties']['languages']['description'] == 'Explicit project language selection; empty or omitted means all project languages. Omission is preserved in native dispatch; SFX is not a localized language.'
+        contract['argument_contract']['properties']['languages']['description'] = 'Batch language selection. Omit when every SoundBank has artifact_expectation=nonlocalized. When any SoundBank is localized or mixed, supply one or more real localized project language names; SFX is not a localized language and is forbidden here.'
+        assert contract['argument_contract']['properties']['languages']['minItems'] == 0
+        contract['argument_contract']['properties']['languages']['minItems'] = 1
+        assert contract['argument_contract']['properties']['skip_languages']['description'] == 'Explicit suppression of localized banks; omitted native control retains its native default. The public business declaration discloses its compatible artifact-derived default separately.'
+        contract['argument_contract']['properties']['skip_languages']['description'] = 'Batch switch derived from the complete soundbanks[] list: true exactly when every SoundBank is nonlocalized, and false when any SoundBank is localized or mixed.'
+        assert 'x-discloseDescription' not in contract['argument_contract']['properties']['skip_languages']
+        contract['argument_contract']['properties']['skip_languages']['x-discloseDescription'] = True
+        assert contract['argument_contract']['properties']['soundbanks']['items']['properties']['artifact_expectation']['description'] == 'Expected artifact layout for this SoundBank. nonlocalized means only the root non-localized/SFX Bank artifact; localized means per-language artifacts; mixed means both root and per-language artifacts. Language selection is a batch-level explicit or native-default choice.'
+        contract['argument_contract']['properties']['soundbanks']['items']['properties']['artifact_expectation']['description'] = 'Expected artifact layout for this SoundBank. nonlocalized means only the root non-localized/SFX Bank artifact; localized means per-language artifacts; mixed means both root and per-language artifacts. Language selection is a batch-level rule derived from all soundbanks[] rows.'
+        assert contract['argument_contract']['properties']['soundbanks']['items']['properties']['aux_busses']['minItems'] == 0
+        contract['argument_contract']['properties']['soundbanks']['items']['properties']['aux_busses']['minItems'] = 1
+        assert contract['argument_contract']['properties']['soundbanks']['items']['properties']['events']['minItems'] == 0
+        contract['argument_contract']['properties']['soundbanks']['items']['properties']['events']['minItems'] = 1
+        assert contract['argument_contract']['properties']['soundbanks']['items']['properties']['inclusions']['minItems'] == 0
+        contract['argument_contract']['properties']['soundbanks']['items']['properties']['inclusions']['minItems'] = 1
+        assert contract['argument_contract']['properties']['soundbanks']['items']['properties']['temporary'] == {'type': 'boolean'}
+        del contract['argument_contract']['properties']['soundbanks']['items']['properties']['temporary']
+        assert contract['argument_contract']['properties']['soundbanks']['minItems'] == 0
+        contract['argument_contract']['properties']['soundbanks']['minItems'] = 1
+        assert 'const' not in contract['argument_contract']['properties']['write_to_disk']
+        contract['argument_contract']['properties']['write_to_disk']['const'] = True
+        assert contract['argument_contract']['properties']['write_to_disk']['description'] == 'Omitted means the native false default: in-memory generation with result-only verification; no bank data is returned by this call.'
+        del contract['argument_contract']['properties']['write_to_disk']['description']
+        assert contract['argument_contract']['properties']['write_to_disk']['type'] == 'boolean'
+        del contract['argument_contract']['properties']['write_to_disk']['type']
+        assert contract['argument_contract']['required'] == ['soundbanks', 'platforms', 'io_root']
+        contract['argument_contract']['required'] = ['soundbanks', 'platforms', 'skip_languages', 'write_to_disk', 'io_root']
+        assert contract['constraints'] == ['SoundBank scope is selected or explicitly all-user; platforms remain bounded and explicit; omitted languages mean all live project languages; Init is an automatic by-product', 'language selection is batch-wide; explicit skip_languages=true conflicts with localized artifact expectations; preserve native omission and explicit options', 'batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent; preserve every explicitly supplied value at its original level', 'Event and AuxBus descriptors resolve live to one GUID before preview', 'Wwise 2021.1 derives project paths from the live Project filePath plus a hashed strict WPROJ parse; later versions use live core.getProjectInfo', 'execution replays project/file/artifact and selection guards; file output requires every requested artifact to be created or changed and non-empty; memory output proves only result schema and diagnostics, not bank delivery']
+        contract['constraints'] = ['the user SoundBank, platform, and language scope is explicit; Init is an automatic by-product and cannot be requested', 'language selection is batch-wide: all-nonlocalized soundbanks require skip_languages=true and languages omitted; any localized or mixed soundbank requires skip_languages=false plus non-empty live project languages, never SFX; one batch may combine nonlocalized with localized or mixed rows', 'batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent; preserve every explicitly supplied value at its original level', 'Event and AuxBus descriptors resolve live to one GUID before preview', 'Wwise 2021.1 derives project paths from the live Project filePath plus a hashed strict WPROJ parse; later versions use live core.getProjectInfo', 'execution replays project/file/artifact guards; verification requires each requested Bank artifact to be created or changed and non-empty']
+        assert contract['identity_arguments'] == ['soundbanks[].events[]', 'soundbanks[].aux_busses[]', 'all_user_bank_expectations[].soundbank']
+        contract['identity_arguments'] = ['soundbanks[].events[]', 'soundbanks[].aux_busses[]']
+        assert contract['optional_arguments'] == ['all_user_soundbanks', 'all_user_bank_expectations', 'skip_languages', 'write_to_disk', 'languages', 'rebuild_soundbanks', 'clear_audio_file_cache', 'rebuild_init_bank']
+        contract['optional_arguments'] = ['languages', 'rebuild_soundbanks', 'clear_audio_file_cache', 'rebuild_init_bank']
+        assert contract['required_arguments'] == ['soundbanks', 'platforms', 'io_root']
+        contract['required_arguments'] = ['soundbanks', 'platforms', 'skip_languages', 'write_to_disk', 'io_root']
+        non_object_set_digests[f"soundbank.generate@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == "20f53f6814e0129d5a71177e058e320d4c570bbcad761201913ceb8635a9a75e"
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_definition_completion("soundbank.convertExternalSources", version)
+        row = contract["argument_contract"]["properties"]["sources"]["items"]
+        assert row["required"] == ["input", "platform"]
+        assert row["optional"] == ["output"]
+        row["required"] = ["input", "platform", "output"]
+        row["optional"] = []
+        non_object_set_digests[f"soundbank.convertExternalSources@{version}"] = canonical_sha256(contract)
+
+    # Localized table final forms change only this all-five TSV disclosure.
+    assert canonical_sha256(non_object_set_digests) == "99ae222d9f424628d6bbd75387b136cdbbe84f70a4709eea7b75a23d32579cf0"
+    before_localized_table_final = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        for operation in ("audio.import", "audio.importTabDelimited"):
+            contract = before_definition_completion(operation, version)
+            if operation == "audio.importTabDelimited":
+                assert contract["constraints"][-1] == 'localized typed Sound Voice owner-only rows support createNew/useExisting/replaceExisting with live metadata-proven fields; create/replace require explicit prerequisite columns and replacement retires the complete old GUID subtree, while existing useExisting may retain satisfied prerequisites and preserves Source identities and files; localized existing-owner regular or bounded inline WAV media binds the exact selected-language Source and preserves other Source files; combined owner-field/media rows retain the exact observed-host guard and table bytes are never rewritten'
+                contract["constraints"][-1] = 'localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows bind the intended language Source, verify planned media changes and preserve other Source files without rewriting the exact table'
+            before_localized_table_final[operation, version] = contract
+            non_object_set_digests[f"{operation}@{version}"] = canonical_sha256(contract)
+    # The existing-Event/global-mode safety disclosure owns only the two
+    # ordinary descriptions and one TSV constraint; preserve the combined seal.
+    assert canonical_sha256(non_object_set_digests) == "e84f03b704cef2293600dc17e60e4962fd5d95b18c85d5c9a3aab2181c70ee81"
+    before_dialogue_mode_boundary = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        for operation in ("audio.import", "audio.importTabDelimited"):
+            contract = deepcopy(before_localized_table_final[operation, version])
+            if operation == "audio.import":
+                props = contract["argument_contract"]["properties"]
+                suffix = " Existing Events require useExisting; replace the Sound first without that directive, then bind the resulting Sound for a separately previewed existing-Event update."
+                for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+                    assert fields["dialogue_event"]["description"].endswith(suffix)
+                    fields["dialogue_event"]["description"] = fields["dialogue_event"]["description"][:-len(suffix)]
+            else:
+                assert contract["constraints"].pop(2) == "Existing Dialogue Event paths require useExisting; preserve create/replace intent by first importing the owner without that existing-Event directive, then bind the resulting owner and Event for a separately previewed audio.import useExisting update"
+            before_dialogue_mode_boundary[operation, version] = contract
+            non_object_set_digests[f"{operation}@{version}"] = canonical_sha256(contract)
+    # Seal the combined final forms, then invert only the closed Switch
+    # group alternative before preserving both independent lifecycle seals.
+    assert canonical_sha256(non_object_set_digests) == "2b932cf2993e74108be0589ed02f2795718e53d8723b0dbb2f255bf437521fd8"
+    before_switch_final_forms = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(before_dialogue_mode_boundary["audio.import", version])
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            switch = fields["switch_assignment"]
+            assert set(switch) == {"oneOf", "description"}
+            assert switch["description"] == 'One exact Switch/State value name under the actual container group, or a closed bound group identity with an optional exact value name. Group-only associates that existing group with the imported SwitchContainer; earlier typed container declarations supply the group for their direct children. Gateway owns directive construction, metadata, group and full pair readback. Supports create/reuse/replace and localized owner/media reuse with groups below Default Work Unit, including VirtualFolders. Replacement removes old-owner pairs and verifies the requested new-owner pairs; an explicit whole-container replacement may replace its occupied group. Native directive grammar, object paths and GUIDs are not caller inputs.'
+            assert switch["oneOf"] == [
+                {"type": "string", "minLength": 1, "maxLength": 16 * 1024},
+                {"type": "object", "additionalProperties": False, "required": ["group"],
+                 "properties": {"group": fields["import_location"],
+                    "value": {"type": "string", "minLength": 1, "maxLength": 255}}},
+            ]
+            fields["switch_assignment"] = {'type': 'string', 'minLength': 1, 'maxLength': 16384, 'description': 'One exact Switch/State value name for a direct imported child of an existing SwitchContainer with its group already bound. Gateway resolves that value under the actual group, constructs the native directive, and verifies the complete assignment set and unchanged group. Supports create/reuse/replace and localized owner/media reuse with groups below Default Work Unit, including VirtualFolders. Replacement removes old-owner pairs and verifies the requested new-owner pairs. Native directive grammar, object paths and GUIDs are not caller inputs.'}
+        before_switch_final_forms[version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+    dialogue_component_digests = dict(non_object_set_digests)
+    # Existing Dialogue Event identity is the only new machine field. Revert
+    # that field and its disclosure before all prior component/history seals.
+    before_dialogue_lifecycle = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(before_switch_final_forms[version])
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            assert fields["dialogue_event"]["properties"].pop("existing_id") == {
+                "type":"string", "description":"Gateway-bound exact existing DialogueEvent GUID; omitted for new Event creation."}
+            fields["dialogue_event"]["description"] = "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; name/path alone requests Event creation, not a decision-path association. Optional ordered bound group/value or wildcard conditions request an association; Probability/Weight require that path. Entry owner/AudioNode and supplied numeric values are checked; exact decision-path sequence is not read back."
+        before_dialogue_lifecycle[version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+    # Source lifecycle extends one TSV disclosure across all five lanes.
+    # Invert exactly that delta before retaining every prior component seal.
+    assert canonical_sha256(non_object_set_digests) == "0a067c9f0ac14b8c48378170821fbcfdb6d9568d54fd0df39f87f4638a4e3ef4"
+    before_source_lifecycle = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(before_dialogue_mode_boundary["audio.importTabDelimited", version])
+        assert contract["constraints"][3] == (
+            "explicit Sound-owned AudioFileSource media rows support createNew/useExisting/replaceExisting with exact absent-or-selected Source paths across languages; a missing Sound kind is bound by its typed parent or same-table typed owner row; unchanged owners and unplanned Source identities/files are preserved, while an explicitly declared Sound replacement retires the complete sealed child set and rebinds requested Sources; regular or bounded inline WAV media and live metadata-proven Source fields retain independent verification; table bytes are never rewritten"
+        )
+        contract["constraints"][3] = (
+            "an explicit path-spelled AudioFileSource media row requires one exact Sound child path across all languages at Preview and execution, matching the selected GUID, class and parent; Notes targets that Source and a separate owner-only Notes row retains the exact-table transaction"
+        )
+        before_source_lifecycle[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+        dialogue_component_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    # The same Source inversion on the copy independently retains Dialogue's
+    # component seal; the main map retains Source's seal before that inversion.
+    assert canonical_sha256(dialogue_component_digests) == "4808739b8ef500377baf8bd7eb02caae2366b40ab28bf4eaaa44d5c5876e72b7"
+
+    # Reconcile the independent Switch extension before the Dialogue component
+    # and all earlier seals. Only its two descriptions/one constraint changed.
+    assert canonical_sha256(non_object_set_digests) == "c56f61d0fb3a1911e6b32c223bc1b482c3e6219676cc09937e36f5787dddcf40"
+    before_switch_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(before_dialogue_lifecycle[version])
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            assert fields["switch_assignment"]["description"] == (
+                "One exact Switch/State value name for a direct imported child of an "
+                "existing SwitchContainer with its group already bound. Gateway resolves "
+                "that value under the actual group, constructs the native directive, and "
+                "verifies the complete assignment set and unchanged group. Supports "
+                "create/reuse/replace and localized owner/media reuse with groups below "
+                "Default Work Unit, including VirtualFolders. Replacement removes old-owner "
+                "pairs and verifies the requested new-owner pairs. Native directive grammar, "
+                "object paths and GUIDs are not caller inputs."
+            )
+            fields["switch_assignment"]["description"] = (
+                "One exact Switch/State value name for a direct imported child of an "
+                "existing SwitchContainer with its group already bound. Gateway resolves "
+                "that value under the actual group, constructs the native directive, and "
+                "verifies the complete assignment set and unchanged group. This first "
+                "slice supports create/reuse with groups below Default Work Unit, including "
+                "VirtualFolders; replacement, new group/container setup and existing "
+                "localized reuse remain outside this slice. Native directive grammar, "
+                "object paths and GUIDs are not caller inputs."
+            )
+        before_switch_contracts["audio.import", version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+        contract = deepcopy(before_source_lifecycle[version])
+        assert contract["constraints"].pop(1) == (
+            "Switch Assignation binds an exact existing group and optional exact values; group-only descriptors associate a typed SwitchContainer without creating a group or adding a child pair; explicitly typed new direct containers use the same single-import path and full group/pair readback"
+        )
+        before_switch_contracts["audio.importTabDelimited", version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    # Explicit path choices add only the ordinary row/default Dialogue fields.
+    # Invert that exact extension before all historical schema seals below.
+    assert canonical_sha256(non_object_set_digests) == "4fabdc0d5496d180c8f0adf680d812204692dd157c26dc85e4e3965890ec9de8"
+    dialogue_input_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(before_switch_contracts["audio.import", version])
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            dialogue = fields["dialogue_event"]
+            assert set(dialogue["properties"]) == {"path", "conditions", "probability", "weight"}
+            assert dialogue["properties"]["conditions"]["maxItems"] == 32
+            for field in ("conditions", "probability", "weight"):
+                dialogue["properties"].pop(field)
+            dialogue["description"] = "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; name/path alone requests Event creation, not a decision-path association. Explicit decision paths remain separate closed support work."
+        dialogue_input_contracts[version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+    # Exact Help and the retained native result establish creation for name
+    # alone. Invert only the corrected promise, retaining the previous seal.
+    assert canonical_sha256(non_object_set_digests) == "5da8cc04ba3f0f1596ec4dd13cfa95c7333d3115df8e20360a6a47403e4450c2"
+    association_promise_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(dialogue_input_contracts[version])
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            assert fields["dialogue_event"]["description"] == "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; name/path alone requests Event creation, not a decision-path association. Explicit decision paths remain separate closed support work."
+            fields["dialogue_event"]["description"] = "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; verifies the Entry.owner and AudioNode association, without asserting unspecified decision-path defaults."
+        association_promise_contracts[version] = deepcopy(contract)
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+    # Dialogue creation now owns path syntax and independently proves the
+    # Entry.owner / AudioNode link. Invert only the two ordinary row/default
+    # field shapes; TSV disclosures and every historical seal stay intact.
+    assert canonical_sha256(non_object_set_digests) == "6a7e5b1ccfaf0a5afb714a8fe8f26cfae4219fc8113edc4acb5de068d5e9cb0c"
+    previous_dialogue_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(association_promise_contracts[version])
+        props = contract["argument_contract"]["properties"]
+        for fields in (props["defaults"]["properties"], props["imports"]["items"]["properties"]):
+            assert fields["dialogue_event"] == {
+                "type": "object", "additionalProperties": False, "required": ["path"],
+                "properties": {"path": {"type": "string", "minLength": 1, "maxLength": 4096}},
+                "description": "Gateway-derived new DialogueEvent path from a bound Dynamic Dialogue parent and exact name; verifies the Entry.owner and AudioNode association, without asserting unspecified decision-path defaults.",
+            }
+            fields["dialogue_event"] = {"type": "string", "minLength": 1, "maxLength": 16 * 1024,
+                "description": "One native Wwise Dialogue Event import directive."}
+        previous_dialogue_contracts[version] = deepcopy(contract)
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+    # The second native failure removes only the unsupported unique-path escape.
+    assert canonical_sha256(non_object_set_digests) == "1b5534697041f3bca74cd5c548d5c09afe76e61634d2aa54dd4326ff993cb9a9"
+    previous_owner_media_host_contract = deepcopy(before_switch_contracts["audio.importTabDelimited", "2025.1"])
+    assert previous_owner_media_host_contract["constraints"][-2] == (
+        "WwiseConsole 2025.1.7 build 9143 blocks combined localized existing-owner fields/media rows reusing an existing language Source: both shared and distinct Source-path native configurations added an extra Source despite correct fields and copied bytes; preparation and prewrite checks enforce this observed host boundary, not an API-absence claim or proven cause; owner-only, pure-media and other-host forms retain their existing boundaries"
+    )
+    previous_owner_media_host_contract["constraints"][-2] = (
+        "WwiseConsole 2025.1.7 build 9143 blocks a combined localized existing-owner fields/media row when its selected Source path is shared across languages: retained native evidence added an extra Source despite correct fields and copied bytes; preparation and prewrite checks match this observed configuration, not a proven root cause; owner-only, pure-media, unambiguous and other-host forms retain their existing boundaries"
+    )
+    non_object_set_digests["audio.importTabDelimited@2025.1"] = canonical_sha256(previous_owner_media_host_contract)
+    # Invert only the observed combined-source host boundary, preserving the
+    # exact earlier combined disclosure and every component/historical seal.
+    assert canonical_sha256(non_object_set_digests) == "04848d1c5153d3ef35c8dd5f57feb858c3b9bb9e74d3d81a833036b25b5affd3"
+    previous_source_boundary_contract = deepcopy(previous_owner_media_host_contract)
+    assert previous_source_boundary_contract["constraints"].pop(-2) == (
+        "WwiseConsole 2025.1.7 build 9143 blocks a combined localized existing-owner fields/media row when its selected Source path is shared across languages: retained native evidence added an extra Source despite correct fields and copied bytes; preparation and prewrite checks match this observed configuration, not a proven root cause; owner-only, pure-media, unambiguous and other-host forms retain their existing boundaries"
+    )
+    non_object_set_digests["audio.importTabDelimited@2025.1"] = canonical_sha256(previous_source_boundary_contract)
+    # Exact TSV combined fields/media adds one reviewed disclosure. Invert
+    # only that constraint before retaining both component and older seals.
+    assert canonical_sha256(non_object_set_digests) == "3d4da617cf27e38485a15d5f716e97cb6221ebe45a620c96e871868545df9962"
+    before_combined_media_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(previous_source_boundary_contract) if version == "2025.1" else deepcopy(before_switch_contracts["audio.importTabDelimited", version])
+        assert contract["constraints"].pop() == (
+            "localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows bind the intended language Source, verify planned media changes and preserve other Source files without rewriting the exact table"
+        )
+        contract["constraints"].append(
+            "localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows remain outside the closed preparation path"
+        )
+        before_combined_media_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    # Combined five-version owner fields + closed Switch binding schema.
+    assert canonical_sha256(non_object_set_digests) == "d3b68dd3cd376da66b1e5926b931feaaee985fc6fb0eb5afc1ec9cd73c7213d0"
+    # Invert only Switch wording on a copy to preserve the independently
+    # reviewed five-version owner-field component seal.
+    owner_fields_component_digests = dict(non_object_set_digests)
+    switch_import_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(previous_dialogue_contracts[version])
+        properties = contract["argument_contract"]["properties"]
+        for field in (properties["defaults"]["properties"]["switch_assignment"],
+                      properties["imports"]["items"]["properties"]["switch_assignment"]):
+            assert field["description"] == (
+                "One exact Switch/State value name for a direct imported child of an "
+                "existing SwitchContainer with its group already bound. Gateway resolves "
+                "that value under the actual group, constructs the native directive, and "
+                "verifies the complete assignment set and unchanged group. This first "
+                "slice supports create/reuse with groups below Default Work Unit, including "
+                "VirtualFolders; replacement, new group/container setup and existing "
+                "localized reuse remain outside this slice. Native directive grammar, "
+                "object paths and GUIDs are not caller inputs."
+            )
+            field["description"] = (
+                "One native Wwise Switch Assignation import directive, not an object "
+                "identity or object-path field. When importing a direct child into an "
+                "existing Switch Container whose Switch/State Group is already bound, "
+                "use the exact Switch/State value name (for example, Snow); do not pass "
+                "the value object's path in that common case."
+            )
+        switch_import_contracts[version] = contract
+        owner_fields_component_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(owner_fields_component_digests) == "8bbef24dd1abb4e7212a8de4c530ff3372b281972e741cf0edd74b47f52d6b9d"
+    # Invert only the five-version owner-field disclosure to preserve the
+    # independently reviewed Switch component before all historical seals.
+    previous_owner_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(before_combined_media_contracts[version])
+        assert contract["constraints"].pop() == (
+            "localized typed Sound Voice owner-only rows in useExisting support live metadata-proven properties and unconstrained references in every supported version; omitted activation columns require the exact existing owner to satisfy the live prerequisites through execution and verification; Source Notes, identities, languages, placement and file bytes remain preserved; combined localized owner-field/media rows remain outside the closed preparation path"
+        )
+        if version == "2025.1":
+            contract["constraints"].append(
+                "the first localized owner-field TSV slice admits an existing typed Sound Voice owner-only row in useExisting on 2025.1; live class metadata validates property/reference fields, required activation columns stay explicit, and Source Notes, identities, languages, placement and file bytes remain preserved; broader localized field/media combinations remain outside this slice"
+            )
+        previous_owner_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == "c34ee7bdbb35217f637d58f8bab27564f9127d7ef262b6cb4b3a88dfc5561357"
+    for version, contract in switch_import_contracts.items():
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+
+    # Combined owner-only field + global Source-wire identity schema.
+    assert canonical_sha256(non_object_set_digests) == "27ba4a25e057a70e89d3955e23803cea448054f7d3ff2b0205cf219d3eae59d2"
+    # Preserve the independently committed owner-only component seal by
+    # inverting only the already-reviewed Source-wire wording on a copy.
+    owner_component_digests = dict(non_object_set_digests)
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = deepcopy(previous_owner_contracts[version])
+        assert contract["constraints"][2] == (
+            "an explicit path-spelled AudioFileSource media row requires one exact Sound child path across all languages at Preview and execution, matching the selected GUID, class and parent; Notes targets that Source and a separate owner-only Notes row retains the exact-table transaction"
+        )
+        contract["constraints"][2] = (
+            "an explicit typed AudioFileSource media row may reimport one existing exact Sound child in the requested language using Notes on the Source; a separate typed owner-only Notes row retains the same exact-table transaction"
+        )
+        owner_component_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(owner_component_digests) == "6bf96594342dac95d9c41ce5cbdaca2ad4c3c79aed0f02ee1c23fcc76fb7d6c5"
+    # Remove only the new 2025 owner-only disclosure to retain Root's seal.
+    owner_only_contract = deepcopy(previous_owner_contracts["2025.1"])
+    assert owner_only_contract["constraints"].pop() == (
+        "the first localized owner-field TSV slice admits an existing typed Sound Voice owner-only row in useExisting on 2025.1; live class metadata validates property/reference fields, required activation columns stay explicit, and Source Notes, identities, languages, placement and file bytes remain preserved; broader localized field/media combinations remain outside this slice"
+    )
+    non_object_set_digests["audio.importTabDelimited@2025.1"] = canonical_sha256(owner_only_contract)
+    # Invert only the reviewed global path-identity disclosure before all
+    # prior schema seals, including the separate observed GUID host boundary.
+    assert canonical_sha256(non_object_set_digests) == "166dc73c36e9d647890490f633dd099a5c54134b16fa13b13c662e6775e245e4"
+    wire_path_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = owner_only_contract if version == "2025.1" else deepcopy(previous_owner_contracts[version])
+        assert contract["constraints"][2] == (
+            "an explicit path-spelled AudioFileSource media row requires one exact Sound child path across all languages at Preview and execution, matching the selected GUID, class and parent; Notes targets that Source and a separate owner-only Notes row retains the exact-table transaction"
+        )
+        contract["constraints"][2] = (
+            "an explicit typed AudioFileSource media row may reimport one existing exact Sound child in the requested language using Notes on the Source; a separate typed owner-only Notes row retains the same exact-table transaction"
+        )
+        wire_path_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    # One observed Console/build boundary changes only the 2025 TSV contract.
+    # Remove exactly that disclosure and retain the complete prior schema seal.
+    assert canonical_sha256(non_object_set_digests) == "f33f339b6f3ce93d866a2d1a42e0f5277f81ee7631ee0ccbb89f6f42f79d5b0a"
+    native_boundary_contract = wire_path_contracts["2025.1"]
+    assert native_boundary_contract["constraints"].pop() == (
+        "WwiseConsole 2025.1.7 build 9143 blocks GUID Object Path TSV cells before preview and execution: retained native evidence interpreted them as literal object names and created unintended objects; other host/version GUID semantics remain unproven pending scope decision"
+    )
+    non_object_set_digests["audio.importTabDelimited@2025.1"] = canonical_sha256(native_boundary_contract)
+    # GUID identities reuse the complete existing typed-TSV target policy.
+    # Invert this wording delta before all historical schema seals.
+    assert canonical_sha256(non_object_set_digests) == "3fd1e7e36d961a8ea781046a8527ba81ede47c090d0529428136dc1b262cce97"
+    class_parity_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = native_boundary_contract if version == "2025.1" else wire_path_contracts[version]
+        assert contract["constraints"][4] == (
+            "canonical GUID Object Path cells resolve exact existing identities under the shared typed-TSV target class and root policy before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries"
+        )
+        contract["constraints"][4] = (
+            "canonical GUID Object Path cells resolve exact existing Sound or AudioFileSource identities before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries"
+        )
+        class_parity_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    # GUID target support adds one reviewed TSV disclosure without new fields.
+    # Invert only this delta and retain the complete native-path schema seal.
+    assert canonical_sha256(non_object_set_digests) == "3c08c10105192d1609df5875122ab106722ff8d50b618a8433d18e3d1a0b79f7"
+    guid_target_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = class_parity_contracts[version]
+        assert contract["constraints"].pop(4) == (
+            "canonical GUID Object Path cells resolve exact existing Sound or AudioFileSource identities before preview; supplied GUID spelling and table bytes remain unchanged, with the same class, parent, language, drift and media verification boundaries"
+        )
+        guid_target_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    # Native media cells add one reviewed TSV constraint; invert that exact
+    # disclosure while retaining the complete earlier combined schema seal.
+    assert canonical_sha256(non_object_set_digests) == "073025d7216355087c4fe62331316385f54da4a100aeeec0df7c5c4b53655a46"
+    native_path_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = guid_target_contracts[version]
+        assert contract["constraints"].pop(3) == (
+            "Audio File cells retain their native spelling and bind a hashed local file; relative paths resolve from the table directory, including parent navigation; proven Wine hosts require Windows absolute or table-relative media cells"
+        )
+        native_path_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    # The next #182 slice admits localized owner fields/inline media and
+    # explicit Source creation. Seal only this disclosure delta, then invert
+    # it so the earlier import and all pre-import seals remain unchanged.
+    assert canonical_sha256(non_object_set_digests) == "b256cd532989c59849a2c0f84297fe39242d6ed31b49e8c56ceb506aeb6ba151"
+    current_import_digests = dict(non_object_set_digests)
+    ordinary_import_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = switch_import_contracts[version]
+        assert contract["constraints"][6] == (
+            "ordinary localized useExisting preserves the exact Voice and language-scoped Source identities; Gateway-owned typed owner/Source paths and the 2025.1 exact existing Source GUID binding support metadata-proven owner properties/references and regular or bounded inline WAV media, including an absent language Source; AudioSourceNotes uses an explicit Source row, while Notes, Originals placement and new Events retain independent verification; localized Dialogue/Switch directives and explicit row import_location remain outside the closed preparation path"
+        )
+        contract["constraints"][6] = (
+            "an ordinary audio.import live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight; Originals placement, one source notes field and a new Event retain ordinary import verification; other requested row fields are rejected"
+        )
+        ordinary_import_contracts[version] = contract
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+    # Explicit Source TSV admission adds one constraint and no request field.
+    # Verify and invert only that reviewed delta, retaining the prior full seal.
+    assert canonical_sha256(non_object_set_digests) == "499c116a84384ac1ba3eb981911ad472b7f255e23f3e696ad3ca8dfb84490eeb"
+    reviewed_tsv_contracts = {}
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = native_path_contracts[version]
+        assert contract["constraints"].pop(2) == (
+            "an explicit typed AudioFileSource media row may reimport one existing exact Sound child in the requested language using Notes on the Source; a separate typed owner-only Notes row retains the same exact-table transaction"
+        )
+        reviewed_tsv_contracts[version] = contract
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+    # Inverting TSV alone must also retain the ordinary component's seal.
+    current_import_digests.update({
+        f"audio.importTabDelimited@{version}": canonical_sha256(contract)
+        for version, contract in reviewed_tsv_contracts.items()
+    })
+    assert canonical_sha256(current_import_digests) == "f7e8659d742bce3fa0de9b380ce392287a5692268e163f680004ad38bab53c80"
+
+    # #182 changes only import constraints: ordinary localized field admission
+    # and exact TSV version/Notes disclosure. Verify and invert those reviewed
+    # deltas before retaining every earlier schema seal below.
+    assert canonical_sha256(non_object_set_digests) == "05fa0904d8607b769b6614a2fa4d989763c0d31a2d87b5adf18d98d878ead741"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = reviewed_tsv_contracts[version]
+        assert contract["constraints"][:2] == [
+            "OriginalsSubFolder is a TSV column from Wwise 2023.1 (WG-60834); ordinary audio.import Originals placement remains separate",
+            "TSV Notes verifies target-object notes independently from Audio Source Notes; the exact user table is never rewritten",
+        ]
+        del contract["constraints"][:2]
+        non_object_set_digests[f"audio.importTabDelimited@{version}"] = canonical_sha256(contract)
+        contract = ordinary_import_contracts[version]
+        assert contract["constraints"][6] == (
+            "an ordinary audio.import live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight; Originals placement, one source notes field and a new Event retain ordinary import verification; other requested row fields are rejected"
+        )
+        contract["constraints"][6] = (
+            "a live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight and other requested row fields are rejected"
+        )
+        non_object_set_digests[f"audio.import@{version}"] = canonical_sha256(contract)
+    # The representative PlaylistSlot native rejection adds one exact
+    # constraint to the same five setName lanes. Preserve all earlier seals.
+    assert canonical_sha256(non_object_set_digests) == "d1cf6cc2d1a3977c8cfbe4e7bf12f0396af64af5c27913f7cd4a0cbdb17f9257"
+    def before_playlist_name_native_boundary(version):
+        contract = before_definition_completion("object.setName", version)
+        assert contract["constraints"].pop() == (
+            "2025.1 PlaylistSlot class 5636096 renaming is blocked before Preview from representative Console 2025.1.7.9143 native rejection; other hosts/builds are unobserved; other classes retain their contracts"
+        )
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.setName@{version}"] = canonical_sha256(before_playlist_name_native_boundary(version))
+    # #180 changes only the five setName constraint lists for exact Inner name
+    # attempts. Invert this reviewed delta before retaining the prior chain.
+    assert canonical_sha256(non_object_set_digests) == "78b7e8a32277e0fea03977c82f4ea0a99e8f0cd4926eafab568c1c832e9c9e3f"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_playlist_name_native_boundary(version)
+        assert contract["constraints"] == [
+            "object types with source-proven non-mutable derived or embedded-value names fail before preview instead of dispatching setName",
+            "exact 2025 PlaylistSlot and MetadataSlot attempts retain class, owner, ordered List, references and display path; native acknowledgment alone never verifies a rename",
+        ]
+        contract["constraints"] = [
+            "object types without a mutable intrinsic name, including derived, embedded-value, and owned-collection objects, fail before preview instead of dispatching setName",
+        ]
+        non_object_set_digests[f"object.setName@{version}"] = canonical_sha256(contract)
+    # R74 adds only the generated structural Switch-child property target proof
+    # to the five setProperty machine contracts. Invert exactly that addition
+    # before retaining every reviewed prior aggregate below.
+    assert canonical_sha256(non_object_set_digests) == "b4b9f6bcc8653b91d0ae37b34a24b80cdd3d5a4bcf476688ff6dd635e20f4fd5"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_definition_completion("object.setProperty", version)
+        contract["optional_arguments"].remove("switch_child_context")
+        contract["argument_contract"]["optional"].remove("switch_child_context")
+        assert contract["argument_contract"]["properties"].pop("switch_child_context") == {
+            "type": "object", "description": "Gateway-generated owner/child context binding; callers use the disclosed binding handles.",
+        }
+        non_object_set_digests[f"object.setProperty@{version}"] = canonical_sha256(contract)
+    # R70 clarifies only the five setReference null-target descriptions: a
+    # directly stored clear may retain an inherited effective reference. The
+    # other 144 machine contracts are unchanged from cb8f4391.
     assert canonical_sha256(non_object_set_digests) == (
+        "dc0e1e57aa623a586b81003c955be87f7740e927eb1e3d4ae237b4ec42249b86"
+    )
+    # Restore exactly those pre-R70 lane seals before retaining every reviewed
+    # historical aggregate and its existing chained substitutions below.
+    non_object_set_digests.update({
+        "object.setReference@2021.1": "3004ce4d78ce9daa9994c6668c2e89996cd956f6f24462f7f716fc9abc14b023",
+        "object.setReference@2022.1": "5235bce690f33d2c5774997731d3042153e4beb34d50bb1278988b4283721cbd",
+        "object.setReference@2023.1": "e11667666b38d8324b0b69492fc5070f1aaf3529f60478acacd51521bbb8350c",
+        "object.setReference@2024.1": "c32f85045ab4fa3fec6ed2403ee89716ba7f3e3b5387cd2a8ca69a3f2fa00092",
+        "object.setReference@2025.1": "3e837a9dd5332f59bd03246a2ebad18e46b762f6f39deb1c7c17e55b71f564fd",
+    })
+    # Reviewed owned ControlInput construction and result bindings change only
+    # object.setRTPC in 2022.1–2025.1; the other 145 contracts are unchanged.
+    assert canonical_sha256(non_object_set_digests) == (
+        "7625144ba94c098847024fea8a5c50d7dbbe1eada00dfa54d6446368ff80851a"
+    )
+    # Exact pre-extension RTPC seals from 7f457d01. The current aggregate above
+    # protects all new fields; substituting only these four prior seals proves
+    # that every other contract and the historical aggregates stay unchanged.
+    non_object_set_digests.update({
+        "object.setRTPC@2022.1": "2f725349ef5e26108544a5e157222657e97317df1a4fe815c08afb40f7b4aa20",
+        "object.setRTPC@2023.1": "e4cf246a63cdc3103dabe67a1f48aee6edfe4741c74d24fb3c55954ecac4889d",
+        "object.setRTPC@2024.1": "f1be65816443c189c12838b817ad83a590e9addc7fa837d1af217c4a415f4ee8",
+        "object.setRTPC@2025.1": "90b6e9e5dd45924b20ad1a73b8432d47011fe5b35eac61b48208a335cb6ca793",
+    })
+    assert canonical_sha256(non_object_set_digests) == (
+        "a3d8593d2d4b0ad167c77264182de22abe49475781c031c0cd96429af874f4f9"
+    )
+    # Only four createPlugin contracts add source-proven Effect Folder placement.
+    # Invert that exact constraint before retaining every earlier reviewed seal.
+    def before_effect_folder_placement(version):
+        contract = before_definition_completion("object.createPlugin", version)
+        assert contract["constraints"][6] == (
+            "independent ShareSets verify parent/class/name/fields and sibling preservation; Effect placement additionally admits a fresh source-proven Folder beneath an Effects Work Unit, while Sink and Metadata require their matching Work Unit"
+        )
+        contract["constraints"][6] = (
+            "independent Effect, Sink and Metadata ShareSets are children of a matching Effects, Audio Devices or Metadata Work Unit and verify parent/class/name/fields and sibling preservation"
+        )
+        return contract
+
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.createPlugin@{version}"] = canonical_sha256(before_effect_folder_placement(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "8a89bd2ef65432a3a4fcddcb72a5ecfa49c32d6a4497d929199a6cf4802e0191"
+    )
+    # Only the five create contracts add same-graph result bindings here.
+    # Invert the exact closed field before retaining every historical seal.
+    def before_graph_result_bindings(version):
+        contract = before_definition_completion("object.create", version)
+        contract["optional_arguments"].remove("graph_result_bindings")
+        contract["argument_contract"]["optional"].remove("graph_result_bindings")
+        assert contract["argument_contract"]["properties"].pop("graph_result_bindings") == {
+            "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": True,
+            "description": "Gateway-owned declaration result bindings; no native identities or caller paths.",
+            "items": {"type": "object", "required": ["result_handle", "request_path"], "additionalProperties": False,
+                "properties": {"result_handle": {"type": "string", "pattern": r"^bnh1-[0-9a-f]{32}$"},
+                    "request_path": {"type": "string", "minLength": 1, "maxLength": 1024}}},
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(before_graph_result_bindings(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "cced6997d5ad93b10d934d95b76890cd535e55678fbd50b870cdef1fe8fa21b1"
+    )
+    # Only five internal waapi.call contracts add the history expectation proof.
+    # Remove that exact field and reuse this inverse in later historical checks.
+    def before_history_binding(version):
+        contract = before_definition_completion("waapi.call", version)
+        contract["optional_arguments"].remove("history_binding")
+        contract["argument_contract"]["optional"].remove("history_binding")
+        assert contract["argument_contract"]["properties"].pop("history_binding") == {
+            "type": "object", "description": "Gateway-owned latest-history scoped expectation proof; never forwarded.",
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(before_history_binding(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "b0dd7d647d234d61ba4a4771336fe742839e1d2476712ecca09a3cf3f8b88fa3"
+    )
+    # Only object.create adds the internal documented List proof. Remove that
+    # exact property and both optional entries to retain every prior seal.
+    def before_documented_create_list_binding(version):
+        contract = before_graph_result_bindings(version)
+        contract["optional_arguments"].remove("documented_list_bindings")
+        contract["argument_contract"]["optional"].remove("documented_list_bindings")
+        assert contract["argument_contract"]["properties"].pop("documented_list_bindings") == {
+            "type": "array", "maxItems": 128, "items": {"type": "object"},
+            "description": "Gateway-owned documented List source/owner proofs; never forwarded.",
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(before_documented_create_list_binding(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "e7360fdd277786e360dd0da34e4ac9becf8b78b598384af5893be37c57c5dcec"
+    )
+    # Only the five internal waapi.call contracts add the protected provider
+    # proof. Remove that exact field before checking every historical seal.
+    def before_provider_profile_binding(version):
+        contract = before_history_binding(version)
+        contract["optional_arguments"].remove("provider_profile_binding")
+        contract["argument_contract"]["optional"].remove("provider_profile_binding")
+        assert contract["argument_contract"]["properties"].pop("provider_profile_binding") == {
+            "type": "object", "description": "Gateway-owned protected provider profile recipe; native values resolve only during dispatch.",
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(before_provider_profile_binding(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "a4f68b59f0d6b6646f5b18d09521e6b126e06364ebd1b06946e8d64e62911c82"
+    )
+    # Only the internal waapi.call contracts add the exact object-file proof.
+    # Removing that one reviewed field must retain every earlier contract seal.
+    def before_source_file_binding(version):
+        contract = before_provider_profile_binding(version)
+        contract["optional_arguments"].remove("source_control_binding")
+        contract["argument_contract"]["optional"].remove("source_control_binding")
+        assert contract["argument_contract"]["properties"].pop("source_control_binding") == {
+            "type": "object", "description": "Gateway-owned exact object-to-file scope proof; never forwarded.",
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(before_source_file_binding(version))
+    assert canonical_sha256(non_object_set_digests) == (
+        "5babd9b4fa6e0993a23a1a79267967dc59fb66e41c5b10ce4638b34c1c4507bd"
+    )
+    # Only the five Undo Group contracts add this closed cancellation choice.
+    # Remove that exact addition to retain the earlier reviewed aggregate.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_definition_completion("waapi.undoGroup", version)
+        assert contract["optional_arguments"] == ["failure_cancellation"]
+        contract["optional_arguments"] = []
+        assert contract["argument_contract"]["optional"] == ["failure_cancellation"]
+        contract["argument_contract"]["optional"] = []
+        assert contract["argument_contract"]["properties"].pop("failure_cancellation") == {
+            "type": "string", "enum": ["undo-changes", "preserve-changes", "native-default"],
+        }
+        non_object_set_digests[f"waapi.undoGroup@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
+        "f0cf1aaf03c0b79f218aff1f20b8e32f3ed19822896f32c39bf20d9f7cab9c33"
+    )
+    # Only the four supported Definition lanes add this reviewed Short ID
+    # resolution contract. Restore that exact addition to retain earlier seals.
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_definition_completion("soundbank.processDefinitionFiles", version)
+        constraint = (
+            "Event, DialogueEvent, AuxBus and Effect uint32 Short IDs resolve through a version-pinned bounded typed read; exact numeric Short ID, canonical GUID and directive type are checked independently"
+        )
+        assert contract["constraints"].count(constraint) == 1
+        contract["constraints"].remove(constraint)
+        non_object_set_digests[f"soundbank.processDefinitionFiles@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
+        "394a834d31bc4bbe49a106abdcfbb9db0998b8e9dee941817bc175cd604bb3e7"
+    )
+    # Reviewed lifecycle replacement and create null-reference additions.
+    # Restore only those exact fifteen lane deltas before checking prior seals.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        for operation in ("object.copy", "object.move"):
+            contract = before_definition_completion(operation, version)
+            conflict = contract["argument_contract"]["properties"]["on_name_conflict"]
+            assert conflict["enum"] == ["fail", "rename", "replace"]
+            conflict["enum"] = ["fail", "rename"]
+            non_object_set_digests[f"{operation}@{version}"] = canonical_sha256(contract)
+        contract = before_documented_create_list_binding(version)
+        properties = contract["argument_contract"]["properties"]
+        for node in (properties, properties["children"]["items"]["properties"]):
+            target = node["references"]["items"]["properties"]["target"]
+            assert target == {"oneOf": [IDENTITY_ARGUMENT_SCHEMA, {"type": "null"}]}
+            node["references"]["items"]["properties"]["target"] = IDENTITY_ARGUMENT_SCHEMA
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
+        "38eefcd78cd9265657e74d7b0775403bf1832b382373e9ce586a09e3e3a3c2fd"
+    )
+    # Four plugin lanes add two ShareSet kinds and bound references. Restore
+    # only those reviewed additions to reproduce the previous aggregate.
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_effect_folder_placement(version)
+        plugin = contract["argument_contract"]["properties"]["plugin"]
+        plugin["optional"].remove("references")
+        assert plugin["properties"]["kind"]["enum"] == ["source", "effect", "sink", "metadata"]
+        plugin["properties"]["kind"]["enum"] = ["source", "effect"]
+        assert plugin["properties"].pop("references") == {
+            "type": "array", "maxItems": 32,
+            "items": {
+                "type": "object", "required": ["name", "target"],
+                "additionalProperties": False,
+                "properties": {
+                    "name": {"type": "string", "minLength": 1},
+                    "target": IDENTITY_ARGUMENT_SCHEMA,
+                },
+            },
+        }
+        assert contract["constraints"][6] == (
+            "independent Effect, Sink and Metadata ShareSets are children of a matching Effects, Audio Devices or Metadata Work Unit and verify parent/class/name/fields and sibling preservation"
+        )
+        contract["constraints"][6] = (
+            "standalone Effect ShareSets are children of an Effects Work Unit and verify their own parent/class/name/properties"
+        )
+        non_object_set_digests[f"object.createPlugin@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
+        "c7fb226089f3c5f610e39090d196ab13958814992f13c03f205c227339694234"
+    )
+    # The only new named contract field is the internal owned model proof.
+    # Removing that exact addition must reproduce the earlier reviewed seal.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_source_file_binding(version)
+        contract["optional_arguments"].remove("model_binding")
+        contract["argument_contract"]["optional"].remove("model_binding")
+        assert contract["argument_contract"]["properties"].pop("model_binding") == {
+            "type": "object", "description": "Gateway-owned Authoring resource and declaration proof.",
+        }
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(contract)
+    # Reviewed hierarchy delta: only the five setReference contracts change
+    # their activation guidance. Restoring that exact prior wording reproduces
+    # the previous aggregate seal, preserving every other field and pair.
+    assert canonical_sha256(non_object_set_digests) == (
+        "aa408e7b856275f9c1a6f0304997c8945d2602eb9c8d10871c5ca74f0399f577"
+    )
+    previous = dict(non_object_set_digests)
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_definition_completion("object.setReference", version)
+        # This older inverse rebuilds the live schema rather than reusing the
+        # substituted digest, so invert R70's exact wording here as well.
+        null_target = contract["argument_contract"]["properties"]["target"]["oneOf"][1]
+        assert null_target["description"] == (
+            "Explicitly clear the directly stored reference; an inherited reference may still apply. Omitted target is never interpreted as a clear request."
+        )
+        null_target["description"] = (
+            "Explicitly clear the reference; omitted target is never interpreted as a clear request."
+        )
+        assert contract["constraints"][2:4] == [
+            "non-null references require their live activation prerequisites already satisfied; use separate Field Handle Previews, or explicit object.set declarations on 2022.1+",
+            "childOfReference binds the chosen target parent to the exact controlling reference; explicit atomic reference changes use the declared future parent and both relationships are revalidated and verified",
+        ]
+        contract["constraints"][2:4] = [
+            "non-null references require their live Boolean activation closure already satisfied; missing prerequisites require separate Field Handle property Previews, or object.set on 2022.1+",
+        ]
+        previous[f"object.setReference@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(previous) == (
+        "e2ff2fedc414e846f092b06d03ad807952461373873ef1ed2c9d2b4ee42970de"
+    )
+    # Retain the earlier layout-proof review and its original aggregate seal.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = before_source_file_binding(version)
+        contract["optional_arguments"].remove("model_binding")
+        contract["argument_contract"]["optional"].remove("model_binding")
+        contract["argument_contract"]["properties"].pop("model_binding")
+        contract["optional_arguments"].remove("layout_binding")
+        contract["argument_contract"]["optional"].remove("layout_binding")
+        assert contract["argument_contract"]["properties"].pop("layout_binding") == {
+            "type": "object",
+            "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded.",
+        }
+        previous[f"waapi.call@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(previous) == (
         "4f05743e90078e3d3ca52dc525b000b2fe46bbd4376ba9a701f1fddde5ca246f"
     )
     assert {

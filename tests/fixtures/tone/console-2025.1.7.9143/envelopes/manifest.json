@@ -1,0 +1,41 @@
+{
+  "contract": "waapi-skill.tone-native-envelope-regression/v1",
+  "original_candidate": "005afc69e79a2101d72bd24abd49164c3cf7e1fe",
+  "original_root": "r52-tone-waveform-envelope-005afc69-2025-r1",
+  "original_receipt_sha256": "f368ce72b4b4a30982c06ff7d5b0e3d841784671b32118aded8e939ac78b566d",
+  "host": "WwiseConsole",
+  "build": "2025.1.7.9143",
+  "native_business_acceptance": false,
+  "original_verification_state": "result_schema_checked",
+  "original_verification_strength": "partial_tone_artifact",
+  "purpose": "Unaltered current-native bytes for public Gateway program verification; the original characterization remains partial and receives no business effect credit.",
+  "phase_limitation": "The 22/44/33-cycle envelope durations cannot distinguish phase continuity from reset; the accepted verifier allows independent unparameterized phase per segment.",
+  "common_request": {
+    "waveform": "sine",
+    "frequency_hz": 440,
+    "channel_layout": "1.0",
+    "sample_rate_hz": 48000,
+    "bit_depth": "float32",
+    "sustain_db": -6
+  },
+  "files": {
+    "sine-attack-only.wav": {
+      "sha256": "df1cb8d5029096838cc9f124d21520fb1721326087ad99442a002bfafb2513b5",
+      "size": 28892,
+      "transaction_id": "tx1-b7ct9m6n0fk6656tefzn",
+      "request": {"attack_seconds": 0.05, "sustain_seconds": 0.1, "release_seconds": 0}
+    },
+    "sine-release-only.wav": {
+      "sha256": "7e846a9d95acda37a22c788b83f437a607adf7ce13ccc54358a9ce2dfcef5fe8",
+      "size": 33692,
+      "transaction_id": "tx1-09ha4w44qpvwx5rfmrd9",
+      "request": {"attack_seconds": 0, "sustain_seconds": 0.1, "release_seconds": 0.075}
+    },
+    "sine-attack-release.wav": {
+      "sha256": "5476fd1d087550835cfb02bf1dfd7360a9b8cf8691d16c30bb7a9be775b78fc3",
+      "size": 43292,
+      "transaction_id": "tx1-yezss7xvmqn4nrvawz9h",
+      "request": {"attack_seconds": 0.05, "sustain_seconds": 0.1, "release_seconds": 0.075}
+    }
+  }
+}

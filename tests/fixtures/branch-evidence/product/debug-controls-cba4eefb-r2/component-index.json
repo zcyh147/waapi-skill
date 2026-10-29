@@ -1,0 +1,37 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": "..",
+  "entries": [
+    {
+      "id": "debug-controls-cba4eefb-aggregate-r2",
+      "bindings": {
+        "artifact": "debug-controls-cba4eefb-r2/selected.bindings.json",
+        "sha256": "1e257410fbdac60812d6ea08f25080064285fada0b68767120f34c3d8d1468ac"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "debug-controls-cba4eefb-r2/selected.bindings.original.json",
+          "sha256": "1e257410fbdac60812d6ea08f25080064285fada0b68767120f34c3d8d1468ac"
+        },
+        "program": {
+          "artifact": "debug-controls-cba4eefb-r2/aggregate-program.json",
+          "sha256": "b0111b33cad677fe1648b3d1ccdca64c3409a4b8331bcf2bce01658f9f6764f1"
+        },
+        "requirements": {
+          "artifact": "debug-controls-cba4eefb-r2/selected.requirements.json",
+          "sha256": "bd0664e06152e17776474dd145c6b9d9dcf9272a5ca57c7dd8b4f2045ed81ed3"
+        },
+        "capture": {
+          "artifact": "debug-controls-cba4eefb-r2/selected.review-context.json",
+          "sha256": "f6bf09be05ae1b1a329d759a6ba6186462a26b7d29727c93eb536bb2201c1045"
+        }
+      }
+    }
+  ],
+  "mapping_attachments": [
+    {
+      "artifact": "debug-controls-cba4eefb-r2/mapping.json",
+      "sha256": "971b59b658fd08a554b4c0cea6402ad3d6bdd481ac797db16916843db08a0000"
+    }
+  ]
+}

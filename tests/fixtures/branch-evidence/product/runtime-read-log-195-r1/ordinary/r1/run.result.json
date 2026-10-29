@@ -1,0 +1,40 @@
+{
+  "candidate": "2fbae96c9524f853b2ce277a68e96c7eeb8941f6",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_rtpc_field_branch_evidence.py::test_one_rtpc_cursor_flow_proves_normalized_construction_and_rejects_resealed_trace",
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_explicit_fixed_fields_reach_consumer_with_exact_order_and_repetition[ordered-repeated]",
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_opaque_metadata_successor_requires_same_route_native_and_whole_public_program",
+    "tests/unit/test_contribution_branch_evidence.py::test_one_contribution_flow_reaches_final_consumer_and_binds_public_projection",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_get_versioned_public_result_branches[authoring-2025.1]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_control_all_public_input_branches[addItem-console-2025.1]",
+    "tests/unit/test_loaded_media_composite_evidence.py::test_older_loaded_media_composite_public_teardown_consumer[2023.1]",
+    "tests/unit/test_console_loaded_media_evidence.py::test_console_loaded_media_public_teardown_portable_consumer[2023.1]"
+  ],
+  "selected_exact_nodes": [
+    "tests/unit/test_rtpc_field_branch_evidence.py::test_one_rtpc_cursor_flow_proves_normalized_construction_and_rejects_resealed_trace",
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_explicit_fixed_fields_reach_consumer_with_exact_order_and_repetition[ordered-repeated]",
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_opaque_metadata_successor_requires_same_route_native_and_whole_public_program",
+    "tests/unit/test_contribution_branch_evidence.py::test_one_contribution_flow_reaches_final_consumer_and_binds_public_projection",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_get_versioned_public_result_branches[authoring-2025.1]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_control_all_public_input_branches[addItem-console-2025.1]",
+    "tests/unit/test_loaded_media_composite_evidence.py::test_older_loaded_media_composite_public_teardown_consumer[2023.1]",
+    "tests/unit/test_console_loaded_media_evidence.py::test_console_loaded_media_public_teardown_portable_consumer[2023.1]"
+  ],
+  "scope": "focused_runtime_shared_mechanisms_only",
+  "new_native_runs": 0,
+  "fresh_runs": 0,
+  "head_after": "2fbae96c9524f853b2ce277a68e96c7eeb8941f6",
+  "candidate_unchanged": true,
+  "exit_code": 1,
+  "git_status": "",
+  "remaining_owned_processes": [],
+  "duration_seconds": 528.901958082919,
+  "log_sha256": "1e7892a1943447e615f46513438774ce5e58320e77cb3cea24b9e094046d831c",
+  "status": "FAIL"
+}

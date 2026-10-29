@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-source195-current-88a6cbbe-r1/test_modern_collector_preserve1/native/1793224808818787000-2631012abbbc4716b00347db031a5366-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Frequency Mode"
+    },
+    "name": "FrequencyMode",
+    "type": "int32"
+  },
+  "risk_level": "low",
+  "timeout": 9.995378792053089,
+  "version": "2023.1"
+}

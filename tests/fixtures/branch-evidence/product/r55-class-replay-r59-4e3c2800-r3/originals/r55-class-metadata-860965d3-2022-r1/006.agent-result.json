@@ -1,0 +1,61 @@
+{
+  "selection": "mf1.1792528787.1.88c9e071fdc4f0a9050b8437f51c21665307d579ad6303e44b9b71efaf056cac",
+  "scope": {
+    "kind": "object_type",
+    "requested": "MusicStinger",
+    "resolved": {
+      "classId": 2490384,
+      "name": "MusicStinger",
+      "type": "WObject"
+    }
+  },
+  "metadata": {
+    "type": "string",
+    "name": "CustomCueMatchName",
+    "default": "",
+    "display": {
+      "name": "Custom cue match name",
+      "index": 1527,
+      "group": "Audio/Stingers"
+    },
+    "dependencies": [],
+    "audioEngineId": 4294967295,
+    "supports": {
+      "unlink": false,
+      "rtpc": "None",
+      "randomizer": false
+    },
+    "restriction": {},
+    "ui": {
+      "value": {
+        "max": 0.0,
+        "min": 0.0,
+        "decimals": 0,
+        "step": 0.0,
+        "fine": 0.0,
+        "infinity": 0.0
+      },
+      "displayAs": {
+        "lrMix": false,
+        "musicNote": false,
+        "bitfield": false
+      },
+      "dataMeaning": "None",
+      "autoUpdate": false
+    },
+    "unit": {
+      "status": "unknown",
+      "value": null
+    },
+    "availability": {
+      "type": "known",
+      "default": "known",
+      "restriction": "known",
+      "dependencies": "known",
+      "supports": "known",
+      "ui": "known"
+    }
+  },
+  "complete": true,
+  "mutation_authority": false
+}

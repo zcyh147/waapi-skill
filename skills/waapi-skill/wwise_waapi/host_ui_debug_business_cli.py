@@ -44,6 +44,9 @@ def add_host_ui_debug_plan_arguments(parser: argparse.ArgumentParser) -> None:
         metavar=("BUSINESS_FIELD", "ENABLE_OR_DISABLE"),
     )
     parser.add_argument(
+        "--empty", action="append", default=[], metavar="BUSINESS_COLLECTION",
+    )
+    parser.add_argument(
         "--marker",
         action="append",
         nargs="+",
@@ -64,6 +67,8 @@ def host_ui_debug_plan_from_namespace(
 
     def field_type(name: str) -> str:
         try:
+            if name not in contract["declaration"]["public_fields"]:
+                raise KeyError(name)
             return str(field_types[name])
         except KeyError as exc:
             raise HostUiDebugBusinessCliError(
@@ -74,6 +79,15 @@ def host_ui_debug_plan_from_namespace(
         if name in result:
             raise HostUiDebugBusinessCliError(f"{name} was supplied twice")
         result[name] = value
+
+    empty_fields: set[str] = set()
+    for name in args.empty:
+        if field_type(name) not in {"channel_index_list", "tone_marker_list", "language_name_list", "platform_creation_mappings"}:
+            raise HostUiDebugBusinessCliError(
+                f"{name} does not disclose an explicit empty collection choice"
+            )
+        put(name, [])
+        empty_fields.add(name)
 
     scalar_types = {
         "exact_waapi_uri",
@@ -118,12 +132,16 @@ def host_ui_debug_plan_from_namespace(
                 )
         put(name, value)
     for name, raw in args.item:
+        if name in empty_fields:
+            raise HostUiDebugBusinessCliError(f"{name} uses conflicting empty and populated forms")
         value_type = field_type(name)
-        if value_type not in {"language_name_list", "channel_index_list"}:
+        if value_type not in {"language_name_list", "channel_index_list", "platform_creation_mappings"}:
             raise HostUiDebugBusinessCliError(
                 f"{name} does not use the --item input form"
             )
         value: Any = raw
+        if value_type == "platform_creation_mappings":
+            value = [raw]
         if value_type == "channel_index_list":
             try:
                 value = int(raw)
@@ -140,6 +158,8 @@ def host_ui_debug_plan_from_namespace(
             raise HostUiDebugBusinessCliError(f"{name} uses conflicting input forms")
         current.append(value)
     for name, key, value in args.mapping:
+        if name in empty_fields:
+            raise HostUiDebugBusinessCliError(f"{name} uses conflicting empty and populated forms")
         if field_type(name) != "platform_creation_mappings":
             raise HostUiDebugBusinessCliError(
                 f"{name} does not use the --mapping input form"

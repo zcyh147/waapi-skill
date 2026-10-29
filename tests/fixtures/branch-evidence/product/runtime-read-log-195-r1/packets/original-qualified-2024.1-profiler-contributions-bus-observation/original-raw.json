@@ -1,0 +1,109 @@
+{
+  "api": "ak.wwise.core.profiler.getVoiceContributions",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2024-r1/owned/authoring-nodes/d6e9da42fb2f751cbc535eeb/native-evidence/1792792206522145000-ef3d26171e854972a224deb660ce92af-ak_wwise_core_profiler_getVoiceContributions.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": {
+      "HPF": 0.0,
+      "LPF": 0.0,
+      "objects": [
+        {
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "children": [],
+          "name": "Master Audio Bus",
+          "parameters": [],
+          "volume": 0.0
+        },
+        {
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "children": [],
+          "name": "Environmental",
+          "parameters": [],
+          "volume": 0.0
+        },
+        {
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "children": [],
+          "name": "SFX",
+          "parameters": [],
+          "volume": 0.0
+        },
+        {
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "children": [],
+          "name": "Cars",
+          "parameters": [],
+          "volume": 0.0
+        },
+        {
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "children": [],
+          "name": "Porsche 911 - Blend Container",
+          "parameters": [
+            {
+              "driver": "SoundBankValue",
+              "driverValue": -3.0,
+              "propertyType": "Volume",
+              "reason": "SoundBankValue",
+              "value": -3.0
+            }
+          ],
+          "volume": -3.0
+        },
+        {
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "children": [],
+          "name": "On-Load",
+          "parameters": [
+            {
+              "driver": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+              "driverValue": 1.0,
+              "propertyType": "Volume",
+              "reason": "RTPC",
+              "value": -0.0
+            },
+            {
+              "driver": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+              "driverValue": 1000.0,
+              "propertyType": "MuteRatio",
+              "reason": "RTPC",
+              "value": 0.0
+            }
+          ],
+          "volume": 0.0
+        },
+        {
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "children": [],
+          "name": "Outside_Idle_1000",
+          "parameters": [
+            {
+              "driver": "SoundBankValue",
+              "driverValue": -6.0,
+              "propertyType": "Volume",
+              "reason": "SoundBankValue",
+              "value": -6.0
+            }
+          ],
+          "volume": -6.0
+        }
+      ],
+      "volume": -9.0
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.839003166998737,
+  "version": "2024.1"
+}

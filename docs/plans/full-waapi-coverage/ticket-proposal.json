@@ -1,0 +1,337 @@
+{
+  "parent_issue": 174,
+  "status": "approved_published_implementation_active",
+  "published": true,
+  "versions": [
+    "2021.1",
+    "2022.1",
+    "2023.1",
+    "2024.1",
+    "2025.1"
+  ],
+  "tickets": [
+    {
+      "draft_id": "01",
+      "title": "Establish complete five-version native catalogs and schema discovery",
+      "blocked_by": [],
+      "path": "tickets/01-establish-complete-five-version-native-catalogs-and-schema-discovery.md",
+      "deliverable": "A maintainer can inspect the complete independently evidenced Console and in-scope Authoring capability set through versioned discovery, with missing wrapper support reported separately from missing native support.",
+      "issue_number": 175,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/175",
+      "blocked_by_issues": []
+    },
+    {
+      "draft_id": "02",
+      "title": "Make branch completion and gap ownership executable",
+      "blocked_by": [
+        "01"
+      ],
+      "path": "tickets/02-make-branch-completion-and-gap-ownership-executable.md",
+      "deliverable": "The coverage checker explains exactly which native-supported uses are unavailable or unverified, which implementation ticket owns each gap, and whether the overall effort is actually complete.",
+      "issue_number": 176,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/176",
+      "blocked_by_issues": [
+        175
+      ]
+    },
+    {
+      "draft_id": "03",
+      "title": "Support native metadata conditions for existing-object changes",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/03-support-native-metadata-conditions-for-existing-object-changes.md",
+      "deliverable": "Valid property and reference changes work across applicable object classes because the Gateway understands their native activation conditions, rather than accepting only previously encountered examples.",
+      "issue_number": 177,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/177",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "04",
+      "title": "Complete conditional configuration of newly created objects",
+      "blocked_by": [
+        "03"
+      ],
+      "path": "tickets/04-complete-conditional-configuration-of-newly-created-objects.md",
+      "deliverable": "A user can create an object with its requested valid initial fields even when those fields depend on class defaults or prerequisite settings.",
+      "issue_number": 178,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/178",
+      "blocked_by_issues": [
+        177
+      ]
+    },
+    {
+      "draft_id": "05",
+      "title": "Complete all native plugin kinds and placements",
+      "blocked_by": [
+        "04"
+      ],
+      "path": "tickets/05-complete-plugin-creation-for-source-owner-effect-and-shareset-placements.md",
+      "deliverable": "Users can create every in-scope native-supported plugin placement with the correct parent, class and properties, including supported alternatives on older Wwise versions.",
+      "issue_number": 179,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/179",
+      "blocked_by_issues": [
+        178
+      ]
+    },
+    {
+      "draft_id": "06",
+      "title": "Complete generic object graph and lifecycle operations",
+      "blocked_by": [
+        "04"
+      ],
+      "path": "tickets/06-complete-generic-object-graph-and-lifecycle-operations.md",
+      "deliverable": "Users can create or edit valid object trees and perform copy, move, rename, delete, property and reference workflows without losing permitted target or conflict-mode alternatives.",
+      "issue_number": 180,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/180",
+      "blocked_by_issues": [
+        178
+      ]
+    },
+    {
+      "draft_id": "07",
+      "title": "Complete object queries and metadata discovery projections",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/07-complete-object-queries-and-metadata-discovery-projections.md",
+      "deliverable": "Users can express valid in-scope read semantics and inspect every applicable property/reference detail through bounded public queries and metadata discovery.",
+      "issue_number": 181,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/181",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "08",
+      "title": "Complete audio import, reimport and replacement workflows",
+      "blocked_by": [
+        "04"
+      ],
+      "path": "tickets/08-complete-audio-import-reimport-and-replacement-workflows.md",
+      "deliverable": "Users can import, update and replace media and object structures with all in-scope native-supported row and option alternatives through closed import declarations.",
+      "issue_number": 182,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/182",
+      "blocked_by_issues": [
+        178
+      ]
+    },
+    {
+      "draft_id": "09",
+      "title": "Complete SoundBank definition, conversion and build options",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/09-complete-soundbank-definition-conversion-and-build-options.md",
+      "deliverable": "Users can manage inclusions, process definitions, convert external sources and generate requested banks without wrapper omissions in valid build branches.",
+      "issue_number": 183,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/183",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "10",
+      "title": "Complete Console project and file-operation alternatives",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/10-complete-console-project-and-file-operation-alternatives.md",
+      "deliverable": "Users can perform the permitted Console project/file/migration workflows with complete native option handling and accurate terminal outcomes.",
+      "issue_number": 184,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/184",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "11",
+      "title": "Complete SoundEngine control branches and capability lifetimes",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/11-complete-soundengine-control-branches-and-capability-lifetimes.md",
+      "deliverable": "Users can perform every in-scope reflected runtime control through meaningful business inputs, with valid game-object and playing-resource lifetimes.",
+      "issue_number": 185,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/185",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "12",
+      "title": "Complete runtime inspection, profiling and transport workflows",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/12-complete-runtime-inspection-profiling-and-transport-workflows.md",
+      "deliverable": "Users can inspect and control the permitted profiling/transport sessions and receive complete bounded results with correct resource cleanup.",
+      "issue_number": 186,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/186",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "13",
+      "title": "Complete Topic filtering, event shapes and monitoring outcomes",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/13-complete-topic-filtering-event-shapes-and-monitoring-outcomes.md",
+      "deliverable": "Users can monitor every in-scope Topic using its legal filtering/options and obtain correctly validated events and truthful completion status.",
+      "issue_number": 187,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/187",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "14",
+      "title": "Expose complete ordinary Authoring layout and view workflows",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/14-expose-complete-ordinary-authoring-layout-and-view-workflows.md",
+      "deliverable": "Users can inspect and manipulate the reflected ordinary Authoring layouts and views through controlled Gateway operations on the correct Wwise host.",
+      "issue_number": 188,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/188",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "15",
+      "title": "Expose Authoring model, window and signal workflows",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/15-expose-authoring-model-window-and-signal-workflows.md",
+      "deliverable": "Users can use native-supported ordinary Authoring model/window/signal capabilities through complete typed business contracts and owned resource lifetimes.",
+      "issue_number": 189,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/189",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "16",
+      "title": "Complete Authoring project, remote and command workflows",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/16-complete-authoring-project-remote-and-command-workflows.md",
+      "deliverable": "Users can use the existing Authoring project/remote/selection/command capabilities with all permitted branches and accurate project/session transitions.",
+      "issue_number": 190,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/190",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "17",
+      "title": "Complete specialized project and object authoring operations",
+      "blocked_by": [
+        "03"
+      ],
+      "path": "tickets/17-complete-specialized-project-and-object-authoring-operations.md",
+      "deliverable": "Users can perform the native-specific authoring operations that generic object edits cannot faithfully substitute, with all legal parameters and meaningful target variants.",
+      "issue_number": 191,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/191",
+      "blocked_by_issues": [
+        177
+      ]
+    },
+    {
+      "draft_id": "18",
+      "title": "Complete source-control and compound edit-history workflows",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/18-complete-source-control-and-compound-edit-history-workflows.md",
+      "deliverable": "Users can perform supported source-control and compound edit-history operations through complete closed requests with accurate outcomes and authorization.",
+      "issue_number": 192,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/192",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "19",
+      "title": "Complete permitted host-control and remaining fixed Core contracts",
+      "blocked_by": [
+        "02"
+      ],
+      "path": "tickets/19-complete-permitted-host-control-and-remaining-fixed-core-contracts.md",
+      "deliverable": "Users receive complete permitted host-control/fixed Core inputs and truthful terminal results, including routes whose zero-input shape previously concealed missing outcome handling.",
+      "issue_number": 193,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/193",
+      "blocked_by_issues": [
+        176
+      ]
+    },
+    {
+      "draft_id": "20",
+      "title": "Validate Skill discovery and formal-harness compatibility end to end",
+      "blocked_by": [
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19"
+      ],
+      "path": "tickets/20-validate-skill-discovery-and-formal-harness-compatibility-end-to-end.md",
+      "deliverable": "An Agent following only the Skill and Gateway discoveries can reach every completed task family without guessing implementation details, and the formal test harness accepts those legal paths.",
+      "issue_number": 194,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/194",
+      "blocked_by_issues": [
+        177,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        187,
+        188,
+        189,
+        190,
+        191,
+        192,
+        193
+      ]
+    },
+    {
+      "draft_id": "21",
+      "title": "Complete integrated five-version coverage and scoped acceptance",
+      "blocked_by": [
+        "20"
+      ],
+      "path": "tickets/21-complete-integrated-five-version-coverage-and-scoped-acceptance.md",
+      "deliverable": "The integrated Skill is ready for delivery only when every in-scope native-supported business branch is implemented, reachable and proven at its required evidence level.",
+      "issue_number": 195,
+      "issue_url": "https://github.com/zcyh147/waapi-skill/issues/195",
+      "blocked_by_issues": [
+        194
+      ]
+    }
+  ],
+  "integration_branch": "codex/full-waapi-coverage"
+}

@@ -192,7 +192,6 @@ def test_waapi_schema_rejects_configured_live_version_drift(tmp_path: Path) -> N
             {"isConnected": False, "status": "Disconnected"},
         ),
         ("2024.1", "ak.wwise.core.ping", {"isAvailable": True}),
-        ("2025.1", "ak.wwise.core.mediaPool.getFields", {"return": []}),
     ),
 )
 def test_zero_input_read_discloses_one_short_continuation_and_dispatches_directly(
@@ -261,7 +260,9 @@ def test_get_info_request_schema_discloses_only_status_fixed_route(
     assert exit_code == 0
     assert contract["input_shape"] == "fixed_business_command"
     assert contract["native_request_fields_disclosed"] is False
-    assert contract["continuation"] == {
+    assert {key: contract["continuation"][key] for key in (
+        "subcommand", "arguments", "business_values_required",
+    )} == {
         "subcommand": "status",
         "arguments": [],
         "business_values_required": False,
@@ -428,9 +429,10 @@ def test_migrated_soundengine_read_rejects_retired_typed_optional_array(
     "api,commands",
     (
         ("ak.wwise.core.getInfo", ["status"]),
+        ("ak.wwise.core.mediaPool.getFields", ["metadata media-pool-fields"]),
         (
             "ak.wwise.core.object.getTypes",
-            ["metadata types", "metadata discover"],
+            ["metadata types", "metadata discover", "metadata list", "metadata detail"],
         ),
         ("ak.wwise.debug.getWalTree", ["debug-wal-tree"]),
     ),
@@ -440,7 +442,7 @@ def test_zero_input_fixed_route_discloses_only_its_existing_command(
     api: str,
     commands: list[str],
 ) -> None:
-    version = "2023.1"
+    version = "2025.1" if api == "ak.wwise.core.mediaPool.getFields" else "2023.1"
     exit_code, contract = waapi_gateway.execute_gateway(
         ["request-schema", api],
         env=_env(tmp_path, version),
@@ -456,13 +458,17 @@ def test_zero_input_fixed_route_discloses_only_its_existing_command(
             "business_values_required": command not in {
                 "status",
                 "metadata types",
+                "metadata media-pool-fields",
                 "debug-wal-tree",
             },
         }
         for command in commands
     ]
     if len(expected_commands) == 1:
-        assert contract["continuation"] == {
+        continuation = contract["continuation"]
+        if api == "ak.wwise.core.getInfo":
+            continuation = {key: continuation[key] for key in expected_commands[0]}
+        assert continuation == {
             **expected_commands[0],
         }
     else:

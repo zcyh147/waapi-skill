@@ -1,0 +1,1347 @@
+{
+  "contract": "waapi-skill.loaded-media-composite-review/v1",
+  "authority": "docs/plans/full-waapi-coverage/RUNTIME_VERIFICATION.md",
+  "positive_review_sha256": "b0c96141eb54a2ff058bde6e846a03d91f33def3a8ff010bdcd054fc2a8ae2c3",
+  "profiles": {
+    "2023.1": {
+      "build": "2023.1.19.8928",
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "anchor": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single",
+      "archive_path": "tests/fixtures/runtime-qualified-reads/r104-2023.1-original.json.gz",
+      "archive_sha256": "47a7cc6bb531e7c1d35d167e47b2794a6f809a2ce0ca80306ba5bf1164999e8b",
+      "archive_files": 377,
+      "archive_decoded_sha256": "446a3a1ff73202c328d7233db49d9f15fc3a8b6fc6014cf2e6da332c8d496d53",
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1",
+      "node_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f.json",
+      "node_sha256": "1c174903f5a16d4956c3674e288cfb55ef5bda9783032b85fe3ba734d436d6ff",
+      "source_count": 616,
+      "source_sha256": "ea923adf89f880842b4fcaff20fc22ec7478fedd9b62c5e2128990a12e45e42b",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789016704961000-ac4fb136b9d1492eb6c1261561930f3a-ak_wwise_core_profiler_getLoadedMedia.json",
+      "raw_sha256": "5ef5b0367250f5ad60e18651500a2661f48811485d8bec499e6f52f889126f95",
+      "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-setup-state/runtime-inspection-observations-v1/rto1-a70b383ac4c1ad8d121ac5bcae5ed1b4.json",
+      "issuer_sha256": "c2597900d40f0dcc0e6f9993a7c25b74e183d043e40bf58e00ea65d06da5441c",
+      "availability_context": {
+        "configuration": {
+          "config_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1/owned/authoring-nodes/d87a1375cafae330c7be7f7f/setup-config.json",
+          "waapi_host": "127.0.0.1",
+          "waapi_port": 8080,
+          "wwise_version": "2023.1"
+        },
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 8080,
+          "url": "ws://127.0.0.1:8080/waapi"
+        },
+        "live": {
+          "processId": 192,
+          "sessionId": "{BB51494B-483E-47D5-BA7D-B6527031A0FA}",
+          "version": {
+            "build": 8928,
+            "displayName": "v2023.1.19",
+            "major": 1,
+            "minor": 19,
+            "nickname": "",
+            "schema": 119,
+            "year": 2023
+          }
+        },
+        "project": {
+          "filePath": null,
+          "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+          "path": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r104-capture-reads-native-2023-r1\\owned\\sandbox-root\\sample-project-93d0e510eb9946d1a9c7635ded7f2ee4\\SampleProject.wproj"
+        }
+      },
+      "request": {
+        "api": "ak.wwise.core.profiler.getLoadedMedia",
+        "args": {
+          "time": 45888
+        },
+        "options": {}
+      },
+      "catalog_schema": {
+        "argsSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "time": {
+              "$ref": "#/definitions/cursorTime",
+              "description": "Time in milliseconds to query for media, or a Time Cursor from which to acquire the time. The User Time Cursor is the one that can be manipulated by the user, while the Capture Time Cursor represents the latest time of the current capture."
+            }
+          },
+          "required": [
+            "time"
+          ],
+          "type": "object"
+        },
+        "optionsSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "resultSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "return": {
+              "description": "Array of Loaded Media.",
+              "items": {
+                "additionalProperties": false,
+                "description": "Information about a media file loaded into memory as a result of the PrepareEvent() and PrepareGameSyncs() functions.",
+                "properties": {
+                  "fileName": {
+                    "description": "The name of the media file.",
+                    "type": "string"
+                  },
+                  "format": {
+                    "description": "The audio format of the media file.",
+                    "type": "string"
+                  },
+                  "mediaId": {
+                    "description": "The short ID of the media file",
+                    "type": "integer"
+                  },
+                  "size": {
+                    "description": "The size (in bytes) of the media file.",
+                    "type": "integer"
+                  },
+                  "soundBank": {
+                    "description": "The name of the SoundBank that contains the media file.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "mediaId",
+                  "fileName",
+                  "format",
+                  "size",
+                  "soundBank"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "return"
+          ],
+          "type": "object"
+        }
+      },
+      "resolved_schema": {
+        "argsSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "time": {
+              "oneOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "description": "Identify one of the global profiler cursors.",
+                  "enum": [
+                    "user",
+                    "capture"
+                  ],
+                  "type": "string"
+                }
+              ],
+              "description": "Time in milliseconds to query for media, or a Time Cursor from which to acquire the time. The User Time Cursor is the one that can be manipulated by the user, while the Capture Time Cursor represents the latest time of the current capture."
+            }
+          },
+          "required": [
+            "time"
+          ],
+          "type": "object"
+        },
+        "optionsSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "resultSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "return": {
+              "description": "Array of Loaded Media.",
+              "items": {
+                "additionalProperties": false,
+                "description": "Information about a media file loaded into memory as a result of the PrepareEvent() and PrepareGameSyncs() functions.",
+                "properties": {
+                  "fileName": {
+                    "description": "The name of the media file.",
+                    "type": "string"
+                  },
+                  "format": {
+                    "description": "The audio format of the media file.",
+                    "type": "string"
+                  },
+                  "mediaId": {
+                    "description": "The short ID of the media file",
+                    "type": "integer"
+                  },
+                  "size": {
+                    "description": "The size (in bytes) of the media file.",
+                    "type": "integer"
+                  },
+                  "soundBank": {
+                    "description": "The name of the SoundBank that contains the media file.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "mediaId",
+                  "fileName",
+                  "format",
+                  "size",
+                  "soundBank"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "return"
+          ],
+          "type": "object"
+        }
+      },
+      "documents": {
+        "composite-2023.1-api.html": {
+          "sha256": "0e639379513c4af3466d29929a2a2a4d436cdf24d3e35d30873f18b962d295ed",
+          "source": "/Applications/Audiokinetic/Wwise2023.1.19.8928/SDK/Help/WwiseSDK-Windows.chm",
+          "page": "ak_wwise_core_profiler_getloadedmedia.html"
+        },
+        "composite-2023.1-result.html": {
+          "sha256": "81ede18c1fa94d4ebc0e6fc7a361cffb6e3d2e5e31c9ce94e73ac7d314eb2744",
+          "source": "/Applications/Audiokinetic/Wwise2023.1.19.8928/SDK/Help/WwiseSDK-Windows.chm",
+          "page": "ak_wwise_core_profiler_getloadedmedia_result_schema.html"
+        }
+      },
+      "packaged_source_changes": {
+        "skills/waapi-skill/scripts/gateway.py": {
+          "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
+          "after": "c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4"
+        },
+        "skills/waapi-skill/wwise_waapi/builders/schema.py": {
+          "before": "4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d",
+          "after": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2"
+        },
+        "skills/waapi-skill/wwise_waapi/builders/stable_reads.py": {
+          "before": "74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d",
+          "after": "ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8"
+        },
+        "skills/waapi-skill/wwise_waapi/business_declarations.py": {
+          "before": "aee2a6cc97e5ccb0340a0f99f520969571e5e2dcf4d48695a396fca29dbeb7b3",
+          "after": "9f196a80ac7e2d82daf7fe0cb452735c9f50b2da825ba7ac2dafae02da700070"
+        },
+        "skills/waapi-skill/wwise_waapi/operation_registry.py": {
+          "before": "f96a2233a98e03dd62de261a24b3f81876284af28f0973758cf1f8a805b5dd5a",
+          "after": "3b298a11c9326d47b968783e536d09d290a8fff4a5a7080b5f5f99d5e7c2734d"
+        },
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
+          "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
+          "after": "06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d"
+        },
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
+          "before": "69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4",
+          "after": "f93e41345477d0e3346230c12ebc056511b4c348ee253cb3df33c91d8bd4658d"
+        },
+        "skills/waapi-skill/wwise_waapi/runtime_log_effects.py": {
+          "before": "62c28fc9bb92ccd8e8efb3ccbfe5b187d6df1d3086c2def79e1d11dbc81ddfe8",
+          "after": "1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00"
+        }
+      },
+      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields."
+    },
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "anchor": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single",
+      "archive_path": "tests/fixtures/runtime-qualified-reads/r104-2024.1-original.json.gz",
+      "archive_sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22",
+      "archive_files": 377,
+      "archive_decoded_sha256": "eb637204417efe17638a220b19057babe589c85b7615dbffa11171d398e2bfd4",
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1",
+      "node_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f.json",
+      "node_sha256": "36f7a8c551a074ee1c9b76da7c5bfa6579c45b9f7564837461ca83e7a7d532c9",
+      "source_count": 616,
+      "source_sha256": "ea923adf89f880842b4fcaff20fc22ec7478fedd9b62c5e2128990a12e45e42b",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789161465638000-8ad189d3872f4630937bdbb7ebfea33e-ak_wwise_core_profiler_getLoadedMedia.json",
+      "raw_sha256": "241fb0551767f8f5896aae80692c56464da93757f9cccf90aa18dd1bc5defe44",
+      "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-setup-state/runtime-inspection-observations-v1/rto1-39669e73e8da2babcbbdc24d4072f1ff.json",
+      "issuer_sha256": "0f88708fcbc9c55093ddf9ec484cce7b2817d420d215ad3924fcb9fb279df0f3",
+      "availability_context": {
+        "configuration": {
+          "config_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/owned/authoring-nodes/d87a1375cafae330c7be7f7f/setup-config.json",
+          "waapi_host": "127.0.0.1",
+          "waapi_port": 8080,
+          "wwise_version": "2024.1"
+        },
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 8080,
+          "url": "ws://127.0.0.1:8080/waapi"
+        },
+        "live": {
+          "processId": 192,
+          "sessionId": "{DFB17241-F150-4F33-ACCF-DC12A65D7A3B}",
+          "version": {
+            "build": 9056,
+            "displayName": "v2024.1.13",
+            "major": 1,
+            "minor": 13,
+            "nickname": "",
+            "schema": 123,
+            "year": 2024
+          }
+        },
+        "project": {
+          "filePath": null,
+          "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+          "path": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r104-capture-reads-native-2024-r1\\owned\\sandbox-root\\sample-project-77ad1986d8604c48a532c8f18ecbf897\\SampleProject.wproj"
+        }
+      },
+      "request": {
+        "api": "ak.wwise.core.profiler.getLoadedMedia",
+        "args": {
+          "time": 45621
+        },
+        "options": {}
+      },
+      "catalog_schema": {
+        "argsSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "time": {
+              "$ref": "waapi_definitions.json#/definitions/cursorTime",
+              "description": "Time in milliseconds to query for media, or a Time Cursor from which to acquire the time. The User Time Cursor is the one that can be manipulated by the user, while the Capture Time Cursor represents the latest time of the current capture."
+            }
+          },
+          "required": [
+            "time"
+          ],
+          "type": "object"
+        },
+        "description": "Retrieves the loaded media at a specific profiler capture time. This data can also be found in the Advanced Profiler, under the Loaded Media tab. To ensure the Loaded Media data is received, refer to \\ref ak_wwise_core_profiler_enableprofilerdata.",
+        "optionsSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "resultSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "return": {
+              "description": "Array of Loaded Media.",
+              "items": {
+                "additionalProperties": false,
+                "description": "Information about a media file loaded into memory as a result of the PrepareEvent() and PrepareGameSyncs() functions.",
+                "properties": {
+                  "fileName": {
+                    "description": "The name of the media file.",
+                    "type": "string"
+                  },
+                  "format": {
+                    "description": "The audio format of the media file.",
+                    "type": "string"
+                  },
+                  "mediaId": {
+                    "description": "The short ID of the media file",
+                    "type": "integer"
+                  },
+                  "size": {
+                    "description": "The size (in bytes) of the media file.",
+                    "type": "integer"
+                  },
+                  "soundBank": {
+                    "description": "The name of the SoundBank that contains the media file.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "mediaId",
+                  "fileName",
+                  "format",
+                  "size",
+                  "soundBank"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "return"
+          ],
+          "type": "object"
+        }
+      },
+      "resolved_schema": {
+        "argsSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "time": {
+              "oneOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "description": "Identify one of the global profiler cursors.",
+                  "enum": [
+                    "user",
+                    "capture"
+                  ],
+                  "type": "string"
+                }
+              ],
+              "description": "Time in milliseconds to query for media, or a Time Cursor from which to acquire the time. The User Time Cursor is the one that can be manipulated by the user, while the Capture Time Cursor represents the latest time of the current capture."
+            }
+          },
+          "required": [
+            "time"
+          ],
+          "type": "object"
+        },
+        "optionsSchema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "resultSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "return": {
+              "description": "Array of Loaded Media.",
+              "items": {
+                "additionalProperties": false,
+                "description": "Information about a media file loaded into memory as a result of the PrepareEvent() and PrepareGameSyncs() functions.",
+                "properties": {
+                  "fileName": {
+                    "description": "The name of the media file.",
+                    "type": "string"
+                  },
+                  "format": {
+                    "description": "The audio format of the media file.",
+                    "type": "string"
+                  },
+                  "mediaId": {
+                    "description": "The short ID of the media file",
+                    "type": "integer"
+                  },
+                  "size": {
+                    "description": "The size (in bytes) of the media file.",
+                    "type": "integer"
+                  },
+                  "soundBank": {
+                    "description": "The name of the SoundBank that contains the media file.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "mediaId",
+                  "fileName",
+                  "format",
+                  "size",
+                  "soundBank"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "return"
+          ],
+          "type": "object"
+        }
+      },
+      "documents": {
+        "composite-2024.1-api.html": {
+          "sha256": "04514b5900069301e3f22ce6726365ef637b8f5058de3214cc42050644f9e51e",
+          "source": "/Applications/Audiokinetic/Wwise2024.1.13.9056/SDK/Help/WwiseSDK-Windows.chm",
+          "page": "ak_wwise_core_profiler_getloadedmedia.html"
+        },
+        "composite-2024.1-result.html": {
+          "sha256": "6de698aa02aaebafec556df17b50b522997bc20be106e7f7f0df1d09c3fe7931",
+          "source": "/Applications/Audiokinetic/Wwise2024.1.13.9056/SDK/Help/WwiseSDK-Windows.chm",
+          "page": "ak_wwise_core_profiler_getloadedmedia_result_schema.html"
+        }
+      },
+      "packaged_source_changes": {
+        "skills/waapi-skill/scripts/gateway.py": {
+          "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
+          "after": "c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4"
+        },
+        "skills/waapi-skill/wwise_waapi/builders/schema.py": {
+          "before": "4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d",
+          "after": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2"
+        },
+        "skills/waapi-skill/wwise_waapi/builders/stable_reads.py": {
+          "before": "74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d",
+          "after": "ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8"
+        },
+        "skills/waapi-skill/wwise_waapi/business_declarations.py": {
+          "before": "aee2a6cc97e5ccb0340a0f99f520969571e5e2dcf4d48695a396fca29dbeb7b3",
+          "after": "9f196a80ac7e2d82daf7fe0cb452735c9f50b2da825ba7ac2dafae02da700070"
+        },
+        "skills/waapi-skill/wwise_waapi/operation_registry.py": {
+          "before": "f96a2233a98e03dd62de261a24b3f81876284af28f0973758cf1f8a805b5dd5a",
+          "after": "3b298a11c9326d47b968783e536d09d290a8fff4a5a7080b5f5f99d5e7c2734d"
+        },
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
+          "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
+          "after": "06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d"
+        },
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
+          "before": "69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4",
+          "after": "f93e41345477d0e3346230c12ebc056511b4c348ee253cb3df33c91d8bd4658d"
+        },
+        "skills/waapi-skill/wwise_waapi/runtime_log_effects.py": {
+          "before": "62c28fc9bb92ccd8e8efb3ccbfe5b187d6df1d3086c2def79e1d11dbc81ddfe8",
+          "after": "1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00"
+        }
+      },
+      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields."
+    }
+  },
+  "entries": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema",
+      "kind": "schema",
+      "shape_sha256": "a72c2746e480686dddc6c9e179b5752232730fa582a88e9c3f34fe96999636cc",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/properties/time": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/properties/time",
+      "kind": "schema",
+      "shape_sha256": "bb65c6e39b09ab5ebdc1d758cedad0fc2b7a3005ab5bf73a8084e89fc364159c",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/properties/time/$ref": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/properties/time/$ref",
+      "kind": "reference",
+      "shape_sha256": "21c519ff0ebb2d6a94efdc2c7baeb5d9b18fca7526ca007f52c1a529de4c4413",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime",
+      "kind": "schema",
+      "shape_sha256": "b30c36884f7bff743ed80d53f8d4c2e3f47e199033168b30b44316b998cf4f35",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0",
+      "kind": "schema",
+      "shape_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0/minimum": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0/minimum",
+      "kind": "constraint",
+      "shape_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1",
+      "kind": "schema",
+      "shape_sha256": "46f0eca6e30e845752c8b1259e94732b76a84653341e434d65aa817126b2d228",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1/$ref": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1/$ref",
+      "kind": "reference",
+      "shape_sha256": "f72676ff26630debef861148ffe4033c668fc9b24d84a20d7c754c1328aec72f",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor",
+      "kind": "schema",
+      "shape_sha256": "b6177e66ca25e1f83db5adcac350aff92816fc7c18a3b5202344c2de22bfb206",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/0": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/0",
+      "kind": "enum_value",
+      "shape_sha256": "3190d261d186aeead3a8deec202737c7775af5c8d455a9e5ba958c48b5fd3f59",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/1": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/1",
+      "kind": "enum_value",
+      "shape_sha256": "47ee4b87312f219001c8d947f53aa0bbd7c7bb7b88eea51cce7b10f28289b1f4",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/additionalProperties": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/optionsSchema",
+      "kind": "schema",
+      "shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema/additionalProperties": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/optionsSchema/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema/@empty/object": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/optionsSchema/@empty/object",
+      "kind": "empty_object",
+      "shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema",
+      "kind": "schema",
+      "shape_sha256": "72e1436887ca05fc58fa368144e7acde02f95b6a589df249c33d83a27c1aab52",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return",
+      "kind": "schema",
+      "shape_sha256": "c982051102201510ab24c4cd055620b3b2221156edf6ff0f5819c69a6ed69ff2",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items",
+      "kind": "schema",
+      "shape_sha256": "961381997e5482fd07c04e4876cd3b65524c60fa25ad08aa334323c9a491ffa4",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/fileName": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/fileName",
+      "kind": "schema",
+      "shape_sha256": "7e10cec76158c011979b1f70694fc7b86e7fd3b2f7d4054b01fcf4bab9803209",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/fileName/@empty/string": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/fileName/@empty/string",
+      "kind": "empty_string",
+      "shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/format": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/format",
+      "kind": "schema",
+      "shape_sha256": "262e1f10354f089dc483512b22a4cab1bd48ffe4cc8e752a952258841b29769e",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/format/@empty/string": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/format/@empty/string",
+      "kind": "empty_string",
+      "shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/mediaId": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/mediaId",
+      "kind": "schema",
+      "shape_sha256": "5c35f84be21bd3970b464713bd5fc28cd8da916a05233b54be6f2e1d8f882c0a",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/size": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/size",
+      "kind": "schema",
+      "shape_sha256": "655aabe5f9abe1a56b99c5cf4923acc922f4200a35c1d28bdddb8a0fc7021730",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/soundBank": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/soundBank",
+      "kind": "schema",
+      "shape_sha256": "23580f8ceff789823c6ad27b6dc554cfa40b361a1a37635937d935ad6cd20c62",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/soundBank/@empty/string": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/soundBank/@empty/string",
+      "kind": "empty_string",
+      "shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/additionalProperties": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/empty": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/@cardinality/empty",
+      "kind": "collection_cardinality",
+      "shape_sha256": "e6845188b1d2aebdf19d13c1613d7a49b5806a7fe336ec775fa182b36719bbc1",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/@cardinality/single",
+      "kind": "collection_cardinality",
+      "shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program",
+        "native"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/multiple": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/@cardinality/multiple",
+      "kind": "collection_cardinality",
+      "shape_sha256": "106c572c7b5c17d9f9d57380703dedabf9ed54c0857fe9e02d752da03f0f12ea",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/additionalProperties": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema",
+      "kind": "schema",
+      "shape_sha256": "9a1a0e2d0262685cb4e8404bcc3aa0655ab415a4a04e8d07da2659f4a5361126",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/properties/time": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/properties/time",
+      "kind": "schema",
+      "shape_sha256": "9c42b1ac7f74c57043a39b63e9c5006f8d08f8d31137dd9c4b17c4d897b6b085",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/properties/time/$ref": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/properties/time/$ref",
+      "kind": "reference",
+      "shape_sha256": "1ac15471078d85eed39256583cb2dec2d6f8ee5054ad0ffee149fb9e163364db",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime",
+      "kind": "schema",
+      "shape_sha256": "b30c36884f7bff743ed80d53f8d4c2e3f47e199033168b30b44316b998cf4f35",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0",
+      "kind": "schema",
+      "shape_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0/minimum": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0/minimum",
+      "kind": "constraint",
+      "shape_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1",
+      "kind": "schema",
+      "shape_sha256": "46f0eca6e30e845752c8b1259e94732b76a84653341e434d65aa817126b2d228",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1/$ref": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1/$ref",
+      "kind": "reference",
+      "shape_sha256": "f72676ff26630debef861148ffe4033c668fc9b24d84a20d7c754c1328aec72f",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor",
+      "kind": "schema",
+      "shape_sha256": "b6177e66ca25e1f83db5adcac350aff92816fc7c18a3b5202344c2de22bfb206",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/0": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/0",
+      "kind": "enum_value",
+      "shape_sha256": "3190d261d186aeead3a8deec202737c7775af5c8d455a9e5ba958c48b5fd3f59",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/1": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/1",
+      "kind": "enum_value",
+      "shape_sha256": "47ee4b87312f219001c8d947f53aa0bbd7c7bb7b88eea51cce7b10f28289b1f4",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/additionalProperties": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/optionsSchema",
+      "kind": "schema",
+      "shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema/additionalProperties": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/optionsSchema/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema/@empty/object": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/optionsSchema/@empty/object",
+      "kind": "empty_object",
+      "shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema",
+      "kind": "schema",
+      "shape_sha256": "72e1436887ca05fc58fa368144e7acde02f95b6a589df249c33d83a27c1aab52",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return",
+      "kind": "schema",
+      "shape_sha256": "c982051102201510ab24c4cd055620b3b2221156edf6ff0f5819c69a6ed69ff2",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items",
+      "kind": "schema",
+      "shape_sha256": "961381997e5482fd07c04e4876cd3b65524c60fa25ad08aa334323c9a491ffa4",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/fileName": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/fileName",
+      "kind": "schema",
+      "shape_sha256": "7e10cec76158c011979b1f70694fc7b86e7fd3b2f7d4054b01fcf4bab9803209",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/fileName/@empty/string": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/fileName/@empty/string",
+      "kind": "empty_string",
+      "shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/format": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/format",
+      "kind": "schema",
+      "shape_sha256": "262e1f10354f089dc483512b22a4cab1bd48ffe4cc8e752a952258841b29769e",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/format/@empty/string": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/format/@empty/string",
+      "kind": "empty_string",
+      "shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/mediaId": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/mediaId",
+      "kind": "schema",
+      "shape_sha256": "5c35f84be21bd3970b464713bd5fc28cd8da916a05233b54be6f2e1d8f882c0a",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/size": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/size",
+      "kind": "schema",
+      "shape_sha256": "655aabe5f9abe1a56b99c5cf4923acc922f4200a35c1d28bdddb8a0fc7021730",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/soundBank": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/soundBank",
+      "kind": "schema",
+      "shape_sha256": "23580f8ceff789823c6ad27b6dc554cfa40b361a1a37635937d935ad6cd20c62",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/soundBank/@empty/string": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/soundBank/@empty/string",
+      "kind": "empty_string",
+      "shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/additionalProperties": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/empty": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/@cardinality/empty",
+      "kind": "collection_cardinality",
+      "shape_sha256": "e6845188b1d2aebdf19d13c1613d7a49b5806a7fe336ec775fa182b36719bbc1",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/@cardinality/single",
+      "kind": "collection_cardinality",
+      "shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program",
+        "native"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/multiple": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/@cardinality/multiple",
+      "kind": "collection_cardinality",
+      "shape_sha256": "106c572c7b5c17d9f9d57380703dedabf9ed54c0857fe9e02d752da03f0f12ea",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/additionalProperties": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ]
+    }
+  },
+  "positive_resolved_schema": {
+    "argsSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "time": {
+          "oneOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "description": "Identify one of the global profiler cursors.",
+              "enum": [
+                "user",
+                "capture"
+              ],
+              "type": "string"
+            }
+          ],
+          "description": "Time in milliseconds to query for media, or a Time Cursor from which to acquire the time. The User Time Cursor is the one that can be manipulated by the user, while the Capture Time Cursor represents the latest time of the current capture."
+        }
+      },
+      "required": [
+        "time"
+      ],
+      "type": "object"
+    },
+    "optionsSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "resultSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "return": {
+          "description": "Array of Loaded Media.",
+          "items": {
+            "additionalProperties": false,
+            "description": "Information about a media file loaded into memory as a result of the PrepareEvent() and PrepareGameSyncs() functions.",
+            "properties": {
+              "fileName": {
+                "description": "The name of the media file.",
+                "type": "string"
+              },
+              "format": {
+                "description": "The audio format of the media file.",
+                "type": "string"
+              },
+              "mediaId": {
+                "description": "The short ID of the media file.",
+                "type": "integer"
+              },
+              "size": {
+                "description": "The size (in bytes) of the media file.",
+                "type": "integer"
+              },
+              "soundBank": {
+                "description": "The name of the SoundBank that contains the media file.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "mediaId",
+              "fileName",
+              "format",
+              "size",
+              "soundBank"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "return"
+      ],
+      "type": "object"
+    }
+  },
+  "exact_resolved_difference": {
+    "pointer": "/resultSchema/properties/return/items/properties/mediaId/description",
+    "older": "The short ID of the media file",
+    "positive": "The short ID of the media file."
+  },
+  "documented_meaning": "Same captured media loaded by SDK PrepareEvent()/PrepareGameSyncs(); no older nonempty native execution or transport.prepare effect. Reference-file layout and description punctuation are explicitly reviewed, not a generic description-stripping equivalence.",
+  "prior_policy_absent": {
+    "path": "docs/branch-coverage-requirements.json",
+    "sha256": "99ad508b7fca40ea0db30542115ce90e421e46ed276200d5fbb63a8e39cada3a",
+    "candidate": "8b600cfaa45f6670da76187db2dd76e27b613ae3"
+  }
+}

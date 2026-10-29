@@ -103,6 +103,7 @@ from tests.semantic.support.codex_import_assets_v3 import (
     bound_import_metadata_tokens,
     canonical_wwise_language,
     materialize_import_case,
+    validate_import_case_version,
 )
 from tests.semantic.support.codex_import_business_plan_v3 import (
     ImportBusinessPlanSections,
@@ -990,6 +991,7 @@ def run_heavy_project_unit(
     requested_status = "BLOCKED"
     reason = ""
     try:
+        validate_import_case_version(unit.scenario, version=unit.version)
         runtime = lifecycle.start()
         if runtime.scenario_id != unit.unit_id or runtime.version != unit.version:
             raise _HeavyProjectInfrastructureError(
@@ -4265,6 +4267,7 @@ def _compile_integration_workflow_plan(
         "draft-start": "operation_compose",
         "draft-apply": "operation_compose",
         "draft-bind-object": "operation_compose",
+        "draft-bind-switch-child-context": "operation_compose",
         "draft-bind-field": "operation_compose",
         "draft-discover-fields": "operation_compose",
         "query-object": "operation_compose",

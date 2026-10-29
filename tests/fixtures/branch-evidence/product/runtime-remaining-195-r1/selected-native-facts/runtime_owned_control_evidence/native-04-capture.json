@@ -1,0 +1,9 @@
+{
+  "archive": {
+    "artifact": "tests/fixtures/runtime-owned-controls/r108-original.json.gz",
+    "sha256": "051ea895006d129d2ffd6ade395097dd19b991aefd9990a6667f85b985020d9f"
+  },
+  "capture_original_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/evidence/authoring-node-observations/6692ab10af30c78d9a593b69-native-evidence/profiler-capture.json",
+  "report_sha256": "1943cbeb5e1ae932d658c7baec5a341afd861772d8ee902d3d8ee249018a7715",
+  "candidate": "013776270f6d9c1b65bf53940442f4ac593e5714"
+}

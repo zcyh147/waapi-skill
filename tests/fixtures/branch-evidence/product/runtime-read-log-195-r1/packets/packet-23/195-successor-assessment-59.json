@@ -1,0 +1,38 @@
+{
+  "contract": "waapi-skill.retained-log-assessment/v1",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.log.clear|/resultSchema",
+  "profile": {
+    "provider": "r104-2024",
+    "target_route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.log.clear",
+    "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+    "target_catalog": "skills/waapi-skill/resources/native-catalog/2024.1/wwise-authoring.json",
+    "target_catalog_sha256": "c5a1480879e32a9a19d711e9dfc15f7bd222a479e84c79dc7a3694d6c4304840",
+    "relationship": "direct-retained",
+    "claim": "Availability and complete log-row preservation; older Console native empty/unobservable read and schema ACK do not establish log absence or business effect. Original source version/host/outcome/cleanup retained separately.",
+    "native_effect_mode": "authoring-general-channel-owned-log-read-add-clear"
+  },
+  "provider": "r104-2024",
+  "source_review": {
+    "artifact": "195-successor-retained-log-support.json",
+    "sha256": "1ab373b97e0b20dd849cf1b4915603785d59e030427163e3fd5c6b66f8abc97c"
+  },
+  "archive": {
+    "artifact": "r104-2024-original.json.gz",
+    "sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22"
+  },
+  "raw": {
+    "artifact": "log-0-raw.json",
+    "sha256": "c94f152531c0eaa33bbff54e95f812a6a461479f7a1b953bcc155fd53b2ba76e"
+  },
+  "program_capture": {
+    "artifact": "log-0-capture.json",
+    "sha256": "02eceb6c13d5303f60b1bb63150f29a7acd56cf669a5804682740b3698895995"
+  },
+  "retained_facts": {
+    "original_workflow_outcome": "BLOCKED",
+    "original_finalization": "BLOCKED",
+    "qualified_log_fact": "owned-addition-and-prior-contents-cleared",
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false
+  }
+}

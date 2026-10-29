@@ -1,0 +1,22 @@
+{
+  "contract": "waapi-skill.music-transition-source/v1",
+  "version": "2025.1",
+  "build": "2025.1.7.9143",
+  "installed_xml": {
+    "original_snapshot": "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz",
+    "source_key": "2025.1.7.9143|condition|WObjects/WObjects.xml",
+    "member": "WObjects.xml.gz",
+    "decompressed_sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454"
+  },
+  "sdk": {
+    "archive": "WwiseSDK-Windows.chm",
+    "archive_sha256": "c54b729388040e9df540a2f58d0d0eda966ac5da6410d3cd715ae256d898166d",
+    "archive_sha256_provenance": "prior source index (not recomputed)",
+    "member": "ak_wwise_core_object_set.html",
+    "sha256": "96244aad7c796698f8d965a80131b160ba02e03c592b139280a4a9ac79a589d6",
+    "packaged_member": "ak_wwise_core_object_set.html.gz"
+  },
+  "manifest_sha256": "1d6d6e32ec042c19c5ebd99b7b964c88410f9b90d26b073eb0869950b1a39c60",
+  "derivation": "Common_TransitionNode.TransitionRoot: custom-only, non-null MusicTransition; exact three transitive inheriting owners (MusicPlaylistContainer, MusicSwitchContainer, MusicTrack); SDK custom-object and recursive children grammar; rename mode creates fresh children rather than merging; no dedicated class example prerequisite",
+  "evidence_strength": "source_and_program_only; no_new_native_or_Fresh; no_priority_or_fade_allocation_or_playback_claim"
+}

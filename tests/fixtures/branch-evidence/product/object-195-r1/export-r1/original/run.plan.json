@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_action_creation_gateway.py::test_new_action_uses_discovered_fields_empty_name_and_exact_parent",
+    "tests/unit/test_action_creation_gateway.py::test_action_native_acknowledgement_cannot_hide_wrong_effect_or_reused_guid",
+    "tests/unit/test_object_graph_business_gateway.py::test_gateway_adds_subordinate_media_without_model_authored_json",
+    "tests/unit/test_object_graph_business_gateway.py::test_subordinate_import_source_control_reaches_immutable_native_preview",
+    "tests/unit/test_object_graph_owned_choices_gateway.py::test_reference_array_business_schema_matches_each_pinned_lane",
+    "tests/unit/test_object_graph_owned_choices_gateway.py::test_create_reference_unions_use_class_field_evidence_and_exact_bound_targets",
+    "tests/unit/test_object_graph_owned_choices_gateway.py::test_documented_metadata_list_handle_clears_through_one_verified_transaction",
+    "tests/unit/test_plugin_kind_placements_gateway.py::test_independent_plugin_kind_uses_exact_live_class_and_hierarchy",
+    "tests/unit/test_plugin_shareset_gateway.py::test_shareset_executes_once_and_verifies_its_own_identity",
+    "tests/unit/test_object_lifecycle_replace_gateway.py::test_replace_lifecycle_seals_exact_deleted_tree_and_verifies_source_distinction",
+    "tests/unit/test_object_lifecycle_replace_gateway.py::test_replace_revalidates_complete_source_and_destination_before_dispatch",
+    "tests/unit/test_object_metadata_business_gateway.py::test_property_draft_discovers_opaque_field_and_materializes_business_value",
+    "tests/unit/test_core_business_gateway.py::test_core_call_resolves_two_exact_objects_and_dispatches_one_bounded_diff",
+    "tests/unit/test_core_business_gateway.py::test_core_call_discovers_is_linked_field_from_business_meaning",
+    "tests/unit/test_object_completion_mapping.py::test_object_cohort_preserves_exact_sources_and_truthful_boundaries",
+    "tests/unit/test_action_creation_gateway.py::test_action_preview_revalidates_class_fields_parent_and_retained_children"
+  ],
+  "candidate": "9c2b007011e301a75a78a343ea5788bf43355eed"
+}

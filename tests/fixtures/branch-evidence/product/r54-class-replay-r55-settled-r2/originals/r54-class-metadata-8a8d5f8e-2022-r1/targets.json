@@ -1,0 +1,62 @@
+[
+  {
+    "scope": "Wwise Delay",
+    "field": "DelayTime",
+    "status": "captured",
+    "list_receipt": "005",
+    "detail_receipt": "006",
+    "whole_inventory_complete": true,
+    "detail_agent_result_sha256": "0c89cae85c7211592ac293a7810087cb952b55a890a32157760870dc3b90b64a",
+    "native_receipt": "dispatcher-evidence/1792523814725003000-805cd016ae5b4d46b6715cddb234d3e5-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523814725003000-805cd016ae5b4d46b6715cddb234d3e5-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "8ffc25e6a9f3b3f7f1af04351ff3e7af87e4d5462ff487610e68456a17a74075",
+    "native_bytes": 1294,
+    "default_present": true,
+    "observed_default": 0.5
+  },
+  {
+    "scope": "Wwise Delay",
+    "field": "FeedbackEnabled",
+    "status": "captured",
+    "list_receipt": "005",
+    "detail_receipt": "007",
+    "whole_inventory_complete": true,
+    "detail_agent_result_sha256": "28c21b2970dd10b87fc79e62f7b2ad46959cae2ccd610b2d27354c5b28fc022b",
+    "native_receipt": "dispatcher-evidence/1792523815195171000-23d4dd48c7f945b896e20202ed79cd4c-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523815195171000-23d4dd48c7f945b896e20202ed79cd4c-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "0b5bde0d710b8b1b376a1021741f9dbf7d25f9afda2ca19884151b839af6d536",
+    "native_bytes": 1205,
+    "default_present": true,
+    "observed_default": true
+  },
+  {
+    "scope": "Sound",
+    "field": "BypassEffect0",
+    "status": "captured",
+    "list_receipt": "009",
+    "detail_receipt": "010",
+    "whole_inventory_complete": false,
+    "detail_agent_result_sha256": "d4efdef955d158bedab084fa6a6edd6f292dbf504931a0287b8299616b31341d",
+    "native_receipt": "dispatcher-evidence/1792523816668659000-a1fcc15ea495480aa40c5743891530f2-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523816668659000-a1fcc15ea495480aa40c5743891530f2-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "871b196cfec07304451dc38544c92325b75cbaf5a0748dfa9c6c623d4b945dfe",
+    "native_bytes": 1583,
+    "default_present": true,
+    "observed_default": false
+  },
+  {
+    "scope": "Sound",
+    "field": "Effect0",
+    "status": "captured",
+    "list_receipt": "009",
+    "detail_receipt": "011",
+    "whole_inventory_complete": false,
+    "detail_agent_result_sha256": "1e3ba2dbece49a75e296c3d7770789c568cf4e817e925f80a0471c46dd0adf4d",
+    "native_receipt": "dispatcher-evidence/1792523817132868000-3bbfe1f2df8f44c4ad2715cdc463f5ed-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523817132868000-3bbfe1f2df8f44c4ad2715cdc463f5ed-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "e957e49cf056df27ede2a556487442dd1de275ca1161d24e838e85d0ab4f635a",
+    "native_bytes": 1519,
+    "default_present": true,
+    "observed_default": null
+  }
+]

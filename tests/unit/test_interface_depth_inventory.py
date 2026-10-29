@@ -47,8 +47,8 @@ def test_generated_inventory_is_current_and_exactly_covers_both_surfaces() -> No
     assert inventory == build_interface_depth_inventory()
     native = inventory["native_lanes"]
     operations = inventory["operation_lanes"]
-    assert len(native) == 849
-    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 849
+    assert len(native) == 897
+    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 897
     expected_operations = {
         (name, version)
         for name, spec in OPERATION_SPECS.items()
@@ -362,12 +362,12 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
         if row["disposition"] == "migration_required"
     }
     assert set(tickets) == expected
-    assert {family["github_issue"] for family in inventory["ticket_families"]} == set()
     assert all(
-        row["owner_issue"] in {56, 57}
+        row["owner_issue"] in {family["github_issue"] for family in inventory["ticket_families"]}
         for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
         if row["disposition"] == "migration_required"
     )
+    assert {188, 189}.isdisjoint(family["github_issue"] for family in inventory["ticket_families"])
     assert inventory["summary"]["unowned_migration_rows"] == 0
 
 
@@ -605,7 +605,7 @@ def test_historical_construction_baseline_is_preserved_without_depth_claim() -> 
     baseline = _inventory()["historical_baseline"]
     assert baseline == {
         "contract": "waapi-skill.typed-request-surface/v1",
-        "total_lanes": 849,
+        "total_lanes": 897,
         "construction_coverage_is_depth_evidence": False,
     }
     assert set(SUPPORTED_WWISE_VERSION_KEYS) == {
@@ -630,3 +630,124 @@ def test_metadata_pagination_and_selection_values_are_gateway_derived_locators()
               for field in contract['model_values'] if field['name'] in {'page', 'selection'}]
     assert fields, 'The current metadata parser must be represented in the field ledger'
     assert all(field['value_ownership'] == 'gateway_derivation' for field in fields)
+
+
+def test_closed_layout_reads_project_scoped_business_fields_and_preserve_result_boundary():
+    from tests.maintenance.interface_depth_inventory import _public_continuation_rows, _typed_field_rows
+    from wwise_waapi.schema_inventory import build_typed_request_surface
+    surface = build_typed_request_surface()
+    lane = next(row for row in surface['lanes'] if row['version'] == '2025.1'
+                and row['uri'] == 'ak.wwise.ui.layout.getElementRectangle')
+    continuation = next(row for row in _public_continuation_rows(surface) if row['version'] == lane['version']
+                        and row['uri'] == lane['uri'])
+    assert continuation['business_read']['continuation']['gateway_argv'] == ['layout-read', 'rectangle']
+    assert 'typed' not in continuation
+    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding='utf-8'))
+    assert _typed_field_rows(lane, policy) == [{'channel': 'business_read',
+        'path': ['business', 'element_handle'], 'name': 'element_handle', 'shape': 'scalar',
+        'required': True, 'value_ownership': 'live_bound_handle', 'transport_ownership': 'gateway_derivation'}]
+
+
+def test_closed_layout_mutations_project_business_fields_without_native_typed_inputs():
+    from tests.maintenance.interface_depth_inventory import _public_continuation_rows, _typed_field_rows
+    from wwise_waapi.schema_inventory import build_typed_request_surface
+    surface = build_typed_request_surface()
+    lane = next(row for row in surface['lanes'] if row['version'] == '2025.1'
+                and row['uri'] == 'ak.wwise.ui.layout.setLayout')
+    continuation = next(row for row in _public_continuation_rows(surface)
+                        if row['version'] == lane['version'] and row['uri'] == lane['uri'])
+    assert continuation['business_declaration']['declaration']['subcommand'] == 'draft-declare-layout-plan'
+    assert continuation['native_request_semantics']['status'] == 'definition_semantics_unresolved'
+    assert 'typed' not in continuation
+    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding='utf-8'))
+    fields = _typed_field_rows(lane, policy)
+    assert {row['name'] for row in fields} == {'layout_handle', 'new_layout_name', 'blueprint'}
+    assert next(row for row in fields if row['name'] == 'layout_handle')['value_ownership'] == 'live_bound_handle'
+    blueprint = next(row for row in fields if row['name'] == 'blueprint')
+    assert blueprint['value_ownership'] == 'stable_business_declaration'
+    assert blueprint['transport_ownership'] == 'gateway_derivation'
+    assert blueprint['required'] is False
+
+
+def test_owned_model_plans_keep_resource_handles_and_constructor_values_separate():
+    inventory = _inventory()
+    from wwise_waapi.authoring_model_business import MODEL_OPERATIONS, model_business_contract
+    rows = [row for row in inventory['native_lanes'] if row['classification'] == 'authoring-model-partial']
+    assert len(rows) == 18
+    assert {(row['version'], row['uri']) for row in rows} == {
+        (version, uri) for version in ('2024.1', '2025.1') for uri in MODEL_OPERATIONS}
+    assert all(row['owner_issue'] is None and row['disposition'] == 'already_deep' for row in rows)
+    for row in rows:
+        contract = model_business_contract(row['uri'], row['version'])
+        assert contract['declaration']['subcommand'] == 'draft-declare-model-plan'
+        assert contract['declaration']['schema']['additionalProperties'] is False
+        assert contract['resource_lifetime']['scope'] == 'configuration_host_build_session_project'
+        assert contract['safety']['native_request_fields'] == 'gateway_owned'
+        assert contract['safety']['immutable_preview'] and contract['safety']['single_execute']
+        assert contract['safety']['authoring_host_required']
+        assert contract['effect_verification']['native_effect_evidence'] == 'not_independently_verified'
+    family = next(item for item in inventory['completed_family_seals']
+                  if item['id'] == 'authoring-model-partial')
+    assert family['github_issue'] == 189
+    assert set(family['rows']) == {f"{row['version']}|function|{row['uri']}" for row in rows}
+    assert family['rows_sha256'] == 'e8e9e05a471620cedbc3f55c6d77fc082e5b9f1a7411b87ebb27c9ceaf46ca88'
+    lane = next(row for row in rows if row['version'] == '2025.1'
+                and row['uri'] == 'ak.wwise.ui.model.createHandle')
+    fields = _model_values(inventory, lane)
+    assert {row['name'] for row in fields} >= {'plan', 'window', 'template', 'template_key'}
+    assert all(row['value_ownership'] == 'live_bound_handle' for row in fields
+               if row['name'] in {'window', 'template'})
+    assert next(row for row in fields if row['name'] == 'template_key')['value_ownership'] == 'stable_business_declaration'
+    assert all(row['transport_ownership'] == 'gateway_derivation' for row in fields)
+
+
+def test_completed_layout_wrapper_has_its_own_exact_seal_without_historical_credit():
+    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
+    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS, layout_mutation_uris
+
+    inventory = _inventory()
+    expected = {(version, uri) for version in ('2024.1', '2025.1')
+                for uri in LAYOUT_READ_URIS | layout_mutation_uris(version)}
+    rows = [row for row in inventory['native_lanes']
+            if row['classification'] == 'authoring-layout-partial']
+    assert {(row['version'], row['uri']) for row in rows} == expected
+    assert all(row['disposition'] == 'already_deep' and row['owner_issue'] is None for row in rows)
+    family = next(item for item in inventory['completed_family_seals']
+                  if item['id'] == 'authoring-layout-partial')
+    assert family['github_issue'] == 188
+    assert set(family['rows']) == {f"{version}|function|{uri}" for version, uri in expected}
+    assert family['rows_sha256'] == 'ce35bc537d44419f735e74285ed52659c3483e1037dde5d085013e198be98c28'
+    from wwise_waapi.authoring_layout import layout_read_contract
+    from wwise_waapi.authoring_layout_business import layout_business_contract_data
+    for version, uri in expected:
+        if uri in LAYOUT_READ_URIS:
+            contract = layout_read_contract(version, uri)
+            assert contract['continuation']['gateway_argv'][0] == 'layout-read'
+            assert contract['safety']['read_only']
+            assert contract['safety']['native_request_input'] == 'forbidden'
+            assert contract['safety']['live_host_detection']
+        else:
+            contract = layout_business_contract_data(uri, version)
+            assert contract['declaration']['subcommand'] == 'draft-declare-layout-plan'
+            assert contract['safety']['native_request_fields'] == 'gateway_owned'
+            assert contract['safety']['immutable_preview'] and contract['safety']['single_execute']
+            assert contract['safety']['authoring_host_required']
+            assert not contract['legacy_typed_call_public']
+            assert not contract['legacy_native_request_public']
+    historical = next(item for item in inventory['completed_family_seals']
+                      if item['id'] == 'generic-host-ui-debug-waapi')
+    assert set(family['rows']).isdisjoint(historical['rows'])
+
+
+def test_active_layout_routes_have_one_exact_completed_wrapper_review():
+    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
+    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS
+    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding='utf-8'))
+    rules = [row for row in policy['native_lane_rules'] if row['id'] == 'authoring-layout-partial']
+    assert len(rules) == 1
+    assert set(rules[0]['match']) == {'uris'}
+    assert set(rules[0]['match']['uris']) == LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS
+    assert rules[0]['disposition'] == 'already_deep'
+    assert rules[0]['owner_issue'] is None
+    assert policy['completed_family_seals']['authoring-layout-partial']['github_issue'] == 188
+    assert 'authoring-layout-partial' not in policy['ticket_blueprints']

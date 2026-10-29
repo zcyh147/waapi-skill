@@ -1,0 +1,64 @@
+{
+  "provenance": {
+    "startup": "SDK-only diagnostic r1; not Authoring/discovery evidence",
+    "empty": "r122 Demo native r2; sole successful empty discovery",
+    "build": "2025.1.11.9262"
+  },
+  "pid": 85656,
+  "socket_snapshots": [
+    {
+      "label": "immediate",
+      "elapsed_seconds": 0.0,
+      "poll": null,
+      "socket_argv": [
+        "/usr/sbin/lsof",
+        "-nP",
+        "-a",
+        "-p",
+        "85656",
+        "-iUDP",
+        "-iTCP",
+        "-FpcnPT"
+      ],
+      "socket_exit": 1,
+      "socket_stdout": "",
+      "socket_stderr": "",
+      "socket_output_overflow": false
+    },
+    {
+      "label": "before-cleanup",
+      "elapsed_seconds": 37.184,
+      "poll": null,
+      "socket_argv": [
+        "/usr/sbin/lsof",
+        "-nP",
+        "-a",
+        "-p",
+        "85656",
+        "-iUDP",
+        "-iTCP",
+        "-FpcnPT"
+      ],
+      "socket_exit": 0,
+      "socket_stdout": "p85656\ncIntegrationDemo\nf7\nPUDP\nn*:24024\nf8\nPTCP\nn*:61758\nTST=LISTEN\nTQR=0\nTQS=0\n",
+      "socket_stderr": "",
+      "socket_output_overflow": false
+    }
+  ],
+  "discovery_empty": {
+    "api": "ak.wwise.core.remote.getAvailableConsoles",
+    "category": "core.remote",
+    "dry_run": false,
+    "error_code": null,
+    "evidence_path": "/private/tmp/waapi-r122-demo-native-r2/owned/authoring-nodes/7739bf5f638298f236fcc62a/native-evidence/1792822399256908000-c690979a4bc046fd8960956678f0a93b-ak_wwise_core_remote_getAvailableConsoles.json",
+    "item_type": "function",
+    "message": "ok",
+    "ok": true,
+    "result": {
+      "consoles": []
+    },
+    "risk_level": "low",
+    "timeout": 29.758756541996263,
+    "version": "2025.1"
+  }
+}

@@ -1,0 +1,766 @@
+{
+  "contract": "waapi-skill.source-copy-causal-review/v1",
+  "date": "2026-10-27",
+  "repository": "/Users/xiye/Documents/Git/waapi-skills",
+  "frozen_git_candidate": "0991e999fdf4505f5097b6d5d736b978a9d95f61",
+  "reviewed_source_basis": "c8498cb37ef6c253da7b319b49a2f8fa1b4e8aec",
+  "active_review": "tests/fixtures/source-copy/branch-successor-review-r123.json",
+  "active_review_sha256": "4f2ccb1aad3e3826b0db88e484919dce06b909d6136a5a3794dc8fc469c2f714",
+  "mode": "static read-only; only these two /tmp reports written",
+  "conclusion": "Selected original native effects remain causally reusable; final admission requires separately reviewed exact successor closure and five current fake public captures. No new native run justified by reviewed drift.",
+  "native_scope": {
+    "original_facts": 5,
+    "selected_shapes": 26,
+    "new_native_credit": false,
+    "historical_verdicts_unchanged": true
+  },
+  "changed_existing_dependencies": [
+    {
+      "path": "ci/test_driver.py",
+      "reviewed_sha256": "29b1cc0d19168487fd8e4254786eaac7899b38818d9f0f2e5397abd7036649c7",
+      "current_sha256": "269298151be54391cb9a06f84e82072b7657e815916193ba240576c0938ac56d",
+      "classification": "guarded_harness",
+      "causal_reason": "TestDriver.run enters new batch path only when batch_plan is not None; ordinary nonlive selection unchanged. New main rejection applies matrix/focused/all plus unit selectors, not planned nonlive captures."
+    },
+    {
+      "path": "skills/waapi-skill/evals/request_mapping_registry.json",
+      "reviewed_sha256": "081457f1ec1c901342eaf7b0432abdff719d388737e81f9b094c27079e2a3f77",
+      "current_sha256": "7f821850b53941554061aea7d2acc473ac92817b4dac02368a843abbdea79a87",
+      "classification": "unreachable_route",
+      "causal_reason": "Adds the exact 2022.1 TSV OriginalsSubFolder readiness item; selected Source fake collectors neither load V3 scenarios nor materialize import assets."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2025.1/semantic-builder-import.md",
+      "reviewed_sha256": "f126c4fd9ab8f94bafc0d2db4cb8a6c947602f569a84cd9174a00473d5b1b9bb",
+      "current_sha256": "0c7ff5a76ee250de9169ff8b8012400d04aff29456811ddb59ba1abfc4e7e878",
+      "classification": "unreachable_route",
+      "causal_reason": "Import source prose changes; selected public copy/Save declarations do not read this reference as runtime input."
+    },
+    {
+      "path": "skills/waapi-skill/resources/native_surface_policy.json",
+      "reviewed_sha256": "c801af08f4a4abd37128c2f343454c6b32877d46921efb0aed26a9fbba3ba641",
+      "current_sha256": "258877cc25df78df2f3418459720d823730eee7b5336d8349ef5c1b4345be810",
+      "classification": "unreachable_route",
+      "causal_reason": "Diff changes audio.convert restriction and two SoundBank semantic boundaries; no object.copy route or selected shape changes."
+    },
+    {
+      "path": "skills/waapi-skill/scripts/gateway.py",
+      "reviewed_sha256": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b",
+      "current_sha256": "84872d1415f0bce5c3d05eb05f4ec3e292d116c1fd7fed8d4017a4d0a1f4ac2d",
+      "classification": "shared_current_capture",
+      "causal_reason": "Parser additions are selected-command guarded. Actual shared changes are retained created-result configuration bindings and query output/Curve validation. Exact object-copy dispatch, generated Save continuation and default _verified_created_root_identity remain; run all five current public captures."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/audio_import_business.py",
+      "reviewed_sha256": "e70d09d520b08d275bf56af8718af40aa9733b2fc9e9b405f84229bdba39bb32",
+      "current_sha256": "3e7e92a19dc4d2ec4170cb536d98986e3b9b3643a0bc6ec0d9b5bd4f9d8d36fb",
+      "classification": "unreachable_route",
+      "causal_reason": "Only audio.import business declaration compiler/replacement scope; draft-check calls new validator only when business_operation == audio.import."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/audio_import_business_contracts.py",
+      "reviewed_sha256": "d06a04e38e224fb32301996c4aa0a4cf5ec46f75f1dcded354d64bf3ff87bd7c",
+      "current_sha256": "4ec0939215f05f340ab4934640f3eecaff7b72ae3b39ab6e9003b94cb3b3b8ce",
+      "classification": "unreachable_route",
+      "causal_reason": "Closed import dialogue/switch/localized row disclosure only; named lifecycle copy and object.create do not use this declaration."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/authoring_layout_business.py",
+      "reviewed_sha256": "931fe9fc2fd7c8d075b59fd13ead2f1de6c57d5d4e6c6f5221e1a6a74f259cfb",
+      "current_sha256": "31fce6ac8c7f45c7f161f98b8adf0c4aee7571c063c9e20261209c869f743d4d",
+      "classification": "unreachable_route",
+      "causal_reason": "Capacity wording only inside Authoring layout contract; Source uses Console and no layout plans."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/authoring_model_business.py",
+      "reviewed_sha256": "5379ed2ffb444591dab7d0c8561de40c76081a951689528f378bf896a4e8c9f6",
+      "current_sha256": "4a87af1714d98cf4308301074e76b082830d59638bf1cfc6f5e3c0d175f49d33",
+      "classification": "unreachable_route",
+      "causal_reason": "Native-effect evidence wording only in Authoring model contract; no Source model operation."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/blend_assignment.py",
+      "reviewed_sha256": "1c334b44b3ff24beb11e36ea716f8866a1d9ea0e743fffba903bd312a35a6f8c",
+      "current_sha256": "ae18dc98be570849cdb44c256dbe014252f0ca45203d4ae7ce698fb4bc485e54",
+      "classification": "unreachable_route",
+      "causal_reason": "prepare/compare changed automatic neighboring Blend edge geometry; Source copy has no Blend-assignment verifier. Preserving existing BlendContainers in saved root order does not invoke this module."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/builders/switchcontainer.py",
+      "reviewed_sha256": "14d1171d68c904946fddf9f0487721e460b616ccf2869ea73c299bbaac06e8da",
+      "current_sha256": "93c460c0ed55238c01b8845f6f25a9b7b3a6b5a82fa2de6b6a17ecf16a2f0397",
+      "classification": "unreachable_route",
+      "causal_reason": "Removes same-child extra Switch-pair rejection; no Switch assignment in Source protocol."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/business_adapters.py",
+      "reviewed_sha256": "1e4d5ecf0a16de4459543bde1297b7a237f9b1e02363f4ed0ff9eb2489e6acf7",
+      "current_sha256": "fdf81bd83017ff29b8b451152795680f5454de24ddad33842139eea5afed5500",
+      "classification": "unreachable_route",
+      "causal_reason": "Adds exact ak.wwise.core.audio.setConversionPlugin adapter/type discovery; object.copy/object.create/project.save adapter selection unchanged."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/business_declaration_state.py",
+      "reviewed_sha256": "174edfdcd64500c6d1fb6d141715d9b2f9f43f2801480191564534e0779faf9f",
+      "current_sha256": "bd3139219be1b200fccc0f022b0cace14dc2bcdcececc2325b4e7344f4d29484",
+      "classification": "guarded_shared",
+      "causal_reason": "New deeper settings normalization requires exact authoring_layout_plan/authoring_layout_binding keys and blueprint. Ordinary Source/empty destination sessions do not satisfy it; current capture exercises ordinary serialization."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/business_declarations.py",
+      "reviewed_sha256": "9f196a80ac7e2d82daf7fe0cb452735c9f50b2da825ba7ac2dafae02da700070",
+      "current_sha256": "ab1e210628551a70251ac51a7c0b2afbb10ef8e27bfb422e5665b53bcd987f13",
+      "classification": "guarded_shared",
+      "causal_reason": "Removed name-mutability guard used only setName/graph new_name. Playlist class metadata branch requires mustChildOf. Opaque display path applies only ConversionPlugin; SourcePlugin/RTPC/Curve/Modulator semantics keep default False. Current capture checks all selected live identities."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/cli_console_business_contracts.py",
+      "reviewed_sha256": "79f3d510a26539b703cff4118baec4adb185e9d87e86ecd7f7747315f51795fa",
+      "current_sha256": "15614b750e580996dcf25a91d5255f742a6e8ff448b2ee47eb827d07bbc90999",
+      "classification": "unreachable_route",
+      "causal_reason": "Platform-copy/media-storage CLI contracts, not ak.wwise.core.project.save; imported console_platform_copy defines constants/classes without I/O at import."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/compound_undo_business_contracts.py",
+      "reviewed_sha256": "da7be1da0ceef214c3a9eb7ad6b903f7e31b3f6aaeac63a0f4222038df46b65f",
+      "current_sha256": "3e9e302e28610a6b296fa6cfe6a463d8f7e1705ebb4aef3992cd8575da8b31dd",
+      "classification": "unreachable_route",
+      "causal_reason": "Compound source-admission disclosure; four Source transactions are separately previewed, not undoGroup."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/console_media_ids.py",
+      "reviewed_sha256": "259c31c10e4bc44176349316dda674367888a82a7a5f748fe2601ab2259afdaf",
+      "current_sha256": "e65404636b837e3f3a255c66a1283196b0b694ed37c7aae0fb540b879111a888",
+      "classification": "unreachable_route",
+      "causal_reason": "Project media storage default and MediaID observation are CLI media migration/refresh paths; Source saved oracle uses source_copy_fixture and console_file_observation."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/console_project_operations.py",
+      "reviewed_sha256": "c577b798ec800c85c59fc210783c0e3b7e696067b86079b025f6f505964c834d",
+      "current_sha256": "67ffd474726e80ea3b21e8c1561dbe330f23c1fa8f7ff73fa1f9c19fc8ad75ee",
+      "classification": "unreachable_route",
+      "causal_reason": "CLI create/migrate/addPlatform and MediaID verifiers; no project.save branch or Source saved-file oracle replacement."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/constructor_inputs.py",
+      "reviewed_sha256": "e1a8cf13d6301178a29a3909b27f5ce7a15bd675b220772cf760f6975d2029ee",
+      "current_sha256": "9f24d65d41fd62e86bd21ea7b1b8511b2a13aa0c13d21159c56dcb0b4c1922c1",
+      "classification": "guarded_shared",
+      "causal_reason": "New authority is exactly 2025.1 class5636096 collection Playlist with no existing target/preexisting GUID. Existing MetadataSlot scope unchanged; empty Sound destination has neither profile and Source copy does not construct RTPC/control/Curve."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/core_business.py",
+      "reviewed_sha256": "ecc915e3ff83bf69fd14fc2a820c51abfa9e74703079b7e55a31d3084498078b",
+      "current_sha256": "d2d1353a5d72c4a2f0061a6bea4ade8d35f7d13e52b4060aaed21122c846b080",
+      "classification": "unreachable_route",
+      "causal_reason": "Exact State empty collections, pasteProperties inclusion/exclusion, setConversionPlugin Type Handle; copy is named lifecycle, Save uses existing project-save contract."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/core_business_contracts.py",
+      "reviewed_sha256": "3df20a4e6d591b3a8fe266630b47ecf60dd5c68800607db00e60c47977634874",
+      "current_sha256": "63dcf1b255798ff7eac88373c6e3e3e56866981c165f13309cfc067c19f06f2d",
+      "classification": "unreachable_route",
+      "causal_reason": "Same exact State/paste/conversion contracts and --type/--empty forms; no object.copy mutation shape changes."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/creation_observations.py",
+      "reviewed_sha256": "c8a5da2830733c713601d3f6eafe01da82b304e6e99366d3ccd65369425adf82",
+      "current_sha256": "03a55fbba8783ce7d5838baf51626d663289d8cb86ed3282f0f7288c0a894e33",
+      "classification": "shared_current_capture",
+      "causal_reason": "Compound source projections require compound children/staged Lists and are not entered. Retained ordinary created occurrence projection is shared with destination result; current capture checks actual independently verified destination and exact copy parent."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/documented_list_fields.py",
+      "reviewed_sha256": "085487818c6ffc98d7d7c196ae7ed921d549cc88c26e773f990603622477e193",
+      "current_sha256": "09c28f7a49f22dd6eb825c20ea546468d4f2a09eb2921f3d92c663ccba3017f5",
+      "classification": "guarded_shared",
+      "causal_reason": "New legacy Playlist/class589840, 2025 PlaylistSlot and direct Metadata authorities are exact source/List guarded. RTPC/Effects ordinary omitted-empty behavior remains. Current selected owned reads exercise existing Source bridge; do not infer new source inheritance."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py",
+      "reviewed_sha256": "ce27359dbfb4414bcc9b96e51c271036206f773e78ee22dc8b3b52fcec56da33",
+      "current_sha256": "02baab67b2767f11bfaf59a9bb493f4e8835c55d94650f7048ef02d48c5caefb",
+      "classification": "unreachable_route",
+      "causal_reason": "Exact debug.generateToneWAV outcome/file-only disclosure and marker input fields; Source Synth fixture is not generated Tone audio."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/layout_blueprint.py",
+      "reviewed_sha256": "1547bedb5439bfbbb9b2b549c448cd2e64ee81cb27ae7aceae3a2e8fd82892af",
+      "current_sha256": "65f489b715971bfedd724f68760b5ab3fb2ea403384f6fca1474247ad3d52f56",
+      "classification": "unreachable_route",
+      "causal_reason": "Authoring layout construction/validation; selected declarations have no layout binding/blueprint."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_capabilities.py",
+      "reviewed_sha256": "75e8605fd1e435ea5df6b152a36d1d9adeaca197ab2dee2454bc8caf071374c1",
+      "current_sha256": "174edce4089ae486b1acff3bcafbf3b7134b033105e32a741c6c910051eb394f",
+      "classification": "guarded_shared",
+      "causal_reason": "Only ConversionPlugin gains opaque_display_path=True; all selected Source roles and ordinary Sound identity records retain prior semantics."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_graph_business.py",
+      "reviewed_sha256": "e09f5e21f17bb1f167b6fad0846a3daa572ee68fc413c0a7471dd426bcd4761b",
+      "current_sha256": "281557a1dfc1c78a2ae62cc3c356c9a19ddb9fc335ee50b5d95d317027e95825",
+      "classification": "shared_current_capture",
+      "causal_reason": "New List result references require bnh1 List plus legacy_playlist_authority; inner rename requires exact2025 PluginInnerObject. Ordinary CREATE now retains graph_result_bindings even without a dependency; this changes destination request metadata/result projection and needs current full-chain fake capture."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py",
+      "reviewed_sha256": "f631807cebece9567eedbe3124cf9acca861fe49d1553ba53efa9c27fa95dc47",
+      "current_sha256": "219d75b7fa994731230505e7269e948931708bb92150967361c617ce6c4ff3bd",
+      "classification": "shared_current_capture",
+      "causal_reason": "Declaration disclosures/result identity contract expanded for created results and source-owned Lists. Existing no-list Sound destination is retained; current capture must establish its ordinary public request and exact result remain consumable."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_graph_paths.py",
+      "reviewed_sha256": "5599f8a3ff5742af0fee883ec28b27dd980876e0217e6cebce165f42298e9075",
+      "current_sha256": "91ca2e00a557ba48e46871674f4fa16c6ba405bbed654a0c1423c27fb6cc16c9",
+      "classification": "unreachable_route",
+      "causal_reason": "Only prepare_compound_path_context and compound_created_child_roots change. No grouped child/ancestor rename in the four separate Source transactions."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_lifecycle_business.py",
+      "reviewed_sha256": "852f45ff852507f183e2d0e2599c03a7c04333469d2c0d630360d76e19223f1a",
+      "current_sha256": "50e703c498afdee21a6cef3f14d1d1c99f870d834f598b5ed9eb0f9b068ab3a9",
+      "classification": "guarded_shared",
+      "causal_reason": "Only object.setName precheck removed. object.copy materialization arm is unchanged; native Source copy remains exact closed selector-to-copy args."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_lifecycle_business_contracts.py",
+      "reviewed_sha256": "f6f8a4c343cb4b223566f89473be618ec3c2305849ce5023315563a05d9d32d9",
+      "current_sha256": "f1f14d66cf58fc04eed91e94b4fe655a3d0aef3a4778374c1d94e86d4645ad02",
+      "classification": "unreachable_route",
+      "causal_reason": "Scoped inner-slot rename disclosures, no object.copy payload change."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_query_local_lists.py",
+      "reviewed_sha256": "177bce181a9ff567fbe4665a5df6bccdcb9aafd13f711f108a8b092cf9a7d51c",
+      "current_sha256": "a0ea295981f10c7d954f1628ad2f13b3fe569c0c566da67b00a67acf39ea43a2",
+      "classification": "shared_current_capture",
+      "causal_reason": "Adds exact2021/22 Marker and2021 RTPC limitations plus typed curve-point validation. Selected repeated2021 collector does not request curve-points; modern four lanes do, so current capture must retain actual ordered x/y/shape data."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_query_outputs.py",
+      "reviewed_sha256": "cd5d4ced3be4252931f2a8f4c2befc4def82a8b4098f31a31ad1923d34568ea2",
+      "current_sha256": "688c2e9711d963c942d9ab46e4bb5fe30d3a90326772494e3f83401e2cadc19f",
+      "classification": "shared_current_capture",
+      "causal_reason": "Adds finite declared returns and Marker records. No selected argv asks those outputs. available_query_outputs nevertheless reads new marker composition source for2023–25; new resources must join closure. Existing ordinary requested output mappings remain."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_query_related.py",
+      "reviewed_sha256": "2507f11e62472b48b472e4fa79373deb6099a4c91514f8c61a290f2835caf1cd",
+      "current_sha256": "a41062d43d8b503dcff2e2b4e413492d0ae85eae52f00a10923ad1848a9a609e",
+      "classification": "shared_current_capture",
+      "causal_reason": "Adds parsed context/function branches and contract disclosure. Existing Source canonical relation/owned hops are unchanged choices; schema discovery may load new resources. Current five captures check actual read/projection behavior."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_query_related_lists.py",
+      "reviewed_sha256": "7198450179abd791fadc2f8366f3fd65708223319ca161c1af8dcc2bc7fa1777",
+      "current_sha256": "b0c3c44da7e0f23b7f30f9fe1b1d814d61fe2a066adc01be87b513cc01f11389",
+      "classification": "guarded_shared",
+      "causal_reason": "New edge.context and function_argument branches require selected new grammar. Shared list plan code is exercised by modern local-RTPC and canonical owned-hop capture; no context or scalar-function result is claimed."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_query_related_metadata.py",
+      "reviewed_sha256": "560a832be22001a2b468a6a71700769219c45dd13c2b6ada5e623d42adfe3a98",
+      "current_sha256": "8d4c3601c3cf733b78d99747a54ca4f3e2803b3fc5e319c90cfbe6444b67a61d",
+      "classification": "guarded_shared",
+      "causal_reason": "New binder early branches only option curve-selection/field-status; selected Source custom field/reference binding uses existing options."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_query_related_runtime.py",
+      "reviewed_sha256": "e994fc9269cae29136e0c779406e4c9265cbf9e0450d5b94b6d93e967cadca12",
+      "current_sha256": "699c8ad77845fcb6345c2778de4dced5a383e84cb15138779bd9b722983aace6",
+      "classification": "guarded_shared",
+      "causal_reason": "Generalized randomizer branch dispatches finite function_kind; ordinary relation states and selected typed references retain old branch. Current captures exercise them end-to-end."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/operation_import.py",
+      "reviewed_sha256": "8c5e646a7cf0af22ef3e5835c5fc51b850d7f7a50d92c0e378c6c80119d02882",
+      "current_sha256": "113c108d534d9f603ed4e710f6293c27b559eeea1e36d362407cbe2832488a9d",
+      "classification": "unreachable_route",
+      "causal_reason": "Bounded TSV parsing, source/media/Dialogue/Switch import normalization. No audio.import/audio.importTabDelimited in selected create/save/copy/save protocol."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/operation_object.py",
+      "reviewed_sha256": "9ee266d021db5f0bf5b58d0d45d8f704a8e00b10c5f4593ad49ae3f5dcd81ee7",
+      "current_sha256": "a1272754c7d6ad8a1c7f4b7f3da195727d8b88d1e4aad1495ea275be5bc8d1e2",
+      "classification": "shared_current_capture",
+      "causal_reason": "ObjectResultNode gains empty reference_lists default; opaque reference associations admitted only with explicit reference_lists. Source destination is ordinary object.create and its ordinary child/result binding must be checked by current capture."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/operation_plugin.py",
+      "reviewed_sha256": "a7440c8fdd24b8ddbda4509ea6e6c100d8e8d828c28b88524a95d6be8f231d39",
+      "current_sha256": "389eab03780303a3079f252c40d9ab817812054feb8b3be21d44b0df93de419c",
+      "classification": "unreachable_route",
+      "causal_reason": "Metadata owner placement branches and associated placement verifier. Source object.copy of existing Synth does not call object.createPlugin or rebuild its owned graph."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/operation_registry.py",
+      "reviewed_sha256": "3b298a11c9326d47b968783e536d09d290a8fff4a5a7080b5f5f99d5e7c2734d",
+      "current_sha256": "5eaff77332dc1452d6f5e1af466753abe086848810fa2123af6a97130997094a",
+      "classification": "shared_current_capture",
+      "causal_reason": "AST comparison proves entire prepare copy/move body and copied/moved verifier body unchanged, including source observation/capture and saved-graph hooks. Changed create/list/result projection and query metadata helpers are shared; import, conversion, Tone, SoundBank, compound and inner rename changes are exact operation/kind/class branches."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/operation_soundbank.py",
+      "reviewed_sha256": "cbc517977a4d9a3b42cfb051631a62bc40977da2eb4a6c81d26c01bf57cea044",
+      "current_sha256": "502324a2d51390441bb75013e8655c6eb68f2366e7bbd82bfbbf6a4a353c66f7",
+      "classification": "unreachable_route",
+      "causal_reason": "SoundBank generate/process definitions/external conversion only; top-level constants/imports do not observe Source files. prove_artifact_path used by workflow remains unchanged."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/operation_tone.py",
+      "reviewed_sha256": "231521ce3931ed2f1cbde931ef21e8db4c582af2718f38f4765a239c5e908550",
+      "current_sha256": "d8d28bc40021f7de7abe6690b417153088e36fba37308e0a78c578f8abaee120",
+      "classification": "unreachable_route",
+      "causal_reason": "Adds file-creation verifier for exact Tone URI; no Source protocol Tone invocation."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/owned_control_inputs.py",
+      "reviewed_sha256": "3f0e642025564ccd501cc3e07909b80372eaa36ced2b1c3aab46a215282b162b",
+      "current_sha256": "5c5d187549b48b41edf13ab32a543ffeb355fe586d4a43a68e06422a2b221716",
+      "classification": "unreachable_route",
+      "causal_reason": "Only docstring and rejection guidance changed; selected protocol copies preexisting ControlInput and performs no owned-control constructor or replacement."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/owned_result_stages.py",
+      "reviewed_sha256": "e23bfbadfdba5215bcf1ae65c773cd2a845903074d7f5548f52c20b62c6500be",
+      "current_sha256": "4d718fccf4d027ec439af06cc6238559c22b5a8bed47a78916395ecb0e3f761a",
+      "classification": "guarded_shared",
+      "causal_reason": "Adds constructor-reference/List arrays and actual-stage roster proofs. Selected empty Sound has no deferred references or named Lists; copy does not enter creation stages. Shared new result binding remains covered by five current captures."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/planned_references.py",
+      "reviewed_sha256": "c0baa1a41fe9349885673a7acbc63ffc75431d2467478bdbad7dcbe4a9ec5c1a",
+      "current_sha256": "1d33b44430c5d70f9dfe4eb0dd57e9e65989c160bf6d80dca324450bd7a33525",
+      "classification": "shared_current_capture",
+      "causal_reason": "retain_created_results causes ordinary CREATE result bindings to persist; new target arrays source-guarded. Current public captures must retain destination root GUID and no duplicate/extra creation before copy."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/platform_paths.py",
+      "reviewed_sha256": "00149d5c4213da5d76d748ef21607051677f6364625853e7838c75701693a527",
+      "current_sha256": "0e4f592cc866a6620eff01304859595d0f0b560a5bc7c1c7dc00b47c663eaf60",
+      "classification": "guarded_shared",
+      "causal_reason": "Changed local_posix_wine I/O mapping uses current_project anchor mapping_root only for audited host-path inputs. Source copy/save have no caller I/O audit paths; localize_live_wwise_project_path unchanged. No new Wine/Windows native credit."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/playlist_reference_conditions.py",
+      "reviewed_sha256": "e387299d850319a6905f88aed34c2eace36457769e9cc7d829759bd106f3662f",
+      "current_sha256": "1b1b8288aa6969bc99539570287da40ae10f2a27d85a21d1081b608625953088",
+      "classification": "unreachable_route",
+      "causal_reason": "New prospective constructor proof exact2025 class5636096 PlaylistObject restriction and RandomSequenceContainer owner; selected Source roles have no PlaylistObject field."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/reference_applicability.py",
+      "reviewed_sha256": "3a9571f4698daf895366365595760cd4edaa54e7f199afa72a5eed7bd308e9eb",
+      "current_sha256": "2c1eef23f7f4d0b7535fea4fb883bd55cf9242df0e9861411c996cc14e2ed6ee",
+      "classification": "unreachable_route",
+      "causal_reason": "New master_sink_target returns None unless exact AudioDevice reference and Bus owner; Source read-only metadata/ControlInput and plain destination do not use AudioDevice assignment."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/soundbank_business.py",
+      "reviewed_sha256": "a4f6e0938b6167420d5e58fb5fdcfcc97c1770770dfb0ef00233c18520a4c056",
+      "current_sha256": "24bbeb066c0bf8d960a1a61f6c37d6972139d8342d1f92567a777ef2c7a53ac6",
+      "classification": "unreachable_route",
+      "causal_reason": "Only SoundBank generate/external-source declaration compiler; Source Save is not SoundBank generation."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/soundbank_business_cli.py",
+      "reviewed_sha256": "709e0be0ba845f882e09962ab2b330308232bdf469ba35953ed18adee6f5bf0f",
+      "current_sha256": "b211fe50551bb5235a47f8e3b7461d254eb08ffa4db6ec3d4c55cbe3e6cb3317",
+      "classification": "unreachable_route",
+      "causal_reason": "SoundBank-specific parser inputs and namespace plan; selected Source argv lacks soundbank plan commands."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/soundbank_business_contracts.py",
+      "reviewed_sha256": "68cff30fc77a78c220fdcd08c6051fb35e08409f3f01e5a322d06d91a96ac6ca",
+      "current_sha256": "c40a6d9dd37befad6e766660c8446ac58682f9d4fc66a8180da2e5ad9af93c37",
+      "classification": "unreachable_route",
+      "causal_reason": "SoundBank generation/definition contracts; no selected operation route."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/topic_business.py",
+      "reviewed_sha256": "1e56daf8efb678b3b582b335c2b5c567ecf673de4427421e5ff4f1aec2739648",
+      "current_sha256": "a28e2a96bf89bc09e5a8401ac2c0728a5ce60412041c563f0bf030e46ff7e6bd",
+      "classification": "unreachable_route",
+      "causal_reason": "Topic row-table/empty-row assembly; selected collector performs bounded synchronous reads and separate transactions, no topic wait/stream or payload construction."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/transaction_runtime.py",
+      "reviewed_sha256": "eca18101c572eb89c6af494235e7957602a4851073db4c99430f6086a7727baf",
+      "current_sha256": "44e7e2e62afbc0fd212b96d5e4b06f0ac56c7b444acbfb7987590319c6c69c8f",
+      "classification": "guarded_shared",
+      "causal_reason": "Both new preview checks return immediately unless request.operation == audio.importTabDelimited; native guard additionally requires exact2025 Console9143. New pre-exec recheck has same guard. All four Source transaction operations miss it."
+    },
+    {
+      "path": "tests/conftest.py",
+      "reviewed_sha256": "4737a4fe3c6352eae705f837b2a667a47e0a61c221b9c9b86a535b48fe5c0a55",
+      "current_sha256": "c9f13bdfb2450c025726c606b4f5d43b51d23cd165f5becc11a533bb5b561655",
+      "classification": "guarded_harness",
+      "causal_reason": "Only conditional BatchResult plugin registration when WAAPI_TEST_BATCH_RESULT is nonempty. Existing pytest phase accumulation and after-teardown exact-evidence hook unchanged; keep batch env unset for plain five-node capture or seal batch helpers if explicitly selected."
+    },
+    {
+      "path": "tests/destructive/support/authoring_batch.py",
+      "reviewed_sha256": "955df44b1426a92a60dcade0c8476f349de4e8a52176f0e0a702bffdf8a03e75",
+      "current_sha256": "8b16b061b8ff402a400358155a4e2f54fb980feba2b9b113872b96510c472a7b",
+      "classification": "unreachable_route",
+      "causal_reason": "Owned Authoring node selection/finalization additions; selected current producers construct fake Console runtimes and never enter Authoring batch. Original Console native category/finalization remains immutable."
+    },
+    {
+      "path": "tests/destructive/test_authoring_ui_business_live.py",
+      "reviewed_sha256": "3fcc9f643bb35b1cb42d40cccffb5345392dcc2e11de9905d8f6118a7c5f8d99",
+      "current_sha256": "fc9506255c48d48f7dc5981d75b353a384deda4f95d244170395bc98ceca944a",
+      "classification": "unreachable_route",
+      "causal_reason": "Additional Authoring collectors/nodes; selected fake producers import the separate workflow module and do not collect this module."
+    },
+    {
+      "path": "tests/destructive/test_gateway_workflow_transaction_matrix.py",
+      "reviewed_sha256": "223e2111ff497c8bfad631a8c03e7af549aa44b9efb211b31f70758c99be3fe4",
+      "current_sha256": "d0a45f3d6a4853fee131f154aff27d24cfc90028919733452c5165f5710f81b4",
+      "classification": "guarded_shared",
+      "causal_reason": "AST-identical _collect_legacy_source_copy_feasibility, all Source node bodies, _complete_business_draft. Runtime dataclass adds optional None field. Real fixture additions require exact CLI case or Profiler node; selected fake tests bypass workflow_sandbox_runtime entirely."
+    },
+    {
+      "path": "tests/semantic/support/codex_compound_heavy_v1.py",
+      "reviewed_sha256": "45b0422943f395c69b0c799126311b314af4c84aa9747620bf2e1e0d047c3e15",
+      "current_sha256": "5f36562dcadce2f85266ecb33aaebd991fb952b175830f1493f3bcfca1ea1f88",
+      "classification": "unreachable_route",
+      "causal_reason": "Readiness defers one TSV version item to exact per-unit asset validation; fake Source producer does not parse/run heavy campaign units."
+    },
+    {
+      "path": "tests/semantic/support/codex_eval_bundle_v3.py",
+      "reviewed_sha256": "e555fb3a8457eccf38d798ff20e60b0149af5387972fe9d16c522596d091cc9b",
+      "current_sha256": "b630f8e93ad56cfa08cc185b15968c51f31ee52fab30fd7a3fad1c03aacf7a70",
+      "classification": "unreachable_route",
+      "causal_reason": "Import-asset definition parser change; no V3 suite parsing by Source fake capture."
+    },
+    {
+      "path": "tests/semantic/support/codex_heavy_project_runner_v3.py",
+      "reviewed_sha256": "710fa4aac98e1e0dd464cbdf178da2070e1e15056090f9db7b1e6a380342a1f1",
+      "current_sha256": "10acb42001405430160a2079c1c09b7b04cebfde981d6452e9c377eb19d8cc2e",
+      "classification": "unreachable_route",
+      "causal_reason": "Calls validate_import_case_version before heavy lifecycle.start; not executed by Source collectors."
+    },
+    {
+      "path": "tests/semantic/support/codex_import_assets_v3.py",
+      "reviewed_sha256": "bc8786fd336bee26a7308bb9d2e170e3a412a146129ffef98129e7890cc2d93c",
+      "current_sha256": "c989981ef0fec1e6c28a21590a35e1b971dbcdc79c447116de9834d76a4039eb",
+      "classification": "unreachable_route",
+      "causal_reason": "Exact TSV OriginalsSubFolder per-version readiness/asset preparation; no media import in selected protocol."
+    },
+    {
+      "path": "tests/semantic/support/codex_typed_input_profile.py",
+      "reviewed_sha256": "a03eb5afc5b633030a62bfe042ea6b40b9e9abbec35a2fa8b956377e73de9a8e",
+      "current_sha256": "fe5ea90a892b89fb4690bc143982c9c440ac912ab2be24134a5fb888103c7304",
+      "classification": "unreachable_route",
+      "causal_reason": "Same per-unit TSV readiness delegation; selected captures use typed_gateway_input helpers directly, whose bytes are unchanged, not campaign profile parser."
+    }
+  ],
+  "current_source_closure_additions": [
+    {
+      "path": "skills/waapi-skill/references/semantic/2021.1/platform-copy-sources.json",
+      "historical": null,
+      "current_sha256": "de813ca9a59eacfdfff54598a2f3c35d9579c7edf7eedd3673ac8f72691a0b32",
+      "source_relevance": "CLI platform copy source only, no selected addPlatform operation."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2021.1/playlist-native-boundary.json",
+      "historical": null,
+      "current_sha256": "3d6e9034576e9f601a6df4d0b33fe4890200bbcc9d582d51c5e7a396ac0ef301",
+      "source_relevance": "Exact Playlist class/List or rename boundary; unrelated to selected Source owned RTPC/ControlInput/Curve roles."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2021.1/query-active-source-native-boundary.json",
+      "historical": null,
+      "current_sha256": "43754eeade75411f5fdbcbe6efc0ea8048bff0ed40f977a3461cea5dc6269f80",
+      "source_relevance": "2021 output-detail discovery boundary; retained repeated collector deliberately excludes curve-points and active-source result selection."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2021.1/query-curve-points-native-boundary.json",
+      "historical": null,
+      "current_sha256": "d2a9c8b053330c467221f7ea27d17ea9037b06d900f66cd58dba1cfaabbf2f0e",
+      "source_relevance": "2021 output-detail discovery boundary; retained repeated collector deliberately excludes curve-points and active-source result selection."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2021.1/source-marker-object-model-boundary.json",
+      "historical": null,
+      "current_sha256": "cbf38d10d47a74703bd56da8b98ed5821420d64ab30f9da6922312e717033c93",
+      "source_relevance": "local_list_contract reads versioned Marker boundary during2021/22 schema discovery; original Source graph/owned RTPC proof unchanged."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2022.1/platform-copy-sources.json",
+      "historical": null,
+      "current_sha256": "ad0a235a5e28bc4396a18fd8f84f286c892de1a62dad70f639c589a4aee47ca7",
+      "source_relevance": "CLI platform copy source only, no selected addPlatform operation."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2022.1/playlist-native-boundary.json",
+      "historical": null,
+      "current_sha256": "76ddb7909a6c7770c2e8eb772cc86f1552359a69c9e1683a879d2ab09bbe5295",
+      "source_relevance": "Exact Playlist class/List or rename boundary; unrelated to selected Source owned RTPC/ControlInput/Curve roles."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2022.1/source-marker-object-model-boundary.json",
+      "historical": null,
+      "current_sha256": "f88030959957037a8d087fc4bab6df8bcbac5b59e71a9c7eeaa04771e844cb99",
+      "source_relevance": "local_list_contract reads versioned Marker boundary during2021/22 schema discovery; original Source graph/owned RTPC proof unchanged."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2023.1/platform-copy-sources.json",
+      "historical": null,
+      "current_sha256": "4f48862341f81a1e9dea45c1e6edb8d01c5228a063607c41538640ccc421a71d",
+      "source_relevance": "CLI platform copy source only, no selected addPlatform operation."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2023.1/query-context-sources.json",
+      "historical": null,
+      "current_sha256": "ebb59dccf08e140cd667fb4a8138395402fbb43c0af08085b1e746afe14f38a8",
+      "source_relevance": "context_contract validates this during related query schema discovery; selected Source relation hops do not execute a new context."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2023.1/query-marker-records-sources.json",
+      "historical": null,
+      "current_sha256": "cda46faae59f0e9dfe9078c19f50c224badc906af34a42d67f8b2e0e6c82b509",
+      "source_relevance": "available_query_outputs validates this exact resource for2023–25 even when marker-records is not selected: reachable discovery/projection dependency; no Marker effect credit."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2024.1/platform-copy-sources.json",
+      "historical": null,
+      "current_sha256": "96593858be6a9b1f9fb5da2c819cbc593f070c6c2384827a61a8a5f7de02260e",
+      "source_relevance": "CLI platform copy source only, no selected addPlatform operation."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2024.1/query-context-sources.json",
+      "historical": null,
+      "current_sha256": "b2bc4ab25553c0855a988ec6a29c1289d761068c909c19f8bc0117e3c33b13ce",
+      "source_relevance": "context_contract validates this during related query schema discovery; selected Source relation hops do not execute a new context."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2024.1/query-marker-records-sources.json",
+      "historical": null,
+      "current_sha256": "63f4a1bd46e5acde7997fda5f50fcaf5c0901b050a46f7c3d8ab607476438613",
+      "source_relevance": "available_query_outputs validates this exact resource for2023–25 even when marker-records is not selected: reachable discovery/projection dependency; no Marker effect credit."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2025.1/platform-copy-sources.json",
+      "historical": null,
+      "current_sha256": "55406d4209c9d06572a49666d3e800e5cd63ec810bd6bd5e4ea61bedeeaa780d",
+      "source_relevance": "CLI platform copy source only, no selected addPlatform operation."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2025.1/playlist-slot-name-native-boundary.json",
+      "historical": null,
+      "current_sha256": "8d7e60dd8531958037214c0789c3a3a8302da80d72c499ba6773af9f0f63eb0d",
+      "source_relevance": "Exact Playlist class/List or rename boundary; unrelated to selected Source owned RTPC/ControlInput/Curve roles."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2025.1/query-context-sources.json",
+      "historical": null,
+      "current_sha256": "da872a826b37b8debc39a0ab0866277fa7632fac4d9d6f4a0b1dd2da61e63c85",
+      "source_relevance": "context_contract validates this during related query schema discovery; selected Source relation hops do not execute a new context."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2025.1/query-function-sources.json",
+      "historical": null,
+      "current_sha256": "01ae8e2ad2efc5a7833567875ea1b4383e6ec623ad2a3e2fcb9db32b03e66178",
+      "source_relevance": "function_contract validates this during2025 related query schema discovery; selected Source argv has no scalar-function terminal."
+    },
+    {
+      "path": "skills/waapi-skill/references/semantic/2025.1/query-marker-records-sources.json",
+      "historical": null,
+      "current_sha256": "2559d80fd20099e51dd31c0ef0322e3b5fde628b952adf8f9e3c9790e8a2892c",
+      "source_relevance": "available_query_outputs validates this exact resource for2023–25 even when marker-records is not selected: reachable discovery/projection dependency; no Marker effect credit."
+    },
+    {
+      "path": "skills/waapi-skill/resources/metadata/reference-master-sink-capabilities.json",
+      "historical": null,
+      "current_sha256": "0c2567a74adcc562b96bb02faf9ad28ede9ef239d768b1b112bb405d6adbad34",
+      "source_relevance": "Exact Bus AudioDevice assignment target capability only, no selected Source assignment."
+    },
+    {
+      "path": "skills/waapi-skill/resources/semantic/2021.1/project_default_language.json",
+      "historical": null,
+      "current_sha256": "c90472edb5cc4819a1f032729322dd2c54ad0b364059ba155b7289c77827b67d",
+      "source_relevance": "CLI created-project/media-storage inspection only; Source project.save verifier uses unchanged source_copy_proof and saved fixture oracle."
+    },
+    {
+      "path": "skills/waapi-skill/resources/semantic/2021.1/project_media_storage_default.json",
+      "historical": null,
+      "current_sha256": "21df2e3df93c6d46857b9951c7c11a876055de1d5a6d8cdce123cde8f6121c61",
+      "source_relevance": "CLI created-project/media-storage inspection only; Source project.save verifier uses unchanged source_copy_proof and saved fixture oracle."
+    },
+    {
+      "path": "skills/waapi-skill/resources/semantic/2022.1/project_default_language.json",
+      "historical": null,
+      "current_sha256": "c847e414fcb5a47eb197d8cd1c4076e3dc38faa2557c3f6fdfe4c909e718b411",
+      "source_relevance": "CLI created-project/media-storage inspection only; Source project.save verifier uses unchanged source_copy_proof and saved fixture oracle."
+    },
+    {
+      "path": "skills/waapi-skill/resources/semantic/2022.1/project_media_storage_default.json",
+      "historical": null,
+      "current_sha256": "f81526ac8e4189eab17ae8fadd4205ced42bf74bedd7d3aa67b3b50a0c3a6708",
+      "source_relevance": "CLI created-project/media-storage inspection only; Source project.save verifier uses unchanged source_copy_proof and saved fixture oracle."
+    },
+    {
+      "path": "skills/waapi-skill/resources/semantic/2023.1/project_default_language.json",
+      "historical": null,
+      "current_sha256": "796adfc435da565c1706b582414649372504fe7822c65b89f0bea14809986658",
+      "source_relevance": "CLI created-project/media-storage inspection only; Source project.save verifier uses unchanged source_copy_proof and saved fixture oracle."
+    },
+    {
+      "path": "skills/waapi-skill/resources/semantic/2023.1/project_media_storage_default.json",
+      "historical": null,
+      "current_sha256": "061392be800ad672a17dc6800bc5862090f1444c8571616060ba887af77ce5b9",
+      "source_relevance": "CLI created-project/media-storage inspection only; Source project.save verifier uses unchanged source_copy_proof and saved fixture oracle."
+    },
+    {
+      "path": "skills/waapi-skill/resources/semantic/2024.1/project_default_language.json",
+      "historical": null,
+      "current_sha256": "4277dc478d043cc5072b9b82c95ade9d8a774f4d8e7a7403c57d42d296fc896f",
+      "source_relevance": "CLI created-project/media-storage inspection only; Source project.save verifier uses unchanged source_copy_proof and saved fixture oracle."
+    },
+    {
+      "path": "skills/waapi-skill/resources/semantic/2024.1/project_media_storage_default.json",
+      "historical": null,
+      "current_sha256": "4f0df78e8b34ae2fc2e164196ea4baadb4ab76bbc6e70f762ae809b238e25ff4",
+      "source_relevance": "CLI created-project/media-storage inspection only; Source project.save verifier uses unchanged source_copy_proof and saved fixture oracle."
+    },
+    {
+      "path": "skills/waapi-skill/resources/semantic/2025.1/project_default_language.json",
+      "historical": null,
+      "current_sha256": "9724d29cf96af56e9c29240bfa973686f0093880478ecb734fd752a0a8620e7b",
+      "source_relevance": "CLI created-project/media-storage inspection only; Source project.save verifier uses unchanged source_copy_proof and saved fixture oracle."
+    },
+    {
+      "path": "skills/waapi-skill/resources/semantic/2025.1/project_media_storage_default.json",
+      "historical": null,
+      "current_sha256": "6430a50abb554ce0efa236de3c30bb0bae290ffed4fc4e77722324290add4157",
+      "source_relevance": "CLI created-project/media-storage inspection only; Source project.save verifier uses unchanged source_copy_proof and saved fixture oracle."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/console_platform_copy.py",
+      "historical": null,
+      "current_sha256": "7d11e3d52d9c74b5cc3ae69b6f9fa6c2d1289ca650ff7710a4921400763faf64",
+      "source_relevance": "Only CLI addPlatform snapshot/copy comparison. Constants imported by CLI contract module; no import-time file I/O."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/conversion_plugin.py",
+      "historical": null,
+      "current_sha256": "3da97e1ab4114d02870991750bbd0f6bf42bd728cfee9e6ce56145e4e9ed3766",
+      "source_relevance": "prepare imported only exact ak.wwise.core.audio.setConversionPlugin; Source copy neither replaces nor configures a codec."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/metadata_plugin_placement.py",
+      "historical": null,
+      "current_sha256": "4abcda0c0d9856df1f2efb2d97bbe079ec634ce0d1474debf63e6cde99e19521",
+      "source_relevance": "Only metadata placement/empty Metadata/Playlist proof; no selected Source copy construction. Imported lazily by a shared omitted-list helper, so seal full module."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_query_contexts.py",
+      "historical": null,
+      "current_sha256": "ceb9f8e563e249ea51af13f627d50d81a7fd53a8636b035716eef72cb0953bba",
+      "source_relevance": "Finite read-context compiler; only parsed context hops execute it. Contract discovery loads context source JSON. No mutation authority."
+    },
+    {
+      "path": "skills/waapi-skill/wwise_waapi/object_query_functions.py",
+      "historical": null,
+      "current_sha256": "94af00791019e4c7189b113da0370fff79d0569c38d47f59bd114e435de5daf0",
+      "source_relevance": "Finite field-status/curve-selection terminals; only new terminal choices execute. function_contract is disclosed during related schema discovery."
+    }
+  ],
+  "source_closure": {
+    "prior_members": 619,
+    "changed_existing": 63,
+    "new_modules": 5,
+    "additional_new_resources": 30,
+    "new_members_if_full_prior_package_policy_retained": 654,
+    "preexisting_exclusion": "skills/waapi-skill/requirements.txt was already excluded and is unchanged; no new exception inferred",
+    "capture_only_sources": "Retain separate capture_sources seals, including source_copy_native_evidence.py pin, branch tools, current review and selected fake producer/finalizer files. Optional batch helper imports require separate seals only if batch env/path chosen."
+  },
+  "required_current_program_nodes": [
+    "tests/unit/test_source_copy_repeated_fixture.py::test_repeated_collector_gates_copy_on_actual_baseline_serialization",
+    "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_preserves_original_graph_through_four_transactions[2022.1]",
+    "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_preserves_original_graph_through_four_transactions[2023.1]",
+    "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_preserves_original_graph_through_four_transactions[2024.1]",
+    "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_2025_preserves_native_crlf_and_direct_rtpc_through_four_transactions"
+  ],
+  "required_protocol": [
+    "create_empty_destination",
+    "save_baseline",
+    "copy_source_only",
+    "save_final"
+  ],
+  "publication_preconditions": [
+    "Final clean committed candidate and no source/capture drift",
+    "Separately reviewed successor preserves original five predecessor descriptors, historical maps, all26 shapes, prior increment records and explicit null-before additions",
+    "Actual setup/call/teardown passed; exact after-teardown finalizer; source_unchanged true; product scope; native_credit false",
+    "Existing publish_source_native_successor validates every current program branch before binding original native bytes",
+    "No weakenings of validate_successor_context, source_seals, original native ownership or source_facts"
+  ],
+  "material_concerns": [
+    {
+      "id": "closure-resources",
+      "status": "open bookkeeping/admission prerequisite",
+      "finding": "Five-module-only closure refresh misses30 new packaged runtime/discovery JSON resources; modern query availability directly reads marker composition sources. Add all35 new package files under retained full-package closure policy with historical null. Do not label module-only map complete."
+    },
+    {
+      "id": "current-capture",
+      "status": "not run in this review",
+      "finding": "Shared ordinary destination creation/result and query validation changes need the existing five current fake captures after final closure/pin settles. Historical component passes are not final candidate receipts."
+    },
+    {
+      "id": "future-completion-delta",
+      "status": "limited supplement required",
+      "finding": "A separate worker is changing only two completion representative-policy files. Before final source snapshot, inspect that exact frozen delta for Source evidence_result/import/candidate/capture semantics and update source/capture seals. If no Source reader/producer change, no full causal reaudit or new native required."
+    }
+  ],
+  "open_user_questions": [
+    {
+      "issue": 179,
+      "scope": "2021 plug-in constructor",
+      "status": "user decision pending; not approved exclusion"
+    },
+    {
+      "issue": 182,
+      "scope": "nonDefault Work Unit group directives and 2021/2022 DialogueContainer alias",
+      "status": "user decision pending; these are the two explicit cases"
+    },
+    {
+      "issue": 184,
+      "scope": "migration Soundcaster loss / audition acceptance",
+      "status": "user decision pending; CREATE lightweight decision does not decide this"
+    },
+    {
+      "issue": 192,
+      "scope": "advanced compound groups 2–5",
+      "status": "user decision pending; simple undo/redo lightweight policy does not decide this"
+    }
+  ],
+  "closed_scope_not_reopened": {
+    "guid_tsv": "No pending user question. Retain exact-2025 guard and raw FAIL; other lanes have code proof; broad five-version exclusion not approved.",
+    "historical_meter_and_177_handoffs": "Closed under accepted method; reconcile stale ledger only unless actual current code/source omission is demonstrated."
+  },
+  "not_performed": [
+    "tests",
+    "inventory generation",
+    "native Wwise",
+    "Fresh",
+    "archive replay",
+    "code/fixture/evidence writes",
+    "issue writes",
+    "new research/probe"
+  ],
+  "reuse_references": [
+    "/tmp/waapi-r123-source-successor-review.md",
+    "tests/fixtures/source-copy/branch-successor-review-r123.json incremental_successor_review",
+    "/tmp/waapi-r132-source-compat-review.md",
+    "/tmp/waapi-r136-meter-source-compat-review.md",
+    "/tmp/waapi-closeout-batch-spec-review.md",
+    "/tmp/waapi-closeout-batch-standards-review.md",
+    "/tmp/waapi-closeout-review-fix.md",
+    "/tmp/waapi-179-older-metadata-successor.md",
+    "/tmp/waapi-192-remaining-admission.md",
+    "/tmp/waapi-191-lightweight-scope.md"
+  ]
+}

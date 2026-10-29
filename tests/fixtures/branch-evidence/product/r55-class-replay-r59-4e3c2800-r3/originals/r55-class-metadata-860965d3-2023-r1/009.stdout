@@ -1,0 +1,145 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 30068,
+    "url": "ws://127.0.0.1:30068/waapi"
+  },
+  "detected_version": "2023.1",
+  "is_command_line": true,
+  "operation": "detail",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 3,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2023.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1/dispatcher-evidence/1792528826568071000-f5f20aff57d547cb9b5fea0f03c9e12f-ak_wwise_core_object_getPropertyInfo.json",
+      "timeout": 29.965816124982666
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 30068,
+      "url": "ws://127.0.0.1:30068/waapi"
+    },
+    "adapter_version": "2023.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:30068/waapi",
+        "adapter_version": "2023.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "selection": "mf1.1792528826.1.e6bf3fb91b501bcf61fada6e0ffd4f44ac62b0e02785d54acfc48c13280a9a04",
+    "scope": {
+      "kind": "object_type",
+      "requested": "ModulatorTime",
+      "resolved": {
+        "classId": 5111824,
+        "name": "ModulatorTime",
+        "type": "WObject"
+      }
+    },
+    "metadata": {
+      "type": "bool",
+      "name": "EnvelopeStopPlayback",
+      "default": true,
+      "audioEngineId": 4294967295,
+      "supports": {
+        "rtpc": "None",
+        "randomizer": false,
+        "unlink": false
+      },
+      "display": {
+        "name": "Stop Playback At End",
+        "index": 1665,
+        "group": ""
+      },
+      "dependencies": [
+        {
+          "type": "property",
+          "action": "Enable",
+          "property": "TimeModLoops",
+          "context": "Self",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "range",
+                "max": 100,
+                "min": 1
+              }
+            }
+          ]
+        }
+      ],
+      "restriction": {},
+      "ui": {
+        "value": {
+          "max": 0.0,
+          "min": 0.0,
+          "decimals": 0,
+          "step": 0.0,
+          "fine": 0.0,
+          "infinity": 0.0
+        },
+        "displayAs": {
+          "lrMix": false,
+          "musicNote": false,
+          "bitfield": false
+        },
+        "dataMeaning": "None",
+        "autoUpdate": false
+      },
+      "unit": {
+        "status": "unknown",
+        "value": null
+      },
+      "availability": {
+        "type": "known",
+        "default": "known",
+        "restriction": "known",
+        "dependencies": "known",
+        "supports": "known",
+        "ui": "known"
+      }
+    },
+    "complete": true,
+    "mutation_authority": false
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "contract": "waapi-skill.retained-transport-assessment/v1",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.executeAction|/resultSchema",
+  "profile": {
+    "provider": "2024.1-wwise-authoring",
+    "call": {
+      "uri": "ak.wwise.core.transport.executeAction",
+      "args": {
+        "action": "play",
+        "transport": 0
+      },
+      "options": {},
+      "result": {}
+    },
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789145630626000-38cb85e0bf054edda301e8ff2245920b-ak_wwise_core_transport_executeAction.json",
+    "raw_sha256": "1fd6235168353981fdb7170d9c9dfaa06dff696fccbf7d4853ca9ad27a2b13b2",
+    "request_source": {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/profiler-capture.json",
+      "sha256": "ae720a473275e7baf9e9cf3ec6a29ad6fac5e526a19779761b33562d67676f0a",
+      "line": null,
+      "pointer": "/setup/6/play/agent_result",
+      "kind": "agent-result"
+    },
+    "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa"
+  },
+  "support_review": {
+    "artifact": "transport-support-review.json",
+    "sha256": "564f7d841a3520d568b48799a375d8c4ed4d15d771b983be33258cb3f29cbd44"
+  },
+  "archive": {
+    "artifact": "transport-origin-2024.1-wwise-authoring.json.gz",
+    "sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22"
+  },
+  "program_capture": {
+    "artifact": "transport-2024.1-12-capture.json",
+    "sha256": "72a4769f910c1421a4345e69683a7603dd03c3a245ad35fced81848e42e25655"
+  },
+  "facts": {
+    "original_candidate": "a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8",
+    "original_context": {
+      "version": "2024.1",
+      "build": "2024.1.13.9056",
+      "host": "wwise-authoring"
+    },
+    "original_finalization": "BLOCKED",
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false,
+    "acoustic_output_verified": false,
+    "global_mode_restoration_verified": false,
+    "business_boundary": "owned_transport_identity_bounded_state_lifetime"
+  }
+}

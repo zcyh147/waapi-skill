@@ -1,0 +1,34 @@
+{
+  "version": "2024.1",
+  "wwise_build": "2024.1.13.9056",
+  "definitions_sha256": "23a2bfa118702c4d03d24412239847d5c97fb3e3ed7c9bedef14e58970103a40",
+  "archive_sha256": "aa6b467caae07c2363806adc1dadeed8df7a29c4bdf2d23fd629126208054364",
+  "page": "waql_reference.html",
+  "page_sha256": "a030dec88e3b956cea1a9595980ddd54e4d40e646453e87198605b60a065ac20",
+  "sections": {
+    "maximum-duration-source": {
+      "html_lines": [
+        365,
+        374
+      ],
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">maxDurationSourceObject</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the Audio Source object that has the maximum playback duration (in seconds) for all descendants of the current object.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with Actor-Mixer Hierarchy objects, Interactive-Music Hierarchy Object, and Events.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from object \"\\Actor-Mixer Hierarchy\" select <span style=\"color: rgb(23,43,77);\">maxDurationSource</span> </td></tr>\r\n",
+      "sha256": "30553c27569aa8f8751a9ba6efb9d64775a5dd83c6c407ede7c18e7fd9d0a37a"
+    },
+    "maximum-radius-attenuation": {
+      "html_lines": [
+        385,
+        394
+      ],
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">maxRadiusAttenuationObject</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the attenuation object that has the maximum radius distance in all descendants of the current objects.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with Actor-Mixer Hierarchy objects, Interactive-Music Hierarchy Object, and Events.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from type Sound select <span style=\"color: rgb(23,43,77);\">maxRadiusAttenuation</span> </td></tr>\r\n",
+      "sha256": "71cbc99bbcb13eb5c68259267c43fb67c6c199793c9ac3b71613b7e0ac7e7c8e"
+    },
+    "panner": {
+      "html_lines": [
+        1160,
+        1169
+      ],
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">panner</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the Speaker Panner object.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects that support Positioning.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ where <span style=\"color: rgb(23,43,77);\">panner.panX &gt; 5</span> </td></tr>\r\n",
+      "sha256": "29c2b3d59d8f8eb43c594c422d662288e4dbe71adfbedfea11b4a605ef3056d2"
+    }
+  }
+}

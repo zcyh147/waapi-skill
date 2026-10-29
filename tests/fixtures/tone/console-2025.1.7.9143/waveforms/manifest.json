@@ -1,0 +1,34 @@
+{
+  "contract": "waapi-skill.tone-native-waveform-regression/v1",
+  "original_candidate": "005afc69e79a2101d72bd24abd49164c3cf7e1fe",
+  "original_root": "r52-tone-waveform-envelope-005afc69-2025-r1",
+  "original_receipt_sha256": "f368ce72b4b4a30982c06ff7d5b0e3d841784671b32118aded8e939ac78b566d",
+  "host": "WwiseConsole",
+  "build": "2025.1.7.9143",
+  "native_business_acceptance": false,
+  "original_verification_state": "result_schema_checked",
+  "original_verification_strength": "partial_tone_artifact",
+  "purpose": "Unaltered native bytes for public Gateway program verification only; original collection outcomes remain diagnostic and partial.",
+  "files": {
+    "square-stationary.wav": {
+      "sha256": "cd333f6813f6d786d98f31d37df5e09b958bc5d9a9e5ea474c3860ef01f90ac5",
+      "size": 48092,
+      "transaction_id": "tx1-mqywgt8ge59kemd43ywd",
+      "request": {
+        "waveform": "square", "frequency_hz": 440, "channel_layout": "1.0",
+        "sample_rate_hz": 48000, "bit_depth": "float32", "sustain_db": -6,
+        "attack_seconds": 0, "sustain_seconds": 0.25, "release_seconds": 0
+      }
+    },
+    "triangle-stationary.wav": {
+      "sha256": "9ce8be11208ef9f8b5923f5e1439cdd1641390056285f26eed9d7b802bff18d2",
+      "size": 48092,
+      "transaction_id": "tx1-avygzzwdkaa3h2twp1tn",
+      "request": {
+        "waveform": "triangle", "frequency_hz": 440, "channel_layout": "1.0",
+        "sample_rate_hz": 48000, "bit_depth": "float32", "sustain_db": -6,
+        "attack_seconds": 0, "sustain_seconds": 0.25, "release_seconds": 0
+      }
+    }
+  }
+}

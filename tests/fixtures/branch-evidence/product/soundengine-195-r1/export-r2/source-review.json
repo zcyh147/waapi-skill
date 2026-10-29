@@ -1,0 +1,23 @@
+{
+  "scope": "component-local portable importer and ordinary completion assessment; no canonical/global completion claim",
+  "mapping_candidate": "a3e33532f1d2723422e2ba5d3fd56790a9080b0e",
+  "code_run_candidate": "0e2e4e0b56bc1a4505f1f64c1f93916fbfeca44d",
+  "component_candidate_sha256": "a48f7c1c69e7039af097ade9a5df61b5567bde2bfa491cd83e81c805fa8d089c",
+  "packaged_skill_git_tree": {
+    "captured": "aae686dcaa1b62eab5002c91e718252e3340288d",
+    "current": "aae686dcaa1b62eab5002c91e718252e3340288d",
+    "byte_identical": true
+  },
+  "assessment_sha256": "12b91539e5e29d491bcfaaf01b8b58243cda309431eda7bbcaee26111122a3e3",
+  "structural_members": 15050,
+  "representative_mechanisms": 8,
+  "current_code_proof": "17 passed in 8.98 seconds; original unchanged-candidate wrapper files retained exactly; aggregate program strength only",
+  "native_fresh_or_full_gate_started": false,
+  "actual_functional_gaps_found": [],
+  "unproved": [
+    "full native return-expression-language equivalence",
+    "per-member execution/native effect",
+    "new native getter-options execution",
+    "atomic snapshot for related/helper values"
+  ]
+}

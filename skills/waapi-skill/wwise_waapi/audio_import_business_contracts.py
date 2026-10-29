@@ -20,16 +20,18 @@ AUDIO_IMPORT_BUSINESS_VALUE_TYPES = {
     **{name: kind for name, kind in OBJECT_BUSINESS_FIELD_TYPES.items()
        if name not in ACTION_DURATION_FIELDS},
     "audio_source_notes": "string",
-    "dialogue_event_directive": "string",
     "inline_wav": "string",
     "language": "string",
     "media_file": "string",
     "originals_subfolder": "string",
+    "source_name": "string",
+    "switch_group": "reference",
     "switch_value": "string",
 }
 AUDIO_IMPORT_BUSINESS_DECLARATION_FIELDS = (
     *tuple(AUDIO_IMPORT_BUSINESS_VALUE_TYPES),
     "event",
+    "dialogue_event",
     "field_values",
 )
 AUDIO_IMPORT_BUSINESS_MODES = {
@@ -71,6 +73,15 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
         "field_value_types": dict(AUDIO_IMPORT_BUSINESS_VALUE_TYPES),
         "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
         "row_requirements": {
+            "named_source": {
+                "field": "source_name",
+                "owner": "sound-sfx_or_sound-voice; Sound_result_handle_remains_the_owner",
+                "target": "exact_named_AudioFileSource_under_that_Sound; media_required",
+                "shared_owner": "multiple_named_Source_rows_may_share_one_Sound; create_owner_only_if_absent",
+                "owner_fields": "declare_separately_on_the_Sound",
+                "replacement": "bind_the_existing_Source_handle_for_replacement; new_Source_rows_require_absence",
+            },
+            "existing_source": "bind_exact_AudioFileSource_handle; media_and_language_required; reimport_preserves_Source_GUID; replace_retires_only_that_Source_GUID; preserve_Sound_and_other_Source_identities_and_media",
             "structure_only": {
                 "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
                 "media": "omit_media_file_and_inline_wav",
@@ -90,7 +101,7 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
         },
         "modes": ["replace"],
         "mode_selection": {
-            "all_new_rows": "derive_create",
+            "all_new_rows": "derive_create_unless_bound_existing_DialogueEvent_then_reimport_with_new_owner_absence_guard",
             "one_or_more_existing_rows": "derive_reimport",
             "replace": "explicit_only_when_user_requests_replacement",
             "use_existing_objects": "row_target_form_not_a_batch_override",
@@ -131,16 +142,26 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
                 for name, value_type in AUDIO_IMPORT_BUSINESS_VALUE_TYPES.items()
                 if value_type != "reference"
             ),
-            "bound_object_handle_fields": ["output_bus"],
+            "bound_object_handle_fields": ["output_bus", "switch_group"],
             "bound_field_handle_container": "field_values",
             "dedicated_declaration_parameters": {
                 "switch_value": "--switch-value",
+                "dialogue_event": "--dialogue-event-handle OR --dialogue-event-parent-handle + --dialogue-event-name; optional repeated --dialogue-condition GROUP_HANDLE VALUE_HANDLE_OR_*; --dialogue-probability/--dialogue-weight require conditions",
             },
             "generic_declaration_field_exclusions": ["switch_value"],
             "reference_value_rule": (
                 "copy_one_bound_object_handle_never_a_path_or_name"
             ),
-            "switch_value_rule": "copy_the_user_requested_switch_value_name",
+            "dialogue_event_rule": "new_DialogueEvent_from_bound_parent_and_exact_name_or_existing_Event_from_exact_handle; Gateway_owns_path_syntax; verify_Event_creation_only; association_requires_an_explicit_decision_path; explicit_ordered_group_value_or_wildcard_conditions_with_path_only_Probability_Weight_0_to_100; verify_association_and_supplied_numeric_values; decision_path_sequence_not_read_back; existing_Event_requires_useExisting; owner_replacement_then_existing_Event_update_requires_two_separate_previews",
+            "switch_value_rule": (
+                "optional_exact_value_name_below_switch_group_bound_handle_or_existing_parent_SwitchContainers_actual_group; "
+                "group_only_on_a_SwitchContainer_associates_that_exact_existing_group; "
+                "planned_direct_container_inherits_its_earlier_declarations_bound_group; "
+                "Gateway_binds_group_and_value_and_owns_native_directive; "
+                "verify_owner_assignment_and_preserve_unrelated_pairs_and_group; "
+                "no_caller_directive_grammar"
+            ),
+            "switch_group_rule": "copy_one_bound_SwitchGroup_or_StateGroup_handle; omit_switch_value_for_group_only; preserve_existing_pairs_unless_the_exact_existing_container_is_explicitly_replaced",
             "language_rule": (
                 "derive_SFX_from_sound-sfx_else_copy_exact_project_language"
             ),

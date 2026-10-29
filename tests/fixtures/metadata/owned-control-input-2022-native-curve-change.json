@@ -1,0 +1,67 @@
+{
+  "contract": "waapi-skill.native-owned-time-curve-observation/v1",
+  "build": "2022.1.19.8584",
+  "candidate": "5232dc14cd60dc9e7c1de948690074fd0efb6782",
+  "receipt_sha256": "494906d81e5f36cad98432169e59284dcbfea789a15df00da69ba23cc48f875d",
+  "request": {
+    "@ControlInput": {
+      "@EnvelopeStopPlayback": false,
+      "@TimeModDuration": 5.0,
+      "name": "TimeMod",
+      "notes": "New time control",
+      "type": "ModulatorTime"
+    },
+    "@Curve": {
+      "points": [
+        {
+          "shape": "Linear",
+          "x": 0,
+          "y": -20
+        },
+        {
+          "shape": "Linear",
+          "x": 1000,
+          "y": 0
+        }
+      ],
+      "type": "Curve"
+    },
+    "@PropertyName": "Volume",
+    "name": "",
+    "type": "RTPC"
+  },
+  "rtpc_readback": {
+    "PropertyName": "Volume",
+    "ControlInput": {
+      "id": "{B0778EB8-05CE-4769-9AC5-B15A7A9D979C}",
+      "name": "TimeMod"
+    },
+    "Curve": {
+      "id": "{47F47679-289E-4447-A238-BE4436AF1C28}",
+      "points": [
+        {
+          "shape": "Linear",
+          "x": 0.0,
+          "y": -20.0
+        },
+        {
+          "shape": "Linear",
+          "x": 5.0,
+          "y": 0.0
+        }
+      ],
+      "@Flags": 3
+    },
+    "id": "{16B8A65D-C1F3-4902-BA13-8992D1C37C76}",
+    "type": "RTPC",
+    "classId": 1441808,
+    "name": "",
+    "notes": "",
+    "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI_OWNED_TIME_9214912fa1d8\\[RTPC: Voice Volume, TimeMod]",
+    "owner": {
+      "id": "{4ADEF03A-7BB7-4E51-85C8-7FAB63221CD7}",
+      "name": "WAAPI_OWNED_TIME_9214912fa1d8"
+    }
+  },
+  "classification": "executed_once_verification_failed_explicit_curve_points_changed_not_accepted_normalization_policy"
+}

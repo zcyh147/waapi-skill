@@ -67,9 +67,9 @@ MAX_TREE_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
 MAX_TREE_FILE_BYTES = 512 * 1024 * 1024
 MAX_TREE_DEPTH = 32
 
-_GENERATE_REQUIRED_KEYS = frozenset({"soundbanks", "platforms", "skipLanguages", "writeToDisk"})
+_GENERATE_REQUIRED_KEYS = frozenset({"soundbanks"})
 _GENERATE_OPTIONAL_KEYS = frozenset(
-    {"languages", "rebuildSoundBanks", "clearAudioFileCache", "rebuildInitBank"}
+    {"languages", "skipLanguages", "writeToDisk", "rebuildSoundBanks", "clearAudioFileCache", "rebuildInitBank", "allUserSoundBanks", "platforms", "allPlatforms"}
 )
 _GENERATE_BANK_REQUIRED_KEYS = frozenset({"name", "artifactExpectation"})
 _GENERATE_BANK_OPTIONAL_KEYS = frozenset({"events", "auxBusses", "inclusions", "rebuild"})
@@ -90,7 +90,6 @@ _DEFAULT_COPY_STREAMED_FILES_COMMAND = (
     '-languages "$(LanguageList)"'
 )
 
-_EXTERNAL_ROW_KEYS = frozenset({"input", "platform", "output"})
 _EXTERNAL_ROOT_ATTRIBUTES = frozenset({"SchemaVersion", "Root"})
 _EXTERNAL_SOURCE_ATTRIBUTES = frozenset({"Path", "Conversion", "Destination", "AnalysisTypes"})
 _ANALYSIS_TYPES = frozenset({"0", "2", "4", "6"})
@@ -136,12 +135,14 @@ def capture_file_proof(
     *,
     field: str,
     max_bytes: int = MAX_SOURCE_FILE_BYTES,
+    io_root: str | os.PathLike[str] | None = None,
 ) -> dict[str, Any]:
     """Capture a digest-bound proof for one absolute, non-symlink file."""
 
     if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 1:
         raise SoundBankContractError("INVALID_LIMIT", "max_bytes must be a positive integer.")
-    path, descriptor, before = _open_regular_file(value, field=field)
+    guard = prove_artifact_path(value, io_root=io_root, field=field, must_exist=True, expect_directory=False) if io_root is not None else None
+    path, descriptor, before = _open_regular_file(value, field=field, io_root=io_root)
     if before.st_size > max_bytes:
         os.close(descriptor)
         raise SoundBankContractError(
@@ -152,7 +153,11 @@ def capture_file_proof(
     digest = hashlib.sha256()
     try:
         with os.fdopen(descriptor, "rb") as opened:
+            consumed = 0
             for chunk in iter(lambda: opened.read(1024 * 1024), b""):
+                consumed += len(chunk)
+                if consumed > max_bytes or consumed > before.st_size:
+                    raise SoundBankContractError('FILE_CHANGED', f'{field} grew beyond its bounded initial extent.')
                 digest.update(chunk)
             after = os.fstat(opened.fileno())
     except OSError as exc:
@@ -162,6 +167,16 @@ def capture_file_proof(
             details={"path": str(path), "error": str(exc)},
         ) from exc
     _require_unchanged_file_stat(before, after, field=field, path=path)
+    try:
+        if guard is not None:
+            current = Path(value).stat()
+            names = ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns')
+            if any(getattr(before, name) != getattr(current, name) for name in names) or prove_artifact_path(
+                    value, io_root=io_root, field=field, must_exist=True, expect_directory=False) != guard:
+                raise SoundBankContractError('FILE_CHANGED', f'{field} path changed during its confined proof.')
+    except OSError as exc:
+        raise SoundBankContractError('FILE_CHANGED', f'{field} disappeared during its confined proof.',
+            details={'path': str(path), 'reason': str(exc)}) from exc
     body = {
         "contract": FILE_PROOF_CONTRACT,
         "path": str(path),
@@ -913,7 +928,7 @@ def build_generate_operation_plan(
     )
 
     soundbanks = _require_sequence(arguments.get("soundbanks"), field="soundbanks")
-    if not soundbanks or len(soundbanks) > MAX_GENERATE_BANKS:
+    if (not soundbanks and "allUserSoundBanks" not in arguments) or len(soundbanks) > MAX_GENERATE_BANKS:
         raise SoundBankContractError(
             "INVALID_SCOPE",
             "soundbank.generate requires an explicit non-empty bounded SoundBank list.",
@@ -969,34 +984,28 @@ def build_generate_operation_plan(
                     raw.get(public_name),
                     field=f"soundbanks[{index}].{public_name}",
                 )
-                if not identities:
-                    raise SoundBankContractError(
-                        "INVALID_ARGUMENT",
-                        f"soundbanks[{index}].{public_name} must not be an empty explicit list.",
-                    )
                 bank[public_name] = identities
-        definitions_present = "events" in bank or "auxBusses" in bank
         if "inclusions" in raw:
-            if not definitions_present:
-                raise SoundBankContractError(
-                    "INVALID_ARGUMENT",
-                    "SoundBank inclusions are accepted only with explicit Event or AuxBus definitions.",
-                    details={"index": index},
-                )
             bank["inclusions"] = _normalize_generate_inclusions(
                 raw.get("inclusions"),
                 field=f"soundbanks[{index}].inclusions",
             )
-        elif definitions_present:
-            bank["inclusions"] = list(_GENERATE_INCLUSIONS)
-        bank["rebuild"] = _optional_bool(raw, "rebuild", default=False, field=f"soundbanks[{index}].rebuild")
+        if "rebuild" in raw:
+            bank["rebuild"] = _require_bool(raw["rebuild"], field=f"soundbanks[{index}].rebuild")
         normalized_banks.append(bank)
 
-    requested_platforms = _require_nonempty_strings(
-        arguments.get("platforms"),
-        field="platforms",
-        limit=MAX_PLATFORMS,
-    )
+    # Native omission means all platforms. Deliberate all-platform intent is
+    # captured here and still dispatches explicit GUIDs, so a later native
+    # platform addition cannot silently widen the write beyond Preview.
+    all_platforms = "allPlatforms" in arguments
+    if all_platforms:
+        if arguments["allPlatforms"] is not True or "platforms" in arguments:
+            raise SoundBankContractError("INVALID_SCOPE", "Choose all configured platforms or one explicit platform list.")
+        available = _require_sequence(project_info.get("platforms"), field="project_info.platforms")
+        requested = [row.get("id") if isinstance(row, Mapping) else None for row in available]
+    else:
+        requested = arguments.get("platforms")
+    requested_platforms = _require_nonempty_strings(requested, field="platforms", limit=MAX_PLATFORMS)
     selected_platforms = _resolve_project_rows(
         requested_platforms,
         project_info.get("platforms"),
@@ -1009,58 +1018,24 @@ def build_generate_operation_plan(
         for bank in normalized_banks
         if bank["artifactExpectation"] in {"localized", "mixed"}
     ]
-    skip_languages = _require_bool(arguments.get("skipLanguages"), field="skipLanguages")
-    if not language_dependent_banks:
-        if skip_languages is not True or "languages" in arguments:
-            raise SoundBankContractError(
-                "INVALID_SCOPE",
-                "An all-nonlocalized SoundBank batch requires "
-                "skipLanguages=true and languages omitted.",
-            )
-        selected_languages: list[dict[str, Any]] = []
+    skip_languages = _optional_bool(arguments, "skipLanguages", default=False)
+    write_to_disk = _optional_bool(arguments, "writeToDisk", default=False)
+    if skip_languages and language_dependent_banks:
+        raise SoundBankContractError("INVALID_SCOPE", "Localized artifact expectations conflict with skipLanguages=true.")
+    if skip_languages and "languages" not in arguments:
+        selected_languages = []
     else:
-        if skip_languages is not False:
-            raise SoundBankContractError(
-                "INVALID_SCOPE",
-                "A SoundBank batch containing any localized or mixed row "
-                "requires skipLanguages=false.",
-                details={"soundbanks": language_dependent_banks},
-            )
-        requested_languages = _require_nonempty_strings(
-            arguments.get("languages"),
-            field="languages",
-            limit=MAX_LANGUAGES,
-        )
+        requested_languages = arguments.get("languages")
+        if requested_languages is None or requested_languages == []:
+            requested_languages = [row["id"] for row in project_info.get("languages", [])
+                if isinstance(row, Mapping) and str(row.get("name", "")).casefold() != "sfx"]
+        requested_languages = _require_nonempty_strings(requested_languages, field="languages", limit=MAX_LANGUAGES) if requested_languages else []
         if any(language.strip().casefold() == "sfx" for language in requested_languages):
-            raise SoundBankContractError(
-                "INVALID_SCOPE",
-                "SFX is not a localized project language and cannot appear in "
-                "soundbank.generate languages.",
-            )
-        selected_languages = _resolve_project_rows(
-            requested_languages,
-            project_info.get("languages"),
-            field="languages",
-            aliases=("id", "name"),
-            required_fields=("id", "name"),
-        )
-    if skip_languages:
-        if "languages" in arguments:
-            raise SoundBankContractError(
-                "INVALID_SCOPE",
-                "languages must be omitted when skipLanguages is true.",
-            )
+            raise SoundBankContractError("INVALID_SCOPE", "SFX is not a localized project language.")
+        selected_languages = _resolve_project_rows(requested_languages, project_info.get("languages"),
+            field="languages", aliases=("id", "name"), required_fields=("id", "name")) if requested_languages else []
     if language_dependent_banks and not selected_languages:
-        raise SoundBankContractError(
-            "INVALID_SCOPE",
-            "Localized or mixed SoundBank artifact expectations require explicit languages and skipLanguages=false.",
-            details={"soundbanks": language_dependent_banks, "skipLanguages": skip_languages},
-        )
-    if _require_bool(arguments.get("writeToDisk"), field="writeToDisk") is not True:
-        raise SoundBankContractError(
-            "UNSUPPORTED_BOUNDARY",
-            "The closed generation route currently requires writeToDisk=true for artifact verification.",
-        )
+        raise SoundBankContractError("INVALID_SCOPE", "Localized artifact expectations require live project languages.")
 
     directories = _require_mapping(project_info.get("directories"), field="project_info.directories")
     cache_path = _require_text(directories.get("cache"), field="project_info.directories.cache")
@@ -1142,14 +1117,16 @@ def build_generate_operation_plan(
             for bank in normalized_banks
         ],
         "platforms": [platform["id"] for platform in selected_platforms],
-        "skipLanguages": skip_languages,
-        "rebuildSoundBanks": _optional_bool(arguments, "rebuildSoundBanks", default=False),
-        "clearAudioFileCache": _optional_bool(arguments, "clearAudioFileCache", default=False),
-        "writeToDisk": True,
-        "rebuildInitBank": _optional_bool(arguments, "rebuildInitBank", default=False),
     }
-    if selected_languages:
-        dispatch_args["languages"] = [language["id"] for language in selected_languages]
+    if "allUserSoundBanks" in arguments and lane in {"2023.1", "2024.1", "2025.1"}:
+        dispatch_args["soundbanks"] = []
+    elif "allUserSoundBanks" in arguments and not normalized_banks:
+        raise SoundBankContractError("INVALID_SCOPE", "No live user SoundBanks were found; older reflected schemas do not establish empty-list generation semantics.")
+    for name in ("skipLanguages", "writeToDisk", "rebuildSoundBanks", "clearAudioFileCache", "rebuildInitBank"):
+        if name in arguments:
+            dispatch_args[name] = _require_bool(arguments[name], field=name)
+    if "languages" in arguments:
+        dispatch_args["languages"] = [language["id"] for language in selected_languages] if arguments["languages"] else []
 
     body = {
         "contract": GENERATE_PLAN_CONTRACT,
@@ -1171,9 +1148,13 @@ def build_generate_operation_plan(
                 for language in selected_languages
             ],
             "skip_languages": skip_languages,
-            "empty_soundbank_list_allowed": False,
+            "empty_soundbank_list_allowed": "allUserSoundBanks" in arguments and lane in {"2023.1", "2024.1", "2025.1"},
+            "all_user_soundbanks": "allUserSoundBanks" in arguments,
+            "all_user_scope_strategy": ("native_empty_list" if lane in {"2023.1", "2024.1", "2025.1"} else "bounded_live_enumeration") if "allUserSoundBanks" in arguments else None,
             "implicit_all_platforms_allowed": False,
-            "implicit_all_languages_allowed": False,
+            "all_platforms": all_platforms,
+            "all_platform_scope_strategy": "bounded_live_enumeration" if all_platforms else None,
+            "implicit_all_languages_allowed": "languages" not in arguments,
             "auto_defined_soundbanks": (
                 "generated_by_wwise_if_project_feature_enabled_and_not_selectable_by_this_api"
                 if lane in {"2023.1", "2024.1", "2025.1"}
@@ -1189,13 +1170,17 @@ def build_generate_operation_plan(
             "metadata_root": str(Path(metadata_root).resolve(strict=False)),
             "cache_root": str(Path(cache_path).resolve(strict=False)),
             "automatic_byproducts": ["Init.bnk"],
-            "required_verification": "bounded_pre_post_tree_delta_plus_nonempty_requested_bank_artifacts",
+            "required_verification": ("bounded_pre_post_tree_delta_plus_nonempty_requested_bank_artifacts"
+                if write_to_disk and normalized_banks else "result_schema_diagnostics_and_bounded_io_guards_only"),
+            "bank_files_requested": write_to_disk,
         },
         "oracle": {
             "result_schema_required": True,
             "logs_are_diagnostic_only": lane != "2021.1",
             "error_field_must_be_empty": lane == "2025.1",
-            "business_state_requires_artifacts": True,
+            "business_state_requires_artifacts": write_to_disk and bool(normalized_banks),
+            "verification_boundary": ("nonempty_requested_artifacts" if write_to_disk and normalized_banks else
+                "result_schema_and_diagnostics_only; no bank data or artifact delivery is verified; in-memory bank data requires a soundbank.generated subscription before generation"),
             "no_retry_after_dispatch": True,
         },
     }
@@ -1422,8 +1407,8 @@ def build_external_sources_operation_plan(
             )
         _require_exact_keys(
             row,
-            required=_EXTERNAL_ROW_KEYS,
-            optional=frozenset(),
+            required=frozenset({"input", "platform"}),
+            optional=frozenset({"output"}),
             context=f"sources[{index}]",
         )
         requested_platforms.append(_require_text(row.get("platform"), field=f"sources[{index}].platform"))
@@ -1447,7 +1432,13 @@ def build_external_sources_operation_plan(
     project_root = project["directories"]["root"]
     for index, (raw, platform) in enumerate(zip(source_rows, selected_platforms, strict=True)):
         input_path = _require_text(raw.get("input"), field=f"sources[{index}].input")
-        output_path = _require_text(raw.get("output"), field=f"sources[{index}].output")
+        if "output" in raw:
+            output_path = _require_text(raw["output"], field=f"sources[{index}].output")
+        else:
+            binding = _require_mapping(project_info.get("externalSourcesOutputPaths"),
+                field="project_info.externalSourcesOutputPaths").get(platform["id"])
+            binding = _require_mapping(binding, field="Project.ExternalSourcesOutputPath")
+            output_path = _require_text(binding.get("effective_path"), field="Project.ExternalSourcesOutputPath.effective_path")
         output_proof = prove_artifact_path(
             output_path,
             io_root=io_root,
@@ -1509,15 +1500,17 @@ def build_external_sources_operation_plan(
                     "verification": "created_or_modified_and_nonempty_wem",
                 }
             )
-        dispatch_rows.append(
-            {"input": parsed["path"], "platform": platform["id"], "output": output_root}
-        )
+        dispatch_row = {"input": parsed["path"], "platform": platform["id"]}
+        if "output" in raw:
+            dispatch_row["output"] = output_root
+        dispatch_rows.append(dispatch_row)
         snapshot_roots.append(output_root)
         request_plans.append(
             {
                 "index": index,
                 "platform": {key: platform[key] for key in ("id", "name", "baseName")},
                 "output_root": output_root,
+                **({"output_setting": dict(binding)} if "output" not in raw else {}),
                 "output_path_proof": output_proof,
                 "source_list": parsed,
                 "expected_outputs": expected_outputs,
@@ -1544,7 +1537,7 @@ def build_external_sources_operation_plan(
         "artifact_plan": {
             "snapshot_roots": _dedupe_strings(snapshot_roots),
             "expected_output_count": sum(len(request["expected_outputs"]) for request in request_plans),
-            "all_outputs_explicit": True,
+            "all_outputs_explicit": all("output" in row for row in source_rows),
             "cross_platform_output_roots_are_distinct": True,
             "required_verification": "bounded_pre_post_tree_delta_plus_exact_nonempty_wem_outputs",
         },
@@ -1564,7 +1557,7 @@ def build_external_sources_operation_plan(
 def parse_soundbank_definition_file(
     definition_file: str | os.PathLike[str],
 ) -> dict[str, Any]:
-    """Parse the strongly verifiable subset of a SoundBank Definition TSV."""
+    """Parse the documented closed SoundBank Definition TSV forms."""
 
     path, data, proof = _read_proven_bytes(
         definition_file,
@@ -1616,7 +1609,6 @@ def parse_soundbank_definition_file(
     banks: dict[str, dict[str, Any]] = {}
     bank_order: list[str] = []
     normalized_rows: list[dict[str, Any]] = []
-    seen_inclusions: set[tuple[str, str, str]] = set()
     for row_number, (cells, quoted_columns) in enumerate(
         zip(parsed_rows, quoted_rows, strict=True),
         start=1,
@@ -1651,11 +1643,27 @@ def parse_soundbank_definition_file(
         bank_name = _require_bank_name(cells[0], field=f"row[{row_number}].soundbank")
         token = cells[1]
         if token == "-GameSyncExclusion":
-            raise SoundBankContractError(
-                "UNSUPPORTED_DEFINITION_DIRECTIVE",
-                "-GameSyncExclusion is not strongly verifiable through getInclusions and is rejected.",
-                details={"row": row_number, "directive": token},
-            )
+            kind = cells[2] if len(cells) > 2 else None
+            count = 4 if kind == "Trigger" else 5
+            if kind not in {"State", "Switch", "Trigger"} or len(cells) != count or any(quoted_columns[:3]):
+                raise SoundBankContractError("INVALID_DEFINITION_ROW",
+                    "GameSyncExclusion requires State/Switch group and value names, or Trigger and its name; no filters.",
+                    details={"row": row_number})
+            for column in range(3, len(cells)):
+                if not quoted_columns[column] and _definition_identity(cells[column], row_number=row_number)["kind"] != "name":
+                    raise SoundBankContractError("INVALID_DEFINITION_IDENTITY",
+                        "GameSync exclusions use names, not GUID or numeric identities.", details={"row": row_number})
+            exclusion = {"row_number": row_number, "definition_keyword": token,
+                "object_type": kind, "name": cells[-1]}
+            if kind != "Trigger":
+                exclusion["group_name"] = cells[3]
+            bank_key = bank_name.casefold()
+            if bank_key not in banks:
+                banks[bank_key] = {"name": bank_name, "inclusions": [], "exclusions": []}
+                bank_order.append(bank_key)
+            banks[bank_key]["exclusions"].append(exclusion)
+            normalized_rows.append({"soundbank": bank_name, **exclusion})
+            continue
         if token.startswith("-"):
             directive = _DEFINITION_DIRECTIVES.get(token)
             if directive is None:
@@ -1710,14 +1718,6 @@ def parse_soundbank_definition_file(
             allowed=allowed_filters,
             row_number=row_number,
         )
-        duplicate_key = (bank_name.casefold(), object_type, _identity_key(identity))
-        if duplicate_key in seen_inclusions:
-            raise SoundBankContractError(
-                "DUPLICATE_DEFINITION_INCLUSION",
-                "A SoundBank Definition must not repeat one object inclusion.",
-                details={"row": row_number, "soundbank": bank_name, "identity": identity},
-            )
-        seen_inclusions.add(duplicate_key)
         inclusion = {
             "row_number": row_number,
             "definition_keyword": keyword,
@@ -1727,7 +1727,7 @@ def parse_soundbank_definition_file(
         }
         bank_key = bank_name.casefold()
         if bank_key not in banks:
-            banks[bank_key] = {"name": bank_name, "inclusions": []}
+            banks[bank_key] = {"name": bank_name, "inclusions": [], "exclusions": []}
             bank_order.append(bank_key)
         banks[bank_key]["inclusions"].append(inclusion)
         normalized_rows.append({"soundbank": bank_name, **inclusion})
@@ -1740,8 +1740,8 @@ def parse_soundbank_definition_file(
         "rows": normalized_rows,
         "soundbanks": [banks[key] for key in bank_order],
         "unsupported_boundary": {
-            "GameSyncExclusion": "rejected because getInclusions cannot prove exclusion state",
-            "identity_quoting": "string names require double quotes; GUID and uint32 identities must be unquoted",
+            "GameSyncExclusion": "accepted names only; effects are not proven by getInclusions",
+            "identity_quoting": "inclusion string names require double quotes; inclusion GUID/uint32 identities are unquoted; GameSync names allow quotes",
             "unknown_directives": "rejected",
             "unknown_filters": "rejected",
         },
@@ -1784,7 +1784,7 @@ def build_process_definition_operation_plan(
     dispatch_files: list[str] = []
     soundbanks: list[dict[str, Any]] = []
     seen_files: set[HostPathKey] = set()
-    bank_sources: dict[str, str] = {}
+    bank_sources: dict[str, dict[str, Any]] = {}
     for index, value in enumerate(raw_files):
         if not isinstance(value, (str, os.PathLike)):
             raise SoundBankContractError(
@@ -1792,12 +1792,13 @@ def build_process_definition_operation_plan(
                 "Definition file paths must be strings.",
                 details={"index": index},
             )
+        prove_artifact_path(value, io_root=io_root, field=f"files[{index}]", must_exist=True, expect_directory=False)
         document = parse_soundbank_definition_file(value)
         if lane == "2022.1":
             name_rows = [
                 int(row["row_number"])
                 for row in document["rows"]
-                if row["identity"]["kind"] == "name"
+                if row.get("identity", {}).get("kind") == "name"
             ]
             if name_rows:
                 raise SoundBankContractError(
@@ -1825,21 +1826,25 @@ def build_process_definition_operation_plan(
             bank_key = bank["name"].casefold()
             previous = bank_sources.get(bank_key)
             if previous is not None:
-                raise SoundBankContractError(
-                    "CROSS_FILE_SOUNDBANK_COLLISION",
-                    "One SoundBank may be defined by only one file in the closed route.",
-                    details={"soundbank": bank["name"], "files": [previous, document["path"]]},
-                )
-            bank_sources[bank_key] = document["path"]
-            soundbanks.append(
-                {
-                    "name": bank["name"],
-                    "source_file": document["path"],
-                    "expected_inclusions": list(bank["inclusions"]),
-                    "pre_state_required": True,
-                    "post_state": "exact_additive_getInclusions_match_after_live_identity_resolution",
-                }
-            )
+                previous["source_files"].append(document["path"])
+                previous["expected_inclusions"].extend(bank["inclusions"])
+                previous["exclusions"].extend(bank["exclusions"])
+                if bank["exclusions"]:
+                    previous["verification_boundary_reasons"].append("gamesync_exclusion_effect_unobserved")
+                previous["verification_boundary_reasons"].append("repeated_bank_across_files")
+                continue
+            target = {
+                "name": bank["name"],
+                "source_file": document["path"],
+                "source_files": [document["path"]],
+                "expected_inclusions": list(bank["inclusions"]),
+                "exclusions": list(bank["exclusions"]),
+                "verification_boundary_reasons": (["gamesync_exclusion_effect_unobserved"] if bank["exclusions"] else []),
+                "pre_state_required": True,
+                "post_state": "exact_inclusions_only_when_independently_predictable",
+            }
+            bank_sources[bank_key] = target
+            soundbanks.append(target)
         documents.append(document)
         dispatch_files.append(document["path"])
     body = {
@@ -1855,7 +1860,8 @@ def build_process_definition_operation_plan(
             "resolve_every_identity_before_dispatch": True,
             "unknown_or_ambiguous_identity_policy": "reject_before_dispatch",
             "capture_existing_soundbank_guid_and_inclusions": True,
-            "verify_new_or_preserved_guid_and_exact_additive_inclusions": True,
+            "verify_exact_inclusions_only_for_single_file_empty_prestate_unique_rows": True,
+            "merge_removal_and_exclusion_effects_independently_verified": False,
             "verify_unrelated_control_soundbank_unchanged": True,
             "result_schema_is_business_state_proof": False,
             "no_retry_after_dispatch": True,
@@ -2060,8 +2066,6 @@ def _normalize_identities(value: Any, *, field: str) -> list[str | int]:
 
 def _normalize_generate_inclusions(value: Any, *, field: str) -> list[str]:
     rows = _require_sequence(value, field=field)
-    if not rows:
-        raise SoundBankContractError("INVALID_ARGUMENT", f"{field} must not be empty.")
     result: list[str] = []
     for index, inclusion in enumerate(rows):
         if not isinstance(inclusion, str) or inclusion not in _GENERATE_INCLUSIONS:
@@ -2355,11 +2359,17 @@ def _read_proven_bytes(
     return path, data, proof
 
 
-def _open_regular_file(
+def open_regular_artifact_file(
     value: str | os.PathLike[str],
     *,
     field: str,
+    io_root: str | os.PathLike[str] | None = None,
 ) -> tuple[Path, int, os.stat_result]:
+    """Open one regular non-link file; optional confinement is checked before content reads.
+
+    The caller owns the descriptor and its post-read identity/extent check.
+    """
+    guard = prove_artifact_path(value, io_root=io_root, field=field, must_exist=True, expect_directory=False) if io_root is not None else None
     supplied = _absolute_path(value, field=field)
     try:
         leaf_stat = supplied.lstat()
@@ -2408,8 +2418,20 @@ def _open_regular_file(
             f"{field} changed while it was opened.",
             details={"path": str(path)},
         )
+    if guard is not None:
+        try:
+            current_guard = prove_artifact_path(value, io_root=io_root, field=field, must_exist=True, expect_directory=False)
+            if current_guard != guard or str(path) != guard['resolved_path']:
+                raise SoundBankContractError('FILE_CHANGED', f'{field} confinement changed while it was opened.')
+        except BaseException:
+            os.close(descriptor)
+            raise
     return path, descriptor, opened_stat
 
+
+
+# Existing source-file proof callers share the same secure descriptor opener.
+_open_regular_file = open_regular_artifact_file
 
 def _require_unchanged_file_stat(
     before: os.stat_result,
@@ -2581,7 +2603,11 @@ def _require_io_root(value: str | os.PathLike[str]) -> Path:
             "io_root must be a real directory, not a file or symbolic link.",
             details={"path": str(supplied)},
         )
-    return supplied.resolve(strict=True)
+    try:
+        return supplied.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise SoundBankContractError('INVALID_IO_ROOT', 'io_root changed while it was resolved.',
+            details={'path': str(supplied), 'reason': str(exc)}) from exc
 
 
 def _absolute_path(value: str | os.PathLike[str] | Any, *, field: str) -> Path:

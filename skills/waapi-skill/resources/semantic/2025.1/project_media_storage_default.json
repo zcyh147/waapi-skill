@@ -1,0 +1,18 @@
+{
+  "contract": "waapi-skill.project-media-storage-default/v1",
+  "version": "2025.1",
+  "installed_build": "2025.1.7.9143",
+  "source_member": "Authoring/Data/WObjects/WObjects.xml",
+  "source_member_sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454",
+  "class": {
+    "Name": "Project",
+    "CompanyID": "1",
+    "PluginID": "3"
+  },
+  "property": "MediaIDsInSingleFile",
+  "type": "bool",
+  "default": false,
+  "property_xml": "<Property Name=\"MediaIDsInSingleFile\" Type=\"bool\" IsVisible=\"false\" DisplayName=\"Persist media IDs in single file\">\n        <DefaultValue>false</DefaultValue>\n      </Property>",
+  "property_xml_sha256": "bdbcbed372e8cdb1cb4bc125c41e0cacf627e6728141011499d9109dc9ddacf7",
+  "authority": "Only this version-lane Project property default; native default-elision observed on2025.1.7 only. No SharedValues active-value claim or generic missing-property default."
+}

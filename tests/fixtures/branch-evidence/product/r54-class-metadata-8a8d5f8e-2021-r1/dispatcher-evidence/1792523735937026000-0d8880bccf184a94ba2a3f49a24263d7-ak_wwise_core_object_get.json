@@ -1,0 +1,23 @@
+{
+  "api": "ak.wwise.core.object.get",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2021-r1/dispatcher-evidence/1792523735937026000-0d8880bccf184a94ba2a3f49a24263d7-ak_wwise_core_object_get.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      {
+        "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+        "name": "SampleProject",
+        "path": "\\",
+        "type": "Project"
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 29.978205457999138,
+  "version": "2021.1"
+}

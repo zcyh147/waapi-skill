@@ -1,0 +1,112 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "meter-2025.1-wwise-authoring-0-",
+      "bindings": {
+        "artifact": "meter-2025.1-wwise-authoring-0-bindings.json",
+        "sha256": "94c40e3eb69d4ca6cedf0080b4f0f4bf39944cc5d8a0add5003d244d34db9f57"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "meter-2025.1-wwise-authoring-0-bindings.json",
+          "sha256": "94c40e3eb69d4ca6cedf0080b4f0f4bf39944cc5d8a0add5003d244d34db9f57"
+        },
+        "program": {
+          "artifact": "meter-2025.1-wwise-authoring-0-program.json",
+          "sha256": "508859ebe0dadc86c871af32bb1bc5acc91faf59c956ae3e2da20d30f57c4efa"
+        },
+        "requirements": {
+          "artifact": "meter-2025.1-wwise-authoring-0-requirements.json",
+          "sha256": "c331fb388611e99f5acabcbff5d2fd7271b59aad59da49016417312397c38a8e"
+        },
+        "capture": {
+          "artifact": "meter-2025.1-wwise-authoring-0-capture.json",
+          "sha256": "8536bf8cc11c47c6fbd928d5e370667befd7b52f7b57a9e1df2a69d063f98dbb"
+        }
+      }
+    },
+    {
+      "id": "meter-2025.1-wwise-authoring-1-",
+      "bindings": {
+        "artifact": "meter-2025.1-wwise-authoring-1-bindings.json",
+        "sha256": "e2238744b3695d334469c38d03a96045543fe24d7fefbcddeb171a582233f882"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "meter-2025.1-wwise-authoring-1-bindings.json",
+          "sha256": "e2238744b3695d334469c38d03a96045543fe24d7fefbcddeb171a582233f882"
+        },
+        "program": {
+          "artifact": "meter-2025.1-wwise-authoring-1-program.json",
+          "sha256": "012f2518af6710a9025c3d1671ff3ab4753d3cc147c02ad6a14097c5f01053ec"
+        },
+        "requirements": {
+          "artifact": "meter-2025.1-wwise-authoring-1-requirements.json",
+          "sha256": "ce45ffe2907ded4817cb48a7425e798adfecdfdde2747b9fcd71af1cceca5f51"
+        },
+        "capture": {
+          "artifact": "meter-2025.1-wwise-authoring-1-capture.json",
+          "sha256": "9909a2332a9a2e440d40307972e8d3d77678d932ca43bef5d9351cfacc5f5d1e"
+        }
+      }
+    },
+    {
+      "id": "meter-2025.1-wwise-authoring-2-",
+      "bindings": {
+        "artifact": "meter-2025.1-wwise-authoring-2-bindings.json",
+        "sha256": "07bbdaedfaab639f9bfea43bd9ad18f14ce86df0040425381d0497089ba066b4"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "meter-2025.1-wwise-authoring-2-bindings.json",
+          "sha256": "07bbdaedfaab639f9bfea43bd9ad18f14ce86df0040425381d0497089ba066b4"
+        },
+        "program": {
+          "artifact": "meter-2025.1-wwise-authoring-2-program.json",
+          "sha256": "45f4bccbdbaf3a72f66b3664a2ede8aa8fad18f4231ee819702f1bdcac9799b7"
+        },
+        "requirements": {
+          "artifact": "meter-2025.1-wwise-authoring-2-requirements.json",
+          "sha256": "358800cbcea18d4face009ea6583a1efc1c39ba50c4fafcbbdd3300c917eb184"
+        },
+        "capture": {
+          "artifact": "meter-2025.1-wwise-authoring-2-capture.json",
+          "sha256": "f759ab8055c3c15cb02b1b322f504dbf20d08ebf093945bf528213c279032e0b"
+        }
+      }
+    },
+    {
+      "id": "meter-2025.1-wwise-authoring-3-",
+      "bindings": {
+        "artifact": "meter-2025.1-wwise-authoring-3-bindings.json",
+        "sha256": "61d5d2eb4cd64482e8e567121e449f94b0b896ae18127248e3ba008741bd42ce"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "meter-2025.1-wwise-authoring-3-bindings.json",
+          "sha256": "61d5d2eb4cd64482e8e567121e449f94b0b896ae18127248e3ba008741bd42ce"
+        },
+        "program": {
+          "artifact": "meter-2025.1-wwise-authoring-3-program.json",
+          "sha256": "380d6bd21297fb6fdeb6f0386f60c1678a9a00a712a09c7cfdfea2f54212c353"
+        },
+        "requirements": {
+          "artifact": "meter-2025.1-wwise-authoring-3-requirements.json",
+          "sha256": "aed17396301b6463a627edbca080b8f769fc7bb505b7e5c81c0825f932d41ed4"
+        },
+        "capture": {
+          "artifact": "meter-2025.1-wwise-authoring-3-capture.json",
+          "sha256": "a047973d9d98466d20cbb6ec44c5c1b964bc4411464525073411e1b2cbe6a90f"
+        }
+      }
+    }
+  ],
+  "qualified_runtime_read_attachments": [
+    {
+      "artifact": "meter-2025.1-wwise-authoring-0-attachment.json",
+      "sha256": "85412b953d8b475b8a8ff4f4fc3155824aae3097a0b57a2d3d88c5e8093863e8"
+    }
+  ]
+}

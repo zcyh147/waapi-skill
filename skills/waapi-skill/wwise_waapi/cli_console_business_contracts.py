@@ -5,6 +5,14 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from .console_platform_copy import PROJECT_COPY_EXCLUSIONS
+
+from .console_project_operations import (
+    CLI_PROJECT_FILE_URIS, MAX_MODEL_FILES, MAX_MODEL_DIRECTORIES, MAX_MODEL_DEPTH, MAX_MODEL_ENTRIES, MAX_MODEL_BYTES, MAX_MODEL_SNAPSHOT_BYTES, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
+    MAX_PROJECT_XML_DEPTH, MAX_PROJECT_DECLARATION_ROWS, MAX_MISSING_PROJECT_DIRECTORIES,
+    MAX_OBJECT_DUMP_JSON_DEPTH,
+)
+
 
 CLI_CONSOLE_BUSINESS_CONTRACT = "waapi-skill.cli-console-business/v1"
 ALL_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
@@ -28,6 +36,11 @@ _COMMON_TYPES: dict[str, str] = {
     "verbosity": "console_verbosity",
     "stop_on_load_issues": "boolean",
     "source_control": "source_control_policy",
+}
+
+_EXPLICIT_EMPTY_COLLECTIONS = {
+    "ak.wwise.cli.createNewProject": ("platforms",),
+    "ak.wwise.console.project.create": ("platforms", "languages"),
 }
 
 
@@ -597,6 +610,19 @@ def cli_console_native_field_ownership(
     }
 
 
+def platform_creation_choices(version: str) -> list[str]:
+    """Disclose the pinned native enum, without claiming installed availability."""
+    from .schema_inventory import load_definition_graph, resolve_schema_reference
+
+    graph = load_definition_graph(version)
+    target = resolve_schema_reference('#/definitions/platformToCreateArg',
+        root_schema={}, graph=graph).target
+    choices = target['properties']['basePlatform']['enum']
+    if not isinstance(choices, list) or not choices or any(not isinstance(value, str) for value in choices):
+        raise ValueError('Pinned platform creation choices are malformed')
+    return list(choices)
+
+
 def cli_console_business_contract_data(
     operation: str,
     version: str,
@@ -611,6 +637,13 @@ def cli_console_business_contract_data(
     if operation == "ak.wwise.cli.waapiServer" and version in {"2021.1", "2022.1"}:
         required = ["project_file"]
     optional = list(row["optional_by_version"].get(version, row["optional"]))
+    constraints = deepcopy(row["constraints"])
+    if operation == "ak.wwise.cli.addNewPlatform" and version == "2025.1":
+        # This default is explicit in the pinned 2025 native field description;
+        # earlier lanes do not establish the same omission semantics.
+        required.remove("platform_name")
+        optional.insert(0, "platform_name")
+        constraints["platform_name_when_omitted"] = "use the base_platform name"
     optional = [field for field in optional if field not in required]
     public_fields = [*required, *optional]
     field_types = {
@@ -646,15 +679,123 @@ def cli_console_business_contract_data(
             "public_fields": public_fields,
             "field_types": field_types,
             "input_forms": {
-                field: _input_form(field, field_types[field])
+                field: _input_form(field, field_types[field], allow_empty=field in _EXPLICIT_EMPTY_COLLECTIONS.get(operation, ()), version=version)
                 for field in public_fields
             },
+            **({"explicit_empty_collections": list(_EXPLICIT_EMPTY_COLLECTIONS[operation])}
+               if operation in _EXPLICIT_EMPTY_COLLECTIONS else {}),
             **(
-                {"constraints": deepcopy(row["constraints"])}
-                if row["constraints"]
+                {"constraints": constraints}
+                if constraints
                 else {}
             ),
         },
+        **({"result_semantics": {
+            "documented_process_outcomes": {"0": "success", "1": "errors_with_possible_partial_effects", "2": "warnings_only"},
+            "earlier_media_id_empty_result": "no_process_outcome_reported",
+            **({"observed_process_result": {
+                "compatibility_rule": "console-media-single-observed-process-result/v1",
+                "scope": "matching_2021_to_2023_Console_moveMediaIdsToSingleFile",
+                "accepted_shapes": ["empty_object_without_process_outcome", "result_integer_0_1_or_2"],
+                "original_reflected_schema": "preserved; compatibility_requires_exact_source_digest",
+            }} if operation == 'ak.wwise.cli.moveMediaIdsToSingleFile' and version in {'2021.1', '2022.1', '2023.1'} else {}),
+            "unknown_outcome": "executed_unverified_no_automatic_retry",
+            "file_effect_verification": "independent_observation_required",
+        }} if operation in CLI_PROJECT_FILE_URIS else {}),
+        **({'effect_verification': {
+            'saved_project': 'bounded_UTF8_WPROJ_and_live_transition_identity',
+            'requested_fields': ['platforms', 'languages', 'first_language_is_default'],
+            'explicit_empty_effect': 'native_semantics_unresolved_no_business_acceptance',
+            'limits': {'project_bytes': MAX_PROJECT_FILE_BYTES, 'xml_nodes': MAX_PROJECT_XML_NODES,
+                'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS,
+                'missing_project_directories': MAX_MISSING_PROJECT_DIRECTORIES},
+        }} if operation == 'ak.wwise.console.project.create' else {}),
+        **({'effect_verification': {
+            'input_binding': 'bounded_saved_WPROJ_GUID_name_and_exact_file_proof_revalidated_before_dispatch',
+            'live_effect': 'exact_requested_project_path_and_saved_GUID_name_match',
+            'older_project_input': 'permitted_under_declared_migration_policy_without_assuming_migration_success',
+            'limits': {'project_bytes': MAX_PROJECT_FILE_BYTES, 'xml_nodes': MAX_PROJECT_XML_NODES,
+                'xml_depth': MAX_PROJECT_XML_DEPTH},
+        }} if operation == 'ak.wwise.console.project.open' else {}),
+        **({'project_start_state': {
+            'loaded_project': 'optional',
+            'absence_evidence': 'successful_bounded_Project_query_zero_rows_or_exact_native_no_project_loaded_with_attested_Console_runtime',
+            'binding': 'selected_configuration_and_Wwise_session_process_version_remain_exact',
+        }} if operation in {'ak.wwise.console.project.open', 'ak.wwise.console.project.create'} else {}),
+        **({'effect_verification': {
+            'saved_project': 'bounded_UTF8_WPROJ_without_post_terminal_native_calls',
+            'requested_fields': ['exact_destination_project_name', 'platforms'],
+            'language_default': 'not_inferred_from_Console_create',
+            'explicit_empty_effect': 'native_semantics_unresolved_no_business_acceptance',
+            'limits': {'project_bytes': MAX_PROJECT_FILE_BYTES, 'xml_nodes': MAX_PROJECT_XML_NODES,
+                'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS,
+                'missing_project_directories': MAX_MISSING_PROJECT_DIRECTORIES},
+        }} if operation == 'ak.wwise.cli.createNewProject' else {}),
+        **({'effect_verification': {
+            'saved_project_and_work_units': 'bounded_UTF8_XML_exact_name_base_and_preserved_model',
+            'copy_settings': 'compare_exact_owned_platform_settings_in_all_observed_WPROJ_and_WWU_files',
+            'project_copy_exclusions': sorted(PROJECT_COPY_EXCLUSIONS),
+            'project_copy_exclusion_scope': 'direct_Project_string_Property_ValueList_Value_only; observe_target_settings_separately',
+            'copied_codec_identity': 'fresh_unique_Conversion_owned_object_ID_only',
+            'copy_source_evidence': f'references/semantic/{version}/platform-copy-sources.json',
+            'cross_base_copy': 'native_may_adjust_unsupported_format_or_sample_rate; '
+                'fallback_differences_remain_unverified_and_are_never_normalized_or_retried',
+            'inherited_or_elided_copy_values': 'unresolved_no_business_acceptance_without_native_evidence',
+            'preexisting_unregistered_platform_values': 'unresolved_no_business_acceptance',
+            'prewrite_inputs': 'all_observed_files_and_root_identity_must_match_Preview',
+            'post_terminal_native_calls': 'none',
+            'limits': {'model_files': MAX_MODEL_FILES, 'model_directories': MAX_MODEL_DIRECTORIES, 'model_depth': MAX_MODEL_DEPTH,
+                'model_entries': MAX_MODEL_ENTRIES, 'model_total_bytes': MAX_MODEL_BYTES,
+                'model_snapshot_bytes': MAX_MODEL_SNAPSHOT_BYTES, 'file_bytes': MAX_PROJECT_FILE_BYTES,
+                'xml_nodes_per_file': MAX_PROJECT_XML_NODES, 'xml_depth': MAX_PROJECT_XML_DEPTH},
+        }} if operation == 'ak.wwise.cli.addNewPlatform' else {}),
+        **({'effect_verification': {
+            'output_artifact': 'stable_confined_bounded_UTF8_JSON',
+            'native_object_model_content_and_session_representation': 'unresolved_no_business_acceptance',
+            'source_project': 'bytes_and_directory_identity_preserved',
+            'limits': {'file_bytes': MAX_PROJECT_FILE_BYTES, 'json_work': 'linear_in_bounded_artifact_bytes',
+                'json_depth': MAX_OBJECT_DUMP_JSON_DEPTH},
+        }} if operation == 'ak.wwise.cli.dumpObjects' else {}),
+        **({'effect_verification': {
+            'saved_project': 'target_Wwise_version_and_preserved_project_identity_platforms_languages',
+            'saved_model': 'all_observed_Work_Units_object_media_identities_and_header_independent_XML',
+            'native_model_transformations': 'partial_until_transformation_semantics_are_established',
+            'unchanged_artifact': 'partial_without_observed_save',
+            'post_terminal_native_calls': 'none',
+        }} if operation == 'ak.wwise.cli.migrate' else {}),
+        **({'effect_verification': {
+            'mapping_file': 'owned_project_name_mediaid_stable_bounded_bytes_if_present',
+            'mapping_container_format': 'five_version_observed_Wwise_MediaIDs_XML; unknown_container_remains_unverified',
+            'work_units': ('bounded_saved_MediaIDList_observation; disclosed_optional_empty_None_CustomState_additions; strict_remaining_model'
+                if operation == 'ak.wwise.cli.moveMediaIdsToSingleFile'
+                else 'bounded_saved_MediaIDList_observation_and_preservation_outside_media_storage'),
+            'central_mapping_record_representation': (
+                'exact_source_GUID_language_ID_and_name_file_and_all_media_ID_attributes; no_remaining_Work_Unit_IDs; exact_project_storage_mode'
+                if operation == 'ak.wwise.cli.moveMediaIdsToSingleFile'
+                else 'Preview_central_records_equal_resulting_Work_Unit_source_GUID_language_file_and_all_media_ID_attributes; '
+                    'exact_disabled_project_storage_mode; central_file_removal_not_required'
+                if operation == 'ak.wwise.cli.moveMediaIdsToWorkUnits'
+                else 'existing_file_matches_exact_saved_source_media_records; already_central_uses_Preview_records; '
+                    'Work_Unit_media_and_storage_mode_preserved; absent_file_stays_absent'),
+            'source_kinds': ['AudioFileSource', 'MidiFileSource', 'PluginMediaSource'],
+            **({'optional_saved_none_state_materialization': {
+                'force_save_scope': 'all_project_work_units',
+                'preview': 'exact_source_proven_saved_owner_group_unique_None_state_bindings',
+                'outcome': 'may_persist_zero_or_one_fresh_empty_CustomState_record_per_binding; actual_saved_GUIDs_and_ShortIDs_reported',
+                'preservation': 'every_old_identity_value_order_and_all_remaining_model_content',
+                'source': 'resources/semantic/' + version + '/none_state_materialization.json',
+                'inevitable': False,
+                'detail': {'command': 'transaction-show',
+                    'fixed_views': ['eligible-bindings', 'actual-additions'],
+                    'selector': '--none-state-outcome', 'artifact_binding': '--outcome-artifact-hash',
+                    'actual_event_binding': '--outcome-event-hash', 'page': '--outcome-page',
+                    'continuation': 'copy_exact_generated_command; offline_read_only; no_confirmation_or_execution',
+                    'limits': {'entries_per_page': 64, 'detail_bytes': 16384, 'gateway_page_bytes': 32768}},
+            }} if operation == 'ak.wwise.cli.moveMediaIdsToSingleFile' else {}),
+            'generated_platform_hashes': 'bounded_observation_only; not_conversion_correctness_proof',
+            'post_terminal_native_calls': 'none',
+        }} if operation in {'ak.wwise.cli.moveMediaIdsToSingleFile', 'ak.wwise.cli.moveMediaIdsToWorkUnits',
+            'ak.wwise.cli.updateMediaIdsInSingleFile'} else {}),
         "gateway_derivations": [
             "native_option_names_and_negative_flags",
             "version_specific_field_availability",
@@ -680,7 +821,7 @@ def cli_console_business_contract_data(
     }
 
 
-def _input_form(field: str, field_type: str) -> dict[str, Any]:
+def _input_form(field: str, field_type: str, *, allow_empty=False, version=None) -> dict[str, Any]:
     if field_type in {
         "platform_name_list",
         "language_name_list",
@@ -689,13 +830,25 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
         "network_address_list",
         "http_origin_list",
     }:
-        return {"flag": "--item", "arguments": [field, "<value>"], "repeatable": True}
+        result = {"flag": "--item", "arguments": [field, "<value>"], "repeatable": True}
+        if allow_empty:
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+        return result
     if field_type.endswith("_mappings"):
-        return {
+        result = {
             "flag": "--mapping",
             "arguments": [field, "<key>", "<value>"],
             "repeatable": True,
         }
+        if field_type == "platform_creation_mappings":
+            result['base_platform_choices'] = platform_creation_choices(version)
+            result['choice_scope'] = 'pinned_schema_values_not_installed_availability'
+            result['row_order'] = 'preserve_declaration_order_across_named_and_unnamed_forms'
+            result["unnamed_platform_form"] = {"flag": "--item", "arguments": [field, "<base_platform>"], "repeatable": True}
+            result["meaning"] = "One base platform per unnamed row, or base platform and explicit name per mapping; the same base may have distinct named rows. Omission preserves the native project default."
+        if allow_empty:
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+        return result
     if field_type == "boolean":
         return {
             "flag": "--toggle",

@@ -1,0 +1,1311 @@
+{
+  "contract": "waapi-skill.object-business-source-reconciliation/v1",
+  "original_roster_sha256": "9583e523cfb4b9776932cb25544198e8f3fa8d065aa5d47b3ada078056482148",
+  "scope": "Exact source-member correspondence admission only; no constructor expansion, native availability, new execution evidence or completion credit. Original source/native rosters and current runtime boundaries retained.",
+  "member_changes": {
+    "2021.1": {
+      "parent_choices": {
+        "ControlSurfaceSession": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "ControlSurfaceBindingGroup"
+            ]
+          }
+        },
+        "Query": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "SearchCriteria"
+            ]
+          }
+        },
+        "ControlSurfaceBindingGroup": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "ControlSurfaceBinding",
+              "ControlSurfaceBindingGroup"
+            ]
+          }
+        }
+      },
+      "owned_lists_class_changes": {
+        "ActorMixer": {
+          "before": {
+            "name": "ActorMixer",
+            "class_id": 524304,
+            "source_member": "wwiseobject_actormixer.html",
+            "source_sha256": "fae75c7333aac95d6809344d300d36595f5aacecee163aac41d638d7ac7a4d3b",
+            "lists": [],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          },
+          "after": {
+            "name": "ActorMixer",
+            "class_id": 524304,
+            "source_member": "wwiseobject_actormixer.html",
+            "source_sha256": "fae75c7333aac95d6809344d300d36595f5aacecee163aac41d638d7ac7a4d3b",
+            "lists": [
+              {
+                "name": "Metadata",
+                "display_name": "Metadata",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "Metadata",
+                    "class_id": 5308432
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          }
+        },
+        "Bus": {
+          "before": {
+            "name": "Bus",
+            "class_id": 1376272,
+            "source_member": "wwiseobject_bus.html",
+            "source_sha256": "778f6fda8b688c1aa90bf66edd52473e6ca797b897c1373ec78650d02aa0f1fc",
+            "lists": [],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "AudioDevice",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "HdrPeakOutputGameParameter",
+              "Mixer",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          },
+          "after": {
+            "name": "Bus",
+            "class_id": 1376272,
+            "source_member": "wwiseobject_bus.html",
+            "source_sha256": "778f6fda8b688c1aa90bf66edd52473e6ca797b897c1373ec78650d02aa0f1fc",
+            "lists": [
+              {
+                "name": "Metadata",
+                "display_name": "Metadata",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "Metadata",
+                    "class_id": 5308432
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "AudioDevice",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "HdrPeakOutputGameParameter",
+              "Mixer",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          }
+        },
+        "MusicSwitchContainer": {
+          "before": {
+            "name": "MusicSwitchContainer",
+            "class_id": 2293776,
+            "source_member": "wwiseobject_musicswitchcontainer.html",
+            "source_sha256": "f99d6a0bac528fa78191e1a36ba82ac0d3681f791d0f49ca5b8a03602bcd3059",
+            "lists": [],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "MidiTarget",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          },
+          "after": {
+            "name": "MusicSwitchContainer",
+            "class_id": 2293776,
+            "source_member": "wwiseobject_musicswitchcontainer.html",
+            "source_sha256": "f99d6a0bac528fa78191e1a36ba82ac0d3681f791d0f49ca5b8a03602bcd3059",
+            "lists": [
+              {
+                "name": "Stingers",
+                "display_name": "Music Stingers",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "MusicStinger",
+                    "class_id": 2490384
+                  }
+                ],
+                "unresolved_element_types": []
+              },
+              {
+                "name": "Metadata",
+                "display_name": "Metadata",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "Metadata",
+                    "class_id": 5308432
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "MidiTarget",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          }
+        },
+        "RandomSequenceContainer": {
+          "before": {
+            "name": "RandomSequenceContainer",
+            "class_id": 589840,
+            "source_member": "wwiseobject_randomsequencecontainer.html",
+            "source_sha256": "0feb6e3bbc00c1a5a7c82a0f47a2738c614bd3ba9c808b16f7e068ad3483af2f",
+            "lists": [],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          },
+          "after": {
+            "name": "RandomSequenceContainer",
+            "class_id": 589840,
+            "source_member": "wwiseobject_randomsequencecontainer.html",
+            "source_sha256": "0feb6e3bbc00c1a5a7c82a0f47a2738c614bd3ba9c808b16f7e068ad3483af2f",
+            "lists": [
+              {
+                "name": "Metadata",
+                "display_name": "Metadata",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "Metadata",
+                    "class_id": 5308432
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          }
+        },
+        "SwitchContainer": {
+          "before": {
+            "name": "SwitchContainer",
+            "class_id": 655376,
+            "source_member": "wwiseobject_switchcontainer.html",
+            "source_sha256": "81a30437634be7a05dfca2034686c910bd9baa062d605a8c00d138ab881fc7af",
+            "lists": [],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "DefaultSwitchOrState",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "SwitchGroupOrStateGroup",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          },
+          "after": {
+            "name": "SwitchContainer",
+            "class_id": 655376,
+            "source_member": "wwiseobject_switchcontainer.html",
+            "source_sha256": "81a30437634be7a05dfca2034686c910bd9baa062d605a8c00d138ab881fc7af",
+            "lists": [
+              {
+                "name": "Metadata",
+                "display_name": "Metadata",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "Metadata",
+                    "class_id": 5308432
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "DefaultSwitchOrState",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "SwitchGroupOrStateGroup",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          }
+        },
+        "BlendContainer": {
+          "before": {
+            "name": "BlendContainer",
+            "class_id": 1900560,
+            "source_member": "wwiseobject_blendcontainer.html",
+            "source_sha256": "6d0b738caefff8f6553d8c25c5e285aea561efa6a9fc26b0bb720690306cb942",
+            "lists": [],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          },
+          "after": {
+            "name": "BlendContainer",
+            "class_id": 1900560,
+            "source_member": "wwiseobject_blendcontainer.html",
+            "source_sha256": "6d0b738caefff8f6553d8c25c5e285aea561efa6a9fc26b0bb720690306cb942",
+            "lists": [
+              {
+                "name": "Metadata",
+                "display_name": "Metadata",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "Metadata",
+                    "class_id": 5308432
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          }
+        },
+        "MusicTrackSequence": {
+          "before": {
+            "name": "MusicTrackSequence",
+            "class_id": 3801104,
+            "source_member": "wwiseobject_musictracksequence.html",
+            "source_sha256": "d14f37f67ae00eb1afee6c831037f2d3fa461a137ecc65845eb55a718b3ac64f",
+            "lists": [],
+            "scalar_references": [
+              "TrackSequenceSwitch"
+            ]
+          },
+          "after": {
+            "name": "MusicTrackSequence",
+            "class_id": 3801104,
+            "source_member": "wwiseobject_musictracksequence.html",
+            "source_sha256": "d14f37f67ae00eb1afee6c831037f2d3fa461a137ecc65845eb55a718b3ac64f",
+            "lists": [
+              {
+                "name": "Clips",
+                "display_name": "Music Clips",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "MusicClip",
+                    "class_id": 3932176
+                  },
+                  {
+                    "name": "MusicClipMidi",
+                    "class_id": 4063248
+                  },
+                  {
+                    "name": "MusicEventCue",
+                    "class_id": 5046288
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "TrackSequenceSwitch"
+            ]
+          }
+        },
+        "Sound": {
+          "before": {
+            "name": "Sound",
+            "class_id": 65552,
+            "source_member": "wwiseobject_sound.html",
+            "source_sha256": "b9fcadd4cc0909c0311f72fc4af3aba5238954997adfd527e65e43b37951845a",
+            "lists": [],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          },
+          "after": {
+            "name": "Sound",
+            "class_id": 65552,
+            "source_member": "wwiseobject_sound.html",
+            "source_sha256": "b9fcadd4cc0909c0311f72fc4af3aba5238954997adfd527e65e43b37951845a",
+            "lists": [
+              {
+                "name": "Metadata",
+                "display_name": "Metadata",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "Metadata",
+                    "class_id": 5308432
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          }
+        },
+        "MusicPlaylistContainer": {
+          "before": {
+            "name": "MusicPlaylistContainer",
+            "class_id": 2228240,
+            "source_member": "wwiseobject_musicplaylistcontainer.html",
+            "source_sha256": "977a4e1cd8ce0df4d8af23f52a165756b7658abb058c89d1bde41822132bd9b8",
+            "lists": [],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "MidiTarget",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          },
+          "after": {
+            "name": "MusicPlaylistContainer",
+            "class_id": 2228240,
+            "source_member": "wwiseobject_musicplaylistcontainer.html",
+            "source_sha256": "977a4e1cd8ce0df4d8af23f52a165756b7658abb058c89d1bde41822132bd9b8",
+            "lists": [
+              {
+                "name": "Stingers",
+                "display_name": "Music Stingers",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "MusicStinger",
+                    "class_id": 2490384
+                  }
+                ],
+                "unresolved_element_types": []
+              },
+              {
+                "name": "Metadata",
+                "display_name": "Metadata",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "Metadata",
+                    "class_id": 5308432
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "MidiTarget",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          }
+        },
+        "MusicTrack": {
+          "before": {
+            "name": "MusicTrack",
+            "class_id": 1835024,
+            "source_member": "wwiseobject_musictrack.html",
+            "source_sha256": "a8b9171cf94c4d1ac81b07bf78a4db525a1743375e61708611339b8921e63add",
+            "lists": [],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "DefaultSwitchOrState",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "MidiTarget",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "SwitchGroupOrStateGroup",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          },
+          "after": {
+            "name": "MusicTrack",
+            "class_id": 1835024,
+            "source_member": "wwiseobject_musictrack.html",
+            "source_sha256": "a8b9171cf94c4d1ac81b07bf78a4db525a1743375e61708611339b8921e63add",
+            "lists": [
+              {
+                "name": "Sequences",
+                "display_name": "Music Track Sequences",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "MusicTrackSequence",
+                    "class_id": 3801104
+                  }
+                ],
+                "unresolved_element_types": []
+              },
+              {
+                "name": "Metadata",
+                "display_name": "Metadata",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "Metadata",
+                    "class_id": 5308432
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "DefaultSwitchOrState",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "MidiTarget",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "SwitchGroupOrStateGroup",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          }
+        },
+        "AuxBus": {
+          "before": {
+            "name": "AuxBus",
+            "class_id": 3997712,
+            "source_member": "wwiseobject_auxbus.html",
+            "source_sha256": "8465b4233c9c8462e762f59c5386ece01fe232248b61d851a6104c3db721e1b9",
+            "lists": [],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          },
+          "after": {
+            "name": "AuxBus",
+            "class_id": 3997712,
+            "source_member": "wwiseobject_auxbus.html",
+            "source_sha256": "8465b4233c9c8462e762f59c5386ece01fe232248b61d851a6104c3db721e1b9",
+            "lists": [
+              {
+                "name": "Metadata",
+                "display_name": "Metadata",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "Metadata",
+                    "class_id": 5308432
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          }
+        },
+        "MusicSegment": {
+          "before": {
+            "name": "MusicSegment",
+            "class_id": 1769488,
+            "source_member": "wwiseobject_musicsegment.html",
+            "source_sha256": "190d73c8fabee1baee8ddb9144e37803eb0e75940b63f4b2f68f56bfcee394bb",
+            "lists": [],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "MidiTarget",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          },
+          "after": {
+            "name": "MusicSegment",
+            "class_id": 1769488,
+            "source_member": "wwiseobject_musicsegment.html",
+            "source_sha256": "190d73c8fabee1baee8ddb9144e37803eb0e75940b63f4b2f68f56bfcee394bb",
+            "lists": [
+              {
+                "name": "Cues",
+                "display_name": "Music Cues",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "MusicCue",
+                    "class_id": 3866640
+                  }
+                ],
+                "unresolved_element_types": []
+              },
+              {
+                "name": "Stingers",
+                "display_name": "Music Stingers",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "MusicStinger",
+                    "class_id": 2490384
+                  }
+                ],
+                "unresolved_element_types": []
+              },
+              {
+                "name": "Metadata",
+                "display_name": "Metadata",
+                "declared_kind": "List",
+                "element_classes": [
+                  {
+                    "name": "Metadata",
+                    "class_id": 5308432
+                  }
+                ],
+                "unresolved_element_types": []
+              }
+            ],
+            "scalar_references": [
+              "AttachableMixerInput",
+              "Attenuation",
+              "Conversion",
+              "Effect0",
+              "Effect1",
+              "Effect2",
+              "Effect3",
+              "MidiTarget",
+              "OutputBus",
+              "ReflectionsAuxSend",
+              "UserAuxSend0",
+              "UserAuxSend1",
+              "UserAuxSend2",
+              "UserAuxSend3"
+            ]
+          }
+        }
+      },
+      "owned_lists_metadata_changes": {
+        "coverage": {
+          "before": {
+            "indexed_pages": 96,
+            "extracted_pages": 96,
+            "omissions": [],
+            "inheritance": "explicit published per-type rows only; unlisted inherited/plugin fields remain unresolved",
+            "native_availability": "not inferred from absent source declarations"
+          },
+          "after": {
+            "indexed_pages": 96,
+            "extracted_pages": 96,
+            "omissions": [],
+            "inheritance": "explicit published per-type rows only; unlisted inherited/plugin fields remain unresolved",
+            "native_availability": "not inferred from absent source declarations",
+            "installed_owned_list_declarations": 17
+          }
+        },
+        "source": {
+          "before": {
+            "build": "2021.1.14.8108",
+            "archive": "WwiseSDK-Windows.chm",
+            "archive_sha256": "d3028d059a69a833d5f99646881c9c44e3c7a609db370ad27afa822c94d0d0d3",
+            "index_member": "wobjects_index.html",
+            "index_sha256": "10bec7e4784f5f4ed55ee25ebb3ef791970ef2521d43495620cf67ac1e75950a"
+          },
+          "after": {
+            "build": "2021.1.14.8108",
+            "archive": "WwiseSDK-Windows.chm",
+            "archive_sha256": "d3028d059a69a833d5f99646881c9c44e3c7a609db370ad27afa822c94d0d0d3",
+            "index_member": "wobjects_index.html",
+            "index_sha256": "10bec7e4784f5f4ed55ee25ebb3ef791970ef2521d43495620cf67ac1e75950a",
+            "installed_owned_lists": {
+              "sha256": "bdbc5b33059de0b86bb8f1fd8b791a8dd738a03546e241fa4a9e7f6b222e4e6b",
+              "source": {
+                "kind": "installed_WObjects_xml",
+                "file": "WObjects/WObjects.xml",
+                "sha256": "6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d",
+                "snapshot_sha256": "b113f5511fa87c21679b99ab46197a7731203b0012d3b8e0052e195fea2e6978"
+              },
+              "rows": [
+                {
+                  "owner": "Bus",
+                  "owner_class_id": 1376272,
+                  "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+                  "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Metadata",
+                    "display_name": "Metadata",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "Metadata",
+                        "class_id": 5308432
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "AuxBus",
+                  "owner_class_id": 3997712,
+                  "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+                  "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Metadata",
+                    "display_name": "Metadata",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "Metadata",
+                        "class_id": 5308432
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "Sound",
+                  "owner_class_id": 65552,
+                  "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+                  "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Metadata",
+                    "display_name": "Metadata",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "Metadata",
+                        "class_id": 5308432
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "ActorMixer",
+                  "owner_class_id": 524304,
+                  "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+                  "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Metadata",
+                    "display_name": "Metadata",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "Metadata",
+                        "class_id": 5308432
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "RandomSequenceContainer",
+                  "owner_class_id": 589840,
+                  "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+                  "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Metadata",
+                    "display_name": "Metadata",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "Metadata",
+                        "class_id": 5308432
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "SwitchContainer",
+                  "owner_class_id": 655376,
+                  "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+                  "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Metadata",
+                    "display_name": "Metadata",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "Metadata",
+                        "class_id": 5308432
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "BlendContainer",
+                  "owner_class_id": 1900560,
+                  "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+                  "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Metadata",
+                    "display_name": "Metadata",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "Metadata",
+                        "class_id": 5308432
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "MusicPlaylistContainer",
+                  "owner_class_id": 2228240,
+                  "source_member": "WObjects/WObjects.xml#WwiseObject[MusicPlaylistContainer]/ObjectLists/ObjectList[Stingers]",
+                  "declaration_xml": "<ObjectList Name=\"Stingers\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Stingers\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicStinger\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Stingers",
+                    "display_name": "Music Stingers",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "MusicStinger",
+                        "class_id": 2490384
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "MusicPlaylistContainer",
+                  "owner_class_id": 2228240,
+                  "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+                  "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Metadata",
+                    "display_name": "Metadata",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "Metadata",
+                        "class_id": 5308432
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "MusicSwitchContainer",
+                  "owner_class_id": 2293776,
+                  "source_member": "WObjects/WObjects.xml#WwiseObject[MusicSwitchContainer]/ObjectLists/ObjectList[Stingers]",
+                  "declaration_xml": "<ObjectList Name=\"Stingers\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Stingers\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicStinger\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Stingers",
+                    "display_name": "Music Stingers",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "MusicStinger",
+                        "class_id": 2490384
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "MusicSwitchContainer",
+                  "owner_class_id": 2293776,
+                  "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+                  "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Metadata",
+                    "display_name": "Metadata",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "Metadata",
+                        "class_id": 5308432
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "MusicSegment",
+                  "owner_class_id": 1769488,
+                  "source_member": "WObjects/WObjects.xml#WwiseObject[MusicSegment]/ObjectLists/ObjectList[Cues]",
+                  "declaration_xml": "<ObjectList Name=\"Cues\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Cues\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicCue\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n      ",
+                  "field": {
+                    "name": "Cues",
+                    "display_name": "Music Cues",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "MusicCue",
+                        "class_id": 3866640
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "MusicSegment",
+                  "owner_class_id": 1769488,
+                  "source_member": "WObjects/WObjects.xml#WwiseObject[MusicSegment]/ObjectLists/ObjectList[Stingers]",
+                  "declaration_xml": "<ObjectList Name=\"Stingers\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Stingers\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicStinger\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Stingers",
+                    "display_name": "Music Stingers",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "MusicStinger",
+                        "class_id": 2490384
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "MusicSegment",
+                  "owner_class_id": 1769488,
+                  "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+                  "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Metadata",
+                    "display_name": "Metadata",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "Metadata",
+                        "class_id": 5308432
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "MusicTrack",
+                  "owner_class_id": 1835024,
+                  "source_member": "WObjects/WObjects.xml#WwiseObject[MusicTrack]/ObjectLists/ObjectList[Sequences]",
+                  "declaration_xml": "<ObjectList Name=\"Sequences\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Track Sequences\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicTrackSequence\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Sequences",
+                    "display_name": "Music Track Sequences",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "MusicTrackSequence",
+                        "class_id": 3801104
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "MusicTrack",
+                  "owner_class_id": 1835024,
+                  "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+                  "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Metadata",
+                    "display_name": "Metadata",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "Metadata",
+                        "class_id": 5308432
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                },
+                {
+                  "owner": "MusicTrackSequence",
+                  "owner_class_id": 3801104,
+                  "source_member": "WObjects/WObjects.xml#WwiseObject[MusicTrackSequence]/ObjectLists/ObjectList[Clips]",
+                  "declaration_xml": "<ObjectList Name=\"Clips\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Clips\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicClip\" />\n            <Type Name=\"MusicClipMidi\" />\n            <Type Name=\"MusicEventCue\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+                  "field": {
+                    "name": "Clips",
+                    "display_name": "Music Clips",
+                    "declared_kind": "List",
+                    "element_classes": [
+                      {
+                        "name": "MusicClip",
+                        "class_id": 3932176
+                      },
+                      {
+                        "name": "MusicClipMidi",
+                        "class_id": 4063248
+                      },
+                      {
+                        "name": "MusicEventCue",
+                        "class_id": 5046288
+                      }
+                    ],
+                    "unresolved_element_types": []
+                  }
+                }
+              ],
+              "limits": "List membership source only; live selected class, constructor prerequisites and verifier remain authoritative. Metadata List declaration does not authorize donor-free selected 2021 AudioDevice/Metadata plugin class birth. No object.set/recursive list or native-effect claim."
+            }
+          }
+        },
+        "catalog_sha256": {
+          "before": "49230aad15a8589b2ce219aad5602baefba785daf44593172b29100a4fe5900b",
+          "after": "14a085c964633ede0307679460b9973701a1b7188a7cb1ba8af7118da84de1eb"
+        }
+      }
+    },
+    "2022.1": {
+      "parent_choices": {
+        "ControlSurfaceSession": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "ControlSurfaceBindingGroup"
+            ]
+          }
+        },
+        "Query": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "SearchCriteria"
+            ]
+          }
+        },
+        "ControlSurfaceBindingGroup": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "ControlSurfaceBinding",
+              "ControlSurfaceBindingGroup"
+            ]
+          }
+        }
+      }
+    },
+    "2023.1": {
+      "parent_choices": {
+        "ControlSurfaceSession": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "ControlSurfaceBindingGroup"
+            ]
+          }
+        },
+        "Query": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "SearchCriteria"
+            ]
+          }
+        },
+        "ControlSurfaceBindingGroup": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "ControlSurfaceBinding",
+              "ControlSurfaceBindingGroup"
+            ]
+          }
+        }
+      }
+    },
+    "2024.1": {
+      "parent_choices": {
+        "ControlSurfaceSession": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "ControlSurfaceBindingGroup"
+            ]
+          }
+        },
+        "Query": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "SearchCriteria"
+            ]
+          }
+        },
+        "ControlSurfaceBindingGroup": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "ControlSurfaceBinding",
+              "ControlSurfaceBindingGroup"
+            ]
+          }
+        }
+      }
+    },
+    "2025.1": {
+      "parent_choices": {
+        "ControlSurfaceSession": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "ControlSurfaceBindingGroup"
+            ]
+          }
+        },
+        "Query": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "SearchCriteria"
+            ]
+          }
+        },
+        "ControlSurfaceBindingGroup": {
+          "before": null,
+          "after": {
+            "allowed_children": [
+              "ControlSurfaceBinding",
+              "ControlSurfaceBindingGroup"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "review_provenance": {
+    "original_roster_commit": "9c00a5b68655b000265e764b7dfce31b544f75b9",
+    "runtime_candidate": "d3f8fb5c87ebf76b45c4c650b721cb4883326d68",
+    "source_seals": {
+      "skills/waapi-skill/wwise_waapi/object_capabilities.py": "00659f9b2a51bfe8f058010a9077f57c5c0bb2a0c58168cf3ebb3648dcc6d509",
+      "skills/waapi-skill/wwise_waapi/documented_list_fields.py": "ac7a5155d51874f85498c470dab71fc4d2a9cd1de7e611d7b480c767055257c2",
+      "skills/waapi-skill/resources/metadata/2021.1/installed-owned-list-fields.json": "bdbc5b33059de0b86bb8f1fd8b791a8dd738a03546e241fa4a9e7f6b222e4e6b",
+      "skills/waapi-skill/resources/metadata/saved-object-constructor-sources.json": "14c4b6c51c097ed9754f62b598332ba6c0ad4745d66986fbfe77511c5d4433b1",
+      "skills/waapi-skill/resources/metadata/control-surface-constructor-sources.json": "a0839b455f66074a418ebd178bf6cf4823396970b95acad5f7013cb5132e1e02"
+    },
+    "parent_choices": {
+      "Query": {
+        "commit": "b07b7b007fd681d7a83508b5f5af4cfefc5bb5e0",
+        "finding": "Query parent allows SearchCriteria in the capability table in every lane, independently of the source-disclosed 2021/2022 construction prohibition and matching saved criterion/name contract. This roster records table correspondence, not unconditional constructor permission."
+      },
+      "ControlSurface": {
+        "commit": "1076c0bb58ef20da94f669252094d30ffd2f33ba",
+        "finding": "Session/BindingGroup table entries are finite placement candidates. Live role2-under3 and Binding-under0/2/4 guards remain authoritative; reserved roles/hardware effects remain disclosed boundaries. Copy/move authority is not granted."
+      }
+    },
+    "owned_lists": {
+      "commit": "7db66d3e57f37272c8328c5a4fd3ca8b73572e5a",
+      "finding": "2021 load_catalog now composes 17 exact installed WObjects owner/List declarations into 12 existing class rows. Original HTML class/source/scalar-reference rows remain intact. Source+coverage record the retained XML overlay and the composed catalog digest changes. This is root object.create List correspondence; no object.set lane or donor-free AudioDevice/Metadata birth is inferred."
+    },
+    "preservation": "All class_inputs/plugin_inputs and every other parent/List/member/source/version remain under the original complete roster hashes after reversing only these exact deltas. User-approved limits and existing known methods are unchanged."
+  }
+}

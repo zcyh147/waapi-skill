@@ -253,18 +253,24 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "versions": _ALL_VERSIONS,
         "roles": ("game_parameter",),
         "required_fields": ("game_parameter_handle", "value"),
-        "required_fields_by_version": {
-            "2021.1": ("game_parameter_handle", "value", "game_object_handle"),
-            "2022.1": ("game_parameter_handle", "value", "game_object_handle"),
+        "optional_fields": ("game_object_handle", "global_scope"),
+        "constraints": {
+            "at_most_one_of": [["game_object_handle", "global_scope"]],
+            "scope_meanings": {
+                "global_scope": "all_game_objects_without_an_object_override",
+                "game_object_handle": "one_registered_game_object",
+                "omission": "transport_game_object_only_when_native_default_exists",
+            },
+            "scope_required_versions": ["2021.1", "2022.1"],
         },
-        "optional_fields": ("game_object_handle",),
-        "optional_fields_by_version": {"2021.1": (), "2022.1": ()},
         "field_types": {
+            "global_scope": "explicit_boolean_intent",
             "game_parameter_handle": "bound_game_parameter_handle",
             "value": "finite_game_parameter_value",
             "game_object_handle": "gateway_runtime_game_object_handle",
         },
         "input_forms": {
+            "global_scope": {"flag": "--global-scope", "repeatable": False},
             "game_parameter_handle": {
                 "flag": "--game-parameter-handle",
                 "repeatable": False,
@@ -280,17 +286,23 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "versions": _ALL_VERSIONS,
         "roles": ("game_parameter",),
         "required_fields": ("game_parameter_handle",),
-        "required_fields_by_version": {
-            "2021.1": ("game_parameter_handle", "game_object_handle"),
-            "2022.1": ("game_parameter_handle", "game_object_handle"),
+        "optional_fields": ("game_object_handle", "global_scope"),
+        "constraints": {
+            "at_most_one_of": [["game_object_handle", "global_scope"]],
+            "scope_meanings": {
+                "global_scope": "all_game_objects_without_an_object_override",
+                "game_object_handle": "one_registered_game_object",
+                "omission": "transport_game_object_only_when_native_default_exists",
+            },
+            "scope_required_versions": ["2021.1", "2022.1"],
         },
-        "optional_fields": ("game_object_handle",),
-        "optional_fields_by_version": {"2021.1": (), "2022.1": ()},
         "field_types": {
+            "global_scope": "explicit_boolean_intent",
             "game_parameter_handle": "bound_game_parameter_handle",
             "game_object_handle": "gateway_runtime_game_object_handle",
         },
         "input_forms": {
+            "global_scope": {"flag": "--global-scope", "repeatable": False},
             "game_parameter_handle": {
                 "flag": "--game-parameter-handle",
                 "repeatable": False,
@@ -398,16 +410,18 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "versions": _ALL_VERSIONS,
         "required_fields": (
             "game_object_handle",
-            "position_frames",
             "multi_position_mode",
         ),
-        "optional_fields": (),
+        "optional_fields": ("position_frames", "clear_positions"),
+        "constraints": {"exactly_one_of": [["position_frames", "clear_positions"]]},
         "field_types": {
+            "clear_positions": "explicit_boolean_intent",
             "game_object_handle": "gateway_runtime_game_object_handle",
             "position_frames": "bounded_position_front_top_frame_list",
             "multi_position_mode": "wwise_multi_position_type_name",
         },
         "input_forms": {
+            "clear_positions": {"flag": "--clear-positions", "repeatable": False},
             "game_object_handle": {
                 "flag": "--game-object-handle",
                 "repeatable": False,
@@ -475,17 +489,24 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
     },
     SET_OUTPUT_BUS_VOLUME_URI: {
         "versions": _ALL_VERSIONS,
-        "required_fields": ("emitter_handle", "listener_handle", "volume_db"),
-        "optional_fields": (),
+        "required_fields": ("emitter_handle",),
+        "optional_fields": ("listener_handle", "all_listeners", "volume_db", "volume_percent"),
+        "constraints": {"exactly_one_of": [
+            ["listener_handle", "all_listeners"], ["volume_db", "volume_percent"],
+        ]},
         "field_types": {
+            "all_listeners": "explicit_boolean_intent",
+            "volume_percent": "percentage_0_through_1600",
             "emitter_handle": "gateway_runtime_game_object_handle",
             "listener_handle": "gateway_runtime_game_object_handle",
-            "volume_db": "finite_decibels",
+            "volume_db": "finite_decibels_with_gain_at_most_1600_percent",
         },
         "input_forms": {
+            "all_listeners": {"flag": "--all-listeners", "repeatable": False},
+            "volume_percent": {"flag": "--volume-percent", "repeatable": False, "minimum": 0, "maximum": 1600},
             "emitter_handle": {"flag": "--emitter-handle", "repeatable": False},
             "listener_handle": {"flag": "--listener-handle", "repeatable": False},
-            "volume_db": {"flag": "--volume-db", "repeatable": False},
+            "volume_db": {"flag": "--volume-db", "repeatable": False, "maximum": 24.082399653118497},
         },
     },
     SET_LISTENER_SPATIALIZATION_URI: {
@@ -577,10 +598,11 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "roles": ("aux_bus",),
         "optional_roles": ("aux_bus",),
         "required_fields": ("emitter_handle",),
-        "optional_fields": ("aux_sends", "clear_aux_sends"),
+        "optional_fields": ("aux_sends", "aux_sends_all_listeners", "clear_aux_sends"),
         "field_types": {
             "emitter_handle": "gateway_runtime_game_object_handle",
             "aux_sends": "bounded_listener_aux_bus_percentage_rows",
+            "aux_sends_all_listeners": "bounded_aux_bus_percentage_rows_for_all_connected_listeners",
             "clear_aux_sends": "explicit_boolean_intent",
         },
         "input_forms": {
@@ -591,6 +613,10 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
                 "arity": 3,
                 "order": ["listener_handle", "bound_aux_bus_handle", "send_percent"],
             },
+            "aux_sends_all_listeners": {
+                "flag": "--aux-send-all-listeners", "repeatable": True, "arity": 2,
+                "order": ["bound_aux_bus_handle", "send_percent"],
+            },
             "clear_aux_sends": {
                 "flag": "--clear-aux-sends",
                 "repeatable": False,
@@ -599,7 +625,8 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "constraints": {
             "row_count": "1_through_4",
             "aux_bus_role_cardinality": "bind_1_through_4_before_declaration",
-            "exactly_one_of": [["aux_sends", "clear_aux_sends"]],
+            "rows_or_clear": "one_or_both_row_forms_or_explicit_clear; combined_row_count_1_through_4",
+            "send_percent": "0_through_1600; zero_is_silence; above_100_amplifies",
         },
     },
     STOP_PLAYING_ID_URI: {
@@ -642,12 +669,15 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
     },
     UNREGISTER_GAME_OBJECT_URI: {
         "versions": _ALL_VERSIONS,
-        "required_fields": ("game_object_handle",),
-        "optional_fields": (),
+        "required_fields": (),
+        "optional_fields": ("game_object_handle", "all_game_objects"),
+        "constraints": {"exactly_one_of": [["game_object_handle", "all_game_objects"]]},
         "field_types": {
+            "all_game_objects": "explicit_boolean_intent",
             "game_object_handle": "gateway_runtime_game_object_handle",
         },
         "input_forms": {
+            "all_game_objects": {"flag": "--all-game-objects", "repeatable": False},
             "game_object_handle": {
                 "flag": "--game-object-handle",
                 "repeatable": False,
@@ -658,7 +688,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "versions": ("2022.1", "2023.1", "2024.1", "2025.1"),
         "execution_shape": "bounded_read",
         "required_fields": ("state_group_id",),
-        "optional_fields": (),
+        "optional_fields": ("outputs", "platform", "language", "fields", "override_source_values", "local_references"),
         "field_types": {"state_group_id": "exact_state_group_guid"},
         "input_forms": {
             "state_group_id": {"flag": "--state-group-id", "repeatable": False},
@@ -671,8 +701,8 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "required_fields_by_version": {
             "2022.1": ("switch_group_id", "game_object_handle"),
         },
-        "optional_fields": ("game_object_handle",),
-        "optional_fields_by_version": {"2022.1": ()},
+        "optional_fields": ("game_object_handle", "outputs", "platform", "language", "fields", "override_source_values", "local_references"),
+        "optional_fields_by_version": {"2022.1": ("outputs", "platform", "language", "fields", "override_source_values", "local_references")},
         "field_types": {
             "switch_group_id": "exact_switch_group_guid",
             "game_object_handle": "gateway_runtime_game_object_handle",
@@ -763,6 +793,22 @@ def soundengine_control_business_contract_data(
             row["optional_fields"],
         )
     )
+    if row.get("execution_shape") == "bounded_read":
+        from .soundengine_object_returns import soundengine_object_return_contract, SOUNDENGINE_FIELD_INPUTS
+        row = {**row, "field_types": {**row["field_types"], "outputs": "closed_object_output_list",
+            "platform": "literal_name_or_guid", "language": "literal_name_or_guid",
+            **{name: "live_class_bound_field_meanings" for name, _, _ in SOUNDENGINE_FIELD_INPUTS}},
+            "input_forms": {**row["input_forms"], "outputs": {"flag": "--include", "repeatable": True},
+                "platform": {"flag": "--platform", "repeatable": False},
+                "language": {"flag": "--language", "repeatable": False},
+                **{name: {"flag": mode.option, "repeatable": True} for name, _, mode in SOUNDENGINE_FIELD_INPUTS}},
+            "constraints": soundengine_object_return_contract(version)}
+    if row.get("execution_shape") == "bounded_read":
+        from .soundengine_related_outputs import RELATED_INPUTS, soundengine_related_contract
+        optional_fields = (*optional_fields, *(name for name, _, _ in RELATED_INPUTS))
+        row = {**row, "field_types": {**row["field_types"], **{name: "closed_related_output_declarations" for name, _, _ in RELATED_INPUTS}},
+            "input_forms": {**row["input_forms"], **{name: {"flag": option, "repeatable": True} for name, _, option in RELATED_INPUTS}},
+            "constraints": {**row["constraints"], "related_outputs": soundengine_related_contract(version)}}
     exposed_fields = set(required_fields) | set(optional_fields)
     roles = tuple(row.get("roles", ()))
     optional_roles = set(row.get("optional_roles", ()))
@@ -846,12 +892,24 @@ def soundengine_control_business_contract_data(
             "continuation",
         ],
         "legacy_typed_call_public": False,
+        **({"effect_verification": {
+            "mode": "independent_runtime_getter_for_bound_scope" if version != "2021.1" else "unresolved_matching_waapi_observer",
+            "state": "Compare the independently observed State GUID in the exact bound State Group",
+            "switch": "Compare the independently observed Switch GUID for the exact bound Switch Group and registered game-object generation",
+            "observation_delay_seconds": 0.01,
+            "write_retry": False,
+            "unresolved_scopes": (["2021.1 matching WAAPI observer; native SDK Query::GetState/GetSwitch remain possible investigation leads"]
+                if version == "2021.1" else ["Switch setter's omitted transport-game-object scope is not proved equivalent to getter omission"]
+                if operation == SET_SWITCH_URI and version in {"2023.1", "2024.1", "2025.1"} else []),
+        }} if operation in {SET_STATE_URI, SET_SWITCH_URI} else {}),
         "safety": {
             "preview": "not_applicable_read_only" if bounded_read else "immutable_before_execution",
             "authorization": "not_required_read_only" if bounded_read else "normal_transaction_policy",
             "automatic_retry": False,
             "lifecycle_cleanup": "packaged_when_operation_has_companion",
             "native_request_input": "forbidden",
+            "runtime_authority": "exact_gateway_generation; consumed_after_durable_execution_start_before_stop_or_unregister_dispatch",
+            "native_resource_observation": "not_attested_by_gateway_lifecycle; independent_native_effect_verification_remains_required",
         },
     }
 

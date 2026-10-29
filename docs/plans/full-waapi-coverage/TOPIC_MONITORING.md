@@ -1,0 +1,272 @@
+# Topic monitoring implementation and required native proof (#187)
+
+This is a partial implementation checkpoint, not completion of #187 or #174.
+The independent native denominator remains
+`docs/branch-coverage-inventory.native-obligations.json.gz`. Its original route,
+pointer, shape, owner and required-evidence identities remain authoritative;
+this document grants no native, Fresh, family or descendant acceptance credit.
+
+## Native comparison
+
+Compare `resources/native-catalog/<version>/wwise-console.json` and
+`wwise-authoring.json` under the packaged Skill, including their exact-build
+provenance, definitions and schema source seals. The existing
+`host-schema-parity.json` records shared-schema equality as reflection only.
+
+| Release | Captured build | Console Topics | Authoring Topics | Public union |
+| --- | --- | ---: | ---: | ---: |
+| 2021.1 | 2021.1.14.8108 | 27 | 27 | 27 |
+| 2022.1 | 2022.1.19.8584 | 32 | 32 | 32 |
+| 2023.1 | 2023.1.19.8928 | 32 | 32 | 32 |
+| 2024.1 | 2024.1.13.9056 | 30 | 34 | 34 |
+| 2025.1 | 2025.1.7.9143 | 31 | 35 | 35 |
+
+The public `topic-schema` union matches all captured Topic URI lists. That is
+discovery evidence, not delivery evidence. The fixed `ui.signal.click/toggle`
+URIs are absent from the captured 2021–2023 Authoring lists; this establishes
+only those exact URI/build observations, not absence of a business alternative.
+
+Subscription options compile through `topic_options_contract`; the recursive
+optional event predicate compiles through `topic_match_contract` and the closed
+business facts/row/exact-entry interface. `topic-schema` discloses the matching
+semantics: object subset, positional arrays of exact length, JSON scalar
+equality with distinct booleans, and separately counted duplicate callbacks.
+No native args/options or arbitrary publisher is introduced.
+
+Delivered events resolve reachable local, external and recursive definitions
+against the pinned version graph before filtering. Unknown references fail
+closed. Definition/type/range/union validity and subscription acknowledgement
+are separate from actual matching delivery and cleanup.
+
+The 2021 `ak.wwise.core.soundbank.generated` source contains legacy properties
+outside the `properties` wrapper. Construction and event validation now use the
+inventory's existing exact `_is_legacy_implicit_property` parser and approved
+`LEGACY_2021_SOUNDBANK_IMPLICIT_PROPERTY_PATHS`. Original native resources and
+pointers remain unchanged. Ten actual implicit members plus their reachable
+children expand the business row catalog from five to eighteen collections:
+media lists, GameParameters, AuxBusses, State/States, Switch/Switches, Triggers,
+and IncludedEvents' media/SwitchContainers/Media. The two additional paths in
+the twelve-path inventory allowlist are already wrapped; they are preserved.
+Native publication and comparison semantics for these rows remain required proof.
+
+Wait and stream monitoring now fail on queue loss, invalid strict JSON and
+schema mismatch; filtering does not conceal a malformed received event. Both
+retain cleanup evidence. `monitoring_outcome.target_completed` requires the
+requested count and successful monitoring/cleanup. A duration or idle stop
+before the count reports `stopped`; a partial wait timeout retains its matching
+count. Event limits, existing total/idle deadlines and bounded output remain
+Skill policy, not claims about native limits.
+
+## Exact 2025 Notes-shape question and controlled probe
+
+Owned native route identities:
+
+- `2025.1|wwise-console|2025.1.7.9143|topic|ak.wwise.core.object.structureChanged`
+- `2025.1|wwise-authoring|2025.1.7.9143|topic|ak.wwise.core.object.structureChanged`
+
+The source pointer is
+`/publishSchema/properties/objects/items/properties/changes/items/properties/notesChange`.
+Its `properties` declare `oldName/newName`, its `required` array instead declares
+`oldNotes/newNotes`, and `additionalProperties` is the string `"false"`.
+The recognized six string-false source paths are retained without inventing a
+Boolean normalization or silently renaming fields. Determine the emitted field
+names, types and required presence on the matching native build before changing
+the closed contract or claiming native schema correctness.
+
+One owned Console `2025.1.7.9143` diagnostic at frozen `8f7d4432` received a
+matching Notes event containing exactly `oldNotes/newNotes`, with the requested
+`topic-notes-before` and `topic-notes-after` strings. The unchanged validator
+accepted the event. This packet needs no field renaming or Boolean normalization
+to traverse the current contract; it does not establish every native shape or
+Authoring-host equivalence. The run failed final transport cleanup:
+`transport.close` timed out after 10.060 seconds, so no delivery PASS follows.
+Create and setNotes executed and verified; the collector's later independent
+Notes readback and object deletion were not reached. The final lifecycle row is
+FAIL, with unchanged source hash/mtime/tree, clean owned-process shutdown and a
+quarantined sandbox. The retained attempt is
+`.waapi-skill-state/full-coverage/r59-topic-notes-8f7d4432-2025-r1/` in the frozen
+diagnostic worktree; its `pytest/gateway-workflows-2025-10/state/structure-changed-notes-diagnostic.json`
+receipt SHA-256 is `afcad0344925f729dfcfb156f334c9b2fdfe00d9064c5393927ce93b87975747`.
+
+The procedure below remains the minimal shape probe. Any further native
+session requires separate authorization, sequential execution and the existing
+isolated sandbox lifecycle/public Gateway path. Preserve the failed attempt
+above without replay.
+
+1. Attest an owned disposable SampleProject copy, its source hash/mtime,
+   configured connection, actual `getInfo` host/version/build/session and
+   Gateway candidate. Never open a committed source or user project. Set the
+   isolated config through `config-set`; preserve its modification policy.
+2. Create one disposable ActorMixer through its closed operation, with Notes
+   `topic-notes-before`. Verify the exact GUID/name/type/path/notes through the
+   simple exact-ID read. Prepare a separate immutable `object.setNotes` Preview
+   changing only that GUID's Notes to `topic-notes-after`. Use
+   `operation-schema object.setNotes` and copy its generated Draft/authorization
+   continuations; observation itself authorizes no write.
+3. Read `topic-schema ak.wwise.core.object.structureChanged`. Copy its digest
+   into `stream-topic`, with global `--timeout 10`, explicit `--event-count 1`,
+   and `--topic-option include` repeated for `id`, `name`, `type`, `path`,
+   `notes`. Omit the native optional
+   `includeLoadedAndUnloadedNestedObjects` option. The resulting subscription
+   options are Gateway-built `return` for those five fields. Do not supply an
+   event filter on the disputed fields or synthesize a raw subscription.
+4. Wait for the public flushed `started` record, which proves subscription
+   setup only. Execute the separately authorized Notes Preview at most once.
+   With no concurrent sandbox edits, inspect the sole event for the tracked
+   GUID and `changes[].type == "notesChange"`; distinguish `oldNotes/newNotes`,
+   `oldName/newName`, both, or another shape, with exact before/after strings.
+   If schema validation fails, retain `TOPIC_EVENT_SCHEMA_MISMATCH` and its
+   small exact `details.event_diagnostic.json` instead of accepting the event.
+   This diagnostic is bounded to 2048 UTF-8 bytes; `complete=false` requires
+   a separately reviewed evidence-capture extension, not guessed fields.
+5. Independently verify the GUID's Notes equals `topic-notes-after`, retain the
+   terminal count/reason/unsubscribe result and prove no subscription remains.
+   Delete the owned object through a separately authorized Preview and exact
+   absence readback. Prove source immutability and owned-process cleanup.
+   Quarantine failed/indeterminate evidence and never replay the Notes write.
+
+This is a minimal owned trigger specification, not a second harness. The older
+`versioned_object_topics_sandbox.py` direct-client smoke does not establish the
+new public Gateway contract or this Notes variant. The future runner must use
+the established lifecycle plus public Gateway producer/observer, retain the
+original received packet or bounded diagnostic and compare its exact source
+seal. #195 owns scheduling and native acceptance; #187 owns the Topic shape fix
+after that observation.
+
+The diagnostic producer is now implemented as the explicitly selected
+`test_structure_changed_notes_shape_diagnostic` node in
+`tests/destructive/test_gateway_workflow_transaction_matrix.py`, limited to
+Console `2025.1.7.9143` in its existing private sandbox lifecycle. It confirms
+the immutable Notes Preview before observation, then executes it once from the
+public stream's post-subscription `started` sink through an independent packaged
+Gateway CLI producer process. Execute and verify reuse the same private
+configuration and sealed transaction state. This isolates the observer from
+waapi-client's process-global txaio loop, which nested same-process clients can
+replace and close. The existing bounded process-group helper owns producer
+termination/reap; no client/library patch is introduced. The receipt preserves exact
+public records or the complete bounded schema-mismatch diagnostic, independent
+Notes readback and verified object cleanup; final source/process/quarantine
+acceptance still belongs to the existing v3 finalizer. A schema mismatch stays
+a failed diagnostic attempt, even when its exact packet is collected. No
+additional native run or native branch acceptance follows from the injected
+controls, and no Authoring-host equivalence is claimed. The failed native packet
+above is a separate observation, not acceptance of this successor producer.
+
+The later clean Console diagnostic at `796f16ca` received the same fixed
+`oldNotes/newNotes` string shape, completed unsubscribe and independent Notes
+readback, verified owned-object absence, and finalized with unchanged source
+hash/mtime/tree, clean process shutdown and sandbox deletion. Its receipt
+SHA-256 is `1fcf0cda348987c74bc2faf76c775f89c41c28256cf013caf4ee6ee3980f4b5e`;
+the final category stream SHA-256 is
+`cb2c35a8a88157a6a313e7704a378a7ef6dc3dd68210547f635e3ddc93b82be4`.
+That observation was unfiltered and grants no filtered-predicate or Authoring
+acceptance.
+
+### Closed Notes predicate compatibility (#187, parent #174)
+
+`topic_compatibility.py` provides an explicit public-only view consumed by Topic
+match construction and resolved delivered-event validation. Canonical native
+inventory walkers and shared definition resolution keep their existing view.
+For the exact 2025.1 `structureChanged` schema, both independently sealed host
+catalogs and the original schema digest are checked before adding only the fixed
+string members `oldNotes/newNotes`. The existing `oldName/newName` members and
+literal string-false annotations remain intact. Raw catalogs, native digests and
+original native branch IDs are not changed. A changed source requires review.
+
+The public `objects-changes` row now discloses
+`notes-change-old-notes` and `notes-change-new-notes`; the changed contract digest
+rejects old continuations. The two separate semantic mappings and their exact
+source/observation provenance are retained in
+`resources/semantic/2025.1/structure-changed-notes-compatibility.json`, with
+program/native requirements still explicit. The mapping grants no generated
+branch acceptance. Authoring construction uses its own matching reflection;
+Authoring publication, filtering and cleanup still require separate native proof.
+
+The distinct opt-in node `test_structure_changed_notes_filtered_diagnostic`
+uses both disclosed fields and their current digest through the existing
+closed row interface and producer/sandbox lifecycle. It retains a separate
+`structure-changed-notes-filtered-diagnostic.json` receipt. The default
+unfiltered diagnostic remains unchanged. The retained successor
+`e89d2f7f5a9c12cc76a9f6c3f38b800d40ad07df` then passed the exact filtered
+Console2025 case in 7.45s: one matching event carried the requested
+oldNotes/newNotes strings, unsubscribe succeeded, independent Notes readback
+and owned-object absence verified, source files were preserved and the sandbox
+was deleted. Its original receipt SHA-256 is
+`3591b63daeb13db92108a6be74c34ee1b8757d3f2c0741cf89688f3caeb61c8e`;
+final category SHA-256 is
+`38b02e7cb4f19859c02a27b034b3fc32ea3e9285ae07ad901f5dc27fcec7c2ea`.
+This is scoped Console delivery/filter/count/cleanup proof, not Authoring,
+other-version or generated-branch acceptance. The semantic resource's original
+requirements and native identities remain unchanged pending #195 reconciliation;
+the earlier failed attempt remains FAIL. No new Notes probe or Fresh run follows.
+Classic `object.notesChanged` remains a five-version monitoring alternative;
+it does not replace the 2025 undo-batched `structureChanged` semantics.
+
+## Exact 2021 recursive SoundBank question
+
+Both captured `2021.1.14.8108` host routes for
+`ak.wwise.core.soundbank.generated` retain the legacy reference
+`soundBankInfoSwitchContainer` at
+`/publishSchema/properties/bankInfo/items/properties/IncludedEvents/items/SwitchContainers/items/properties/Children/items`.
+The matching `id` is attached to the `SwitchContainers` array, so resolving the
+captured reference requires each `Children` element to be an array, rather than
+directly the SwitchContainer object described by the surrounding source text.
+The original raw pointer is retained here; the runtime implicit-property
+projection inserts its normal `properties` wrapper without changing native IDs.
+
+The closed business row walker now descends array-valued items and permits
+recursive schemas only with progress through another array level. The existing
+`--event-row` collection and indices carry every list position: a 2021
+Children step has two indices, while the independently pinned 2022–2025
+object-recursive Children step has one. The existing empty-row action can select
+an inner empty list. No reference, native source ID or publish schema is rewritten.
+
+The catalog discloses the existing schema-depth ceiling 16 and array-item
+ceiling 256; only disclosed paths can be constructed. Unknown/deeper paths,
+wrong index arity, out-of-bound indices and unknown fields fail before monitoring.
+Public injected-client controls prove literal two-level 2021 array-of-arrays
+construction, modern object recursion, empty inner lists and rejection of the
+prose-intended direct-object 2021 shape. These are construction/validation and
+cleanup controls, not native publication proof or a claim of unrestricted depth.
+No native shape experiment is required by this code fix; later representative
+event evidence uses the existing owned build/subscription mechanism and current
+test-selection policy, without a per-recursion/shape quota.
+
+## Remaining delivery obligations and dependencies
+
+- Real events and unsubscribe/resource cleanup remain required for object
+  mutations (including the Notes contradiction), imported object arrays,
+  version-specific SoundBank nested rows, log entries, runtime/profiler and
+  transport events, project lifecycle, command/selection and frontend signals.
+  Reflection equality permits no automatic host/version behavioral credit.
+- #189 owns model/WAFM/window resource lifetimes and the closed signal-emission
+  trigger. Signal observation consumes its active model/parent receipts via
+  `--signal-model` and `--signal-widget`, bound to the same exact configuration,
+  host/build/session/project. Native options and exact callback identity filters
+  are derived; copied native ID facts are rejected. Any owned widget can receive
+  either fixed Topic: producer descriptions do not prove receiver restrictions.
+  The reviewed safety projection now includes the Authoring profile's fixed
+  Topics while the emitter remains separately authorization-gated and unknown
+  Topics remain unreviewed. For a monitor without total duration, the scope's
+  project read has a separate disclosed ten-second setup budget; the monitor
+  retains its original count/idle policy. Native signal delivery still depends on #189's
+  owned resource/trigger workflow; fake callbacks grant no native credit.
+- Native alternatives not yet exercised retain their exact original #187
+  owner and evidence obligations. New scoped tests prove only their selected
+  public construction/validation behavior; they do not complete the 115,676
+  original #187 native obligations or update their evidence states.
+- #194 retains separate Fresh/Broker/archive routing acceptance, and no Fresh
+  expense is authorized. Program and Non-live gates run centrally after the
+  combined candidate's source seals are reconciled.
+
+## Console log publication build boundary (WG-80630)
+
+The matching build9143 SDK 2025.1.4 release note establishes Console
+`ak.wwise.core.log.itemAdded` publication and `log.get` contents from 2025.1.4.
+The runtime log observation policy owns this exact host/build condition for
+#186/#187: pinned older Console builds return a native observation boundary
+before subscribing; missing build facts cannot claim support. Authoring stays
+available on its reflected lanes. The Topic remains cataloged with its original
+schema and counts; schema presence does not prove publication. Historical R98
+and R121 zero-event failures are retained unchanged. Current 2025 event evidence
+is distinct from the still-pending nonempty getter/clear native effect proof.

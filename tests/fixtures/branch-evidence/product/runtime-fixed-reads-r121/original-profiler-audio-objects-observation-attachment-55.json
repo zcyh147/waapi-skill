@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/spatializationMode",
+  "proof": {
+    "artifact": "original-profiler-audio-objects-observation-proof-55.json",
+    "sha256": "b8423acf40d342c5ebc5598b6e1ae8747c224b8b1434ed6dbb8d128da98b603d"
+  },
+  "evidence": {
+    "artifact": "original-profiler-audio-objects-observation-native.json",
+    "sha256": "4734311c5f2eea4bbace40e950251b9ed6375406dd85a69b8d01446919f56de2",
+    "nodeid": "tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_2025_profiler_readers"
+  },
+  "native_equivalence": {
+    "artifact": "original-profiler-audio-objects-observation-equivalence-55.json",
+    "sha256": "e65bd9cbba144a904578240e8b7018103f534202e7fd03f76ec657f84f1ae778"
+  }
+}

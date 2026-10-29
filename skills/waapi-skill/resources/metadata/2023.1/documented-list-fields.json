@@ -1,0 +1,1749 @@
+{
+  "contract": "waapi-skill.documented-list-fields/v1",
+  "version": "2023.1",
+  "source": {
+    "build": "2023.1.19.8928",
+    "archive": "WwiseSDK-Windows.chm",
+    "archive_sha256": "fa5e37e8adacc33cf9189be46a4bdbb7f780ebf776429154fddc0ae2df303415",
+    "index_member": "wobjects_index.html",
+    "index_sha256": "f4d81a300bfd32a0315bf5dc092076938aaac1cd4c37e4abaee229e76d3b0c57"
+  },
+  "coverage": {
+    "indexed_pages": 101,
+    "extracted_pages": 101,
+    "omissions": [],
+    "inheritance": "explicit published per-type rows only; unlisted inherited/plugin fields remain unresolved",
+    "native_availability": "not inferred from absent source declarations"
+  },
+  "classes": [
+    {
+      "name": "AcousticTexture",
+      "class_id": 4718608,
+      "source_member": "wwiseobject_acoustictexture.html",
+      "source_sha256": "994564596f9f01c0fef3ead07d1e9dacdeed5d5defa40307014b7b9cae93733a",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Action",
+      "class_id": 327696,
+      "source_member": "wwiseobject_action.html",
+      "source_sha256": "2494aa5ae0a4ab4e65252fe8e40d0a378b2b02084d35c1be9cdd0d81481c3651",
+      "lists": [],
+      "scalar_references": [
+        "Target",
+        "TargetEffect"
+      ]
+    },
+    {
+      "name": "ActionException",
+      "class_id": 4980752,
+      "source_member": "wwiseobject_actionexception.html",
+      "source_sha256": "3713104fada3f1b256e32b40b021e9e4faef90985b68bad2325b84e355c00801",
+      "lists": [],
+      "scalar_references": [
+        "Target"
+      ]
+    },
+    {
+      "name": "ActorMixer",
+      "class_id": 524304,
+      "source_member": "wwiseobject_actormixer.html",
+      "source_sha256": "f6bf67ba1ce848588aa9b59479d7e775c4792bc9ea1ae6e8c3920884cf66a124",
+      "lists": [
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Metadata",
+          "display_name": "Metadata",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Metadata",
+              "class_id": 5308432
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Attenuation",
+        "Conversion",
+        "OutputBus",
+        "ReflectionsAuxSend",
+        "UserAuxSend0",
+        "UserAuxSend1",
+        "UserAuxSend2",
+        "UserAuxSend3"
+      ]
+    },
+    {
+      "name": "Attenuation",
+      "class_id": 2686992,
+      "source_member": "wwiseobject_attenuation.html",
+      "source_sha256": "e1a6dbb629135763972bb10a7d48e02f3e51755255a3cb29f82a76bad5c4f195",
+      "lists": [
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": []
+    },
+    {
+      "name": "AudioDevice",
+      "class_id": 4653072,
+      "source_member": "wwiseobject_audiodevice.html",
+      "source_sha256": "af15f3f4478c709cda64819b0beaa8498a4abc2a3308a44bd83cabdea9eb3977",
+      "lists": [
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": []
+    },
+    {
+      "name": "AudioFileSource",
+      "class_id": 16,
+      "source_member": "wwiseobject_audiofilesource.html",
+      "source_sha256": "baed276ca5750ee42c0c23a46a0983bcdfc9d54cea4c1bab24fb2db75da632db",
+      "lists": [
+        {
+          "name": "Markers",
+          "display_name": "Markers",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Marker",
+              "class_id": 5373968
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Conversion"
+      ]
+    },
+    {
+      "name": "AuxBus",
+      "class_id": 3997712,
+      "source_member": "wwiseobject_auxbus.html",
+      "source_sha256": "914d4046b6a8b6971f00bfbfdafe983fd91eee310f2478f269c9837e274cd8d3",
+      "lists": [
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Metadata",
+          "display_name": "Metadata",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Metadata",
+              "class_id": 5308432
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Attenuation",
+        "ReflectionsAuxSend",
+        "UserAuxSend0",
+        "UserAuxSend1",
+        "UserAuxSend2",
+        "UserAuxSend3"
+      ]
+    },
+    {
+      "name": "BlendContainer",
+      "class_id": 1900560,
+      "source_member": "wwiseobject_blendcontainer.html",
+      "source_sha256": "7f5fcd0b4d780fb53a0811290539ea7d6aeba013f58ad5716e44b5e1f8ce67ab",
+      "lists": [
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Metadata",
+          "display_name": "Metadata",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Metadata",
+              "class_id": 5308432
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Attenuation",
+        "Conversion",
+        "OutputBus",
+        "ReflectionsAuxSend",
+        "UserAuxSend0",
+        "UserAuxSend1",
+        "UserAuxSend2",
+        "UserAuxSend3"
+      ]
+    },
+    {
+      "name": "BlendTrack",
+      "class_id": 1966096,
+      "source_member": "wwiseobject_blendtrack.html",
+      "source_sha256": "b1ba6b98a6aa87ffe92bb5067471f19792c91df4de0eb1e119e1355e92ccd1dc",
+      "lists": [
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "LayerCrossFadeControlInput"
+      ]
+    },
+    {
+      "name": "Bus",
+      "class_id": 1376272,
+      "source_member": "wwiseobject_bus.html",
+      "source_sha256": "5690be02123a6067d5702853c0d2fc57a201f81bff78fa2c68161674aead9fc5",
+      "lists": [
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Metadata",
+          "display_name": "Metadata",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Metadata",
+              "class_id": 5308432
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Attenuation",
+        "AudioDevice",
+        "HdrPeakOutputGameParameter",
+        "ReflectionsAuxSend",
+        "UserAuxSend0",
+        "UserAuxSend1",
+        "UserAuxSend2",
+        "UserAuxSend3"
+      ]
+    },
+    {
+      "name": "ControlSurfaceBinding",
+      "class_id": 4390928,
+      "source_member": "wwiseobject_controlsurfacebinding.html",
+      "source_sha256": "d1de4771d9dddba983c013403291f512b4e24cd9323c06f5dbdd2f3eb23857b7",
+      "lists": [],
+      "scalar_references": [
+        "TargetObject"
+      ]
+    },
+    {
+      "name": "ControlSurfaceBindingGroup",
+      "class_id": 4456464,
+      "source_member": "wwiseobject_controlsurfacebindinggroup.html",
+      "source_sha256": "1fbb3d21bb4b357029e2f5b2fbc410742825158f5322e8c619d12d1011c79806",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "ControlSurfaceSession",
+      "class_id": 4325392,
+      "source_member": "wwiseobject_controlsurfacesession.html",
+      "source_sha256": "6e5fdc7fa97625599ad52d3ac446be5af4b456f37604377b340bb85935244207",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Conversion",
+      "class_id": 3604496,
+      "source_member": "wwiseobject_conversion.html",
+      "source_sha256": "3380b6dcfbc8efde258c78ffbcd96d1a4a2ab5773e5e97144b01bcde3c9f86d5",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Curve",
+      "class_id": 917520,
+      "source_member": "wwiseobject_curve.html",
+      "source_sha256": "98b6d4fce8ac496bc9a7f38b460b65375b9aa3d2cd3f5858e3c8483d15a2d915",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "CustomState",
+      "class_id": 5177360,
+      "source_member": "wwiseobject_customstate.html",
+      "source_sha256": "7b00072539981cf29cbc79e8573a85a9066f5fd5530e209a2ec412a25ebb8e92",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "DialogueEvent",
+      "class_id": 3014672,
+      "source_member": "wwiseobject_dialogueevent.html",
+      "source_sha256": "7020d5e5c4c8a85b82baed5b0f4aa5d454a6aaa36881f24886d6ebcc710804b8",
+      "lists": [
+        {
+          "name": "Arguments",
+          "display_name": "Arguments",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "SwitchGroup",
+              "class_id": 1245200
+            },
+            {
+              "name": "StateGroup",
+              "class_id": 458768
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Entries",
+          "display_name": "Entries",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "MultiSwitchEntry",
+              "class_id": 5439504
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": []
+    },
+    {
+      "name": "Effect",
+      "class_id": 1114128,
+      "source_member": "wwiseobject_effect.html",
+      "source_sha256": "5082c5c236bf707fe9e7923a058ce4a71a25f6c9f5f7e8eba69902810f168b92",
+      "lists": [
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": []
+    },
+    {
+      "name": "EffectSlot",
+      "class_id": 5505040,
+      "source_member": "wwiseobject_effectslot.html",
+      "source_sha256": "fb545d0ae076ba3106f662ced63715dc06a1d8de135014163c151041b3819a3c",
+      "lists": [
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Effect"
+      ]
+    },
+    {
+      "name": "Event",
+      "class_id": 262160,
+      "source_member": "wwiseobject_event.html",
+      "source_sha256": "2d34682789d6de804bd7cf4105359185cc419225ba7951c7c12e98ecd5ca925e",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "ExternalSource",
+      "class_id": 3735568,
+      "source_member": "wwiseobject_externalsource.html",
+      "source_sha256": "b581e9639731ecda82fed3215bcf052e97ed69d5c490c1be713c45d379bfbd08",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "ExternalSourceFile",
+      "class_id": 3670032,
+      "source_member": "wwiseobject_externalsourcefile.html",
+      "source_sha256": "f1e5a3030352bde8cf365f108a1b5f1bccbfc0ee00d3e88b02bb1ae90b310ddc",
+      "lists": [],
+      "scalar_references": [
+        "Conversion"
+      ]
+    },
+    {
+      "name": "Folder",
+      "class_id": 131088,
+      "source_member": "wwiseobject_folder.html",
+      "source_sha256": "2dcf0a1985e18c4aae2bed1e49e7f767701449b4ac0b83eb0838fc1e8e845c69",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "GameParameter",
+      "class_id": 1507344,
+      "source_member": "wwiseobject_gameparameter.html",
+      "source_sha256": "7bd278ecb71b5aea73b2b8db8db7bb7c11e0294c4c4ea7e1c7277dd0420d5ade",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Language",
+      "class_id": 4915216,
+      "source_member": "wwiseobject_language.html",
+      "source_sha256": "2b1db251dffc28496ee3d3d669a03ef07b1cd45eeede4270686687d2a1d1f813",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Marker",
+      "class_id": 5373968,
+      "source_member": "wwiseobject_marker.html",
+      "source_sha256": "d32904f1395519bf6ff5cc4073acb8119c763ae393b72622bf78babb3fd920d3",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Metadata",
+      "class_id": 5308432,
+      "source_member": "wwiseobject_metadata.html",
+      "source_sha256": "180c1dc0bce14db259bd68e58c4997cf3dcfd686a4749135f1024480e7cdd537",
+      "lists": [
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": []
+    },
+    {
+      "name": "MidiFileSource",
+      "class_id": 5242896,
+      "source_member": "wwiseobject_midifilesource.html",
+      "source_sha256": "1f2410ff5ceb9428dd378ae289153ab004b4f871ea7dac4df0da52682607a840",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "MidiParameter",
+      "class_id": 4128784,
+      "source_member": "wwiseobject_midiparameter.html",
+      "source_sha256": "de249426b6d9591e765215ca5a36fdfc3501c93b46bfb279ede4fa5e0743761d",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "MixingSession",
+      "class_id": 3473424,
+      "source_member": "wwiseobject_mixingsession.html",
+      "source_sha256": "bda3955307dfdef342f93683bb98e58beec171c653fc31786e106a880042e56b",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Modifier",
+      "class_id": 983056,
+      "source_member": "wwiseobject_modifier.html",
+      "source_sha256": "5789e43e3d63f90a9c2294b4028d97f513f9e50c6a5a1496be8376580f298320",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "ModulatorEnvelope",
+      "class_id": 4259856,
+      "source_member": "wwiseobject_modulatorenvelope.html",
+      "source_sha256": "b576d50a68f7d060bbe74cafe9ce7194b003aae270aead626828cb908f5c26c7",
+      "lists": [
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": []
+    },
+    {
+      "name": "ModulatorLfo",
+      "class_id": 4194320,
+      "source_member": "wwiseobject_modulatorlfo.html",
+      "source_sha256": "06ab4bd311ff662487b0c03d89addc05e888cda993eb68175f973dc00d59b0dd",
+      "lists": [
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": []
+    },
+    {
+      "name": "ModulatorTime",
+      "class_id": 5111824,
+      "source_member": "wwiseobject_modulatortime.html",
+      "source_sha256": "f04265abd68a6aaf04e8e916c0cd594eb07bfd0b8c00f45b1a0b94801a8ba148",
+      "lists": [
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": []
+    },
+    {
+      "name": "MultiSwitchEntry",
+      "class_id": 5439504,
+      "source_member": "wwiseobject_multiswitchentry.html",
+      "source_sha256": "7c62b448a556142207a4c9a2d11c833a250173abf3275c4c29d3f6f559f75929",
+      "lists": [
+        {
+          "name": "EntryPath",
+          "display_name": "Path",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "SwitchGroup",
+              "class_id": 1245200
+            },
+            {
+              "name": "Switch",
+              "class_id": 1310736
+            },
+            {
+              "name": "StateGroup",
+              "class_id": 458768
+            },
+            {
+              "name": "State",
+              "class_id": 393232
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "AudioNode"
+      ]
+    },
+    {
+      "name": "MusicClip",
+      "class_id": 3932176,
+      "source_member": "wwiseobject_musicclip.html",
+      "source_sha256": "0433db053fa53712999f49b05c8ebb012d67d360cb095e32a92044a48def6e2c",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "MusicClipMidi",
+      "class_id": 4063248,
+      "source_member": "wwiseobject_musicclipmidi.html",
+      "source_sha256": "22fcfe418d430162ef5b04d4d894cbed9a5dca60670a09d8c0d038323a63a5c8",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "MusicCue",
+      "class_id": 3866640,
+      "source_member": "wwiseobject_musiccue.html",
+      "source_sha256": "08bfa42ad431ad2142b9a383cfd031dc40c2f4da08a1a30e71dabb026092a450",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "MusicEventCue",
+      "class_id": 5046288,
+      "source_member": "wwiseobject_musiceventcue.html",
+      "source_sha256": "7b20a52d60713747cfb1a6ee0c44dbc947c8b16a81d4b4bb0cf9c12ef5a24d4d",
+      "lists": [],
+      "scalar_references": [
+        "PostEventTarget"
+      ]
+    },
+    {
+      "name": "MusicFade",
+      "class_id": 2555920,
+      "source_member": "wwiseobject_musicfade.html",
+      "source_sha256": "8e0b6f00b3a41fa42ea6f3c01588a6d824b4d11269cd2a6d430b543519998ab5",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "MusicPlaylistContainer",
+      "class_id": 2228240,
+      "source_member": "wwiseobject_musicplaylistcontainer.html",
+      "source_sha256": "0467886fbf999173ecef255d244103797fab6e12444470e12ba1a24e45bf35ae",
+      "lists": [
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Metadata",
+          "display_name": "Metadata",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Metadata",
+              "class_id": 5308432
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Stingers",
+          "display_name": "Music Stingers",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "MusicStinger",
+              "class_id": 2490384
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Attenuation",
+        "Conversion",
+        "MidiTarget",
+        "OutputBus",
+        "PlaylistRoot",
+        "ReflectionsAuxSend",
+        "TransitionRoot",
+        "UserAuxSend0",
+        "UserAuxSend1",
+        "UserAuxSend2",
+        "UserAuxSend3"
+      ]
+    },
+    {
+      "name": "MusicPlaylistItem",
+      "class_id": 2359312,
+      "source_member": "wwiseobject_musicplaylistitem.html",
+      "source_sha256": "deaf5d5dce2f0d2f7e045d8d84c81545077cbcc27fcb4306620c757708384efa",
+      "lists": [],
+      "scalar_references": [
+        "Segment"
+      ]
+    },
+    {
+      "name": "MusicSegment",
+      "class_id": 1769488,
+      "source_member": "wwiseobject_musicsegment.html",
+      "source_sha256": "479a1bd2bd07acbc0b244d38342c6dc0a9cb933c57605667037e0457e6187dc7",
+      "lists": [
+        {
+          "name": "Cues",
+          "display_name": "Music Cues",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "MusicCue",
+              "class_id": 3866640
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Metadata",
+          "display_name": "Metadata",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Metadata",
+              "class_id": 5308432
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Stingers",
+          "display_name": "Music Stingers",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "MusicStinger",
+              "class_id": 2490384
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Attenuation",
+        "Conversion",
+        "MidiTarget",
+        "OutputBus",
+        "ReflectionsAuxSend",
+        "UserAuxSend0",
+        "UserAuxSend1",
+        "UserAuxSend2",
+        "UserAuxSend3"
+      ]
+    },
+    {
+      "name": "MusicStinger",
+      "class_id": 2490384,
+      "source_member": "wwiseobject_musicstinger.html",
+      "source_sha256": "23527a871adfc9bf37fee998359e415374bc999fd7c2463e13defaca1e7f932b",
+      "lists": [],
+      "scalar_references": [
+        "Segment",
+        "Trigger"
+      ]
+    },
+    {
+      "name": "MusicSwitchContainer",
+      "class_id": 2293776,
+      "source_member": "wwiseobject_musicswitchcontainer.html",
+      "source_sha256": "1a43b5f3d8afd1fab6ba6d92b7afbb151b78bd83c544a9f0870cd06d9f38d525",
+      "lists": [
+        {
+          "name": "Arguments",
+          "display_name": "Arguments",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "SwitchGroup",
+              "class_id": 1245200
+            },
+            {
+              "name": "StateGroup",
+              "class_id": 458768
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Entries",
+          "display_name": "Entries",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "MultiSwitchEntry",
+              "class_id": 5439504
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Metadata",
+          "display_name": "Metadata",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Metadata",
+              "class_id": 5308432
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Stingers",
+          "display_name": "Music Stingers",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "MusicStinger",
+              "class_id": 2490384
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Attenuation",
+        "Conversion",
+        "MidiTarget",
+        "OutputBus",
+        "ReflectionsAuxSend",
+        "TransitionRoot",
+        "UserAuxSend0",
+        "UserAuxSend1",
+        "UserAuxSend2",
+        "UserAuxSend3"
+      ]
+    },
+    {
+      "name": "MusicTrack",
+      "class_id": 1835024,
+      "source_member": "wwiseobject_musictrack.html",
+      "source_sha256": "3e2b5ebf5e0fc094056bca89b75eb5bbdb57a4492daebc4cfd493d6b68a6b770",
+      "lists": [
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Metadata",
+          "display_name": "Metadata",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Metadata",
+              "class_id": 5308432
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Sequences",
+          "display_name": "Music Track Sequences",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "MusicTrackSequence",
+              "class_id": 3801104
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Attenuation",
+        "Conversion",
+        "DefaultSwitchOrState",
+        "MidiTarget",
+        "OutputBus",
+        "ReflectionsAuxSend",
+        "SwitchGroupOrStateGroup",
+        "TransitionRoot",
+        "UserAuxSend0",
+        "UserAuxSend1",
+        "UserAuxSend2",
+        "UserAuxSend3"
+      ]
+    },
+    {
+      "name": "MusicTrackSequence",
+      "class_id": 3801104,
+      "source_member": "wwiseobject_musictracksequence.html",
+      "source_sha256": "2a22712669e77f21152d13c8810458b0ccdc767c472e7f28755af5b43ae4eef0",
+      "lists": [
+        {
+          "name": "Clips",
+          "display_name": "Music Clips",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "MusicClip",
+              "class_id": 3932176
+            },
+            {
+              "name": "MusicClipMidi",
+              "class_id": 4063248
+            },
+            {
+              "name": "MusicEventCue",
+              "class_id": 5046288
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "TrackSequenceSwitch"
+      ]
+    },
+    {
+      "name": "MusicTransition",
+      "class_id": 2424848,
+      "source_member": "wwiseobject_musictransition.html",
+      "source_sha256": "f8c4afaf87ff154b2f1df3faf035cf3096de3c290c92fc9387505e2f335dc4e2",
+      "lists": [],
+      "scalar_references": [
+        "DestinationContextObject",
+        "SourceContextObject"
+      ]
+    },
+    {
+      "name": "ObjectSettingAssoc",
+      "class_id": 1572880,
+      "source_member": "wwiseobject_objectsettingassoc.html",
+      "source_sha256": "65c044a8a591a3139b1bb4271992f3a859efae40b2b363379652b11d95881ec9",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Panner",
+      "class_id": 2752528,
+      "source_member": "wwiseobject_panner.html",
+      "source_sha256": "74d0e45716e8d52765ba6368b9a414a25f150b45f4c7ee7265d7e50c461d95d1",
+      "lists": [
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": []
+    },
+    {
+      "name": "Path2D",
+      "class_id": 720912,
+      "source_member": "wwiseobject_path2d.html",
+      "source_sha256": "9d9f9d9413b1b2a9eb21743f48bb3ca5637864d14176046a7af5018874a4452c",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Platform",
+      "class_id": 4522000,
+      "source_member": "wwiseobject_platform.html",
+      "source_sha256": "cc34a076040e7f1a9ceb454f553ed212de6de367c3ca22460f5a1f0fa04c2885",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "PluginDataSource",
+      "class_id": 3538960,
+      "source_member": "wwiseobject_plugindatasource.html",
+      "source_sha256": "ef8ceef2004bd37f1928b51cb5081dc8b8993520fae8c1ae6bf34280f21153f9",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Position",
+      "class_id": 786448,
+      "source_member": "wwiseobject_position.html",
+      "source_sha256": "bb40a05f1a3707d4672c467df8b67155a5094247585dca6d2ee6425fbce06281",
+      "lists": [
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": []
+    },
+    {
+      "name": "Project",
+      "class_id": 196624,
+      "source_member": "wwiseobject_project.html",
+      "source_sha256": "8602df9637c6ede2364a1b15b388d2e76d5f1089c0fc51c747a104b3b55927bf",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Query",
+      "class_id": 2097168,
+      "source_member": "wwiseobject_query.html",
+      "source_sha256": "7f4da1d46734dfe3c85ad257ac980848330fb385a8b12e1e8eba0d8e8d15afdf",
+      "lists": [],
+      "scalar_references": [
+        "StartObject"
+      ]
+    },
+    {
+      "name": "RandomSequenceContainer",
+      "class_id": 589840,
+      "source_member": "wwiseobject_randomsequencecontainer.html",
+      "source_sha256": "7ed6b7f5866deb3af535ce59a2835a3ff54e4df5c1bef7ac5af96e52a28ad107",
+      "lists": [
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Metadata",
+          "display_name": "Metadata",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Metadata",
+              "class_id": 5308432
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Playlist",
+          "display_name": "Playlist",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Sound",
+              "class_id": 65552
+            },
+            {
+              "name": "RandomSequenceContainer",
+              "class_id": 589840
+            },
+            {
+              "name": "SwitchContainer",
+              "class_id": 655376
+            },
+            {
+              "name": "BlendContainer",
+              "class_id": 1900560
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Attenuation",
+        "Conversion",
+        "OutputBus",
+        "ReflectionsAuxSend",
+        "UserAuxSend0",
+        "UserAuxSend1",
+        "UserAuxSend2",
+        "UserAuxSend3"
+      ]
+    },
+    {
+      "name": "RTPC",
+      "class_id": 1441808,
+      "source_member": "wwiseobject_rtpc.html",
+      "source_sha256": "3458e0ea71edce15c6cab0416d32d25e632dfb57bea34e4bbad90705c7ba95db",
+      "lists": [],
+      "scalar_references": [
+        "ControlInput",
+        "Curve"
+      ]
+    },
+    {
+      "name": "SearchCriteria",
+      "class_id": 2162704,
+      "source_member": "wwiseobject_searchcriteria.html",
+      "source_sha256": "3dbbf1d09b7a963e572ac50f6f41f445754b8c28bbcaf820b9afec5f106441bc",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Sound",
+      "class_id": 65552,
+      "source_member": "wwiseobject_sound.html",
+      "source_sha256": "57cf1a3a2068a1ea014a7dfb55fa083f8e8af0d27da453b0f6c06f0a0e9571cf",
+      "lists": [
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Metadata",
+          "display_name": "Metadata",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Metadata",
+              "class_id": 5308432
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Attenuation",
+        "Conversion",
+        "OutputBus",
+        "ReflectionsAuxSend",
+        "UserAuxSend0",
+        "UserAuxSend1",
+        "UserAuxSend2",
+        "UserAuxSend3"
+      ]
+    },
+    {
+      "name": "SoundBank",
+      "class_id": 1179664,
+      "source_member": "wwiseobject_soundbank.html",
+      "source_sha256": "7865ebf5ca497c58305eb867820ed86a0f6d890d1e9fe3c8a905d094e67431da",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "SoundcasterSession",
+      "class_id": 1703952,
+      "source_member": "wwiseobject_soundcastersession.html",
+      "source_sha256": "9d959b303c5b610e3b90d0a92e1dd542eeb4a52929afa66b9a60d6870b8f1be9",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "SourcePlugin",
+      "class_id": 1048592,
+      "source_member": "wwiseobject_sourceplugin.html",
+      "source_sha256": "65b496b42fe4569689bc007aa8542b7a1ec361d3df0a427fd2ed400314606c30",
+      "lists": [
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": []
+    },
+    {
+      "name": "State",
+      "class_id": 393232,
+      "source_member": "wwiseobject_state.html",
+      "source_sha256": "630ef0043ab30be84212267f01e6522c35eb23bd72548635abfc682314563043",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "StateGroup",
+      "class_id": 458768,
+      "source_member": "wwiseobject_stategroup.html",
+      "source_sha256": "fcf049c8519ace76aef04c52cbd35f02d7246c0d6716c6211afdaa3f9ac8991c",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Switch",
+      "class_id": 1310736,
+      "source_member": "wwiseobject_switch.html",
+      "source_sha256": "fe1d5a2d8b4f01d6d8337d0d379c83e63755203272e883f4fcb4ffef5e02391c",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "SwitchContainer",
+      "class_id": 655376,
+      "source_member": "wwiseobject_switchcontainer.html",
+      "source_sha256": "c012820ecf9aed33bfd76de748ebd444fca53811591fca13c0931602ae5066b4",
+      "lists": [
+        {
+          "name": "Effects",
+          "display_name": "Effects",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "EffectSlot",
+              "class_id": 5505040
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "Metadata",
+          "display_name": "Metadata",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "Metadata",
+              "class_id": 5308432
+            }
+          ],
+          "unresolved_element_types": []
+        },
+        {
+          "name": "RTPC",
+          "display_name": "RTPC",
+          "declared_kind": "List",
+          "element_classes": [
+            {
+              "name": "RTPC",
+              "class_id": 1441808
+            }
+          ],
+          "unresolved_element_types": []
+        }
+      ],
+      "scalar_references": [
+        "Attenuation",
+        "Conversion",
+        "DefaultSwitchOrState",
+        "OutputBus",
+        "ReflectionsAuxSend",
+        "SwitchGroupOrStateGroup",
+        "UserAuxSend0",
+        "UserAuxSend1",
+        "UserAuxSend2",
+        "UserAuxSend3"
+      ]
+    },
+    {
+      "name": "SwitchGroup",
+      "class_id": 1245200,
+      "source_member": "wwiseobject_switchgroup.html",
+      "source_sha256": "b11482bed580058104f25e0d35bc1555e44c1074a73d368de6a62d29f097a1c8",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Trigger",
+      "class_id": 2621456,
+      "source_member": "wwiseobject_trigger.html",
+      "source_sha256": "9fba0a485d869ea14f9ba44b88962a0dacb2fb780702fc109dfa1e0a0e5c19b7",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "UserProjectSettings",
+      "class_id": 3342352,
+      "source_member": "wwiseobject_userprojectsettings.html",
+      "source_sha256": "fc63d3f24d41628dc028ef84e130f04333172e352e0eddcb6d5a0a7b1a0df10c",
+      "lists": [],
+      "scalar_references": [
+        "Conversion"
+      ]
+    },
+    {
+      "name": "WorkUnit",
+      "class_id": 1638416,
+      "source_member": "wwiseobject_workunit.html",
+      "source_sha256": "d2ee14d7f6d66966a8a96e01286e1cd8bf23eb764e68762eeeb8f228f4191cf2",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Mastering Suite",
+      "class_id": 12189699,
+      "source_member": "wwiseobject_effect_mastering_suite.html",
+      "source_sha256": "972d5962c0c630f6e932147e97880882cd12452376ce910adf712b007b332012",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise 3D Audio Bed Mixer",
+      "class_id": 12451843,
+      "source_member": "wwiseobject_effect_wwise_3d_audio_bed_mixer.html",
+      "source_sha256": "c7891556eeb8b0f66cc6997d7a79e029cb0a63c909afb1accb06d1fd095ecbc1",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Compressor",
+      "class_id": 7077891,
+      "source_member": "wwiseobject_effect_wwise_compressor.html",
+      "source_sha256": "427077656addc4e5bca4bc0f66432c45d06c2e62ddeb1a2e34d88dcfbe25a904",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Convolution Reverb",
+      "class_id": 8323075,
+      "source_member": "wwiseobject_effect_wwise_convolution_reverb.html",
+      "source_sha256": "12640548f9b5eab7dc9327293713b1262a3711e574143d634803afbc61f691f1",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Delay",
+      "class_id": 6946819,
+      "source_member": "wwiseobject_effect_wwise_delay.html",
+      "source_sha256": "8d2218c743a1c6ae7120388957c5b88b6d5d9fec8609c0cf41a16a4dfff266b9",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Expander",
+      "class_id": 7143427,
+      "source_member": "wwiseobject_effect_wwise_expander.html",
+      "source_sha256": "98aa358ed290785268d627fc396be73ba03a19b536e1c52d0e2509569a6a7a28",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Flanger",
+      "class_id": 8192003,
+      "source_member": "wwiseobject_effect_wwise_flanger.html",
+      "source_sha256": "d7c127b860bf4f1d801c24be4c0e6681b150195cd8ca417cc5ae9be1df53efcf",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Gain",
+      "class_id": 9109507,
+      "source_member": "wwiseobject_effect_wwise_gain.html",
+      "source_sha256": "2e6d927699efa8f34ea7c87f5db297c2ad3bcded12eab7e86a3a592901e901ed",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Guitar Distortion",
+      "class_id": 8257539,
+      "source_member": "wwiseobject_effect_wwise_guitar_distortion.html",
+      "source_sha256": "fce640044961596bb3dbf8696f3a2f71efa59c5347b82aa8eaaddfe3210dc425",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Harmonizer",
+      "class_id": 9043971,
+      "source_member": "wwiseobject_effect_wwise_harmonizer.html",
+      "source_sha256": "2b1616f426ccba50d6a8208ec17108ba0fb933fb1e202ae7b37a5542868d429e",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Matrix Reverb",
+      "class_id": 7536643,
+      "source_member": "wwiseobject_effect_wwise_matrix_reverb.html",
+      "source_sha256": "f56dd071c5377e1e4a8a8cc007efb158692aec81fc95ccdbdc86f60f910b30ae",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Meter",
+      "class_id": 8454147,
+      "source_member": "wwiseobject_effect_wwise_meter.html",
+      "source_sha256": "0c42975436a26e122becc8819dc7e5c825c4ba0c057b8dc944afae7a3c59741a",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Parametric EQ",
+      "class_id": 6881283,
+      "source_member": "wwiseobject_effect_wwise_parametric_eq.html",
+      "source_sha256": "44c7902c0a586866054eb1a725e2a9e222a9f829801cadad9de4dccdcacbe559",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Peak Limiter",
+      "class_id": 7208963,
+      "source_member": "wwiseobject_effect_wwise_peak_limiter.html",
+      "source_sha256": "2388247de5ff9ef240849a5dd31480a50b3e9279ac26ed4317665f37699d933b",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Pitch Shifter",
+      "class_id": 8912899,
+      "source_member": "wwiseobject_effect_wwise_pitch_shifter.html",
+      "source_sha256": "9d89dde42151b7319f3187f581b0c3cb75c0ae3eb3394db25e255bf1a55436a4",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Recorder",
+      "class_id": 8650755,
+      "source_member": "wwiseobject_effect_wwise_recorder.html",
+      "source_sha256": "5b92dc4e71db8c71c5dae44a3e6d9e429443b8cbccf5ec39e00cdf68328d3a8a",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Reflect",
+      "class_id": 11206659,
+      "source_member": "wwiseobject_effect_wwise_reflect.html",
+      "source_sha256": "8aa24a068ea4c1a95ce577fd5ba6558d2a9f38c6c154a9cf7e5a96bdcc4ccaa8",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise RoomVerb",
+      "class_id": 7733251,
+      "source_member": "wwiseobject_effect_wwise_roomverb.html",
+      "source_sha256": "3d1009bfd5470a437b4ad48fe5e5b32cb85e24bfa76f1284720ff4656ac431d8",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Stereo Delay",
+      "class_id": 8847363,
+      "source_member": "wwiseobject_effect_wwise_stereo_delay.html",
+      "source_sha256": "e551a9cd8000c4532e09799f7a3fd06d0512f9bc4e103be4b17832d46a5710c0",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Time Stretch",
+      "class_id": 8519683,
+      "source_member": "wwiseobject_effect_wwise_time_stretch.html",
+      "source_sha256": "4928e409fb203062d05a6b4d6eb003a34070a90b61bfa92b0ca4739306f9928b",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Tremolo",
+      "class_id": 8585219,
+      "source_member": "wwiseobject_effect_wwise_tremolo.html",
+      "source_sha256": "3a48d2ba49fa20a5abd5a6070f561c2b5eec092c5ca2cabcfff68bf8e35b4573",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Impacter",
+      "class_id": 12058626,
+      "source_member": "wwiseobject_source_impacter.html",
+      "source_sha256": "9bc5aa9b967c5b811b4558e7f1f65af60a52c38d0f67f4bf81e50a57fb53aa71",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "SoundSeed Air Wind",
+      "class_id": 7798786,
+      "source_member": "wwiseobject_source_soundseed_air_wind.html",
+      "source_sha256": "1e558c1957691e2270bc2e9847a8467007a9499e549e5612845aa0fb56877de7",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "SoundSeed Air Woosh",
+      "class_id": 7864322,
+      "source_member": "wwiseobject_source_soundseed_air_woosh.html",
+      "source_sha256": "9c15ac586125ba8bdab30db7732151aaed8f8acd6a8bf5e3ef6867892764e717",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "SoundSeed Grain",
+      "class_id": 11993090,
+      "source_member": "wwiseobject_source_soundseed_grain.html",
+      "source_sha256": "68aefeba8d219678e0e598b5c375ac48008af0f14503cc15f86c889c3d0274da",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Motion Source",
+      "class_id": 26804226,
+      "source_member": "wwiseobject_source_wwise_motion_source.html",
+      "source_sha256": "758b45c2421dfdcd89d9c66d9abed3e66159325ddb7b22774640bad027f96be5",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Silence",
+      "class_id": 6619138,
+      "source_member": "wwiseobject_source_wwise_silence.html",
+      "source_sha256": "980591be9c531057ad23988c54257c37f21919f41d4cacbc0a696443d2d340dd",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Synth One",
+      "class_id": 9699330,
+      "source_member": "wwiseobject_source_wwise_synth_one.html",
+      "source_sha256": "5188b83d36e38d4b454f6396ff1396a005e2b26f37d83fa808ce4273a8a4b0d2",
+      "lists": [],
+      "scalar_references": []
+    },
+    {
+      "name": "Wwise Tone Generator",
+      "class_id": 6684674,
+      "source_member": "wwiseobject_source_wwise_tone_generator.html",
+      "source_sha256": "4a536d5e01c7d65b9346dad23fdbbc67779f5b4632dfa6bd2b489964bf4ddfbd",
+      "lists": [],
+      "scalar_references": []
+    }
+  ],
+  "catalog_sha256": "7195870632ce4ddbb52e6bd5d9e9ebf31619db7c431a8f2ad7254dcfeceaf09f"
+}

@@ -1,0 +1,490 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema": {
+      "native_shape_sha256": "13482ea100df320b382d3187768adce7c3b94e141e21001f49be58a3ee99d92a",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema/properties/busPipelineID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema/properties/time": {
+      "native_shape_sha256": "cec8a10c6143214e7a1f35a939d415dff9e824bc695b9e3f0959da8b5f7dab81",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema/properties/time/$ref": {
+      "native_shape_sha256": "21c519ff0ebb2d6a94efdc2c7baeb5d9b18fca7526ca007f52c1a529de4c4413",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime": {
+      "native_shape_sha256": "b30c36884f7bff743ed80d53f8d4c2e3f47e199033168b30b44316b998cf4f35",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0": {
+      "native_shape_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0/minimum": {
+      "native_shape_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/argsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema": {
+      "native_shape_sha256": "81e3bb6616a903dc15cc542f64ccd31d51c76bc8dd734eb3ce4af739f28291a7",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/properties/return/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/properties/return": {
+      "native_shape_sha256": "06abae3ec1f6da7d4ed38950ff12d81328186f28dd88f1be4d678e2c73dca419",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/properties/return/$ref": {
+      "native_shape_sha256": "4a4e616d402b8ccdabc8bc596f516f17dd7c55b902d23b8926aff553a8dd43ec",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions": {
+      "native_shape_sha256": "af840299cb7421393556787319eac3b15ca1eba30a15781ac6e947d9346e6008",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items": {
+      "native_shape_sha256": "067f6cc72c3abb2633a0fd8747c3db393da0292f5b58c793587f2ae7aca589cb",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/0": {
+      "native_shape_sha256": "9dd4714228453b8ec3f1b719df720bb7310f3160cf5b23a7acec34075bed428f",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/1": {
+      "native_shape_sha256": "3ef490f84cc9de7af8ffd59eb56987807bca50a0c6a56267e0c6f7f7d357e466",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/2": {
+      "native_shape_sha256": "890bed83422a223cb5a47819ac80ac0b9ff7257a0a2a425519f9d906faded31a",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/3": {
+      "native_shape_sha256": "a10de2420290b51a493291ed4b67a024d7e2dd00f3e2e6200ab887cd6b1eaff9",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/4": {
+      "native_shape_sha256": "58506d2d9ba0beee414f70d1ce45675c3aa7ebbb409149a11f07b51ae6dd31d9",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/5": {
+      "native_shape_sha256": "54169f1fe50bf8e83ea0585550a09c49c7aaf54dcd62277d54fd9b9320773fce",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/6": {
+      "native_shape_sha256": "236c533dab11f007df0a7bf1f934818b97e4ee96d29783c561d2c7fc601d5c43",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/7": {
+      "native_shape_sha256": "673a826b701042e1ac914b5907f61349c25ae1847dd429c5d0b420c687d69ad6",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/8": {
+      "native_shape_sha256": "97e39bf1d70958e055c71bf744d2d01d66a6f719463fea3c6678568cde5ae32b",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/9": {
+      "native_shape_sha256": "f92603ad31424b32c1fe81172977f0f0c700de701b96fb7a4c0572c46a6bb511",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/10": {
+      "native_shape_sha256": "d76a8016ef4b486e4ce3a84636be2ee2271aa3a64b47b3644817fe563802ac80",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/11": {
+      "native_shape_sha256": "ba2df4903a2c14e86dc3bcca58911b44ac1d2514b7227bf6eb08cfb978f55a1b",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/12": {
+      "native_shape_sha256": "2bc983a5942276eb00a75e2113a69694318cd28c7de0fc83c0598d9db50eb777",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/13": {
+      "native_shape_sha256": "20c400557af0eddc0be4d9e0ae86f7ccc2890e8a285005aea2a752951ed94bed",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/14": {
+      "native_shape_sha256": "a27f5024cf953ddc09454fc9f27ec05dc04a3dd2b8d38e9ec7c5255c638533b5",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/15": {
+      "native_shape_sha256": "16e746032c4e9c72b4945897f568f2626b2397a6b9d088be6db664967e65c4b2",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/16": {
+      "native_shape_sha256": "85d76628ada548936ab39f991fb866acb27a3e3395558b2df60fc3dd6dd51b09",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/17": {
+      "native_shape_sha256": "78891c70f231a9fcf382e07734467478cde8e8a6b81daf3a5ecb6275e255063d",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/18": {
+      "native_shape_sha256": "3736b9366296817f5ea07fc17b411b0b69d82e43337b8eae4a186fa37930b487",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/19": {
+      "native_shape_sha256": "cad5d1ef0023953da8d63bd2a4d67fcc925fca4c658f0011df19326428162e95",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/20": {
+      "native_shape_sha256": "03ecfa528faba233ffed8f99976ee4d451fb3710196cd042ff96505121a2796b",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/items/enum/21": {
+      "native_shape_sha256": "7b9e1c8c2ec2dfc8d58821e01d8226621e28a41235edd5198699c3937f331032",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/@definition/waapi_definitions.json/definitions/audioObjectReturnOptions/@cardinality/multiple": {
+      "native_shape_sha256": "106c572c7b5c17d9f9d57380703dedabf9ed54c0857fe9e02d752da03f0f12ea",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/optionsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema": {
+      "native_shape_sha256": "1311e7ea47d4c8a664ba12ec714ada1ce2763c115e05b16aaae80edf77b390ab",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/properties/return": {
+      "native_shape_sha256": "81e27acf2f77c2a8f130c69f68968a2a9dd4c2fbbf0c7545f0d8e59431b7f131",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/properties/return/items": {
+      "native_shape_sha256": "dfbf8137621f00559da8460b63e188b8aad111a909ea024e99104e9cadae0957",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/properties/return/items/$ref": {
+      "native_shape_sha256": "aeeb74303f668102a8a2143f2f5869371c231c679d85d89257a9e2650537c196",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn": {
+      "native_shape_sha256": "ad4b5a53791592f7dcf9c8600c3e6479f47909a6c3554f76ded36eeac66f8fa0",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectName/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busName/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/channelConfig/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/effectClassID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/effectIndex/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/effectPluginName/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/focus/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectName/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/instigatorPipelineID/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/metadata/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/peakMeter/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/rmsMeter/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/spatializationMode/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/spread/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/x/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/y/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/z/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/@empty/object": {
+      "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/properties/return/@cardinality/single": {
+      "native_shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    }
+  }
+}

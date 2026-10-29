@@ -1,0 +1,95 @@
+{
+  "contract": "waapi-skill.branch-bindings/v1",
+  "bindings": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.addItem|/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string": {
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.addItem|/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+      "construction": {
+        "selector": "/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+        "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_control_business_request"
+      },
+      "input": {
+        "gateway_argv": [
+          "draft-start",
+          "ak.wwise.core.log.addItem"
+        ],
+        "selector": "/counterexample/compiled/gateway/payload/agent_result/request/arguments/args/severity",
+        "declaration": "draft-declare-runtime-control-plan",
+        "correspondence": {
+          "rule": "exact_versioned_closed_runtime_declaration_and_whole_result_preservation",
+          "native_pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+          "original_mapping_index_sha256": "b0e7f6bfa09efc899498dde87515e5fbc9387c5dd49e1b644eec62de67b91389"
+        },
+        "choices": {
+          "log-channel": [
+            "general",
+            "soundbank-generation",
+            "audio-conversion",
+            "platform-settings-copy",
+            "waapi",
+            "project-load",
+            "source-control",
+            "lua"
+          ],
+          "severity": [
+            "message",
+            "warning",
+            "error",
+            "fatal"
+          ],
+          "message": "exact UTF-8 text; omitted channel/severity compile to documented defaults"
+        }
+      },
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "public_route": "2025.1|function|ak.wwise.core.log.addItem",
+      "public_route_sha256": "019c9aadc53713984f3839d8f98f1229cf7c6a0fa5574083b68ecf09aa4000d5",
+      "validation": {
+        "selector": "/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+        "source": "skills/waapi-skill/wwise_waapi/builders/schema.py#validate_semantic_payload"
+      },
+      "verifier": {
+        "selector": "/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+        "source": "skills/waapi-skill/wwise_waapi/runtime_log_effects.py#compare_channel"
+      },
+      "evidence": {
+        "program": {
+          "artifact": "runtime-read-log-195-r1/selected-11-program.json",
+          "sha256": "94cff34d219be3095d1542b3aa9e8887f80c6c53adf25a38eb5cea7aa26a0a50"
+        }
+      },
+      "ordinary_test_run_attachment": true,
+      "relevant_sources": [
+        "skills/waapi-skill/scripts/gateway.py",
+        "skills/waapi-skill/scripts/run.py",
+        "skills/waapi-skill/wwise_waapi/builders/schema.py",
+        "skills/waapi-skill/wwise_waapi/builders/stable_reads.py",
+        "skills/waapi-skill/wwise_waapi/capabilities.py",
+        "skills/waapi-skill/wwise_waapi/dispatcher.py",
+        "skills/waapi-skill/wwise_waapi/io_policy.py",
+        "skills/waapi-skill/wwise_waapi/operation_registry.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_observations.py",
+        "skills/waapi-skill/wwise_waapi/runtime_log_effects.py",
+        "skills/waapi-skill/wwise_waapi/transaction_cleanup.py",
+        "skills/waapi-skill/wwise_waapi/transaction_runtime.py",
+        "skills/waapi-skill/wwise_waapi/transactions.py",
+        "tests/unit/test_runtime_log_branch_evidence.py"
+      ],
+      "disposition": "schema_counterexample",
+      "empty_candidate": {
+        "contract": "waapi-skill.empty-candidate-classification/v1",
+        "status": "rejected",
+        "candidate": "",
+        "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.addItem",
+        "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+        "parent_pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity",
+        "parent_schema_sha256": "f67365c1392c37c1dc87e92bb07d5f03eb6238ae948a42ad732c75a50b293145",
+        "context_sha256": "67c3432d4da4b0e96ac31018c2deaef6b203a288a0a5ead67e047abfdc6109c1",
+        "catalog_sha256": "411c83c1e9b0d8d1fcb0fa82242e1a47728525379dfca93d1c4c40a9325679b5",
+        "definitions_sha256": "5b84d51bcc827ec556297f06e60e7755fe29af1c9d8ac3fb729f3ef99225e8e3",
+        "owning_section_sha256": "78ea47fdecefa4bb304c7b087e9381efff73d3fb340f11b08c882c70da7f735b",
+        "reason": "resolved schema rejects concrete candidate"
+      }
+    }
+  }
+}

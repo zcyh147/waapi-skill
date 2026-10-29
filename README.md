@@ -56,6 +56,32 @@ The packaged profiles expose every reviewed and permitted route in their
 supported Wwise versions. Host-only, version-only, dangerous, or unverifiable
 capabilities return an explicit boundary instead of guessing.
 
+The current Skill also has these accepted creation limits. They describe
+unwrapped creation roles, not native Wwise impossibility. Existing queries,
+exact-object edits and compatible donor-copy operations retain their contracts.
+
+| Creation role currently outside the Skill | Versions |
+| --- | --- |
+| Standalone UserProjectSettings, PluginDataSource, ExternalSource/File and MidiParameter | 2021.1–2025.1 |
+| Add Language to an existing project; allocate/resolve new MusicFade roles | 2021.1–2025.1 |
+| Panner, Position and spatial Path/Path2D construction | 2021.1–2025.1 |
+| BlendTrack construction | 2021.1–2023.1 |
+| MusicPlaylistItem and MusicTransition construction | 2021.1–2022.1 |
+| CustomState birth/per-State identity; StateGroupInfo birth/identity | CustomState 2021.1–2025.1; StateGroupInfo 2025.1 |
+| ActionException collection construction | 2021.1–2025.1 |
+| MusicSwitch MultiSwitchEntry construction | 2021.1–2022.1 |
+| ParamControl construction and unresolved Curve birth roles | 2021.1 |
+| Saved MediaPoolQuery construction | 2025.1 |
+
+Known methods remain available: initial languages when creating a project,
+attenuation curve setters, Dialogue condition imports, 2023+ State-group/property
+associations, and the supported modern Playlist, Transition, BlendTrack,
+Media Pool database/directory and Control Surface constructors. Association
+methods do not guarantee acquisition of a newly created owned object's GUID.
+The Gateway continues to reject unsupported placement through its existing
+closed contracts. The exact scope decision is recorded in the
+[coverage specification](docs/plans/full-waapi-coverage/SPEC.md#user-approved-remaining-creation-limits--2026-10-29).
+
 ## Supported versions
 
 | Wwise | Packaged support |

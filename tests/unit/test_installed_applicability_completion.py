@@ -1,0 +1,589 @@
+"""Source applicability is a join, never one native test per installed class."""
+from copy import deepcopy
+from pathlib import Path
+import json
+
+import pytest
+
+ROOT = Path(__file__).parents[2]
+
+
+@pytest.fixture(scope='module')
+def creation_limit_context():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    from tests.maintenance.branch_audit_completion import installed_obligations
+    from tests.maintenance.branch_coverage_audit import digest, load
+    mapping = definition_mapping(ROOT)
+    return {'mapping': mapping, 'members': {r['id']: r for r in mapping['rows']},
+        'branches': {b['id']: b for b in installed_obligations(ROOT, digest=digest, load=load)
+            if b['kind'] in {'target_applicability', 'plugin_topology'}}}
+
+
+def test_approved_creation_limits_reach_completion_reader_without_execution_credit(creation_limit_context, tmp_path):
+    from tests.support.applicability_completion_mapping import evaluate_binding
+    from tests.maintenance.branch_coverage_audit import digest
+    context = creation_limit_context
+    # Exercise the existing completion consumer with current source mapping. The
+    # historical program attachment is deliberately not recaptured by this test.
+    rows = [r for r in context['mapping']['rows'] if r.get('approved_exclusion', {}).get('heading') ==
+        '## User-approved remaining creation limits — 2026-10-29']
+    assert len(rows) == 66
+    for row in rows:
+        authority = row['approved_exclusion']
+        assert authority['native_absence_claim'] is False and authority['execution_credit'] is False
+        assert row['operation_mode'] == 'new-object' and row['kind'] == 'target_applicability'
+        assert row['dependencies'] == []
+        branch = deepcopy(context['branches'][row['id']])
+        original = deepcopy(branch)
+        attachment = {'contract': 'waapi-skill.installed-applicability-attachment/v1'}
+        binding = {'branch_id': row['id'], 'native_shape_sha256': row['shape_sha256'],
+            'installed_applicability_attachment': attachment,
+            'correspondence_sha256': digest(row['correspondence']), 'evidence': {}}
+        policy = {'native_shape_sha256': row['shape_sha256'], 'categories': [],
+            'definition_scope': 'installed_class_mode_applicability',
+            'reason': row['correspondence']['admission'], 'implementation_dependencies': [],
+            'approved_exclusion': authority}
+        evaluate_binding(branch, binding, policy, 'product', tmp_path, ROOT, context)
+        assert branch['state'] == 'approved_exclusion'
+        assert branch['exclusion'] == authority and branch['requirements'] == []
+        assert all(branch[key] == value for key, value in original.items() if key != 'state')
+        assert branch['direct_recipient_native_effect'] == 'not_observed'
+        for key, value in (('shape_sha256', 'f' * 64), ('source_file_sha256', 'e' * 64), ('version', '2099.1'),
+                ('kind', 'plugin_topology'), ('business_dimensions', {})):
+            foreign = deepcopy(original)
+            foreign[key] = value
+            evaluate_binding(foreign, binding, policy, 'product', tmp_path, ROOT, context)
+            assert foreign['state'] == 'unresolved'
+
+
+def test_creation_limits_preserve_known_methods_and_every_existing_mode(creation_limit_context, tmp_path):
+    from tests.support.applicability_completion_mapping import evaluate_binding
+    from tests.maintenance.branch_coverage_audit import digest
+    context = creation_limit_context
+    mixed = [r for r in context['mapping']['rows']
+        if 'approved_creation_boundary' in r['correspondence']]
+    expected = {
+        ('2021.1', 'Curve'): ['ak.wwise.core.object.setAttenuationCurve'],
+        ('2021.1', 'MultiSwitchEntry'): ['audio.import'],
+        ('2022.1', 'MultiSwitchEntry'): ['audio.import'],
+        ('2023.1', 'CustomState'): ['ak.wwise.core.object.setStateGroups', 'ak.wwise.core.object.setStateProperties'],
+        ('2024.1', 'CustomState'): ['ak.wwise.core.object.setStateGroups', 'ak.wwise.core.object.setStateProperties'],
+        ('2025.1', 'CustomState'): ['ak.wwise.core.object.setStateGroups', 'ak.wwise.core.object.setStateProperties'],
+        ('2025.1', 'StateGroupInfo'): ['ak.wwise.core.object.setStateGroups', 'ak.wwise.core.object.setStateProperties'],
+    }
+    assert {(r['version'], r['class_name']) for r in mixed} == set(expected)
+    for row in mixed:
+        role = row['correspondence']
+        assert role['operations'] == expected[row['version'], row['class_name']]
+        assert row['state'] == 'source_definition_verified' and row['dependencies'] == []
+        authority = role['approved_creation_boundary']
+        assert authority['native_absence_claim'] is False and authority['execution_credit'] is False
+        assert authority['original_dependencies']
+        attachment = {'contract': 'waapi-skill.installed-applicability-attachment/v1'}
+        binding = {'branch_id': row['id'], 'native_shape_sha256': row['shape_sha256'],
+            'installed_applicability_attachment': attachment,
+            'correspondence_sha256': digest(role), 'evidence': {'program': attachment}}
+        policy = {'native_shape_sha256': row['shape_sha256'], 'categories': ['program'],
+            'definition_scope': 'installed_class_mode_applicability',
+            'reason': role['admission'], 'implementation_dependencies': []}
+        branch = deepcopy(context['branches'][row['id']])
+        evaluate_binding(branch, binding, policy, 'product', tmp_path, ROOT, context)
+        assert branch['state'] == 'source_definition_verified'
+        assert branch['requirements'] == ['program'] and 'exclusion' not in branch
+        assert branch['direct_recipient_native_effect'] == 'not_observed'
+    for row in context['mapping']['rows']:
+        if row['operation_mode'] == 'existing-object' and row['class_name'] != 'BatchRenameSettings':
+            assert 'approved_creation_boundary' not in row['correspondence']
+            assert 'approved_exclusion' not in row
+    rows = {(r['version'], r['class_name'], r['operation_mode']): r
+        for r in context['mapping']['rows'] if r['kind'] == 'target_applicability'}
+    for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'):
+        language = rows[version, 'Language', 'new-object']
+        assert 'adding Language to an existing project only' in language['approved_exclusion']['scope']
+        assert language['correspondence']['retained_methods'] == [
+            'ak.wwise.cli.createNewProject initial languages', 'exact existing Language fields']
+        assert rows[version, 'Project', 'new-object']['correspondence']['operations'] == ['ak.wwise.cli.createNewProject']
+        for name in ('WorkUnit', 'Query', 'SearchCriteria', 'ControlSurfaceSession',
+                'ControlSurfaceBinding', 'ControlSurfaceBindingGroup'):
+            assert rows[version, name, 'new-object']['state'] == 'source_definition_verified'
+    for version in ('2023.1', '2024.1', '2025.1'):
+        for name in ('MusicPlaylistItem', 'MusicTransition'):
+            assert rows[version, name, 'new-object']['correspondence']['operations'] == ['object.set']
+    for version in ('2024.1', '2025.1'):
+        assert rows[version, 'BlendTrack', 'new-object']['correspondence']['operations'] == ['ak.wwise.core.blendContainer.addTrack']
+    for name in ('MediaPoolDatabase', 'MediaPoolDatabasePath'):
+        assert rows['2025.1', name, 'new-object']['correspondence']['operations'] == ['object.set']
+
+
+def test_creation_limit_authority_cannot_approve_existing_or_foreign_source_rows(creation_limit_context):
+    from tests.support.applicability_completion_mapping import validate_mapping
+    mapping = creation_limit_context['mapping']
+    for damage in ('absence-credit', 'execution-credit', 'authority', 'class', 'build', 'mode', 'existing-row'):
+        proposed = deepcopy(mapping)
+        row = next(r for r in proposed['rows'] if r['version'] == '2025.1'
+            and r['class_name'] == 'Language' and r['operation_mode'] == 'new-object')
+        if damage == 'absence-credit': row['approved_exclusion']['native_absence_claim'] = True
+        elif damage == 'execution-credit': row['approved_exclusion']['execution_credit'] = True
+        elif damage == 'authority': row['approved_exclusion']['section_sha256'] = '0' * 64
+        elif damage == 'class': row['source_dimensions']['class_id'] = 5636112
+        elif damage == 'build': row['build'] = '2025.1.0.1'
+        elif damage == 'mode': row['operation_mode'] = 'existing-object'
+        else:
+            existing = next(r for r in proposed['rows'] if r['version'] == '2025.1'
+                and r['class_name'] == 'Language' and r['operation_mode'] == 'existing-object')
+            existing.update(state='approved_exclusion', approved_exclusion=deepcopy(row['approved_exclusion']))
+        with pytest.raises(ValueError, match='Exact installed applicability'):
+            validate_mapping(proposed, ROOT)
+
+
+def test_exact_installed_roster_separates_birth_from_existing_field_access():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    mapping = definition_mapping(ROOT)
+    assert mapping['denominator'] == {'target_applicability': 1110, 'plugin_topology': 554}
+    assert len({r['id'] for r in mapping['rows']}) == 1664
+    rows = {(r['version'], r['class_name'], r['operation_mode'], r['kind']): r for r in mapping['rows']}
+    assert rows['2025.1', 'MetadataSlot', 'new-object', 'target_applicability']['correspondence']['path'] == 'owned_list_constructor'
+    assert rows['2021.1', 'MusicClip', 'new-object', 'target_applicability']['correspondence']['path'] == 'owned_list_constructor'
+    assert rows['2021.1', 'MusicClip', 'new-object', 'target_applicability']['correspondence']['operations'] == ['object.create']
+    assert rows['2025.1', 'MusicClip', 'existing-object', 'target_applicability']['correspondence']['path'] == 'exact_existing_object_fields'
+    assert rows['2021.1', 'Wwise System Output Settings', 'new-object', 'plugin_topology']['state'] == 'approved_exclusion'
+    assert rows['2021.1', 'Wwise System Output Settings', 'existing-object', 'plugin_topology']['state'] != 'approved_exclusion'
+    assert rows['2025.1', 'Wwise System Output Settings', 'new-object', 'plugin_topology']['correspondence']['placements'] == ['shareset', 'owner-local-metadata']
+    assert all(r['native_effect'] == 'not_claimed' for r in mapping['rows'])
+
+
+def test_changed_or_unknown_source_cannot_become_constructible(tmp_path):
+    from tests.support.applicability_completion_mapping import definition_mapping, validate_mapping
+    mapping = definition_mapping(ROOT)
+    for damage in ('mode', 'source', 'missing-source', 'route', 'missing', 'absence', 'version'):
+        proposed = deepcopy(mapping)
+        row = next(r for r in proposed['rows'] if r['class_name'] == 'MetadataSlot' and r['operation_mode'] == 'new-object')
+        if damage == 'mode': row['operation_mode'] = 'existing-object'
+        elif damage == 'source': row['source_file_sha256'] = '0' * 64
+        elif damage == 'missing-source': row.pop('class_source')
+        elif damage == 'route': row['correspondence']['operations'] = []
+        elif damage == 'missing': proposed['rows'].pop()
+        elif damage == 'version': row['version'] = '2021.1'
+        else: row['state'] = 'proven_native_absence'
+        with pytest.raises(ValueError, match='Exact installed applicability'):
+            validate_mapping(proposed, ROOT)
+
+
+def test_named_session_and_sidechain_births_reuse_ordinary_constructor_strength():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    mapping = definition_mapping(ROOT)
+    selected = [r for r in mapping['rows'] if r['operation_mode'] == 'new-object'
+        and r['class_name'] in {'ControlSurfaceSession', 'SidechainMix'}]
+    assert len(selected) == 6
+    for row in selected:
+        assert row['id'] == f"{row['version']}|metadata|{row['build']}|target|{4325392 if row['class_name'] == 'ControlSurfaceSession' else 5636112}|new-object"
+        comparison = next(r for r in mapping['rows'] if r['version'] == row['version']
+            and r['class_name'] == 'AcousticTexture' and r['operation_mode'] == 'new-object')
+        assert row['correspondence'] == comparison['correspondence']
+        assert row['state'] == 'source_definition_verified'
+        assert row['dependencies'] == []
+        assert row['native_effect'] == 'not_claimed'
+        assert row['direct_recipient_execution'] == 'not_observed'
+
+
+def test_blend_factory_and_legacy_marker_join_preserve_exact_role_boundaries():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    mapping = definition_mapping(ROOT)
+    births = {(r['version'], r['class_name']): r for r in mapping['rows']
+        if r['kind'] == 'target_applicability' and r['operation_mode'] == 'new-object'}
+    for version in ('2024.1', '2025.1'):
+        row = births[version, 'BlendTrack']
+        assert row['state'] == 'source_definition_verified'
+        assert row['correspondence']['path'] == 'blend_container_owned_track_factory'
+        assert row['correspondence']['operations'] == ['ak.wwise.core.blendContainer.addTrack']
+        assert 'result_schema_checked' in row['correspondence']['verification']
+    for version in ('2021.1', '2022.1'):
+        row = births[version, 'Marker']
+        assert row['state'] == 'source_definition_verified'
+        assert row['source_dimensions']['class_id'] == 65077248
+        boundary = row['correspondence']['boundary']
+        assert boundary['introduced_in'] == '2023.1'
+        assert boundary['all_marker_information_absence_proven'] is False
+        assert boundary['modern_marker']['class_id'] == 5373968
+        assert row['dependencies'] == []
+    for version in ('2021.1', '2022.1', '2023.1'):
+        assert births[version, 'BlendTrack']['state'] == 'approved_exclusion'
+    for version in ('2021.1', '2022.1'):
+        row = births[version, 'MultiSwitchEntry']
+        assert row['state'] == 'source_definition_verified'
+        assert row['dependencies'] == []
+        assert row['correspondence']['approved_creation_boundary']['native_absence_claim'] is False
+        role, = row['correspondence']['partial_roles']
+        assert role['operations'] == ['audio.import']
+        assert role['role'] == 'Dialogue_conditions_owned_association'
+        assert 'decision-path order' in role['verification']
+    assert not any(r['state'] == 'proven_native_absence' for r in mapping['rows'])
+
+
+def test_saved_constructor_join_uses_version_gates_and_disclosed_weaker_outcomes():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    mapping = definition_mapping(ROOT)
+    rows = [r for r in mapping['rows'] if r['operation_mode'] == 'new-object'
+        and r['class_name'] in {'WorkUnit', 'Query', 'SearchCriteria'}]
+    assert len(rows) == 15
+    for row in rows:
+        role = row['correspondence']
+        assert row['state'] == 'source_definition_verified'
+        assert row['dependencies'] == []
+        assert role['implementation_issue'] == 205
+        assert role['source']['build'] == row['build']
+        assert role['source']['class_id'] == row['source_dimensions']['class_id']
+        if row['class_name'] != 'WorkUnit' and row['version'] < '2023.1':
+            assert role['operations'] == []
+            assert role['boundary']['native_absence_claim'] is False
+            assert role['boundary']['scope'] == ('object.create' if row['version'] == '2021.1' else 'object.create and object.set')
+        else:
+            assert role['operations'] == (['object.create'] if row['version'] == '2021.1' else ['object.create', 'object.set'])
+            if row['class_name'] == 'WorkUnit':
+                assert role['effects'] == ['undo_redo_history_cleared', 'clipboard_cleared', 'corresponding_WWU_saved_in_active_project']
+                assert 'result_schema_checked' in role['verification']
+                assert 'unobserved' in role['verification']
+            elif row['class_name'] == 'SearchCriteria':
+                assert len(role['source']['criteria']) == 11
+                assert 'SearchOperationID_and_query_matches_unobserved' in role['verification']
+        assert row['native_effect'] == 'not_claimed'
+
+
+def test_playlist_constructor_join_is_exactly_three_source_bound_owned_roles():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    from wwise_waapi.music_playlist import declaration_contract
+    mapping = definition_mapping(ROOT)
+    rows = [r for r in mapping['rows'] if r['class_name'] == 'MusicPlaylistItem']
+    births = [r for r in rows if r['operation_mode'] == 'new-object']
+    assert len(births) == 5
+    for row in births:
+        if row['version'] in ('2021.1', '2022.1'):
+            assert row['state'] == 'approved_exclusion'
+            assert row['dependencies'] == []
+            assert row['correspondence']['operations'] == []
+            continue
+        role = row['correspondence']
+        contract = declaration_contract(row['version'])
+        assert row['id'] == f"{row['version']}|metadata|{row['build']}|target|2359312|new-object"
+        assert row['state'] == 'source_definition_verified' and row['dependencies'] == []
+        assert role['implementation_issue'] == 206
+        assert role['path'] == 'music_playlist_container_owned_ordered_tree'
+        assert role['operations'] == ['object.set']
+        assert role['source']['build'] == row['build']
+        assert role['source']['class_id'] == row['source_dimensions']['class_id'] == 2359312
+        assert len(role['source']['members']) == 2
+        assert len(role['source']['supporting_readback_sources']) == 2
+        assert role['source']['supporting_readback_scope']['version'] == '2025.1'
+        assert role['source']['supporting_readback_scope']['public_gateway_execution'] == 'not_claimed'
+        assert role['source']['supporting_readback_scope']['other_versions'] == 'matching_source_and_program_correspondence_only'
+        assert role['declaration'] == contract
+        assert role['verification_scope'] == 'stored_playlist_tree; never_audio_or_playback_quality'
+        assert role['ordered_readback'] == contract['ordered_readback']
+        assert role['hidden_loop_controller'] == contract['hidden_loop_controller']
+        assert 'unexposed_IsLoopingInfinite' in role['hidden_loop_controller']
+        assert role['mechanism_sources']['strength'] == 'existing shared public mechanism tests; no per-row or native execution inferred'
+        assert row['native_effect'] == 'not_claimed'
+        assert row['direct_recipient_execution'] == 'not_observed'
+    assert all(r['correspondence']['path'] == 'exact_existing_object_fields'
+        for r in rows if r['operation_mode'] == 'existing-object')
+
+
+@pytest.mark.parametrize('damage', ('resource-version', 'member', 'native-member', 'manifest', 'class', 'build'))
+def test_playlist_join_rejects_selected_source_or_identity_drift(tmp_path, damage):
+    import shutil
+    from tests.support.applicability_completion_mapping import _music_playlist_correspondence
+    version = '2025.1'
+    resource = f'skills/waapi-skill/resources/metadata/{version}/music-playlist-construction.json'
+    manifest = f'skills/waapi-skill/resources/manifest/{version}/schemas.json'
+    for relative in (resource, manifest):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, target)
+    members = f'skills/waapi-skill/references/semantic/{version}/music-playlist-sources'
+    shutil.copytree(ROOT / members, tmp_path / members)
+    class_id, build = 2359312, '2025.1.7.9143'
+    if damage == 'resource-version':
+        record = json.loads((tmp_path / resource).read_bytes())
+        record['version'] = '2024.1'
+        (tmp_path / resource).write_text(json.dumps(record))
+    elif damage == 'member':
+        (tmp_path / members / 'wwiseobject_musicplaylistitem.html').write_bytes(b'changed primary source')
+    elif damage == 'native-member':
+        (tmp_path / members / 'native-readback.original.json').write_bytes(b'changed readback source')
+    elif damage == 'manifest':
+        (tmp_path / manifest).write_bytes(b'changed reflected schema')
+    elif damage == 'class':
+        class_id += 1
+    else:
+        build = '2024.1.13.9056'
+    with pytest.raises(ValueError, match='Exact installed applicability Music Playlist'):
+        _music_playlist_correspondence(tmp_path, version, class_id, build)
+
+
+def test_portable_applicability_join_keeps_approved_limits_separate_from_execution(tmp_path):
+    from tests.maintenance.map_applicability_completion import main
+    from tests.maintenance.branch_coverage_audit import portable_binding_inputs
+    from tests.maintenance.branch_audit_completion import evaluate_coverage
+    from tests.maintenance.branch_coverage_audit import digest, load
+    from tests.maintenance.branch_audit_completion import installed_obligations
+    base = tmp_path / 'join'
+    assert main(['--output-directory', str(base)]) == 0
+    result = {'requirements': load(base / 'requirements.json'), 'bindings': load(base / 'bindings.json'),
+        'branches': [b for b in installed_obligations(ROOT, digest=digest, load=load)
+            if b['kind'] in {'target_applicability', 'plugin_topology'}]}
+    imported, base, inputs = portable_binding_inputs(tmp_path / 'join/evidence-index.json', result['requirements'])
+    assert imported == result['bindings']
+    assert inputs['installed_applicability']['exact_source_members'] == 1664
+    subset = {'contract': result['requirements']['contract'],
+        'branches': {r['id']: result['requirements']['branches'][r['id']] for r in result['branches']}}
+    assessment = evaluate_coverage(ROOT, {'routes': [], 'native_coverage': {
+        'candidate_sha256': 'c' * 64, 'catalogs': {}, 'routes': [], 'obligations': result['branches']}},
+        imported, digest=digest, evidence_base=base, requirements_document=subset)
+    # Completion here covers this source-applicability subset only. Accepted
+    # creation limits resolve its remaining scope without granting execution.
+    assert assessment['completion']['complete'] is True
+    assert assessment['completion']['routes'] == 0
+    assert assessment['installed_applicability']['native_runs'] == 0
+    assert assessment['installed_applicability']['direct_recipient_execution'] == 'not_observed'
+    assert assessment['completion']['obligations'] == 1664
+    pending = [r for r in assessment['obligations'] if r['state'] == 'implementation_dependency']
+    assert pending == []
+    limits = [r for r in assessment['obligations'] if r.get('exclusion', {}).get('heading') ==
+        '## User-approved remaining creation limits — 2026-10-29']
+    assert len(limits) == 66
+    assert all(r['exclusion']['native_absence_claim'] is False and
+        r['exclusion']['execution_credit'] is False for r in limits)
+    mixed = [r for r in assessment['obligations'] if
+        'approved_creation_boundary' in r['applicability_correspondence']]
+    assert {(r['version'], r['business_dimensions']['class_name']) for r in mixed} == {
+        ('2021.1', 'Curve'), ('2021.1', 'MultiSwitchEntry'), ('2022.1', 'MultiSwitchEntry'),
+        ('2023.1', 'CustomState'), ('2024.1', 'CustomState'), ('2025.1', 'CustomState'),
+        ('2025.1', 'StateGroupInfo')}
+    assert all(r['state'] == 'source_definition_verified' and r['requirements'] == ['program']
+        and r['applicability_correspondence']['operations'] for r in mixed)
+    assert all(r['applicability_correspondence']['approved_creation_boundary']['native_absence_claim'] is False
+        and r['applicability_correspondence']['approved_creation_boundary']['execution_credit'] is False for r in mixed)
+    assert all(r.get('direct_recipient_native_effect') == 'not_observed' for r in assessment['obligations'])
+    assert not any(r['state'] in {'verified', 'proven_native_absence'} for r in assessment['obligations'])
+    assert load(base / 'assessment.json')['completion'] == assessment['completion']
+    saved = [r for r in assessment['obligations']
+        if r['business_dimensions']['class_name'] in {'WorkUnit', 'Query', 'SearchCriteria'}
+        and r['business_dimensions']['operation_mode'] == 'new-object']
+    assert len(saved) == 15
+    assert all(r['state'] == 'source_definition_verified' for r in saved)
+    playlists = [r for r in assessment['obligations']
+        if r['business_dimensions']['class_name'] == 'MusicPlaylistItem'
+        and r['business_dimensions']['operation_mode'] == 'new-object']
+    assert len(playlists) == 5
+    assert all(r['state'] == ('approved_exclusion' if r['version'] in ('2021.1', '2022.1')
+        else 'source_definition_verified') for r in playlists)
+    previous = load(ROOT / 'docs/branch-coverage-requirements.json')['branches']
+    assert all(result['requirements']['branches'][i] == p for i, p in previous.items()
+        if i not in {b['id'] for b in result['branches']})
+
+
+def test_joined_roles_reject_scope_or_strength_promotion_and_keep_source_identity():
+    from tests.maintenance.branch_audit_completion import installed_obligations
+    from tests.maintenance.branch_coverage_audit import digest, load
+    from tests.support.applicability_completion_mapping import definition_mapping, validate_mapping
+    mapping = definition_mapping(ROOT)
+    original = {r['id']: r for r in installed_obligations(ROOT, digest=digest, load=load)
+        if r['kind'] in {'target_applicability', 'plugin_topology'}}
+    for row in mapping['rows']:
+        source = original[row['id']]
+        assert all(row[k] == source[k] for k in ('id', 'version', 'build', 'shape_sha256',
+            'source_file_sha256', 'source_evidence_kind', 'owner_issue'))
+        assert row['source_dimensions'] == source['business_dimensions']
+    for name, version, field, value in (
+        ('WorkUnit', '2025.1', 'verification', 'verified_all_effects'),
+        ('SearchCriteria', '2023.1', 'operations', ['audio.import']),
+        ('MusicPlaylistItem', '2023.1', 'operations', ['object.create']),
+        ('MusicPlaylistItem', '2024.1', 'verification_scope', 'playback_order_verified'),
+        ('MusicPlaylistItem', '2025.1', 'hidden_loop_controller', 'infer_from_LoopCount'),
+        ('Marker', '2021.1', 'boundary', {'all_marker_information_absence_proven': True}),
+        ('MultiSwitchEntry', '2022.1', 'partial_roles', [])):
+        proposed = deepcopy(mapping)
+        row = next(r for r in proposed['rows'] if r['class_name'] == name
+            and r['version'] == version and r['operation_mode'] == 'new-object')
+        row['correspondence'][field] = value
+        with pytest.raises(ValueError, match='Exact installed applicability'):
+            validate_mapping(proposed, ROOT)
+
+
+@pytest.mark.parametrize('source,damage', [
+    ('skills/waapi-skill/wwise_waapi/documented_list_fields.py', 'changed'),
+    ('skills/waapi-skill/resources/metadata/2021.1/installed-owned-list-fields.json', 'changed'),
+    ('skills/waapi-skill/resources/metadata/2021.1/installed-owned-list-fields.json', 'missing'),
+    ('skills/waapi-skill/wwise_waapi/operation_registry.py', 'removed-route')])
+def test_changed_invoked_code_or_resource_invalidates_shared_proof(tmp_path, source, damage):
+    from tests.support.platform_filesystem import create_symlink_or_skip
+    from tests.support.applicability_completion_mapping import program_review
+    for directory in ('tests', 'docs'):
+        create_symlink_or_skip(tmp_path / directory, ROOT / directory, target_is_directory=True)
+    for directory in ('scripts', 'wwise_waapi', 'resources', 'references'):
+        for original in (ROOT / 'skills/waapi-skill' / directory).rglob('*'):
+            if not original.is_file() or '__pycache__' in original.parts:
+                continue
+            target = tmp_path / original.relative_to(ROOT)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            create_symlink_or_skip(target, original)
+    # Establish a valid unchanged closure before introducing exactly one defect.
+    # Missing retained primary references must not make this negative pass.
+    program_review(tmp_path)
+    target = tmp_path / source
+    raw = target.read_bytes()
+    target.unlink()
+    if damage != 'missing':
+        if damage == 'removed-route':
+            lines = raw.splitlines(keepends=True)
+            selected = [line for line in lines if line.startswith(b'    ("object.createPlugin",')]
+            assert len(selected) == 1
+            raw = raw.replace(selected[0], b'', 1)
+        else:
+            raw += b'\nchanged-proof-input\n'
+        target.write_bytes(raw)
+    with pytest.raises(ValueError, match='source closure'):
+        program_review(tmp_path)
+
+
+def test_attachment_import_is_atomic_and_never_grants_native_credit(tmp_path):
+    from tests.support.applicability_completion_mapping import export_mapping, attach_mappings
+    from tests.maintenance.branch_audit_completion import evidence_result
+    result = export_mapping(ROOT, tmp_path)
+    identity = next(iter(result['bindings']['bindings']))
+    branch = next(r for r in result['branches'] if r['id'] == identity)
+    binding = result['bindings']['bindings'][identity]
+    for category in ('native', 'live_metadata'):
+        assert evidence_result(result['attachment'], branch, 'c' * 64, category, 'product', tmp_path, binding, ROOT)[0] == 'missing'
+    for descriptors, retained in (([result['attachment']] * 2, {}),
+            ([result['attachment']], {identity: {'original': 'preserve'}})):
+        before = deepcopy(retained)
+        with pytest.raises(ValueError):
+            attach_mappings(descriptors, retained, tmp_path, ROOT)
+        assert retained == before
+
+
+def test_overlaid_list_correspondence_cites_exact_installed_xml_field():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    source = json.loads((ROOT / 'skills/waapi-skill/resources/metadata/2021.1/installed-owned-list-fields.json').read_bytes())
+    mapping = definition_mapping(ROOT)
+    music = next(r for r in mapping['rows'] if r['version'] == '2021.1'
+        and r['class_name'] == 'MusicClipMidi' and r['operation_mode'] == 'new-object')
+    owner, = music['correspondence']['owners']
+    declaration, = [r for r in source['rows'] if r['owner_class_id'] == owner['owner_class_id']
+        and r['field']['name'] == owner['list']]
+    assert owner['source_member'] == declaration['source_member']
+    assert owner['source_sha256'] == source['source']['sha256']
+    assert not owner['source_member'].endswith('.html')
+
+
+def test_shared_program_source_closure_includes_invoked_gateway_helpers():
+    from tests.support.applicability_program import program_sources
+    sources = program_sources(ROOT)
+    assert {'tests/conftest.py', 'tests/unit/test_legacy_owned_list_gateway.py',
+        'tests/unit/test_new_object_conditions_gateway.py',
+        'tests/unit/test_object_graph_owned_choices_gateway.py',
+        'tests/unit/test_field_interface_closure_gateway.py',
+        'tests/unit/test_plugin_shareset_gateway.py',
+        'tests/unit/test_plugin_kind_placements_gateway.py',
+        'tests/unit/test_music_playlist_gateway.py'} <= sources.keys()
+    playlist_sources = {p.relative_to(ROOT).as_posix() for version in ('2023.1', '2024.1', '2025.1')
+        for p in (ROOT / 'skills/waapi-skill/references/semantic' / version / 'music-playlist-sources').iterdir()
+        if p.suffix in {'.html', '.json'}}
+    assert len(playlist_sources) == 8
+    assert playlist_sources <= sources.keys()
+
+    transition_sources = {p.relative_to(ROOT).as_posix() for version in ('2023.1', '2024.1', '2025.1')
+        for p in (ROOT / 'skills/waapi-skill/references/semantic' / version / 'music-transition-sources').iterdir()}
+    assert len(transition_sources) == 9
+    assert transition_sources <= sources.keys()
+    assert 'tests/unit/test_music_transition_gateway.py' in sources
+
+
+def test_media_pool_database_birth_joins_exact_source_owned_directory_flow():
+    from tests.support.applicability_completion_mapping import definition_mapping, validate_mapping
+    mapping = definition_mapping(ROOT)
+    selected = [row for row in mapping['rows'] if row['version'] == '2025.1'
+        and row['class_name'] in {'MediaPoolDatabase', 'MediaPoolDatabasePath'} and row['operation_mode'] == 'new-object']
+    assert len(selected) == 2
+    for row in selected:
+        assert row['state'] == 'source_definition_verified'
+        assert row['dependencies'] == []
+        role = row['correspondence']
+        assert role['implementation_issue'] == 207
+        assert role['path'] == 'media_pool_database_owned_directory_configuration'
+        assert role['operations'] == ['object.set']
+        assert role['source']['class_id'] == row['source_dimensions']['class_id']
+        assert role['source']['member_sha256'] == 'de5de9c1908f5dbcd810714bb1f9dc693bb05764da85a1cdd0493cc75bc5d708'
+        assert 'index_completion_not_claimed' in role['verification_scope']
+        assert row['native_effect'] == 'not_claimed' and row['direct_recipient_execution'] == 'not_observed'
+    query, = [row for row in mapping['rows'] if row['version'] == '2025.1'
+        and row['class_name'] == 'MediaPoolQuery' and row['operation_mode'] == 'new-object']
+    assert query['state'] == 'implementation_dependency'
+    promoted = deepcopy(mapping)
+    row = next(row for row in promoted['rows'] if row['id'] == selected[0]['id'])
+    row['correspondence']['verification_scope'] = 'indexing_completed'
+    with pytest.raises(ValueError, match='Exact installed applicability'):
+        validate_mapping(promoted, ROOT)
+
+
+def test_modern_transition_births_join_owned_append_and_explicit_replacement_only():
+    from tests.support.applicability_completion_mapping import definition_mapping, validate_mapping
+    mapping = definition_mapping(ROOT)
+    rows = {row['version']: row for row in mapping['rows'] if row['class_name'] == 'MusicTransition'
+        and row['operation_mode'] == 'new-object'}
+    assert set(rows) == {'2021.1', '2022.1', '2023.1', '2024.1', '2025.1'}
+    for version in ('2023.1', '2024.1', '2025.1'):
+        row = rows[version]
+        role = row['correspondence']
+        assert row['state'] == 'source_definition_verified' and row['dependencies'] == []
+        assert role['implementation_issue'] == 195 and role['parent_issue'] == 174
+        assert role['path'] == 'music_owner_transition_root_and_rule_construction'
+        assert role['operations'] == ['object.set']
+        assert role['declaration']['mode'] == ['append-rules', 'replace-entire-root']
+        assert role['declaration']['owner_classes'] == {'MusicSwitchContainer': 2293776, 'MusicPlaylistContainer': 2228240, 'MusicTrack': 1835024}
+        assert len(role['source']['members']) == 3
+        assert 'priority_not_verified' in role['verification_scope']
+        assert row['native_effect'] == 'not_claimed' and row['direct_recipient_execution'] == 'not_observed'
+    for version in ('2021.1', '2022.1'):
+        assert rows[version]['state'] == 'implementation_dependency'
+        assert rows[version]['dependencies'][0]['owner_issue'] == 195
+        assert rows[version]['dependencies'][0]['native_absence_claim'] is False
+    assert validate_mapping(mapping, ROOT) == mapping
+
+
+def test_transition_join_checks_selected_candidate_primary_bytes(tmp_path):
+    import shutil
+    from tests.support.applicability_completion_mapping import _music_transition_correspondence
+    directory = 'skills/waapi-skill/references/semantic/2025.1/music-transition-sources'
+    shutil.copytree(ROOT / directory, tmp_path / directory)
+    manifest = 'skills/waapi-skill/resources/manifest/2025.1/schemas.json'
+    (tmp_path / manifest).parent.mkdir(parents=True)
+    shutil.copyfile(ROOT / manifest, tmp_path / manifest)
+    role = _music_transition_correspondence(tmp_path, '2025.1', 2424848, '2025.1.7.9143')
+    assert role['source']['authority']['version'] == '2025.1'
+    (tmp_path / directory / 'ak_wwise_core_object_set.html.gz').write_bytes(b'changed selected source')
+    with pytest.raises(ValueError, match='Music Transition source differs'):
+        _music_transition_correspondence(tmp_path, '2025.1', 2424848, '2025.1.7.9143')
+
+
+def test_control_surface_birth_join_is_exactly_ten_role_scoped_rows():
+    from tests.support.applicability_completion_mapping import definition_mapping
+    mapping = definition_mapping(ROOT)
+    rows = [row for row in mapping['rows'] if row['class_name'] in {'ControlSurfaceBindingGroup', 'ControlSurfaceBinding'}]
+    births = [row for row in rows if row['operation_mode'] == 'new-object']
+    assert len(births) == 10
+    for row in births:
+        role = row['correspondence']
+        assert row['state'] == 'source_definition_verified' and row['dependencies'] == []
+        assert row['id'] == f"{row['version']}|metadata|{row['build']}|target|{4456464 if row['class_name'] == 'ControlSurfaceBindingGroup' else 4390928}|new-object"
+        assert role['path'] == 'control_surface_role_guarded_named_children'
+        assert role['source']['build'] == row['build']
+        assert role['source']['classes'][row['class_name']] == row['source_dimensions']['class_id']
+        assert role['operations'] == ['object.create', *([] if row['version'] == '2021.1' else ['object.set'])]
+        assert 'automatic_birth_not_claimed' in role['declaration']['reserved_groups']
+        assert 'hardware_effect_not_claimed' in role['declaration']['hardware_assignment']
+        assert row['native_effect'] == 'not_claimed' and row['direct_recipient_execution'] == 'not_observed'
+    assert all(row['correspondence']['path'] == 'exact_existing_object_fields' for row in rows if row['operation_mode'] == 'existing-object')
+    assert any(row['class_name'] == 'UserProjectSettings' and row['operation_mode'] == 'new-object'
+        and row['state'] == 'implementation_dependency' for row in mapping['rows'])

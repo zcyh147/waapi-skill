@@ -3201,7 +3201,9 @@ def _parse_import_asset_spec(value: Any, path: str, *, adapter: str) -> Mapping[
         raise EvalBundleV3Error(f"{path}.tsv must not be empty for tab-import fixtures")
     seen_names: list[str] = []
     tab_by_name: dict[str, Mapping[str, Any]] = {}
-    allowed_headers = set(TAB_HEADERS_BY_VERSION[EXECUTION_PROFILE_VERSION])
+    # Preserve review definitions; native version readiness is separate from
+    # known column syntax and remains blocked by request mappings/production.
+    allowed_headers = set().union(*TAB_HEADERS_BY_VERSION.values())
     for index, value in enumerate(tab_rows):
         tab_path = f"{path}.tsv[{index}]"
         tab = _object(value, tab_path)

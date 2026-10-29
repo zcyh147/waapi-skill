@@ -58,16 +58,16 @@ def test_schema_inventory_resources_have_deterministic_bytes() -> None:
         assert path.read_text(encoding="utf-8") == writer.dumps(payload)
 
 
-def test_packaged_surface_closes_all_849_exact_lanes() -> None:
+def test_packaged_surface_includes_all_exact_lanes_and_closed_layout_reads() -> None:
     result = validate_packaged_typed_request_surface(root=RESOURCE_ROOT)
 
     assert result["contract"] == TYPED_REQUEST_SURFACE_CONTRACT
     assert result["versions"] == list(SUPPORTED_WWISE_VERSION_KEYS)
     assert result["totals"] == {
-        "function_lanes": 689,
+        "function_lanes": 737,
         "topic_lanes": 160,
-        "total_lanes": 849,
-        "unique_function_uris": 168,
+        "total_lanes": 897,
+        "unique_function_uris": 193,
         "unique_topic_uris": 35,
     }
     assert result["unresolved_references"] == []
@@ -78,7 +78,7 @@ def test_packaged_surface_closes_all_849_exact_lanes() -> None:
         for row in result["lanes"]
         if row["item_type"] == "function"
     }
-    assert function_shapes == {"zero", "inline", "draft"}
+    assert function_shapes == {"zero", "inline", "draft", "closed_read", "closed_business"}
     assert sum(
         row["construction_shape"] == "zero"
         for row in result["lanes"]
@@ -453,3 +453,58 @@ def _canonical_sha256(value: object) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def test_closed_layout_reads_retain_native_definition_graph_and_unresolved_result_semantics():
+    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
+    result = build_typed_request_surface(root=RESOURCE_ROOT)
+    rows = [row for row in result['lanes'] if row['uri'] in LAYOUT_READ_URIS]
+    assert len(rows) == 14
+    assert {row['construction_shape'] for row in rows} == {'closed_read'}
+    assert result['unresolved_references'] == []
+    assert result['unknown_schema_keywords'] == []
+    for version in ('2024.1', '2025.1'):
+        graph = result['native_result_definition_graphs'][version]
+        element = graph['documents']['waapi_ui_definitions.json']['definitions']['Element']
+        assert 'OneOf' in element and 'oneOf' not in element
+        layout = next(row for row in rows if row['version'] == version and row['uri'].endswith('.getLayout'))
+        assert layout['business_read_contract']['continuation']['gateway_argv'] == ['layout-read', 'contents']
+        assert layout['result_semantics']['status'] == 'definition_semantics_unresolved'
+        assert layout['native_result_definition_graph_sha256'] == graph['sha256']
+        assert layout['result_semantics']['business_arrangement_verified'] is False
+
+
+def test_closed_layout_business_lanes_retain_exact_native_request_definition_obligations():
+    result = build_typed_request_surface(root=RESOURCE_ROOT)
+    rows = [row for row in result['lanes'] if row['construction_shape'] == 'closed_business'
+            and row['uri'].startswith('ak.wwise.ui.layout.')]
+    assert len(rows) == 16
+    assert {row['uri'].rsplit('.', 1)[-1] for row in rows} == {'setLayout', 'switchLayout', 'removeLayout', 'getOrCreateView', 'closeView', 'undockView', 'dockView', 'moveSplitter', 'resetLayouts'}
+    assert {row['version'] for row in rows if row['uri'].endswith('.closeView')} == {'2025.1'}
+    assert result['unresolved_references'] == []
+    for row in rows:
+        assert row['business_contract']['input_mode'] == 'business_declaration'
+        assert row['native_request_schema_is_not_public_construction'] is True
+        if row['uri'].endswith('.setLayout'):
+            assert row['request_semantics']['status'] == 'definition_semantics_unresolved'
+            graph = result['native_result_definition_graphs'][row['version']]
+            assert row['native_ui_definition_graph_sha256'] == graph['sha256']
+            assert graph['documents']['waapi_ui_definitions.json']['definitions']['Element']['OneOf']
+
+
+def test_owned_models_use_exact_authoring_definitions_and_closed_business_constructors():
+    from wwise_waapi.authoring_model_business import MODEL_OPERATIONS
+    from wwise_waapi.schema_inventory import load_authoring_definition_graph
+    result = build_typed_request_surface(root=RESOURCE_ROOT)
+    rows = [row for row in result['lanes'] if row['uri'] in MODEL_OPERATIONS]
+    assert {(row['version'], row['uri']) for row in rows} == {
+        (version, uri) for version in ('2024.1', '2025.1') for uri in MODEL_OPERATIONS}
+    for row in rows:
+        graph = load_authoring_definition_graph(row['version'])
+        assert 'wafm_definitions.json' in graph.documents
+        assert row['definition_graph_sha256'] == graph.inventory_sha256
+        assert row['native_authoring_definition_graph_sha256'] == graph.inventory_sha256
+        assert row['construction_shape'] == 'closed_business'
+        assert row['business_contract']['declaration']['subcommand'] == 'draft-declare-model-plan'
+        assert row['request_semantics']['native_write_acceptance'] == 'pending_owned_native_observation'
+    assert result['unresolved_references'] == []

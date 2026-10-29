@@ -20,26 +20,14 @@ import stat
 from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping, Sequence
 
+from .host_paths import HostPathError, localize_waapi_host_path, parse_absolute_host_path, parse_relative_host_path
+
 
 AUDIO_IMPORT_PLAN_CONTRACT = "waapi-skill.audio-import-plan/v1"
 TAB_IMPORT_PLAN_CONTRACT = "waapi-skill.tab-import-plan/v1"
 SUPPORTED_WWISE_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 SUPPORTED_IMPORT_OPERATIONS = ("createNew", "useExisting", "replaceExisting")
 AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS = ("2023.1", "2024.1", "2025.1")
-
-# Wwise 2022 evidence establishes only audioFile/objectPath/importLanguage for
-# a useExisting row that resolves to a localized object.  The fields below are
-# therefore creation- or placement-sensitive at that boundary; they must not
-# be silently removed from a caller's request.
-# A useExisting request may legitimately mix live and absent target paths, so
-# the registry applies this row policy only after it has captured each path's
-# actual pre-state.
-LOCALIZED_EXISTING_UNSUPPORTED_FIELDS = (
-    "originals_subfolder",
-    "notes",
-    "audio_source_notes",
-    "event",
-)
 
 MAX_IMPORT_ITEMS = 128
 MAX_TAB_BYTES = 256 * 1024
@@ -78,6 +66,7 @@ _DYNAMIC_FIELD_NAME = re.compile(r"^[:_a-zA-Z0-9]+$")
 _PROPERTY_HEADER = re.compile(r"^Property\[([:_a-zA-Z0-9]+)\]$")
 _REFERENCE_HEADER = re.compile(r"^Reference\[([:_a-zA-Z0-9]+)\]$")
 _AT_HEADER = re.compile(r"^@([:_a-zA-Z0-9]+)$")
+_TAB_OBJECT_GUID = re.compile(r"^\{[0-9A-Fa-f]{8}-(?:[0-9A-Fa-f]{4}-){3}[0-9A-Fa-f]{12}\}$")
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
 
 # These pairs describe reviewed import-syntax aliases, not reflected-class
@@ -119,8 +108,11 @@ _TAB_HEADERS = frozenset(
         "Switch Assignation",
     }
 )
+# Wwise 2023.1 release note WG-60834 introduced this TSV column.
+# Ordinary audio.import originalsSubFolder is a separate, five-version field.
 TAB_HEADERS_BY_VERSION: Mapping[str, frozenset[str]] = {
-    version: _TAB_HEADERS for version in SUPPORTED_WWISE_VERSIONS
+    version: (_TAB_HEADERS - {"OriginalsSubFolder"} if version in {"2021.1", "2022.1"} else _TAB_HEADERS)
+    for version in SUPPORTED_WWISE_VERSIONS
 }
 REQUIRED_TAB_HEADERS = frozenset({"Object Path"})
 
@@ -226,37 +218,6 @@ def import_operation_policy(import_operation: str) -> dict[str, Any]:
     }
 
 
-def unsupported_localized_existing_fields(
-    *,
-    import_language: Any,
-    originals_subfolder_supplied: bool,
-    notes_supplied: bool,
-    audio_source_notes_supplied: bool,
-    event_supplied: bool,
-) -> tuple[str, ...]:
-    """Return fields unsafe on an existing localized useExisting target.
-
-    Wwise's import operation is call-wide, but localization state is row-wide:
-    some useExisting rows can resolve to live Sound Voice objects while other
-    rows in the same call are still absent.  The caller must therefore invoke
-    this only for a row already proven to exist.  ``SFX`` and rows without an
-    explicit language are outside this narrow localized boundary.
-    """
-
-    if not isinstance(import_language, str) or import_language.casefold() == "sfx":
-        return ()
-    requested: list[str] = []
-    if originals_subfolder_supplied:
-        requested.append("originals_subfolder")
-    if notes_supplied:
-        requested.append("notes")
-    if audio_source_notes_supplied:
-        requested.append("audio_source_notes")
-    if event_supplied:
-        requested.append("event")
-    return tuple(requested)
-
-
 def regular_file_proof(value: str | os.PathLike[str], *, field: str) -> dict[str, Any]:
     """Hash one absolute, non-symlink regular file without following the leaf."""
 
@@ -286,7 +247,16 @@ def verify_regular_file_proof(proof: Mapping[str, Any], *, field: str) -> dict[s
     expected_path = proof.get("path")
     if not isinstance(expected_path, str):
         raise ImportContractError("INVALID_FILE_PROOF", f"{field} proof requires path.")
-    actual = regular_file_proof(expected_path, field=field)
+    current_path = expected_path
+    if "native_path" in proof:
+        native_path, directory = proof.get("native_path"), proof.get("table_directory")
+        if not isinstance(native_path, str) or not isinstance(directory, str) or not Path(directory).is_absolute():
+            raise ImportContractError("INVALID_FILE_PROOF", "A table media proof lacks its native path or absolute table directory.")
+        try:
+            current_path = _tab_media_host_path(native_path, table_directory=Path(directory))
+        except HostPathError as exc:
+            raise ImportContractError("FILE_CHANGED", f"{field} native path no longer maps to its proven file.", details={"reason": str(exc)}) from exc
+    actual = regular_file_proof(current_path, field=field)
     compared = ("path", "size", "sha256", "mtime_ns", "device", "inode")
     if any(actual.get(key) != proof.get(key) for key in compared):
         raise ImportContractError(
@@ -476,11 +446,20 @@ def build_audio_import_plan(
             expected_source_path = expected_audio_file_source_result_path(
                 target["canonical_target_path"],
                 source_name_path,
+                target_is_audio_file_source=(
+                    str(effective.get("object_type", _typed_leaf_object_type(object_path))).casefold() == "audiofilesource"
+                ),
             )
             if expected_source_path is not None:
                 oracle_row["expected_audio_file_source_result_path"] = expected_source_path
+            elif str(effective.get("object_type", _typed_leaf_object_type(object_path))).casefold() == "audiofilesource":
+                raise ImportContractError("INVALID_TARGET_TYPE", "An explicit AudioFileSource requires reviewed audio media, not MIDI topology.")
 
         explicit_type = effective.get("object_type")
+        if str(explicit_type or _typed_leaf_object_type(object_path)).casefold() == "audiofilesource":
+            owner_type = _typed_leaf_object_type(object_path.rpartition("\\")[0])
+            if owner_type is not None:
+                oracle_row["requested_source_owner_type"] = owner_type
         inferred_type = _typed_leaf_object_type(object_path)
         if explicit_type is not None:
             object_type = _require_object_type(
@@ -526,6 +505,13 @@ def build_audio_import_plan(
             )
             dispatch["importLanguage"] = language
             oracle_row["requested_language"] = language
+        elif oracle_row["media_expected"]:
+            if (str(oracle_row.get("requested_object_type", "")).casefold() == "sound voice"
+                    or str(oracle_row.get("requested_source_owner_type", "")).casefold() == "sound voice"):
+                raise ImportContractError("INVALID_ARGUMENT", "Voice media requires its exact project import_language.")
+            # Omission retains native SFX dispatch semantics; ownership still
+            # needs the effective language to detect competing Source claims.
+            oracle_row["requested_language"] = "SFX"
         if "originals_subfolder" in effective:
             if not oracle_row["media_expected"]:
                 raise ImportContractError(
@@ -561,18 +547,40 @@ def build_audio_import_plan(
             dispatch["event"] = event["waapi_value"]
             oracle_row["requested_event"] = {key: value for key, value in event.items() if key != "waapi_value"}
         if "dialogue_event" in effective:
-            dialogue_event = _require_native_import_directive(
-                effective.get("dialogue_event"),
-                field=f"imports[{index}].dialogue_event",
-            )
-            dispatch["dialogueEvent"] = dialogue_event
+            dialogue_event = effective.get("dialogue_event")
+            if (not isinstance(dialogue_event, Mapping) or set(dialogue_event) - {"path", "existing_id", "conditions", "probability", "weight"}
+                    or not isinstance(dialogue_event.get("path"), str)
+                    or not dialogue_event["path"].startswith("\\Dynamic Dialogue\\")
+                    or len(dialogue_event["path"]) > 4096
+                    or any(c in dialogue_event["path"] for c in "<>:@|\r\n\t\x00")
+                    or not dialogue_event["path"].rpartition("\\")[2]):
+                raise ImportContractError("INVALID_ARGUMENT", "dialogue_event requires a closed absolute DialogueEvent path; native directive strings are not accepted.")
+            if "existing_id" in dialogue_event and (not isinstance(dialogue_event["existing_id"], str)
+                    or not re.fullmatch(r"\{[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}", dialogue_event["existing_id"])):
+                raise ImportContractError("INVALID_ARGUMENT", "Existing Dialogue Event requires one canonical bound GUID.")
+            conditions = dialogue_event.get("conditions")
+            if conditions is not None and (not isinstance(conditions, list) or not 1 <= len(conditions) <= 32
+                    or any(not isinstance(c, Mapping) or set(c) != {"group", "value"} for c in conditions)):
+                raise ImportContractError("INVALID_ARGUMENT", "Dialogue conditions require one to 32 closed group/value choices.")
+            for key in ("probability", "weight"):
+                if key in dialogue_event and (not conditions or type(dialogue_event[key]) not in (int, float)
+                        or not 0 <= dialogue_event[key] <= 100):
+                    raise ImportContractError("INVALID_ARGUMENT", "Dialogue Probability/Weight require an explicit path and a finite value from 0 to 100.")
+            dialogue_event = dict(dialogue_event)
+            dispatch["dialogueEvent"] = dialogue_event["path"]
             oracle_row["requested_dialogue_event"] = dialogue_event
         if "switch_assignment" in effective:
-            switch_assignment = _require_native_import_directive(
-                effective.get("switch_assignment"),
-                field=f"imports[{index}].switch_assignment",
-            )
-            dispatch["switchAssignation"] = switch_assignment
+            switch_assignment = effective["switch_assignment"]
+            if isinstance(switch_assignment, Mapping):
+                if (set(switch_assignment) - {"group", "value"} or "group" not in switch_assignment
+                        or not isinstance(switch_assignment["group"], Mapping)
+                        or "value" in switch_assignment and not isinstance(switch_assignment["value"], str)):
+                    raise ImportContractError("INVALID_ARGUMENT", "Switch assignment requires one closed group identity and an optional exact value name.")
+                switch_assignment = dict(switch_assignment)
+                dispatch["switchAssignation"] = switch_assignment.get("value", "")
+            else:
+                switch_assignment = _require_native_import_directive(switch_assignment, field=f"imports[{index}].switch_assignment")
+                dispatch["switchAssignation"] = switch_assignment
             oracle_row["requested_switch_assignment"] = switch_assignment
 
         properties = _normalize_named_value_rows(
@@ -632,6 +640,44 @@ def build_audio_import_plan(
     }
 
 
+def _tab_media_host_path(value: str, *, table_directory: Path) -> str:
+    """Prove native cell spelling locally; relative cells belong to the table."""
+    if os.name == "posix" and value.startswith("/") and not value.startswith("//"):
+        # Retain the existing native POSIX read contract, including explicit
+        # parent navigation; the live namespace check separately handles Wine.
+        return value
+    try:
+        parse_absolute_host_path(value)
+    except HostPathError:
+        relative = parse_relative_host_path(value, allow_parent_segments=True)
+        return str(table_directory.joinpath(*relative.components))
+    return localize_waapi_host_path(value)
+
+
+def tab_import_guid_targets(import_file: str | os.PathLike[str]) -> list[str]:
+    """Discover only bounded canonical GUID cells for registry-owned resolution.
+
+    The complete parser still validates and proves the file after these reads;
+    an intervening new GUID cannot use a name/path fallback.
+    """
+    _, data, _ = _read_proven_bytes(import_file, field="import_file", max_bytes=MAX_TAB_BYTES)
+    try:
+        text = data.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise ImportContractError("INVALID_ENCODING", "import_file must be strict UTF-8.", details={"start": exc.start}) from exc
+    try:
+        records = list(csv.reader(io.StringIO(text, newline=""), delimiter="\t", strict=True))
+    except csv.Error as exc:
+        raise ImportContractError("INVALID_TAB_FILE", "import_file is not valid tab-delimited data.", details={"error": str(exc)}) from exc
+    if not records or records[0].count("Object Path") != 1:
+        return []  # The complete parser owns header/record diagnostics.
+    if len(records) - 1 > MAX_TAB_ROWS:
+        raise ImportContractError("LIMIT_EXCEEDED", "import_file exceeds the closed row limit.")
+    column = records[0].index("Object Path")
+    return list(dict.fromkeys(record[column].upper() for record in records[1:]
+        if len(record) > column and _TAB_OBJECT_GUID.fullmatch(record[column])))
+
+
 def parse_tab_delimited_import_file(
     import_file: str | os.PathLike[str],
     *,
@@ -641,11 +687,18 @@ def parse_tab_delimited_import_file(
     import_operation: str,
     auto_add_to_source_control: bool = False,
     auto_check_out_to_source_control: bool | None = None,
+    guid_targets: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Parse and prove a reviewed UTF-8 TSV subset without trusting caller rows."""
 
     lane = _require_version(version)
     policy = import_operation_policy(import_operation)
+    if import_operation == "useExisting":
+        policy = {**policy, "notes_destination_policy": (
+            "tsv_Notes_routes_to_target_object;"
+            "tsv_Audio_Source_Notes_routes_to_audio_file_source"
+        )}
+
     auto_add = _require_boolean(
         auto_add_to_source_control,
         field="auto_add_to_source_control",
@@ -751,7 +804,7 @@ def parse_tab_delimited_import_file(
             single_value("Object Path"),
             field=f"row[{offset}].Object Path",
         )
-        target = derive_tab_target(object_path, import_location=location, version=lane)
+        target = derive_tab_target(object_path, import_location=location, version=lane, guid_targets=guid_targets)
         target_key = target["canonical_target_path"].casefold()
         if target_key in seen_targets:
             raise ImportContractError(
@@ -776,10 +829,13 @@ def parse_tab_delimited_import_file(
             oracle_row["requested_language"] = language
         source_name_path: str | None = None
         if audio_file:
-            proof = regular_file_proof(
-                audio_file,
-                field=f"row[{offset}].Audio File",
-            )
+            try:
+                local_media = _tab_media_host_path(audio_file, table_directory=path.parent)
+            except HostPathError as exc:
+                raise ImportContractError("INVALID_FILE", f"row[{offset}].Audio File has no safe local file mapping.",
+                    details={"path": audio_file, "reason": str(exc)}) from exc
+            proof = {**regular_file_proof(local_media, field=f"row[{offset}].Audio File"),
+                     "native_path": audio_file, "table_directory": str(path.parent)}
             _require_media_extension(
                 proof["path"],
                 field=f"row[{offset}].Audio File",
@@ -798,16 +854,8 @@ def parse_tab_delimited_import_file(
             oracle_row["source_file"] = source_proof
             source_name_path = str(source_proof["relative_path"])
 
-        if source_name_path is not None:
-            expected_source_path = expected_audio_file_source_result_path(
-                target["canonical_target_path"],
-                source_name_path,
-            )
-            if expected_source_path is not None:
-                oracle_row["expected_audio_file_source_result_path"] = expected_source_path
-
         object_type_value = single_value("Object Type")
-        inferred_type = _typed_leaf_object_type(object_path)
+        inferred_type = target.get("resolved_object_type") or _typed_leaf_object_type(object_path)
         if object_type_value:
             object_type = _require_object_type(
                 object_type_value,
@@ -837,6 +885,25 @@ def parse_tab_delimited_import_file(
                 "A structure-only tab row requires Object Type or a typed final Object Path segment.",
                 details={"row": offset},
             )
+
+        if _import_object_type_token(str(oracle_row.get("requested_object_type", ""))) == "audiofilesource":
+            owner_path = object_path.rpartition("\\")[0]
+            owner_type = _typed_leaf_object_type(owner_path)
+            if owner_type is not None:
+                oracle_row["requested_source_owner_type"] = _require_object_type(owner_type, field=f"row[{offset}].Object Path parent")
+
+        if source_name_path is not None:
+            expected_source_path = expected_audio_file_source_result_path(
+                target["canonical_target_path"], source_name_path,
+                target_is_audio_file_source=(
+                    _import_object_type_token(str(oracle_row.get("requested_object_type", ""))) == "audiofilesource"
+                ),
+            )
+            if expected_source_path is not None:
+                oracle_row["expected_audio_file_source_result_path"] = expected_source_path
+
+            elif _import_object_type_token(str(oracle_row.get("requested_object_type", ""))) == "audiofilesource":
+                raise ImportContractError("INVALID_TARGET_TYPE", "An explicit AudioFileSource requires reviewed audio media, not MIDI topology.")
 
         originals_subfolder = single_value("OriginalsSubFolder")
         if originals_subfolder:
@@ -899,6 +966,11 @@ def parse_tab_delimited_import_file(
         if dialogue_events:
             row_plan["dialogue_events"] = dialogue_events
             oracle_row["requested_dialogue_events"] = dialogue_events
+            if (not oracle_row["media_expected"] and language_requires_live_project_validation(language)
+                    and _import_object_type_token(str(oracle_row.get("requested_object_type", ""))) == "soundvoice"):
+                oracle_row["requested_language"] = language
+                if policy["import_operation"] == "useExisting":
+                    oracle_row["localized_owner_only"] = True
 
         switch_assignments = [
             _require_native_import_directive(
@@ -934,6 +1006,14 @@ def parse_tab_delimited_import_file(
         )
         if dynamic_fields:
             oracle_row["requested_dynamic_fields"] = dynamic_fields
+            # Typed Voice fields belong to the owner; preparation binds planned
+            # media changes and preserves every other language Source.
+            if (language_requires_live_project_validation(language)
+                    and _import_object_type_token(str(oracle_row.get("requested_object_type", ""))) == "soundvoice"):
+                oracle_row["requested_language"] = language
+                oracle_row["localized_owner_fields"] = True
+                if not oracle_row["media_expected"]:
+                    oracle_row["localized_owner_only"] = True
 
         rows.append(row_plan)
         target_oracle.append(oracle_row)
@@ -1007,11 +1087,14 @@ def canonical_import_target(object_path: str, *, version: str) -> dict[str, str]
 def expected_audio_file_source_result_path(
     canonical_target_path: str,
     source_file_path: str,
+    *,
+    target_is_audio_file_source: bool = False,
 ) -> str | None:
     """Seal the exact AudioFileSource result path for reviewed audio media.
 
-    Wwise names the AudioFileSource child from the imported audio filename,
-    without its extension.  MIDI imports have a different object topology and
+    An explicitly typed AudioFileSource TSV target names the Source itself.
+    Otherwise Wwise names the AudioFileSource child from the imported audio
+    filename, without its extension.  MIDI imports have a different object topology and
     therefore deliberately do not claim this AudioFileSource result contract.
     """
 
@@ -1033,6 +1116,8 @@ def expected_audio_file_source_result_path(
             "source_file_path does not use a reviewed AudioFileSource extension.",
             details={"path": source_file_path, "supported_extensions": [".amb", ".wav"]},
         )
+    if target_is_audio_file_source:
+        return "\\" + "\\".join(target_segments)
     source_name = source_path.stem
     if (
         not source_name
@@ -1063,11 +1148,20 @@ def canonical_import_location(import_location: str, *, version: str) -> str:
     return "\\" + "\\".join(segments)
 
 
-def derive_tab_target(object_path: str, *, import_location: str, version: str) -> dict[str, str]:
+def derive_tab_target(object_path: str, *, import_location: str, version: str,
+                      guid_targets: Mapping[str, Mapping[str, Any]] | None = None) -> dict[str, str]:
     """Resolve a tab row's absolute or relative object path deterministically."""
 
     lane = _require_version(version)
     location = canonical_import_location(import_location, version=lane)
+    if _TAB_OBJECT_GUID.fullmatch(object_path):
+        row = (guid_targets or {}).get(object_path.upper())
+        if not isinstance(row, Mapping):
+            raise ImportContractError("UNRESOLVED_GUID_TARGET", "A GUID Object Path requires exact live identity resolution.", details={"object_path": object_path})
+        return {**canonical_import_target(row["path"], version=lane),
+                "requested_target_id": object_path, "resolved_object_type": row["type"]}
+    if object_path.startswith("{") or object_path.endswith("}"):
+        raise ImportContractError("INVALID_IDENTITY", "Object Path GUID targets must use a canonical braced GUID.")
     if object_path.startswith("\\"):
         return canonical_import_target(object_path, version=lane)
     relative = _canonical_wwise_segments(object_path, field="Object Path", absolute=False)
@@ -1418,6 +1512,38 @@ def _require_dynamic_field_name(value: Any, *, field: str) -> str:
     return name
 
 
+def parse_dialogue_import_directive(value: str) -> dict[str, Any]:
+    """Parse the documented exact-table form into closed identity choices."""
+    parts = value.split("|")
+    event, marker, decision = parts[0].partition("@Path:")
+    if not event.startswith("\\"):
+        event = "\\Dynamic Dialogue\\Default Work Unit\\" + event
+    if not event.startswith("\\Dynamic Dialogue\\") or event.endswith("\\") or any(c in event for c in "<>:@|\r\n\t"):
+        raise ImportContractError("INVALID_ARGUMENT", "Dialogue Event must name one exact Dynamic Dialogue path.")
+    result = {"path":event}
+    if marker:
+        conditions = []
+        for component in decision.split("."):
+            match = re.fullmatch(r"<(Switch Group|State Group):([^<>:@|]+)>([^<>:@|]+)", component)
+            if match is None:
+                raise ImportContractError("INVALID_ARGUMENT", "Dialogue paths require documented group/value choices or wildcard.")
+            group_type, group_name, selected = match.groups()
+            root = "Switches" if group_type == "Switch Group" else "States"
+            group_path = f"\\{root}\\Default Work Unit\\{group_name}"
+            result_type = "Switch" if root == "Switches" else "State"
+            conditions.append({"group":{"kind":"path","value":group_path},
+                "value":"*" if selected == "*" else {"kind":"scoped-name","parent":{"kind":"path","value":group_path},"type":result_type,"name":selected}})
+        if not 1 <= len(conditions) <= 32:
+            raise ImportContractError("INVALID_ARGUMENT", "Dialogue path must have one to 32 conditions.")
+        result["conditions"] = conditions
+    for option in parts[1:]:
+        match = re.fullmatch(r"(Probability|Weight):([0-9]+(?:\.[0-9]+)?)", option)
+        if match is None or not marker or match[1].lower() in result or not 0 <= float(match[2]) <= 100:
+            raise ImportContractError("INVALID_ARGUMENT", "Dialogue Probability/Weight require one explicit path and finite values from 0 to 100.")
+        result[match[1].lower()] = float(match[2])
+    return result
+
+
 def _require_native_import_directive(value: Any, *, field: str) -> str:
     text = _require_text(value, field=field)
     if len(text) > MAX_TEXT_CHARS or any(
@@ -1467,6 +1593,13 @@ def _validate_tab_headers(headers: Sequence[str], *, version: str) -> None:
             details={"duplicate_headers": duplicate_singletons},
         )
     allowed = TAB_HEADERS_BY_VERSION[version]
+    if "OriginalsSubFolder" in headers and "OriginalsSubFolder" not in allowed:
+        raise ImportContractError(
+            "VERSION_BEHAVIOR_BOUNDARY",
+            "The OriginalsSubFolder TSV column requires Wwise 2023.1 or newer (WG-60834).",
+            details={"version": version, "column": "OriginalsSubFolder",
+                     "introduced_version": "2023.1", "source_change": "WG-60834"},
+        )
     unsupported = sorted(
         {
             header
@@ -1871,6 +2004,7 @@ __all__ = [
     "canonical_import_location",
     "canonical_import_target",
     "derive_tab_target",
+    "tab_import_guid_targets",
     "import_operation_policy",
     "language_requires_live_project_validation",
     "normalize_auto_check_out_to_source_control",

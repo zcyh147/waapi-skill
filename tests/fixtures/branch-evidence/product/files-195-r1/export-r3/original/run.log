@@ -1,0 +1,14 @@
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.001188, "reason": "locked developer interpreter ready", "automatic_repair_attempted": false}
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.000287, "reason": "selected Non-live prerequisites ready", "automatic_repair_attempted": false}
+== Test Context ==
+version:      none
+mode:         nonlive
+console:      <unset>
+project:      <unset>
+sandbox_root: <unset>
+test_config:  <unset>
+pytest args:  -q -ra tests/unit/test_cli_console_business_adapter.py::test_generate_soundbank_plan_derives_flags_mappings_and_modes tests/unit/test_console_project_alternatives_gateway.py::test_cli_media_ids_observe_owned_file_and_work_units_without_inventing_mapping_format tests/unit/test_console_project_alternatives_gateway.py::test_cli_migration_distinguishes_failed_preservation_and_unresolved_transformation tests/unit/test_console_project_alternatives_gateway.py::test_console_create_saves_requested_language_order_and_default tests/unit/test_console_project_native_witness.py::test_console_create_close_collector_uses_two_authorized_transitions_and_final_writer tests/unit/test_conversion_plugin_gateway.py::test_conversion_type_handle_invokes_setter_without_claiming_codec_or_platform_effect tests/unit/test_core_business_gateway.py::test_audio_convert_core_plan_accepts_bound_objects_names_and_exact_io_root tests/unit/test_soundbank_business_gateway.py::test_business_inclusion_plan_checks_and_seals_one_immutable_preview tests/unit/test_media_build_business_gateway.py::test_soundbank_inclusion_core_call_resolves_business_identities tests/unit/test_soundbank_business_gateway.py::test_definition_ordered_repeated_bank_files_disclose_result_only_before_authorization tests/unit/test_soundbank_business_gateway.py::test_generation_business_choice_reaches_immutable_preview_and_truthful_verifier tests/unit/test_soundbank_business_gateway.py::test_external_source_omitted_output_binds_live_project_platform_setting
+
+........................................................................ [ 69%]
+...............................                                          [100%]
+103 passed in 32.05s

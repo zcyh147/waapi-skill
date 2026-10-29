@@ -1,0 +1,31 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "rtpc-2023.1-wwise-authoring-cursor-capture",
+      "bindings": {
+        "artifact": "2023.1-wwise-authoring-cursor-capture-bindings.json",
+        "sha256": "c9809be61a3ca2583f17027a6a312a3b8b11469dfc899e0425a963d16cd58ebf"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-authoring-cursor-capture-bindings.json",
+          "sha256": "c9809be61a3ca2583f17027a6a312a3b8b11469dfc899e0425a963d16cd58ebf"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-authoring-cursor-capture-program.json",
+          "sha256": "f14e8672cf07343cd64487f24a89ac68ccd4695a6ff938f9ceb5c0c75713a8ee"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-authoring-cursor-capture-requirements.json",
+          "sha256": "61dcda5fafaf1401f1cd6e35bbb4dd3c79e6bbd1cd47d48550c031f329ff926d"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-authoring-cursor-capture-program-capture.json",
+          "sha256": "a50adbcdb75b15359d9c4dd3974b68a8d9195daed1a27fad8c4d2636bd81cbc6"
+        }
+      }
+    }
+  ]
+}

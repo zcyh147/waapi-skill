@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from tests.support.gateway_config import set_gateway_config
 
+import base64
+import gzip
 import importlib.util
 import json
 import math
@@ -417,6 +419,95 @@ def test_status_uses_live_detection_and_dispatcher_evidence(tmp_path: Path) -> N
     assert client.disconnected is True
 
 
+def _retained_status_results(version: str) -> dict[str, Any]:
+    """Read the first original R125 native packets, without changing their data."""
+    archive = Path(__file__).resolve().parents[1] / "fixtures" / "runtime-console-reads" / f"{version}-original.json.gz"
+    files = json.loads(gzip.decompress(archive.read_bytes()))["files"]
+    project_api = "ak.wwise.core.object.get" if version == "2021.1" else "ak.wwise.core.getProjectInfo"
+    results = {}
+    for api in ("ak.wwise.core.getInfo", project_api):
+        suffix = "-" + api.replace(".", "_") + ".json"
+        member = min(name for name in files if name.endswith(suffix))
+        packet = json.loads(base64.b64decode(files[member]))
+        assert packet["ok"] is True and packet["version"] == version
+        results[api] = packet["result"]
+    return results
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_status_detail_delivers_complete_retained_native_results_through_main(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], version: str,
+) -> None:
+    results = _retained_status_results(version)
+    client = FakeClient(results)
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version=version)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(waapi_gateway, "default_client_factory", lambda _url: client)
+
+    assert waapi_gateway.main(["status", "--detail"]) == 0
+    stdout = capsys.readouterr().out
+    payload = json.loads(stdout)
+    fallback = version == "2021.1"
+    project_api = "ak.wwise.core.object.get" if fallback else "ak.wwise.core.getProjectInfo"
+    project = results[project_api]["return"][0] if fallback else results[project_api]
+    assert payload["agent_result"] == {
+        "wwise": results["ak.wwise.core.getInfo"],
+        "project": project,
+        "project_source": {
+            "api": project_api,
+            "get_project_info": "not_reflected" if fallback else "available",
+        },
+    }
+    assert list(payload)[-1] == "agent_result"
+    assert len(stdout.encode("utf-8")) < waapi_gateway.MAX_GATEWAY_RESULT_JSON_BYTES
+    assert [call[0] for call in client.calls] == [
+        "ak.wwise.core.getInfo", "ak.wwise.core.getInfo", project_api,
+    ]
+    assert client.disconnected is True
+
+
+@pytest.mark.parametrize("version,api", (
+    ("2021.1", "ak.wwise.core.getInfo"),
+    ("2025.1", "ak.wwise.core.getProjectInfo"),
+))
+def test_status_request_schema_discloses_optional_complete_detail_view(
+    tmp_path: Path, version: str, api: str,
+) -> None:
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version=version)
+    code, payload = waapi_gateway.execute_gateway(
+        ["request-schema", api], env=env,
+        client_factory=lambda _url: pytest.fail("status discovery must remain offline"),
+    )
+    assert code == 0
+    status = next(command for command in payload["commands"] if command["subcommand"] == "status")
+    assert status["optional_inputs"] == ["detail"]
+    assert status["input_forms"]["detail"]["arguments"] == ["--detail"]
+    assert ["status", "--detail"] in status["command_templates"]
+
+
+def test_status_detail_rejects_malformed_nested_work_unit_reference(tmp_path: Path) -> None:
+    results = _retained_status_results("2025.1")
+    results["ak.wwise.core.getProjectInfo"]["defaultWorkUnits"]["Events"]["id"] = "not-a-guid"
+    client = FakeClient(results)
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version="2025.1")
+
+    code, payload = waapi_gateway.execute_gateway(
+        ["status", "--detail"], env=env, client_factory=lambda _url: client,
+    )
+    assert code == 2
+    assert payload["error_code"] == "SemanticValidationError"
+    assert payload["details"]["section"] == "result.defaultWorkUnits.Events.id"
+    assert "agent_result" not in payload
+    assert [call[0] for call in client.calls] == [
+        "ak.wwise.core.getInfo", "ak.wwise.core.getInfo", "ak.wwise.core.getProjectInfo",
+    ]
+    assert client.disconnected is True
+
+
 def test_gateway_outer_exception_normalization_contains_broken_string_hook(tmp_path: Path) -> None:
     class BrokenStringError(RuntimeError):
         def __str__(self) -> str:
@@ -543,7 +634,16 @@ def test_status_rejects_malformed_or_identity_free_modern_project_result(
     )
 
     assert exit_code == 2
-    assert payload["error_code"] == "INVALID_STATUS_RESULT"
+    if project_result is None:
+        assert payload["ok"] is False
+        assert payload["calls"][-1]["error_code"] == "WAAPI_RESPONSE_MISSING"
+        assert payload["project"] is None
+        assert "agent_result" not in payload
+        assert [call[0] for call in client.calls] == [
+            "ak.wwise.core.getInfo", "ak.wwise.core.getInfo", "ak.wwise.core.getProjectInfo",
+        ]
+    else:
+        assert payload["error_code"] == "INVALID_STATUS_RESULT"
 
 
 def test_status_rejects_malformed_second_get_info_result(tmp_path: Path) -> None:
@@ -1938,8 +2038,8 @@ def test_capability_matrix_is_available_offline_without_config_or_client(tmp_pat
     }
     assert payload["summary"]["totals"]["preferred_routes"] == {
         "bounded_topic_wait": 152,
-        "fixed_command": 56,
-        "manifest_dispatch": 111,
+        "fixed_command": 57,
+        "manifest_dispatch": 110,
         "transaction_operation": 489,
         "unsupported_boundary": 6,
     }
@@ -1953,6 +2053,16 @@ def test_capability_matrix_is_available_offline_without_config_or_client(tmp_pat
     assert payload["returned_count"] == 0
     assert payload["truncated"] is False
     assert "capabilities" not in payload
+    # The sole route reclassification is the disclosed fixed Media Pool field read.
+    code, fields = waapi_gateway.execute_gateway(
+        ["describe", "ak.wwise.core.mediaPool.getFields", "--all-versions"],
+        env=gateway_env(tmp_path), client_factory=client_factory,
+    )
+    assert code == 0 and called is False
+    assert fields["availability"]["2024.1"]["available"] is False
+    interface = fields["availability"]["2025.1"]["capability"]["interface"]
+    assert interface["preferred_route"] == "fixed_command"
+    assert interface["gateway_commands"] == ["metadata media-pool-fields"]
 
 
 def test_object_types_searches_packaged_catalog_without_connecting(
@@ -3514,7 +3624,7 @@ def test_query_object_broad_results_remain_gateway_bounded(tmp_path: Path) -> No
     assert client.calls[-1][1] == {"waql": "from type Sound take 2"}
 
 
-def test_query_object_projects_not_applicable_mixed_type_fields_as_null(
+def test_query_object_preserves_absent_null_and_present_mixed_type_fields(
     tmp_path: Path,
 ) -> None:
     rows = [
@@ -3532,6 +3642,12 @@ def test_query_object_projects_not_applicable_mixed_type_fields_as_null(
             "audioSource:language": {"id": "{language}", "name": "SFX"},
         },
     ]
+    # Absence is unknown; only an explicit native null is null.
+    rows.append({
+        "id": "{null-source}", "name": "silent_source", "type": "AudioFileSource",
+        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Silent\silent_source",
+        "audioSource:language": None,
+    })
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": live_info(year=2023),
@@ -3552,18 +3668,26 @@ def test_query_object_projects_not_applicable_mixed_type_fields_as_null(
             "--include",
             "source-language",
             "--max-results",
-            "2",
+            "3",
         ],
         env=set_gateway_config(gateway_env(tmp_path), wwise_version="2023.1"),
         client_factory=lambda url: client,
     )
 
     assert exit_code == 0, payload
-    assert payload["objects"][0]["source_language"] is None
+    assert "source_language" not in payload["objects"][0]
+    assert payload["objects"][0]["unavailable_fields"] == ["source_language"]
     assert payload["objects"][1]["source_language"] == {
         "id": "{language}",
         "name": "SFX",
     }
+
+    assert payload["objects"][2]["source_language"] is None
+    assert "unavailable_fields" not in payload["objects"][1]
+    assert "unavailable_fields" not in payload["objects"][2]
+    assert payload["agent_result"] == payload["objects"]
+    assert list(payload)[-1] == "agent_result"
+    assert client.calls[-1][2] == {"return": ["id", "name", "type", "path", "audioSource:language"]}
 
 
 def test_query_object_exact_path_uses_from_object_without_doubled_separators(
@@ -4852,12 +4976,18 @@ def test_metadata_types_uses_fixed_builder_and_result_parser(tmp_path: Path) -> 
 
     assert exit_code == 0
     assert payload["operation"] == "types"
-    assert payload["normalized"][0]["name"] == "Sound"
-    assert "raw" not in payload["normalized"][0]
-    assert "extra" not in payload["normalized"][0]
+    result = payload["agent_result"]
+    assert result["contract"] == "waapi-skill.metadata-types-page/v1"
+    assert [{key: value for key, value in row.items() if key != "selection"} for row in result["types"]] == [{"classId": 1, "name": "Sound", "type": "Sound", "extra": "preserved"}]
+    assert result["types"][0]["selection"].startswith("mts1.")
+    assert result["available_count"] == result["total_count"] == 1
+    assert result["offset"] == result["remaining_count"] == 0
+    assert result["complete"] is True and result["next_page"] is None
+    assert result["mutation_authority"] is False
     assert "summary_only" not in payload
-    assert "agent_result" not in payload
-    assert client.calls[-1][0] == "ak.wwise.core.object.getTypes"
+    assert "normalized" not in payload
+    assert list(payload)[-1] == "agent_result"
+    assert client.calls[-1] == ("ak.wwise.core.object.getTypes", {}, {})
 
 
 
@@ -5142,7 +5272,7 @@ def test_wait_topic_uses_payload_match_and_unsubscribes(tmp_path: Path) -> None:
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
-                {"object": {"id": "wrong", "name": "Ignore"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000003}", "name": "Ignore"}},
                 {"object": {"id": wanted, "name": "UI"}},
             ]
         },
@@ -5179,7 +5309,7 @@ def test_stream_topic_emits_matching_events_immediately_from_one_subscription(
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
-                {"object": {"id": "wrong", "name": "Ignore"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000003}", "name": "Ignore"}},
                 {"object": {"id": wanted, "name": "UI_1"}},
                 {"object": {"id": wanted, "name": "UI_2"}},
             ]
@@ -5216,7 +5346,7 @@ def test_stream_topic_emits_matching_events_immediately_from_one_subscription(
     assert records[0]["session_context"]["available"] is True
     assert terminal["contract"] == waapi_gateway.TOPIC_STREAM_RECORD_CONTRACT
     assert terminal["record_type"] == "terminal"
-    assert terminal["status"] == "completed"
+    assert terminal["status"] == "stopped"
     assert terminal["completion_reason"] == "duration_elapsed"
     assert terminal["event_count"] == 2
     assert terminal["cleanup"] == "unsubscribed"
@@ -5292,7 +5422,7 @@ def test_stream_topic_discloses_effective_idle_policy_without_shortening_user_du
 ) -> None:
     topic = "ak.wwise.core.object.created"
     client = FakeClient({"ak.wwise.core.getInfo": live_info()},
-        subscription_events={topic: [{"object": {"id": "one", "name": "One"}}]})
+        subscription_events={topic: [{"object": {"id": "{00000000-0000-0000-0000-000000000001}", "name": "One"}}]})
     records: list[Mapping[str, Any]] = []
     code, terminal = waapi_gateway.execute_gateway(
         [*global_args, "stream-topic", topic, "--event-count", "1", *idle_args,
@@ -5325,7 +5455,7 @@ def test_stream_topic_matching_events_restart_idle_clock(tmp_path: Path, monkeyp
     monkeypatch.setattr(waapi_gateway, "time", SimpleNamespace(monotonic=lambda: clock[0]))
     topic = "ak.wwise.core.object.created"
     client = FakeClient({"ak.wwise.core.getInfo": live_info()}, subscription_events={
-        topic: [{"object": {"id": str(i), "name": "Sound"}} for i in range(3)]})
+        topic: [{"object": {"id": f"{{00000000-0000-0000-0000-{i:012x}}}", "name": "Sound"}} for i in range(3)]})
     def sink(record: Mapping[str, Any]) -> None:
         if record["record_type"] == "event":
             clock[0] += 4.0
@@ -5348,9 +5478,9 @@ def test_stream_topic_stops_at_its_explicit_event_count_bound(
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
-                {"object": {"id": "one", "name": "UI_1"}},
-                {"object": {"id": "two", "name": "UI_2"}},
-                {"object": {"id": "three", "name": "UI_3"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000001}", "name": "UI_1"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000002}", "name": "UI_2"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000003}", "name": "UI_3"}},
             ]
         },
     )
@@ -5442,7 +5572,7 @@ def test_stream_topic_bounds_cumulative_event_record_output(
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
-                {"object": {"id": str(index), "name": "x" * 512}}
+                {"object": {"id": f"{{00000000-0000-0000-0000-{index:012x}}}", "name": "x" * 512}}
                 for index in range(8)
             ]
         },
@@ -5705,7 +5835,7 @@ def test_wait_topic_no_timeout_returns_strict_bounded_json(
     tmp_path: Path,
 ) -> None:
     topic = "ak.wwise.core.object.created"
-    event = {"object": {"id": "wanted", "name": "UI"}}
+    event = {"object": {"id": "{00000000-0000-0000-0000-000000000002}", "name": "UI"}}
     client = FakeClient(
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={topic: [event]},
@@ -5819,7 +5949,7 @@ def test_wait_topic_collects_bounded_matching_events_in_order(tmp_path: Path) ->
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
-                {"object": {"id": "wrong", "name": "Ignore"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000003}", "name": "Ignore"}},
                 {"object": {"id": wanted, "name": "UI_1"}},
                 {"object": {"id": wanted, "name": "UI_2"}},
                 {"object": {"id": wanted, "name": "UI_3"}},
@@ -5888,7 +6018,7 @@ def test_wait_topic_accepts_waapi_client_kwargs_only_callback_shape(tmp_path: Pa
         ) -> FakeEventHandler:
             handler = FakeEventHandler()
             self.handlers.append(handler)
-            callback(object={"id": "wrong", "name": "Ignore"})
+            callback(object={"id": "{00000000-0000-0000-0000-000000000003}", "name": "Ignore"})
             callback(object={"id": wanted, "name": "UI"})
             return handler
 

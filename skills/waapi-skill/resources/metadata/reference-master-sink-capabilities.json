@@ -1,0 +1,53 @@
+{
+  "contract": "waapi-skill.reference-master-sink-capabilities/v1",
+  "meaning": "Bus AudioDevice targets with an explicit CanBeMasterSink=false are incompatible. Missing attributes remain unspecified; other installed classes are not declared compatible by this source.",
+  "source_role": {
+    "name": "Bus",
+    "classId": 1376272,
+    "reference": "AudioDevice"
+  },
+  "target_class": {
+    "name": "No Output",
+    "classId": 11862023,
+    "type": "AudioDevice"
+  },
+  "capability": {
+    "CanBeMasterSink": false
+  },
+  "plugin_source": "Authoring/x64/Release/bin/plugins/DefaultSink.xml / SinkPlugin[@Name='No Output'][@CompanyID='0'][@PluginID='181']/PluginInfo/@CanBeMasterSink",
+  "reference_source": "Authoring/Data/WObjects/WObjects.xml / WwiseObject[@Name='Bus']/Properties/Reference[@Name='AudioDevice']",
+  "class_source": "Exact classId/name/type from matching packaged object-types.json; IDs are not derived from CompanyID or PluginID.",
+  "versions": {
+    "2021.1": {
+      "build": "2021.1.14.8108",
+      "plugin_sha256": "aae49cc3140136586cd8673f47ddb5c319db189287c7fb45cf503c852eca399c",
+      "wobjects_sha256": "6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d",
+      "types_sha256": "d35b51d3a4bbf06146215dec68f9a30924ad5902df59901bc4177c31fdcfd479"
+    },
+    "2022.1": {
+      "build": "2022.1.19.8584",
+      "plugin_sha256": "ad537711658fb1ea1740eb8d2273204ec42a074014ae5c1151974f9629ab409f",
+      "wobjects_sha256": "018ddcb9e0b50c4cdc2f0849d0cc8a95d5568c169f0c888ca6f07c3f0e3266b6",
+      "types_sha256": "465787f842997f729944536fe7a346aa90e639a6c0a20f40d4f6539a2b0f2378"
+    },
+    "2023.1": {
+      "build": "2023.1.19.8928",
+      "plugin_sha256": "21e2e0bb5f324eee79f37fd2751c85d10be0eae133178810208b69530b7c236f",
+      "wobjects_sha256": "bae4d5fdd821fef226f1939d34ba1810e08bf79578fb8edc4ae3bdc3c66bd468",
+      "types_sha256": "51d63c58394536b21b86811af9ea79d87bcadff061baea1a5e2a1eda58ea2609"
+    },
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "plugin_sha256": "24f96c085840589c55c7bf60357c76e69ab6cd4db3a7648100b85ffcd9a6e3f1",
+      "wobjects_sha256": "28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f",
+      "types_sha256": "ce453380d932369e24ba7186f06f459f3785a19e824c123e15148689805109d8"
+    },
+    "2025.1": {
+      "build": "2025.1.7.9143",
+      "plugin_sha256": "24f96c085840589c55c7bf60357c76e69ab6cd4db3a7648100b85ffcd9a6e3f1",
+      "wobjects_sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454",
+      "types_sha256": "518f72403f7dc8e1d2adfa398a81ac607fd45a0d89d156810033a27ad51cb59d"
+    }
+  },
+  "sha256": "29dcd481f2ffe1d3e187867863a6b8fc2d2b28309881cdd6dd3e12c8c9eee481"
+}

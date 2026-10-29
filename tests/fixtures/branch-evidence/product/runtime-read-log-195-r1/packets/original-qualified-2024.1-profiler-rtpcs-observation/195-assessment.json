@@ -1,0 +1,143 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-assessment/v1",
+  "version": "2024.1",
+  "category": "profiler-rtpcs-observation",
+  "original_candidate": "503688449ba9f9db964a5fb7116ac6be2fb07198",
+  "original_workflow_outcome": "BLOCKED",
+  "original_finalization": "BLOCKED",
+  "successful_finalization": false,
+  "qualified_read_fact": "PASS",
+  "lifecycle_obligations": [
+    {
+      "issue": 186,
+      "version": "2023.1",
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2023-r1",
+      "obligation": "owned-Authoring post-teardown port-release/lifecycle",
+      "status": "BLOCKED"
+    },
+    {
+      "issue": 186,
+      "version": "2024.1",
+      "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2024-r1",
+      "obligation": "owned-Authoring post-teardown port-release/lifecycle",
+      "status": "BLOCKED"
+    }
+  ],
+  "archive": {
+    "artifact": "qualified-original.json.gz",
+    "sha256": "91cb35808f25dc24e20e25d1453654bffa0c72450d3449470d117fa2d36147ea"
+  },
+  "program_capture": {
+    "artifact": "original-raw.json",
+    "sha256": "3eb85df9ee479917a46f32c1f677e159ec572d93ffc358f452a4d332cf5c3219"
+  },
+  "source_changes": {
+    "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
+      "before": "33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b",
+      "after": "50192ce8dd71af490d1585b87cf0718f7a26987efeeaab837605dc96a324f851"
+    },
+    "skills/waapi-skill/wwise_waapi/business_declarations.py": {
+      "before": "aee2a6cc97e5ccb0340a0f99f520969571e5e2dcf4d48695a396fca29dbeb7b3",
+      "after": "9f196a80ac7e2d82daf7fe0cb452735c9f50b2da825ba7ac2dafae02da700070"
+    },
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
+      "before": "69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4",
+      "after": "14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594"
+    },
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
+      "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
+      "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
+    },
+    "skills/waapi-skill/scripts/gateway.py": {
+      "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
+      "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
+    },
+    "skills/waapi-skill/wwise_waapi/builders/stable_reads.py": {
+      "before": "21108e298bc83cdf2eda6269db3d440a0865cacbab7c953d9ef57f84217fe62a",
+      "after": "ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8"
+    },
+    "skills/waapi-skill/wwise_waapi/builders/schema.py": {
+      "before": "4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d",
+      "after": "cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2"
+    },
+    "skills/waapi-skill/wwise_waapi/operation_registry.py": {
+      "before": "f96a2233a98e03dd62de261a24b3f81876284af28f0973758cf1f8a805b5dd5a",
+      "after": "3b298a11c9326d47b968783e536d09d290a8fff4a5a7080b5f5f99d5e7c2734d"
+    },
+    "skills/waapi-skill/wwise_waapi/runtime_log_effects.py": {
+      "before": "62c28fc9bb92ccd8e8efb3ccbfe5b187d6df1d3086c2def79e1d11dbc81ddfe8",
+      "after": "1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00"
+    }
+  },
+  "changed_symbols": {
+    "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": [
+      "METER_OUTPUT_NAMES: admit existing media-size-bytes -> mediaSize binding; meter-root only; nearby comment",
+      "METER_OUTPUT_NAMES: reviewed R135 fixed canonical and known root-name allowlist extensions only; nearby comment"
+    ],
+    "skills/waapi-skill/wwise_waapi/business_declarations.py": [
+      "BusinessHandleRegistry._require_context: exact UTF-8 byte comparison; no normalization"
+    ],
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": [
+      "field ceiling",
+      "profiler_result_field_choices",
+      "three fixed row declarations",
+      "runtime_inspection_business_contract_data",
+      "runtime_transport_requires_authoring",
+      "runtime_inspection_business_catalog_rows: exact registered-version Console transport admission and metadata-only finalization",
+      "runtime_log_observation_support/CONSOLE_LOG_ADD_OBSERVER; runtime_inspection_business_catalog_rows/runtime_inspection_business_contract_data: exact log metadata only",
+      "MAX_LOG_MESSAGE_BYTES = 16 * 1024",
+      "_CONTRACTS[LOG_ADD_ITEM_URI]: input_forms/field_types message disclosure only"
+    ],
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": [
+      "module import: builders.query.STRUCTURED_GUID_PATTERN",
+      "_validate_rtpc_rows",
+      "normalize_runtime_inspection_result",
+      "rtpc_validated_name_compatibility",
+      "Sequence/field-contract imports",
+      "materialize_runtime_inspection_business_request",
+      "module import: MAX_LOG_MESSAGE_BYTES",
+      "materialize_runtime_control_business_request: log.addItem exact empty/whitespace UTF-8 message only; no NUL, required type/field and16KiB bound retained",
+      "normalize_runtime_inspection_result: optional version argument and only exact2021/2022 getCursorTime absent-return unavailable/null reason; present values and noncursor branches unchanged"
+    ],
+    "skills/waapi-skill/scripts/gateway.py": [
+      "_execute_gateway_unconstrained: retain only already-attested getInfo bool in missing finish host context; preserve exact agent_result last; no additional call or successful read request/result change",
+      "module import: builders.schema.validate_resolved_semantic_result",
+      "module import: runtime_inspection_business.rtpc_validated_name_compatibility",
+      "module import: builders.stable_reads.MAX_GAME_OBJECT_ROWS/MAX_STABLE_STRING_BYTES",
+      "build_parser",
+      "dispatch_command",
+      "resolve_profiler_voice_path",
+      "dispatch_profiler_voice_contributions_request",
+      "runtime_authoring_host_required_payload",
+      "dispatch_offline_command",
+      "dispatch_business_runtime_control_plan",
+      "dispatch_runtime_inspection_business_read",
+      "preflight_stable_read_input",
+      "fixed_command_route_payload",
+      "preflight_core_business_input",
+      "runtime_log_observation_support import; live_log_topic_boundary; dispatch_command/dispatch_topic_stream: exact log Topic guard",
+      "dispatch_offline_command/dispatch_runtime_inspection_business_read: exact log disclosure only",
+      "_dispatch_transaction_command_with_execution_lease: exact log observation-plan drift/event selection only",
+      "module import: MAX_LOG_MESSAGE_BYTES",
+      "transaction_verify_terminal_budget: exact valid2023-25 log.addItem rendered allowance only, resolved native request validation; ordinary global24576B retained",
+      "project_successful_transaction_verify_payload: successful exact log-only duplicate scope projection; exact agent_result/full durable journal retained",
+      "dispatch_runtime_inspection_business_read: forward only already-attested detected_version to existing normalizer; no query/request/output assembly change"
+    ],
+    "skills/waapi-skill/wwise_waapi/builders/stable_reads.py": [
+      "build_profiler_voice_contributions_request",
+      "normalize_profiler_voice_contributions_result",
+      "normalize_profiler_game_objects_result"
+    ],
+    "skills/waapi-skill/wwise_waapi/builders/schema.py": [
+      "validate_resolved_semantic_result",
+      "_validate_resolved_sections",
+      "_runtime_result_reference_schema"
+    ],
+    "skills/waapi-skill/wwise_waapi/operation_registry.py": [
+      "prepare_operation/verify_prepared_operation: exact log observation plan, verifier selection and message only"
+    ],
+    "skills/waapi-skill/wwise_waapi/runtime_log_effects.py": [
+      "compare_channel: exact Console log observation guard only"
+    ]
+  }
+}

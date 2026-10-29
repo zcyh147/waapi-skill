@@ -1,0 +1,63 @@
+{
+  "branch_ids": [
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name"
+  ],
+  "business_fact_id": "2021.1|source-copy-synth-owned-graph",
+  "contract": "waapi-skill.source-copy-native-attachment/v2",
+  "equivalence": {
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+      "artifact": "source-195-current-88a6cbbe-2021.1/portable/equivalence-0.json",
+      "sha256": "bdc8d7fd42db43b379d206235b101a04e7a989ea34f66d40fef834bf0a7b5de3"
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": {
+      "artifact": "source-195-current-88a6cbbe-2021.1/portable/equivalence-1.json",
+      "sha256": "c87f039909041c2a7c453b9206f1be19dc4a2876a2f9c3a367be1e7e94653d71"
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": {
+      "artifact": "source-195-current-88a6cbbe-2021.1/portable/equivalence-2.json",
+      "sha256": "39ed474b46cba1d8450d0575eff44460b303359415258231fb34eac8ec8aa729"
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": {
+      "artifact": "source-195-current-88a6cbbe-2021.1/portable/equivalence-3.json",
+      "sha256": "a474e5bbdf18ac2d5b480b8b5e61cf9f63f4067cba6388f0274b2ab999daa479"
+    }
+  },
+  "evidence": {
+    "artifact": "source-r59-4e3c2800-import-r4-2021.1/portable/native.json",
+    "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_source_copy_repeated_native_donor_saved_graph[2021-native-donor-two-properties/v1]",
+    "sha256": "1073767c900efa6deda97f9163f95fb2984fc141115a74e73814e41e17ce8614"
+  },
+  "native_equivalence": {
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+      "artifact": "source-195-current-88a6cbbe-2021.1/portable/native_equivalence-0.json",
+      "sha256": "656d0d7c7760d2d33c7130607c53c20d5f5a47d25a27cd2ea2fe418f18ccf91b"
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": {
+      "artifact": "source-195-current-88a6cbbe-2021.1/portable/native_equivalence-1.json",
+      "sha256": "0ef65551acee9e6ebfa6b88867ae817cba1c5fd39f610a6d5e1fd2c4ffbcfff4"
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": {
+      "artifact": "source-195-current-88a6cbbe-2021.1/portable/native_equivalence-2.json",
+      "sha256": "fb3c560c1a8610de2bdc980e1e1dd072dc39b4ad6c35992fddf4e9606f1765fa"
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": {
+      "artifact": "source-195-current-88a6cbbe-2021.1/portable/native_equivalence-3.json",
+      "sha256": "9485d686941ae8f78b1ea44dacad31ad5e44a7e175c32c076099173ee7049e4d"
+    }
+  },
+  "predecessor": {
+    "artifact": "source-r59-4e3c2800-import-r4-2021.1/portable/native-attachment.json",
+    "sha256": "25c34c1f96a6b2a5a4e48509e9eab44d5a606b9764d4b1c981ca02c6a1983c14"
+  },
+  "proof": {
+    "artifact": "source-r59-4e3c2800-import-r4-2021.1/portable/native-proof.json",
+    "sha256": "9fb7b5110ea42fba362c8d5a3f89fbb524d1343be2f31a27be9425d9613f83f4"
+  },
+  "successor_context": {
+    "artifact": "source-195-current-88a6cbbe-2021.1/portable/successor-context.json",
+    "sha256": "f80eca4beb52db644cf20c058b6648d23921724857ab344d2391355d21992e82"
+  }
+}

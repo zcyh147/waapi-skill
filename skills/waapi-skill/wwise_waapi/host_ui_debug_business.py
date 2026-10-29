@@ -222,6 +222,7 @@ def _normalize(
     if (
         str(result.get("channel_layout", "")).startswith("Ambisonics ")
         and result.get("waveform", "silence") != "silence"
+        and result.get("anonymous_channels") is not True
     ):
         raise _invalid(
             session,
@@ -282,8 +283,8 @@ def _native_args(operation: str, plan: Mapping[str, Any]) -> dict[str, Any]:
             result["languages"] = plan["languages"]
         if "platforms" in plan:
             result["platforms"] = [
-                {"basePlatform": base, "name": name}
-                for base, name in plan["platforms"]
+                {"basePlatform": row[0], **({"name": row[1]} if len(row) == 2 else {})}
+                for row in plan["platforms"]
             ]
         return result
     result["bypassSave"] = plan.get("discard_unsaved_current_project", False)
@@ -337,8 +338,8 @@ def _channel_indexes(
     field: str,
     raw: object,
 ) -> list[int]:
-    if not isinstance(raw, list) or not raw or len(raw) > 64:
-        raise _invalid(session, field, "provide one or more channel indexes")
+    if not isinstance(raw, list) or len(raw) > 64:
+        raise _invalid(session, field, "provide an explicit empty set or up to 64 channel indexes")
     values: list[int] = []
     for value in raw:
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 63:
@@ -417,8 +418,8 @@ def _string_list(
     field: str,
     raw: object,
 ) -> list[str]:
-    if not isinstance(raw, list) or not raw or len(raw) > MAX_COLLECTION_ITEMS:
-        raise _invalid(session, field, "provide one or more bounded exact values")
+    if not isinstance(raw, list) or len(raw) > MAX_COLLECTION_ITEMS:
+        raise _invalid(session, field, "provide a bounded exact collection, including an explicit empty collection")
     values = [_string(session, field, value) for value in raw]
     if len(set(values)) != len(values):
         raise _invalid(session, field, "provide each value once")
@@ -430,21 +431,22 @@ def _platforms(
     field: str,
     raw: object,
 ) -> list[list[str]]:
-    if not isinstance(raw, list) or not raw or len(raw) > MAX_COLLECTION_ITEMS:
-        raise _invalid(session, field, "provide one or more platform mappings")
+    if not isinstance(raw, list) or len(raw) > MAX_COLLECTION_ITEMS:
+        raise _invalid(session, field, "provide a bounded platform collection, including an explicit empty collection")
     result: list[list[str]] = []
     names: set[str] = set()
     for row in raw:
-        if not isinstance(row, list) or len(row) != 2:
-            raise _invalid(session, field, "provide each platform as [base, name]")
+        if not isinstance(row, list) or len(row) not in {1, 2}:
+            raise _invalid(session, field, "provide each platform as [base] or [base, name]")
         base = _string(session, field, row[0])
-        name = _string(session, field, row[1])
+        name = _string(session, field, row[1]) if len(row) == 2 else None
         if base not in BASE_PLATFORM_CHOICES:
             raise _invalid(session, field, "choose one disclosed base platform")
-        if name.casefold() in names:
+        if name is not None and name.casefold() in names:
             raise _invalid(session, field, "provide each project platform name once")
-        names.add(name.casefold())
-        result.append([base, name])
+        if name is not None:
+            names.add(name.casefold())
+        result.append([base, name] if name is not None else [base])
     return result
 def _string(session: BusinessDeclarationSession, field: str, raw: object) -> str:
     if not isinstance(raw, str) or not raw or "\x00" in raw:

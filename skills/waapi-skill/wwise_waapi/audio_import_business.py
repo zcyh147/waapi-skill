@@ -37,6 +37,7 @@ from .audio_import_business_contracts import (
 )
 from .operation_import import (
     ImportContractError,
+    canonical_import_target,
     normalize_inline_audio_file,
     normalize_originals_subfolder,
 )
@@ -179,6 +180,60 @@ def materialize_audio_import_business_request(
     ).request
 
 
+def validate_audio_import_replacement_scope(
+    session: BusinessDeclarationSession,
+    compiled: CompiledBusinessPlan,
+    prepared: Mapping[str, Any],
+) -> None:
+    """Bind declared-new absence and replacement permission to declarations.
+
+    The successful Draft check seals this exact prepared snapshot; Preview and
+    execution retain their existing digest and prewrite drift checks.
+    """
+
+    replace_existing = compiled.request["arguments"].get("import_operation") == "replaceExisting"
+    existing_dialogue_reuse = any(
+        isinstance(row.get("dialogue_event"), Mapping) and row["dialogue_event"].get("existing_id") is not None
+        for row in compiled.request["arguments"].get("imports", []))
+    if not replace_existing and not existing_dialogue_reuse and not any(
+        "source_name" in expectation["business_fields"]
+        for expectation in compiled.verifier_expectations
+    ):
+        return
+    targets = prepared.get("verification_plan", {}).get("targets", [])
+    by_path = {row["canonical_target_path"].casefold(): row for row in targets}
+    declarations = {f"import:{row.declaration_id}": row for row in session.declarations}
+    if len(by_path) != len(targets) or len(targets) != len(declarations):
+        raise _repair(session, "AUDIO_IMPORT_SCOPE_INVALID", field="targets",
+            action="prepare every declared import target exactly once")
+    for effect_id, expectation in zip(compiled.ordered_effect_ids, compiled.verifier_expectations, strict=True):
+        declaration = declarations[effect_id]
+        path = canonical_import_target(expectation["object_path"], version=session.context.wwise_version)["canonical_target_path"]
+        target = by_path.pop(path.casefold(), None)
+        if target is None:
+            raise _repair(session, "AUDIO_IMPORT_SCOPE_INVALID", field="targets",
+                action="prepare the exact declared import targets")
+        if "source_name" in expectation["business_fields"]:
+            if target.get("pre_state_rows") or target.get("preexisting_id") is not None:
+                raise _repair(session, "NEW_IMPORT_TARGET_EXISTS", field="source_name", path=path,
+                    action="keep this new Source absent or bind its exact Source handle for reimport or replacement")
+            continue
+        if not replace_existing:
+            if existing_dialogue_reuse and isinstance(declaration.target, NewDescendantTarget) and target.get("pre_state_rows"):
+                raise _repair(session, "NEW_IMPORT_TARGET_EXISTS", field="target", path=path,
+                    action="keep the declared-new Sound absent or bind its exact existing handle explicitly")
+            continue
+        if isinstance(declaration.target, NewDescendantTarget):
+            if target.get("pre_state_rows") or target.get("preexisting_id") is not None:
+                raise _repair(session, "NEW_IMPORT_TARGET_EXISTS", field="target", path=path,
+                    action="keep the new target absent or bind it explicitly before requesting replacement")
+        else:
+            expected_id = session.handles.resolve_object(declaration.target.object_handle).object_id
+            if str(target.get("preexisting_id")).upper() != expected_id.upper():
+                raise _repair(session, "EXISTING_IMPORT_TARGET_CHANGED", field="target", path=path,
+                    action="bind the exact existing replacement target again before preparing a new Preview")
+
+
 def _normalize_settings(session: BusinessDeclarationSession) -> dict[str, Any]:
     unknown = sorted(set(session.settings) - _SETTING_FIELDS)
     if unknown:
@@ -247,6 +302,11 @@ def _resolve_mode(
     }
     if explicit_mode is None:
         if forms == {"new"}:
+            defaults = session.settings.get("defaults", {})
+            if any(isinstance(dialogue, Mapping) and "event_handle" in dialogue
+                    for row in session.declarations
+                    for dialogue in [{**dict(defaults), **dict(row.fields)}.get("dialogue_event")]):
+                return "reimport"  # Creates absent owners while reusing the exact bound Event.
             return "create"
         if forms in ({"existing"}, {"new", "existing"}):
             return "reimport"
@@ -259,8 +319,6 @@ def _resolve_mode(
         )
     assert isinstance(explicit_mode, str)
     if explicit_mode == "create" and forms != {"new"}:
-        raise _mode_target_mismatch(session, explicit_mode, forms)
-    if explicit_mode == "replace" and forms != {"existing"}:
         raise _mode_target_mismatch(session, explicit_mode, forms)
     return explicit_mode
 
@@ -289,6 +347,21 @@ def _compile_declaration(
     collect_file_evidence: bool,
 ) -> tuple[BusinessEffect, BusinessFileEvidence | None]:
     fields = {**dict(default_fields), **dict(declaration.fields)}
+    default_values = default_fields.get("field_values")
+    row_values = declaration.fields.get("field_values")
+    if isinstance(default_values, Mapping) and isinstance(row_values, Mapping):
+        # Rediscovery can issue another handle for the exact same bound field.
+        # Only identical scope/metadata bindings share native-default precedence.
+        row_bindings = {
+            session.handles.bound_field(handle).binding_digest for handle in row_values
+        }
+        fields["field_values"] = {
+            **{
+                handle: value for handle, value in default_values.items()
+                if session.handles.bound_field(handle).binding_digest not in row_bindings
+            },
+            **row_values,
+        }
     unknown = sorted(set(fields) - _DECLARATION_FIELDS)
     if unknown:
         raise _repair(
@@ -417,6 +490,11 @@ def _compile_declaration(
         row["audio_file_base64"] = normalized_inline
 
     has_media = media_file is not None or inline_wav is not None
+    if _type_token(object_type) == "audiofilesource":
+        unavailable = set(fields) - {"media_file", "inline_wav", "language", "originals_subfolder", "notes", "audio_source_notes"}
+        if not has_media or unavailable:
+            raise _repair(session, "AUDIO_IMPORT_SOURCE_FIELDS_UNAVAILABLE", field="fields",
+                action="reimport or replace this exact media Source; declare owner fields on its bound Sound")
     language = fields.get("language")
     if has_media:
         if language is None and (
@@ -444,14 +522,23 @@ def _compile_declaration(
     for business_name, native_name in (
         ("notes", "notes"),
         ("audio_source_notes", "audio_source_notes"),
-        ("dialogue_event_directive", "dialogue_event"),
         ("switch_value", "switch_assignment"),
     ):
         value = fields.get(business_name)
         if value is not None:
-            if not isinstance(value, str) or not value:
-                raise _field_type_repair(session, business_name, "non-empty string")
+            allows_empty = business_name in {"notes", "audio_source_notes"}
+            if not isinstance(value, str) or (not value and not allows_empty):
+                raise _field_type_repair(
+                    session, business_name, "string" if allows_empty else "non-empty string"
+                )
             row[native_name] = value
+    if "switch_group" in fields:
+        group = _resolve_object(session, fields["switch_group"])
+        if _type_token(group.object_type) not in {"switchgroup", "stategroup"}:
+            raise _repair(session, "REFERENCE_TARGET_TYPE_MISMATCH", field="switch_group",
+                allowed_target_types=("SwitchGroup", "StateGroup"), action="choose one exact bound Switch or State group")
+        row["switch_assignment"] = {"group": {"kind": "id", "value": group.object_id},
+            **({"value": fields["switch_value"]} if "switch_value" in fields else {})}
     if "originals_subfolder" in fields:
         try:
             row["originals_subfolder"] = normalize_originals_subfolder(
@@ -568,6 +655,34 @@ def _compile_declaration(
     if "event" in fields:
         row["event"] = _compile_event(session, fields["event"])
 
+    if "dialogue_event" in fields:
+        row["dialogue_event"] = _compile_dialogue_event(session, fields["dialogue_event"])
+
+    if "source_name" in fields:
+        source_name = fields["source_name"]
+        if (not isinstance(source_name, str) or not source_name or len(source_name) > 255
+                or source_name != source_name.strip() or source_name in {".", ".."}
+                or any(c in source_name for c in '<>:"/\\|?*\x00\r\n\t')):
+            raise _field_type_repair(session, "source_name", "one exact bounded Source name without path syntax")
+        if semantic_kind_name not in {"sound-sfx", "sound-voice"} or not has_media:
+            raise _repair(session, "AUDIO_IMPORT_NAMED_SOURCE_OWNER", field="source_name",
+                action="name one media Source owned by a Sound SFX or Sound Voice declaration")
+        owner_fields = set(fields) - {"source_name", "media_file", "inline_wav", "language", "originals_subfolder", "audio_source_notes"}
+        if owner_fields:
+            raise _repair(session, "AUDIO_IMPORT_NAMED_SOURCE_OWNER_FIELDS", field="source_name",
+                action="declare Sound fields separately from the named media Source")
+        if isinstance(target, ExistingObjectTarget) and session.settings.get("mode") == "replace":
+            raise _repair(session, "AUDIO_IMPORT_REPLACE_SOURCE_HANDLE_REQUIRED", field="source_name",
+                action="bind the exact existing Source handle before requesting its replacement")
+        object_path = f"{object_path}\\<AudioFileSource>{source_name}"
+        object_type = "AudioFileSource"
+        row.update(object_path=object_path, object_type=object_type)
+        if "audio_source_notes" in row:
+            row["notes"] = row.pop("audio_source_notes")
+        # The declaration's result is still its Sound, including when another
+        # row creates a second Source below that same owner. Do not replace the
+        # owner identity cached above with the terminal native Source identity.
+
     readable = [
         f"对象：{object_name}",
         f"类型：{kind.path_segment_type if isinstance(target, NewDescendantTarget) else readable_type}",
@@ -582,6 +697,13 @@ def _compile_declaration(
         readable.append(f"输出总线：{_resolve_object(session, fields['output_bus']).name}")
     if has_media:
         readable.append(f"语言：{row['import_language']}")
+    if "source_name" in fields:
+        readable.append(f"音频源：{fields['source_name']}")
+    if _type_token(object_type) == "audiofilesource" and "audio_source_notes" in row:
+        if "notes" in row:
+            raise _repair(session, "AMBIGUOUS_EXISTING_AUDIO_SOURCE_NOTES", field="notes",
+                action="declare the Source notes once")
+        row["notes"] = row.pop("audio_source_notes")
     return (
         BusinessEffect.create(
             effect_id=f"import:{declaration.declaration_id}",
@@ -656,6 +778,44 @@ def _append_dynamic_fields(
                     "target": {"kind": "id", "value": target.object_id},
                 }
             )
+
+
+def _compile_dialogue_event(session: BusinessDeclarationSession, value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or set(value) - {"event_handle", "parent_handle", "name", "conditions", "probability", "weight"}:
+        raise _field_type_repair(session, "dialogue_event", "existing Event handle or parent/name with optional conditions")
+    if "event_handle" in value:
+        if "parent_handle" in value or "name" in value:
+            raise _field_type_repair(session, "dialogue_event", "one existing Event handle without creation fields")
+        event = _resolve_object(session, value["event_handle"])
+        if event.object_type != "DialogueEvent" or not event.path.startswith("\\Dynamic Dialogue\\"):
+            raise _repair(session, "AUDIO_IMPORT_DIALOGUE_EVENT_INVALID", field="dialogue_event", action="bind one exact existing DialogueEvent")
+        result = {"path":event.path, "existing_id":event.object_id}
+    else:
+        if not {"parent_handle", "name"} <= set(value):
+            raise _field_type_repair(session, "dialogue_event", "parent_handle and exact child name")
+        parent = _resolve_object(session, value["parent_handle"])
+        name = value["name"]
+        if (parent.object_type not in {"WorkUnit", "Folder"} or not parent.path.startswith("\\Dynamic Dialogue\\")
+                or not isinstance(name, str) or not name or name != name.strip() or len(name) > 255
+                or any(c in name for c in "\\/<>:@|\r\n\t\x00")):
+            raise _repair(session, "AUDIO_IMPORT_DIALOGUE_EVENT_INVALID", field="dialogue_event",
+                action="provide an exact Dynamic Dialogue folder/Work Unit handle and one child name without directive grammar")
+        result = {"path": f"{parent.path}\\{name}"}
+    if "conditions" in value:
+        conditions = value["conditions"]
+        if not isinstance(conditions, list) or not 1 <= len(conditions) <= 32:
+            raise _field_type_repair(session, "dialogue_event", "one to 32 ordered group/value conditions")
+        result["conditions"] = []
+        for condition in conditions:
+            if not isinstance(condition, Mapping) or set(condition) != {"group_handle", "value_handle"}:
+                raise _field_type_repair(session, "dialogue_event", "group_handle/value_handle conditions")
+            group = _resolve_object(session, condition["group_handle"])
+            selected = condition["value_handle"]
+            result["conditions"].append({"group": {"kind":"id", "value":group.object_id},
+                "value": "*" if selected == "*" else {"kind":"id", "value":_resolve_object(session, selected).object_id}})
+    for key in ("probability", "weight"):
+        if key in value: result[key] = value[key]
+    return result
 
 
 def _compile_event(
@@ -779,4 +939,5 @@ def _type_token(value: str) -> str:
 __all__ = [
     "compile_audio_import_business",
     "materialize_audio_import_business_request",
+    "validate_audio_import_replacement_scope",
 ]

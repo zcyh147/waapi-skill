@@ -1,0 +1,182 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": "../../../../../../..",
+  "entries": [
+    {
+      "id": "runtime195-native-runtime_capture_control_evidence-native-00-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-00-bindings.json",
+        "sha256": "1bc8b488f5b25611f94e8536c8da7b4ac5c23d717a610bd068a32666bc0e0b93"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-00-bindings.json",
+          "sha256": "1bc8b488f5b25611f94e8536c8da7b4ac5c23d717a610bd068a32666bc0e0b93"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-00-program.json",
+          "sha256": "dcf2aa6c8a814c37d1c016caa5667b7a3a3f6f9c012df32038d904b50ec4906a"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-00-capture.json",
+          "sha256": "84f0669efbf36f39d4d747192432c797a689850f41d09bcae8fa03f55c6efa40"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-00-requirements.json",
+          "sha256": "b92afd00b4d7e699a3baf112312f127907f944e1a8d06dd328a594d7490637b3"
+        }
+      }
+    },
+    {
+      "id": "runtime195-native-runtime_capture_control_evidence-native-01-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-01-bindings.json",
+        "sha256": "a6039293e406694c553f16090a21a1719aadd4b8e7c0972f4fbbed201a6e63ac"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-01-bindings.json",
+          "sha256": "a6039293e406694c553f16090a21a1719aadd4b8e7c0972f4fbbed201a6e63ac"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-01-program.json",
+          "sha256": "dcf2aa6c8a814c37d1c016caa5667b7a3a3f6f9c012df32038d904b50ec4906a"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-01-capture.json",
+          "sha256": "84f0669efbf36f39d4d747192432c797a689850f41d09bcae8fa03f55c6efa40"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-01-requirements.json",
+          "sha256": "e7cfe121e17ae02df6d29bccefac9634e91cfd3d38937591f50c98b1363f479e"
+        }
+      }
+    },
+    {
+      "id": "runtime195-native-runtime_capture_control_evidence-native-02-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-02-bindings.json",
+        "sha256": "61053d76695b6c02842eb0aad7aef3c0ec95bc1852f9f9deac2d84e06ca81d40"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-02-bindings.json",
+          "sha256": "61053d76695b6c02842eb0aad7aef3c0ec95bc1852f9f9deac2d84e06ca81d40"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-02-program.json",
+          "sha256": "dcf2aa6c8a814c37d1c016caa5667b7a3a3f6f9c012df32038d904b50ec4906a"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-02-capture.json",
+          "sha256": "84f0669efbf36f39d4d747192432c797a689850f41d09bcae8fa03f55c6efa40"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-02-requirements.json",
+          "sha256": "4b9904e46375d834b3d6edc5248bf611d6a1b710ec9c18ec722f8131e4fc4b9b"
+        }
+      }
+    },
+    {
+      "id": "runtime195-native-runtime_capture_control_evidence-native-03-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-03-bindings.json",
+        "sha256": "e96883f1e866924c7e8de904e79bbec9130b5eda75b4e1ac9eb6e1d3736a12b9"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-03-bindings.json",
+          "sha256": "e96883f1e866924c7e8de904e79bbec9130b5eda75b4e1ac9eb6e1d3736a12b9"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-03-program.json",
+          "sha256": "45f8e86a28bf08e5a8ca9157d1be68479b44a8dd8a099eb249305cff2293cb43"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-03-capture.json",
+          "sha256": "ef9c420f11b67e5dda6f7fb584f96a90a026dcb3e9161acec0b2e2ae7b840e41"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-03-requirements.json",
+          "sha256": "a4ef6ea73479603c6b1737ebbf3e9b708eae359ae0a75798819e58c85f3a13c8"
+        }
+      }
+    },
+    {
+      "id": "runtime195-native-runtime_capture_control_evidence-native-04-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-04-bindings.json",
+        "sha256": "66c881b8b8d0887f9540c9e994a7f01093c0458ebda57a8fd6852750bd4a4b71"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-04-bindings.json",
+          "sha256": "66c881b8b8d0887f9540c9e994a7f01093c0458ebda57a8fd6852750bd4a4b71"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-04-program.json",
+          "sha256": "45f8e86a28bf08e5a8ca9157d1be68479b44a8dd8a099eb249305cff2293cb43"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-04-capture.json",
+          "sha256": "ef9c420f11b67e5dda6f7fb584f96a90a026dcb3e9161acec0b2e2ae7b840e41"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-04-requirements.json",
+          "sha256": "2ea35b8e441ed90453426fd8bf28f87b6b8ee6fa7d2960f5a3a1d4569711fca9"
+        }
+      }
+    },
+    {
+      "id": "runtime195-native-runtime_capture_control_evidence-native-05-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-05-bindings.json",
+        "sha256": "561b7ccb780da42e4fc11baf14b750ca1852c4cbe5fff7441899ddbcc15e7f51"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-05-bindings.json",
+          "sha256": "561b7ccb780da42e4fc11baf14b750ca1852c4cbe5fff7441899ddbcc15e7f51"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-05-program.json",
+          "sha256": "45f8e86a28bf08e5a8ca9157d1be68479b44a8dd8a099eb249305cff2293cb43"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-05-capture.json",
+          "sha256": "ef9c420f11b67e5dda6f7fb584f96a90a026dcb3e9161acec0b2e2ae7b840e41"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-05-requirements.json",
+          "sha256": "2db683b648be9275e39689889a2d67afb7c5beb92c8e4a0b47a6640b7c79535b"
+        }
+      }
+    }
+  ],
+  "qualified_runtime_read_attachments": [
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-00-attachment.json",
+      "sha256": "9cf44520f848de6ca44aa2b605cec2411d87841ffd38f8ae74a1800bdb732e48"
+    },
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-01-attachment.json",
+      "sha256": "547a98f92afa62474e7f218c6bd9713bb9295f9aeda6a16bb45b4453634a4667"
+    },
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-02-attachment.json",
+      "sha256": "2b7444db5007b46322947e61d35db90ead6aadb9a49c52bb17fc6522a414c25e"
+    },
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-03-attachment.json",
+      "sha256": "95212c53769e294093e069a2d54284517ce85ae22c116a517aeccce23307c4c2"
+    },
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-04-attachment.json",
+      "sha256": "56a47412267b99ea6570423e29cf3369243c3418698691852698d217c6fb25b3"
+    },
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/runtime_capture_control_evidence/native-05-attachment.json",
+      "sha256": "d0bec1a334aa69939fa2aa1232ecd0900b6c858e9d228baa65e1416962c1977e"
+    }
+  ]
+}

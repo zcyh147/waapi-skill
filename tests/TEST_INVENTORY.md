@@ -5,6 +5,4721 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-28 #195 condition accounting and bounded playlist diagnosis
+
+Reviewed integration `2d4ed137` incorporates exact source-structure accounting
+for 30 PositioningType members and the user-approved exclusion of 240 Batch
+Rename window-setting members. The existing producer/reader assessment preserves
+all 7,297 IDs and shapes: 7,042 source definitions, 240 approved exclusions and
+15 unresolved MusicPlaylistItem dependencies; `complete=false`. Canonical
+condition publication and final combined gates remain pending. Source-definition
+and exclusion states confer no native effect or recipient-metadata observation.
+
+Fieldless implementation `c21b300f` recorded a grouped result of **49 passed,
+2 failed in 235.13s**; both failures were negative-test binding-scope mistakes.
+After correcting only those inputs, the two affected controls passed in72.41s.
+This is separate evidence, not a single51/51 run. User-approved exclusion
+implementation `32b5be8a` then passed its12 selected controls in138.78s, including
+the actual export/import/persisted assessment and non-Batch scope negatives.
+Original artifacts and failing verdicts remain unchanged; ordinary object
+renaming and unrelated Inner types were not excluded.
+
+Playlist read-plan change `0e29731f` added only first-item field inventory and
+exact LoopCount enabled-state reads through the existing public Gateway. Its
+focused file passed41 tests in1.23s. Standards review found that the new proof
+stopped before persistence; `8336093a` added the actual maintenance-entrypoint
+and final-v3 category writer check. Only its three new disabled/error/retained-
+failure cases ran: **3 passed,41 deselected in1.98s**. The original41 passing
+checks were not repeated, and the review finding was resolved.
+
+Two isolated macOS Console2025.1.7.9143 read-only diagnostics are retained:
+
+- At `747c88f8`, the original11-read playlist plan passed its diagnostic node
+  in8.46s. LoopCount was readable, while its native metadata named the
+  IsLoopingInfinite dependency absent from the returned nine-field inventory.
+- At `8336093a`, the reviewed13-read plan passed its diagnostic node in5.36s.
+  The first item's explicit inventory was complete with nine names and still
+  omitted that controller; native `isPropertyEnabled` for LoopCount on Mac
+  returned `false`.
+
+These PASS labels mean bounded diagnostic completion, not editable-condition,
+mutation or Fresh acceptance. Both final lifecycle records retain unchanged
+source content hashes/mtimes, zero transactions, deleted owned sandboxes and no
+residual processes. The playlist-root parent-comparison discrepancy remains a
+finding, not a passing ownership assertion or additional investigation. Original
+records and raw packets are retained in `.waapi-skill-state/full-coverage/`
+`195-music-read-2025-r1/` and `195-music-read-2025-r2/`. No additional native
+absence, other-version outcome, full gate or Fresh credit is claimed.
+
+## 2026-10-27 #183 configured external-output correction
+
+The failed-only diagnostic at `46ec36ed`, root
+`soundbank183-external-default-2025-r1`, remained **FAIL, 6.44s** but retained
+complete owned-output evidence: Wwise created a 1,696-byte WEM under the
+Project's configured `ExternalSourcesOutputPath`. The wrapper had incorrectly
+predicted a converted-media-cache subdirectory. Its original observation SHA
+is `bd69b89781a48065e3cceefd15860b6dba14f0ba9d74c7d3af205cfcf1e877b8`.
+
+Fix `11b10c19`, integrated in `451647cd`, reads the exact live Project property
+for the selected platform, seals the effective path and rereads it before
+execution. Native output omission remains omission. **22 focused code checks
+passed in 4.50s**; both review axes are clear. Literal blank-property fallback
+and custom platform naming are program-tested, not newly native-proven.
+
+The same external-only node on `451647cd` passed on macOS WwiseConsole
+**2025.1.7/build 9143: 1 PASS, 4.78s**, root
+`.waapi-skill-state/full-coverage/soundbank183-external-fixed-2025-r1`.
+One transaction was verified; the exact configured output contained the
+independently proved 1,696-byte WEM. Input/source hash, tree and project mtime
+were preserved; owned processes were cleaned and the successful sandbox deleted.
+Observation SHA: `8ccd32a36183f03b4859cbf30d82dac4292f7eb9f7bdc70977301c5bcb473047`.
+The two earlier successful mechanisms were not rerun. Both older native FAILs
+remain unchanged; these are scoped cumulative effects, not a new single-run
+three-effect PASS or a Windows/five-version native/Fresh gate.
+
+## 2026-10-27 #184 media-ID effect checks
+
+Implementation `a370b5cd`, tested merge `6edf5981`, adds exact central-to-Work-Unit
+transfer checks and existing central-file refresh/preserving absent-file no-op
+checks. Closed public inputs, native XML parser and optional None-state rules
+remain unchanged. **87 selected public-Gateway program checks passed in 39.63s**
+across the five applicable lanes. Both reviews accepted the scoped change;
+optional baseline-selector duplication is nonblocking. No #184 native result
+or whole-ticket completion is added by this entry.
+
+## 2026-10-27 #183 Core file workflows and Definition coverage
+
+Integrated candidate `e6bb933f` includes the reviewed Core option mappings,
+Definition completion and one three-effect native witness. Definition's focused
+program run passed **115 checks in 11.65s**; the combined seal/policy/admission
+selection passed **4 checks in 3.85s**. The later audio.convert witness extension
+passed its **2 producer-to-persisted-writer controls in 2.62s**. These are separate
+focused runs, not a full Program/Non-live gate or an additive campaign total.
+The Program roster contains 375 entries; that is a structural count.
+
+On macOS WwiseConsole **2025.1.7/build 9143**, root
+`.waapi-skill-state/full-coverage/soundbank183-core-files-2025-r1`, the selected
+node `test_core_audio_conversion_temporary_bank_and_default_external_conversion`
+ended **FAIL, 7.71s**, after three independently authorized transactions:
+
+- `audio.convert`: independent exact Sound/active Source readbacks identified a
+  new nonempty owned WEM; input and identity preservation passed. The Gateway
+  itself still reports `result_schema_checked`, not business verification.
+- Temporary SoundBank generation: independent nonempty Bank artifact and
+  identity/input preservation passed; the transaction was verified.
+- External-source conversion with omitted output: native result was `{}`, but
+  the expected WEM was absent from the bound default output directory.
+  Verification failed. Conversion success and the default location are not
+  accepted from this result.
+
+The final category row retains the first two scoped PASS observations and the
+third FAIL; the whole selected node remains FAIL. The original observation
+SHA-256 is `ac7541f885fa4048c245b11566341daf4b2d2147e0d59f7dea839bbff1819d09`.
+Source full hash, tree metadata and project mtime were unchanged; owned processes
+were cleaned, and the failed sandbox was quarantined. The root's
+`main-assessment.json` and copied original category rows retain exact paths.
+Read-only diagnosis precedes any failed-only follow-up; neither successful
+mechanism needs repetition solely because the combined node failed.
+
+Definition/table imports use the approved wrapper/code-test acceptance and had
+no new native run. No Fresh, Windows-host, 2024 native-effect or final broad-gate
+credit is added. The global branch snapshot generator failed once on the
+retained Source successor context; original snapshots remain unchanged and
+#195 owns reconciliation. #183 remains open, including its #179 codec-setter
+dependency and unresolved external conversion effect.
+
+## 2026-10-27 #182 Source-identity boundary approved
+
+The user approved the precise [localized TSV Source-identity boundary](../docs/plans/full-waapi-coverage/SPEC.md#user-approved-localized-tsv-source-identity-boundary--2026-10-27):
+retain the no-additional-Source requirement and stop further native tests of
+the guarded combined localized existing-Source fields/media configuration on
+Console 2025.1.7/build 9143. The existing before-Preview/prewrite guard has 20
+focused passing checks; no new run occurred for this decision. Both retained
+shared/distinct-path native FAILs and their partial effects remain unchanged.
+This supersedes the pending decision in dated entries below, without approving
+additional-Source behavior, other host/build/version exclusions or the separate
+all-five GUID TSV question. Owner-only/pure-media boundaries remain unchanged;
+this acceptance decision is resolved, while #182 and overall coverage stay open.
+
+## 2026-10-26 #182 repeated TSV Switch native milestone
+
+Console 2025.1.7/build 9143, `ee13e472`, root `import182-tsv-switch-2025-r1`:
+**PASS, 7.22s**, two verified transactions including setup. The exact table's
+two Switch columns assigned Snow and Metal to one new SFX Sound with one Source
+and requested bytes; assignment pairs grew 3→5. Old group/values, subtree/media,
+spare, inputs and table stayed exact. Source hash/tree/mtime were unchanged;
+process cleanup passed and the PASS sandbox was deleted. Main assessment/final
+category remain in the full-coverage root; receipt SHA-256:
+`0af062ccc22be4c59d689981562d3dc28e1a80d2859d2860bd845cc216520944`.
+
+Five-lane repeated-column program proof is **13 distinct component checks**,
+separate from this native result; localized/reuse/replacement TSV and Dialogue
+remain unproven. CI `40344306708` retains its admission FAIL before tests.
+Three new fake-only Gateway files are now registered in Program: **370 parsed
+roster selectors**, not passing tests; only focused admission checks ran.
+No Fresh, full gates or all-coverage claim is added; #182 remains OPEN.
+
+## 2026-10-26 #182 distinct-Source failure and current host boundary
+
+Console 2025.1.7/build 9143, `784e1bfe`, root
+`import182-tsv-distinct-source-2025-r1`: **FAIL, 8.31s**. Despite initially
+distinct English/Japanese Source paths, the combined TSV added another English
+Source. Old GUIDs and Japanese bytes stayed; English bytes and owner fields
+updated. After two verified setups, the witness ended `verification_failed`.
+Source preservation and process cleanup passed; the failed sandbox remains
+quarantined. Original assessment/final category evidence remains under the
+full-coverage root; receipt SHA-256:
+`7bee26cdbc80b0f16d5d69809e84a6a10676b8bcbc2f14a7d3a65d151e222b02`.
+
+Reviewed `35432c76` blocks combined localized existing-owner `useExisting`
+fields/media with a bound existing Source on that exact Console host/build,
+regardless of path uniqueness, before Preview and at prewrite. **20 distinct
+focused checks passed**; owner-only, pure-media and other hosts/builds/versions
+retain their existing boundaries. Both original native FAILs remain intact;
+shared paths are not necessary for the failure, and its cause remains unproven.
+Native variants have stopped. The user's decision remains pending: preserve
+Source identity with the current-host limit, explicitly accept additional-Source
+behavior, or authorize investigation. #182 is not coverage-complete; no Fresh,
+broad gate, native-Windows proof or global count is added.
+
+## 2026-10-26 #182 guarded TSV batch and Switch program progress
+
+Reviewed `293fb909` adds five-version ordinary Switch new/reuse media and
+additive assignment program proof: **14 distinct passing component checks**.
+The earlier 2025.1 native PASS retains its scoped effects; older native lanes
+and other forms remain unproven. Tests-only `84e6c86a` separates exact host
+command paths from the unchanged compact-summary budget: **2 focused PASS**.
+These separate results are not a combined Program/Non-live gate.
+
+Combined localized TSV root `import182-tsv-combined-2025-r1` at `b997fbd6`,
+Console 2025.1.7/build 9143: **FAIL, 8.77s**. Owner fields and English bytes
+were correct, but native added an extra English Source. Original English and
+Japanese GUIDs stayed, with Japanese bytes unchanged. The witness ended
+`verification_failed` after two verified setups; its failed sandbox remains
+quarantined, with source preservation and clean process cleanup. Original
+assessment/final category evidence remains under the full-coverage root;
+receipt SHA-256 `e84e7d01e12825a71f44a7c98ccbe7961ceaee060f2cbba142fbd58eebd04400`.
+
+Reviewed `c5c13278` blocks that exact Console host/build before Preview and
+at prewrite when an existing localized `useExisting` owner combines fields
+and media and the selected Source path is shared across languages. **11
+focused checks passed**. This records an observed unsafe configuration,
+without a proven cause or all-five-version ban. Otherwise-unambiguous combined
+native Source identity and broader #182 forms remain pending. #182 stays OPEN;
+no Fresh, broad gates, native-Windows proof or global coverage counts were added.
+
+## 2026-10-26 #182 Switch import native milestone
+
+Console 2025.1.7.9143, macOS, candidate `19bb77ea`: **PASS, 6.05s** in
+`import182-switch-2025-r2`, two verified transactions including setup. One
+import reused an existing SFX Sound with media plus Switch-only intent and
+created a new Sound assigned to Snow. Independent checks proved changed reuse
+media with preserved owner/Source identity, original three assignment pairs,
+group/values, baseline subtree/media, spare and inputs. Source preservation
+and process cleanup passed; the PASS sandbox was deleted. Receipt SHA-256:
+`3c6354a754c236b7a0ee4fa52fe48f6dc1a3c57b0f8ffc6bcfa1437f9ee788d6`.
+
+Original `import182-switch-2025-r1` at `60e33e47` remains **FAIL, 8.34s**:
+the fixture omitted a named ancestor folder; zero transactions ran. Source
+remained untouched, process cleanup passed and its sandbox stays quarantined.
+Both roots retain `main-assessment.json` and final `category.jsonl` under
+`.waapi-skill-state/full-coverage/`. Five-version Switch program proof and
+other forms remain pending. Reviewed `594e7a42` adds the first combined
+localized TSV owner-field/media flow with unchanged table and planned-Source
+preservation; it is program-only, with native effects and broader forms still
+pending. #182 remains OPEN; no Fresh, broad gates or coverage totals were added.
+
+## 2026-10-26 #182 owner-only exact TSV fields milestone
+
+The public Gateway admits metadata-proven owner-only localized TSV fields on
+all five pinned versions, preserving Source/media and each row's sealed
+prestate. Activation may be explicit or already satisfied on the exact owner.
+`6548a1c0` has 14 distinct passing program nodes across separate components;
+prior tracer/multiowner/final-writer proofs remain separate, not a broad gate.
+
+Console 2025.1.7.9143, macOS, candidate `08e9111a`: **PASS, 6.94s** in
+`import182-tsv-owner-fields-2025-r2`, three verified transactions including two
+setups. The exact table has no Audio File column: Volume changed 0→-6,
+explicit OverrideOutput false→true and OutputBus Main→Secondary. Independent
+checks preserved both-language Source identities/Notes/media, owner facts,
+unrelated/spare objects, both Buses and inputs. Source/process cleanup passed;
+the PASS sandbox was deleted. Receipt SHA-256:
+`3ea67cb126c08b00c2e01bac1e490c4a236fda3e9510e4d0f72a82a700402708`.
+
+Original `import182-tsv-owner-fields-2025-r1` at `4b11301e` remains **FAIL,
+7.44s**: wrong fixture Bus class, two verified setups, witness never executed;
+source/process cleanup passed and its sandbox remains quarantined. Both roots
+retain `main-assessment.json` and final `category.jsonl` under
+`.waapi-skill-state/full-coverage/`. #182 remains OPEN for combined localized
+owner-field/media TSV rows, broader media forms and Dialogue/Switch directives.
+Older lanes and omitted activation have program-only proof. Fresh budget stays
+zero; no broad gates or native-Windows evidence were added.
+
+## 2026-10-26 #182 GUID TSV failure and immediate safety boundary
+
+GUID parsing and shared typed-class policy have separate component evidence:
+20 focused passes and eight unique parity controls across overlapping runs,
+not an aggregate gate. One native attempt at `0b350f8b`, Console 2025.1.7/build
+9143, root `import182-tsv-guid-2025-r1`: **FAIL, 7.90s**. Correct Z: media and
+explicit Object Type were present, but native created unexpected GUID-named
+objects and left intended targets unchanged. Strict verification failed;
+source/process cleanup passed and the unchanged failed sandbox is quarantined.
+Reviewed `945cc6f5` blocks that observed host/build before Preview and again
+before execution; **10 focused checks passed in 2.19s**. Older lanes remain
+program-only; a user decision on an all-five-version exception is pending.
+This proves no all-five native absence or #182 closure. Ordinary r4 PASS remains
+reusable; the GUID attempt was not replayed. Original assessment/receipts remain
+under the named full-coverage root; the remaining obligations below stay open.
+
+## 2026-10-26 #182 owner/Source progress and retained native failures
+
+Reviewed implementation through `d6c63639` separates metadata-proven owner
+properties/references from Source Notes/media, including inline media and a new
+language. The media-ownership P2 repair retains exact selected-Source binding
+and preservation. Exact TSV media proofs bind native spelling, canonical local
+bytes and table-relative bases; namespace checks use proven Wine facts. Ordinary
+Gateway-generated Source names avoid cross-language collisions, and the reuse
+P2 repair retains an existing generated Source after its original collider is
+renamed. Explicit TSV targets keep their declared identities.
+
+Source-backed fixture repairs bind the actual 2025 Busses hierarchy and exact
+Main Audio Bus among valid siblings. The launcher now rejects explicit unit
+selectors in matrix/focused/all modes before readiness, directing them to
+Non-live. Schema-seal inversions retain reviewed contracts and historical seals.
+CI `40296335746` at `a077f112` recorded **837 passed, 1 failed in 96.68s**;
+its sole failure was the digest inventory, repaired at `7edae952` with the exact
+failed node **1 passed in 0.39s**. Subsequent CI has not run yet. Component and
+merge-intersection counts overlap; none is an aggregate Program/Non-live gate.
+
+Six separate Console 2025.1.7.9143 roots under the durable full-coverage state
+retain original receipts and authoritative `main-assessment.json` files:
+
+- `import182-owner-source-2025-r1`: **FAIL, 8.45s**. Old Bus hierarchy path
+  resolved nothing; two setup transactions verified, witness never executed.
+- `import182-tsv-source-2025-r1`: **FAIL, 6.45s**. Owner/Source Notes changed,
+  but media/path stayed old with the POSIX media cell; strict verification failed.
+- `import182-owner-source-2025-r2`: **FAIL, 6.27s**. Singleton-Bus fixture
+  assumption failed among four valid Bus children; witness never executed.
+- `import182-owner-source-2025-r3`: **FAIL, 7.62s**. Explicit Source lookup
+  reused English identity and changed its Notes; no Japanese Source was created.
+- `import182-tsv-source-2025-r2` at `9548a89c92ce47181aa7de363b843392a3c91b39`:
+  **FAIL, 7.56s**. Correct native Z: cell retained; Notes and identities passed,
+  but old media/path remained. Namespace proof alone did not prove replacement.
+- `import182-owner-source-2025-r4` at `d6c63639b7b48bbc4b629f374953b8d49408c496`:
+  **PASS, 7.27s**, three verified transactions including setup. Distinct Japanese
+  Source/Notes/exact inline media/After placement and owner Volume/OutputBus/
+  OverrideOutput passed; English GUID/Notes/media and unrelated/input state
+  were preserved. This ordinary result grants no TSV media-effect credit.
+
+All six confirm source preservation and clean process cleanup. The PASS sandbox
+was deleted; all five FAIL sandboxes remain quarantined, unchanged and unregraded.
+No universal native-absence conclusion follows. #182 remains OPEN: GUID targets
+are being implemented; localized TSV dynamic fields, Dialogue/Switch directives
+and TSV media outcome remain work. No new Fresh or native-Windows evidence is
+claimed. #194 Fresh budget stays zero; #195 owns combined gates/reconciliation.
+
+## 2026-10-26 #182 import progress and scoped native outcomes
+
+Implementation through `f4445eba` preserves independent default Field Handle
+assignments, row precedence and explicit empty Notes. Mixed replace/create
+binds destructive intent to exact existing targets and requires declared-new
+targets to be absent. Ordinary localized fields and exact TSV retain separate
+Notes/AudioSourceNotes expectations, source/language snapshots and media/drift
+checks. TSV `OriginalsSubFolder` is gated to 2023.1+ by WG-60834; four incompatible
+current 2022 V3 definitions block before producers without changing historical
+campaigns. Source-bound 2025 Events use a controlled owner/Event row plus exact
+Source/media row in one call; older wire behavior remains unchanged.
+
+Focused component tests and small integration selections are recorded separately
+in `.waapi-skill-state/full-coverage/import-182-work/`. Counts overlap; they are
+not a combined Program/Non-live pass. Original REDs, the mixed 73-pass/2-fail run
+and its two repaired synthetic fixtures remain attributed to their actual runs.
+No new Fresh, native-Windows or full gate is claimed.
+
+Five separate owned macOS Console 2025.1.7.9143 roots retain these original results:
+
+- `import182-mixed-2025-r1` at `eb3b0e29`: **PASS, 12.65s**, two verified
+  transactions including setup. Distinct replacement/old-GUID absence, new
+  target, Source ownership/language/media bytes and unrelated/input preservation
+  passed; setup grants no extra API credit.
+- `import182-localized-2025-r1` at `eb3b0e29`: **FAIL, 6.96s** during Japanese
+  setup. Requested AudioSourceNotes read back empty; English witness never ran.
+- `import182-localized-2025-r2` at `a256767b`: **FAIL, 6.78s**. The English
+  witness reached verification, failing its Event Action's zero-GUID Target.
+  Other verifier facts remain scoped observations; independent after-reads
+  were not reached.
+- `import182-localized-2025-r3` at `b3b7a644`: **PASS, 7.19s**, three verified
+  transactions after the owner/Event partition repair. Literal English Notes,
+  exact Source identity/media/moved folder, Event target, owner notes and
+  other-language/unrelated preservation passed. This does not prove r1's
+  new-language AudioSourceNotes effect.
+- `import182-tsv-2025-r1` at `f4445eba`: **FAIL, 10.24s**. Two setup transactions
+  verified; TSV execution was indeterminate after native rejection of Audio
+  Source Notes. No Verify or follow-up reads/writes ran; final target effects
+  remain unknown, without a native-absence conclusion.
+
+Evidence roots are below `.waapi-skill-state/full-coverage/`; each retains its
+`main-assessment.json` beside original receipts/category rows. All five confirm
+source preservation and clean process cleanup. Passing sandboxes were deleted;
+all three failed sandboxes remain quarantined. No original FAIL was replayed or
+regraded. These are separate scoped results, not one green campaign.
+
+#182 remains OPEN: new-language AudioSourceNotes and actual localized TSV effects
+remain unresolved; localized owner properties/references/inline media and
+Dialogue/Switch assignments remain implementation/proof work. #194 Fresh budget
+stays zero; #195 owns final mapping reconciliation and combined gates.
+
+## 2026-10-26 #181 functional closeout
+
+Reviewed `cc545ad2` completes the remaining disclosure after the query increment
+below. The user accepted the precise 2021 stored-property-to-RTPC association
+Skill limitation, retaining RTPC/Game Parameter/typed ControlInput reads. Public
+schema and early rejection distinguish that limitation from native absence;
+stale developer backlog text now points to available query paths. The two new
+disclosure checks passed **2 in 0.45s**, and adjacent schema/version controls
+passed **6 in 0.81s**. Both review axes were clear.
+
+At frozen `ceb9a58c`, one existing plugin/no-file Sound was queried through the
+already supported advanced `SELECT activeSource` route on Console
+2021.1.14.8108. Original result: **FAIL, 9.48s**, native
+`ak.wwise.query.invalid_query`, `Unknown accessor activeSource (61)`; one public
+invocation/value dispatch, 990 packet bytes, zero transactions. No source
+selection or exact-ID readback was reached. Source full hash/tree/mtime and
+prepared MIDI bytes were unchanged; processes were cleaned and the sandbox
+quarantined. Root `query181-2021-active-source-r1` under the durable full-coverage
+state retains the original category, receipt, packet and `main-assessment.json`.
+
+The precise observed-host/build restriction is now disclosed; the existing
+file-backed algorithm, modern choices and advanced grammar remain unchanged.
+The positive capability probe is explicitly skipped, with its body and original
+FAIL preserved and no native PASS credit. Four focused collector/finalizer
+controls passed before that attempt; only the affected disclosure/retirement
+checks ran afterwards. No native retry, new fixture, unlinked permutation sweep,
+Fresh or full gate followed. The closeout audit found no further functional
+blocker; #195 retains global mapping reconciliation and stable combined gates,
+and #194 retains Fresh budget zero. This is not parent or Windows acceptance.
+
+## 2026-10-26 #181 query increment
+
+Reviewed integration `74823e56` adds modern `local-markers` and root
+`marker-records`, selected-State/Panner/computed object contexts, 2025 field-status
+and curve-selection outputs, and twelve finite declared return choices. The
+eleven legacy spellings remain selectable across all five lanes; `states` is
+2025-only. Actual native keys/values are retained without alias-equivalence or
+per-choice attribution claims. Source-established 2023 Marker object-model
+introduction supplies the older-version boundary; no older native sample was
+created merely to reproduce absence.
+
+Component program selections overlap and are not a full-gate total: declared
+choices passed **57 in 16.55s**; context/runtime controls **45 in 5.88s** and
+collector/finalizer controls **8 in 4.87s**; public-boundary cleanup **39 passed**;
+final merge intersections **6 in 1.60s**. Marker records used focused tracer,
+version/presence/shape, paging/drift and rejection checks, including a final
+four-check tracer/schema selection passing in **5.05s**. These establish
+Gateway construction/projection, not an exact native Marker-record composition
+receipt or computed/file-cue equivalence. Retained R90 Marker identity and
+Time/Label facts support only those observed primitives. Both incremental review
+axes were clear; no new broad gate or Fresh run occurred.
+
+| Frozen candidate / Console build | Original result | Scoped observation |
+| --- | --- | --- |
+| `36de89a1` / 2021.1.14.8108 | **FAIL, 9.33s** | One value dispatch, one public query, zero transactions. Native `ak.wwise.query.invalid_query`: `Unknown accessor points`. The subsequent precise 2021 accessor boundary replaces the unverified candidate; it does not establish absence of all legacy RTPC reads. |
+| `36de89a1` / 2025.1.7.9143 | **FAIL, 8.30s** | Twelve public invocations, eighteen dispatches, zero transactions. State/Panner selections and exact readbacks, property/reference/List status values and two curve-source values observed. Duration selection returned an accepted empty list; radius selection returned actual Footsteps attenuation, contradicting the collector's XML-derived target expectation. |
+
+The computed-target collector now follows actual zero-or-one results, with
+focused code proof through its finalizer. Original FAILs remain unchanged and
+neither attempt was rerun for this repair. The radius target's later exact-ID
+readback was not reached in the original attempt; an empty duration result is
+not nonempty evidence. Both roots retain source full-hash/tree/mtime proof,
+clean process teardown and quarantined sandboxes:
+`.waapi-skill-state/full-coverage/query181-2021-points-r1` and
+`query181-2025-functions-r1`, including `main-assessment.json` and original
+receipts/categories. Detailed component commands/reviews are retained in
+`.waapi-skill-state/full-coverage/query-181-work/`.
+
+Public Curve/Playlist boundary resources now omit historical developer fixture
+and transaction records. Exact originals remain hash-pinned under
+`tests/fixtures/resource-evidence/native-boundaries/`; source evidence and
+original outcomes were not rewritten. #181 remains open for the residual
+2021 association/applicability work. #194 Fresh budget is zero; #195 retains
+mapping reconciliation and stable combined Program/Non-live gates. No Windows,
+whole-ticket or parent-completion claim follows from this increment.
+
+## 2026-10-26 #180 graph/lifecycle closeout
+
+Reviewed combined `18defa44` resolves the three audited #180 gaps through the
+existing public Gateway. Pair-aware nested RTPC preparation admits non-fail
+parent merges with a new owned ControlInput while preserving existing pairs,
+Curves and actual occurrence handles. Old-owned replacement now previews the
+old GUID's removal and verifies a fresh new input, old absence and retained
+RTPC/Curve/list/peer state. Five-version contracts and program boundaries remain:
+the source-certified constructor is supported in 2022–2025; 2021 retains its
+constructor-introduction boundary, without excluding all other RTPC workflows.
+Mixed platform intent uses the existing separately previewed property path.
+
+Selected program results remain component-attributed and overlapping: the
+2022/2025 parent/shared-input merge group passed **7 in 4.64s**; the final
+PlaylistSlot boundary/MetadataSlot/preservation/schema group passed **27 in
+9.31s**; replacement controls passed **24 in 14.79s**, with its existing finalizer
+group separately **12 in 14.68s**. Shared replacement tests cover 2022–2025.
+These are representative mechanisms, not a per-class/value/conflict receipt
+quota or a summed full-gate result. Detailed commands and reviews are retained
+under `.waapi-skill-state/full-coverage/graph-180-closeout/`.
+
+| Candidate / exact Console build | Original result | Scoped native outcome |
+| --- | --- | --- |
+| `18defa44` / 2022.1.19.8584 | **PASS, 9.18s** | Three VERIFIED transactions: two setup, one owned Time→fresh `TimeModFresh` replacement. Fresh GUID/class/RTPC owner/values, old GUID absence, unchanged RTPC/Curve GUID/class/owner/points and complete owning List independently proven. |
+| `549ef3f9` / 2022.1.19.8584 | **FAIL, 11.92s** | Four VERIFIED transactions and retained `Object not found (13)` response support only old-input absence after owned→shared displacement. Consumer repair `935f121c` preserves this scoped assessment; it does not regrade the root or establish owned→owned replacement. |
+| `549ef3f9` / 2025.1.7.9143 | **FAIL, 10.73s** | PlaylistSlot class 5636096 `setName` returned `ak.wwise.invalid_arguments`, `Can't rename this object.` Transaction remains indeterminate; no post-error query, verification or retry. |
+
+The approved exact-class/2025-lane rename boundary pins that representative
+Console rejection in `references/semantic/2025.1/playlist-slot-name-native-boundary.json`;
+other hosts/builds remain unobserved. The historical capability probe is explicitly
+skipped without PASS credit. MetadataSlot class 5570560 retains its scoped rename
+path and fake coverage only; no native name claim follows. Existing reference,
+notes and Playlist List outcomes remain available through their own contracts.
+
+The three native roots under `.waapi-skill-state/full-coverage/` are
+`owned-input180-2022-replacement-r1`, `owned-input180-2022-disposition-r1` and
+`inner-rename180-2025-native-r1`; each retains `main-assessment.json`, category
+records and logs. Replacement observation SHA-256 is
+`10d05ddca24eb954fb5479bdbcf29903300616abe2f245b76c812f2115799bde`.
+All three preserve source full hash/tree/project mtime and clean process teardown;
+the PASS sandbox was deleted, both failed sandboxes remain quarantined. Original
+FAILs and the indeterminate transaction are unchanged. Both incremental reviews
+were CLEAR before the final replacement run.
+
+R59 already delivered the Source evidence adapter and attached the 26 exact
+Source branches; no Source capture or adapter rerun was needed here. #195 retains
+mapping/source reconciliation and stable combined Program/Non-live gates; #194
+Fresh budget remains zero. This #180 closeout grants no parent completion,
+Windows evidence, broad native matrix or #179 scope exception.
+
+## 2026-10-26 #179 Sink guard and Conversion evidence checkpoint
+
+Sink guard `e0cbf3be` uses five matching DefaultSink/WObjects/catalog sources:
+No Output has CanBeMasterSink=false; absent System capability stays unspecified.
+Existing reference/SET routes reject that incompatible class before Preview,
+retain live class binding and preserve unrelated references. Affected checks
+passed **46 in 68.17s**; renamed-instance correction passed **9 overlapping
+checks in 2.00s**, not 55 distinct tests. Packaged
+reference-master-sink-capabilities.json retains source digests.
+
+Conversion `144acba7` adds Type Handle/platform mapping, independent observations
+and a typed verified-codec outcome retained through compaction. Affected checks
+passed **12 in 28.01s**, compaction controls **3 in 13.95s** (program evidence).
+The original Console 2025.1.7.9143 getter preflight remains **FAIL, 14.60s**,
+zero writes/transactions: explicit Mac context returned two owner codec GUIDs.
+The metadata diagnostic was **PASS, 5.58s**, business category **blocked**:
+both PCM inventories exposed scalar MaxBitDepth, no platform/reference field.
+Current wrapper refuses ambiguity; neither setter impossibility nor placement
+effect is proven. Original category rows/packets/main-assessment.json remain in
+conversion-179-2025-native-r1 and conversion-179-2025-metadata-r1.
+
+Older exact-build read-r1 at `bc1dd284` retains **SKIP, 9.26s** (2021) and
+**SKIP, 4.31s** (2022): codec/owner identities had generic class 2818064 and empty
+pluginName; the original collector stopped before metadata. Console 2023.1.19.8928
+read-r1 passed **4.39s**, concrete Vorbis 262145/QualityFactor metadata observed.
+Pinned-wrapper `302ed287` metadata-r2 passed **5.94s** on 2021.1.14.8108 and
+**4.07s** on 2022.1.19.8584. All reads had zero writes/transactions; old concrete
+codec class remains unresolved. Roots: older-codec179-{2021,2022,2023}-read-r1
+and older-codec179-{2021,2022}-metadata-r2.
+
+At `a47152b7`, Console 2021 existing object.setProperty FieldHandle passed
+**6.35s**: transaction `tx1-y5an0z8y2dkgeh4nw7vh` VERIFIED QualityFactor 3.0→4.0,
+with GUID/name/type/opaque path/owner/raw class 2818064/empty pluginName unchanged.
+After the shared opaque-identity correction (`73f944c7`), existing
+object.setProperty required no further production change. Root
+older-codec179-2021-field-r1 retains
+independent readback/artifact/final category. Every native source tree/full
+hash/project mtime was preserved and processes cleaned; PASS sandboxes were
+deleted, original SKIPs/FAIL quarantined. This proves exact chosen-GUID scalar
+configuration, not replacement/platform lookup. Both user decisions (2021
+Sink/Metadata direct-factory boundary and modern verification depth) remain
+pending: no scope exception or #179 closure. #195 owns mapping/gates; #194 Fresh
+budget remains zero.
+
+## 2026-10-26 #178 planned Playlist arrays and older native boundary
+
+Combined `04bf7f8f` adds one immutable SET Preview for a new 2023/2024
+RandomSequenceContainer, direct children and an ordered/repeated Playlist
+reference array. Actual GUIDs and the complete constructor roster are observed
+before assignment; append retains that observed prefix. The exact legacy
+omitted-empty consumer now requires a separate bounded empty-membership read,
+preserving null/error distinctions and all hierarchy targets. Independent
+Standards/Spec reviews found no scoped issue; the six selected combined
+intersection checks passed **6 in 4.64s**. These are program results, not new
+native constructor evidence.
+
+Retained Console 2023.1.19.8928 roots remain unchanged: replacement at `37af4ea5`
+matched the requested `[Up, Loop, Loop]` roster with owner/targets preserved, but
+the original root remains **FAIL, 12.26s** because its result consumer rejected
+schema-valid reference associations. The fresh append/clear root at `2e4c9d13`
+remains **FAIL, 7.40s**: append verified with `[Up, Loop, Up]`; clear independently
+produced `[]` and preserved owner/targets, but verification rejected the omitted
+direct List projection. The repaired consumers reuse those actual effects;
+neither failure was regraded or replayed. Evidence roots below
+`.waapi-skill-state/full-coverage/` are `legacy-playlist178-2023-native-r1` and
+`legacy-playlist178-2023-append-clear-r1`, each with `main-assessment.json`.
+
+Two read-only probes at `04bf7f8f` finished on exact Console builds
+2021.1.14.8108 (**17.54s**) and 2022.1.19.8584 (**11.88s**). Both original final
+verdicts remain **SKIP**, with zero transactions/mutations: after exact copied
+project/owner/target proof, native `select @Playlist` returned
+`ak.wwise.query.invalid_query`, `Unknown property Playlist (61)`. Both source
+trees and project mtimes were preserved, processes cleaned, and sandboxes
+quarantined. Roots: `older-playlist178-2021-read-r1` and
+`older-playlist178-2022-read-r1`, including original observations and assessments.
+
+Installed 2023.1 release note **WG-47295** explicitly introduces Sequence
+Container object-list access; its New Features page names Playlist in
+Random/Sequence Container as newly accessible through WAAPI/WAQL. Combined with
+the matching older observations, this establishes the precise older Playlist
+native boundary; generic List support and MusicPlaylistContainer are distinct.
+The canonical versioned `references/semantic/*/playlist-native-boundary.json`
+files retain exact primary source and native-observation hashes. Structured
+discovery and exact missing-choice repairs disclose that boundary without
+issuing a selectable unsupported field, suppressing 2022 Metadata/RTPC Lists,
+or claiming class-wide native absence. Unknown fields remain unresolved.
+
+Focused public TDD checks passed **4 in 0.60s** for both older object/class
+discovery scopes, **6 in 0.95s** for reachable live/planned repairs and unknown
+field controls, then **6 in 0.79s** for existing five-version discovery and
+unrelated missing-source callers. Original RED/setup observations are retained
+in the boundary closeout handoff. No further native attempt, Fresh or full gate
+was run. Final #178 tracker closure follows review; #195 retains final mapping
+reconciliation and stable combined Program/Non-live gates, while #194 Fresh
+budget remains zero.
+
+## 2026-10-26 #178 Playlist construction and verified-node continuation
+
+Reviewed runtime implementation through `3db7e527` adds source-certified 2025
+PlaylistSlot append, replaceAll and root `object.create` list placement. Required
+PlaylistObject stays inline, native names remain empty, and declaration labels
+and returned handles retain their separate meaning. The public two-Preview
+new-owner/new-child workflow uses Gateway-issued verified-node bindings; forged,
+unverified and changed identities are rejected. Ordinary-root continuation and
+MetadataSlot compatibility remain covered by focused checks. Two indistinguishable
+Playlist members exposed and fixed a real result-handle retention omission.
+
+The selected Python groups cover the meaningful constructor modes, metadata and
+owner/target drift, replacement absence/order, partial results, policies, selected
+verified handles and actual final report persistence. Their separate results and
+original RED/setup failures are recorded in
+`.waapi-skill-state/full-coverage/playlist-178-followup-closeout/`; these are not
+an aggregate Program/Non-live gate. No Fresh or native-Windows run was added.
+
+The first Mac Console 2025.1.7.9143 native root,
+`.waapi-skill-state/full-coverage/playlist-178-native-r1`, ran at `3db7e527` and
+retains **FAIL in 13.99s**. Append independently proved the new GUID, exact class,
+owner, target, original peer order and references. Replacement reached VERIFIED,
+independent new-roster/reference observations and three sealed old-GUID absence
+readbacks. The collector then incorrectly expected successful empty rows from
+an extra exact-ID WAQL query for a deleted GUID; Wwise returned its exact
+structured `Object not found` error. Root create had not run. Original failure,
+raw error and quarantine are preserved; acceptance of the separate append and
+replacement effects is recorded alongside them, without regrading or replay.
+
+Test-only `b6293502` repairs that exact absence oracle, rejects unrelated errors,
+and exposes a root-create-only node through the same collector/lifecycle. The
+root-only positive/failure and affected combined consumer passed **3 in 5.51s**
+through the persisted final writer. Only the unexecuted constructor then ran:
+`.waapi-skill-state/full-coverage/playlist-178-root-create-native-r1` passed
+**1 in 8.59s** on the same exact Console build. Its dispatcher recorded one
+`object.create` and zero `object.set` calls; the new unnamed class5636096 member,
+owner/reference, ordered two-existing-plus-one-new roster and preservation passed.
+Final source full hashes, tree metadata and mtimes were unchanged in both roots;
+process cleanup completed. The passing sandbox was deleted, the failed one retained.
+
+These are cumulative scoped native effects across two frozen roots, not a green
+three-phase run. The new-owner/new-child continuation is program-tested here.
+#178 remains open for single-Preview planned dependencies and older-version
+Playlist work. The 2023/2024 reference-list representation remains distinct;
+missing named 2021/2022 examples do not establish native absence. #195 retains
+source reconciliation and final combined gates; Fresh remains under #194.
+
+## 2026-10-26 #200/#201 representative Console outcomes
+
+One macOS WwiseConsole 2025.1.7.9143 session on `68445296` ran the owned
+meter/cursor/capture node in **38.98s**. The original result remains **FAIL**:
+its meter assertion expected the Sound's Cars Bus, while the complete native
+and public result contained the exact fixture Main Audio Bus with 20 named
+numeric channels. The pinned 2025 definition names Main as the default meter;
+the separate Cars register/unregister calls prove accepted paired controls,
+not registration membership or causal meter population.
+
+Independent outcomes in that same record passed: user-cursor setter/readback
+6976 ms, previous-frame/readback 6965 ms, and creation of the exact requested
+`OwnedCapture.prof` (778,532 bytes) with sibling preservation. No capture-file
+content or format QA is claimed. Final evidence confirms unchanged source full
+hash, tree and project mtime, completed cleanup and no residual processes.
+The failed sandbox stays quarantined. Evidence root:
+`.waapi-skill-state/full-coverage/console-runtime-200-201-native-r2`; its
+`category.jsonl` remains final FAIL and its observation retains separate outcomes.
+An earlier r1 setup failed before sandbox/Wwise creation because Main omitted
+the explicit pytest basetemp parent; that failure grants no native credit.
+
+The collector expectation correction `2657a3fb` uses the exact fixture Main
+GUID/name for data, independently of Cars control acknowledgments. Its public
+collector-to-final-writer TDD retained a Main-only RED, then a passing tracer;
+the four final affected checks passed **4 in 27.48s**. They cover Main-only
+success, a complete nonempty wrong witness, unavailable-cursor partial results,
+and once-only unknown-stop failure. The original native run was not replayed,
+regraded or repeated. No packaged runtime, public mapping or contract changed.
+
+These are representative component outcomes, not a full Program/Non-live,
+Fresh or native-Windows pass. #195 retains final combined gates and exact
+source reconciliation, including unresolved legacy meter-literal contracts;
+canonical business selections do not establish exact native alias equivalence.
+
+## 2026-10-26 #202 Tone file-creation acceptance
+
+The user narrowed Tone acceptance to the correct closed versioned call and
+creation of the exact owned output file. Public verification now reports
+`tone_file_creation` with explicit `file_creation_only` scope; no file contents
+or audio quality are certified. Missing, nonregular, stale unchanged or drifted
+outputs still fail. The internal audio parser and every historical WAV, receipt
+and original outcome remain preserved. Forty-three superseded public content-QA
+test functions were removed from current collection; their code remains in Git,
+and no active CI/unit/semantic selector references them.
+
+On the component worktree based on `e557cea9`, the three-version public tracer
+passed **3 in 1.86s** after its retained partial-to-verified RED. The affected
+selection passed **128 in 36.76s** (current Tone/discovery) and **9 in 12.24s**
+(exact callers, three Tone route rows and persisted diagnostic report consumers).
+The final marker-constraint disclosure, stale-output cases and existing machine
+contract seal passed **4 in 1.50s**. These separate source-sealed developer batches
+are not an aggregate Program/Non-live gate. The earlier fixture/projection test
+mistakes remain failed receipts. No Wwise, Fresh, full gate or new Windows run
+occurred; native creation/source/cleanup observations cited in earlier Tone
+entries are reused without changing their historical verdicts.
+
+## 2026-10-25 #197 developer batching and evidence retention prerequisite
+
+Reviewed implementation through `0399649d` extends the existing developer
+driver/pytest path with explicit deduplicated batches, durable per-node results,
+ordinary-failure collection, failed/affected selection, fail-closed original
+receipt reuse and reporting-only recovery. Separate candidate-scoped focused
+groups cover those mechanisms, source/cleanup boundaries and future test-file
+admission; they are not an aggregate Program or Non-live gate. The final
+test-only fixture correction passed four affected checks in 2.63s under a deep
+outer pytest root, with independent short owned physical sandbox parents.
+
+The macOS WwiseConsole 2025.1.7.9143 representative at candidate `0399649d`
+passed its one existing grouped-reader node in **10.74s**. Its root is
+`.waapi-skill-state/full-coverage/prerequisite-197-console-2025-r3`.
+`summary.json` records one executed group and 14 collector-preflight checks
+REUSED from their original receipts, with no consumer repeat. The native
+reference points to `groups/console-2025/category.jsonl`, record index 1:
+`phase: final`, `outcome: PASS`, rather than the earlier prepared record.
+The saved observation independently records PASS for voices, busses,
+audio objects, RTPCs, dry contributions and game objects. Source content,
+project mtime and tree metadata were unchanged; process cleanup was complete,
+no owned processes remained and the owned sandbox was deleted.
+
+Earlier roots remain failures: `prerequisite-197-console-2025-r1` stopped before
+pytest/Wwise launch because the standalone driver could not import the existing
+test helper; r2 was the first actual native attempt and failed the existing
+original-media path limit before playback/setup mutations. Its sandbox remains
+quarantined. The repaired r3 used a separate short physical sandbox parent;
+neither earlier verdict was rewritten or replayed.
+
+No Fresh, full Program/Non-live gate or native Windows run was added for this
+prerequisite. This validates the bounded framework and representative Console
+path, not downstream business coverage. #174's prescribed final gates remain
+assigned to #195; the mandatory pause after accepted #197 remains in force.
+
+## 2026-10-24 R135 known meter output construction
+
+Reviewed product changes `d9a22dbc` and `967abf75` add 62 fixed business names
+to the meter-root output allowlist. Matching getMeters definitions establish
+the canonical choices or accessor grammar, result-property meanings and
+existing closed mappings for each supported version. Every explicitly named
+objectReturn property now has a fixed root construction in 2024/2025. Missing
+per-object values remain unavailable; this does not promise that a metered Bus
+has source-media or SoundBank data. The compiler, projection, limits and other
+production AST nodes are unchanged.
+
+The two focused groups passed nine checks in 2.23s and nine in 3.12s respectively.
+They cover both hosts in 2024/2025, older-version preconnection boundaries,
+exact requests, complete pages, selected values/absence, invalid off-page
+values and the existing output limit. Independent review checked primary
+definitions, mappings and source/log seals. No native or Fresh run was added.
+
+This establishes construction, not complete meter evidence admission. The
+unchanged 2,744-ID ledger contains 2,668 candidate program obligations, four
+native root gates, 60 unresolved literal spellings and 12 empty-input questions.
+Those unresolved items remain assigned; Console root evidence is still needed.
+Only profiler_meter_objects.py changed in the packaged tree. Exact source-reuse
+reconciliation is complete at `b120332a`: 27 full historical/current map
+comparisons, all 413 package paths and all 619 Source dependencies were checked.
+The existing focused compatibility guard passed in 0.64s; original maps and
+outcomes remain unchanged. No producer was repeated for the hash update.
+
+The shared R93 archive added at `9f1cf26a` preserves all 255 files of the
+original 2024 meter workflow byte-for-byte, including its actual 412-path
+package map. Both meter consumers reuse this single artifact. Archiving grants
+no new native or branch credit. The final combined gates remain outstanding.
+
+## 2026-10-24 R134 capture control evidence
+
+Reviewed feature `2e320baf`, integrated at `a03a7db5`, covers the exact 672
+existing enable/start/stop capture IDs and 30 native acknowledgement roots.
+Five grouped public Gateway program cases reached actual teardown and the
+ordinary portable consumer: the first version passed in 86.23s; the remaining
+four ran once and passed in 149.69s. Missing-root checks isolate each route,
+and reused packets exercise malformed outcomes, extra dispatch, source drift,
+cleanup and composition failures. Earlier assertion-encoding failures remain
+recorded; only affected development cases were repeated.
+
+The native facts reuse ten unchanged original workflows with matching
+host/build, exact public authorization and dispatcher receipts, source
+preservation and cleanup. Independent review checked all 30 control receipts,
+ten primary default descriptions and the exact five-report union. These are
+acknowledgements, not proof of enabled settings, current recording state or
+global restoration. Explicit enable is equivalent to the documented default;
+literal native omission is not claimed. No native or Fresh run was added.
+
+The sole merge manifest check passed in 0.31s; the fixed Program roster has
+355 entries. Packaged Skill code is unchanged. The remaining 298 control IDs,
+transport and meter work remain assigned to #186. This is component evidence,
+not a new full gate or global completion result.
+
+## 2026-10-24 R132 diagnostic readers, cursor compatibility and bounded collector
+
+The subsequent single native diagnostic at `fc28985c` ran on isolated macOS
+Authoring 2025.1.7.9143 in Automation Mode. It failed in 100.35s: the literal
+`states` and `suppportsRandomizer` projections returned empty objects, losing
+the requested identity fields. The omitted-options baseline and correctly
+spelled `supportsRandomizer` returned the owned Bus identity; the latter was
+false. All four native responses passed their schemas. These observations do
+not establish aliases or meaningful values for the two anomalous selectors.
+The final four category records remain BLOCKED, and the original failed sandbox
+is quarantined. All six capture cleanup steps succeeded; source files and
+project mtime were unchanged, and no owned Wwise/Wine process remained.
+Independent review checked packet seals, launch provenance, source preservation
+and final outcomes. No retry or regrade was performed. The local evidence root
+is `.waapi-skill-state/full-coverage/r132-meter-anomalies-native-2025-r1`.
+
+Reviewed integration `c8498cb3` adds the three diagnostic-reader and cursor
+evidence adapters. The 654 CPU/performance/streaming IDs use 18 retained
+same-host/build native observations and six grouped public program flows.
+Independent review verified their exact scope, complete source maps and 1,613
+original archive files. It found an overly permissive truncation-flag check;
+the repair rejects null, numeric and string flags. Only the affected group
+reran (17.67s); the other five retain their 77.59s result and original candidate.
+
+Cursor queries now handle a native-admitted missing position in 2021/2022 as
+unavailable with `native-position-not-returned`. They preserve the distinct
+documented `-1` result; required-position versions and malformed present values
+still reject. Six focused public checks passed in 3.00s. The five paired-host
+evidence groups cover 142 IDs and ten roots: the first passed in 5.51s and the
+other four in 21.29s. A subsequent trace control repaired acceptance of an
+unrelated extra native call; only its affected check reran (1.15s). Independent
+review verified 2,574 original archive members and the exact scoped union.
+
+Both writers now forward closed version/host prefixes through the existing
+common-base composer. Two focused composition checks passed in 2.90s and 12.02s,
+including collision, duplicate-branch and wrong-prefix rejection. Existing
+semantic groups were not repeated for this packaging change.
+
+A separate developer-only meter diagnostic is implemented and reviewed for the
+two unresolved 2025 spellings `states` and `suppportsRandomizer`. Eleven distinct
+fake-host checks exercise its actual final category writer, request outcomes,
+packet integrity/bounds, session loss, cleanup and single-node Automation Mode
+admission. It allows four fixed reads in one owned session; diagnostic completion
+never grants alias or business coverage. Its later native outcome is recorded
+above separately from these fake-host checks.
+
+The merge's sole manifest check passed in 0.30s; the fixed Program roster has
+354 entries. Reviewed source-compatibility successor `33ef8cf8` preserves all
+historical maps and advances only the exact two product and two developer-file
+changes. Its existing guard passed in 0.63s; independent review checked 27 full
+map comparisons and all 619 current Source hashes. No producer or native run
+was repeated for those hash changes. No full gate, Fresh or global
+coverage publication ran for this integration. #186 and the overall effort
+remain unfinished; all earlier failures and source attributions are retained.
+
+## 2026-10-24 R130 log, Console LoadedMedia and empty-value integration
+
+Independent closure review of #176 at `40001e6f` found the reopened checker
+regression resolved. All 272,313 original branch identities, shapes and owners
+remain; the 29,413-row empty-candidate audit still covers the exact current set.
+The six original invalid log/cursor candidates are rejected. Four severity
+counterexamples have public receipts; the two cursor adapters remain unverified
+product work under #186. Thirty integration seals and the affected reviewed
+functions/test blobs match. No extra regression was needed for the unchanged
+combined checker behavior. Original tool acceptance is historical evidence;
+this review does not claim a new full run or complete product coverage.
+
+Reviewed integration `40001e6f` adds ordinary-consumer evidence for 4,888 log
+branches and 93 Console LoadedMedia branches. These are candidate-scoped
+component results; the current global evaluation has not been regenerated and
+ticket #186 remains open.
+
+The log slice retains all original native outcomes, including old Console
+schema-only clear acknowledgements. Its legal GET expansion initially missed
+the ordinary consumer and some native-root attachments. After fixing that
+chain, the affected canary passed in 32.69s and the remaining nine groups passed
+in 303.21s. ADD, CLEAR and counterexample results were reused; native collection
+was not repeated. Independent review also repaired unrelated-scope fixture
+loading and reliance on unavailable historical Git objects. Exact scope,
+archive-integrity and portability checks passed without rerunning producers.
+
+The three Console LoadedMedia targets passed in 517.68s. They combine matching
+Console empty-result availability with separately attributed Authoring nonempty
+meaning; they do not claim nonempty Console observations. An earlier test-only
+requirement-order failure remains recorded. A dependency-closure correction
+passed its affected check in 0.35s without repeating the 15 public captures.
+
+Concrete empty-value validation resolved the remaining 49 unknown candidates
+without interpreting unused child schemas as active constraints. Nine focused
+checks passed in 6.44s; independent replay verified all 155 previously unknown
+candidates and preserved the four severity rejections. These are classifications,
+not new business coverage. Original ledgers, failed records and native gates
+remain unchanged.
+
+The combined manifest/policy checks passed in 1.38s. The fixed Program roster
+now has 352 entries. Packaged runtime code and all 619 Source-copy dependencies
+were unchanged by this integration. No full gate, Fresh or new native run was
+performed for this merge.
+
+## 2026-10-24 R129 source reuse and schema annotations
+
+Reviewed integration `13295ccb` extends the existing exact source compatibility
+tables for the three log-product changes and the collector matrix change.
+Independent Git checks verified all 413 packaged files for seven retained
+families, all 619 Source-copy dependencies and unchanged original evidence.
+The focused compatibility guard passed in 0.56s, including changed-original,
+extra-file and missing-review-pin rejection. No public producer or native run
+was repeated merely because source hashes changed.
+
+A separate two-line accounting repair reuses the existing schema annotation
+registry. `descriptionOverride` and `optionalPositional` are descriptive metadata;
+they no longer cause false unknown classifications. Its affected test passed in
+5.14s, retaining minimum-length rejection and unknown-constraint rejection.
+An exact static check reclassified the ten affected runtime empty-array rows as
+accepted candidates. This grants no business coverage credit. Other unresolved
+schema semantics remain assigned to the shared checker; original classification
+ledgers and failures are preserved. No full gate or global evaluation ran.
+
+## 2026-10-24 R128 bounded Console log observations
+
+Frozen `d72e935c` ran three sequential owned Console sessions through the
+existing destructive lifecycle. Four independently recorded cases passed:
+
+| Console build | Selected cases | Test seconds | Established result |
+| --- | --- | ---: | --- |
+| 2023.1.19.8928 | Clear general log | 14.62 | Successful native ACK; result-schema-only verification |
+| 2024.1.13.9056 | Clear general log | 10.58 | Successful native ACK; result-schema-only verification |
+| 2025.1.7.9143 | Empty message; message with surrounding space, tab and newline | 11.30 | Exact matching addition event and durable verification for each message |
+
+The old-version results explicitly retain `business_state_verified=false` and
+`console_log_unobservable`; they prove command availability, not observed log
+removal. Each 2025 case observed one exact matching event and successful
+unsubscribe, with the same observation preserved in the transaction journal.
+Neither case claims exclusive causation or continuing channel state.
+
+All selected category and final invocation records passed. Source hashes and
+project mtimes stayed unchanged; all owned process groups exited and all three
+sandboxes were deleted. Total pytest time was 36.50s. Roots are
+`.waapi-skill-state/full-coverage/r128-console-log-native-{2023,2024,2025}-r1`.
+There was no retry, extra runtime-reader sweep, GUI, SDK setup or Fresh run.
+This is Mac Console evidence; original failed roots remain unchanged.
+
+The collector was independently reviewed after ten distinct focused fake-client
+cases passed. Cleanup controls corrected a test-only assumption about repeated
+unsubscribe attempts after failure; only those two failed cases were rerun.
+Existing native test bodies, the shared lifecycle and packaged source were
+unchanged by the collector. Exact branch admission and current global publication
+remain separate work; these four cases do not complete #186.
+
+## 2026-10-24 R128 exact log messages and empty-candidate accounting
+
+Reviewed integration `9ba83f9a` combines the log-message repair and the shared
+empty-candidate accounting repair. Log addition now preserves native-valid empty
+and surrounding-whitespace messages. Its existing 16 KiB input limit remains;
+the bounded terminal allowance handles JSON escaping while preserving exact
+`agent_result` and full verification journals. Only resolved, valid log requests
+receive the exceptional allowance; the ordinary global limit is unchanged.
+Four maximum-message transactions passed in 4.21s. The final referenced-choice
+guard repair passed its three affected version cases in 0.58s; earlier complete
+transactions were not rerun for that isolated guard correction.
+
+The accounting tool now checks generated empty candidates against their resolved
+parent schemas, preserving IDs, owners and historical outcomes. Its ordinary
+consumer accepts exact-field public counterexamples only with causal successful
+counterparts. The initial three focused cases passed in 7.31s; independent review
+then found a missing CLI-flag-to-native-field relation. The repaired argument
+case passed in 1.45s, including a coherent wrong-flag control. Result evidence and
+the classification sweep were unchanged and were not recaptured.
+
+The static sweep classified 29,413 empty occurrences across all 14 owners:
+29,079 accepted, 179 rejected and 155 unknown. These are schema classifications,
+not completed business branches. Unsupported semantics remain unresolved, and
+native business requirements remain independent. The new test module is in the
+350-entry fixed Program roster; its manifest contract passed in 0.31s.
+
+Both review findings are resolved. This slice ran no native Wwise, Fresh or
+full gate and grants no new global coverage credit. Log native observations,
+current source reconciliation and the broader runtime admission remain pending.
+
+## 2026-10-24 R127 additional Console runtime observations
+
+Frozen `2dc0ee57` ran one owned Console test on each pinned 2023.1–2025.1
+build, sequentially. Each session reused one capture frame for LoadedMedia,
+CPU usage, PerformanceMonitor and StreamedMedia, with separate complete
+results and bounded retained-page reads. No initial native read was repeated.
+
+| Console build | Test seconds | Capture T (ms) | LoadedMedia rows | CPU rows | Performance rows | StreamedMedia rows |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2023.1.19.8928 | 17.70 | 2698 | 0 | 32 | 42 | 1 |
+| 2024.1.13.9056 | 14.66 | 2581 | 0 | 34 | 45 | 1 |
+| 2025.1.7.9143 | 15.04 | 2634 | 0 | 32 | 46 | 1 |
+
+All 12 independent reader outcomes and all three selected category/final
+invocation records passed; total test time was 47.40s. Each source tree hash
+and project mtime stayed unchanged; owned cleanup completed, process groups
+were empty and sandboxes were deleted. Roots are
+`.waapi-skill-state/full-coverage/r127-console-additional-native-{2023,2024,2025}-r1`.
+Their original reports retain all raw/native/public pages and exact attribution.
+
+Empty LoadedMedia establishes Console availability only. Nonempty diagnostic
+and streaming rows retain their actual context; no SDK preparation, selected
+Sound ownership or control effect is inferred. Exact branch/composite admission
+and global publication remain separate pending work. This is Mac evidence,
+not Windows execution. No SDK installation, GUI startup or Fresh run was used.
+
+The collector's ten focused fake-client cases passed before native execution,
+covering complete retained arrays, independent reader failures, connection loss,
+cleanup failure, changed pages, result bounds and older-version rejection.
+They reside in an already registered Program module; no duplicate sweep was
+added. Existing six-reader behavior and its original evidence remain intact.
+
+## 2026-10-24 R127 meter media-size output
+
+Reviewed integration `e6cef72e` exposes the existing closed `media-size-bytes`
+output on meter objects. It reuses the reflected `mediaSize` integer field,
+existing projection, whole-result validation and retained paging. The focused
+public test covers 2024.1/2025.1 on both Console and Authoring: exact same-API
+construction, zero/nonzero/absent values, complete pages, malformed off-page
+rejection and unknown-name rejection. Together with the three existing older
+unavailable-version checks, seven cases passed in 1.60s.
+
+This is fake-client program evidence, not native media-size population. The
+production diff only extends the named-output allowlist and its comment.
+Historical evidence remains unchanged; exact source compatibility reconciliation
+is pending before current evidence reuse. Fourteen legacy option spellings and
+two 2025 source inconsistencies remain separate #186 work. No native, Fresh or
+full-gate run was added for this deterministic output change.
+
+## 2026-10-24 R126 runtime publication readiness
+
+Reviewed integration `a3eabbef` adds collision-checked composition, exact native
+ownership selection and optional actual post-teardown output to the existing
+runtime tests. Four focused composition/ownership/finalizer controls passed
+in 5.04s; four affected producer probes passed in 33.19s. Independent review
+verified exact ownership and preserved artifact bytes without rerunning them.
+The probes retain their original source basis and are not final publication
+inputs. Existing module-level Program registration includes the new controls.
+
+The prepared roster collects 588 nodes; collection is not execution evidence.
+No formal capture batch, global evaluation, native rerun or full gate ran.
+Final publication remains deferred while the remaining #186 families are
+integrated. Neither the 6,292-row selection nor the separate 93 LoadedMedia
+rows establishes whole-ticket completion.
+
+## 2026-10-24 R126 older Authoring LoadedMedia evidence
+
+Reviewed integration `0f0fd614` adds exact 2023.1/2024.1 Authoring support
+through separately attributed evidence: successful older empty native calls,
+the retained 2025.1.11.9262 nonempty SDK observation, matching documented
+semantics and resolved schemas, and current per-version public replay. It does
+not claim older nonempty native execution. Original BLOCKED parent workflows,
+archives and source maps remain unchanged. Console routes are not included.
+
+Eight focused checks passed in 356.87s, including three actual post-teardown
+public consumer packets, collision-safe composition of all 93 Authoring rows,
+and reused-packet corruption and boundary controls. Independent review found no
+remaining scoped issue. The new module is registered in the Program manifest;
+its manifest check passed in 0.31s. Verbatim documentation fixture bytes are
+preserved through scoped Git attributes. No SDK installation, native rerun,
+Fresh run or broad gate was performed. Global publication and whole-ticket
+acceptance remain pending.
+
+## 2026-10-24 R126 retained-read admission and opaque-result policy
+
+Reviewed integration `a7414f3b` admits the exact106 newly needed Console
+observations from R125. It preserves all29 original packets and five finalized
+native closures; only25 distinct packets need current public replay. The first
+packet passed in6.95s; the remaining24 packets plus a shared corruption-control
+case passed in168.28s (25 tests, first packet deselected). Independent review
+compared every archived file and the exact ID/shape/value selections with the
+finalized originals. These are unit consumer checks; their synthetic phase
+metadata is not a formal post-teardown capture or global publication receipt.
+
+The same integration includes the independently reviewed exact44 opaque-output
+successor. R124 and historical failures remain immutable. All6,292 IDs/shapes/
+owners remain; effective requirements now have2,120 conditional preservation
+rows and272 retained native anchors. The44 fields are validated/copied output,
+without Gateway identity/control interpretation. Actual same-route native
+anchors and current program proof remain mandatory; no rare populated native
+feature is claimed. Six affected admission/gating/history controls passed
+in118.82s, following the causal portable-importer RED and first full-chain GREEN.
+The rule and limits are documented in `RUNTIME_VERIFICATION.md`.
+
+The new Console evidence module is registered in the fixed Program roster;
+the focused manifest check passed in0.30s. No native/Fresh/full-gate rerun was
+used for this integration. Final current captures, global evidence composition
+and evaluation remain pending the settled publication helpers.
+
+## 2026-10-24 R125 grouped Console runtime reads and source compatibility
+
+Frozen candidate `0d56a083da7a7965d734df3e02c0fb5681a75c70` ran
+`test_console_owned_runtime_read_batch` once per version, sequentially on Mac.
+Each owned Console session reads Voices, Busses, AudioObjects, RTPCs, default
+dry-path voice contributions and, where reflected, GameObjects at one fixed
+capture position. Readers have independent outcomes; shared setup and cleanup
+remain mandatory.
+
+| Console build | Test duration | Fixed capture T (ms) | Reader outcomes |
+| --- | --- | --- | --- |
+| 2021.1.14.8108 | 11.70s | 1898 | 5 PASS; GameObjects absent from matching catalog |
+| 2022.1.19.8584 | 13.46s | 2282 | 6 PASS |
+| 2023.1.19.8928 | 13.02s | 2837 | 6 PASS |
+| 2024.1.13.9056 | 12.68s | 2656 | 6 PASS |
+| 2025.1.7.9143 | 15.40s | 3328 | 6 PASS |
+
+The five tests total 66.26s. All five final invocations and selected reader
+categories passed. Source hashes and project mtimes were unchanged, sandboxes were deleted by their lifecycle,
+and launcher process groups were empty. No attempt was repeated. Evidence roots
+are `.waapi-skill-state/full-coverage/r125-console-read-native-{2021,2022,2023,2024,2025}-r1`;
+each retains its isolated config, launch decision, full reader report and final
+category record. The 2022 fixture retains the previously attested common2025
+PCM source qualification. These observations do not prove arbitrary metadata,
+recursive children, driver alternatives, setter effects or all #186 branches.
+Exact106 branch attachment was subsequently integrated in R126; current global
+publication remains pending.
+
+Reviewed successor `8ec4e331` reconciles retained runtime evidence with the
+seven-line Gateway exception-context correction. Historical source maps and
+native results remain original; exact reviewed source differences are checked
+against current code. Three affected runtime/Source checks passed in 6.46s.
+One LoadedMedia publication/consumer check passed in 101.99s, reusing its packet
+for wrong-source, extra-source and unrelated-route rejection. Its earlier
+teardown failures exposed separate current-program and historical-native map
+handling and remain recorded. These checks neither reran Wwise nor replaced
+the pending final gates. Both new unit modules are registered in the existing
+Program roster; its focused integrity check passed in 0.31s.
+
+## 2026-10-24 R124 attributable IntegrationDemo LoadedMedia observation
+
+One named Mac Authoring/stock SDK test passed on matching **2025.1.11.9262**
+at candidate `7289081b`: 1 passed in 163.60s, 164.52s including the launcher.
+The public reader returned one complete page at capture position 99328ms:
+media `124871431`, `Ambience_40.wav`, `VORBIS`, 160821 bytes, SoundBank
+`Prepared`. The stock Prepare Event/Bank page supplied the Area1 producer;
+the retained native row, rather than the UI action alone, establishes the
+nonempty attributable observation. All 12 scoped live schemas matched.
+
+The final category and lifecycle passed, the 297-file source tree/hash/mtime
+and SDK fixture were unchanged, and the owned sandbox was removed by the
+lifecycle. Post-terminal inspection found no owned processes; TCP8080,
+TCP50218 and UDP24024 were free. Evidence is retained under
+`/private/tmp/waapi-r122-demo-native-r4/evidence`, including `root-review.json`,
+the raw capture, finalization and actual UI screenshot. The reader observation
+does not prove the separately exposed preparation/streaming-control operations,
+pinned build9143, older-version behavior or whole-#186 acceptance.
+
+Earlier r3 remains FAIL/lifecycle BLOCKED. It found the correct Demo immediately
+but its fixture misread macOS lsof's `pPID`/`fFD` output. The reviewed five-file
+repair retained exact PID/port ownership, deadlines and bounded failure output;
+11 focused controls passed before this single native rerun. r1/r2/r3 are not
+regraded. Missing global Reflect/Motion plug-ins remain recorded; none was
+installed, renamed or bypassed to obtain this Area1 observation.
+
+The user separately approved risk-based native acceptance in
+`docs/plans/full-waapi-coverage/SPEC.md`: all API/parameter/branch code coverage
+remains five-version, while native work targets actual business semantics,
+nonempty attribution, host/version differences and cleanup rather than forcing
+every return-value combination. Its scoped evidence-policy implementation and
+review completed in successor `ac6ea4c1`; current publication remains pending.
+The exact 6,292-ID roster is unchanged, 2,076 preservation leaves require conditional
+program proof, and 316 semantic anchors remain native. Focused causal
+Gateway→portable importer→consumer checks passed, including nine removal/tamper
+variants and immutable historical-policy checks (2 tests, 60.09s), 25 existing
+five-version malformed-result controls (4.35s), and the final positive/scope
+isolation selection (2 tests, 8.04s). Earlier causal RED and development failures
+are preserved in the implementation handoff. These are focused mechanism checks,
+not a current 6,292-branch evaluation or full Program/Nonlive gate. No native rerun
+or Fresh test was used for this evidence-policy change.
+
+Reviewed successor `bf256141` admits only 43 additional retained R105 native
+field anchors: 2021 Voices/Busses/contribution and 2023/2024 Voices/Busses.
+Seven unique complete-original-array public Gateway flows passed once in 62.09s.
+The final qualified-admission control passed in 42.14s using one fresh capture
+for ten related damage variants and exact-scope rejection. The seven flows were
+not repeated solely because the negative test was added later; their interim
+captures are mechanism evidence, not final current-source publication receipts.
+
+The 2021 portable archive contains 178 exact original files, including all 172
+node-manifest artifacts. Its whole-gzip SHA-256 is
+`d3fd223608b347e205e9151aeae8ba6820ce478825bcb384b19c426979b53105`;
+independent review compared every decoded file with its retained original.
+The original 15-second port-release failure and separate BLOCKED lifecycle
+obligation remain unchanged. Existing 2023/2024 archives and the strict PASS
+reader are unchanged. This is reuse of actual read facts, not a new native run
+or whole-workflow acceptance. The exact22 R104 facts were subsequently reviewed
+and integrated as `d22fa9b5`; the LoadedMedia consumer was integrated as
+`9731b83d` and its exact source transition as `8ec4e331`. Final shared-source
+publication remains pending.
+
+## 2026-10-24 R123 source compatibility and IntegrationDemo checkpoint
+
+Reviewed runtime successor `8a64b499`, integrated as `18065490`, passed
+20 current public-Gateway fake replays of complete retained original arrays in
+58.50s. These cover R103/R118/R119 fixed readers and strict/qualified RTPC and
+contribution reads. Eight negative controls reuse four of those same replays:
+resealed source-hash drift and consistently truncated native/public results
+still fail admission. Exact whole-original-to-current source maps and original
+PASS/BLOCKED attribution remain enforced. These are source-review unit proofs,
+not formal after-teardown publication or new native observations; logs and seals
+are recorded in `/tmp/waapi-r123-runtime-source-compatibility-proof.json`.
+Source preparation `24b6568c`, integrated as `a6cfb115`, separately pins the
+619-source successor review while preserving R92, five native predecessors and
+26 shapes. Its final five current public captures and successor publication
+remain pending the settled combined candidate. The runtime helper changes alter
+candidate identity, so final contexts must be regenerated. No current global
+coverage credit follows from either preparation merge.
+
+IntegrationDemo r1 on `0a4d1b4a` remains FAIL/lifecycle BLOCKED: the fixture
+compared three schema fields against the complete four-field live result.
+Reviewed repair `ea9db027` preserves exact schema/session checks; r2 passed all
+12 actual 2025.1.11.9262 schema reads, then failed on its sole discovery result,
+`consoles: []`, before any transaction or LoadedMedia read. Both roots preserve
+source and cleanup evidence at
+`/private/tmp/waapi-r122-demo-native-r{1,2}/evidence/root-review.json`;
+empty discovery does not establish its cause or authorize an unchanged retry.
+
+The separate SDK-only diagnostic observed the actual main menu and exact owned
+PID's UDP24024/TCP listener. Cleanup required SIGKILL (exit -9); process-group
+absence, released ports and source preservation were checked in
+`/private/tmp/waapi-r123-demo-sdk-startup-diagnostic-r1/evidence/root-review.json`.
+This establishes startup/socket prerequisites for that diagnostic only, not
+Authoring discovery or nonempty LoadedMedia. Historical failures remain unchanged;
+no Fresh, broad gate, pinned9143 replacement or whole-#186 acceptance is claimed.
+
+## 2026-10-24 R120–R121 Unicode Draft binding and fixture path checks
+
+Reviewed candidate `3694f194bb59204a81194faab84097ac815ba754`, integrated as
+`b6f41524018342f551fefbec83f3287508873e90`, repairs a real public Draft failure
+for non-ASCII project context: ASCII-only `hmac.compare_digest` string operands
+now use exact UTF-8 bytes. Context fields, mismatch errors, authorization and
+execute-once behavior are unchanged; no Unicode normalization is applied.
+
+Focused program evidence was collected in separate selections, not a unified
+full gate. All five version positives completed the public Draft/Preview/
+confirmation/execute/verify path and rejected a second execute. A subsequent
+15-case affected selection passed in 6.97s: public context-drift negatives,
+exact Unicode versus normalization drift, existing context mismatch checks,
+and the actual Unicode-path producer through final report/cleanup. After
+integration of the independent fixture path guard, five affected path/producer
+checks passed in 13.53s. Test-development failures are retained in the linked
+local handoff/logs; no native Unicode, Windows-native or Fresh result is claimed.
+
+The developer-only Console fixture guard checks actual Windows/UNC native paths
+against the matching 260 UTF-16-unit bound including NUL before runtime effects.
+It rejects the oversized case with zero transactions, admits the exact boundary,
+and leaves POSIX paths uncapped by this Windows rule. The guard's original
+Unicode-at-boundary failure exposed the Draft defect above. Existing native
+ASCII observations remain attributed to their original candidates; source-map
+reconciliation and current combined receipts are required before formal reuse.
+
+## 2026-10-24 R119 four older Console playback and Voices observations
+
+Frozen candidate `301a2235f51b1721fb113a1e01311bc59ab67f87` ran
+`test_console_owned_older_transport_profiler_diagnostic` once per version,
+sequentially on owned macOS Console. All four attempts passed:
+
+| Console build | Available setup used | Duration | Fixed capture T (ms) | Public calls |
+| --- | --- | --- | --- | --- |
+| 2021.1.14.8108 | Neither `useOriginals` nor `prepare` exists | 15.25s | 5077 | 80 |
+| 2022.1.19.8584 | `prepare`; `useOriginals` does not exist | 14.69s | 5280 | 88 |
+| 2023.1.19.8928 | `useOriginals` and `prepare` | 15.95s | 6005 | 96 |
+| 2024.1.13.9056 | `useOriginals` and `prepare` | 15.38s | 5781 | 96 |
+
+Each independently reported `playing` and returned one complete, nontruncated
+Voices page for the owned Car GUID and actual transport gameObject, using the
+matching version's 20-field diagnostics view. Absent setup APIs were not
+called or credited. The 2022 lane used the attested common 2025 PCM original
+(SHA-256 `939e2d62dd820cb10ba571d769f7dbc0b5a3f170efaed94014e46df6f1e4038e`)
+with the unchanged 2022 authored source binding; it is not matching-build media
+provenance. The other lanes used their matching installed originals. Every
+selected WAV native path was 221 UTF-16 units (222 including NUL), under the
+matching SDK's 260-unit bound, using short same-`Y:` owned sandbox roots
+`.waapi-skill-state/r119-owned-<year>`.
+
+All four retained source hash/mtime/tree attestations and exact fixture
+readbacks matched; cleanup completed, final sandboxes were deleted by the
+existing lifecycle, and no native processes remained. For 2024, an extra
+post-terminal bare-bind check initially returned errno48 after the fixture's
+final PASS; a later bounded observation found the port free with no native
+processes. Both observations are retained in
+`post-terminal-port-observation.json` and the root review; no native retry or
+regrade occurred. Each capture-log observer received 3 of 8 requested events
+and ended on idle timeout, not event-count completion or a Topic coverage pass.
+
+Evidence roots are `.waapi-skill-state/full-coverage/` plus
+`r119-console-profiler-native-{2021,2022,2023,2024}-r1`, retaining the original
+logs, reports, category evidence and `root-review.json`. These are four narrow
+owned Car playback/Voices observations, not all transport actions, other
+datasets, a broad matrix or Fresh evidence. The existing R118 Console2025
+identity observation was not rerun. Earlier evidence roots remain preserved;
+the subsequent inventory-only successor leaves native-tested source unchanged.
+
+## 2026-10-24 R117→R118 controlled Console playback and Voices observation
+
+Frozen candidate `6e0fb16a53466ab9dd57ea647fc21fb02c0c22e1` ran the single
+`test_console_owned_2025_transport_profiler_diagnostic` on owned macOS Console
+2025.1.7.9143. R117 failed in **18.54s**: the accepted capture-log stream
+reported `ErrorCode_FileNotFound` naming the exact staged Car WAV, and the
+independent state remained `stopped`; no Voices read occurred. The file's host
+hash matched, but its native path was 264 UTF-16 units (265 including NUL),
+above the matching Windows SDK's `AK_MAX_PATH` of 260. The error lacked object/
+gameObject identity, so automatic correlation remains unresolved. This failed
+root and its quarantined sandbox are preserved.
+
+R118 changed only the existing owned `WWISE_SANDBOX_ROOT` to the shorter same-
+`Y:` repository state root `.waapi-skill-state/r118-owned`. The selected native
+WAV path is 216 units (217 including NUL). The same candidate, source/media,
+action, host and observer then **passed in 12.76s**: independent state was
+`playing`, and one complete owned identity Voices row was returned at capture
+T=6016ms. Cleanup completed, source hash/mtime/tree and exact fixture readbacks
+matched, port30629 was released, no native processes remained, and the final
+sandbox was deleted through the existing two-phase finalizer. The capture-log
+observer received 3 of 8 requested events and ended on idle timeout; this is
+not event-count completion or a separate Topic coverage pass.
+
+Retained roots are `.waapi-skill-state/full-coverage/` plus
+`r117-console-profiler-native-2025-r1` and `r118-console-profiler-native-2025-r1`.
+This is narrow Console2025 Car playback and complete identity Voices evidence;
+it supports the changed pathname prerequisite without proving path length was
+the sole cause, other versions/hosts, other datasets or other selected fields.
+No native repeat, Fresh campaign or broad matrix was run for the subsequent
+removal of one developer-status catalog field; native source pins remain tied
+to their exact frozen candidate pending explicit source-transition review.
+
+## 2026-10-24 R116 Console playback prerequisite observation
+
+Unmerged candidate `e9f54e881a42a8a4c0698b191586a27df9aae88a` ran only
+`test_console_owned_2025_transport_profiler_probe` against owned Mac Console
+2025.1.7.9143. The attempt failed in **14.67s**: preparation and Play were
+acknowledged, but the independent transport-state read returned `stopped`.
+No Voices query was dispatched. This does not prove that Console playback or
+Profiler data is unavailable; the missing observation remains under #186.
+
+The collector made 86 bounded public calls through normal closed transactions.
+Cleanup completed, source content/hash/mtime/tree receipts matched, exact object
+readbacks were unchanged, the actual allocated port 31183 was released, and
+no native processes remained. The failed sandbox is retained in quarantine.
+The final category is BLOCKED and the selected node is FAIL, not a partial
+acceptance. Retained decision, report, category and root review are under
+`.waapi-skill-state/full-coverage/r116-console-profiler-native-2025-r1`.
+No unchanged retry, Fresh run, broad matrix or production host-support claim
+is made. The candidate transport admission change remains unmerged pending
+diagnosis of the retained records.
+
+## 2026-10-24 R116 explicit Profiler field selection
+
+Reviewed product `2cc69b5d`, integrated at `cf8187a9`, adds repeatable
+`--result-field` choices to Voices, Busses and AudioObjects reads. The closed
+versioned vocabulary matches all 15 native version/URI profiles on both hosts.
+Requests preserve selected list order/repetition without appending identity
+fields; public data retains only requested reported fields. Actual returned
+identity still governs handle issuance. Presets, omission/empty selection,
+complete-result validation and immutable cached continuations remain intact.
+The 64-choice limit is disclosed as a Gateway resource ceiling.
+
+The public two-field case failed before repair and passed afterward. New
+controls initially recorded 87 passes and 14 fixture failures: scalar RMS
+fixtures contradicted the native array definition, and two assertions demanded
+unpromised result-object key order. Those failures are retained; only the
+failed/affected 24-case selection was rerun and passed. Compatibility/default
+checks passed 98 cases; immediate retention/reference neighbors passed 45.
+Independent review checked matching definitions, exact field dispatch/data,
+authority and caller preservation without rerunning tests.
+
+This closes the chosen-field implementation gap, not all reader evidence.
+R105 source reuse now needs an exact five-file/408-unchanged transition;
+R103 remains seven-file/406-unchanged. Current original-array replays and
+combined formal publication remain required. No new native/Fresh run or full
+gate is claimed by this increment.
+
+## 2026-10-24 R114 qualified retained runtime reads
+
+Reviewed mechanism `265730db`, integrated at `792b8683`, admits exactly four
+retained R105 Authoring observations: RTPC and observed Bus contributions on
+2023/2024. It uses the existing program producer, portable importer and final
+consumer. Original workflow/finalization BLOCKED verdicts, quarantines and
+two open lifecycle obligations remain explicit; the strict finalized-PASS
+reader is unchanged. This path cannot establish lifecycle or mutation success.
+
+On source `c17450c8`, four public replay-to-final-consumer cases passed in
+**77.22s**, independently checking **82 exact retained result selectors**:
+11 RTPC selectors per version, 32 contribution selectors on 2023 and 28 on
+2024. Thirteen unwitnessed contribution selectors remain unproved. Eight of
+eleven subsequent controls passed initially; three fixture corrections then
+passed in a failed-only 39.03s run. Two final roster/cache checks passed in
+0.43s. Strict-PASS compatibility, BLOCKED rejection, exact source selection,
+changed native data/host/time/failure/archive and lifecycle-credit rejection
+remain covered. No successful business selection was repeated for review.
+
+Independent review checked both immutable original closures and retained logs.
+The four positive temporary bundles were pruned by pytest's shared temporary
+retention; no rehash of those missing bundles is claimed. Formal current-source
+receipt/publication is held until the shared reader implementation settles,
+using a durable explicit output root. The later R115 product delta needs exact
+source reconciliation. This is reviewed mechanism evidence, not a new global
+coverage result, native execution, Fresh run or completed ticket.
+
+## 2026-10-24 R115 versioned Game Object result handling
+
+Reviewed product `0ff025eb`, integrated at `a71f438d`, repairs the dedicated
+`profiler-game-objects` route against both hosts' matching pinned definitions.
+Legal partial 2022 rows now retain absent fields as null with an exact ordered
+`unreported_fields` list; complete rows keep their existing shape. Present
+timestamp aliases are individually validated and conflicting values rejected.
+IDs use uint64 on 2022/2023 and int64-or-uint64 on 2024/2025. Later required
+fields and the 2021 unavailable-route boundary remain enforced. Request-schema
+discloses these result domains, missing-field semantics and output bounds.
+
+Public empty-row, negative-ID and disclosure cases failed before repair.
+The affected GameObjects selection passed **139 checks**; a nine-case follow-up
+passed in **40.67s**, comprising three added bounds/type controls, four updated
+disclosure checks and two existing fake capture consumers. The last group
+reaches persisted 2022 acceptance and the seven-reader 2025 final categories.
+Independent review reused these logs without rerunning tests. No native/Fresh
+run or full gate is claimed. Historical runtime packages retain their source
+seals; current-source reconciliation remains required before combined evidence
+publication.
+
+## 2026-10-24 R114 program selection repair
+
+Read-only execution-boundary review found 69 newly added fake-only unit files
+missing from the fixed Program roster. Reviewed commit `b786cdb8`, integrated
+at `7f56f676`, registers those files and strengthens the existing cross-platform
+roster assertion; the original ordered selection and sentinels are preserved.
+The exact roster assertion failed with 273 versus 342 entries, then passed
+once in 0.25s through the locked developer wrapper. This verifies selection,
+not execution of the 69 files or a full Program gate. Existing focused business
+results retain their original scope; the final combined gate remains required.
+
+## 2026-10-24 R113 contribution contracts and standalone evidence
+
+Reviewed mechanism `9ad5cc2f`, integrated at `a51e0c35`, preserves legal
+partial 2021/2022 contribution results, discloses omitted versus explicit dry
+Bus paths, and accepts the versioned Game Object ID domain. Moving cursors
+are resolved once before voice/Bus selection and contribution reads. Mixed
+object-ID/issued-handle selections retain the selected ordered Bus path.
+Later required fields, handle lifetime, ownership and malformed-value checks
+remain enforced. Causal failures and affected follow-ups verified the fixes;
+review also caught and repaired an integral-float cursor proof loophole.
+
+Artifact `fe36087b`, integrated at `cb602d4d`, adds
+`tests/fixtures/branch-evidence/product/runtime-contributions-r113/index.json`.
+On frozen source `a51e0c35`, **76 actual setup/call/teardown receipts passed
+once in 10.09s**. One publication/import/final evaluation persisted its results
+before reporting assertions: **1,080 program PASS, 761 verified (694
+program-only plus 67 original native-backed), 319 native-missing and zero
+unselected/extra branches**. Scope covers all five versions and both host
+contracts; native credit is only 36 exact 2022 Authoring branches and 31 exact
+2025 Authoring branches from the original finalized observations.
+
+Independent review checked the 599-file package, portable seals, all 76
+phase-complete receipts, exact branch bindings, original native archives and
+the reviewed four-file source transition (409 other packaged files unchanged).
+The final evaluator took 64.67s; neither it nor successful tests were repeated
+for review. Targeted repairs reused earlier passing results rather than
+repeating the 1,080-branch unit selection after each change.
+
+This is standalone evidence, not a global ledger update or ticket completion.
+The 319 native requirements remain open. Historical RTPC packages retain their
+original source seals and need explicit reconciliation before current global
+acceptance; they were not silently resealed. No new native/Fresh run or full
+Program/Non-live gate is claimed.
+
+## 2026-10-24 R112 complete RTPC program branch publication
+
+Reviewed mechanism `d87f5125`, integrated at `7bc03a2`, adds exact scalar
+predicate checks and two-step cursor construction proof to the existing RTPC
+evidence consumer. It also discloses the legacy name compatibility actually
+enforced after successful Gateway row validation: preserve string labels,
+including native MIDI names outside the 2021–2024 reflected regex. The 2025
+contract receives no legacy exception. R111's reviewed structure and
+optional/empty/single-result checks are included in this combined publication.
+
+Artifact `7b63cec5`, integrated at `61e30412`, adds the standalone
+`tests/fixtures/branch-evidence/product/runtime-rtpc-complete-r112/index.json`.
+On stable source `7bc03a2`, **72 actual setup/call/teardown receipts passed once
+in 11.20s**. Final evaluation records **402 program PASS, 304 verified
+(280 program-only plus 24 original native-backed), 98 native-missing and zero
+unselected RTPC branches**. The original 182 requirement objects are unchanged.
+Native credit remains limited to 15 exact 2022 Authoring leaves and nine exact
+2025 Authoring leaves; synthetic shapes and normalized cursor construction
+receive no native-occurrence credit.
+
+The first evaluator completed in 24.75s, but an incorrect reporting count
+assertion prevented saving its result. One bounded recovery re-imported the
+unchanged package and evaluated it in 24.33s, persisting actual results before
+reporting assertions. No receipts, tests or native workflows were rerun.
+The committed `reader-proof.json` and `capture-manifest.json` retain the final
+result/input seals and 72 unique phase-complete receipt identities. Independent
+review checked all 488 package files, portable seals, current 413+9 source maps,
+the original six native artifacts, exact three-file source bridge and unchanged
+pre-recovery files without rerunning the evaluator.
+
+Focused mechanism verification included the exact 88 new scalar/cursor
+branches and seven corruption controls. Three fixture failures in that run
+were corrected; the failed/affected follow-up passed 26 checks in 37.25s.
+Earlier successful selections were not repeated solely for a unified log.
+The global index/policy/ledger remain unchanged; this package supersedes no
+historical bytes and must not be combined with overlapping R108/R110 inputs.
+No new native/Fresh run, full gate or whole-ticket acceptance is claimed.
+
+## 2026-10-24 R110 standalone RTPC branch publication
+
+Package `793c9f8a0222bde34156a47518488a4d43fe3467`, integrated at
+`133cb1aa7b808c206b5c00a705c02af84cccf184`, adds the standalone
+`tests/fixtures/branch-evidence/product/runtime-rtpc-fields-r110/index.json`.
+On stable bridge candidate `0c499d82`, 22 actual setup/call/teardown receipts
+passed once in **3.61s**. The first final package evaluation passed in **17.748s**:
+182 program branches passed; 84 met their requirements (60 deterministic
+construction and 24 matched native-data branches), 98 still lacked native
+evidence, and all 220 unselected RTPC alternatives remained unresolved.
+
+Native evidence is limited to the original finalized 2022/2025 Authoring runs.
+The exact reviewed three-file source delta requires unchanged complete original
+arrays through the current Gateway; all other 410 packaged paths remain
+byte-identical. Independent review checked source and receipt maps, unique
+phase-complete nodes, 166 referenced artifact seals, original archives and
+selected outcomes. No successful test or final consumer was repeated for review.
+
+The global index still contains no runtime entries; this package has not changed
+the global policy or completion ledger. The earlier R108 package remains
+historical. No new native/Fresh run, full gate or whole-ticket acceptance follows.
+
+## 2026-10-24 R109–R110 runtime result validation and evidence reuse
+
+Integrated candidate `0a6400d199e638b3b00e13679af4be147198e696` combines the
+reviewed RTPC evidence mechanism (`a3596f60`) and runtime result guards
+(`5343f159`). The earlier RTPC scalar guard (`a5e3b1a6`) checks every returned
+row before pagination, preserving actual MIDI labels and older optional fields.
+The new guards resolve the pinned result definitions for Voices, Busses,
+AudioObjects, performance counters, meters, logs and voice-contribution trees
+before publishing results or retaining handles. Each family uses its supported
+versions; no latest-version schema is substituted for older definitions.
+
+Focused public-Gateway RED/GREEN checks cover malformed off-page rows, nested
+references, recursive contribution values and preservation of valid labels,
+optional fields and ID domains. Two narrow result-only compatibility rules
+preserve the documented pre-2024 contribution driver reason/GUID union and
+existing selected nullable meter values. Other meter fields retain their
+reflected checks. The retained successful arrays in
+`tests/fixtures/runtime/referenced-runtime-native-results.json` were replayed
+through the corresponding public routes: 18 row/counter cases passed, then five
+contribution cases passed after correcting their test CLI route. All 23 source
+dispatch hashes and exact copied values were independently checked. These are
+offline compatibility checks, not new native executions or whole-run acceptance
+for the original R104 roots.
+
+Review also found that valid negative Game Object IDs on 2024/2025 received
+handles but were rejected by contribution identity revalidation. The narrow
+versioned lower-bound repair preserves uint64-only behavior through 2023 and
+all bool/type/upper-bound checks. The two affected public-flow nodes first
+reported four failures and 18 passes, then **22 passes in 6.89s**. They exercise
+actual Gateway-issued voice and bus handles plus invalid live rereads. No
+negative-ID native execution is claimed. Earlier guard selections retain their
+separate tool-transcript-reported results; they were not repeated merely to
+create log files or summed into a broad-gate count.
+
+The RTPC publisher maps 182 exact construction/data/reference branches across
+the five versions and two host contracts. Its no-native final-consumer test
+proved 60 deterministic construction branches and left all 122 data branches
+missing native evidence. Only the preserved finalized 2022/2025 Authoring runs
+are eligible for subsequent native attachment. Two review findings were fixed:
+program evidence must preserve the complete native/public array and exact field
+occurrence, and removing optional markers cannot bypass the captured-program
+contract. Their separate causal follow-ups passed two and three selected tests,
+including the affected stage and historical attachment path. Those were test
+produced inputs; the subsequent standalone publication above supplies final
+receipts and the sealed package. Global ledger publication remains pending.
+
+One evaluator invocation now reuses immutable historical Git source hashes:
+two native branches require 413 Git reads total, and a second invocation reads
+all 413 afresh. Exact source selections remain distinct. Current source checks,
+per-branch assertions and original archive/lifecycle checks are not cached.
+No Wwise/Fresh launch, full Program/Non-live gate or whole-#186 acceptance was
+performed for this batch. Original failed evidence and historical sealed
+program records remain unchanged.
+
+## 2026-10-24 R108 cursor moves and runtime evidence publication
+
+On frozen candidate `013776270f6d9c1b65bf53940442f4ac593e5714`, one owned Mac
+Authoring 2025.1.7.9143 cursor-only workflow passed in **65.18s**, with final
+lifecycle PASS. Its 63 public calls include the two initial ownership/config
+receipts. Each move executed once and its returned time matched an independent
+user-cursor readback:
+
+| Move | Returned and observed time (ms) |
+| --- | ---: |
+| first | 10133 |
+| next | 10144 |
+| last | 13600 |
+| previous | 13589 |
+
+The stopped capture-latest cursor was 13600ms. These facts prove the selected
+four modes, matching readbacks and ordered endpoint relationships; they do not
+prove exact adjacent-frame indices, acoustic output or capture-content
+completeness. No audition, media setup, property writes, setter, meter, log or
+other reader case was repeated. The owner used its Automation Mode path.
+The original project hash/mtime was unchanged, cleanup completed, no owned
+process remained and port 8080 was released. Main independently checked all
+617 source-context hashes and 99 archived files without mismatches. Evidence:
+`.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/root-review.json`.
+
+The collector's initial code-test fixture concealed a short-audio playback
+race and admitted a failed setup verification. Both were caught before native
+execution. The revised collector removes audition entirely, rejects failed
+setup, and counts initial and failed receipts against its limits. Six affected
+cases passed in 50.32s, preserving unavailable, mismatch, insufficient-frame
+and cleanup-failure reports through the actual final writer. Unchanged owner
+admission and prior collector controls retain their separate earlier results.
+
+The runtime evidence adapter is independently reviewed and merged as
+`49489e73dfc65de3134d31d9f85f51ecf18f5212`. Its standalone portable fixture
+`tests/fixtures/branch-evidence/product/runtime-read-r108/index.json` proves
+one exact 2025 getRTPCs value leaf through the existing final audit evaluator,
+using an actual Gateway program receipt and the preserved R105 native PASS.
+All 34 same-route sibling obligations remain unresolved in that proof; the
+global policy/index/ledger has not been updated by this slice. The archive
+contains 170 required original objects, preserving their byte hashes, rather
+than copying the original sandbox. Original absolute paths are inert locators.
+
+The shared evidence reader now permits multiple actual outcomes from one node
+while requiring the exact archived category roster and statuses. Five forged
+roster/status cases first reproduced the defect, then passed as rejection
+checks. Six targeted roster/layout controls and two affected program/final-
+consumer cases passed after that repair; the earlier 23-check run remains
+separate evidence, not an additional full gate. Original native archives,
+failed verdicts and global coverage claims were not rewritten.
+
+[Runtime verification decisions](../docs/plans/full-waapi-coverage/RUNTIME_VERIFICATION.md)
+record the source-backed distinction between acknowledged controls, captured
+data and independently observed state. LoadedMedia nonempty, unbound runtime
+branches and other remaining #186 requirements are still open. No Fresh,
+Windows, full Program/Non-live or whole-ticket completion is claimed here.
+
+## 2026-10-24 R105–R107 targeted Profiler follow-up and lifecycle repair
+
+R105 candidate `503688449ba9f9db964a5fb7116ac6be2fb07198` ran only the
+missing bus-contribution observation on all five Mac Authoring builds and
+RTPC observations on 2022–2025. Every selected business observation passed;
+whole-run lifecycle outcomes remain distinct:
+
+| Build | Raw pytest result | Final lifecycle result | Public calls |
+| --- | --- | --- | ---: |
+| 2021.1.14.8108 | 1 passed, 73.70s | BLOCKED: port-release deadline | 77 |
+| 2022.1.19.8584 | 1 passed, 73.32s | PASS | 78 |
+| 2023.1.19.8928 | 1 passed, 78.91s | BLOCKED: port-release deadline | 86 |
+| 2024.1.13.9056 | 1 passed, 81.45s | BLOCKED: port-release deadline | 86 |
+| 2025.1.7.9143 | 1 passed, 83.12s | PASS | 86 |
+
+The collector now selects the unique complete observed mixing-Bus instance,
+which can differ from the authored logical OutputBus, and accepts attributed
+RTPC read values without demanding an unrelated global setter effect. Partial
+voice/bus seeds fail closed before selection. The 2021 RTPC read is retained
+from R104; it was not repeated. CPU delivery was repaired and checked against
+copied exact native rows through fresh Gateway state and cached continuations,
+without repeating native measurements or using original continuation tokens.
+Separate focused checks passed: 13 affected integration cases, 13 matching-
+version delivery/admission cases, and six partial-seed/final-writer cases.
+These are cumulative focused results, not a full Program or Non-live gate.
+
+Evidence roots are `r105-missing-profiler-native-<year>-r1` below
+`.waapi-skill-state/full-coverage/`, summarized in `r105-native-summary.json`.
+All 616 source-context hashes per root and 172/156/168/168/168 archived files
+were checked without mismatches. Collector cleanup completed; fixture
+readbacks and original-project hash/mtime were unchanged. Later process and
+bind observations do not replace the original failed cleanup deadlines or
+change their formal verdicts. Failed trees remain retained.
+
+R106 candidate `5b183841676ff802811d77973296794b780ba0b7` ran one bounded
+2025.1.7.9143 Event-preparation probe after starting capture. The existing
+Play_Rifle_Close Event and committed media were used without new fixture
+objects, streaming-property changes or SDK installation. LoadedMedia at
+22794ms returned a complete empty list: raw node failed in 61.27s and formal
+outcome stayed BLOCKED. All 57 public calls are archived; collector cleanup,
+fixture and source checks succeeded, with 617 source-context hashes and 86
+archive files checked. The root is `r106-loaded-event-native-2025-r1`.
+Nonempty LoadedMedia remains unresolved under #186/#174; an acknowledgement
+of Event preparation does not establish SDK PrepareEvent equivalence or
+native absence. No other-version repetition followed this empty result.
+
+A separate post-terminal observation recorded local port 8080 in TIME_WAIT
+and an actual bare-bind EADDRINUSE error, then a later successful bind. This
+does not diagnose earlier R105 failures whose errno was not retained. The
+lifecycle now preserves the last bind error; R107 candidate `51b539e1` gives
+macOS a 45-second default release window (other platforms retain 15 seconds).
+Explicit deadlines, immediate return when free, strict bare bind and failed
+quarantine remain unchanged. Eight focused fake-socket/time checks passed,
+including the causal old-deadline failure and release at 30 seconds. This
+repair grants no new native cleanup or API-coverage credit.
+
+All native launches used `-AutomationMode`. No Fresh, Windows, full combined
+gate or whole-#186 acceptance is claimed. GitHub Pure-code preflight for
+`50368844` passed after five stale acknowledgement-message expectations were
+corrected; that preflight is not the full Program/Non-live promotion gate.
+
+## 2026-10-24 R104 remaining Profiler capture reads
+
+Candidate `a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8` ran one owned Mac
+Authoring capture per pinned build, sequentially with `-AutomationMode`.
+Each raw pytest node failed and each final lifecycle stayed BLOCKED; individual
+observations below are not whole-node or ticket acceptance.
+
+| Build | Duration | Public calls | Independent collector outcomes |
+| --- | ---: | ---: | --- |
+| 2021.1.14.8108 | 97.91s | 122 | 5 PASS, 4 BLOCKED |
+| 2022.1.19.8584 | 104.45s | 132 | 5 PASS, 4 BLOCKED, 1 FAIL |
+| 2023.1.19.8928 | 131.55s | 173 | 11 PASS, 6 BLOCKED |
+| 2024.1.13.9056 | 131.01s | 173 | 11 PASS, 6 BLOCKED |
+| 2025.1.7.9143 | 114.20s | 139 | 3 PASS, 4 BLOCKED |
+
+Dry voice contributions were observed in all five versions. The applicable
+2023–2025 PerformanceMonitor and StreamedMedia reads returned data; 2023/2024
+also independently saved a capture and added/cleared the owned General log.
+Older voice/audio-object reads and filters retained their individual outcomes.
+The 2025 unit did not repeat its seven previously accepted reader checks.
+
+Unresolved outcomes exposed specific follow-through: CPU native results were
+complete but the collector retained only their first Gateway page; logical
+Cars routing did not provide the actual mixing-Bus handle expected by the
+collector; 2021 returned owned RPM data at its object-specific value instead
+of the requested global value, while later RTPC snapshots were empty.
+LoadedMedia remained empty despite the bounded Sound preparation probe.
+The additional 2022 failure is a real compatibility defect: Authoring returned
+`registerTime`/`unregisterTime`, while the reflected contract and normalizer
+expected `registrationTime`/`unregistrationTime`. These remain #186/#174 work,
+not native-absence exclusions. No repairs or automatic reruns occurred within
+this frozen batch.
+
+Evidence roots are `.waapi-skill-state/full-coverage/r104-capture-reads-native-<year>-r1`.
+Each `root-review.json` records the exact host, report hash and separate
+outcomes. All 616 candidate source hashes per root and archived artifact
+hashes were checked; original-project hash/mtime and fixture readbacks matched.
+Collector cleanup completed, lifecycle errors were empty, and terminal
+inspection found no owned process with port 8080 released. Failed owned trees
+remain sealed and retained. No Fresh, Windows, broad Program/Non-live, or
+complete five-version reader acceptance is claimed.
+
+## 2026-10-24 R101–R103 transport states and Profiler reader observations
+
+The missing transport-state observations were collected once per older build,
+with eight independently prepared selected/mixed-scope cases per version:
+
+| Build | Candidate | Raw node result | Final lifecycle result |
+| --- | --- | --- | --- |
+| 2021.1.14.8108 | `14d9b00c` | PASS, 276.38s | BLOCKED: post-teardown wildcard port bind exceeded 15 seconds. |
+| 2022.1.19.8584 | `4e5eb44b` | PASS, 294.84s | PASS, cleanup and port release complete. |
+| 2023.1.19.8928 | `4e5eb44b` | PASS, 291.24s | PASS, cleanup and port release complete. |
+| 2024.1.13.9056 | `4e5eb44b` | PASS, 301.66s | PASS, cleanup and port release complete. |
+
+All eight state relations agree with the retained separate 2025 selected and
+mixed-scope observations. Exact roots below `.waapi-skill-state/full-coverage/`
+are `r101-transport-older-native-2021-r3`,
+`r102-transport-older-native-2022-r2`,
+`r102-transport-older-native-2023-r1`, and
+`r103-transport-older-native-2024-r1`, each with `root-review.json`.
+The 2021 collector completed its observations and transport cleanup; its sealed
+tree and original-project hash/mtime matched. Later inspection proved no owned
+process/listener and successful loopback/wildcard port binding. Its original
+formal BLOCKED result remains unchanged; the eight observations are reused
+without replaying or reverifying its transactions.
+
+Reviewed implementation `0c3a7e46` uses these observations to resolve
+play-directly → playing, pause from stopped → stopped, and play/stop toggle
+from paused → playing. Its 70 affected public-flow checks and three affected
+collector/final-writer checks passed in separate focused runs. These prove the
+new deterministic mapping; the earlier native transactions were not rerun or
+retroactively marked verified. State proof does not establish acoustic output,
+restart timing, or prior global-setting restoration.
+
+On candidate `4e5eb44b`, Mac Authoring 2025.1.7.9143 then passed the new Profiler
+reader node in 102.53s, with final lifecycle PASS. At one capture position,
+40042ms, Voices, Busses and AudioObjects each returned one attributable row;
+GameObjects returned two rows, including the owned audition GameObject. Three
+same-position filters used actual issued voice/bus handles and returned the
+matching instances. The seven reader calls shared one capture; 123 public calls
+include all setup and cleanup. Fixture projections, original source, archive
+hashes, process cleanup and port release were checked. Evidence is
+`.waapi-skill-state/full-coverage/r103-profiler-readers-native-2025-r1/root-review.json`.
+This proves these seven 2025 observations, not older-reader behavior, every
+projection, acoustic output, or restoration of prior capture/audition settings.
+
+All runs used owned Authoring launches with `-AutomationMode`. This records
+successful startup under that invocation across the five installed builds,
+not a universal dialog-suppression guarantee. No Fresh or native Windows run,
+broad Program/Non-live gate, or whole-#186 acceptance is claimed here.
+
+## 2026-10-24 R122 Console log version boundary and 2025 getter/clear proof
+
+Matching build9143 SDK release note `whatsnew_2025_1_4.html`, WG-80630,
+states that Console waapi-server now publishes `log.itemAdded` and returns
+results with `log.get`. Member SHA-256 is
+`52e90027565b93b27f36af7a872f5f225ff686da6f880f6f1c8e41f4749cb150`;
+the same entry is present in installed build9262 documentation. This supersedes
+the generic API-page blanket-empty wording for Console 2025.1.4 onward.
+Pinned older Console Topic monitoring is a documented native feature boundary;
+valid reflected add/clear routes remain available with schema-only verification.
+R98/R121 original FAILs, receipts, transactions and quarantines remain unchanged.
+Frozen candidate `1f32f9f223cebe11076ca07f168f29fad99adfab` then passed one
+separately reviewed Mac Console 2025.1.7.9143 owned add → post-get → clear →
+retained verifier-get workflow in **9.49s**, exit 0. The exact General/Message
+marker appeared in the complete post-add getter and complete nonempty clear
+Preview prestate (one row each); the retained complete post-clear getter had
+zero rows. Both separately previewed, once-only transactions verified. Source
+content, tree metadata and project mtime were unchanged; the sandbox was deleted,
+owned processes cleaned up and port32743 was free. Evidence is
+`.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/`
+(`root-review.json`, `result.json` and final `evidence/category.jsonl`). This
+proves the selected 2025 getter/clear workflow; older FAILs retain their original
+verdicts and no other host/runtime or whole-#186 acceptance is claimed.
+
+## 2026-10-24 R98 Console log and R99 Authoring startup observations
+
+Three separate Mac Console runs on candidate
+`263624cc0b2162e117524096168c0e935f720722` retain these exact results:
+
+| Build | Raw node result | Observed addition outcome |
+| --- | --- | --- |
+| 2023.1.19.8928 | FAIL, 13.25s | Acknowledged subscription ID `0`; zero decoded EVENT messages/callback entries during the five-second bound; addition acknowledged, schema-only verification. |
+| 2024.1.13.9056 | FAIL, 18.27s | Acknowledged subscription and addition; zero observed events, schema-only verification. |
+| 2025.1.7.9143 | PASS, 8.65s | Exact unique General/Message event persisted at execution and reused by later verification; transaction verified. |
+
+All three observers unsubscribed. All three Console `log.get` prestate snapshots were
+empty, including the successful event case. The 2025 snapshot preceded the
+addition; no post-add getter was collected by that run. Empty prestate does
+not contradict later addition delivery. Timeouts prove neither native Topic absence nor a
+callback defect. Source hash/mtime/tree and process/port cleanup were checked;
+failed sandboxes remain quarantined. Evidence roots below
+`.waapi-skill-state/full-coverage/` are
+`r98-console-log-diagnostic-native-2023-r2`,
+`r98-console-log-native-2024-r1`, and `r98-console-log-native-2025-r1`, each
+with `root-review.json`. Required unresolved observations remain under #186;
+original failures and transactions are not replayed or regraded.
+
+R121 then ran exactly one distinct 2023.1.19.8928 Console diagnostic on frozen
+candidate `0534446d8dba76e3a67077d95d2b87d88ad863be`: **FAIL in 18.93s**.
+An independent public `log.itemAdded` subscription acknowledged before the
+single prepared General/Message addition; the original same-execution-session
+observer remained in place. The native add acknowledged `{}`, but both
+subscriptions observed zero events and unsubscribed. The retained diagnostic
+classification is `neither_session_matched`; original verification remains
+`result_schema_checked` and node/category FAIL. This supplies a two-session
+no-event fact, not native absence, an effect pass or a regrade of R98.
+Source content/mtime/tree matched, the failed sandbox remains quarantined,
+no native processes remained, and port32343 was free after teardown. Evidence
+is `.waapi-skill-state/full-coverage/r121-console-log-peer-native-2023-r1/`
+with `root-review.json`, category evidence and the partial/final receipt.
+That diagnostic performed no 2024/2025 retry.
+
+Separately, candidate `664121e48fdf0bc788720f532413a6bfc641ab8d` launched owned
+Authoring 2021.1.14.8108 with the documented `-AutomationMode` argument and
+reached WAAPI readiness in 28.79s. The transport node failed in 32.85s before
+any transport case or transaction: the Gateway rejected the successful native
+Platform result `name: Mac, path: Mac` as a hierarchy path. This is a query
+validation failure, not a transport-effect result. Source hash/mtime and sealed
+quarantine tree were checked, process cleanup completed without residuals, and
+port 8080 was released. The retained root is
+`.waapi-skill-state/full-coverage/r99-transport-older-native-2021-r1`, with
+`root-review.json`; all eight transport cases remain unproved by this attempt.
+
+These are targeted, different-candidate Mac observations, not native Windows,
+Fresh, broad Program/Non-live, or whole-#186 acceptance. Existing 2025
+Authoring add/clear evidence remains reusable at its original candidate.
+
+## 2026-10-23 R98 remaining signed cursor observation
+
+Exact candidate `8a582235fbbb1718da17450da9f05cd551d98d02` ran only the
+previously unattempted `-2` setter input on Mac Console 2025.1.7.9143, after
+bounded capture preparation. Wwise returned `ak.wwise.unexpected_error` with
+“The user time is out of range.” The Gateway retained `indeterminate`; no
+verification, restoration or retry followed that uncertain execution. The raw
+node result remains FAIL (10.81s), with source hash/mtime/tree unchanged,
+process cleanup complete, port released and sandbox quarantined. Evidence is
+`.waapi-skill-state/full-coverage/r98-cursor-minus-two-native-2025-r1/root-review.json`.
+The earlier `-1` transaction was not repeated. Both planned negative examples
+now have exact native error observations; neither establishes a universal
+negative-input rule or successful cursor change. No earlier green test,
+full gate or Fresh run was repeated for this observation.
+
+## 2026-10-23 R97 Console input observations
+
+On exact candidate `0c7713f82267fb636a87e91049d7d9fcd855b4d0`, five
+sequential Mac WwiseConsole runs accepted all three capture-data submissions:
+an explicit empty list, two identical Voices-enable rows, and Voices-enable
+followed by Voices-disable. The exact builds were 2021.1.14.8108,
+2022.1.19.8584, 2023.1.19.8928, 2024.1.13.9056 and 2025.1.7.9143.
+Each exact enablement node passed; durations were respectively 11.28s, 11.50s,
+7.37s, 11.53s and 5.59s. These 15 separately previewed submissions prove
+native acceptance of the tested shapes, not hidden settings, repetition
+precedence or prior-setting restoration. Transactions remain
+`result_schema_checked`, with false business-effect claims.
+
+The 2023.1 Console log node failed: one add returned `{}`, but its acknowledged
+subscription delivered zero events within the fixed observation window.
+Unsubscribe succeeded; later verification truthfully remained schema-only.
+This is neither verified log addition nor proof that Console cannot publish
+the Topic. On 2025.1, bounded capture preparation succeeded, but setter `-1`
+returned native `ak.wwise.unexpected_error`, “The user time is out of range.”
+The Gateway retained `indeterminate`; `-2` was not attempted. Neither failed
+transaction was replayed or reverified, and no universal negative-time rule
+is inferred from that one input.
+
+Actual reports, exact final category rows and independent report-hash,
+source-hash/mtime/tree, process-cleanup and port-release checks are indexed by
+`.waapi-skill-state/full-coverage/r97-native-summary.json` and its per-run
+`root-review.json` files. Failed sandboxes remain quarantined. An earlier
+2021 command failed before Wwise launch because the basetemp parent was absent;
+only the invocation was corrected in a new root. Subsequent separate roots
+ran only previously unattempted enablement nodes after the log/cursor failures.
+No passing enablement case was repeated. This is targeted Console evidence,
+not Windows, Fresh, a broad regression gate or whole-#186 completion.
+
+## 2026-10-23 R94 selected transport observations
+
+The separate five-case mixed-transport collector `440a3674`, integrated at
+`43c22a03`, completed one Mac Authoring 2025.1.7.9143 run in 229.49s with
+323 public calls. It independently rebuilt each two-object prestate: playDirectly
+changed playing/paused to playing/playing; pause changed stopped/playing to
+stopped/paused and playing/paused to paused/playing; playStop changed
+stopped/playing to playing/stopped and paused/stopped to playing/playing.
+Source hash/mtime, both loop restorations, owned process cleanup and port release
+passed. Raw diagnostic classifications remain unchanged; these observations are
+not older-version or acoustic proof. The selected three cases were not rerun.
+Code repair reused passing cases: only the failed Automation Mode owner check
+and the subsequently changed failure-interval control were rerun. No duplicate
+poststate reads were added merely for finer timestamps.
+
+Reviewed input repair `8a7160d4`, integrated at `e05bae10`, adds an explicit
+empty capture-data declaration, preserves repeated rows and their order across
+all five definitions, and admits signed numeric cursor targets in 2025. The
+incremental public-flow tests cover construction, discovery, rejection of
+conflicting or malformed declarations, returned-time verification and
+execute-once failures. Later result-disclosure changes received only affected
+checks; these receipts are not a combined gate. Enablement remains explicitly
+schema-only, with no invented empty-list, repetition or negative-time meaning.
+That increment added no real input-acceptance evidence; the later R97
+observations are recorded above.
+
+Reviewed collector `645ee1d2`, integrated at `224c8d79`, exercises the public
+Gateway through the actual archive and final category writer. Review caught a
+missing original-audio audition prerequisite before native execution. Its causal
+regression failed twice; only the affected success and setup-failure flows were
+rerun after repair, passing in 24.45s. Earlier unaffected ownership and failure
+controls were retained, not repeated as another full selection.
+
+One matching Mac Authoring 2025.1.7.9143 run on `224c8d79` completed in
+104.83s with 124 public calls. It observed three selected-transport transitions:
+stopped plus playDirectly became playing; stopped plus pause remained stopped;
+paused plus playStop became playing. The last result differs from the fake's
+example outcome, which the diagnostic deliberately did not treat as an oracle.
+Source hash/mtime, restored loop settings, owned process cleanup and port release
+passed. The original diagnostic report and transactions remain explicitly
+unverified for business effects; these facts support a later bounded semantic
+assessment without repeating the mutations. This is not all-active, older-version,
+acoustic, restart-position or prior global audition-mode restoration evidence.
+No Fresh or full Program/Non-live gate was run, and #186 remains open.
+
+## 2026-10-23 R91 runtime verification and focused repair
+
+The published `ca6af9ac` preflight passed 826 checks in 94.49s (GitHub run
+39955331464). Its preceding run on `77988814` retained three failures: the
+roster count and two cursor matrix fixtures. The test-only repair passed those
+three cases and 31 directly affected cursor controls in 32.72s. Runtime
+verification was unchanged. This preflight is not the full Program gate.
+
+The matching Mac Authoring 2024.1.13.9056 meter workflow on `7c17cd54`
+passed in 96.70s, with 116 public calls. Its independently checked nested and
+related values belong to the selected Guns Bus. The isolated fixture temporarily
+used its live-disclosed 2.0 channel configuration, then restored the original
+value; source hash/mtime, selected values, process cleanup and port release
+passed. The preceding `eca991f4` attempt remains a failure: the default
+non-mixing Guns Bus did not appear in the frame. Matching Authoring help explains
+that non-mixing buses have no meters. Source-grounded fake success and empty
+frame controls passed in 36.46s after the fixture repair. Neither the native
+failure nor the earlier 2025 success was replayed or regraded. This increment
+does not establish 2024 cursor/log/file effects or whole-ticket completion.
+
+Source successor publication at `705591b8`, integrated in `77988814`, retains
+the original native artifacts and verifies complete current program phases.
+Five affected version workflows on frozen `29b34d4c` passed in 45.43s;
+interface and branch generation/checks passed, while require-complete returned
+2 for unfinished scope. Its 26 Source leaves and five business descriptors were
+preserved. Regeneration removed stale verified credit from 65 older metadata
+rows lacking current-candidate equivalence; their reconciliation remains under
+#181/#195. Later Authoring fixture changes require the declared source map to
+be refreshed at the next stable integration batch, without another native run
+merely to refresh that map.
+
+The owned 2025 profiler collector was integrated at `9ed95f41` after its
+public fake-host flow reached the actual archived final category writer.
+The affected success case passed in 25.61s. An explicit cleanup-failure
+reporting defect then passed its causal regression and the affected existing
+cleanup control: two passes in 43.11s. These checks preserve partial business
+observations while withholding acceptance after cleanup failure.
+
+Its first native attempt failed during startup, before the test body. Reviewed
+startup repair `8c589ee7`, integrated at `c7144d22`, restores the existing child
+Automation Mode request for this exact node; three affected controls passed in
+0.57s. The next native attempt reached matching 2025.1.7.9143 Authoring but
+failed in 37.21s before any mutation: the collector incorrectly assumed the
+selected Bus's structural parent was another Bus rather than its Work Unit.
+All five business outcomes remain blocked. The source hash and mtime were
+unchanged, lifecycle cleanup reported no errors, and the failed roots remain
+quarantined. Startup success grants no profiler, cursor, file or log effect
+credit. Fixture repair `a06f4d18`, integrated at `3368fd48`, derives simulated
+hierarchy facts from the committed Work Units and checks the actual WorkUnit
+parent. Its complete success flow and wrong-parent rejection passed in 26.39s.
+The fresh owned native run on `3368fd48` then passed in 122.47s: meter object
+and related output, snapped cursor readback, exact saved capture artifact,
+owned log addition and log clearing each have separate passing observations.
+Its retained root is
+`.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3`; the final record
+is `evidence/authoring-batch-finalization.json`. The R91 heading records the
+implementation stage; the successful native attempt uses the R92 root name.
+Finalization confirms unchanged source hash/mtime, no residual processes and
+released port 8080. This is Mac Authoring 2025.1.7.9143 evidence; it does not
+prove other versions, capture-content completeness or whole-ticket completion.
+No broad gate or Fresh run was performed by this follow-up.
+
+Reviewed capture-artifact candidate `0aeaee85`, integrated at `9cf8eac7`,
+binds the exact authorized destination before execution and independently checks
+the resulting bounded regular-file artifact. It explicitly does not certify
+capture-format validity or complete measurement content. Initial development
+slices passed 31 artifact controls, seven authorization/matrix controls and six
+size/existing-caller controls; ten affected filesystem-error controls and 20
+actual merge consumers passed separately. Review then reproduced a missing
+intermediate-directory symlink redirect that falsely verified another path.
+The repair passed that public regression and ten affected path controls, and
+narrow rereview found it resolved. The regression also proves redirected
+contents are not read before rejection. These overlapping component checks are
+not one aggregate gate, and no native save was performed by this increment.
+
+Reviewed log-effect candidate `71a86adf`, integrated at `927f4468`, observes the
+selected channel before execution and once afterward. Adding a message needs
+increased matching multiplicity; clearing reports remaining or competing
+content without assuming unique message IDs or timestamp ordering. Resolved
+native definitions validate each bounded snapshot. Console's empty getter
+cannot establish the effect and remains explicitly unverified. The initial
+focused selection retained 116 passes and two error-classification failures;
+the repair passed 12 failed/affected controls. Six schema checks passed after
+the F1 contract merge. Independent review found no remaining issue and reused
+these results. No native log effect or Console Topic behavior is established
+by this program increment.
+
+Reviewed getMeters candidate `50d70910`, integrated at `30df878d`, exposes
+2024.1/2025.1 nested meter-object outputs, live property/reference fields,
+related outputs and platform/language scope through the existing closed read
+contract. Native defaults and explicit empty selection remain distinct. The
+earlier meter selection passed 40 checks; its shared-consumer selection retained
+964 passes and ten stale-test failures reproduced on the old baseline. Only
+those ten repaired expectations were rerun. Independent review then exposed a
+related-planner comparison of raw GUID letter case. Repair `6f01102b` uses copied
+canonical root identities without changing native evidence or public strings:
+ten directly affected controls passed in 4.92s, and four integration controls
+passed in 1.98s. Focused rereview found no remaining issue. These overlapping
+component runs are not a new complete gate. Matching native meter projections,
+scopes and actual capture measurements still need their specific effect proof.
+
+Reviewed cursor candidate `6c045363`, integrated at `5a7d15c4`, verifies the
+2025.1 user cursor with one bounded read of the returned, buffer-snapped time.
+Unavailable results remain explicitly weaker; a mismatch is not described as
+proof that execution never occurred. The implementer reported 62 focused passes
+(258 deselected, 31.69s); the independent review checked the implementation and
+test definitions but did not locate a retained run log, so this count remains
+worker-reported. No extra run was started just to recreate that log. This proves
+neither capture-data completeness nor a new native cursor execution.
+
+Blend repair `3885c0e1`, reviewed and integrated at `b025f134`, materializes the
+documented explicit index clamp consistently at preparation, prewrite and the
+post-execution dispatch guard. The final category writer now receives its
+required verifier field; the actual collector-to-writer success/failure checks
+passed 2/2 in 2.38s. Four earlier count-drift/omission controls are retained;
+the six failed/affected clamp and route-matrix controls passed in 3.34s after
+repair. There was no repeated complete matrix or native attempt. The original
+2024 failure below stays unchanged, and Automatic-neighbor geometry remains
+unresolved under #191; the unstarted 2025 attempt earns no credit.
+
+No additional Fresh, full Program/Non-live, Windows or whole-ticket acceptance
+is claimed by these increments. #186 remains the current closeout focus.
+
+## 2026-10-23 R90 attenuation and retained object identity
+
+Transport-create association repair `cf5a8df2`, reviewed as `3cb8699c` and
+integrated at `bb73ba87`, seals the selected object GUID and optional explicit
+Game Object ID in the Preview. Verification compares the existing `getList`
+readback before publishing a transport handle. Omitted native defaults,
+transport ID zero and exact uint64 Game Object IDs remain supported. The
+affected public Gateway, Registry, transaction, lifetime and cleanup selection
+passed **115 checks** (838 deselected); independent review found no issue.
+No additional native read, native run or Fresh attempt was needed for this
+comparison repair. This is five-version program proof, not whole #186 acceptance.
+The subsequent pure-code CI preflight on `786bf349` retained 821 passes and
+five transport-create failures because its older route-matrix fake returned
+only the transport ID. Updating that fake to return the created association
+made the five failed version rows pass in 0.65s (804 deselected). Production
+behavior and the independent wrong-association controls were unchanged; this
+targeted repair is not a replacement full preflight or release gate.
+
+Reviewed GET disclosure `6eb66b29`, integrated at `a3dd01be`, exposes the exact
+reflected attenuation curve choices for all five versions: 7/19/19/19/24.
+The original seven meanings remain stable; GET DSF and SET HSF are not treated
+as aliases. The final focused metadata selection passed **294 checks in 7.60s**
+(288 deselected). Dispatch and bounds are unchanged; this is mapping/program
+evidence, not a new native curve-effect campaign.
+
+Reviewed combined `e8e1c0e5`, with formatting-only successor `ce4cf58b`, was
+integrated at `afc351f0`. A shared finite identity proof admits source-certified
+2023–25 Marker objects and 2025 MetadataSlot objects with empty intrinsic names,
+exact GUID/class/owner and complete ordered membership. The existing Playlist
+exception and unknown-class rejection remain intact. Public retained Marker
+binding/discovery/read/edit preparation and the manual constructor fixture
+passed **26 focused checks in 7.11s**; the directly affected retained Metadata
+positive passed separately in 1.17s. Retained Metadata drift, final-state and
+older-version controls passed **9 checks in 5.64s**. These selections overlap
+other component runs and are not an aggregate gate. A native retained Metadata
+reference-edit effect has not been established by this increment.
+
+The manual Marker native node on frozen `afc351f0` **failed** on Mac Console
+2025.1.7.9143 during the initial `draft-check`, before any Preview or write.
+Native owner projection `id,@Markers` returned only `id`; the snapshot consumer
+raised `INVALID_READBACK`. An earlier independent member query returned an empty
+set, but omission alone is not proof of an empty list. The original receipt and
+all 29 dispatcher packets were hash-checked: 15 public calls, 12 handshakes,
+zero continuations and zero transactions. Source full-tree hash, mtime and tree
+metadata were unchanged; processes cleaned and the failed sandbox was
+quarantined. Record: `r90-manual-marker-afc351f0-2025-r1/root-review.json`.
+The omission requires a source-backed consumer repair and causal public-flow
+test before another native selection. No retry or native-absence claim follows.
+
+No Fresh, broad gate, Windows acceptance or whole-ticket completion is claimed.
+
+The reviewed retained Marker adapter and operation-wide notes expectations
+(`39228fc7`) are integrated at `fed49590`. Exact 2025 `[Marker]` display text
+requires the existing certified ownership proof and remains comparison-only;
+scalar changes use the actual GUID. Postwrite proof expectations apply every
+declared existing target's notes by GUID, while prewrite and undeclared peers
+retain their original state. The final batch repair passed 13 focused cases in
+14.72s. A shared-normalizer merge conflict was resolved by retaining both
+reviewed Marker and BlendTrack conditions; its directly affected selection
+passed 13 checks in 3.04s. These overlapping checks are separate component
+evidence, not a new aggregate gate or native Marker edit result.
+
+Reviewed Blend insertion and collector work was integrated at `d0b68da9`.
+The selected 2024.1.13.9056 native attempt **failed with a teardown error in
+11.13s**. Transaction `tx1-qngfentbbdxc0cy8eens` executed once and ended
+`verification_failed`: native index -9 appended the child at explicit index6,
+contrary to the documented clamp and the Preview's expected index0. The prior
+last assignment's Automatic right-edge positions also changed; its mode/shape
+and the other existing rows were retained. All 26 stored native packets match
+their recorded hashes. The collector preserved the failed verification, but
+its category row omitted required `verifier_strength`, so the final lifecycle
+record was not emitted. No sealed source/cleanup PASS is claimed from that
+missing record. Root review:
+`r90-blend-d0b68da9-2024-r1/root-review.json`.
+
+The planned 2025 attempt was stopped for this evidence-finalization fault.
+The failed transaction was not replayed or queried again. Repair work must
+establish the native clamp materialization and Automatic-neighbor semantics,
+and exercise the existing category writer. The two directly affected public
+route-matrix rows also failed on their older generic fake identities (0.99s);
+their fixture repair remains part of this same increment. No additional native
+attempt is selected while the observed-edge oracle remains unresolved.
+
+The omitted-projection repair `6330b8b9`, reviewed as `5031a90b` and integrated
+at `42bc090c`, reuses the existing source-bound empty-list proof. Only an exact
+modern Marker owner/profile and a fresh independent `select @Markers take 1`
+returning exactly an empty result can normalize the omitted projection. The
+full public fake collector reproduced the failure and then passed in 2.23s;
+14 new/affected controls passed in 12.76s. Independent review found no issue.
+
+The new native attempt on frozen `42bc090c` **retained an overall FAIL in
+6.80s**, but passed creation and independent Marker observation: transaction
+`tx1-ywrvbet3n5hr8dmgdkxf` verified; actual Marker GUID/class/owner and
+Time0/Label `R90_MARKER` matched, with Source Mode2 and unchanged media. The
+later read-only retained binding rejected the actual opaque display path
+`[Marker]`. This is a separate identity-normalization defect; creation evidence
+is reusable and the original whole-case verdict is not regraded. The run has
+26 public calls, 101 hash-checked dispatcher packets, 20 handshakes and one
+verified transaction. Source full-tree hash/mtime/tree metadata were unchanged,
+processes cleaned and the failed sandbox quarantined. Record:
+`r90-manual-marker-42bc090c-2025-r1/root-review.json`. No replay or additional
+write is selected solely to fix this observed display-path consumer.
+
+## 2026-10-23 R89 imported Marker observation
+
+Reviewed fixture `4d5d9e46` uses one closed audio import in the existing private
+workflow lifecycle, followed by actual Source/mode/media and bounded Marker
+reads. Eleven focused checks passed in 5.08s; the three extracted RIFF helpers
+retain their original function bytes and four concrete fixture digests.
+
+Frozen integration `b25fe515` **failed the positive Marker observation in
+7.29s** on Mac Console2025.1.7.9143. The import transaction
+`tx1-6b2j1qsjehd5gc2xhgyp` verified, copied media matched the input WAV, and the
+actual Source reported MarkerInputMode0. The local `@Markers` query returned
+an empty list; no exact Marker Time/Label read followed. This does not prove
+native absence or the behavior of a different accessor. The retained result
+requires source reconciliation of stored object Lists versus imported-file
+marker projections before another native selection.
+
+Thirteen public calls produced 28 hash-checked dispatcher packets and nine
+version handshakes, with zero continuations and one setup transaction. Source
+full-tree hash, project mtime and tree metadata were unchanged; processes
+cleaned and the failed sandbox was quarantined. No retry, Fresh or all-version
+native claim follows. Record: `r89-marker-b25fe515-2025-r1/root-review.json`.
+
+## 2026-10-23 R89 condition mapping and Inner policy increment
+
+Reviewed condition core `f8469066` maps 7,297 installed condition IDs across
+11 recipes: 7,012 source-definition outcomes and 285 explicit dependencies.
+These are source/mechanism assignments, not 7,012 observed native effects.
+It preserves all 655 prior non-installed requirements and reuses seven distinct
+native proof packages without new native runs. Existing focused reader checks
+passed 20 in 68.03s; the separate public class-route producer passed one in
+2.24s. Independent review found no actionable issue. Final integrated-source
+reconciliation and dependency completion remain pending.
+
+Reviewed Inner batch `f572d4ba` adds exact 2025 MetadataSlot identity binding
+and staged merge/replace/replaceAll policies. The final affected selection
+passed 29 checks in 43.43s; a separate merged-hierarchy selection passed two
+in 4.79s. These are scoped selections, not a new broad gate. Both reviewed
+batches are integrated at `46db6f4b`.
+
+The original named-List native node on frozen `46db6f4b` **failed in 11.24s**
+on Mac Console2025.1.7.9143. It passed the earlier binding point and obtained
+the actual MetadataSlot GUID, class, empty name and owner through an independent
+read. The next constructor-reference check stopped because native `@Metadata`
+returned a singleton list whereas the current check expected a scalar object.
+This is a remaining representation/consumer issue, not complete source success.
+The setup transaction was verified; source transaction
+`tx1-074k7119fvb2azts6edy` remains indeterminate and was not retried, verified or
+replayed. The run retained 43 public calls, 11 independent observations and
+128 hash-checked packets; three SET calls were acknowledged. Source full-tree
+hash, project mtime and tree metadata were unchanged, processes cleaned, and
+the failed sandbox quarantined. Exact record:
+`r89-named-list-46db6f4b-2025-r1/root-review.json`.
+
+Reviewed correction `fc6e4342` interprets only the source-certified MetadataSlot
+constructor's singleton local reference. Both constructor observation and final
+verification use the same strict adapter and observed local accessor; ordinary
+reference parsing is unchanged. The full public fake collector passed one check
+in 3.41s, and 11 affected controls passed in 10.28s. Original causal and
+intermediate verification failures remain retained.
+
+Frozen integration `a491fb59` then **passed the original native node in 10.45s**
+on the same 2025 build, in a new lifecycle. Both transactions verified; 58 public
+calls, 23 independent observations and 199 hash-checked packets establish the
+actual MetadataSlot identity/class/owner, ordered membership, required local
+Metadata reference, subsequent OutputBus reference and retained object scope.
+All four SET calls were acknowledged. Source full-tree hash, project mtime and
+tree metadata remained unchanged; processes cleaned and the passing sandbox
+was deleted by the lifecycle. Record:
+`r89-named-list-a491fb59-2025-r1/root-review.json`. This accepts this selected
+mixed creation/reference flow, not every Inner class, owner, conflict policy,
+history composition or version. The earlier indeterminate transactions were
+not touched or regraded.
+
+No Fresh, full Program/Non-live gate or whole-ticket completion is claimed.
+
+## 2026-10-23 R88 legacy ControlInput typed query
+
+Reviewed runtime `bf57bd55` certifies only the source-defined 2021 RTPC
+class1441808 ControlInput reference whose native metadata omits its kind.
+Root and related query binders require current field inventory, unchanged raw
+metadata and exact object/class identity, then revalidate those observations
+before returning results. Mutation discovery and target restrictions remain
+unchanged. The directly affected selection passed 207 checks in 13.31s,
+including 25 new controls; independent review found no actionable issue.
+
+Frozen `17ccde20` passed the selected Mac Console2021.1.14.8108 workflow in
+10.69s: five groups, nine live public invocations, 86 hash-checked native
+packets, zero continuations and zero transactions. Fresh exact Source/RTPC/LFO
+baselines matched ordinary/local ControlInput RETURN, chained LfoFrequency4
+and LfoDepth90 values, and two combined occurrences sharing the same GUID.
+Repeated business baselines, source/prepared-file preservation and lifecycle
+cleanup passed. Root: `r88-controlinput-17ccde20-2021-r1/root-review.json`.
+
+The fixture uses the existing lifecycle and real-Gateway/fake-client seam;
+its final five controls passed in 1.25s, following an overlapping 30-check
+selection in 2.03s. Original development failures remain retained. The first
+Main report script expected an unrecorded source_after key; its correction
+used the actual baseline records and frozen source-frame equality assertion,
+without rerunning or regrading the native test. Complete legacy RTPC membership,
+property association, points, Marker and BatchRename discovery remain separate
+obligations. No modern green family, full gate or Fresh run was added.
+
+## 2026-10-23 R87 bounded condition evidence reuse
+
+Reviewed condition accounting `b4cf930e`, integrated at `d8fb3e44`, preserves
+the frozen original receipts and distinguishes six selected 2025 LFO members'
+reviewed mechanism reuse from directly observed recipient effects. Native,
+class metadata and current public program evidence remain separate; controlled
+captures grant no product publication credit and original native witness IDs
+are deduplicated. The source resolver retains all 5,669 original scalar IDs and
+shapes with no source-only coverage credit. This does not complete #177.
+
+Original focused evidence remains 139 PASS / 1 FAIL in 307.21s; subsequent
+scoped corrections passed nine checks in 56.43s and two in 8.61s with one
+overlap. Independent review then reproduced an uncaught malformed-trace URI
+error. The repaired negative and retained scope positive passed two checks in
+8.92s; the intermediate 1 PASS / 1 FAIL compatibility result is retained.
+Correction review verified source/hunk reconciliation and original receipt
+lineage without another green test run. No native or Fresh test was added for
+this accounting change. Reports: `r87-handoff-review/condition-correction-hashes.json`
+and `r87-condition-reviewed-evidence/correction-review.md`. Remaining grouped
+source-to-proof assignments, Music/BatchRename/fieldless dependencies and
+non-scalar condition coverage remain same-parent work.
+
+## 2026-10-23 R86/R87 local Lists and plug-in result identity
+
+Reviewed query implementation `22ff1cb5` adds closed local RTPC outputs for
+2022–2025 and EffectSlot outputs for 2023–2025, including related Curve points.
+The Synth class bridge is explicitly source-bound; it does not infer general
+plug-in inheritance. Original affected results were 672 PASS / 9 FAIL; the
+corrected selection passed 113 checks in 8.72s, the bridge selection 34 in
+2.45s, and the merged tracer eight in 0.68s. These overlap and are not summed.
+Test-only `00cdbcc2` exercised both real-Gateway/fake-client collector backends:
+ten controls passed in 9.60s, followed by four affected packet-proof checks in
+7.56s. Original fixture failures remain recorded.
+
+The first real local-List attempt on frozen `7a0d95b3`, Mac Console
+2025.1.7.9143, failed in 5.41s before any query or transaction. Its fixture
+incorrectly required raw source/copy byte equality despite the existing sandbox
+normalizer rewriting XML. Source hash/mtime/tree were unchanged and process
+cleanup completed. This is a fixture failure, not native query acceptance.
+Evidence: `r87-local-lists-7a0d95b3-2025-r1/root-review.json`.
+
+Test-only `f2f473c6` reproduced that failure using the actual existing sandbox
+normalizer, then passed both backends and 12 affected collector controls in
+12.84s. Original and prepared file hashes remain separately pinned; selected
+owner/member/Curve subtrees must match and prepared-byte drift stops before
+any query. Frozen `9f694d04` subsequently passed sequential native witnesses:
+
+| Mac Console version/build | Result | Read groups | Public live calls | Hashed packets | Transactions |
+| --- | --- | --- | --- | --- | --- |
+| 2025.1.7.9143 | PASS, 8.45s | 6 | 32 | 299 | 0 |
+| 2022.1.19.8584 | PASS, 9.90s | 5 | 23 | 239 | 0 |
+
+Both runs independently observed actual Sound/Synth RTPC owners, distinct input
+and Curve associations, complete/selected/combined projections, point values
+and repeated baseline preservation. The 2025 run additionally observed the
+AuxBus EffectSlot and related Effect projection. Composed RETURN and older
+GUID-grouped dispatch were observed on their respective hosts; all original
+packet hashes, source/prepared files and lifecycle cleanup passed. Neither run
+needed a continuation. Aggregate: `r87-local-list-native-review-2022-2025.json`;
+individual roots are `r87-local-lists-9f694d04-{2025-r2,2022-r1}/root-review.json`.
+This grants no 2021/2023/2024 native, other plug-in bridge, Marker or Fresh
+coverage. The original fixture failure remains unchanged.
+
+Reviewed plug-in correction `9c9cd6b5` preserves the requested Metadata
+ShareSet name while accepting the observed 2025 ASCII-space-to-underscore
+relation. It also requires the typed readback GUID to match the resolved
+created plug-in GUID. The substituted-GUID regression failed before repair;
+that case and three existing EffectSlot identity controls passed in 2.25s.
+Independent correction review found no further issue. Other name/version
+profiles remain separately assigned; this is not universal normalization proof.
+
+The next named-List attempt on the same frozen candidate failed in 6.32s.
+Its separately authorized Metadata setup transaction was **verified**, proving
+the repaired name binding on this native placement. The later source transaction
+`tx1-jve6tx3v5c6t7acyd617` is **indeterminate**: Bus and Sound/MetadataSlot SETs
+were acknowledged, but the slot returned an empty name and type
+`PluginInnerObject`, and result association stopped before later stages or
+typed slot verification. This does not establish a completed source workflow.
+The original 43 commands, 11 independent reads and 121 hashed packets remain
+in `r87-named-list-7a0d95b3-2025-r4/root-review.json`; all three native SET
+acknowledgements were checked against their original packets. No post-failure
+read, verification or replay occurred. Source integrity and process cleanup
+passed; the failed sandbox remains quarantined. Inner-object binding remains
+implementation work under #178/#180. No Fresh or full gate ran in this batch.
+
+## 2026-10-23 R85 randomizer outputs and condition-source reconciliation
+
+Reviewed runtime `38676aac` exposes property-bound randomizer enabled/minimum/
+maximum offsets through the existing root, related singleton and full/selected
+member planners. Fresh property metadata selects the field; fixed typed terminals
+retain owner/member scope, bounds and absent/false/zero distinctions. Matching
+primary definitions were checked for all five supported versions. The affected
+program selection passed 261 checks in 22.65s; independent review found no
+material issue. This does not expose arbitrary function strings or treat a
+Modifier as a separately addressable mutation identity.
+
+Test-only `0c0b0998` passed seven collector controls in 2.53s, including both
+native planner models and missing/wrong-type member failures. Original failed
+fixture attempts are retained in `r85-randomizer-fixture-review`; the final
+collector uses compact replies and preserves exact Gateway continuations.
+Those seven controls are program evidence, not native acceptance.
+
+Frozen `15a7780d` then passed sequential macOS Console workflows:
+
+| Version/build | Result | Public groups | Hashed native packets | Transactions |
+| --- | --- | --- | --- | --- |
+| 2025.1.7.9143 | PASS, 5.68s | 6 | 52 | 0 |
+| 2021.1.14.8108 | PASS, 9.51s | 6 | 80 | 0 |
+
+Each independently established the actual Footstep_Types Pitch randomizer
+enabled=true/min=-200/max=200 and Volume min=-5, related-parent results, complete
+child membership and the selected FS_Crouching member. The 2025 composed-member
+backend and 2021 GUID-grouped backend were observed separately. Scoped metadata,
+repeated root values, source hash/mtime/tree and lifecycle cleanup passed.
+The accepted aggregate is `r85-randomizer-native-review-2021-2025.json`; individual
+roots are `r85-randomizer-15a7780d-{2021,2025}-r1/root-review.json`. No omission in
+project XML was interpreted as an Enabled default. This gives no 2022–2024
+native or Fresh credit. Remaining versioned query contexts and source mappings
+stay assigned to #181; the final Program/Non-live gates are still outstanding.
+
+Condition reconciliation reused the already implemented evaluation mechanism
+for source-bound LFO, Compressor and Sidechain recipients; selected direct
+recipient effects remain unobserved, not new native passes. The exact reuse
+scope is `r85-condition-mechanism-reuse.json`. Test-only `9f018391` also passed
+one MediaPoolFilter FieldName public flow in 0.80s using the retained actual
+2025 metadata and an explicitly fake object. The requested empty string was
+preserved through Preview, execution and verification without a CriteriaType
+write. Its initial launch was blocked by an incomplete developer environment
+before testing; the existing complete interpreter resolved that prerequisite.
+This proves neither a native Filter instance nor its constructor/List placement.
+
+The finite reference-source audit checked all 136 pinned WObjects/plugin XML
+files across the five installed builds and resolved 1,034 inheritance edges.
+It found no additional mixed/repeated-category or non-Playlist mustChildOf
+field in that corpus. The exact 2021 ControlInput receipt has restriction {},
+whereas the matching 2022+ source introduces the per-type shared-only subset.
+These findings prevent synthetic cases from being reported as observed native
+gaps; they do not establish universal absence. Existing Playlist-list work and
+unresolved semantic questions retain their owners. Main verified 155 source/
+receipt hashes in `r85-reference-source-audit-review`; no new native run or
+whole-ticket completion follows from this source audit.
+
+## 2026-10-23 R84 named owned Lists: implementation and native constructor failure
+
+Reviewed `5441f931` adds source-certified named owned List occurrences to the
+existing staged creation mechanism, retaining actual GUID/class/owner, ordered
+membership and original per-stage results. Independent review reproduced an
+empty replaceAll partition defect: successive fragments could delete an earlier
+member. Correction `9b3a09d9` preserves the initial policy and explicitly appends
+later fragments of that same List, with complete prefix guards. The reproducer
+failed before the fix and passed afterward; six affected checks passed in 8.32s
+and two strengthened causal controls in 2.84s. Counts overlap. Original logs and
+both reviews are retained in `r84-named-list-reviewed-evidence`.
+
+The first selected native fixture at `72d5cce9` failed in 5.41s before any
+Draft or transaction because it expected the literal label Bus instead of the
+actual metadata label Audio Bus. Seven independent reads and 28 hashed packets
+are retained. Test-only `a2e3a953` uses the exact retained OutputBus and
+OverrideOutput metadata; its three full collector controls passed in 3.67s.
+
+The second native attempt at `2a3037eb` failed in 6.56s. The first SET created
+the Bus, but Wwise rejected the second SET because the new MetadataSlot omitted
+its required Metadata reference. The transaction is **indeterminate**, not a
+successful source workflow: the second stage's effect is not established, and
+no post-error read, verification or replay occurred. The 27 public commands,
+seven independent reads and 90 hashed packets remain in
+`r84-named-list-2a3037eb-2025-r2/root-review.json`. Transaction
+`tx1-jt6fhmahbbtcyd3vww00` and its quarantined sandbox are protected from replay.
+Both failed runs preserved source integrity and completed process cleanup.
+
+Matching 2025 definitions and the actual rejection establish this exact
+constructor requirement. Preparation had checked only supplied descriptors;
+the omission therefore reached execution. A source-certified completeness
+guard and a valid separately previewed Metadata ShareSet setup are now assigned
+implementation work under #178/#179. Generic notNull is not sufficient to
+infer constructor requirements: ordinary Sound creation may inherit OutputBus.
+The failed empty-slot witness, stronger List history and richer creation
+branches are not accepted as complete. No Fresh or broad gate was added.
+
+Reviewed successor `3971b13e` implements that exact constructor guard and keeps
+required references inline through staged creation and verification. Fifteen
+affected controls passed in 19.47s; the complete corrected collector passed
+three checks in 5.09s. Independent review found a public-output issue: the
+missing-input details exposed internal campaign provenance. The correction
+keeps that provenance sealed internally and projects only the business input
+requirements. Its two public regressions failed before the fix, then passed in
+2.31s; correction review found no further issue. Counts overlap; the successful
+collector was not repeated for this output-only correction.
+
+The fresh macOS Console2025.1.7.9143 attempt at `3971b13e` failed in 12.17s
+during the separately previewed Metadata ShareSet setup. Wwise acknowledged its
+one SET, returning `R84_System_Output_Settings` for the requested
+`R84 System Output Settings`. The plugin verifier rejected the actual name with
+`PLUGIN_RESULT_NAME_MISMATCH` before independent object readbacks. Transaction
+`tx1-c8e88z2bratefbmpw6tk` is **verification_failed**, not indeterminate or
+business-verified. The original Bus/Sound/slot source Draft never started.
+Nineteen public commands, nine independent reads and 27 hashed packets are
+retained in `r84-named-list-3971b13e-2025-r3/root-review.json`; source integrity
+and process cleanup passed, and the failed sandbox is quarantined. The original
+transaction was not replayed. This adds a concrete plugin name-normalization/
+result-binding gap under #179; changing only the fixture name would not resolve
+it. Matching-source diagnosis and a closed repair are required before another
+attempt. No Metadata setup or named-List native success is claimed.
+
+## 2026-10-23 R84 related property outputs and existing EQ witness
+
+Reviewed `6e0aa118` extends existing related scalar-property terminals to fresh
+metadata-selected namespaced fields, in both ordinary and override-source-value
+modes. Singleton, list, selected sequence and combined outputs use their existing
+planners; reference hops and reference terminals retain their previous kind and
+token boundaries. Root output behavior and general expression grammar are
+unchanged. The final five-version affected selection passed 227 checks in
+12.24s; earlier failed assertions and repairs remain in the original logs.
+Test-only output controls passed five checks in 1.33s before native execution.
+
+Frozen `a5439459` passed one matching macOS Console2025.1.7.9143 workflow in
+6.78s: seven public read groups, seven invocations, 30 hashed native packets and
+zero transactions. Root, AudioFileSource-to-parent and selected child-list
+outputs returned actual typed integer-zero values for both @MyCompany:Status
+and @@MyCompany:Status. Fresh scoped metadata, actual parent identity/class,
+complete selected membership and repeated root values matched the public output.
+Source hash/mtime/tree and lifecycle cleanup passed. Evidence:
+`r84-namespaced-outputs-a5439459-2025-r1/root-review.json`. This establishes the
+selected 2025 native outputs, not an inheritance difference or five-version
+native execution. Earlier R82/R83 condition witnesses were not repeated.
+
+The separate existing-EQ test on the same candidate failed in 4.14s before any
+Draft or write. Its collector incorrectly required the query-only terminal
+`agent_result` field on the successful `status` response, which has no such
+field. One public status invocation and two hashed read-only native packets were
+captured; no transaction occurred. Source integrity and process cleanup passed;
+the failed sandbox remains quarantined. The original FAIL is retained at
+`r84-eq-gain-a5439459-2025-r1/root-review.json`. This is a test-oracle mismatch,
+not evidence of an EQ implementation failure or a passing EQ business outcome.
+The test-only repair `477b0049` added a complete public Gateway/fake-transport
+collector flow, which also caught a nine-field request exceeding the existing
+eight-field ceiling. The corrected 8+1 queries compare identity envelopes;
+`66a2a1f1` preserves each original response before joining the separate context.
+The affected controls passed 25 in 2.14s, followed by four full-flow controls in
+2.12s after Main's exact-response preservation finding. These runs overlap.
+
+Frozen `66a2a1f1` then passed the selected existing-EQ native workflow on macOS
+Console2025.1.7.9143 in 7.04s. One verified transaction changed Voice_EQ GainBand1
+from 4 to 3; 19 independent reads and 114 hashed native packets establish the
+actual Effect class6881283, all three Gain dependency clauses and recursive
+controller metadata. NumBands3, OnOffBand1true, FilterTypeBand1=4, other observed
+target values, peer values, complete ordered folder membership and selected
+metadata remained unchanged. The platform came from actual project status.
+No setup/history transaction occurred; source integrity and cleanup passed.
+Evidence: `r84-eq-gain-66a2a1f1-2025-r2/root-review.json`. The original failed
+root remains unchanged. This is one actual existing-EQ composition witness,
+not every plugin, band, version or audio-state verification. Neither slice adds
+Fresh or full-gate evidence.
+
+## 2026-10-23 R82 duplicate creation and namespaced query witness
+
+Reviewed SET implementation `878cde58`, integrated at `79f76858`, gives duplicate
+ordinary rename declarations distinct result handles. It creates an ambiguous
+sibling group in declaration order against the actual owned parent GUID, retains
+each native result separately, and checks the cumulative created roster before
+later writes. Public results and owned history retain every observed occurrence;
+actual names are verified exactly without guessing Wwise suffixes.
+
+The public source/verify/undo/redo tracer passed in 27.96s; the public complete
+roster assertion initially failed, then passed in 28.24s. Focused shape and causal
+controls retained their initial failures: the suffix-like name repair passed in
+5.24s, and a corrected between-stage test hook passed in 4.03s. Final affected
+existing callers passed nine checks in 25.33s. Original logs and two independent
+reviews are retained in `r82-reviewed-evidence`; overlapping runs are not summed.
+Reviews found no material issue. Those initial checks were program evidence.
+The reviewed test-only successor `993a8e1a` then passed the matching macOS
+Console2025.1.7.9143 SET duplicate workflow in 23.86s: three separately verified
+source/undo/redo transactions, 19 independent observations, 60 public commands
+and 232 hashed native packets. Wwise returned distinct Send and Send_01 objects
+under the newly created parent's actual GUID; reference and public occurrence
+roster matched independent reads. Undo restored the baseline and proved all
+three new GUIDs absent; redo restored the exact original created graph and
+reference. Source integrity and cleanup passed. Exact stage results and three
+missing-GUID errors were matched to their original native packets. Root:
+`r82-duplicate-set-993a8e1a-2025-r1/root-review.json`. This is selected 2025 SET
+composition evidence, not a CREATE or all-version duplicate native result.
+
+Reviewed CREATE successor `c9dadc2b` extends that owned-stage mechanism across
+2021–2025: later creates use the actual parent GUID and each deferred reference
+uses closed setReference. Shared history observations consume the complete
+actual roster; compound phases avoid the old requested-path rewrite. The 2021
+public source workflow passed in 1.21s; 2025 compound source/undo/redo passed in
+24.46s. Three middle-version source/count cases and four causal stops passed
+seven checks in 5.64s; final existing CREATE/SET callers passed seven in 15.70s.
+Counts overlap. Original failures and fixes are retained in
+`r83-create-reviewed-evidence`; Main's runtime and final-delta review found no
+material issue. The test-only successor `e51f4ff8` then passed on matching
+macOS Console2021.1.14.8108 in 10.38s: one verified transaction, zero setup or
+history transactions, nine independent reads, 27 public commands and 117 hashed
+native packets. Three CREATE calls used actual parent GUIDs, then one closed
+setReference connected the correct actual siblings. Full public occurrence
+roster, original owner/ancestor/leaves, matching 2021 field metadata and source
+integrity/cleanup passed. All four stage results match their original native
+packets. Root: `r83-duplicate-create-e51f4ff8-2021-r1/root-review.json`.
+
+The accepted component assessment
+`r83-duplicate-creation-component-acceptance.json` combines that CREATE witness,
+new 2025 SET duplicate/history evidence, retained matching 2025 ordinary CREATE
+history and current five-version program/CREATE history-adapter checks. It
+justifies shared-mechanism reuse without an additional 2025 CREATE history
+chain, while explicitly not claiming a directly observed 2025 staged-CREATE
+native run or every-version native matrix. Broader conflict policies, graph
+shapes and constructor/history alternatives remain assigned to #178/#192.
+
+Test-only candidate `1c5a07b7` passed one macOS Console2025.1.7.9143 namespaced
+query witness in 9.71s. The private project copy loaded the official
+`MyCompany:Status` custom property; fresh actual Sound metadata disclosed its
+integer default zero and enumeration. Seven public query groups and nine hashed
+native packets showed both ordinary and override-source-value WHERE predicates
+select the Sound for zero and no object for one. The fixture made zero
+transactions; original project/work-unit data, source hash/mtime/tree and cleanup
+passed. Root `r82-namespaced-query-1c5a07b7-2025-r1` retains final-v3 evidence,
+exact packets and Main review. Thirteen fixture program checks passed in 0.51s
+before the native run. This proves matching-2025 token/membership acceptance,
+not custom-value RETURN, an inheritance difference, or five-version native
+coverage. Reviewed implementation `778df7fa`, integrated at `633731c0`, now
+admits fresh metadata-selected namespaced scalar properties in ordinary and
+override-source-value business conditions. Token permission is applied on every
+binding after actual-object kind fallback; cached discovery cannot grant the
+condition's permission to outputs or reference hops. Generic accessor grammar
+and mandatory typed predicate-value RETURN/readback checks are unchanged.
+
+The final five-version focused file passed 96 checks in 7.21s. The existing
+scalar/reference/related selection passed 170 in 18.25s; after its last fallback
+repair, 50 directly affected checks passed in 2.08s. These counts overlap.
+Initial field-token, disclosure and exact-object fallback failures remain
+preserved in `r83-namespaced-reviewed-evidence`. Independent review found no
+material issue and checked all five definitions and embedded source hashes.
+The separate closed-business witness passed at frozen `b3aedf70` on macOS
+Console2025.1.7.9143 in 8.73s: seven public query groups, 33 hashed native packets
+and zero transactions. Actual typed @MyCompany:Status and @@MyCompany:Status
+values were zero in all eight before/after observations; all four positive and
+negative native selections matched public IDs, with fresh class metadata,
+complete source scopes and unchanged source/cleanup. Root:
+`r83-namespaced-business-b3aedf70-2025-r1/root-review.json`. This completes the
+selected public-flow readback acceptance; it is separate from the earlier
+advanced identity-only witness. Equal local/resolved values do not prove an
+inheritance difference or all-version native coverage. A subsequent one-string
+schema disclosure cleanup `dbcb1eb3` preserves the mandatory live readback rule;
+five existing schema/source checks passed in 0.35s, without a native rerun.
+No Fresh or full gate ran for this slice.
+
+## 2026-10-23 R81 reference and override query conditions
+
+Reviewed implementation `6316028a`, integrated at `39052582`, adds metadata-bound
+`reference`, `local-reference` and `override-source-value` predicates to the
+shared root/related query mechanism. Five pinned WHERE source sections support
+the owned identity, null/setness, negation and override expressions separately
+from RETURN projection evidence. Canonical GUID comparison constants require
+no target-existence read; named selectors use bounded unique resolution and
+revalidation. Native predicates determine results, including inequality with
+unset references. The public interface does not accept arbitrary accessors.
+
+Original failures and their narrow repairs are retained. Initial unsupported
+modes failed 11 checks. Runtime expansion passed 75 while five schema assertions
+failed, then those five passed after disclosure was added. A later selection
+passed 80 and exposed five named-selector drift failures; those five passed
+after revalidation was repaired. Additional mode/type controls passed 50.
+The final affected selections passed 122 in 16.24s and 60 in 16.06s, including
+existing scalar consumers, source completeness, typed pages and reducers. Counts
+overlap and do not represent a full-file or full-gate total. Independent static
+review found no material issue; originals, source notes and review are archived
+in `r81-reference-condition-program-logs`.
+
+The reviewed test-only successor `f28e51c2`, integrated at frozen
+`eb02a2390a4c4d87ee5dd37f1280322c83f578eb`, passed on macOS Console2025.1.7.9143
+in5.88s: eight compact public query groups, eight invocations,82 hashed native
+packets and zero transactions. Independent unfiltered source/value observations
+and actual native WHERE membership prove resolved/local references, known-set
+null/setness/inequality and ordinary versus override scalar values. Fresh local
+UserAuxSend0 returned a present zero-GUID reference with matching native metadata;
+its null predicate selected the Sound, while setness and identity inequality
+selected no rows. The implementation preserves that native inequality outcome,
+not a Python complement. Source hash/mtime/tree and cleanup passed. Evidence root
+`r81-reference-query-eb02a239-2025-r1` includes the original final-v3 record and
+Root review. Existing all-five projection/program evidence remains separately
+attributed.
+
+The reduced oldest-backend successor `e3abcbfa165906dda6b7ac3812b83d078a422c1c`
+passed macOS Console2021.1.14.8108 in9.25s. One lifecycle covered four core groups
+plus three separately observed unassigned-reference predicates: seven public
+queries,73 hashed native packets and zero transactions. Matching2021 observations
+establish a present zero-GUID UserAuxSend0 value, null selecting the Sound, and
+setness/identity inequality selecting no rows; these facts were observed afresh,
+not inferred from2025. Source/cleanup passed. The original2025 native run was not
+repeated for this test-only variant. Aggregate evidence is
+`r81-reference-query-native-review-2021-2025.json`; exact roots retain original
+candidates and final-v3 records. Five-version primary semantics/program controls
+and earlier matching-host projection/ordinary-condition evidence support shared
+mechanism reuse; no intermediate-version native matrix was added.
+
+No Fresh or full gate ran. Collision-specific and exact namespaced custom-property
+WHERE token facts remain #181 work; the disclosed current token boundary is not
+native absence. Other query records, reference chains, functions and legacy
+alternatives remain assigned to the same ticket. These are selected2021/2025 predicate
+observations, not every-version native query coverage.
+
+## 2026-10-23 R80 owned Action history and multiple-root creation
+
+Action history implementation `274119a3`, integrated at `62e4bac0`, retains the
+actual before/after Action identity, class, parent and typed ActionType in the
+source verifier's original read. Owned undo/redo consumes that witness and
+revalidates native metadata and source-kind authority. It does not reconstruct
+paths or enrich old executed receipts. Ordinary history and creation observers
+remain on their existing contracts.
+
+The initial public failure passed after repair. The expanded selection retained
+46 passes and two native-typed metadata-extension failures; the two failures and
+two valid counterparts then passed (4 in 4.20s). A parent-extension failure was
+repaired and its four affected controls passed in 4.16s. Existing source/history
+callers passed 58 in 24.89s. A malformed-witness diagnostic failure was repaired;
+eight legacy/forged-receipt controls and a valid flow passed in 4.67s. The selections
+overlap; original failures and repair attribution are retained in
+`r80-action-history-program-logs`. Independent Root review found no actionable
+issue in this slice.
+
+Frozen `62e4bac0468d45bec124c9cd0715ea6639f711df` passed the macOS Console
+2025.1.7.9143 Action retarget/undo/redo workflow in 14.35s. Three separately
+authorized transactions verified; 30 independent queries and 163 hash-checked
+native packets establish actual Target/path/controller changes and restoration,
+Event children, peer Action and old/new audio-target preservation. Final v3
+lifecycle evidence proves unchanged source hash/mtime/tree and completed process
+and passing-sandbox cleanup. Evidence root:
+`r80-action-history-62e4bac0-2025-r1`, including `root-review.json`.
+
+This adds native owned-history evidence for the exercised 2025 Action flow.
+Program controls cover 2022 undo and 2023–2025 undo/redo, both source-certified
+and native-typed metadata, and the 2021 history/2022 redo catalog boundaries.
+No other-version native history, global stack-head, outside-scope, full Action
+family, Fresh or Windows acceptance follows. Matching five-version definitions
+and public controls, retained R79 source effects, R76 matching-host history effects
+and the new 2025 integration support proportional shared-mechanism reuse; the
+review is `research/waapi-r80-action-history-version-reuse.md`. No additional
+per-version run was selected without a differing branch. Other #192 obligations
+stay open.
+
+Separately, creation implementation `27d0abe8` and repair `ba8af705`, integrated
+at `aec44f31`, stage ambiguous retained-parent roots individually and preserve
+actual native GUIDs/names and separate results. The cumulative created roster is
+reobserved before dependent reference writes. Independent review exposed an extra
+child inserted under an earlier root; its failing public counterexample passed
+after repair. Final affected controls passed 8 in 51.13s, including retained-read
+replay, source/history and prior identity/collision guards. Earlier applicable
+version/history controls remain separate overlapping evidence. Original logs,
+review and repair are archived in `r80-multiple-root-program-logs`.
+
+The prepared native fixture first failed in 6.08s before any transaction because
+its observation directory did not yet exist (`35c6760f`). A test-only initialization
+repair then reached verified creation/reference and undo, but failed in 15.53s
+because an exact query for a deleted GUID returns a structured native Object not
+found error, not an empty list (`ace89c4f`). Both original FAIL roots/quarantines
+remain unchanged. The absence oracle now accepts only the exact owned GUID/query,
+endpoint/version and native error; eight mismatched controls were rejected using
+the retained real response. No Gateway behavior changed for these fixture repairs.
+
+Frozen `cfd0d19a79a6883626d32c1eba83c70e3e05e70e` passed the complete macOS Console
+2025.1.7.9143 workflow in 22.06s: zero setup transactions, three separately
+verified source/undo/redo transactions, 20 independent observations, 62 public
+commands and 285 hashed native packets. Separate native collision roots preserve
+actual GUID/name binding; cumulative membership is checked before the internal
+reference write. Undo restores the original scope and proves all four new GUIDs
+absent; redo restores the same graph, names and reference. Source hash/mtime/tree
+and final lifecycle cleanup passed. Evidence and Root review are in
+`r81-multiple-root-cfd0d19a-2025-r3`; the two failed roots remain alongside it.
+This proves the exercised 2025 ordinary two-root graph, not duplicate requested
+siblings, richer creation/history forms or other-version native effects. Those
+remain #178/#192 work. Neither increment ran a full Program or Non-live gate.
+
+## 2026-10-23 R79 source-backed Action.Target kind
+
+Reviewed implementation `c667a640`, integrated at `35d1ae1e`, supports the existing
+Action.Target field when native metadata omits its kind. Matching SDK definitions
+certify Reference separately; actual Action GUID, class, ActionType and raw
+metadata remain bound through Field discovery, Preview, prewrite and verification.
+Native restrictions are unchanged. No global empty-kind allowance or Sound-only
+target restriction was added, and ordinary Show metadata remains visibility only.
+
+The first public counterexample failed before repair, then passed. Expanded
+controls passed 32 in 7.55s. The affected selection passed 110 with five new
+fixture assertion failures in 25.44s; only those five corrected Preview-notice
+checks reran and passed in 1.88s. Final eligibility/builder controls passed 13 in
+2.31s. These selections overlap. Original logs and their causal reconciliation
+are hash-archived in `r79-action-program-logs`; independent review found no
+remaining actionable issue in the selected diff.
+
+Frozen `35d1ae1e6c392a8bce0f13c436699270c39c845d` passed the existing Play Action
+retarget workflow on macOS Console 2025.1 in 9.84s and 2021.1 in 9.39s. Both
+actual object-scoped Target responses had empty native type/restriction, so the
+separate documented-kind proof was exercised. Each case has one verified
+transaction and 20 independent before/after queries; 2025 captured 85 native
+packets and 2021 captured 81. Raw metadata hashes match the original packets.
+The selected Action retains its GUID, intrinsic name, ActionType and other
+observed fields while its display path follows the new target. Event membership,
+peer Action/Event, old/new audio objects and sibling context are preserved.
+Source integrity and cleanup passed; the lifecycle removed the passing sandboxes.
+
+Evidence: `r79-action-target-native-review-2021-2025.json` and the two original
+root reviews. All five versions retain source/program checks; native 2022–2024
+was not repeated. No audio playback, complete Action-family, owned-history,
+Fresh or Windows native acceptance is claimed. Source-kind history support stays
+required work under #192; other #177/#178/#180 branches remain open. No full
+Program or Non-live gate was added for this increment.
+
+## 2026-10-23 R77 scalar conditions and R78 creation integration
+
+Integration `2589b9a17d9f41b7f903af7a71c34917488b9a94` combines the reviewed
+scalar-query repair `5f1eeb29` and creation counterpart `4515d479`. These are
+focused program results, not new native or Fresh acceptance.
+
+Scalar conditions now use actual property metadata for root `--where-field`
+and related matching/count/any/all views. The complete bounded source and
+relationship transforms precede the native predicate and final root limit.
+Unknown field authority remains distinct from an empty matching set. Initial
+affected checks passed 248 in 100.84s; a later selection-budget change passed
+11 directly affected checks in 4.94s. Independent review then found four real
+defects: an advanced-root cap could become1000, incomplete metadata discovery
+could select an ambiguous field, source removal could raise KeyError, and
+related selected-value disagreement could go unchecked. All60 five-version
+counterexamples failed before repair (16.64s), then passed (11.95s). Final
+selected scope/type/reducer/page/older-source controls passed111 in81.28s.
+These selections overlap; none is a full-suite or distinct-case total. Main
+reviewed the immutable repair and its original logs without repeating green
+checks. Original evidence is retained in `r77-query-field-program-logs` and
+`r77-query-field-repair-logs` below the ignored full-coverage evidence root.
+Reference/local/override predicates and record/function variants remain #181.
+
+Creation now admits ordinary no-collision compound set graphs and preserves
+the original standalone object.create planned-reference operation across all
+five versions. Actual native-chosen names/GUIDs are bound by class, parent and
+membership before dependent reference writes; no suffix or result-order guess
+is used. The2021 create route uses closed setReference stages, never object.set.
+Native stages/results stay separately retained, with independent final effects
+and preservation checks. Existing-only compound children keep their original
+route; creation-only children disclose one actual write and no dependent stage.
+
+The no-collision source/history selection passed8 in56.47s; the five-version
+original create caller and affected guards passed34 in42.98s. Main review found
+missing/incorrect creation-only stage disclosure; its original RED is retained
+and the corrected public source/history positive passed1 in9.91s. Counts overlap.
+Handoffs, selected logs and review are hash-archived in
+`r78-compound-program-logs`. No native witness is claimed for these new staged
+behaviors. Multi-root collisions, duplicate requested sibling names, richer
+graph forms and native-name create history remain #178/#192 work.
+
+The first prepared scalar-query native node ran on macOS Console2025.1.7.9143
+at `f6f1f28e` and failed in9.51s. The independent baseline and initial related
+query succeeded, but the test wrapper prepended `--timeout30` to the Gateway's
+complete pagination continuation; the Gateway rejected that altered command.
+The detailed diagnostic document also contained4128 entries, making full paging
+inappropriate for this small acceptance flow. This is no native acceptance PASS.
+Its original root `r77-query-fields-f6f1f28e-2025-r1` retains85 hash-checked native
+packets, three public invocations, zero transactions, unchanged source hashes/
+mtime/tree, clean process teardown and a quarantined sandbox. The2021 attempt
+was deferred pending a test-only correction; the failed root is not reused.
+
+The test-only correction `aa82ea1e` uses compact business replies and a passive
+capture of actual Gateway dispatch inputs, linked to the unchanged original
+native packets. Complete returned continuations execute verbatim. On frozen
+`d4183c6a6942f38cf07d9ab4f66fec928cc46b2a`, the same five-group read-only workflow
+passed2025.1 in6.02s and2021.1 in9.37s. Each made five public queries, captured119
+native packets and created zero transactions. Independent child order/values,
+actual Pitch metadata, related matching/count/empty-root preservation and complete
+root scope before native WHERE/final take1 all passed. All packet hashes and
+actual dispatch associations, source integrity and cleanup were checked; passing
+sandboxes were deleted by the existing lifecycle. See
+`r77-query-fields-native-review-2021-2025.json` and each original root review.
+
+The2022–2024 native matrix was not repeated for this shared predicate mechanism;
+matching source and program checks still cover all five versions. The two real
+runs do not establish every scalar kind, heterogeneous predicate, reference mode
+or record/function variant. Original2025 fixture FAIL remains unchanged.
+
+No Fresh, Windows native, full Program or full Non-live gate ran for this
+increment. The PR remains draft and all affected functional tickets stay open.
+
+## 2026-10-23 R78 Bed Mixer condition acceptance
+
+No runtime change was needed. Four-version public ShareSet setup/edit checks,
+existing policy alternatives and the 2021 constructor boundary passed 17 focused
+tests in 5.99s. The original four fixture failures (missing requested stored-field
+projection in a fake client) and corrected result are retained in
+`r78-bed-program-logs`; five files are hash-archived with their handoff/source plan.
+
+Frozen `df9af555619219b430c33b43f4392f91ebc08bae` passed one native workflow on
+each matching macOS Console: 2022.1 = 9.79s, 2023.1 = 10.03s, 2024.1 = 10.44s,
+2025.1 = 10.08s. Each has 25 independent observations, 115 hashed native packets
+and two separately authorized verified transactions. A standalone Bed Mixer
+ShareSet is created with policy1 only; its existing limit is then changed64→128.
+Every parameter read, setup, edit and verifier uses the same actual nonzero
+platform. Actual scalar metadata/enabled state, all four plugin parameters,
+identity/notes, WorkUnit membership, parent and existing RoomVerb peer are checked.
+Source integrity and cleanup passed; no audio rendering is claimed.
+
+Evidence: `r78-bed-mixer-native-review.json` and
+`r78-bed-df9af555-<year>-r1/root-review.json`. Matching 2021 captured host catalog
+and primary plugin corpus contain no Bed Mixer class, and its constructor
+backend is separately unavailable in the pinned function surface. No 2021 Bed
+case ran or received PASS credit; this is a scoped host/version boundary, not
+universal absence on every possible host. The source rationale remains in the
+archived plan. No Fresh, Windows, Authoring or full gate was added. #177 and the
+broader construction/plugin tickets remain open pending their full criteria.
+
+## 2026-10-23 R76 sequence and R77 Time native acceptance
+
+The R76 closed sequence workflow passed on all five pinned macOS Console
+builds at frozen `c98ccf574a6d82380046a56df53f7e5eef34ce26`:
+
+| Version | Result | Public reads | Native packets | Transactions |
+| --- | --- | --- | --- | --- |
+| 2021.1 | 1 passed, 9.65s | 7 | 155 | 0 |
+| 2022.1 | 1 passed, 9.20s | 7 | 155 | 0 |
+| 2023.1 | 1 passed, 9.04s | 7 | 155 | 0 |
+| 2024.1 | 1 passed, 8.57s | 7 | 155 | 0 |
+| 2025.1 | 1 passed, 9.19s | 7 | 155 | 0 |
+
+Independent child identities/order/Volume/Pitch/class anchor first, last,
+index, ranges, custom metadata scope, derived count/any/all/empty values,
+ordered combination and repeated occurrences. An exact repeated business result
+checks stability. No extra paging invocation was needed. All packet hashes,
+source integrity and teardown checks passed. Evidence:
+`r76-query-sequence-five-version-native-review.json` and
+`r76-query-sequences-c98ccf57-<year>-r1/root-review.json`.
+This is selected sequence acceptance, not every native predicate or record type.
+
+R77 adds test evidence, with **no runtime change**. The public fake setup/edit
+flow uses actual Time class 5111824 and matching five-version definitions;
+18 affected checks passed in 7.19s. Earlier runs overlap and original fixture
+failures are retained in `r77-time-program-logs` (nine archived files).
+The native workflow separately creates a standalone Time Modulator with only
+TimeModLoops=50, then edits its existing EnvelopeStopPlayback from true to false.
+Live scalar metadata/enabled state, loops, Duration, notes, identity, parent,
+peer Envelope values and complete WorkUnit membership are checked.
+
+| Version | Frozen candidate | Result | Observation reads / native packets | Verified transactions |
+| --- | --- | --- | --- | --- |
+| 2021.1 | `0070be26` | 1 passed, 9.25s | 25 / 115 | 2 |
+| 2022.1 | `0070be26` | 1 passed, 8.79s | 25 / 123 | 2 |
+| 2023.1 | `0070be26` | 1 passed, 9.78s | 25 / 123 | 2 |
+| 2024.1 | `0070be26` | 1 passed, 9.40s | 25 / 123 | 2 |
+| 2025.1 | `0070be26` | 1 passed, 5.98s | 25 / 123 | 2 |
+
+2021 omits currentPlatformId: both live fields explicitly certify unlink=false,
+so the enabled observation uses the existing null-GUID read convention and the
+mutation omits platform. Later versions use the actual disclosed platform.
+All source/packet/cleanup checks passed. Evidence:
+`r77-time-five-version-native-review.json` and per-root reviews. These are the
+representative count-50 existing edit and minimal setup, not every numeric
+endpoint, conditional constructor combination or complete Time/Bed Mixer family.
+No Fresh, Windows, Authoring or full Program/Non-live gate was added.
+
+## 2026-10-23 R75 positive device fixture and R76 sequence queries
+
+The positive master-bus workflow uses a new owned copy of the currently assigned
+System device. Closed `object.copy` and `object.setReference` each receive their
+own preview, authorization, execution and verification. Independent reads prove
+the copied plugin identity and five actual selected-platform parameter values,
+the changed reference, and preservation of observed devices, peers and topology.
+
+| Console version | Frozen candidate | Result | Observation reads / native packets | Verified transactions |
+| --- | --- | --- | --- | --- |
+| 2024.1.13.9056 | `987b0702` | 1 passed, 10.47s | 38 / 152 | 2 |
+| 2025.1.7.9143 | `93c339bf` | 1 passed, 7.00s | 38 / 152 | 2 |
+
+Both source trees remain unchanged and passing sandboxes were cleaned. Exact
+packet hashes, observations and lifecycle checks are bound in
+`r75-system-copy-native-review.json` and the per-root `root-review.json` files.
+The first 2025 attempt at `987b0702` failed before any transaction because its
+test assumed two siblings; the committed 2025 fixture contains four. The repair
+requires the selected bus and peer, rejects duplicate GUIDs, and preserves all
+observed sibling rows/order. Original FAIL (8.36s, 11 reads, 22 packets) and
+quarantine remain retained. The valid 2024 effect was reused, not rerun.
+The earlier No_Output rejection remains indeterminate and was never replayed.
+These positive System-copy results do not establish arbitrary plugin eligibility.
+
+R76 sequence queries are integrated at `93fc2467`: closed filtering, ordered
+first/last/index/ranges, count/existence/all-match and concatenation reuse the
+existing related-output planner. Output explicitly identifies Gateway-derived
+sequences rather than claiming native function-return equality. Matching pinned
+source sections distinguish SELECT transformations from return expressions.
+The original affected selection passed 235 in 30.53s. Review found a discarded
+finite prefix before a later filter and a custom field colliding with an internal
+reducer marker. Both reproduced through the public Gateway and were repaired;
+70 affected controls passed in 16.31s (overlap with the earlier selection).
+Independent correction review found no further actionable issue. Twenty-six
+original log/handoff/review files are hash-archived in
+`r76-query-sequence-program-logs`; these original runs are program evidence; subsequent native sequence acceptance
+is recorded above. Neither is a full gate. Record lists, metadata-bound comparison predicates,
+randomizer and remaining versioned query functions stay assigned to #181.
+
+## 2026-10-23 R75 reference applicability and R76 structural history
+
+R75 candidate `3898c8ad98253bdf49a8ae253073e0e720d5ad3c` replaces invalid
+reference-enabled probes with a source-bound topmost-Bus ancestry proof at Field
+binding/refresh, preparation, prewrite and verification. Scalar enabled-state
+checks remain. Focused final affected controls passed 69 in 12.95s; strengthening
+the fixture to existing System → distinct No_Output then passed 47 in 12.09s.
+These overlap. All 149 machine-contract seals remain unchanged; fourteen
+operation guidance lanes and five property-state disclosures changed. Twelve
+original log/schema files are hash-archived in `r75-reference-program-logs`.
+
+The 2024 native attempt `r75-master-bus-3898c8ad-2024-r3` reached one authorized
+`setReference` dispatch after structural checks, then received
+`ak.wwise.invalid_reference`. Original result: **1 failed in 10.01s**.
+Transaction `tx1-k7dva2jtg0mmvr1jvtgj` remains **indeterminate**: twelve public
+observation commands, 58 native packets, no reference `isPropertyEnabled` call,
+and no post-dispatch verification. Its journal, observation, packet hashes and
+source/cleanup checks are bound by `root-review.json`. The failed sandbox is
+quarantined; never verify or replay this transaction. The source project is
+unchanged. Matching plugin source identifies a `CanBeMasterSink=false` target
+restriction for No Output; its exact role applicability is under diagnosis.
+That original attempt provides no successful reference-effect credit; the subsequent positive fixture below is separate evidence.
+
+R76 structural property history is implemented at `988e60b1`, integrated with
+R75 at `c08ca046f3c28052ae1e83535f42ede677106fc0`. The existing receipt observer
+now accepts the tagged Switch-child proof without inventing native type, checks
+metadata/association conditions and typed values, and admits a certified
+nonlinkable omitted-platform view. Undo remains pinned to 2022–2025 and redo
+to 2023–2025. No global history-stack identity or automatic retry is claimed.
+Focused structural/context tests passed 152 in 100.34s; existing ordinary
+scalar/reference/policy/nonretry callers passed 37 in 25.51s. An additional
+zero-GUID platform boundary passed one in 0.81s; three post-merge shared-caller
+checks passed in 3.60s. Overlapping earlier runs and original fixture failures
+are retained in `r76-history-program-logs`.
+
+The selected structural history workflow passed at frozen `9a055665` on
+2022.1 (10.52s, source change and undo, native type omitted) and 2023.1 (10.61s,
+source change, undo and redo, native type present). Both force tagged structural
+binding. They use 21/26 independent observation reads, 130/167 native packets,
+and 2/3 separately authorized verified transactions respectively. ContinuePlay,
+FadeInTime, owner, child and ordered membership are checked after each phase.
+Source integrity and cleanup passed. Evidence: `r76-structural-history-native-review.json`
+and `r76-association-history-9a055665-<year>-r1/root-review.json`.
+The same tagged source/undo/redo workflow then passed on 2024.1 (10.49s)
+and 2025.1 (10.22s) at frozen `bb0e5bea`. Each has 26 observation reads,
+167 hashed native packets and three verified transactions, with unchanged source
+and clean teardown. These resolve the exact later-version association reversal
+outcome that generic history and source-write component evidence alone could not
+prove. The 2022/2023 witnesses were reused without rerunning. The combined
+`r76-structural-history-native-review-2022-2025.json` binds all four original
+candidates/results. Wwise 2021 retains its pinned history API boundary.
+This proves the selected outcomes, not a global stack head or unobserved state.
+#177 and #192 stay open; no Fresh or full-gate result is added.
+
+## 2026-10-23 R74 related list native acceptance
+
+Frozen candidate `e48bfcc378f8404b80f4ed1b7e959ed4a177f32c` passed the
+root-preserving child-record workflow on all five pinned macOS Console builds:
+
+| Version | Selected result | Native packets | Strategy |
+| --- | --- | --- | --- |
+| 2021.1 | 1 passed, 9.55s | 31 | Owner-specific relationship queries and GUID-keyed value reads |
+| 2022.1 | 1 passed, 9.40s | 31 | Owner-specific relationship queries and GUID-keyed value reads |
+| 2023.1 | 1 passed, 4.70s | 15 | Native composed member records |
+| 2024.1 | 1 passed, 4.18s | 15 | Native composed member records |
+| 2025.1 | 1 passed, 4.67s | 15 | Native composed member records |
+
+Each case uses three read-only public commands. The container remains the root;
+five child GUIDs, their native order, Volume and metadata-bound Pitch agree with
+raw packets and an independent fixed-field children query. Repeating the root
+query returns the same values. All fifteen commands succeeded, with zero
+transactions, unchanged source hash/mtime/tree inventory, clean process teardown
+and deleted passing sandboxes. Original packet hashes and observations are
+bound in `r74-lists-e48bfcc3-<year>-r3/root-review.json`; the local aggregate is
+`r74-five-version-list-native-review.json`.
+
+The older implementation uses documented SELECT membership and positive-offset
+skip windows, never a bare list return accessor or `skip 0`. The latter caused
+the separate original 2021 failure at `6af29be7` (1 failed, 8.47s, zero writes).
+The 2023 original case on that candidate first proved native composed values,
+then failed at a test-only unsupported relationship/custom-field combination
+(1 failed, 8.42s, zero writes); the independent oracle now uses the existing
+fixed `pitch-cents` output. Both original verdicts and quarantines are retained.
+
+Focused repair evidence includes twelve passing first/positive-window,
+overflow and origin-page controls in 17.66s; earlier affected page reconstruction
+passed five in 19.30s and caller checks passed 27 in 15.88s. These overlap and
+are not a full gate. Page fitting reduces the number of unchanged entries,
+preserving absolute offsets, values and existing output limits. The native
+workflow proves the selected child-list path, not every list relation, function
+or pagination branch. Remaining query functions stay in #181. No Fresh,
+Windows, Authoring or full-gate result is claimed.
+
+## 2026-10-23 R74 list and R75 master-bus native findings
+
+The list implementation and test-only master-bus corrections were combined at
+`f5ecfd8240ac4f1cd87820ba63385a27a21b201b`. The list review repaired origin
+diagnostics changing between result pages and unchanged native extensions
+being mistaken for scope drift. Focused correction selections passed 14 in
+0.98s, 17 in 10.96s and 27 in 49.13s; these overlap and are not a full gate.
+Twenty original program logs, including failures, are hash-indexed under the
+local full-coverage `r74-list-program-logs` directory.
+
+Native observations remain failures, with no mutation or acceptance credit:
+
+| Root / candidate | Original result | Finding |
+| --- | --- | --- |
+| `r75-master-bus-0b9a0dc8-2024-r1` / `0b9a0dc8` | 1 failed, 7.30s | Test assumed the base AudioDevice class for plugin instances; matching catalogs and native packets instead prove System 11403271 and No Output 11862023. Native reference metadata uses the label `Audio Device`. Test-only repair preserved exact identities. |
+| `r74-lists-f5ecfd82-2021-r1` / `f5ecfd82` | 1 failed, 8.20s | Wwise rejected `children` as a return accessor before returning members. The older-version strategy requires documented relationship-query semantics; this is unfinished interface support. |
+| `r75-master-bus-f5ecfd82-2024-r2` / `f5ecfd82` | 1 failed, 7.35s | Reference metadata discovery succeeded, but native `isPropertyEnabled(AudioDevice)` reported that the property did not exist. Property-versus-reference applicability must be resolved before another attempt. |
+
+The three roots respectively contain 9, 1 and 12 public invocations, zero
+transactions, unchanged source hashes/mtimes/tree inventories and clean process
+teardown. Their failed sandboxes remain quarantined. Each root's
+`root-review.json` binds the original observation and packet evidence. Other
+versions are held pending diagnosis, not counted as tested. #177 and #181 retain
+the intended master-bus reference effect and five-version list requirements.
+No new Fresh, Windows, Authoring or full-gate result is claimed.
+
+## 2026-10-23 R74 Switch-child property identity support
+
+Candidate `e53b15e380ac05a58ee86c57462c882bf8d6e922` adds a closed
+`draft-bind-switch-child-context` target for `object.setProperty`. Normal owner
+and child handles establish the documented context edge, reverse owner and
+version-pinned class/source proof. The tagged target preserves native type
+omission and revalidates its proof at discovery, preparation, execution and
+verification. Ordinary incomplete-ID binding stays rejected. Live metadata
+authorizes scalar fields; the implementation is not limited to ContinuePlay.
+
+Focused program selections passed 55 in 16.71s and 112 in 26.03s before the
+final early-discovery guard correction. The failing discovery/continuation
+nodes were repaired and passed; final ordinary schema, materializer, discovery,
+formal receipt and history-boundary consumers passed 20 in 1.15s. The exact
+overlapping selections and original failure-to-fix mapping are retained in
+`r74-association-program-logs/waapi-r74-association-implementation.md`; all
+seventeen original logs were hash-checked and preserved. Five setProperty
+schema lanes changed; the other 144 reviewed schema digests remain identical.
+
+One real macOS Console case per older version passed on the same candidate:
+**2021.1: 1 passed in 9.06s; 2022.1: 1 passed in 8.30s;
+2023.1: 1 passed in 4.72s; 2024.1: 1 passed in 4.23s**. Native 2021/2022
+association rows omit type and use the new structural target. Native 2023/2024
+rows report ObjectSettingAssociation and use the ordinary typed route.
+Each run makes one separately previewed, authorized, executed and verified
+ContinuePlay false-to-true change, with sixteen public observation commands.
+Independent readback preserves FadeInTime, owner state, the child and ordered
+child/context membership. Packet counts are respectively 91, 93, 75 and 75;
+all recorded hashes match. Source content/mtime/tree metadata are unchanged,
+process cleanup completed and passing sandboxes were deleted.
+
+Evidence under `.waapi-skill-state/full-coverage/`:
+`r74-association-e53b15e3-<year>-r1/root-review.json` and
+`r74-association-native-review.json`. The original R73 failures stay unchanged.
+The previously proven 2025 ordinary route at `e3f22460` is reused, not rerun
+or relabeled as same-candidate structural-route evidence. Structural targets
+with present native type have program proof, not an extra 2025 native run.
+Structural history recovery remains explicitly unavailable and assigned #192;
+Fresh discovery of the new route is unproven and no Fresh budget was spent.
+Other condition mechanisms and full #177 acceptance remain open.
+
+## 2026-10-23 R72 scoped multi-hop query outputs
+
+Candidate `f9c3e81325ae7a64209337de2b22484652c7ee43` extends the closed
+related-output path with multiple singleton relations, metadata-bound custom
+terminals and resolved/local reference hops. Actual related class or exact
+object metadata owns field selection; root order, identity and observed path
+scopes are revalidated. Existing projection limits and sealed paging apply.
+Root review corrected typed scope equality, native extension preservation and
+exact-object fallback when class metadata cannot establish a field's kind.
+
+Focused program evidence includes 400 passed in 54.20s before the final
+preservation and review corrections. Subsequent affected selections passed
+92 in 8.97s, 35 in 3.23s, 90 in 4.65s and 62 in 4.50s. These overlapping runs
+are not additive or a post-fix full-gate result. Original RED logs and exact
+commands remain in `r72-program-logs/waapi-r72-implementation.md` under the
+retained full-coverage evidence root.
+
+The same final candidate passed one combined read-only case per pinned macOS
+Console version: **2021.1: 1 passed in 4.97s; 2022.1: 1 passed in 8.44s;
+2023.1: 1 passed in 4.16s; 2024.1: 1 passed in 3.91s;
+2025.1: 1 passed in 4.09s**. Each case uses four public queries: AudioFileSource
+through its Sound and container, an independent Sound read, an independent
+resolved Bus read and a repeated source read. Assertions prove the two-hop
+container Volume, scoped Pitch, local versus inherited OutputBus, reference-hop
+Bus Volume and actual Sound class metadata scope while preserving root identity.
+
+All five final category records are PASS, with zero transactions, unchanged
+source hashes/mtime/tree metadata, clean process shutdown and deleted passing
+sandboxes. Each root retains twenty native packets and an independently checked
+root review. Evidence: `.waapi-skill-state/full-coverage/`
+`r72-related-paths-f9c3e813-<year>-r1/` and
+`r72-five-version-native-review.json`. No Fresh, Windows, Authoring or full gate
+was added. List composition, functions, legacy spellings and other outstanding
+query obligations remain #181 work; this is not whole-ticket completion.
+
+## 2026-10-23 R73 older association identity observation
+
+Two targeted macOS Console **2021.1.14.8108** attempts remain failed,
+with zero transactions. At `1085ff19`, **1 failed in 9.18s** after a successful
+status read: the test required currentPlatformId, which native status omitted.
+Test-only `00d9bebf` uses the existing null-GUID enabled-read convention and
+omits mutation platform only when that status key is absent and both live
+scoped fields prove `supports.unlink=false`. Present invalid platform values
+still fail; the proven 2025 explicit-platform path is unchanged.
+
+The new attempt at `00d9bebf` retained **1 failed in 4.87s**, after five
+successful public reads. The actual association returned GUID, class ID
+1572880, owner, path and ContinuePlay/FadeInTime values, but omitted `type`.
+The complete-identity gate stopped before Draft creation. This establishes a
+version-specific interface gap, not native absence or mutation success.
+Closed association/owner/child identity support remains #177 implementation
+work; no type alias or general identity relaxation is inferred.
+
+Both attempts preserve source content hashes, project mtime and tree metadata;
+process cleanup completed and failed sandboxes remain quarantined. Original
+category/observation files and checked `root-review.json` records are under
+`.waapi-skill-state/full-coverage/r73-association-1085ff19-2021-r1/` and
+`r73-association-00d9bebf-2021-r2/`. All eleven second-attempt native packet
+hashes were checked. No 2022–2024 run, 2025 repeat, Fresh or full gate was added.
+
+## 2026-10-23 R72 existing association ContinuePlay
+
+The existing public `object.setProperty` path passed a targeted macOS Console
+**2025.1.7.9143** case at `e3f224604f6e0672b192559eb34c39705b55bbd5`:
+**1 passed in 5.23s**, one verified transaction. The test resolves the current
+association GUID through Shells_Concrete's child-context output, rather than
+reusing an earlier sandbox's ephemeral GUID. Exact object-scoped metadata
+proves ContinuePlay is Boolean with an AssocParent/Enable dependency on
+SwitchBehavior=1; the owner's real int16 metadata discloses Step=0 and
+Continuous=1. Public property-state reads report enabled before and after.
+
+The separately previewed and authorized edit changes only that association's
+ContinuePlay from false to true. Independent readback preserves FadeInTime,
+observed association identity/owner, the owner's settings, the original child
+and the ordered child/context membership. Sixteen public observation commands
+(status, object queries and metadata reads) supplement the Draft transaction
+phases. All 75 retained native packet hashes were checked; final category is
+PASS, source hashes/mtime/tree metadata are unchanged, processes are cleaned
+and the passing sandbox is deleted. No runtime fix was needed.
+
+The original attempt at `e46ac6ea` retained **1 failure in 6.23s**, five
+successful reads and zero transactions. Its test incorrectly required explicit
+`parent:null`; the current query preserves native omission and reports
+`unavailable_fields:["parent"]`. The test-only repair keeps absence and null
+distinct and preserves exact before/after snapshots. That original FAIL and
+quarantined sandbox remain unchanged; its read observations are retained, but
+it grants no mutation credit.
+
+Evidence roots under `.waapi-skill-state/full-coverage/`:
+`r72-association-e46ac6ea-2025-r1/` and
+`r72-association-e3f22460-2025-r2/`, each with original category/observation files
+and `root-review.json`. Test inspection receipts are in
+`r72-association-program/`. Other-version association identities/applicability
+remain assigned #177 work; this is not five-version native effect, atomic
+object.set, Fresh, Windows or whole-ticket acceptance.
+
+## 2026-10-23 R72 Parent/Show Weight evidence reuse
+
+Read-only review of the five original Parent/Show roots at
+`5d899f1e30d42422fbd04c07ebb3490252a7477f` found sufficient native business
+evidence for the exact existing Sound.Weight condition. Ten original Weight
+transactions (two modes per version) retain matching immutable artifact hashes,
+confirmation tokens, one execution each, successful guards and independent
+readback. Sequence mode 0 changes Weight 50 to 37; Random mode 1 changes 37 to
+38. Each Weight edit preserves the parent mode and the other observed source
+fields. Metadata remains equal before/after, and isPropertyEnabled is true in
+both modes. All five original lifecycles are PASS with unchanged source hashes
+and mtimes, no recorded errors and completed cleanup.
+
+The original `agent_semantic_pass=false` values remain unchanged: these runs
+never claimed Fresh Agent acceptance. Exploratory provenance and the absence
+of newer category wrappers do not erase their actual authorization, effect and
+cleanup evidence. This assessment grants no new run or modern producer receipt.
+It withdraws the proposed five replacement native tests.
+
+The property builder/value validation and Real64 comparison retain their
+relevant ASTs. Current Show validation and metadata/identity/platform guards
+strengthen preparation without changing this native property effect. On current
+candidate `d1c4866d`, the directly affected public Parent/Show function passed
+**18 tests in 5.02s**, covering both modes for setProperty on all five versions
+and object.set on 2022.1–2025.1. This is focused program evidence, not another
+native batch or full gate.
+
+Exact five product IDs, ten transaction/artifact hashes, observation/lifecycle
+hashes and source review are retained under
+`.waapi-skill-state/full-coverage/research/` in
+`waapi-r72-parent-weight-native-reuse.md` and
+`waapi-r72-parent-weight-reuse-audit.json` (SHA-256
+`214be9d4bd7ef38ca0988960f4bcce72f6fc95134b3f404d73ba19710b852db2`).
+The current program log is `r72-parent-current-program.log` in the parent state
+directory. Exact source/evidence linkage remains #195 work; missing linkage
+must not be relabeled as missing native effect. Other condition mechanisms,
+unobserved sibling/global state and whole #177 completion are not claimed.
+
+## 2026-10-23 R71 related fixed outputs
+
+Candidate `fd1c139e44e3fd39870d5fb3c6456a281a6be86a` adds
+`--include-related RELATION BUSINESS_OUTPUT`. The closed parent/owner/work-unit
+relations share one projection record with source-reviewed fixed outputs and
+version-specific descriptors. Root identities remain unchanged; related values
+and their native object reference appear in a separate group. Fixed related
+outputs require no property metadata lookup. Existing output budgets, native
+limits, platform/language scope and sealed lossless pages remain enforced.
+
+Matching SDK descriptor/chain rows are packaged for all five versions. The new
+142 fake-client controls were resolved through focused selections, not one
+combined all-green run: five initial positives passed in 0.44s; the expanded
+selection retained 101 passes and five budget-message failures in 1.72s, then
+the corrected message passed those five in 0.44s. Twenty-six list-valued output
+and paging controls passed in 2.76s; 35 affected existing caller checks passed
+in 1.33s. The final seven source/schema checks passed in 0.53s, including the
+corrected 2024 SDK descriptor row. Original REDs, intermediate failures and exact
+commands remain in `.waapi-skill-state/full-coverage/r71-program-logs/`.
+
+Sequential macOS Console runs on this same candidate passed:
+
+| Version/build | Result |
+| --- | --- |
+| 2021.1.14.8108 | 1 passed in 4.57s |
+| 2022.1.19.8584 | 1 passed in 4.31s |
+| 2023.1.19.8928 | 1 passed in 4.06s |
+| 2024.1.13.9056 | 1 passed in 3.79s |
+| 2025.1.7.9143 | 1 passed in 4.57s |
+
+Each performs three read-only queries: the Sound with parent outputs, an
+independent exact-parent read, then a repeated Sound read. All five distinguish
+the Sound's local Volume/Pitch (0/0) from FS_Concrete's (-12/-560), preserve both
+identities, and match native packets to public projections. Total: fifteen
+reads, zero transactions. Final categories are PASS, sources remain unchanged
+and all owned processes/sandboxes are cleaned. Roots:
+`r71-related-fd1c139e-<version>-r1/` under the same state directory, with original
+packets and `root-review.json`; aggregate `r71-five-version-native-review.json`.
+
+This proves the shared scalar parent projection and identity handling. It does
+not claim separate native execution of every terminal or owner branch. Custom
+related fields, multiple declared hops, list composition and unresolved native
+outputs remain #181 implementation work. No new Fresh, full gate, Windows or
+Authoring validation is claimed.
+
+## 2026-10-23 R70 stored-reference clear and owned history
+
+Candidate `23f5b5d70e797e2ecee348033fe8421bdf3eb9b5` fixes the nullable
+`object.setReference` clear path. Its Preview binds the directly stored value
+and resolved inherited context separately; drift checks preserve both, while
+verification checks that the stored value was cleared. The public outcome
+explicitly allows an inherited reference to remain effective. Ordinary non-null
+reference assignment and its activation requirements are unchanged. Legacy
+unexecuted clear Previews require a new Preview; executed or indeterminate
+transactions are not reinterpreted or replayed.
+
+The matching five-version nullable metadata and native reference result shapes
+were checked before implementation. Focused fake-client selections cover all
+five versions, hidden local/context drift, missing/malformed observations,
+native JSON extensions, null identities, legacy state, authorization and owned
+history consumers. The final extension/control selection passed **91 in
+24.60s**; directly affected reference-presence, preservation and non-null
+activation callers passed **60 in 15.94s**. Earlier producer/consumer controls
+passed **35 in 2.01s**, targeted repaired/positive nodes **15 in 5.58s**, and
+merged Preview/history checks **9 in 4.53s**. These overlap and are not a summed
+fresh gate. Original REDs and intermediate failures remain in
+`.waapi-skill-state/full-coverage/r70-program-logs/`.
+
+One macOS WwiseConsole **2025.1.7.9143** workflow passed **1 test in 10.96s**.
+It uses one isolated lifecycle, three separately previewed/confirmed/executed
+and verified transactions (clear, undo, redo), and twelve independent reads.
+The Sound's stored Thunders Attenuation becomes the zero GUID while inherited
+Footsteps remains effective and OverridePositioning remains false. Undo
+restores the original local reference; redo restores the cleared state. The
+ancestor and peer remain unchanged after every step. Final category evidence
+is PASS, source hashes/mtime/tree metadata are unchanged, processes are cleaned
+and the passing sandbox is deleted.
+
+Evidence: `r70-stored-clear-23f5b5d7-2025-r1/` under the same state root, including
+original category records, observation packets and `root-review.json`. This
+proves receipt-bound history effects on the observed objects, not global undo
+stack ownership, preservation of unobserved project state, or a new automatic
+rollback mechanism. Five-version R69 read evidence is reused for the stored vs
+inherited distinction; it is not five-version clear/undo execution evidence.
+No Fresh, broad gate, Windows or Authoring run is claimed. Remaining #177,
+#181 and #192 obligations stay open.
+
+Published candidate `3c19b324` subsequently ran the hosted pure-code preflight:
+**825 passed / 1 failed in 46.39s** (run `39854162870`). Its only failure was
+the reviewed operation-schema aggregate. Exact comparison of all 149 lanes
+proved that only the five setReference null-target descriptions changed; the
+other 144 remained identical. Test-only repair `89f26343` adds the new aggregate
+and exact prior-lane substitutions while preserving all fifteen historical
+aggregate assertions. The original failed node passed **1 in 0.37s**; an
+intermediate historical-inverse failure is retained. Original CI logs, exact
+schema deltas and the focused repair are archived in `r70-program-logs/` and
+the adjacent `r70-published-ci-*` files. No native rerun was needed for this
+test-contract correction.
+
+## 2026-10-23 R69 directly stored reference values
+
+Candidate `850b163b8b56298c3d4dfa88db41e83d2fc1f6fa` adds the closed
+`--include-local-reference` mode, with fresh live reference discovery and
+separate `local_references` results. Ordinary reference reads retain their
+existing override-resolved behavior. The shared field-mode table preserves
+property modes, result bounds, paging and exact terminal output. Matching
+five-version SDK Return Options evidence is packaged with exact page/build
+and section hashes; no installed SDK is required at runtime.
+
+New fake-client controls ran as bounded selections: the expanded file retained
+**105 passes / 15 test-fixture failures in 6.08s**; correcting parser/cap/inventory
+fixture assumptions and rerunning only the affected parameterized functions
+passed **75 in 3.40s**. The existing affected regression selection retained
+**140 passes / 2 source-hash assertion failures in 4.68s**. Exact older-version
+HTML hashes corrected those two guards (**2 passed in 0.34s**); the final
+source-packaging guards passed **5 in 0.38s**. Together these selections resolve
+the new 120 controls and affected existing checks; they are not a single fresh
+combined all-green run. Original REDs, intermediate failures and exact commands
+remain in `.waapi-skill-state/full-coverage/r69-program-logs/`.
+
+Sequential real macOS Console cases all passed on the same candidate:
+
+| Version/build | Result |
+| --- | --- |
+| 2021.1.14.8108 | 1 passed in 9.23s |
+| 2022.1.19.8584 | 1 passed in 8.17s |
+| 2023.1.19.8928 | 1 passed in 8.76s |
+| 2024.1.13.9056 | 1 passed in 7.47s |
+| 2025.1.7.9143 | 1 passed in 8.51s |
+
+Each case performs five read-only queries on existing source-selected objects.
+It proves that the Sound stores Master/Main Audio Bus and Thunders Attenuation
+while resolving SFX and Footsteps Attenuation from its ancestor; its local
+OverridePositioning remains false. Exact native packets and public groups agree,
+the ancestor's values and both Bus identities are read independently, and the
+Sound repeats unchanged. All final category records are PASS, with zero
+transactions, unchanged source hashes/mtime/tree metadata, clean process
+shutdown and deleted passing sandboxes.
+
+Roots: `.waapi-skill-state/full-coverage/r69-local-reference-850b163b-<year>-r1/`;
+each has `root-review.json`, original packet hashes and captured Attenuation
+metadata. The aggregate is `r69-five-version-native-review.json`. The captured
+nullable/inherited reference facts also support the separate clear-verifier
+repair; they do not prove a clear mutation. No Fresh, full gate, Windows/Authoring
+or inventory regeneration is claimed. Related-field projections and other #181
+branches remain assigned work.
+
+## 2026-10-23 R68 Blend Track output and field-refinement guidance
+
+Candidate `f437f57cfa22cf03d0983be66dfc3864940a00c0` exposes the fixed
+`query-object --include blend-tracks` output on the source-proven 2024.1/2025.1
+lanes. Its schema cites the matching return-expression enum, native addTrack
+read guidance and object-return pattern union. It does not invent a narrower
+accessor-specific schema. Earlier versions retain an explicit unavailable
+packaged route, not a claim of native absence.
+
+The selected fake-client run passed **169 tests in 8.25s**: versioned discovery
+and dispatch, unchanged native order/extensions, false/zero/empty/null/absence,
+advanced-query composition, duplicates, bounded result paging and result drift.
+The same batch repairs custom-field refinement guidance to retain the originally
+requested ordinary/override-source mode. No-match followed by refinement proves
+the intended native accessor remains selected. The output audit now accounts
+for return-expression enum entries as well as named result properties; new
+unclassified enum entries fail the check. Legacy spelling reconciliation,
+2025 `states` semantics and the native spelling conflict remain explicit #181
+questions rather than assumed equivalences or automatic public inputs.
+
+Sequential native macOS Console runs on that same candidate each passed once:
+**2024.1.13.9056: 1 passed in 7.40s**;
+**2025.1.7.9143: 1 passed in 8.74s**. Each reads an existing Blend Container's
+track list, independently resolves both exact track GUIDs, then reads the owner
+again. Original native packets and public output agree on the On-Load/Off-Load
+track identities, names and order. All four reads per version completed; there
+were no transactions. Source hashes/mtime/tree metadata were unchanged, process
+shutdown was clean and the passing sandbox was deleted.
+
+Evidence roots: `.waapi-skill-state/full-coverage/r68-blend-tracks-f437f57c-<year>-r1/`,
+with per-root `root-review.json` and aggregate `r68-two-version-native-review.json`.
+Observation SHA-256 values are
+`1ded5b8c706ac15f4b492d1357575a77de4cefdcf4e5af60808fd94c6194fc9a`
+and `475a47855caba9c8837b612baf649d82ff356660631227f4ec840b9e9c11388c`
+for 2024 and 2025 respectively. Original RED/intermediate audit failures and
+final code-test stdout remain in `r68-program-logs/`; they were not regraded.
+No new Fresh, broad gate, Windows/Authoring, inventory regeneration or historical
+source-evidence rebinding was performed. R67's native property results remain
+valid without rerunning them for the refinement guidance change. #181 stays open.
+
+## 2026-10-23 R67 property values at the source of override
+
+Candidate `29cb2291ba87d67c1058dae6f5e77c106c25c302` adds the closed
+`query-object --include-override-source-value` option. Ordinary property values
+and values at their source of override can be requested together and remain in
+separate result groups. The Gateway owns native accessor construction; this is
+not ancestor identity or a runtime RTPC/audio result.
+
+Five-version fake-client controls cover exact dispatch, disclosure provenance,
+false/zero/null/absence, metadata scope, invalid declarations, duplicate output
+aliases, paging and continuation drift. The affected four-file run retained
+**623 passes / 2 stale baseline assertion failures in 77.62s**. Correcting only
+the old 2021 diagnostic-message expectations and running the failed/new/directly
+affected selection produced **127 passes in 4.71s**. Original logs and source
+notes are preserved under `.waapi-skill-state/full-coverage/r67-program-logs/`.
+
+The same read-only native test ran sequentially on five independently owned
+macOS Console sandbox copies, all on that single candidate:
+
+| Version/build | Result |
+| --- | --- |
+| 2021.1.14.8108 | 1 passed in 8.71s |
+| 2022.1.19.8584 | 1 passed in 8.40s |
+| 2023.1.19.8928 | 1 passed in 8.43s |
+| 2024.1.13.9056 | 1 passed in 7.93s |
+| 2025.1.7.9143 | 1 passed in 5.02s |
+
+Each case reads the child Sound, its parent and the same child again. Native
+packets and public results independently retain child `3DSpatialization=0`,
+`OverridePositioning=false`, and source-of-override value `2`; the parent's
+own and override-source values are both `2`, with its override enabled.
+All final category records are PASS, with no transactions, unchanged source
+hashes/mtime/tree metadata, clean process shutdown and deleted passing sandboxes.
+Exact roots are `.waapi-skill-state/full-coverage/r67-query-override-29cb2291-<year>-r1/`;
+the per-root `root-review.json` and aggregate `r67-five-version-native-review.json`
+pin original observations and hashes. No Windows, Authoring, Fresh or full-gate
+evidence is added; #181 remains open for its other query branches.
+
+## 2026-10-23 R66 existing-field metadata and staged PlaylistSlot edits
+
+Public fake-client tests reproduced a shared `object.set` omission: metadata
+without activation dependencies was not retained for execution/verification
+drift checks. The ordinary reference controls produced **8 failures / 4 passes**
+across 2022.1–2025.1, then **12 passes** after using the existing guard for every
+consumed field. At `99d31eca`, the selected final run passed **41 in 13.20s**,
+including ordinary scalar/reference drift, notes-only changes without metadata
+queries, conditional callers and the native 2021.1 operation boundary.
+Original focused logs are retained in
+`.waapi-skill-state/full-coverage/r66-compound-program-logs/`.
+
+The simulated direct PlaylistSlot `object.set` success did **not** establish
+native support. The first native attempt at `99d31eca` failed in the test helper
+before a transaction: it assumed the wrong field-discovery projection
+(1 failed in 5.63s). Reusing the existing projection helper passed its two
+controls in 0.51s. The second native attempt at `c770e807` reached `object.set`
+and was rejected by Console 2025.1.7.9143 with `ak.wwise.unexpected_error`,
+`objectType: 50`, and `Can't process object type` (1 failed in 5.57s).
+Transaction `tx1-dbdr5e98xjqb8szgr6ye` remains indeterminate; it was not verified
+or replayed, and no unchanged sandbox write outcome is inferred. Both original
+FAILs and quarantined sandboxes remain preserved. These observations do not
+establish absence of every possible owner-list or other-host update form.
+
+Candidate `eba0e2bb` then completed the business outcome through existing
+`object.setNotes` and `object.setReference` routes: **1 passed in 7.69s** on
+Console 2025.1.7.9143. Each stage had a separate immutable Preview, authorization,
+execution and verification; the second Draft rebound the independently observed
+post-notes object. Sixteen bounded query observations proved exact final notes
+and reference, unchanged peer, ordered list membership, owner and target.
+Both transactions reached `verified`; source hashes/mtime/tree metadata were
+unchanged, processes exited cleanly and the passing sandbox was deleted.
+This is a two-step workflow, not an atomic `object.set` success.
+
+The reviewed final code at `0534b7ca` withdraws the direct-slot admission and
+its simulated success expectations. It retains the generalized metadata guard
+and rejects direct existing-slot `object.set` before Preview with a scoped
+diagnostic and the separately previewed alternative. Final affected checks
+passed **44 in 12.68s**; the final guidance/zero-write controls passed **9 in
+1.71s**. The existing standalone reference helper is unchanged from R64.
+
+Original native roots are under `.waapi-skill-state/full-coverage/`:
+`r66-playlist-compound-99d31eca-2025-r1`,
+`r66-playlist-compound-projection-2025-r2`, and
+`r66-playlist-staged-eba0e2bb-2025-r3`. The final observation SHA-256 is
+`ca7568395c684d551dd2d55cf4916ea1cc5c03c1a5533a63b50806c9180f71be`.
+No Fresh, broad gate, inventory regeneration or historical evidence rebinding
+was performed for this runtime slice. #177/#178/#180 and consolidated #195
+acceptance remain open; no whole-ticket or whole-goal completion is claimed.
+
+## 2026-10-23 R64 existing PlaylistSlot reference change
+
+Candidate `ee55f8e5` passed one public-Gateway mutation on macOS Console
+**2025.1.7.9143: 1 passed in 6.04s**. The existing unnamed PlaylistSlot was
+bound by its exact native class, its `PlaylistObject` field was discovered,
+and one separately previewed and authorized transaction changed its reference
+to a direct child of the owning RandomSequenceContainer. Thirteen independent
+bounded query observations established the requested target, unchanged peer,
+unchanged list order/membership, and unchanged owner and target identities.
+The transaction reached `verified`; source hashes, mtime and tree metadata
+were unchanged, the process exited cleanly, and the passing sandbox was deleted.
+
+Original log, final lifecycle record, observation and Root review are retained
+under `.waapi-skill-state/full-coverage/r64-playlist-effect-ee55f8e5-2025-r1/`.
+The observation SHA-256 is
+`52b157ba15d0f98949ef03c1bdb24e0e19bac4104e0b78bc485fe99a9d5ee1a6`.
+The fixture's separate Authoring-host boundary grants no Authoring coverage.
+
+At `23008fa31`, affected fake-client tests passed **1291 in 290.24s**, including
+55 new Playlist cases. This result is retained as an explicitly transcript-derived
+receipt (`r64-playlist-23008fa31-focused-transcript-receipt.json`); original stdout
+was not saved to a file. Review then reproduced an unproved rename reaching a
+Preview. A class-specific `OBJECT_NAME_MUTABILITY_UNPROVEN` guard at `ee55f8e5`
+passed **19 focused checks in 1.55s**; the original RED and final logs are retained
+under `.waapi-skill-state/full-coverage/r64-playlist-rename-*.log`.
+That guard does not claim Wwise prohibits renaming this class.
+
+No full Program/Non-live, Fresh or older-version native gate ran for this slice.
+The 2023/2024 list-level variants, new-slot construction and unproved name
+semantics remain work under #177/#178/#180. This result closes only the tested
+existing-slot reference outcome; it does not close any of those tickets or
+refresh historical branch-completion evidence automatically.
+
+The follow-up interface-inventory check found older unreconciled seals. Extracted
+contracts are identical at `ee55f8e5`, `518edce3` and `09ae4b8e`; the Playlist
+slice adds no contract-row drift. The prior difference from policy `c5b93c31`
+is 13 operation rows, two parser rows and one Topic continuation row, with no
+added/removed rows. A provisional interface regeneration succeeded in a separate
+worktree, but dependent branch generation failed on the historical Source
+attachments: all five versions have the same five changed runtime-file hashes
+among 547 source keys. The incomplete reconciliation is not merged or counted
+as a passing inventory check. Preserve the original evidence; consolidate the
+source review and dependent inventories once the runtime batch settles, before
+the required final gates under #195. No native recapture was performed for this
+bookkeeping failure.
+
+## 2026-10-21 R62 targeted PlaylistSlot metadata observation
+
+Candidate `7572b2d7` ran one read-only observation on macOS Console
+**2025.1.7.9143: 1 passed in 4.73s**. Two public Gateway calls listed the
+`PlaylistSlot` class fields and read the selected `PlaylistObject` detail.
+Native metadata confirms class 5636096, `mustChildOf`, `notNull`, and reference
+type labels `Container`, `Switch Container`, `Blend Container`, and `Sound`.
+This establishes the exact metadata shape, not hierarchy semantics, mutation
+effects or complete playlist support.
+
+The existing sandbox lifecycle recorded no transactions, unchanged source file
+hashes/mtime/tree metadata, clean process shutdown and sandbox deletion. The
+final category record is line 289 of the local
+`.waapi-skill-state/evidence/full-typed-input/macos-category-evidence.jsonl`.
+The observation and original pytest log are under
+`.waapi-skill-state/full-coverage/r62-playlist-metadata-7572b2d7-2025-r1/`.
+
+Two focused public-Gateway fake-client controls passed in **0.38s**, including
+rejection of a missing native flag. An earlier test collection skipped because
+it imported the live-only module; the observer was separated from that fixture
+before the passing run. No full Program/Non-live or Fresh gate ran. The 2023/2024
+list-level variant and 2025 existing/new-slot implementation remain work under
+#177/#178/#180. Historical branch inventories are not refreshed by this scoped
+collection.
+
+## 2026-10-21 R60 focused schema-seal follow-up
+
+GitHub pure-code preflight on `99d8f115` reported **825 passed / 1 failed in
+64.42s** (run `39549064298`). The sole failure was the non-object-set operation
+schema aggregate. An isolated comparison with `7f457d01` established that only
+the four 2022.1–2025.1 `object.setRTPC` contracts changed: owned ControlInput
+construction, result bindings and their constraints. The other 145 contracts,
+existing identity alternatives and required arguments remain unchanged.
+
+The test now protects the new aggregate and retains all historical aggregates
+using the four exact previous RTPC seals. An initial focused attempt exposed
+the still-stale historical aggregate (1 failed in 0.42s); after preserving that
+history explicitly, the same node passed in **0.40s**. No other local tests were
+rerun. This test-only edit is absent from all R59 capture source maps; it grants
+no new native, Fresh or broad-gate acceptance. The original CI failure remains
+historical evidence.
+
+## 2026-10-21 R59 Source completion and portable evidence integration
+
+Candidate `4e3c2800` passed the **65-case program capture in 62.09s** after
+repairing the Source selector binding and admitting the exact 26 Source branches
+to the default product evidence policy. Five original version-specific Source
+native attachments were reused without rerunning Wwise. The actual default
+completion evaluator now verifies **91 branches: 65 metadata and 26 Source**.
+The metadata policy requires native evidence for 60 branches and program evidence
+for the five version-specific default-absence branches. Topic's 559 branches
+still lack required native evidence; overall completion remains false.
+
+The original import attempt exited unsuccessfully because its final assertion
+read the inventory scaffold before applying evidence bindings. Its result is
+preserved as failed. A separate read-only evaluation verified the completed
+artifact effects, all **11,241 previous archive files** unchanged, and the same
+651 binding identities. Official inventory generation/check and semantic
+preservation review passed: 650 selected evidence rows changed, with obligation
+identities, shapes, owners and unrelated rows preserved. The successor local
+coordinator uses the actual completion evaluator; no import was replayed.
+
+Post-import checks reported **4 passed / 1 failed in 318.35s**. The failure was
+an obsolete test expectation that all 65 metadata branches required native
+evidence. After aligning that oracle with the approved 60/5 policy, only the
+failed node was rerun: **1 passed in 35.84s**. This test-only change leaves the
+captured candidate identity unchanged. These are separate runs, not a single
+five-test passing run.
+
+No new native, Fresh Agent, Windows-host or full Program/Non-live gate ran in this
+integration. The historical full Program failure is not superseded. Detailed
+terminal receipts and the separate read-only verification are retained under
+`/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-diagnosed-r5/`; original failed
+attempts remain intact.
+
+## 2026-10-21 R58 settled Source and evidence integration
+
+Source/bridge candidate `35410b7e` passed **49 affected controls in 80.70s**
+and one **60-case capture in 19.14s**. All four interface semantic seals and
+existing generated interface artifacts matched; no interface refresh was needed.
+One additive import and branch generation/check passed. Artifact candidate
+`f5a6487e` then passed the two existing portable-product checks in **30.33s**,
+with source/HEAD unchanged and no remaining owned process groups.
+
+The import preserved all **2,683 earlier archive files** and added 1,096 files /
+128,655,875 bytes. All 625 selected bindings and 272,313 native obligation
+identities, shapes and owners remain intact. Only 624 Topic/metadata evidence
+rows changed. Metadata remains 65 program facts / 60 historical native facts /
+5 missing default-absence requirements; Topic remains 559 program facts with
+559 native requirements missing. Original native candidates and current program
+sources retain their separate attribution. Five scoped Source business rows do
+not yet grant generated native credit; the #180 attachment reader remains work.
+
+The native component results below belong to their frozen candidates. This
+integration ran no Wwise, Fresh Agent, Windows native or broad regression gate.
+The historical full Program failure is not superseded. Fixed preflight runs on
+GitHub only. Detailed terminal receipts are retained under
+`/tmp/waapi-r58-integration/run-settled-r1/`.
+
+## 2026-10-21 R57/R58 scoped native Source copy and Save
+
+The [Source fact ledger](../docs/plans/full-waapi-coverage/SOURCE_COPY.md) pins
+original receipt hashes and separates raw diagnostic flags from Root's exact
+effect assessment. The 2021.1 repeated two-property Synth graph on `6d4a3547`
+passed one native node in 16.06s. Frozen `411e8173` then passed the modern existing
+Synth/RTPC/ModulatorLfo/Curve node sequentially on Console 2022.1.19.8584,
+2023.1.19.8928, 2024.1.13.9056 and 2025.1.7.9143 in 15.91/17.50/16.00/16.32s.
+Each run had four separately authorized transactions, independent saved-file
+and live-state oracles, unchanged sources and terminal cleanup. These are
+component native results, not current-integration test runs. The Source fact
+adapter remains required #180 implementation; no generated branch count,
+constructor, other-class, Windows or Fresh acceptance is inferred.
+
+## 2026-10-21 R55/R56 saved-copy, Tone and portable metadata integration
+
+Accepted runtime/harness sources are Source saved-copy `ee78f00b` with explicit
+Save-choice disclosure `4a6208a1`, full task consumers `20c8dcc8`, stationary
+square `8d015764`, stationary triangle `4521245a`, and exact historical/current
+metadata-source bridge `514c8100`. The current Program roster has **272 modules**;
+that count is not a completed full gate.
+
+The saved-copy protocol has scoped native evidence on Console 2021.1.14.8108:
+one case at `cd272949` passed in **10.40s**, with separately authorized baseline
+and final Save children, one copy, and an independent saved-XML oracle. It covers
+the exercised Synth/RTPC/LFO/Curve graph with zero ObjectRefs. The original
+collector category remains diagnostic; arbitrary graphs, ObjectRef remapping and
+history are not certified. Full formal task-consumer program checks subsequently
+exercise the actual Broker, grader, archiver and mandatory campaign reader,
+substituting only the external Codex process and existing fake WAAPI boundary.
+The final dirty-flow/classifier selection passed **2 in 19.44s**; read-only and
+topology controls passed separately. Earlier component-only checks and mixed
+failed attempts retain their original scope and verdicts. No Fresh run follows.
+
+Stationary square/triangle checks preserve the requested cadence and gain under
+their disclosed numerical tolerance. Triangle's final affected selections passed
+**13 in 6.38s**, then **3 in 1.67s** after constant precomputation. These are
+separate program selections, not a combined gate. The actual retained triangle
+WAV is replayed byte-identically; its original diagnostic result is unchanged.
+Missing phase witnesses remain partial, and envelope/noise/fractional and other
+unverified Tone branches remain required. The exact metadata bridge passed
+**19 in 41.07s**, including strict rejection of unknown or omitted source proofs.
+
+Four sequential read-only native collections on frozen `860965d3` (2021–2024)
+observed six fields providing ten exact empty-string/Boolean witnesses. Their
+34 public calls and 82 native packets are retained in **262 sealed files /
+1,607,698 bytes**. Source projects and cleanup checks passed. These observations
+supplement the earlier R51/R54 originals; no default-absence claim is inferred.
+
+Integration capture source `0377d16b` passed **60 selected cases in 20.47s**
+(wrapper 21.12s), with no skips or source drift. Interface generation/check passed
+in **16.591s / 16.839s**. The preceding `settled-r1` stopped before capture because
+the reviewed new continuation command lacked its parser-policy seal; that failed
+attempt remains preserved. Only the reviewed seal and derived inventory changed
+before the fresh `settled-r2` capture.
+
+Artifact commit `3f8f3146` preserves all **1,587 earlier archive files** and adds
+1,096 files / 128,638,233 bytes through the existing importers. Thirty-five program
+entries were refreshed; historical native attachments are exactly **9 R51 +
+41 R54 + 10 R55**. Full original/current source maps and native bytes remain
+separate: attribution is historical-native/current-program, not current-native.
+Branch generation/check passed in **63.620s / 62.875s**. All 272,313 native
+obligation identities, shapes and owners remain exact; only the selected 624
+Topic/metadata evidence rows changed. Current accounting is **65 metadata program
+passed, 60 live_metadata passed, 5 absent-default requirements missing**;
+**559 Topic program passed, 559 native requirements missing**. Overall completion
+remains false: 60 verified, 565 implemented_unverified, 271,572 unresolved and
+116 approved exclusions.
+
+On clean `3f8f3146`, the two actual portable-product checks passed **2 in 27.97s**
+(wrapper 28.70s), with original context variables cleared, no local-evidence
+fallback, independent program proof, unchanged source and empty owned process
+groups. The fixed preflight is reserved for GitHub and was not repeated locally.
+Exact commands, logs and preservation receipts are under
+`/tmp/waapi-r55-integration/run-settled-r2`; captures remain under
+`.waapi-skill-state/read-evidence-r55-settled-r2`. The earlier full Program result
+remains FAIL (13,529 passed, 7 failed, 4 skipped). This integration is not full
+Program/Non-live, Fresh, Windows or whole-ticket acceptance.
+
+## 2026-10-21 R54 Source-copy, closed Save and five-version class metadata
+
+Conflict-free merge `55865039` incorporates accepted class source `8a8d5f8e`,
+including Source-copy `a8d30c5b` and Save `ae7e6e29`. Source-only copy now reports
+its certified default-view fields/owner-frame scope explicitly; complete-copy
+preservation stays false. Closed project Save is available on all five versions:
+2021.1/2022.1 accept an empty business plan; 2023.1–2025.1 preserve optional
+Boolean checkout choices and omission. Normal authorization/execute-once rules
+and the `result_schema_checked` Save boundary remain intact.
+
+The fixed Program roster now has **271 entries**: the three new worker modules
+plus the actual portable product-attachment integration module. This is a roster
+count, not a full Program run. Accepted worker-focused evidence remains bound
+to its original source and was not repeated wholesale.
+
+Interface generate/check passed once in **17.879s / 17.277s**, with unchanged
+artifacts. The complete native class closure is **560/560 byte-identical** from
+frozen `8a8d5f8e` to clean capture source `e860aed1`; the standalone integration
+test and roster edits are outside that closure. One existing 38-node capture
+then passed **38 in 7.56s** (wrapper 8.175s): five Topic cases, 30 metadata
+cases and three R51-native/current-public replays. HEAD/all 2,763 tracked files
+stayed exact. Fresh source closures contain 349 Topic / 344 metadata /
+348 current replay files; the historical closure remains separately retained.
+Current source identity is
+`199e696ed430594a5c39b518082ee2e5bca2d9b812aa2f49facd0a0636325e9c`.
+
+Root separately reviewed one sequential native class attempt per version on
+frozen `8a8d5f8e`; all five passed with source/fixture/cleanup proof. Exact
+builds are 2021.1.14.8108, 2022.1.19.8584, 2023.1.19.8928, 2024.1.13.9056 and
+2025.1.7.9143. Sixteen actual field reads provide **41 exact leaf witnesses**,
+by version **1 / 10 / 9 / 9 / 12**: Boolean true/false, null, number and empty
+string alternatives as actually returned. All defaults were present; no absence
+proof follows. The original five runs used 59 public Gateway calls and sealed
+474 files / 2,646,283 bytes. Root's independent receipt is
+`.waapi-skill-state/full-coverage/r54-root-class-native-review.json`.
+
+Import `253ed73d` uses the existing portable importers and accepted class
+attachment writer. All 838 earlier archive/projection files and non-replaced
+index entries remain exact. Thirty-five fresh Topic/metadata entries and nine
+fresh historical replay attachments replace only their selected predecessors;
+41 class descriptors are additive. Each native original/seal is copied
+byte-identically, with its native input and full original/current source proof;
+program evidence remains independent. Additive storage is **749 files /
+58,728,162 bytes**: Topic 25 / 37,704,043; metadata 150 / 5,397,147;
+replay 33 / 11,443,951; class originals/attachments 541 / 4,183,021.
+
+Branch generate/check passed once in **46.113s / 45.709s**. All 272,313 native
+IDs/shapes/owners, 116 exclusions, requirements/native policy, interface bytes
+and 79/91 source/index memberships remain exact. The 625 selected bindings
+comprise 559 Topic + 65 metadata + one unchanged Move binding; only the 624
+refreshed Topic/metadata rows change evidence/binding fields. Current accounting:
+**559 Topic program passed / 559 native missing**; **65 metadata program
+passed / 50 live_metadata passed / 15 missing**. The 50 retain nine historical
+R51 witnesses separately from 41 current-native class witnesses. Remaining
+alternatives stay assigned and required. Completion remains false:
+50 verified, 575 implemented_unverified, 271,572 unresolved and 116 exclusions.
+
+Generated candidate `25372579` passed one final **3-test focus in 16.43s**
+(wrapper 17.158s): roster assertion, portable R51 originals and the actual
+committed class product attachments. The actual product test blocked all
+machine-local `.waapi-skill-state` reads, unset the original-root environment,
+validated exact native/runtime source binding through the strict product reader
+and independently required all 65 program facts. No skips; HEAD/all 3,512
+tracked files stayed exact and every owned group exited. No synthetic class
+positive substitutes for this actual archive check.
+
+The earlier R53 production Source-only native diagnostic also remains bound to
+`a8d30c5b`: one 2021.1.14.8108 attempt, **1 passed in 11.39s**, 67 public calls,
+four separate transactions and 18 scoped runtime assertions. Its independent
+saved-image oracle proves the genuine Synth fixture's serialized owned graph;
+runtime full-copy authority/history remains open. Save reply validation alone
+does not establish persistence, and ObjectRef remapping was not exercised.
+
+Plans, exact commands, process/source/output and storage/preservation receipts
+are in `/tmp/waapi-r54-integration/`; current captures are under
+`.waapi-skill-state/read-evidence-r54/`. This merger launched no native, Fresh,
+full Program/Non-live gate, local fixed preflight, install, push or PR edit.
+Root owns publication and exact-head hosted CI; no main merge or ticket/family
+completion is claimed. Original evidence and failed quarantines are retained.
+
+## 2026-10-21 R52 saved-copy, Tone and exact metadata attachments
+
+Runtime merge `191382e0` combines only accepted saved-copy `56a7c376`
+(including `90c1089b`), Tone `7f3c360d` (including `005afc69` and `70f3ff0c`),
+and metadata `5a5eeda4`, without conflicts. The shared destructive collector
+combines both accepted additions; all other component files retain exact
+accepted blobs. The Program roster adds `test_metadata_replay_attachments.py`
+and its canonical required-entry/count assertion: 267 manifest entries.
+
+Interface generate/check passed once in **18.174s / 17.963s**; generated
+artifacts stayed byte-identical. Clean source `d1d9dd64` then received one
+38-node capture: **38 passed in 7.86s** (wrapper 8.548s), comprising the existing
+five public Topic and 30 metadata nodes plus three public replays of preserved
+R51 metadata packets. HEAD/all 2,549 tracked files stayed unchanged. Full
+closures remain 348 Topic / 343 metadata / 347 current replay files; the bridge
+also retains all 343 historical sources. Source identity:
+`32f90e32adca4c9cca68b7e831a3f0bba2ef9d93d4f08ffa1d5d84c1e6de8c76`.
+
+Existing portable importers select 35 fresh entries with 140 byte-identical
+originals and locator-only projections. The whole replay tree is copied
+byte-identically, with nine additive sealed `live_metadata` attachments; original
+program receipts remain unchanged. All 630 earlier archive/projection files and
+non-replaced index entries remain exact. New storage is 25 Topic files /
+37,625,197 bytes, 150 metadata files / 5,384,023 bytes, and 33 replay files /
+11,439,167 bytes. No old archive or failed sandbox was deleted.
+
+Branch generate/check passed once in **40.398s / 39.084s**. Strict current
+accounting proves **559 Topic program passed / 559 native missing**, and
+**65 metadata program passed / 9 live_metadata passed / 56 missing**. The nine
+leaves are only original 2021.1.14.8108 Console RTPC reads: Color default 0
+(five), ControlInput default null (two), OverrideColor default false (two).
+Historical native execution and current injected public replay retain separate
+identities; no current-native, mutation or other-host/version proof follows.
+All 272,313 IDs/shapes/owners, 116 exclusions, requirements/native policy and
+79/91 source/index memberships stay exact. Only 624 selected rows'
+evidence/bindings change; complete=false, with 9 verified,
+616 implemented_unverified and 271,572 unresolved obligations.
+
+Generated `3973fb63` passed one focus: **9 passed in 12.11s** (wrapper 12.820s).
+The portable-originals test actually ran with `WAAPI_R51_METADATA_ORIGINAL_ROOT`
+absent and no skips, alongside exact Tone bridge acceptance/drift/partial-bridge
+controls, compact 36-channel and large-marker terminal delivery, fixed manifest,
+Topic selection and saved-copy protocol. HEAD/all 2,757 tracked files stayed
+unchanged; all owned groups ended empty. Strict portable evaluation already ran
+during branch generation/check; complete worker suites were not repeated.
+
+Separately accepted native evidence stays bound to its original candidates.
+Saved-copy `56a7c376` on 2021.1.14.8108 passed its one diagnostic node in
+**11.07s**: four separately previewed transactions (baseline Save, empty Sound,
+Source-only copy, final Save), 67 public calls and independent complete saved
+subtree/live identity/owner/ShortID comparison. Save phases remain
+`result_schema_checked`; create/copy phases are `verified`. The final collection
+stays diagnostic-only, `business_effect_verified=false`. One genuine Synth
+fixture exercises no ObjectRef remapping and proves no generic copy/history,
+constructor or points-getter contract. Earlier native failures remain unchanged.
+
+Tone `7f3c360d` on 2025.1.7.9143 passed its one diagnostic node in **9.39s**:
+one 36-channel anonymous fifth-order-count sine/float32 envelope transaction,
+12 public replies and one native Tone call. Its transaction is `verified`,
+`business_state_verified=true`, under the declared artifact policy: exact
+header/count/mask/frame facts and all 108 channel/segment observations, fixed
+frequency/gain/linear envelope, independent phase per segment. Its original
+collector category remains blocked/diagnostic, `business_effect_verified=false`,
+without coverage credit. Phase continuity, internal channel-config type, other
+waveforms, 2023/2024 native effects, other patches and Windows remain open.
+Root's independent integrity review remains in
+`.waapi-skill-state/full-coverage/r52-root-native-review.json`.
+
+Plans, process/source/output receipts and preservation/storage proofs are in
+`/tmp/waapi-r52-integration/`; captures are under
+`.waapi-skill-state/read-evidence-r52/`. This integration ran no native, Fresh,
+CLI Agent, install, full Program/Non-live, local fixed preflight, push or PR edit.
+Root owns publication and exact-head hosted CI; no ticket/family closure or
+main merge occurred.
+
+## 2026-10-21 R50 exact created-Topic evidence and original-only diagnostic
+
+Runtime merge `8bcd215f` combines only accepted Topic `8390ce8b` (including
+`b1617894`) and original-only diagnostic `cbd067c2` from `17c0ffd3`, without
+conflicts. All nine component files retain exact accepted blobs. The Program
+manifest adds `test_created_topic_branch_evidence.py` with its canonical
+required-entry assertion, for 266 manifest entries. No packaged runtime,
+resources, guidance, public contract or interface seal changed; exact interface
+artifact/policy proof justified skipping interface regeneration.
+
+Clean combined source `470b9248` received one existing 35-node capture:
+**35 passed in 6.88s** (wrapper 7.448s), comprising five actual public Topic
+nodes and the 30 existing metadata nodes. Metadata recapture was required by
+one actual changed whole-file seal, `branch_audit_completion.py`, and the
+changed requirements identity. Its 343-file closure and the Topic's 348-file
+closure remained exact; all 2,364 tracked files and HEAD stayed unchanged.
+
+The reviewed importers selected five Topic and 30 metadata entries, copying
+140 original JSON files byte-for-byte and changing only program locators in
+35 projections. All 469 prior evidence files, including R26/R47/R49, remain
+byte-identical. Topic artifacts occupy 37,625,113 bytes in 25 files; metadata
+artifacts occupy 5,383,723 bytes in 150 files (43,008,836 bytes total). These
+immutable archives were retained without format redesign or another capture.
+
+Branch generate/check each passed once after capture/import, in
+**37.722s / 37.078s**. Existing strict evaluation proves **559 exact Console
+object.created primitive publish leaves program passed / 559 native missing**
+(79/112/116/116/136 across 2021–2025) and **65 metadata program passed / 65
+live_metadata missing**. Injected callbacks establish no native emission,
+applicability, include/omission, co-occurrence or lifecycle behavior. All other
+4,343 created-Topic rows stay unproven. All 272,313 obligation IDs, shapes and
+owners, original R26, all 116 exclusions and 79/91 source/index memberships
+remain exact. Only the selected 624 rows' evidence/requirements/bindings change;
+complete=false, with 625 implemented_unverified and 271,572 unresolved.
+Current source identity is
+`e2c47fbef9e63023f219039924e86a59350e8a6d94b2cc3d933d639f147b0673`.
+
+On generated candidate `987fe1c2`, one deduplicated focus passed **5 tests in
+4.08s** (wrapper 4.702s): fixed manifest, exact Topic selection, existing metadata
+public-leaf compatibility, diagnostic first-hop failure/no-write/no-fallback,
+and the existing copy category's actual v3 validator. Strict current portable
+evaluation was already performed by branch generation/check and was not
+repeated by another broad pytest evaluation. All 2,539 tracked files and HEAD
+stayed unchanged; every owned process group ended empty. Original plans,
+process/source/output receipts, import/storage and preservation proofs are in
+`/tmp/waapi-r50-integration/`; fresh ignored capture roots are under
+`.waapi-skill-state/read-evidence-r50/`.
+
+The separately completed native root
+`r50-original-owned-read-cbd067c2-2021-r1` remains its original **FAIL, 5.98s**
+(wrapper 6.591s): the first bounded Source `@RTPC` query failed natively with
+`ak.wwise.query.invalid_query`, `Unknown property RTPC (61)`. Eight public calls,
+31 native archives, zero writes/transactions; all 18 Source fields were observed,
+but RTPC membership, ControlInput/LFO, Curve fields/points and copied graph
+were not reached. Source hash/size/mtime/tree and candidate stayed unchanged,
+owned processes ended, and the failed sandbox remains quarantined. This exact
+rejection proves neither native absence nor complete Source-copy semantics;
+no historical receipt or failed verdict was rewritten or regraded.
+
+No native, Fresh, CLI Agent, install, full Program/Non-live, local fixed
+preflight, push or PR edit ran in this integration. Root owns publication and
+exact-head hosted CI. Final implementation/evidence obligations remain open;
+no main merge or ticket closure occurred.
+
+## 2026-10-21 R49 transfer admission and exact metadata-default evidence
+
+Runtime merge `c7b21ae9` integrates only frozen `4199c5d1`, `2c444f69`,
+`8e2eb229` and `0a183133` from `4ccbd66e`, without conflicts. The shared
+collector composes both accepted additions; the other component files retain
+exact accepted blobs apart from the two intentional Program-manifest edits.
+Copy/move admits resolved compatible custom WorkUnits and Source-to-Sound
+transfers with required actual source type, exact class/category checks and
+execution/verification drift checks. Transfer admission does not prove complete
+Source/plugin copying or constructor support. The ordinary Source recorder now
+preserves complete original query replies. The legacy diagnostic supplies the
+category field required by the existing finalizer; original failures stay frozen.
+
+After interface generation/check, clean source `e7ec62de` received one existing
+30-node metadata capture: **30 passed in 5.83s** (wrapper 6.435s). All 343
+source seals and 2,210 tracked files stayed unchanged, with no owned process
+remaining. Thirty new portable entries retain byte-identical originals and only
+relocate the program locator in projections. All 319 pre-existing evidence fixture files,
+including R26 and R47 r1/r2, remain byte-identical; the bundle README updates
+only its current-index description. The fixed Program manifest
+now includes the metadata-default test file and contains 265 entries; this is a
+manifest count, not a passing-test count.
+
+On generated candidate `16ead09b`, one deduplicated focus passed **11 tests in
+27.27s** (wrapper 27.864s): complete ordinary-Source query/all-call immutability,
+actual legacy category validation, current portable metadata evaluation, the
+canonical manifest, positive/missing source-type copy/move, two source
+class/category drift controls and one complete Source-copy flow. HEAD and all
+2,360 tracked files stayed unchanged; the owned process group ended empty.
+Worker checks remain separate original receipts, not an aggregate gate.
+
+Interface generate/check passed once in **17.455s / 17.627s**; branch
+generate/check passed once in **25.247s / 23.370s**, after the frozen capture
+and import. Only ten copy/move safety disclosure contract references and their
+reviewed aggregate seal refresh; all 153 machine contracts, parser/continuation
+contracts and 79/91 source/index memberships remain exact. All 272,313 native
+IDs, shapes and owners remain exact. Only the selected 65 default-result rows
+acquire program evidence: **65 program passed / 65 live_metadata missing**,
+all implemented_unverified. Original R26 and all 116 exclusions are unchanged;
+complete=false (66 implemented_unverified / 272,131 unresolved). Source identity
+is `6a83b79f8b61ffae5ddfd8297f0c1c7d93914d8c39da975a23114b4cd91d1127`.
+Original commands, process/source/output seals and proofs are retained under
+`/tmp/waapi-r49-integration/`; capture is in ignored
+`.waapi-skill-state/read-evidence-r49/capture-r1/`.
+
+Separately completed historical macOS Console evidence remains bound to its
+original candidate and root under `.waapi-skill-state/full-coverage/`:
+
+- `r46-render-history-4ccbd66e-2025-r1`: **PASS, 16.51s**, 227 calls / 2,821,903
+  receipt bytes, seven verified transactions and exact source/undo/redo state.
+  Hosted CI run `39456571914` passed exact `4ccbd66e`; neither is R49 evidence.
+- `r47-ordinary-source-da0becf6-2025-r1`: original **PASS, 12.50s**, 66 calls,
+  three verified transactions and retained file/Tone state. Its root-review
+  addendum records in-place query-payload mutation, so those query replies are
+  not exact original Gateway receipt proof. `2c444f69` repairs copying with
+  program evidence only; no new native acceptance is claimed.
+- `r48-legacy-copy-ae7a6b4b-2021-r1`: native Source-only copy admission and 18
+  observed scalars succeeded, with 55 calls and two verified transactions, but
+  the overall result remains **ERROR_EVIDENCE_FINALIZATION** (one body passed,
+  one teardown error, 12.78s) because the category field was missing. Original
+  failure, source closure and quarantine remain; `8e2eb229` is program-only.
+  Copied owned-object remapping/full-copy semantics remain unproved.
+
+This integration ran no local fixed preflight, full Program/Non-live, native,
+Fresh, CLI Agent, installation, other-host validation or publication. Root owns
+review, push and exact-head hosted CI. Remaining implementation/evidence and
+final gates stay open; no main merge or ticket closure occurred.
+
+## 2026-10-21 R46 existing Source preservation and Render collector integration
+
+Runtime merge `5e41bed1` combines only accepted `7979072d` and `dceb20f1`
+from workflow-only `06fcadaf`. All 11 component files retain their exact pinned
+blobs; the merge had no conflicts. Ordinary existing Sound/Voice Source
+placement now retains observed plugin/file Source state through bounded field
+pages. The scoped Render collector keeps complete calls and independent state
+while replacing duplicate phase payloads with exact call/hash references.
+
+One combined focus through pinned Poetry and `ci/test.sh --mode nonlive` passed
+**9 tests in 27.44s** (wrapper 28.409s): three file Source preservation cases,
+two paged-field cases, two stripped-origin controls, the staged two-Preview
+flow, and one modern Render path with captured native metadata and receipt
+sizing. HEAD and all 1,905 tracked files stayed unchanged; no owned process
+remained. Original argv/source/process/output seals and logs are retained under
+`/tmp/waapi-r46-integration/`.
+
+Interface generate/check and branch generate/check each passed once, serially:
+**18.067s / 17.547s / 24.689s / 23.734s**. Only the reviewed operation-contract
+aggregate seal and four `object.set` public contract references refresh. All 153
+machine schemas, parser/continuation contracts, 79/91 source/index memberships,
+272,313 native obligations and compressed bytes, owners and evidence requirements
+remain exact.
+
+Original `027ac095` native results remain separate: 2022 **PASS** and 2025
+**FAIL** at the unchanged 8MiB receipt ceiling. The latter verified source and
+undo, then stopped with redo awaiting confirmation; redo was not executed.
+`r45-render-history-027ac095-native-summary.json` under Root's ignored
+full-coverage directory retains both attempts and their original receipt hashes.
+The collector repair and simulated sizing grant no native redo acceptance.
+No local preflight, full Program/Non-live, native or Fresh run occurred in this
+integration. Root owns exact-head hosted CI after publication and a separately
+scheduled new 2025 Render sandbox case. Broader Source/history work and final
+gates remain open; no ticket is closed.
+
+## 2026-10-20 R44 scoped Source, staged completion and exact Render/history integration
+
+Runtime merge `f173d0c0` combines only accepted `4f869927`, `d8c55b4d` and
+`39b7cfc9` (including exact-history `cb0e6b3d`). Withdrawn existing-GUID
+autosuffix branches are excluded. The 23 component files retain exact blobs,
+clean shared-file composition or the reviewed additive test-helper resolution.
+
+The frozen merged tree, with reconciled/generated artifacts, completed these
+checks through the pinned Poetry interpreter and existing test driver:
+
+| Check | Result | Scope |
+| --- | --- | --- |
+| Central `ci/preflight.py` | **826 passed, 51.09s** | Complete fake public-route matrix, roster/schema seals and Tone terminal controls |
+| Shared-conflict focus | **7 passed, 25.30s** | Staged completion/drift, exact-history positive/two faults, retained atomic-2025 and explicit-current-2022 prewrite boundaries |
+
+Both test runs kept all 1,902 tracked files and HEAD unchanged and left no owned
+process. Original argv, source/process/output seals and logs are retained under
+`/tmp/waapi-r44-integration/`. Interface generate/check and branch generate/check
+each ran once, in that order: **17.398s / 17.595s / 25.239s / 40.039s**.
+Only three reviewed aggregate source seals refresh. All 149 machine-contract
+rows outside the four affected `object.set` versions remain exact. The 79/91
+source/index memberships, all 272,313 native obligations and compressed bytes,
+requirements, ownership and evidence policy remain intact.
+
+Separate original 2025 macOS Console receipts remain bound to their component
+candidates: `d8c55b4d` staged Voice/Source **1 passed, 8.05s** (34 calls, two
+separately verified `object.set` transactions), and `cb0e6b3d` exact graph
+rename/notes/history **1 passed, 19.14s** (114 calls, five verified transactions).
+Their roots are `r44-gateway-staged-source-d8c55b4d-2025-r1` and
+`r43-history-exact-cb0e6b3d-2025-r1` under Root's ignored full-coverage directory;
+neither was rerun or promoted to integrated native acceptance. Render native
+acceptance, broader Source/Render/history work and final full Program/Non-live
+gates remain open. No new native, Fresh, hosted-CI or Windows run was performed
+by this integration, and no ticket is closed.
+
+## 2026-10-20 R42 scoped Source selection and staged Voice integration
+
+Runtime merge `779823d3` combines accepted `8664cfb6`, `1a1b3b03` and
+`bba85da9` from `e80d9250`. The separate #192 suffix/history candidate is
+excluded. These original results are separate receipts, not a combined gate:
+
+| Candidate and lane | Original result | Scope |
+| --- | --- | --- |
+| `e80d9250`, full Program | **13,529 passed / 7 failed / 4 skipped, 5,044.89s** | Retained failed gate; no regrading |
+| `6f25cfd0`, seven selected repairs | **7 passed, 8.74s** | Only the original failed nodes |
+| `8664cfb6`, RTPC portability follow-up | **3 passed, 2.37s** | Windows-shaped continuation on macOS; no Windows host credit |
+| `d64e0db7`, 2025 Console Source-plugin selection | **1 passed, 8.58s** | 70 calls, four previewed transactions, 170 native archives; current-view A→B plus preservation |
+| `1a1b3b03`, 2025 Console staged Voice/Source | **1 passed, 6.10s** | Diagnostic-only; 33 calls, two transactions, 86 archives; atomic language unresolved |
+
+Exact native roots are `r42-source-selection-d64e0db7-2025-r2` and
+`r41-planned-source-staged-1a1b3b03-2025-r1` under Root's
+`.waapi-skill-state/full-coverage/`. The three original atomic Source r1/r2/r3
+failures remain FAIL with quarantined sandboxes. Source-plugin r1 stopped at a
+prerequisite before host launch and remains separate. Passing native runs kept
+source full hash/mtime/tree unchanged, left no owned process, and deleted only
+the passing sandbox. No family, other-version, native Windows or Fresh credit
+is inferred. Selected program chronology remains in
+`/tmp/waapi-r42-seven-program-repairs/handoff.md`.
+
+Four serial interface/branch generate/check commands passed once in
+**16.605s / 16.775s / 23.544s / 22.241s**. All 153 Registry machine seals and
+272,313 native obligation rows, including their compressed bytes, are exact.
+Only reviewed public disclosure references, the one operation aggregate seal,
+source/hash/line/candidate data and four exact requirement rows change.
+#195 adds requirements only, preserving program+native policy and historical
+entries; there is no capture/index entry or new PASS. Source membership remains
+79/91 indexed entries and full candidate closure 330 files. No merger pytest,
+native, Fresh or new final-candidate gate ran; Root owns promotion and validation.
+
+## 2026-10-20 R41 scoped Source, active-selection and reimport integration
+
+Runtime merge `edbc24cb` combines accepted `aaa91777`, `8ec0925d` and `01a65041`
+from `e80d9250`. Seventeen component files retain their exact blobs or clean
+shared-file composition. The following are separate original focused receipts;
+none is a combined final-candidate or full Program result.
+
+- Source construction: **29 passed in 10.06s**, then only collision/retained-GUID
+  controls **2 passed in 1.07s**. The real Voice→planned Bus unknown-language
+  continuation tracer went **1 failed in 0.68s → 1 passed in 0.64s**. Earlier
+  plain-Source attempts were test-design failures and remain recorded as such.
+  Collector prior-owner extra-child RED was **1 failed in 3.69s**; changed
+  happy/fault controls were **2 passed in 6.03s**, proving the 74-call collector,
+  three distinct executions, exact native-byte archive and retained child sets.
+- Query: the new predicate tracer went **1 failed in 0.39s → 1 passed in 0.40s**;
+  relationship/mixed producers **2 passed in 0.42s**, existing affected guards
+  **22 passed in 1.21s**. Only the full 1000-owner control went **1 failed in
+  0.51s → 1 passed in 0.64s**; structured config-drift/context controls went
+  **2 failed in 1.27s → 2 passed in 1.30s**; child/caller-bound guards were
+  **2 passed in 0.37s**. Setter linkage disclosure and public Preview summary
+  have separate passing receipts; neither promises unlinking or isolation.
+- Reimport: inactive-filename public RED was **1 failed in 0.62s**, then
+  **1 passed in 0.51s**. Distinct public effect/boundary controls were **9 passed
+  in 2.41s**, unchanged 2021 guards **29 passed in 1.54s**, and affected public/
+  later-version controls **12 passed in 1.43s**. Contradictory exact Source-path
+  RED/GREEN was **1 failed in 0.66s → 1 passed in 0.71s**. Empty-Sound Source
+  insertion exposed a further prewrite gap (**1 failed / 1 passed in 0.93s**);
+  the same two controls passed in **0.98s** after binding the empty precondition.
+
+Full chronology and original argv/outcomes remain in
+`/tmp/waapi-r41-planned-source/handoff.md`,
+`/tmp/waapi-r41-multi-sound-query-handoff.md`,
+`/tmp/waapi-r41-owner-bound-error-context-handoff.md` and
+`/tmp/waapi-r41-reimport-active-source-handoff.md`. Focused tests used pinned
+Poetry via `ci/test.sh --mode nonlive`; no counts are summed across stages.
+
+Four serial interface/branch generate/check commands passed once in
+**17.637s / 17.855s / 24.686s / 23.505s**. Restoring original policy formatting
+with the same two hash values invalidated its raw-byte branch source seal; only
+the branch generate/check pair repeated, passing in **24.666s / 23.455s**. The
+first receipts are retained and the interface pair was not repeated. All 153
+Registry machine seals and 272,313 compressed native obligations, ownership,
+statuses and evidence remain exact.
+Two reviewed aggregate disclosure seals, four Source business contracts, four
+setter linkage contract references and source/hash/line/candidate data refresh;
+there is no new branch credit. 2025 fixture LFS objects were materialized from
+local storage only (15 objects, zero remaining pointers; no fetch).
+
+Native originals are unchanged: the 2022 platform diagnostic r2 is **FAIL in
+11.84s** (only Linked final saved selection, no divergent-platform proof), and
+2024 owned OS observation is **BLOCKED / 1 skipped in 224.27s** (exact window
+observed, one click without image change, no saved-value proof). Both retained
+sandboxes/evidence and unchanged source/zero-owned-process results remain.
+Root's full Program on `e80d9250` is still pending at this stage; its eventual
+result must be recorded separately. No merger pytest/native/Fresh run occurred.
+The next reviewed 2025 Source construction run is Root-owned and not yet claimed.
+
+## 2026-10-20 R40 scoped regression, Voice context and stationary Tone
+
+Runtime merge `495f8a7f` preserves accepted graph `026f9181`, Voice `89d0ef9f`
+and Tone `49e4b69e` components: nine exact file blobs, without merger fixups.
+Root's original R39 failed-node subset on `6e126276` ended **456 passed,
+10 failed, 2,008 deselected in 103.95s**. Its retained original log is
+`.waapi-skill-state/full-coverage/r39-failed-subset-6e126276-r1/run.log`.
+This is a failed subset result, distinct from both the R38 subset and the
+earlier full Program failure; R40 does not replace it with an aggregate PASS.
+
+The ten graph residuals have separate staged results: **5 passed / 5 failed in
+1.26s**, only five unresolved cases **1 passed / 4 failed in 0.73s**, then only
+four remaining cases **4 passed in 0.58s**. Existing 7/8 KB compactness limits
+remain unchanged; full public inspection retains the complete RTPC declaration
+and batch precondition. No final ten-node or broad rerun is inferred.
+
+Voice controls include **19 passed / 4 failed in 4.81s**, corrected four controls
+**4 passed in 1.24s**, final two original-language negatives **2 passed in 0.32s**,
+and the unrelated Source-preservation RED **1 failed in 0.76s** followed by
+**1 passed in 0.65s**. These are separate receipts, not a combined result.
+The new empty Voice language is validated construction context in 2022.1–2025.1,
+not a persisted Sound language or localized Source. Existing-merge language
+effects and atomic planned-parent Source construction remain #179/#180/#181
+work. Staged Voice creation then Source-plugin creation on its bound existing
+GUID already exists; the atomic gap does not mean all Source creation is absent.
+
+Tone's public wrong-frequency RED is **1 failed in 0.93s**. Separate successor
+selections passed **13 tests in 6.18s** (retained-file route combinations),
+**16 in 7.79s** (signal/partial controls), **45 in 19.85s** (existing guards),
+and **11 in 12.76s** (short-record/diagnostic controls). Overlapping selections
+are not summed. Exact original failures, projection corrections and argv are in
+`/tmp/waapi-r40-tone-handoff.md`; graph and Voice chronology are in
+`/tmp/waapi-r40-graph-residuals-handoff.md` and
+`/tmp/waapi-r40-voice-language/handoff.md`.
+
+Stationary zero-attack/release sine verification checks frozen frequency/gain
+within a disclosed numerical policy, including every active sample and exact
+masked-off silence. Retained native bytes are reused offline; original native
+outcomes remain unchanged. No new native/Fresh run or business acceptance is
+claimed. Other waveforms/envelopes and remaining #193 scope stay required.
+
+Four serial inventory generate/check commands passed once. Only the four
+2022–2025 object.set `sound_semantics.language_and_media` disclosure leaves,
+their public contract references and reviewed aggregate seal change, alongside
+source/hash/line/candidate refreshes. All 153 Registry machine seals (including
+the `6085...` object.set literal), source membership and 272,313 native obligation
+bytes/statuses/ownership/evidence remain unchanged. No merger pytest ran; Root
+owns publication and selection of the next settled gate.
+
+## 2026-10-20 R39 scoped regression integration
+
+Frozen runtime merge `c51371d1` preserves accepted graph fixtures `3eb19047`,
+registry fixtures `373b9ff4`, optional active-source diagnostic `34a64ac1` and
+Render/remaining fixtures `4404f41d`: all 21 component files match their reviewed
+blobs. The Render repair retains explicit reference intent, binds planned
+targets to the existing graph GUID proof and rechecks certified equivalent
+platform views. Public schemas and seals for all 153 versioned operation rows
+(34 named operations) remain equal to `695344f1`.
+
+Root's original **R38 failed-node subset** on exact `695344f1` ended **976 passed,
+466 failed, 3,598 deselected in 375.99s**, exit 1 (wrapper 376.777s). Its 1,897
+tracked files stayed unchanged and no owned process remained. Original records
+remain in `.waapi-skill-state/full-coverage/r38-failed-subset-695344f1-r1/`.
+This differs from the earlier full Program failure on `c18225d9` recorded below;
+neither is an R39 acceptance result.
+
+R39 controls are separate staged Non-live runs, not an aggregate gate:
+
+| Component selection | Original result |
+|---|---|
+| Four graph fixture files and related controls | 106 passed in 30.52s |
+| Registry original failed nodes and related controls | 126 passed, 35 failed in 10.29s |
+| Only corrected registry residuals plus retained Japanese-language boundary | 31 passed, 5 failed in 0.64s |
+| Only five remaining registry corrections | 5 passed in 0.28s |
+| Only registry cleanup-affected data controls | 10 passed in 0.39s |
+| Render certified-equivalent-view positives and prewrite drift controls | 4 passed in 4.23s |
+| Other modern Render version controls | 5 passed in 5.29s |
+| Only final compound directory-entry assertion correction | 1 passed in 0.97s |
+
+The remaining component's original 75-node closure maps to its staged receipts;
+it is not a final-candidate 75-test run or a sum of passes. Original intermediate
+failures, including a registry collection error before any test ran, remain.
+Exact selections and receipts are indexed in `/tmp/waapi-r39-graph-fixtures-handoff.md`,
+`/tmp/waapi-r39-registry-fixtures-plan.md` and
+`/tmp/waapi-r39-other-fixtures/handoff.md`. The original no-media Japanese merge
+request remains an exact unresolved-boundary control under #180/#181; its
+separate positive proves platform scoping only.
+
+Four serial inventory generation/check commands exited zero once. Only the
+registry source hash, three existing source-index entries and native candidate
+identity refresh; interface inventory, source membership, native descriptors and
+all 272,313 compressed obligation rows remain exact. No merger pytest, native,
+Fresh or replacement broad gate ran at that handoff. Root owned the subsequent
+466-node subset; its original result is recorded in the R40 entry above.
+
+The separate Root-owned 2021.1 diagnostic on `34a64ac1` **failed in 12.78s** at
+`ordering_counterexample_unproven`. All three two-source copies' path joins
+matched saved ActiveSource GUIDs, but the active source was always ordinal zero
+in public and saved ordering. This remains blocked/diagnostic-only with no
+generic active-source credit. Root's method review supports a future narrow
+2021 file-backed path join with program order-permutation and ambiguity
+controls, without another native boot solely to change the active ordinal.
+No resolver is implemented yet; plugin/no-file, equal-path, unlinked-view and
+active-choice-transition cases remain #181 work. See the retained native
+follow-up.
+
+## 2026-10-20 R38 selected regression repairs
+
+Runtime merge `5fcd2d97` preserves accepted components `8836b0e5` (local-import
+binding), `2c2ef80b` (version-bound import class fixtures), `7ad1f0f5`
+(condition class fixtures) and `122ea303` (compact directory prose, structured
+error context and assigned fixtures) without merger fixups. Production class,
+drift, readback, continuation and output-bound safeguards remain intact.
+
+These are separate staged Non-live selections through the pinned Poetry
+`WAAPI_TEST_PYTHON` and `ci/test.sh`; no aggregate gate result is inferred:
+
+| Component selection | Original result |
+|---|---|
+| Replacement copy/move across five versions and optional notice | 11 passed in 5.73s |
+| Import tracers, version-spanning positives and malformed/drift/alias controls | 39 passed in 2.54s |
+| Condition fixtures, first selection | 91 passed in 37.63s |
+| Condition fixtures, remaining roles and three new corruption controls | 67 passed, 3 failed in 21.76s |
+| Only three new corruption controls, first assertion correction | 3 failed in 1.03s |
+| Same three controls, exact wrapper/inner assertions corrected | 3 passed in 0.96s |
+| Gateway/small regressions and related controls | 23 passed, 1 failed in 26.02s |
+| Only remaining policy-create fixture, type/class corrected | 1 passed in 0.97s |
+
+The condition failures were test-author expectations: the strict product
+returned `OPERATION_DRAFT_CHECK_FAILED` with `INVALID_READBACK` for
+missing/malformed class and `INVALID_TARGET_TYPE` for mismatch. The small
+selection's residual failure exposed stale fake PropertyContainer state for a
+declared ActorMixer. Neither correction relaxed production behavior. The
+2021.1 generic active-source boundary remains an open #181 implementation gap.
+Original component logs/argv/process receipts remain at the paths in
+`/tmp/waapi-r38-replace-fix-handoff.md`,
+`/tmp/waapi-r38-import-fixtures/handoff.md`,
+`/tmp/waapi-r38-class-fixtures-handoff.md` and
+`/tmp/waapi-r38-small-regression-triage.md`.
+
+On frozen `5fcd2d97`, four serial inventory generation/check commands exited
+zero once. All four policy seals, 79 source members, 91 source-index members,
+272,313 native obligation rows and compressed artifact bytes remain exact;
+only existing source hashes/line offsets and native candidate identity refresh.
+No merger pytest, full Program, native or Fresh run occurred. At that checkpoint
+the original 1,442 failed-node subset had not yet been retested; the subsequent
+exact `695344f1` subset result is recorded above. The earlier full-gate failure
+below remains unchanged and no broad PASS credit follows.
+
+## 2026-10-20 R37 focused integration and original Program failure
+
+R37 `510a40f5` merges accepted history `4a8fee72` and portable evidence
+`b9633fad` without component edits. Four serial inventory generation/check
+commands exited zero once; no pytest, native or Fresh run was added for the
+merge. All 272,313 obligation IDs and 116 exclusions remain. The sole changed
+R26 move-single result row is `implemented_unverified`, with both required
+program/native outcomes `missing` (reason `'artifact'`); the historical program
+candidate has no equivalence attachment. No historical PASS becomes current
+proof. All other obligation rows remain exact.
+
+History evidence remains staged: parent-proof/discovery controls passed
+**11 tests in 10.55s**; the later external-reference-only regression failed,
+then passed **1 test in 2.76s** after its activation repair. These public
+fake-native controls cover exact-intent ancestor/phase/history behavior across
+the supported lanes; native-chosen suffixes, cross-child Render preservation
+and native acceptance remain open. The portable default CLI control passed
+**1 test in 80.42s**, its four integrity controls passed **4 tests in 79.70s**,
+and the explicit missing-policy regression failed in **20.07s**, then passed
+**1 test in 26.90s**. No staged results are summed into an R37 gate.
+
+The separate original fixed Program run on exact `c18225d98ecc9f5be91da559a6f728042bec8b65`
+ended **1,442 failed, 12,000 passed, 4 skipped in 4,891.23s**, exit 1
+(wrapper 4,893.158s). Source snapshots and all 1,891 tracked files are unchanged;
+the owned process group is empty. Original `result.json`, `run.log`, process
+and before/after receipts remain under the Root checkout's
+`.waapi-skill-state/full-coverage/program-r36-c18225d9-r1/`.
+The log SHA-256 is `4d70acd3c944d7dfcd351b9530f93ed410601c7a573f8a5dd970485df6c2e309`.
+This is a failed earlier-candidate broad gate, not an R37 result. Failure triage
+and replacement broad acceptance remain open; passing individual cases grant
+no gate PASS credit.
+
+## 2026-10-19 Tone writer compatibility and bounded operator observation
+
+Integration `af637e20` preserves the two accepted component filesets without
+merge edits; four serial inventory commands passed, changing only the native
+candidate hash. Tone regression evidence remains staged: four original-byte
+controls passed after their genuine failures; eight format/older-lane controls,
+two new matching-catalog controls and five compatibility controls passed in
+separate scoped runs. No aggregate full-gate result is inferred.
+
+On fixed `1e07d63f`, matching Console 2023/2024 collection passed **1 test in
+11.07s** and **1 test in 9.95s**, respectively. Both final lifecycle rows pass;
+source full hash/mtime/tree and 1,891 tracked files are unchanged, sandboxes are
+deleted and owned processes ended. All eight native WAVs match corresponding
+original 2025 files. Each has a separate transaction with successful structural
+verification and explicit `partial_tone_artifact`; active signal acceptance is
+unfinished. The original four 2025 failed verifications remain unchanged.
+
+The developer operator gate passed **2 focused controls in 8.88s**. Its owned
+2024 attempt on `6570e7c2` is final **BLOCKED** (**1 skipped in 58.79s**): the
+computer-use inventory could not identify the isolated Wine app. No GUI action
+occurred; source hash/mtime and 1,886 tracked files stayed unchanged, processes
+ended and the sandbox/evidence are retained. Pre/post Inspect global scalars
+remain 1/1000 and do not prove saved-session values. No further GUI attempt,
+Fresh, Windows acceptance or whole-ticket closure is claimed.
+
+## 2026-10-19 ordinary hierarchy history and native diagnostic evidence
+
+Integration `3f7205e1` preserves accepted graph `4469adba`, frontend `ae95b5cc`
+and Tone collector `205097b6` source files without merge edits. Four serial
+inventory generation/check commands passed once. The only semantic contract
+change is five-version undoGroup hierarchy scope and its still-open ancestor
+rename dependency. Native obligation identities, requirements and evidence are
+unchanged. No aggregate pytest rerun or broad gate was added for this merge.
+
+Graph evidence remains staged: `4926f900` passed **7 tests in 8.83s** covering
+five-version internal-reference source/history behavior and two compound graph
+flows; `70023040` passed **4 tests in 4.03s** for the later aggregate Render bound.
+Root's same-basename case exposed a real rejection; `4469adba` then passed that
+case and its existing reference control (**2 passed in 2.99s**). These establish
+program behavior, not native graph-history acceptance or whole-ticket closure.
+
+The owned 2024 Authoring diagnostic on `ae95b5cc` passed **1 test in 44.34s**;
+source hash/mtime and 1,886 tracked files were unchanged, its sandbox was deleted
+and owned processes ended. Root's independent archived-image review confirms
+Minigun session loading in an ObjectTab, selected GUID and Materials=Concrete.
+Filtered RTPC/other saved values remain unverified. The category intentionally
+stays diagnostic/blocked. Earlier `493b0d35` cleanup BLOCKED, `c8238eba` two-view
+FAIL (**48.44s**) and `57ab9859` missing-view FAIL (**37.46s**) remain original
+results; absence of a separately named view did not prove failed activation.
+
+The owned 2025.1.7.9143 Console characterization on `205097b6` passed **1 test
+in 10.74s**, retaining four original mono sine WAVs (int16/float32, 0/-6 dB),
+39 public calls, independent transactions and complete raw evidence. Source
+hash/mtime/tree and 1,886 tracked files were unchanged; cleanup completed.
+All four transaction verifications remain **verification_failed** because the
+Tone parser rejected the actual zero-valid-bits extensible headers. Collection
+success grants no waveform/level acceptance; the diagnostic category is blocked.
+No Fresh or Windows acceptance is added. Full gates and final review remain open.
+
+## 2026-10-19 TSV admission and Soundcaster diagnostic follow-up
+
+Integration `dacfa842` preserves component evidence without redundant reruns.
+The original 2022 TSV regression first failed because `draft-check` accepted
+`IsVoice`; its repaired control passed **1 test in 0.69s**. At `6ed4f2e4`,
+the alias rejection and valid Sound SFX import passed **2 tests in 0.81s**.
+These are separate staged results. The conflict-free merge preserves each
+accepted source file; four serial inventory generation/check commands passed,
+with unchanged schema seals, Program roster and native obligations.
+
+Diagnostic component `72021d16` passed **2 focused tests in 4.60s**. The real
+2024 Authoring attempt on `493b0d35` has a **BLOCKED final outcome**: the test
+body passed in **54.13s**, but the post-teardown port check failed. Source full
+hash/mtime and all 1,886 tracked files stayed unchanged; no owned process
+remained. A later independent bind found the port free without regrading the
+original attempt. Both archived PNGs were identical main-editor images; Root
+review found no Soundcaster session or values. No preservation credit is given.
+The original sandbox, receipts and images remain retained. No Fresh or broad
+regression was added; final gates and remaining native validation stay open.
+
+## 2026-10-19 actual class and compound history integration
+
+Fixed `a047bf0d` passed **5 selected tests in 7.71s**: the cross-platform
+Program roster, the 2022 null-constructor/history compatibility case, compound
+created-field history on 2022/2025, and compound object.set Render plus notes.
+All 1,886 tracked files and HEAD remained unchanged; the owned process group
+was empty. Four serial inventory generation/check commands exited zero.
+The actual Program roster is 263 unique entries after adding the public generic
+class controls. All 272,313 native obligation identities, semantics, requirements
+and historical evidence remain unchanged.
+
+Component evidence remains separate: `90d7a483` passed only the four new
+2021–2024 ordinary class parameters (4 passed, 1.22s), retaining the earlier
+2025 result without rerunning it. Compound successor `92e816bc` passed five
+typed child-ownership controls and three compatibility checks in separate
+runs. These are program results, not native acceptance or a combined full-suite
+pass. No local preflight, broad gate, Wwise or Fresh run was added for this
+integration; final Program/Non-live and native acceptance remain outstanding.
+
+## 2026-10-18 object-dump and immutable history-page integration
+
+Fixed `841ae9b2` passed **3 selected tests in 2.98s**: large external dump
+validation with a compact reply, lossless long-notes history pages, and the
+existing immutable None-state page/cursor contract. All 1,885 tracked files and
+HEAD remained unchanged; the owned process group was empty. Four serial
+inventory generation/check commands exited zero. A separate wrapper bookkeeping
+assertion stopped after the second generator because it incorrectly required
+changed source hashes to remain equal; its original failure was retained, the
+exact source changes were reviewed, and only the remaining checks ran.
+
+No local preflight, full Program/Non-live or native rerun was added. The original
+`bfd411ac` 2024 dump test remains **1 failed in 9.57s**. Fixed `4dcf1a6f` then
+parsed its exact retained 3,638,677-byte artifact offline: 134,036 nodes, depth
+three, original hash unchanged. This proves the parser repair only. Session
+preservation, compound history and generic class completion remain separate
+work. The prior completed gate results retain their original candidates.
+
+## 2026-10-18 constructor repair and Authoring startup follow-ups
+
+Final integration `59b270b1` passed **6 selected cross-path tests in 12.22s**:
+2021 legacy import, 2022 null creation, multi-field history, modern and legacy
+Render history, and raw-metadata drift rejection. The run preserved all 1,885
+tracked files and left no owned process. Serial generators/checks passed with
+unchanged native obligation/ownership/requirement/evidence bytes and Program
+roster 262. No local 825-test preflight, full Program/Non-live or new native
+campaign was run for this integration; original component evidence below stays
+bound to its original candidate.
+
+Later focused native successors completed separately: `a3b70b45` passed the
+2021 legacy import collector (**1 passed, 17.16s**); `3b8f88ba` passed the
+2024 Authoring startup/metadata diagnostic with child-only automation mode
+(**1 passed, 47.68s**). Both preserved source full hash/mtime and 1,883 tracked
+files, deleted their passing sandboxes and left no owned process. The import
+case also preserved source tree metadata. The first proves the original three
+import effects with a complete unique-source-child oracle, not generic 2021
+active-source selection; the second proves startup and metadata observation,
+not Authoring mutation or full media-format acceptance. Earlier failures below
+retain their original verdicts.
+
+Staging `5acc4054`, macOS Console 2022.1: the separate null-source diagnostic
+passed **1 test in 9.83s**, followed in a fresh root by the unchanged complete
+created-field history case, **1 passed in 7.95s**. Both source variants and
+their undo effects passed independent checks. The diagnostic itself remains
+diagnostic-only; it is not separate full-history coverage. Both runs preserved
+source hash/mtime/tree and 1,883 tracked files, deleted passing sandboxes and
+left no owned process. These are exact 2022 component results, not generic
+class, nested/platform, Fresh or whole-ticket acceptance.
+
+The matching 2021 legacy import collector on `5acc4054` recorded **1 failed in
+12.65s**. The saved-project prerequisite now succeeds; the first media/Render
+write passed Gateway verification. Independent reading then hit native rejection
+of the public `active-source` projection (`Unknown accessor activeSource`).
+Its sandbox is quarantined; source integrity and process cleanup passed. This
+requires a version-correct public mapping and oracle, not removal of the check.
+
+Two root `1d58f5fa` Authoring startup attempts ended before test collection with
+exit 3. The first had a user-observed/user-accepted EULA; the second used the
+user-requested child-only `AK_AUTOMATION_MODE=1`. Readiness reached a malformed
+client `getInfo` result after 58.93s / 3.85s, respectively. Neither passed the
+exact host/build guard. Source full hash/mtime and 1,883 tracked files remained
+unchanged and owned processes ended. These are diagnostic evidence, not passing
+tests. Exact roots and limitations are in
+[native follow-ups](../docs/plans/full-waapi-coverage/NATIVE_FOLLOWUPS.md).
+
+## 2026-10-18 full-coverage R33 integration and history
+
+Integrated runtime `51906536` passed one central preflight: **825 passed**
+(30.82s), followed by **8 selected integration checks passed** (22.37s).
+Both runs preserved 1,883 tracked files and left no owned processes. Serial
+inventory generation/checks passed; the Program roster is 262. These focused
+runs do not replace the outstanding full Program and Non-live gates.
+
+Created-field history at component `854d28aa` passed on matching macOS Console
+2023.1, 2024.1 and 2025.1: **1 passed** per version in 16.31s, 10.00s and
+19.71s. Each retains both original five-field creation/undo/redo cases, with
+existing or null Attenuation. Source hash/mtime/tree and 1,881 tracked files
+were unchanged; passing sandboxes were deleted and owned processes ended.
+
+The same collector on integrated `51906536`, Wwise 2022.1, recorded **1 failed /
+1 warning** (23.63s). Existing-reference creation and undo passed. Null-reference
+creation returned no native acknowledgement during transport loss, but Gateway
+incorrectly recorded accepted execution; verification then could not connect.
+Its effect remains unknown. Source hash/mtime/tree and 1,883 tracked files were
+unchanged, processes ended and the failed sandbox was quarantined. The original
+root `created-history-51906536-2022-r1` is preserved without replay. See
+[native follow-ups](../docs/plans/full-waapi-coverage/NATIVE_FOLLOWUPS.md) for
+the original candidate/path boundaries. No Fresh, Windows or whole-ticket
+acceptance follows from these results.
+
+## 2026-10-18 full-coverage R32 native components
+
+Voice creation at `b560eaab` passed the exact collector separately on macOS
+Console 2021.1–2025.1: **1 passed** per version in 10.90s, 5.60s, 5.85s, 5.92s
+and 6.89s. Ordinary root/nested effects apply to all five; the third object.set
+effect applies only to 2022–2025. Each original category seals its observation
+file hash. All source hash/mtime/tree and 1,882 tracked-file checks passed,
+sandboxes were deleted and no owned process remained. No media, Windows or
+Fresh evidence is implied.
+
+At `98c1f74f`, one 2025 Render clearing diagnostic passed (14.33s), observing
+both flags cleared by one first-slot setter. Its category remains diagnostic-only
+and blocked for business acceptance. Source hash/mtime/tree and 1,881 tracked
+files were unchanged; sandbox deletion and process cleanup passed. Other
+versions and the successor suffix planner are not certified by this result.
+
+Separate matching diagnostics at `a4936b07` passed on 2023.1 (13.11s) and
+2024.1 (8.23s), observing the same clearing transition with complete scoped
+preservation. Source hash/mtime/tree and 1,881 tracked-file checks, sandbox
+deletion and process cleanup passed. These remain diagnostic observations,
+not legacy or successor-planner acceptance.
+
+## 2026-10-18 full-coverage R31 native component
+
+At fixed `5e22e208`, the existing anonymous EffectSlot construction case passed
+once on each macOS Console 2023.1, 2024.1 and 2025.1: **1 passed** in 16.92s,
+19.27s and 22.24s, respectively. Each case independently verifies three effects
+through 164 public calls; setup receives no effect credit. All three source
+hash/mtime/tree and 1,882 tracked-file checks passed, sandboxes were deleted and
+no owned process remained. The earlier contradictory Render request remains a
+separate failed/quarantined result. These are exact modern construction results,
+not legacy, import, clearing/suffix, history, Fresh or whole-ticket acceptance.
+
+The separate created-field history tracer at `807f33e7` on macOS 2025.1
+recorded **1 failed** (11.36s). Sound creation was rejected before dispatch by
+the new-object non-master-bus visibility proof; undo/redo were not reached.
+The setup Attenuation was verified without history credit. The original failed
+sandbox remains quarantined; source hash/mtime/tree and 1,881 tracked files
+were unchanged and no owned process remained.
+
+## 2026-10-18 full-coverage R30 component results
+
+Hosted preflight on published `03f5ef62`: **825 passed** (64.76s), run
+39097821039. This is a completed preflight, not the full Program/Non-live gate.
+
+The existing RTPC graph case passed separately on macOS Console 2023.1,
+2024.1 and 2025.1 at `e2bbf7e5`: **1 passed** in 25.26s, 22.73s and 23.66s.
+The 2022.1 attempt there failed (12.17s) because shared-target classification
+rejected a valid independent parameter before the first intended effect.
+Version-specific repair `567a9fd3` passed that 2022 case: **1 passed** (24.29s).
+Every passing case verified five effects, kept source hashes/mtime/tree and
+1,881 tracked files unchanged, deleted its sandbox and left no owned process.
+These are component results on two candidates, not a single-candidate matrix.
+
+The separate anonymous EffectSlot constructor at `e2bbf7e5` on 2025.1 remains
+**1 failed** (8.05s), quarantined: a later Render=true automatically changed an
+earlier requested Render=false. The Gateway's cross-slot condition repair is
+pending. Source integrity and process cleanup passed. No Fresh, Windows,
+2021 RTPC-construction or whole-ticket acceptance is added.
+
+## 2026-10-18 full-coverage R29 checkpoint
+
+Central `90e63ad9`: **824 passed / 1 failed** (30.13s). The sole failure was
+the non-object-set schema seal for four approved createPlugin Folder disclosures.
+On test-only successor `96660a68`, that exact node passed (0.48s), then the
+separate approved cross-focus passed **9 tests** (11.74s). These are separate
+runs, not a single 825-pass claim. Source stayed unchanged and owned processes
+ended. Serial generators/checks passed; the fixed Program roster is now 261.
+Public counts remain 897 version rows / 228 URIs / 515 contracts / 32,978
+branches. Native obligation/owner/requirement/policy bytes remain unchanged.
+
+Native macOS 2025.1 RTPC graph case on `96660a68`: **1 failed** (20.42s).
+Four effect phases passed both Gateway and independent verification; replaceAll
+was accepted but its Gateway ordered-membership assertion used a GUID-sorted
+snapshot; the raw native accessor actually preserved request order. The whole
+case remains FAIL/quarantined. Source full hash, mtime/tree and 1,881 tracked files were unchanged; owned processes ended.
+No Fresh, Windows, full-gate or whole-ticket pass follows. Authoring startup
+remains unresolved after bounded owned diagnostics; historical direct-Wine argv
+is retained, and its partial process sample grants no business acceptance.
+
+## 2026-10-18 full-coverage R28 checkpoint
+
+Frozen `4fac9727` passed the central preflight **825 tests** (27.01s) and
+the separate affected cross-focus **8 tests** (4.26s). Both runs preserved all
+1,878 tracked files and left no owned processes. Program roster: 259 entries.
+This is not a replacement full Program or Non-live gate.
+
+The same candidate passed one native anonymous EffectSlot exact-ID edit case
+on each of macOS Wwise 2023.1, 2024.1 and 2025.1, sequentially: **1 passed**
+in 13.04s, 13.29s and 9.71s respectively. Each case independently checked two
+separate effects and preservation; source hashes/mtime/tree stayed unchanged,
+the sandbox was deleted and owned processes ended. The original `f4c245b6`
+2025 failure remains a failure: its collector assumed the wrong embedded
+Effect owner/parent relationship and stopped before the intended effects.
+These results do not establish new anonymous List construction, inline merge,
+RTPC graph effects, history effects, Windows or Fresh acceptance. See the
+[implementation checkpoint](../docs/plans/full-waapi-coverage/IMPLEMENTATION.md#twenty-eighth-integration-checkpoint).
+
+## 2026-10-18 full-coverage R27 checkpoint
+
+Central `cb35b9d7` recorded **824 passed / 1 failed** (27.28s). The shared-schema
+wording repair preserves unrelated operation contracts; its exact failed check
+plus five integration checks passed on `b06dfe1c`: **6 passed** (5.92s). Source
+stayed unchanged and owned processes ended in both runs. The Program roster now
+contains 258 entries; no new full Program or Non-live result is claimed.
+
+Separate earlier `8e9b9f17` completed one read-only 2021 RTPC identity/metadata
+diagnostic: **1 passed** (9.52s), ten public calls, source unchanged, sandbox
+removed and owned processes ended. Its business category remains blocked;
+existing identity/metadata does not establish RTPC construction or effects.
+No Fresh or Windows run is added. See the
+[implementation checkpoint](../docs/plans/full-waapi-coverage/IMPLEMENTATION.md#twenty-seventh-integration-checkpoint).
+
+## 2026-10-18 full-coverage R26 checkpoint
+
+Frozen `3c3423eb` passed central preflight **825 tests** (27.22s) and a separate
+cross-feature focus **8 tests** (7.89s). Both source snapshots were unchanged,
+with no owned processes remaining. The actual Program roster has 257 entries.
+A separate exact 2025.1 media-result program capture passed **1 test** (1.13s);
+its full-product overlay records program proof and missing native proof, not
+completed coverage. Both overlay generation and identical check returned
+expected exit 2 while other obligations remain open.
+
+Authoring diagnostic `a79ef03b` failed before launch; repaired `f4abca75` launched
+but timed out before WAAPI readiness. Both source projects stayed unchanged;
+the latter's owned process cleanup completed. Neither is a native business PASS.
+No new full Program, Non-live, Fresh or Windows result is added. See the
+[implementation checkpoint](../docs/plans/full-waapi-coverage/IMPLEMENTATION.md#twenty-sixth-integration-checkpoint).
+
+## 2026-10-18 full-coverage R25 checkpoint
+
+The complete five-version Program gate at `55383f8c` ended **12,245 passed /
+168 failed / 4 skipped** (4,131.32s). R25 fixes have scoped passing successors
+for those original failures; no replacement full-gate PASS is claimed.
+Central `7228c25f` recorded **820 passed / 5 failed**; combined repair focus
+`0311ab60` recorded **208 passed / 1 failed**, including the five central repairs;
+`883fd0c7` then passed the sole remaining metadata-drift error-fixture node.
+All source snapshots were unchanged and owned processes ended. Counts are not
+summed into a single-candidate gate. The actual Program roster has 256 entries.
+
+Exact earlier `6ca8d96c` passed one prospective AuxBus reference case on each
+supported native version. Existing-source reference/scalar/create-merge and the
+new optional saved None-state handling still need matching native proof.
+No Fresh or Windows run is added. See the
+[implementation checkpoint](../docs/plans/full-waapi-coverage/IMPLEMENTATION.md#twenty-fifth-integration-checkpoint)
+for retained failures and scope limits.
+
 ## 2026-10-17 v1.1 repair checkpoint
 
 Candidate `e8ca72d3` passed Program **6942 / 3 skipped** and Non-live
@@ -746,3 +5461,260 @@ Collected with `ci/test.sh --version all --mode matrix -- --collect-only -q`. Th
 | Final #51 Weapons batch-order repair gates on exact code candidate `fd2f9ed2c9fd2336e76545b1aef6f0ce4e99acfe` | macOS Program 4738 passed / 2 skipped; native-Windows Program 4715 passed / 25 skipped; macOS Non-live 10325 passed, 113 skipped, 27 deselected; focused object-set batch/Gateway/Broker regression 14/14; all exit 0 | Frozen exact-candidate roots `imac-int-2e60bce-r69-full12` and `iwin-int-2e60bce-r60-full12` each passed ten units and failed only INT22/INT25 Weapons before Gateway because the Broker compared commutative repeated-option placement literally. All four failures had the same argument-14 rejection; the source hashes/mtimes were unchanged and failed sandboxes were retained. The repair derives stable object-set fields from the operation contract, avoids rewriting an unchanged handle registry, and canonicalizes independent batch groups while checking every object, field, handle, and value. Its initially strict row-sequence oracle was superseded by the final semantic-harness correction below. Program and Non-live started neither Codex nor Wwise; declared platform/live skips receive no PASS credit. |
 | Final #51 independent-row oracle and public integration closure on exact candidate `0682c1a979f7ce5bfb648914914b7393148a6495` | Focused independent-row/Weapons regression passed 14/14. Native Windows root `iwin-int-0682c1a-r63-full12` passed 12/12 in one root plus identical verify-only. MacOS root `imac-int-0682c1a-r73-full12` passed 11/12; queued root `imac-int-0682c1a-r74-int22-rifle` passed the sole failed unit plus identical verify-only. | The packaged Skill tree is byte-identical to `0edaf1a`. Independent existing-object edits may be permuted, while missing, extra, duplicate, or changed rows and facts still fail closed; ordered create/import semantics are unchanged. The Mac failure was an Agent-only early stop after falsely calling `response_integrity.complete=true, truncated=false` truncated, so no code or harness change preceded the queued rerun. MacOS therefore has explicitly cumulative same-candidate 12/12 evidence, not a single-root claim; Windows has a single-root 12/12. Across 25 lifecycle records source hashes/mtimes were unchanged, PASS sandboxes were removed, the failed sandbox remained sealed, verify-only replays exited 0, and final LaunchAgent/Scheduled Task/Wwise checks were empty. |
 | Post-audit transaction execution-lease gates | Exact product candidate `4dadee360c736c18a7c616dd8f67a2ea31be1f00`: focused concurrency/lease regression passed 5/5 on macOS and native Windows; macOS Program passed 4743 / 2 platform skips; native-Windows Program passed 4720 / 25 platform skips. Test-only manifest-count successor `f17554acbd065f8d7cc25cea4afdf423d653b511` passed the exact self-check 1/1 on both hosts and full macOS Non-live 10330 / 113 skipped / 27 deselected. Every credited invocation exited 0. | A deterministic red test first reproduced the defect: while one fake WAAPI call held a transaction in `executing`, a concurrent verify changed it to `indeterminate`. The fix adds a separate non-blocking, cross-process execution lease held across validation, dispatch, and result persistence. A contender returns `execution_in_progress` without changing durable state; only a caller that acquires the lease and still observes `executing` may perform stale-owner recovery. Tests cover active execute versus verify, abandoned-state recovery without replay, successful execution followed by rejected re-execution, POSIX ownership/release, and real native-Windows `msvcrt` contention/release. The first Non-live run passed 10329 tests and exposed only the stale 180-node manifest expectation; after changing it to the measured 182 nodes, the focused check and complete rerun passed. Program and Non-live started neither Codex nor Wwise, so no Fresh Agent or real-Wwise evidence is claimed. |
+
+## Archived steering evidence
+
+The following records preserve historical statements moved from always-loaded
+agent guidance at `cba4eefb`. Their original candidates, failures and cumulative
+qualifications remain unchanged. They grant no evidence to later candidates.
+
+### Historical steering record: `AGENTS.md` lines 479–669 at `cba4eefb`
+
+Pre-review public `integration` candidate
+`ebcfde245bcbcacd2b8842e5ec205e7111b86743` passed all 12 units in one fresh
+root on each host: macOS `imac-int-ebcfde2-r67-full12` and native Windows
+`iwin-int-ebcfde2-r56-full12`. Both roots then passed identical
+`--resume --verify-only`. Across the 24 PASS lifecycle records, source-project
+full hashes and mtimes remained unchanged, passing sandboxes were removed, and
+final scoped-process checks were empty. The macOS LaunchAgent and Windows
+`InteractiveToken` / `Limited` Scheduled Tasks were deleted. This is
+independent single-root 12/12 evidence on both hosts, not cumulative repair-root
+credit. Review-repair code candidate
+`170e8e8f01cd5e931933c6fe76baff47d0683f57` later hardened playing and
+transport capability stores against Windows reparse points and resolved
+non-stable object-set batch `--field` names through live metadata, so the
+earlier root remains truthful evidence but is not final-candidate acceptance
+for that successor. That successor passed macOS Program 4737 / 2 skipped,
+native Windows Program 4714 / 25 skipped, and macOS Non-live 10322 / 113
+skipped / 27 deselected. Batch-order repair candidate
+`fd2f9ed2c9fd2336e76545b1aef6f0ce4e99acfe` then passed macOS Program 4738 /
+2 skipped, native Windows Program 4715 / 25 skipped, and macOS Non-live 10325 /
+113 skipped / 27 deselected before its targeted Weapons reruns.
+
+Final semantic-harness candidate
+`0682c1a979f7ce5bfb648914914b7393148a6495` keeps the packaged Skill tree
+byte-identical to `0edaf1a` and accepts permutations of independent existing-
+object edit rows while still rejecting missing, extra, duplicate, or changed
+objects, fields, handles, and values. Native-Windows root
+`iwin-int-0682c1a-r63-full12` passed the public `integration` profile 12/12 in
+one root plus identical verify-only. MacOS root
+`imac-int-0682c1a-r73-full12` passed 11/12; only INT22 Rifle stopped before
+Preview after the Agent incorrectly called an explicit
+`complete=true, truncated=false` response truncated. Fresh queued root
+`imac-int-0682c1a-r74-int22-rifle` then passed that sole unit plus identical
+verify-only without any code, suite, harness, or option change. MacOS therefore
+has same-candidate cumulative 12/12 evidence, not a single-root 12/12 claim.
+Every source hash and project mtime remained unchanged, passing sandboxes were
+removed, the failed sandbox stayed sealed, and all temporary LaunchAgents,
+Scheduled Tasks, and Wwise processes were cleared.
+
+Composer migration evidence is focused Adapter evidence, not public
+`integration` acceptance. For `object.set`, candidate
+`68697244063e02304eea79da54da502270be3704` passed Weather and Weapons on
+Wwise 2022.1/2025.1 in both macOS root `imac-flatrow-6869724-r1` and
+native-Windows root `i15-6869724-r1`; both four-unit roots also passed
+identical `--resume --verify-only` audits. For `audio.import`, macOS root
+`imac-import-6479595-r13-final6` at
+`6479595ea4b9a53c3351a4d1595c988e94ee5967` passed all six selected
+Weather/Rifle/Footsteps version units fresh and verify-only. Native-Windows
+root `iwin-import-f87b800-r2-interactive` passed four and failed two;
+`iwin-import-0be8266-r3-rifle-footsteps` then passed Footsteps and failed
+Rifle, and final fresh root `iwin-import-0be8266-r4-rifle` passed Rifle and
+its identical verify-only audit. The commits after `6479595` changed only
+program/semantic tests and harness support, not the packaged Skill tree. Thus
+all six Windows audio-import units have passing evidence cumulatively across
+three frozen roots, not one root or one Git candidate with a 6/6 result. Every
+recorded source hash/mtime stayed unchanged; PASS sandboxes were removed, FAIL
+sandboxes were sealed/quarantined, and scoped residual-process checks were
+empty.
+
+For Switch assignments, runtime candidate
+`d05f1ecdc3b33fca83866e75669c65039877edd6` passed the final macOS and
+native-Windows Program gates, macOS Non-live, and the closed add/remove
+workflow on native Windows Wwise 2022.1/2025.1. Route-only candidate
+`d45f75f5e75190d5b4e607a02aee2dcf38e73ab9` then passed macOS Program and
+the same real workflow on macOS 2022.1/2025.1. Fresh roots
+`imac-sab-d45f75f-r2` and `iwin-sab-d45f75f-r2` each passed the one-unit
+`switch_assignment_business_1` profile plus identical
+`--resume --verify-only`. Earlier `d05f1ec` roots on both hosts remain
+frozen FAILs because the Agents invented operation aliases; the Broker rejected
+them before Gateway or Wwise dispatch. No Fresh root executed a mutation, all
+temporary launch resources were removed, and scoped residual-process checks
+were empty.
+After the entry Skill was compacted, exact packaged-Skill candidate
+`b544197fb6b7455814fbb2079043a5a354daca59` repeated the same one-unit PASS
+plus identical verify-only in macOS root `imac-sab-b544197-r1` and
+native-Windows root `iwin-sab-b544197-r1`. Both roots retained sealed attempt
+manifests, started no Wwise process, executed no mutation, removed their
+temporary launch resources, and ended with zero scoped residual processes.
+
+Final deepened Switch-assignment candidate
+`c874917220cb7723d60f86a14cea72c5d15cca52` passed the one-unit profile
+fresh plus identical `--resume --verify-only` in macOS root
+`imac-sab-c874917-r1` and native-Windows root `iwin-sab-c874917-r1`.
+Both Agents followed the Gateway-owned copy-ready `draft-start`, then the fixed
+`switch_container`, `child`, and `state_or_switch` role continuations into one
+Preview; no Wwise process or mutation occurred. The Windows Fresh and replay
+used temporary `InteractiveToken`/`Limited` Scheduled Tasks. Both hosts ended
+with zero scoped residual processes and Windows retained zero matching tasks.
+Exact Program candidate `4c55ba6b53eeb4beff97e7b590686d78da7e612e`
+passed macOS 3659 / 2 skipped and native Windows 3646 / 15 skipped; later
+`c874917` changes only semantic evidence/protocol tests. MacOS Non-live at
+`d10dc23c4dd95eb865a5a768ac8a4e0885e6a233` passed 8639 / 110 skipped /
+27 deselected. The later packaged diffs are bounded to copy-ready business
+start/role continuations and compact audio-import receipts, covered by exact
+focused regressions (410 passed at `4389b6c`, 452 / 4 skipped at `4c55ba6`,
+and 76 passed at `c874917`); Switch native dispatch and verification did not
+change. Frozen Mac diagnostic root `imac-sab-d10dc23-r1` stopped after a
+successful schema read without issuing `draft-start`, received no PASS credit,
+and was not replayed.
+
+The completed 2026-07-31 macOS integration evidence is cumulative across frozen
+campaign roots, not one final-candidate 6/6 run. The initial `a12` root passed
+both Alarm and Harbor workflows on both versions and failed both Weather
+workflows. Fresh repaired roots `a20-int22-weather` and
+`a24-int25-weather` then passed the two Weather units. Thus all six unique
+profile units have passing evidence across those roots; do not report that
+`a12` itself passed 6/6 or that all six were rerun after the final repair.
+Every passing sandbox was removed, failed sandboxes were sealed and
+quarantined, and both source SampleProjects retained identical full hashes and
+mtimes. This older evidence belongs to the candidate before the
+structured-query request and closed mutation-selector migration.
+The roots named in this paragraph and the 2026-08-03 macOS paragraph below
+seal `runtime.platform=darwin`; later cross-host component reruns are recorded
+separately.
+
+The 2026-08-03 current-wording rerun is also cumulative, not one final-candidate
+6/6 run. `campaign-integration-workflows-v1-terra-20260803-current-r1` passed
+five units and failed `INT25-ALARM-DIAGNOSE-AND-REPAIR` before mutation because
+the Agent redundantly re-read the Action instead of following the already
+returned `Target.id`. The Skill query reference was then narrowed to forbid
+that duplicate hop. Fresh roots `r2-int25-alarm-action-hop` and
+`r3-int22-alarm-action-hop` passed both Alarm versions on the same repaired
+candidate, and both passed `--resume --verify-only`. Weather and Harbor had
+loaded only the unchanged operate reference in `r1`; all four passed there.
+Thus all six current prompt units have passing evidence across these roots,
+but there is still no single repaired-candidate 6/6 campaign. All eight
+recorded lifecycles preserved source hashes and mtimes; passing sandboxes were
+removed and the one failed sandbox remains quarantined. Those V1 roots do not
+validate the newer V2 fixture, routing, or workflow contracts.
+
+Later reruns used the legacy internal
+`integration_workflows_cross_version_6` component, not the public composed
+`integration` profile. At commit
+`9e75a1aea496abcb9ef2a61e1da685adb99f4b01`, macOS root
+`imac-wah-9e75a1a-r1` passed all six component units fresh and then passed
+`--resume --verify-only`. At commit
+`9b4de8f618855091a424700b50ab8b0fd1989270`, macOS root
+`imac-wah-9b4de8f-r1` passed five units and failed one, while native-Windows
+root `iwin-wah-9b4de8f-r1` passed three and failed three; both failed roots
+were frozen without verify-only replay. These results remain exact
+six-unit-component provenance and must not be reported as current public
+`integration` acceptance or combined into a unified 12/12 result.
+
+### Historical steering record: `AGENTS.md` lines 686–706 at `cba4eefb`
+
+The completed 2026-08-03 macOS evidence for that legacy component is
+cumulative across frozen roots, not one final-candidate 6/6 run. `r8` passed
+both Rifle units, `r12-2022` passed the
+2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
+`r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. Thus all six
+unique units have passing evidence across those roots. Passing sandboxes were
+removed; failed or blocked diagnostic sandboxes were sealed and quarantined;
+every recorded source-project full hash and mtime remained unchanged. This
+grants no per-API coverage credit and proves only the exact Rifle, Footsteps,
+and Weapons workflow paths, not advanced WAQL or unrelated routes.
+
+The later native-Windows evidence for that legacy component is also cumulative.
+At commit `0dfea2b`,
+`windows-v2-six-0dfea2b-r1` attempted all six units, passed 2022.1 Rifle,
+2022.1 Footsteps, and 2025.1 Rifle, failed the other three, exited `1`, and had
+no verify-only replay. At `a516835`, `a516-w22-r1` passed 2022.1 Weapons fresh
+and verify-only; `a516-f25-r1` failed 2025.1 Footsteps and was frozen without
+verify-only. At `f1b6a51`, `f1b-f25-r1` and `f1b-w25-r1` passed 2025.1
+Footsteps and Weapons fresh and verify-only. All six V2 units therefore have
+native-Windows passing evidence across these frozen roots, but there is no
+single-root or single-candidate Windows 6/6 result.
+
+### Historical steering record: `tests/AGENTS.md` lines 544–554 at `cba4eefb`
+
+The focused `modification_policy_9` campaign is separate from those historical
+v2 totals. Its sealed
+`campaign-modification-policy-9-c7` run passed 9/9 Wwise 2022.1 tasks and all
+15 turns using nine unique memory-isolated Codex Terra threads. It covered
+three repetitions each of `read_only`, question-style `ask_before_changes`,
+and same-turn `allow_changes`; all source-project hashes remained unchanged
+and every sandbox was cleaned. The six authorized writes each verified seven
+created objects through 46 passing business assertions. Preserve this exact
+scope: it is policy-interaction evidence for that frozen c7 candidate, not
+broad API, cross-version semantic coverage, or fresh evidence for later
+structured-query and closed-selector changes.
+
+### Historical steering record: `tests/AGENTS.md` lines 585–735 at `cba4eefb`
+
+Historical macOS evidence is split across three frozen 2026-07-31 roots. Initial
+`a12` passed the four Alarm/Harbor version units and failed both Weather units;
+fresh `a20-int22-weather` and `a24-int25-weather` roots passed the repaired
+Weather units. This is passing evidence for all six unique units across roots,
+not one single-candidate 6/6 campaign. Passing sandboxes were cleaned, failed
+sandboxes remain quarantined, and every lifecycle record reports unchanged
+source-project full hash and mtime. Those campaigns predate the structured
+`query-schema`/`query-object --request-json` migration, the separately
+disclosed bounded advanced-WAQL layer, and the removal of raw WAQL mutation
+selectors. Those V1 roots do not validate the newer routing contracts; keep
+the historical integration result attached only to its migration-before
+candidate. The V2 evidence below applies only to its exact workflow paths.
+The roots named in this paragraph and the 2026-08-03 macOS paragraph below
+seal `runtime.platform=darwin`; later cross-host component reruns are recorded
+separately.
+
+The natural-language prompt revision received a fresh 2026-08-03 campaign.
+`campaign-integration-workflows-v1-terra-20260803-current-r1` passed five of
+six units. The 2025.1 Alarm failed safely on turn one because the Agent added a
+redundant exact-ID Action lookup after the Event children row had already
+returned `ActionType` and `Target`; no mutation occurred. After a query-reference
+repair clarified that `Target.id` is the next Sound identity, fresh roots
+`r2-int25-alarm-action-hop` and `r3-int22-alarm-action-hop` passed the 2025.1
+and 2022.1 Alarm units on the same repaired candidate. Both repair roots pass
+`--resume --verify-only`. Weather and Harbor loaded only the unchanged operate
+reference and passed for both versions in `r1`. This gives all six current
+prompt units passing evidence across roots, not a single repaired-candidate
+6/6 run. All eight lifecycle records preserve source hashes and mtimes;
+passing sandboxes were cleaned and the failed sandbox remains quarantined.
+Those V1 roots do not validate the newer V2 fixture, routing, or workflow
+contracts.
+
+Later reruns used the legacy internal
+`integration_workflows_cross_version_6` component, not the public composed
+`integration` profile. At commit
+`9e75a1aea496abcb9ef2a61e1da685adb99f4b01`, macOS root
+`imac-wah-9e75a1a-r1` passed all six component units fresh and passed
+`--resume --verify-only`. At commit
+`9b4de8f618855091a424700b50ab8b0fd1989270`, macOS root
+`imac-wah-9b4de8f-r1` passed five units and failed one, and native-Windows root
+`iwin-wah-9b4de8f-r1` passed three and failed three; both failed roots were
+frozen without verify-only replay. These runs are exact legacy-component
+provenance, not current `integration` acceptance and not unified 12/12 evidence.
+
+### Historical steering record: `tests/AGENTS.md` lines 748–767 at `cba4eefb`
+
+The completed 2026-08-03 macOS evidence for that legacy component is
+cumulative across frozen roots, not one final-candidate 6/6 run. `r8` passed
+both Rifle units, `r12-2022` passed the
+2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
+`r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. All six unique
+units therefore have passing evidence across those roots. Passing sandboxes
+were removed; failed or blocked diagnostic sandboxes were sealed and
+quarantined; every recorded source-project full hash and mtime remained
+unchanged.
+
+The later native-Windows evidence for that legacy component is also cumulative.
+Commit `0dfea2b` root
+`windows-v2-six-0dfea2b-r1` attempted all six units, passed 2022.1 Rifle,
+2022.1 Footsteps, and 2025.1 Rifle, failed the other three, exited `1`, and had
+no verify-only replay. At `a516835`, `a516-w22-r1` passed 2022.1 Weapons fresh
+and verify-only; `a516-f25-r1` failed 2025.1 Footsteps and was frozen without
+verify-only. At `f1b6a51`, `f1b-f25-r1` and `f1b-w25-r1` passed 2025.1
+Footsteps and Weapons fresh and verify-only. All six V2 units therefore have
+native-Windows passing evidence across these frozen roots, but there is no
+single-root or single-candidate Windows 6/6 result.

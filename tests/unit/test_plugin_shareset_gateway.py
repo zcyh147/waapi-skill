@@ -48,7 +48,7 @@ class ShareSetClient(BindingClient):
                 plugin.update(self.plugin_overrides)
                 return {"return": [{field: plugin[field] for field in options["return"] if field in plugin}]}
             if args.get("transform"):
-                return {"return": self.children}
+                return {"return": self.children + ([{"id": PLUGIN, "name": "Room", "type": "Effect", "parent": {"id": PARENT}}] if self.created else [])}
             return {"return": [self.target]}
         return super().call(uri, args, options)
 

@@ -1,0 +1,37 @@
+{
+  "contract": "waapi-skill.music-playlist-construction-source/v1",
+  "version": "2024.1",
+  "build": "2024.1.13.9056",
+  "sources": [
+    {
+      "member": "wwiseobject_musicplaylistitem.html",
+      "sha256": "ed6ce04c586d3dd5faed4e608d2ad1bb7bf30770a3870676547e8d051fbbdd91",
+      "archive_sha256": "aa6b467caae07c2363806adc1dadeed8df7a29c4bdf2d23fd629126208054364"
+    },
+    {
+      "member": "ak_wwise_core_object_set_example_create_a_music_playlist_container_with_segment_and_playlist.html",
+      "sha256": "71decf0495bb28ab251ec457ea3f056e5bb7c195260b742d26c3897fec4c2ab1",
+      "archive_sha256": "aa6b467caae07c2363806adc1dadeed8df7a29c4bdf2d23fd629126208054364"
+    }
+  ],
+  "manifest_sha256": "45e1f3cd2e18f0c9d6b86adcc5ce5823a05bb059c26a6713c6c99e9461aa0f68",
+  "item_class": 2359312,
+  "source_enum": {
+    "Group": 0,
+    "Segment": 1
+  },
+  "native_root": "PlaylistRoot",
+  "native_segment": "Segment",
+  "intrinsic_name": "",
+  "ordered_getter_native_evidence": {
+    "observed_version": "2025.1",
+    "build": "2025.1.7.9143",
+    "host": "wwise-console",
+    "platform": "macOS",
+    "scope": "representative stored tree order and exact old GUID absence; no playback quality or other-version native claim",
+    "source": "references/semantic/2025.1/music-playlist-sources/native-readback.original.json",
+    "sha256": "1b65f7cbff6ecd83fb20059157f6b78b70eef375eca0e1bc15ae8a067e0a47b1",
+    "lifecycle_source": "references/semantic/2025.1/music-playlist-sources/native-lifecycle.original.json",
+    "lifecycle_sha256": "4311c617f6588d7547b80c86e02ae40a6f55820dbeeacd8ae77fc873bdbce6c8"
+  }
+}

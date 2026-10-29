@@ -311,6 +311,7 @@ def _get_source_files_request(
         "originals_folder",
         "recursive",
         "include_usage_objects",
+        "usage_outputs",
         "max_results",
     }
     if set(plan) - allowed:
@@ -327,7 +328,19 @@ def _get_source_files_request(
             action="choose all, used, or unused",
         )
     recursive = plan.get("recursive", True)
-    include_usage = plan.get("include_usage_objects", False)
+    from .object_query_outputs import available_query_outputs
+    output_choices = available_query_outputs(version)
+    usage_outputs = plan.get("usage_outputs", [])
+    if (not isinstance(usage_outputs, list) or len(usage_outputs) > len(output_choices)
+            or any(not isinstance(name, str) or name not in output_choices for name in usage_outputs)
+            or len(set(usage_outputs)) != len(usage_outputs)):
+        _repair("SOURCE_CONTROL_USAGE_OUTPUT_INVALID", field="usage_outputs",
+                action="choose distinct disclosed business outputs available in this version",
+                choices=sorted(output_choices))
+    include_usage = plan.get("include_usage_objects", bool(usage_outputs))
+    if usage_outputs and include_usage is False:
+        _repair("SOURCE_CONTROL_USAGE_OUTPUT_CONFLICT", field="include_usage_objects",
+                action="omit --no-usage-objects when selecting usage outputs")
     max_results = plan.get("max_results", 100)
     if not isinstance(recursive, bool) or not isinstance(include_usage, bool):
         _repair(
@@ -354,7 +367,7 @@ def _get_source_files_request(
     options: dict[str, Any] = {"return": fields}
     if include_usage:
         fields.append("usage")
-        options["objectReturn"] = ["id", "name", "type", "path"]
+        options["objectReturn"] = ["id", "name", "type", "path", *[output_choices[name][0] for name in usage_outputs]]
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",
@@ -386,37 +399,52 @@ def materialize_source_control_business_request(
         operation,
         session.context.wwise_version,
     )
-    if operation == SOURCE_CONTROL_SET_PROVIDER_URI:
-        _repair(
-            "SOURCE_CONTROL_PROVIDER_CONFIGURATION_REQUIRED",
-            field="provider",
-            action="configure provider and credentials in human-owned Wwise settings",
-        )
     raw_roots, plan = _settings(session)
+    if operation == SOURCE_CONTROL_SET_PROVIDER_URI:
+        from .source_control_profiles import validate_binding
+        if set(plan) != {"provider_profile_binding"}:
+            _repair("SOURCE_CONTROL_PROFILE_REQUIRED", field="provider_profile", action="select --provider-profile configured")
+        binding = validate_binding(plan["provider_profile_binding"])
+        return parse_operation_request({"contract": "waapi-skill.operation-request/v1",
+            "version": session.context.wwise_version, "operation": "waapi.call", "arguments": {
+                "api": operation, "args": {"provider": binding["provider"]}, "options": {},
+                "provider_profile_binding": binding, "io_root": str(_roots(raw_roots)["project"])}}).as_dict()
     if operation == SOURCE_CONTROL_GET_SOURCE_FILES_URI:
         return _get_source_files_request(plan, version=session.context.wwise_version)
     roots = _roots(raw_roots)
     explicit_io_root = _io_root(plan)
-    allowed = {"files", "io_root"}
+    allowed = {"files", "io_root", "object_file_binding"}
     if operation == SOURCE_CONTROL_COMMIT_URI:
         allowed.add("commit_message")
     if operation == SOURCE_CONTROL_MOVE_URI:
-        allowed = {"moves", "io_root"}
-    if set(plan) != (allowed - {"io_root"}) and not (
-        "io_root" in plan and set(plan) == allowed
-    ):
+        allowed = {"moves", "io_root", "object_move_inputs"}
+    required = {"moves"} if operation == SOURCE_CONTROL_MOVE_URI else {"files"}
+    if operation == SOURCE_CONTROL_COMMIT_URI:
+        required.add("commit_message")
+    if not required <= set(plan) or set(plan) - allowed:
         _repair(
             "SOURCE_CONTROL_PLAN_FIELDS_INVALID",
             field="source_control_plan",
             action="submit exactly the disclosed fields for this source-control action",
         )
+    object_move_binding = None
     if operation in _FILE_OPERATIONS:
-        paths = _file_paths(
-            plan.get("files"),
-            roots=roots,
-            io_root=explicit_io_root,
-            require_existing=operation in _EXISTING_SOURCE_OPERATIONS,
-        )
+        paths = ([] if plan.get("files") == [] and plan.get("object_file_binding") else _file_paths(
+            plan.get("files"), roots=roots, io_root=explicit_io_root,
+            require_existing=operation in _EXISTING_SOURCE_OPERATIONS))
+        if plan.get("object_file_binding"):
+            from .source_control_object_files import validate_object_file_binding
+            try:
+                bound_files = validate_object_file_binding(operation, plan["object_file_binding"])
+            except ValueError as exc:
+                _repair("SOURCE_CONTROL_OBJECT_FILE_BINDING_INVALID", field="object_files", action=str(exc))
+            observed_paths = list(dict.fromkeys(row["file_path"] for row in bound_files))
+            derived = _file_paths([{"scope": "exact", "path": path} for path in observed_paths],
+                roots=roots, io_root=explicit_io_root or roots["project"],
+                require_existing=operation in _EXISTING_SOURCE_OPERATIONS)
+            paths = list(dict.fromkeys([*paths, *derived]))
+            if len(paths) > MAX_SOURCE_CONTROL_FILES:
+                _repair("SOURCE_CONTROL_FILES_INVALID", field="object_files", action="reduce the combined exact file set")
         native_args: dict[str, Any] = {"files": [str(path) for path in paths]}
         if operation == SOURCE_CONTROL_COMMIT_URI:
             message = plan.get("commit_message")
@@ -436,6 +464,25 @@ def materialize_source_control_business_request(
         all_paths = paths
     elif operation == SOURCE_CONTROL_MOVE_URI:
         moves = plan.get("moves")
+        literal_count = len(moves) if isinstance(moves, list) else 0
+        if plan.get("object_move_inputs"):
+            from .source_control_object_moves import materialize_move_inputs
+            def resolve_move_file(locator: Any, *, derived: bool) -> Path:
+                return _locator_path(locator, roots=roots,
+                    io_root=(explicit_io_root or roots["project"]) if derived else explicit_io_root,
+                    field="object_moves")
+            try:
+                derived_moves, object_move_binding = materialize_move_inputs(plan["object_move_inputs"], resolve_file=resolve_move_file)
+            except ValueError as exc:
+                _repair("SOURCE_CONTROL_OBJECT_FILE_BINDING_INVALID", field="object_moves", action=str(exc))
+            # The derived paths have already passed exactly the same root checks.
+            # Use project-relative locators where possible, retaining explicit I/O authority elsewhere.
+            for move in derived_moves:
+                for side, locator in move.items():
+                    path = Path(locator["path"])
+                    if path.is_relative_to(roots["project"]):
+                        move[side] = {"scope": "project", "path": path.relative_to(roots["project"]).as_posix()}
+            moves = [*moves, *derived_moves] if isinstance(moves, list) else moves
         if (
             not isinstance(moves, Sequence)
             or isinstance(moves, (str, bytes, bytearray))
@@ -467,6 +514,15 @@ def materialize_source_control_business_request(
                 io_root=explicit_io_root,
                 field=f"moves[{index}].destination",
             )
+            sources.append(source)
+            destinations.append(destination)
+        source_keys = [os.path.normcase(str(path)) for path in sources]
+        destination_keys = [os.path.normcase(str(path)) for path in destinations]
+        if (len(set(source_keys)) != len(source_keys) or len(set(destination_keys)) != len(destination_keys)
+            or set(source_keys) & set(destination_keys)):
+            _repair("SOURCE_CONTROL_MOVES_CONFLICT", field="moves",
+                    action="choose distinct sources and destinations with no source/destination intersection")
+        for index, (source, destination) in enumerate(zip(sources, destinations)):
             if not source.is_file() or path_is_link_or_reparse(source):
                 _repair(
                     "SOURCE_CONTROL_SOURCE_MISSING",
@@ -485,13 +541,18 @@ def materialize_source_control_business_request(
                     field=f"moves[{index}].destination",
                     action="choose a destination inside an existing ordinary directory",
                 )
-            sources.append(source)
-            destinations.append(destination)
         native_args = {
             "files": [str(path) for path in sources],
             "newFiles": [str(path) for path in destinations],
         }
         all_paths = [*sources, *destinations]
+        object_move_binding = object_move_binding or {"objects": [], "moves": []}
+        object_move_binding["moves"] = [
+            *({"row_id": None, "source_index": None, "destination_index": None, "basename": None,
+               "source_path": str(source), "destination_path": str(destination)}
+              for source, destination in zip(sources[:literal_count], destinations[:literal_count])),
+            *object_move_binding["moves"],
+        ]
     else:  # pragma: no cover - contract registry invariant
         raise ValueError("unsupported source-control business operation")
     arguments: dict[str, Any] = {
@@ -499,6 +560,10 @@ def materialize_source_control_business_request(
         "args": native_args,
         "options": {},
     }
+    if plan.get("object_file_binding"):
+        arguments["source_control_binding"] = dict(plan["object_file_binding"])
+    if object_move_binding is not None:
+        arguments["source_control_binding"] = object_move_binding
     if operation in _MUTATIONS:
         arguments["io_root"] = str(
             _mutation_io_root(

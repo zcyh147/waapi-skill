@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+from pathlib import Path
 from typing import Any
 
 from .business_declarations import SUPPORTED_WWISE_VERSIONS
@@ -21,7 +24,7 @@ _DECLARATIONS: dict[str, dict[str, Any]] = {
             "check_out_from_source_control",
         ],
         "field_types": {
-            "name_conflict": "fail_or_rename",
+            "name_conflict": "fail_or_rename_or_replace",
             "add_to_source_control": "boolean",
             "check_out_from_source_control": "boolean",
         },
@@ -40,7 +43,7 @@ _DECLARATIONS: dict[str, dict[str, Any]] = {
             "check_out_from_source_control",
         ],
         "field_types": {
-            "name_conflict": "fail_or_rename",
+            "name_conflict": "fail_or_rename_or_replace",
             "check_out_from_source_control": "boolean",
         },
     },
@@ -59,6 +62,18 @@ _DECLARATIONS: dict[str, dict[str, Any]] = {
         },
     },
 }
+
+
+def object_name_native_limitations(version: str) -> list[dict[str, Any]]:
+    """Expose pinned capability facts without historical task or transaction state."""
+    if version != "2025.1":
+        return []
+    path = Path(__file__).resolve().parents[1] / "references" / "semantic" / version / "playlist-slot-name-native-boundary.json"
+    with path.open("rb") as source:
+        raw = source.read(8193)
+    if len(raw) > 8192 or hashlib.sha256(raw).hexdigest() != "8d7e60dd8531958037214c0789c3a3a8302da80d72c499ba6773af9f0f63eb0d":
+        raise ValueError("Pinned PlaylistSlot native name-boundary source changed")
+    return [json.loads(raw)]
 
 
 def object_lifecycle_business_contract_data(
@@ -119,10 +134,25 @@ def object_lifecycle_business_contract_data(
             "continuation",
         ],
         "legacy_inline_typed_public": False,
+        **({"native_name_limitations": object_name_native_limitations(version)}
+            if operation == "object.setName" else {}),
         "safety": {
             "immutable_preview": True,
             "single_execute": True,
             "object_revalidation": "exact_guid_name_type_path",
+            **({"destination": {
+                "admission": "exact_live_parent_and_versioned_parent_child_compatibility_independent_of_WorkUnit_name",
+                "protected": "Project_and_management_roots_remain_prohibited",
+                "existing_Source": "exact_Sound_parent_plus_unique_live_Source_category_or_pinned_file_Source_class;_class_and_identity_revalidated",
+                "boundary": "existing_object_transfer_admission_is_not_plugin_construction_or_complete_plugin_copy_proof",
+            }, "replace": {
+                "authorization": "explicit_name_conflict_replace_and_exact_destination",
+                "preview": "complete_bounded_source_and_replaced_subtree",
+                "revalidation": "identities_topology_notes_and_discovered_default_view_fields",
+                "verification": "source_copy_or_move_identity_and_topology_values_and_all_replaced_guid_absence",
+                "verification_boundary": "indeterminate_until_unlinked_platform_and_owned_list_plugin_state_are_observed",
+                "maximum_subtree_nodes": 128,
+            }} if operation in {"object.copy", "object.move"} else {}),
         },
         "version_features": {
             "add_to_source_control": add_to_source_control_available,
@@ -134,4 +164,5 @@ def object_lifecycle_business_contract_data(
 __all__ = [
     "OBJECT_LIFECYCLE_BUSINESS_CONTRACT",
     "object_lifecycle_business_contract_data",
+    "object_name_native_limitations",
 ]

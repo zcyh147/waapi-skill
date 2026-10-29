@@ -1,0 +1,17 @@
+[
+  {
+    "scope": "ModulatorTime",
+    "field": "EnvelopeStopPlayback",
+    "status": "captured",
+    "list_receipt": "005",
+    "detail_receipt": "006",
+    "whole_inventory_complete": true,
+    "detail_agent_result_sha256": "19e0d36d245cde9e9448b001af2c8793334b855e4ed8855cff1ff3b8e74bbbf7",
+    "native_receipt": "dispatcher-evidence/1792523736855286000-2ca0f0798e06410c8316a231a6b0f6be-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2021-r1/dispatcher-evidence/1792523736855286000-2ca0f0798e06410c8316a231a6b0f6be-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "408ed03b6ce6b9eca69aa4cb139c829e97fcc7eb0926cfe3be4d9db4c73de354",
+    "native_bytes": 1560,
+    "default_present": true,
+    "observed_default": true
+  }
+]

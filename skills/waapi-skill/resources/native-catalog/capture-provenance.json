@@ -1,0 +1,101 @@
+{
+  "captures": {
+    "2021.1/wwise-authoring.json": {
+      "candidate": "3c8406f3f5748f4107f5a11c78094c850a728d39",
+      "capture": "authoring-2021-r1",
+      "catalog_sha256": "567433b3c72a379f89639ca952562ff3feb9de4666d75c7906c6d1f50d7ee705",
+      "content_sha256": "237c92402a950df73a75cb15a5ad2fc48fbfeadef311053afea846632996ec7b",
+      "original_status": "CAPTURED",
+      "reflection_only": true,
+      "seal_sha256": "0b89778f1c5fb72f928ba2a144dded02e374b5167a9c76f3087e2ce53505819c"
+    },
+    "2021.1/wwise-console.json": {
+      "candidate": "3c8406f3f5748f4107f5a11c78094c850a728d39",
+      "capture": "console-2021-r1",
+      "catalog_sha256": "0d9258e455d39e360267fd8f90e68622707fbdccecc384b7048f0c21519927f5",
+      "content_sha256": "1095c5d28b63fa0c36da6bf7a970462e979d72d03b24444d51061a5c703501c8",
+      "original_status": "PASS",
+      "reflection_only": true,
+      "seal_sha256": "0cc2f51f633ee73e43f924b5aff9e5ac0cb0edf1ca908e3320c9fa9db9807ca1"
+    },
+    "2022.1/wwise-authoring.json": {
+      "candidate": "3c8406f3f5748f4107f5a11c78094c850a728d39",
+      "capture": "authoring-2022-r1",
+      "catalog_sha256": "f3df757ea64f15de83466f56f68601bd0085ca216dfc7f4a575909a3cb7a37c9",
+      "content_sha256": "b04cb8629b2f26a69e827bb6957885685dc61b8bd6ea95df2949f9ec2cbe6df1",
+      "original_status": "CAPTURED",
+      "reflection_only": true,
+      "seal_sha256": "c588a89bd27a29e7c9b698226f9a9118f5cc7a01d32ead8d37e761ac907b848f"
+    },
+    "2022.1/wwise-console.json": {
+      "candidate": "3c8406f3f5748f4107f5a11c78094c850a728d39",
+      "capture": "console-2022-r1",
+      "catalog_sha256": "cb340f2af737310e07b2e262b47701d5608d349143e2a904105f5a121bae2601",
+      "content_sha256": "a01fdc6d252579c8c4a83ed9423850efe6a70dc83b2882f8a7e49eca5032bdae",
+      "original_status": "PASS",
+      "reflection_only": true,
+      "seal_sha256": "cd97714c5cbf8121606da4f91f6222d76958d0ecdf968bbba607bc9c3a4d38f2"
+    },
+    "2023.1/wwise-authoring.json": {
+      "candidate": "3c8406f3f5748f4107f5a11c78094c850a728d39",
+      "capture": "authoring-2023-r1",
+      "catalog_sha256": "914125ee8523a35b7babfdf6f9f79062c12f2b77e9633813c0d8d9f636156274",
+      "content_sha256": "e2b9eca52f6b57622253b3d937fb7974dc9ec9176fb7cfe7d1b64dc3e63ea9b1",
+      "followup_cleanup": {
+        "note": "Original teardown checked immediately; subsequent bounded port-release guard passed. Original BLOCKED record retained.",
+        "port_released": true,
+        "residual_pids": [],
+        "source_unchanged": true
+      },
+      "original_status": "BLOCKED",
+      "reflection_only": true,
+      "seal_sha256": "b74ad47ba45df4ece345da22aa9c6f3348daf358bf0b5f6e324c1c9ad954a1b3"
+    },
+    "2023.1/wwise-console.json": {
+      "candidate": "3c8406f3f5748f4107f5a11c78094c850a728d39",
+      "capture": "console-2023-r1",
+      "catalog_sha256": "4e9c69a24479820952fc235c2f7f6b4931193bb0af76d462c93977649785ffa3",
+      "content_sha256": "d5990c1eab159c8ab86d168777265f6f4d6531ea84891e3d569be29ad9668841",
+      "original_status": "PASS",
+      "reflection_only": true,
+      "seal_sha256": "0ecd0ac0b32c897e00a8a9830b88b037ef1df596755e786aaa881dbcaeecfd25"
+    },
+    "2024.1/wwise-authoring.json": {
+      "candidate": "3c8406f3f5748f4107f5a11c78094c850a728d39",
+      "capture": "authoring-2024-r1",
+      "catalog_sha256": "c5a1480879e32a9a19d711e9dfc15f7bd222a479e84c79dc7a3694d6c4304840",
+      "content_sha256": "32d68574fe0f41a4ee70bb1c6098f5ecdac434d6f6e00bbb237cba4aa28f7fd9",
+      "original_status": "BLOCKED",
+      "reflection_only": true,
+      "seal_sha256": "dd7da07a0c4cf5575d415506082384f16ec6c1a3481019198920daa7e1d22aef"
+    },
+    "2024.1/wwise-console.json": {
+      "candidate": "3c8406f3f5748f4107f5a11c78094c850a728d39",
+      "capture": "console-2024-r1",
+      "catalog_sha256": "4709a7e429515efb80594d5395db3c0ef50d18be67153ecc844c8d494cffc380",
+      "content_sha256": "7f7e2f12e5a6fa369d33edc24f4aaa5dcf7fcaa48d5a357d7ddec33481840b89",
+      "original_status": "PASS",
+      "reflection_only": true,
+      "seal_sha256": "8ba456ee2b380437bd55254f22b65e39bbcb6ffeb89aa557618cfda1fb6fa126"
+    },
+    "2025.1/wwise-authoring.json": {
+      "candidate": "3c8406f3f5748f4107f5a11c78094c850a728d39",
+      "capture": "authoring-2025-r2",
+      "catalog_sha256": "b7602cd4e66c008fb80b321ef1841a0d61386f1d31fe9710ff268198b94fe906",
+      "content_sha256": "411c83c1e9b0d8d1fcb0fa82242e1a47728525379dfca93d1c4c40a9325679b5",
+      "original_status": "BLOCKED",
+      "reflection_only": true,
+      "seal_sha256": "6bab130ffeda2abce90534d9d5179aace80f28d7e4c4994a051fe1072d1e0be3"
+    },
+    "2025.1/wwise-console.json": {
+      "candidate": "3c8406f3f5748f4107f5a11c78094c850a728d39",
+      "capture": "console-2025-r1",
+      "catalog_sha256": "d0135cdd7e53ead98c50b6dc7f6be161d212a7d1feb9b2e52daf38e63acb6e1d",
+      "content_sha256": "7b3e3bc255bbc425bde6820e44bfdda6302a42da623e987e9ab4414651a36dc8",
+      "original_status": "PASS",
+      "reflection_only": true,
+      "seal_sha256": "d2c1aab2a672e3d2e5afbe06d8f25093ed0ba5b69e43dfa7f510a0ae9610bd16"
+    }
+  },
+  "contract": "waapi-skill.native-capture-provenance/v1"
+}

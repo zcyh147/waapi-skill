@@ -1,0 +1,43 @@
+{
+  "get_info": {
+    "directories": {
+      "user": "Y:\\Library\\Application Support\\Audiokinetic\\WwiseConsole",
+      "install": "Z:\\Applications\\Audiokinetic\\Wwise2025.1.7.9143\\",
+      "authoring": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\",
+      "bin": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\x64\\Release\\bin\\",
+      "help": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\Help\\"
+    },
+    "displayName": "WwiseConsole",
+    "platform": "x64",
+    "version": {
+      "displayName": "v2025.1.7",
+      "year": 2025,
+      "major": 1,
+      "minor": 7,
+      "build": 9143,
+      "nickname": "",
+      "schema": 133
+    },
+    "sessionId": "{D7C3BEB8-2E97-4F3B-9A3E-4F4B5F07B406}",
+    "apiVersion": 1,
+    "branch": "wwise_v2025.1.7",
+    "copyright": "(C) 2006-2026. Audiokinetic Inc. All rights reserved.",
+    "configuration": "release",
+    "isCommandLine": true,
+    "processId": 364,
+    "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe"
+  },
+  "host": "127.0.0.1",
+  "port": 30607,
+  "home": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2025-r1/scenario/owned/wwise-user-home",
+  "prefix": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2025-r1/scenario/owned/wwise-user-home/Library/Application Support/Wwise2019/Bottles/Wwise2019x64",
+  "sandbox": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2025-r1/scenario/owned/sandbox-root/sample-project-e5733c0031de488ead29ef2cdf83933d/SampleProject.wproj",
+  "source_hash_before": {
+    "algorithm": "sha256",
+    "strategy": "full",
+    "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+    "file_count": 83,
+    "bytes_hashed": 3943065
+  },
+  "source_mtime_before_ns": 1792521230238907829
+}

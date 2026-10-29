@@ -1,0 +1,13 @@
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.001293, "reason": "locked developer interpreter ready", "automatic_repair_attempted": false}
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.000146, "reason": "selected Non-live prerequisites ready", "automatic_repair_attempted": false}
+== Test Context ==
+version:      none
+mode:         nonlive
+console:      <unset>
+project:      <unset>
+sandbox_root: <unset>
+test_config:  <unset>
+pytest args:  -q -ra tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2021.1] tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2022.1] tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2023.1] tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2024.1] tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2025.1]
+
+.....                                                                    [100%]
+5 passed in 1.78s

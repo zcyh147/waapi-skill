@@ -676,6 +676,8 @@ def test_normal_object_set_schema_and_detail_expose_only_business_input(
         "draft-declare-existing",
         "draft-declare-existing-batch",
         "draft-declare-new",
+        "draft-declare-rtpc",
+        "draft-declare-field-change",
     ]
     assert adapter["declaration"]["existing_batch"]["business_quantities"] == {
         "action_time": {
@@ -737,10 +739,11 @@ def test_normal_audio_import_schema_exposes_only_its_business_declaration_input(
     transport = schema["business_adapter"]["field_transport"]
     assert "switch_value" in transport["literal_fields"]
     assert transport["dedicated_declaration_parameters"] == {
-        "switch_value": "--switch-value"
+        "switch_value": "--switch-value",
+        "dialogue_event": "--dialogue-event-handle OR --dialogue-event-parent-handle + --dialogue-event-name; optional repeated --dialogue-condition GROUP_HANDLE VALUE_HANDLE_OR_*; --dialogue-probability/--dialogue-weight require conditions"
     }
     assert transport["generic_declaration_field_exclusions"] == ["switch_value"]
-    assert transport["bound_object_handle_fields"] == ["output_bus"]
+    assert transport["bound_object_handle_fields"] == ["output_bus", "switch_group"]
     assert transport["reference_value_rule"] == (
         "copy_one_bound_object_handle_never_a_path_or_name"
     )
@@ -1308,11 +1311,11 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
         )
     expected_declaration_append = {
         "object.copy": [
-            "[--name-conflict fail|rename]",
+            "[--name-conflict fail|rename|replace]",
         ],
         "object.delete": [],
         "object.move": [
-            "[--name-conflict fail|rename]",
+            "[--name-conflict fail|rename|replace]",
         ],
         "object.setName": [
             "--new-name",
@@ -1562,7 +1565,7 @@ def test_named_reference_source_discloses_exact_existing_music_stinger_kind(vers
     assert continuation["required_next_phase"] == "discover_field_for_bound_object"
     assert "--object-handle" in continuation["field_discovery"]["append"]
     assert client.calls[-1] == ("ak.wwise.core.object.get", {"from": {"id": [STINGER_BINDING_ROW["id"]]}},
-                               {"return": ["id", "name", "type", "path"]})
+                               {"return": ["id", "name", "type", "path", "classId"]})
     assert not any(call[0] == "ak.wwise.core.object.setReference" for call in client.calls)
 
 

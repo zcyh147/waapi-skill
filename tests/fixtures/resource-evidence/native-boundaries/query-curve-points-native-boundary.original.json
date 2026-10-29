@@ -1,0 +1,60 @@
+{
+  "contract": "waapi-skill.query-curve-points-native-boundary/v1",
+  "version": "2021.1",
+  "wwise_build": "2021.1.14.8108",
+  "uri": "ak.wwise.core.object.get",
+  "accessor": "points",
+  "class_name": "Curve",
+  "class_id": 917520,
+  "status": "native_accessor_unavailable",
+  "scope": "fixed object.get return accessor points on Curve; not all legacy Curve or RTPC reads",
+  "source_delta": {
+    "2021": {
+      "definition_sha256": "1e23d3f4d2d9a654c4fd90655c955c20a43aadbccea4f393158cc4925e3139b4",
+      "named_points": false,
+      "points_definition": false,
+      "request_pattern_admits_identifier": true,
+      "request_pattern_pointer": "/definitions/returnExpression/items/anyOf/1",
+      "request_legality_does_not_prove_accessor_semantics": true,
+      "complete_retained_curve_field_names": ["Flags"],
+      "metadata_source": "tests/fixtures/branch-evidence/product/r51-replay-r55-settled-r2/originals/observation.original.json",
+      "metadata_source_sha256": "c409accff2f6b7ed19f20bc544a822e237ae646928d91154b0bf73070ac82f0a",
+      "sdk_curve_member": "wwiseobject_curve.html",
+      "sdk_curve_member_sha256": "eed5da8237c2b2281e4933505d0c8a15b8bbcdde3840b985e578d2a78e4841bc"
+    },
+    "2022": {
+      "wwise_build": "2022.1.19.8584",
+      "definition_sha256": "947aa8dc8a714ad5173290394f84b5f4739b2edb5d9d7a6b2884caf03e501d20",
+      "named_points": true,
+      "points_definition": true,
+      "native_result_pointer": "/definitions/objectReturn/properties/points",
+      "sdk_example_member": "ak_wwise_core_object_get_example_gets_information_for_a_curve.html",
+      "sdk_example_member_sha256": "438d986fdf4f02d5baa992872340889b8233e68222b57d3984b9f3698339d6c1"
+    }
+  },
+  "observation": {
+    "build": "2021.1.14.8108",
+    "host": "wwise-console",
+    "candidate": "36de89a12e0a100fd38c9a3c9e2a13b59095ca48",
+    "root": ".waapi-skill-state/full-coverage/query181-2021-points-r1",
+    "observation_sha256": "b0c855241618a32daecbec5dba5569eb607e88cbb467b0e488359783ac47e393",
+    "packet_sha256": "f5f154606eab29977b856784fded6df949ae0f045c5d9406aab72184387f2513",
+    "packet_bytes": 961,
+    "native_error_uri": "ak.wwise.query.invalid_query",
+    "native_error_details": {
+      "message": "Unknown accessor points",
+      "details": {"procedureUri": "ak.wwise.core.object.get"}
+    },
+    "query": "from object \"{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}\" take 1",
+    "return": ["id", "name", "type", "path", "classId", "owner", "points"],
+    "original_verdict": "FAIL",
+    "value_dispatches": 1,
+    "project_mutation_count": 0,
+    "source_and_prepared_preservation": "unchanged hashes, tree metadata and mtimes",
+    "process_cleanup": "cleaned",
+    "sandbox": "quarantined",
+    "interpretation": "The exact fixed accessor was rejected. The original failure is unchanged; no alternate accessor was tried."
+  },
+  "remaining": ["2021 property-to-RTPC association", "other independently source-established Curve read mechanisms"],
+  "alternatives": "Known exact Curve identity, owner and Flags and RTPC ControlInput reads remain available; they do not supply ordered points. Attenuation curve reads inspect a different curve family."
+}

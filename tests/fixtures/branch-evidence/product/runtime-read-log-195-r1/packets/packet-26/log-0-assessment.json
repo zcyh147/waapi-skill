@@ -1,0 +1,40 @@
+{
+  "contract": "waapi-skill.retained-log-assessment/v1",
+  "branch_id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.log.clear|/resultSchema",
+  "profile": {
+    "provider": "r128-2024",
+    "target_route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.log.clear",
+    "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+    "target_catalog": "skills/waapi-skill/resources/native-catalog/2024.1/wwise-console.json",
+    "target_catalog_sha256": "4709a7e429515efb80594d5395db3c0ef50d18be67153ecc844c8d494cffc380",
+    "relationship": "direct-retained-exact-host-build-ack",
+    "claim": "Actual same-target native clear acknowledgement and schema validation only; no observed clearing, absence, or continuing channel state. Original finalized PASS/source preservation/cleanup retained.",
+    "native_effect_mode": "console-pre-2025.1.4-unobservable"
+  },
+  "provider": "r128-2024",
+  "source_review": {
+    "artifact": "retained-log-support.json",
+    "sha256": "d1d86d7269434d9d9cba3a8f65acf1c4b5800bea864ee9361a527d02020cfdc9"
+  },
+  "archive": {
+    "artifact": "r128-2024-original.json.gz",
+    "sha256": "611bfe02276c0c32f321b858dbe7e10a51a1f8fc8b37b57edc6a90bb5375d429"
+  },
+  "raw": {
+    "artifact": "log-0-raw.json",
+    "sha256": "fbfd296b80fc2368a2939320a539c7e0832338af2624a0998f8591156e9414f9"
+  },
+  "program_capture": {
+    "artifact": "log-0-capture.json",
+    "sha256": "82615f1b2c50d70e5da8be34997a80f1e9ce20839524cfd3938d42c70c414777"
+  },
+  "retained_facts": {
+    "original_workflow_outcome": "PASS",
+    "original_finalization": "PASS",
+    "qualified_log_fact": "same-host-build-native-clear-schema-ack-only",
+    "effect_observed": false,
+    "business_state_verified": false,
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false
+  }
+}

@@ -19,6 +19,7 @@ class ObjectIdentitySemantics:
     mutable_intrinsic_name: bool
     display_identity_source: str
     relative_display_paths: tuple[str, ...] = ()
+    opaque_display_path: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +86,12 @@ _BY_OBJECT_TYPE = {
     "Panner": _EMBEDDED_VALUE,
     "Position": _EMBEDDED_VALUE,
     "RTPC": _EMBEDDED_VALUE,
+    # Codec GUIDs are owned, anonymous objects, not hierarchy nodes. Retained
+    # native packets return opaque display text rather than a hierarchy path.
+    "ConversionPlugin": ObjectIdentitySemantics(
+        name_mode="embedded_value", empty_name_allowed=True, mutable_intrinsic_name=False,
+        display_identity_source="owner_and_embedded_role", opaque_display_path=True,
+    ),
     "CustomState": _OWNED_COLLECTION_ENTRY,
     "MultiSwitchEntry": _OWNED_COLLECTION_ENTRY,
     "MusicPlaylistItem": _OWNED_COLLECTION_ENTRY,
@@ -100,9 +107,19 @@ _BY_OBJECT_TYPE = {
         relative_display_paths=(r"Root\Transition",),
     ),
     "StateGroupInfo": _OWNED_COLLECTION_ENTRY,
+    # Native 2025.1 exact context-GUID readback exposes an unnamed association.
+    # That observation establishes identity acceptance, not rename immutability.
+    "ObjectSettingAssociation": ObjectIdentitySemantics(
+        name_mode="intrinsic",
+        empty_name_allowed=True,
+        mutable_intrinsic_name=True,
+        display_identity_source="name_and_path",
+    ),
 }
 
-NON_INTRINSIC_NAME_OBJECT_TYPES = frozenset(_BY_OBJECT_TYPE)
+NON_INTRINSIC_NAME_OBJECT_TYPES = frozenset(
+    name for name, semantics in _BY_OBJECT_TYPE.items() if not semantics.mutable_intrinsic_name
+)
 
 OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
     {
@@ -118,15 +135,25 @@ OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
     }
 )
 OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT = {
+    "ControlSurfaceSession": frozenset({"ControlSurfaceBindingGroup"}),
+    "ControlSurfaceBindingGroup": frozenset({"ControlSurfaceBindingGroup", "ControlSurfaceBinding"}),
+    "Query": frozenset({"SearchCriteria"}),
+    "Event": frozenset({"Action"}),
     "Bus": frozenset({"Bus", "AuxBus"}),
     "AuxBus": frozenset({"Bus", "AuxBus"}),
     "StateGroup": frozenset({"State"}),
     "SwitchGroup": frozenset({"Switch"}),
 }
 # A parent's child allowlist is not the inverse of a child's required parent:
-# Bus/AuxBus may also be created under a WorkUnit. Only these game-sync children
-# require their dedicated group; preserve that restriction independently.
+# Bus/AuxBus may also be created under a WorkUnit. Inverse child placement
+# requirements remain independent from each specialized parent's allowlist.
 _OBJECT_CREATE_REQUIRED_PARENT_TYPES_BY_CHILD = {
+    "WorkUnit": frozenset({"WorkUnit", "Folder"}),
+    "Query": frozenset({"WorkUnit", "Folder"}),
+    "SearchCriteria": frozenset({"Query"}),
+    "ControlSurfaceBindingGroup": frozenset({"ControlSurfaceSession", "ControlSurfaceBindingGroup"}),
+    "ControlSurfaceBinding": frozenset({"ControlSurfaceBindingGroup"}),
+    "Action": frozenset({"Event"}),
     "State": frozenset({"StateGroup"}),
     "Switch": frozenset({"SwitchGroup"}),
 }
@@ -147,6 +174,43 @@ def object_identity_semantics(object_type: str) -> ObjectIdentitySemantics:
     """Return reviewed identity behavior for one exact reflected object type."""
 
     return _BY_OBJECT_TYPE.get(object_type, _DEFAULT)
+
+
+def reviewed_existing_display_identity(*, version: str | None, object_type: str,
+                                      name: object, path: object) -> bool:
+    """Recognize reviewed exact-GUID display facts, never selector/name authority.
+
+    The #195 owned-role survey observed these shapes on 2025.1.7.9143.
+    Language, UserProjectSettings and MidiParameter have matching class/type
+    definitions in all five lanes; MediaPoolQuery is introduced in 2025. These
+    rules accept a matching live shape, without claiming it was seen on every
+    version or treating its text as a hierarchy path.
+    This comparison-only admission neither constructs nor renames an object.
+    """
+    if (version not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}
+            or not isinstance(name, str) or not isinstance(path, str)):
+        return False
+    if any(ord(character) < 32 or 127 <= ord(character) <= 159 for character in name + path):
+        return False
+    if object_type == "UserProjectSettings":
+        return name == "" and path == "<Unnamed Default Object Values>"
+    if not name or name != name.strip() or any(character in name for character in "\\/"):
+        return False
+    if object_type == "Language" or (version == "2025.1" and object_type == "MediaPoolQuery"):
+        return path == name
+    if object_type == "MidiParameter":
+        parts = path.split("\\")
+        return (len(parts) >= 2 and parts[0] == "MIDI" and parts[-1] == name
+                and all(part and part not in {".", ".."} and "/" not in part for part in parts))
+    return False
+
+
+def display_identity_requires_name_boundary(*, version: str | None, object_type: str,
+                                           name: object, path: object) -> bool:
+    """Withhold new name authority without regressing the old 2021 Language rule."""
+    return (reviewed_existing_display_identity(version=version, object_type=object_type,
+                name=name, path=path)
+            and not (version == "2021.1" and object_type == "Language"))
 
 
 def object_child_capability(
@@ -223,6 +287,19 @@ def object_child_capability(
         allowed_child_types=allowed_child_types,
         required_parent_types_by_child=requirements,
     )
+
+
+def object_transfer_parent_compatible(*, version: str, parent_type: object, child_type: object) -> bool:
+    """Transfer admission is distinct from creating an object of this class."""
+    if parent_type in {"ControlSurfaceSession", "ControlSurfaceBindingGroup"}:
+        # Constructor role admission does not grant copy/move authority on
+        # reserved or user groups; those operations need their own role proof.
+        return False
+    if child_type in {"Source", "SourcePlugin", "AudioFileSource"}:
+        # Existing Source identity carries the plugin/file class. The public
+        # preparation seam separately certifies that class and the Sound owner.
+        return parent_type == "Sound"
+    return object_child_capability(version=version, parent_type=parent_type, child_types=(child_type,)).allowed
 
 
 __all__ = [

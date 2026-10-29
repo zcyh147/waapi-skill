@@ -1,0 +1,26 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.addItem|/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string": {
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "categories": [
+        "program"
+      ],
+      "empty_candidate": {
+        "contract": "waapi-skill.empty-candidate-classification/v1",
+        "status": "rejected",
+        "candidate": "",
+        "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.addItem",
+        "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+        "parent_pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity",
+        "parent_schema_sha256": "f67365c1392c37c1dc87e92bb07d5f03eb6238ae948a42ad732c75a50b293145",
+        "context_sha256": "67c3432d4da4b0e96ac31018c2deaef6b203a288a0a5ead67e047abfdc6109c1",
+        "catalog_sha256": "411c83c1e9b0d8d1fcb0fa82242e1a47728525379dfca93d1c4c40a9325679b5",
+        "definitions_sha256": "5b84d51bcc827ec556297f06e60e7755fe29af1c9d8ac3fb729f3ef99225e8e3",
+        "owning_section_sha256": "78ea47fdecefa4bb304c7b087e9381efff73d3fb340f11b08c882c70da7f735b",
+        "reason": "resolved schema rejects concrete candidate"
+      },
+      "reason": "Resolved reflected schema rejects this concrete synthetic candidate; exact public counterexample program proof required. No native absence/effect or parent credit."
+    }
+  }
+}

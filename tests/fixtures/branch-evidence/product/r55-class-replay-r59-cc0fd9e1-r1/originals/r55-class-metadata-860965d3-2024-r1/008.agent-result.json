@@ -1,0 +1,59 @@
+{
+  "contract": "waapi-skill.metadata-page/v1",
+  "scope": {
+    "kind": "object_type",
+    "requested": "ModulatorTime",
+    "resolved": {
+      "classId": 5111824,
+      "name": "ModulatorTime",
+      "type": "WObject"
+    }
+  },
+  "snapshot": "8faab0ccc71d0ca5f82144bdc2ba6b1f5f35cf4ef58a0804174442ea6beae22b",
+  "snapshot_kind": "live-property-reference-inventory",
+  "fields": [
+    {
+      "name": "Color",
+      "selection": "mf1.1792528940.0.a4ea2d18c03c643be0a3d0ed232a9dab3cd4d5d86973ac43bf79cd780e272ce5"
+    },
+    {
+      "name": "EnvelopeStopPlayback",
+      "selection": "mf1.1792528940.1.5b53f222efd935b1f5657d17dea7fc3d83d3c3ab69e2fa1f5bbc6b001941bea8"
+    },
+    {
+      "name": "EnvelopeTriggerOn",
+      "selection": "mf1.1792528940.2.9783b03ec2f81266969925ee342c21a1c00afd366f462a7f00dd4820d6b06fec"
+    },
+    {
+      "name": "ModulatorScope",
+      "selection": "mf1.1792528940.3.1a24323c83b02bab463a0731ba96eda2943ec7213909dac4b108956e7c3b2520"
+    },
+    {
+      "name": "OverrideColor",
+      "selection": "mf1.1792528940.4.ac2e5ccd2824cbe315715288dc69cd300ff98df5d69fca77c5c9fa2afd8d8f33"
+    },
+    {
+      "name": "TimeModDuration",
+      "selection": "mf1.1792528940.5.e7679e8dca65d28bc3798100593be3fdfb6816e0da3eb774972db77d11c37ff1"
+    },
+    {
+      "name": "TimeModInitialDelay",
+      "selection": "mf1.1792528940.6.ffecbc7780814db93c730f4e8ce50b29168c93c809651049efdd08d461fa69b3"
+    },
+    {
+      "name": "TimeModLoops",
+      "selection": "mf1.1792528940.7.153eff957cb6657af96514d3d0e10d39acde22d9d04d76c0706917ea3acf2ca8"
+    },
+    {
+      "name": "TimeModPlaybackRate",
+      "selection": "mf1.1792528940.8.0c32e1f2e41f362cf09562f7f5045e4887c645768572ed979370dc86bad4accf"
+    }
+  ],
+  "total_count": 9,
+  "offset": 0,
+  "remaining_count": 0,
+  "complete": true,
+  "next_page": null,
+  "expires_at": 1792529840,
+  "mutation_authority": false
+}

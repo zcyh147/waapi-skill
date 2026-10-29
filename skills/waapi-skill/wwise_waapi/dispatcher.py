@@ -11,7 +11,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Protocol
+from typing import Any, Callable, Mapping, Protocol
 
 from .category_policy import (  # pyright: ignore[reportMissingImports]
     is_policy_exempt_category,
@@ -25,7 +25,10 @@ from .subscriptions import (
     MAX_WAIT_EVENT_COUNT,
     SubscriptionCleanupError,
     SubscriptionEvent,
+    SubscriptionEventValidationError,
     SubscriptionManager,
+    SubscriptionStreamIngressError,
+    SubscriptionStreamOverflow,
     SubscriptionTimeout,
     SubscriptionUnavailable,
     payload_matches,
@@ -91,6 +94,8 @@ class DispatcherRequest:
     live_behavior: bool = False
     result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES
     topic_event_count: int = 1
+    protected_provider_binding: Mapping[str, Any] | None = None
+    topic_event_validator: Callable[[Any], Any] | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -180,8 +185,10 @@ class WwiseDispatcher:
         topic_mode: str = "wait",
         topic_match: Mapping[str, Any] | None = None,
         topic_event_count: int = 1,
+        topic_event_validator: Callable[[Any], Any] | None = None,
         live_behavior: bool = False,
         result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES,
+        protected_provider_binding: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Dispatch one WAAPI function or topic and return a structured result."""
 
@@ -197,9 +204,14 @@ class WwiseDispatcher:
             topic_mode=topic_mode,
             topic_match=topic_match,
             topic_event_count=topic_event_count,
+            topic_event_validator=topic_event_validator,
             live_behavior=live_behavior,
             result_limit_bytes=result_limit_bytes,
+            protected_provider_binding=protected_provider_binding,
         )
+        if request.protected_provider_binding is not None and request.api != "ak.wwise.core.sourceControl.setProvider":
+            return self._error_result(request.api, request.version, "PROTECTED_PROVIDER_SCOPE_INVALID",
+                "Protected provider recipe has the wrong fixed URI")
         try:
             result = self._dispatch(request)
         except Exception as exc:  # noqa: BLE001 - callers need structured WAAPI errors
@@ -291,12 +303,38 @@ class WwiseDispatcher:
     def _dispatch_function(self, request: DispatcherRequest, entry: ManifestApiEntry) -> dict[str, Any]:
         if self.client is None:
             return self._error_result(request.api, request.version, "CLIENT_UNAVAILABLE", "A WAAPI client is required for function calls")
+        if request.protected_provider_binding is not None:
+            from .source_control_profiles import SET_PROVIDER
+            from .source_control_protected_dispatch import protected_provider_call
+            if request.api != SET_PROVIDER:
+                return self._error_result(request.api, request.version, "PROTECTED_PROVIDER_SCOPE_INVALID", "Protected provider recipe has the wrong fixed URI")
+            protected = protected_provider_call(request.protected_provider_binding, version=request.version,
+                call=lambda native_args: _call_with_timeout(self.client, request.api, native_args, {}, request.timeout))
+            if protected["ok"]:
+                return self._success_result(request, entry, protected["result"])
+            result = self._error_result(request.api, request.version, protected["error_code"],
+                "Protected provider call did not produce a validated observation; native text is withheld", item_type=entry.item_type)
+            result["protected_native_result"] = True
+            result["native_text_disclosed"] = False
+            return result
         try:
             payload = _call_with_timeout(self.client, request.api, request.args, request.options, request.timeout)
         except TimeoutError as exc:
             return self._exception_result(request, exc, item_type=entry.item_type, error_code="TIMEOUT")
         except Exception as exc:  # noqa: BLE001 - preserve client error type in machine field
             return self._exception_result(request, exc, item_type=entry.item_type)
+        if payload is None:
+            # WaapiClient uses None for a failed/unblocked request, whereas an
+            # acknowledged empty WAMP result is {}. The write may have reached
+            # Wwise: missing acknowledgement is not a native rejection.
+            result = self._error_result(
+                request.api, request.version, "WAAPI_RESPONSE_MISSING",
+                "The WAAPI client returned no acknowledgement; effects are unknown",
+                item_type=entry.item_type, category=entry.category, risk_level=entry.risk_level,
+                details={"response_received": False, "effects_unknown": True},
+            )
+            result["failure_origin"] = "missing_response"
+            return result
         return self._success_result(request, entry, payload)
 
     def _dispatch_topic(self, request: DispatcherRequest, entry: ManifestApiEntry) -> dict[str, Any]:
@@ -314,9 +352,12 @@ class WwiseDispatcher:
                 "timeout": request.timeout,
                 "options": dict(request.options or {}),
             }
-            if request.topic_match is not None:
-                expected = dict(request.topic_match)
-                wait_kwargs["predicate"] = lambda event: payload_matches(event.payload, expected)
+            if request.topic_match is not None or request.topic_event_validator is not None:
+                def accepts(event: SubscriptionEvent) -> bool:
+                    if request.topic_event_validator is not None:
+                        request.topic_event_validator(event.payload)
+                    return request.topic_match is None or payload_matches(event.payload, request.topic_match)
+                wait_kwargs["predicate"] = accepts
             if request.topic_event_count == 1:
                 event = manager.wait_for_event(request.api, **wait_kwargs)
                 payload: Any = _subscription_event_envelope(event)
@@ -372,6 +413,16 @@ class WwiseDispatcher:
                 exc,
                 item_type=entry.item_type,
                 error_code="SUBSCRIPTION_UNAVAILABLE",
+            )
+        except (SubscriptionEventValidationError, SubscriptionStreamIngressError, SubscriptionStreamOverflow) as exc:
+            # The manager has completed unsubscribe before raising a predicate
+            # or ingress failure. Keep that cleanup evidence on the failure.
+            return _with_subscription_cleanup(
+                self._exception_result(
+                    request, exc, item_type=entry.item_type,
+                    error_code=exc.error_code,
+                ),
+                status=SUBSCRIPTION_CLEANUP_UNSUBSCRIBED,
             )
         return _with_subscription_cleanup(
             self._success_result(
@@ -580,8 +631,10 @@ class WwiseDispatcher:
             topic_mode=str(kwargs["topic_mode"]),
             topic_match=kwargs["topic_match"],
             topic_event_count=kwargs["topic_event_count"],
+            topic_event_validator=kwargs["topic_event_validator"],
             live_behavior=bool(kwargs["live_behavior"]),
             result_limit_bytes=int(kwargs["result_limit_bytes"]),
+            protected_provider_binding=kwargs.get("protected_provider_binding"),
         )
 
     def _destructive_allowed(self, request: DispatcherRequest) -> bool:
@@ -704,6 +757,11 @@ def _truncate_utf8(value: str, byte_budget: int) -> str:
     return "".join(parts)
 
 
+@dataclass(slots=True, frozen=True)
+class _ExceptionMetadataString:
+    value: str
+
+
 @dataclass(slots=True)
 class _ExceptionMetadataSanitizer:
     """Budgeted copier for optional third-party exception metadata."""
@@ -712,10 +770,11 @@ class _ExceptionMetadataSanitizer:
     string_bytes_remaining: int = MAX_EXCEPTION_METADATA_STRING_BYTES
     active_ids: set[int] = field(default_factory=set)
 
-    def sanitize(self, value: Any, *, depth: int = 0) -> Any:
-        if self.nodes_remaining <= 0:
-            return {"truncated": "node_budget"}
-        self.nodes_remaining -= 1
+    def sanitize(self, value: Any, *, depth: int = 0, reserved: bool = False) -> Any:
+        if not reserved:
+            if self.nodes_remaining <= 0:
+                return {"truncated": "node_budget"}
+            self.nodes_remaining -= 1
         if depth > MAX_EXCEPTION_METADATA_DEPTH:
             return {"truncated": "depth_budget"}
         if value is None or isinstance(value, (bool, int)):
@@ -723,7 +782,8 @@ class _ExceptionMetadataSanitizer:
         if isinstance(value, float):
             return value if math.isfinite(value) else {"type": "float", "reason": "non_finite"}
         if isinstance(value, str):
-            return self._copy_string(value)
+            # Defer value copies until all bounded keys have reserved their bytes.
+            return _ExceptionMetadataString(value)
         if isinstance(value, Mapping):
             return self._sanitize_mapping(value, depth)
         if isinstance(value, (list, tuple)):
@@ -735,29 +795,53 @@ class _ExceptionMetadataSanitizer:
         self.string_bytes_remaining -= len(copied.encode("utf-8"))
         return copied
 
+    @staticmethod
+    def _mark(result: dict[str, Any], key: str, reason: str) -> None:
+        # Never overwrite a real field, including an existing diagnostic-like key.
+        while key in result:
+            key += "_"
+        result[key] = reason
+
     def _sanitize_mapping(self, value: Mapping[Any, Any], depth: int) -> dict[str, Any]:
         identity = id(value)
         if identity in self.active_ids:
             return {"truncated": "circular_reference"}
         self.active_ids.add(identity)
         result: dict[str, Any] = {}
+        entries: list[tuple[str, Any]] = []
+        keys: set[str] = set()
+        omitted: set[str] = set()
+        unavailable = False
         try:
             try:
                 iterator = iter(value.items())
             except BaseException:  # noqa: BLE001 - hostile Mapping implementation
                 return {"type": _safe_type_name(value), "unavailable": "items"}
-            while self.nodes_remaining > 0:
+            # Fixed before iteration: even an infinite stream of duplicate/empty keys is bounded.
+            for _ in range(self.nodes_remaining):
                 try:
                     key, item = next(iterator)
                 except StopIteration:
                     break
                 except BaseException:  # noqa: BLE001 - partial safe metadata is sufficient
-                    result["_metadata_unavailable"] = "items"
+                    unavailable = True
                     break
                 safe_key = self._safe_key(key)
-                result[safe_key] = self.sanitize(item, depth=depth + 1)
+                if safe_key is None or safe_key in keys:
+                    omitted.add("key_budget_or_invalid" if safe_key is None else "key_collision")
+                    self.nodes_remaining -= 1
+                    continue
+                self.nodes_remaining -= 1
+                keys.add(safe_key)
+                entries.append((safe_key, item))
             else:
-                result["_metadata_truncated"] = "node_budget"
+                omitted.add("node_budget")
+            for key, item in entries:
+                result[key] = self.sanitize(item, depth=depth + 1, reserved=True)
+            if unavailable:
+                self._mark(result, "_metadata_unavailable", "items")
+            if omitted:
+                self._mark(result, "_metadata_truncated", ",".join(sorted(omitted)))
             return result
         finally:
             self.active_ids.remove(identity)
@@ -778,26 +862,48 @@ class _ExceptionMetadataSanitizer:
         finally:
             self.active_ids.remove(identity)
 
-    def _safe_key(self, key: Any) -> str:
+    def _safe_key(self, key: Any) -> str | None:
         if isinstance(key, str):
-            return self._copy_string(key)
-        if key is None:
-            return "null"
-        if key is True:
-            return "true"
-        if key is False:
-            return "false"
-        if isinstance(key, int):
-            return int.__repr__(key)
-        if isinstance(key, float) and math.isfinite(key):
-            return float.__repr__(key)
-        return f"<key-type:{_safe_type_name(key)}>"
+            safe_key = key
+        elif key is None:
+            safe_key = "null"
+        elif key is True:
+            safe_key = "true"
+        elif key is False:
+            safe_key = "false"
+        elif isinstance(key, int):
+            if int.bit_length(key) > self.string_bytes_remaining * 4:
+                return None
+            try:
+                safe_key = int.__repr__(key)
+            except (ValueError, OverflowError):
+                return None
+        elif isinstance(key, float) and math.isfinite(key):
+            safe_key = float.__repr__(key)
+        else:
+            safe_key = f"<key-type:{_safe_type_name(key)}>"
+        # A key is an identity: copying only a prefix would fabricate or collide with another key.
+        safe_key = _bounded_public_string(safe_key, None, self.string_bytes_remaining)
+        if safe_key is not None:
+            self.string_bytes_remaining -= len(safe_key.encode("utf-8"))
+        return safe_key
+
+    def copy_values(self, value: Any) -> Any:
+        """Finish only the fresh, bounded tree; no second untrusted Mapping traversal."""
+        if isinstance(value, _ExceptionMetadataString):
+            return self._copy_string(value.value)
+        if isinstance(value, dict):
+            return {key: self.copy_values(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self.copy_values(item) for item in value]
+        return value
 
 
 def _json_safe_exception_value(value: Any) -> Any:
     """Copy third-party error metadata into a deterministic JSON-safe shape."""
 
-    return _ExceptionMetadataSanitizer().sanitize(value)
+    sanitizer = _ExceptionMetadataSanitizer()
+    return sanitizer.copy_values(sanitizer.sanitize(value))
 
 
 def _probe_json_document_size(value: Any, limit_bytes: int) -> _JsonSizeProbe:

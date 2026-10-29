@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import importlib.util
+import base64
 import json
 import os
+import hashlib
+import math
+import re
 from pathlib import Path
 import sys
+from time import monotonic as _operator_monotonic, sleep as _operator_sleep
 from typing import Mapping
 import uuid
+import xml.etree.ElementTree as ET
 
 import pytest  # pyright: ignore[reportMissingImports]
 
@@ -42,6 +48,661 @@ assert GATEWAY_SPEC is not None and GATEWAY_SPEC.loader is not None
 gateway = importlib.util.module_from_spec(GATEWAY_SPEC)
 sys.modules[GATEWAY_SPEC.name] = gateway
 GATEWAY_SPEC.loader.exec_module(gateway)
+
+
+@pytest.fixture(scope='module')
+def owned_authoring_layout_batch(request):
+    from tests.destructive.support.authoring_batch import AuthoringBatchAdapter
+    batch = getattr(request.config, '_waapi_authoring_batch', None)
+    if not isinstance(batch, AuthoringBatchAdapter):
+        pytest.fail('Layout effects require an actual owner-supplied ScenarioLifecycle batch; environment labels are insufficient')
+    yield batch
+    batch.prepare_stop(request.session.items)
+
+
+@pytest.fixture
+def owned_authoring_layout_node(owned_authoring_layout_batch, request):
+    batch = owned_authoring_layout_batch
+    return batch, batch.node_gateway(request.node.nodeid)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_2025_meter_cursor_capture(owned_authoring_layout_node):
+    from tests.destructive.support.profiler_capture import collect_owned_capture
+    collect_owned_capture(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_2025_meter_spelling_diagnostic(owned_authoring_layout_node):
+    from tests.destructive.support.profiler_capture import collect_owned_capture
+    collect_owned_capture(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_2025_profiler_cursor_moves(owned_authoring_layout_node):
+    from tests.destructive.support.profiler_capture import collect_owned_capture
+    collect_owned_capture(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_2025_loaded_media_event_probe(owned_authoring_layout_node):
+    from tests.destructive.support.loaded_media_probe import collect_loaded_event_probe
+    collect_loaded_event_probe(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_2025_integration_demo_loaded_media(owned_authoring_layout_node):
+    from tests.destructive.support.integration_demo import OwnedIntegrationDemo
+    from tests.destructive.support.loaded_media_probe import collect_loaded_event_probe
+    batch, call = owned_authoring_layout_node
+    collect_loaded_event_probe(batch, call, demo=OwnedIntegrationDemo(batch.owner.developer_observation, batch.runtime))
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_2025_profiler_readers(owned_authoring_layout_node):
+    from tests.destructive.support.profiler_capture import collect_owned_capture
+    collect_owned_capture(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_profiler_capture_reads(owned_authoring_layout_node):
+    from tests.destructive.support.profiler_capture import collect_owned_capture
+    collect_owned_capture(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_missing_profiler_reads(owned_authoring_layout_node):
+    from tests.destructive.support.profiler_capture import collect_owned_capture
+    collect_owned_capture(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_2024_meter_projection(owned_authoring_layout_node):
+    from tests.destructive.support.profiler_capture import collect_owned_capture
+    collect_owned_capture(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_2025_selected_transport_semantics(owned_authoring_layout_node):
+    from tests.destructive.support.transport_semantics import collect_selected_transport_semantics
+    collect_selected_transport_semantics(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_2025_mixed_transport_semantics(owned_authoring_layout_node):
+    from tests.destructive.support.transport_semantics import collect_mixed_transport_semantics
+    collect_mixed_transport_semantics(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_older_transport_semantics(owned_authoring_layout_node):
+    from tests.destructive.support.transport_semantics import collect_older_transport_semantics
+    collect_older_transport_semantics(*owned_authoring_layout_node)
+
+
+def _layout_effect(call, suffix, *, layout_handle, fields=()):
+    schema = call(['request-schema', 'ak.wwise.ui.layout.' + suffix])
+    started = call(schema['continuation']['gateway_argv'])
+    draft, authority = started['draft'], started['task_authority']
+    declared = call(['draft-declare-layout-plan', draft['draft_id'], '--task-authority', authority,
+        '--expected-revision', str(draft['revision']), '--layout-handle', layout_handle, *fields])
+    checked = call(['draft-check', draft['draft_id'], '--task-authority', authority,
+        '--expected-revision', str(declared['draft']['revision'])])
+    preview = call(['preview-from-draft', draft['draft_id'], '--task-authority', authority,
+        '--expected-revision', str(checked['draft']['revision'])])
+    tx = preview['transaction_id']
+    shown = call(['transaction-show', tx])
+    call(['confirm', tx, '--confirmation-token', shown['confirmation']['token']])
+    call(['execute', tx])
+    verified = call(['verify', tx])
+    assert verified['verification']['business_state_verified'] is True, verified
+    return verified
+
+
+def _owned_layout_start(call):
+    original = call(['layout-read', 'current'])['result']['name']
+    assert original, 'Owned layout fixture needs a named current layout for restoration'
+    anchor = call(['layout-inspect', '--layout-name', original])
+    name = 'WAAPI_Skill_Owned_' + uuid.uuid4().hex
+    _layout_effect(call, 'setLayout', layout_handle=anchor['layout_handle'], fields=['--new-layout-name', name])
+    observed = call(['layout-read', 'contents', '--layout-name', name])['result']
+    assert observed['Layout']['Name'] == name
+    owned = call(['layout-inspect', '--layout-name', name])
+    _layout_effect(call, 'switchLayout', layout_handle=owned['layout_handle'])
+    assert call(['layout-read', 'current'])['result']['name'] == name
+    return original, name
+
+
+def _owned_layout_remove(call, original, name):
+    restore = call(['layout-inspect', '--layout-name', original])
+    _layout_effect(call, 'switchLayout', layout_handle=restore['layout_handle'])
+    assert call(['layout-read', 'current'])['result']['name'] == original
+    owned = call(['layout-inspect', '--layout-name', name])
+    _layout_effect(call, 'removeLayout', layout_handle=owned['layout_handle'])
+
+
+def test_authoring_model_2024_state_click(owned_authoring_layout_node):
+    from tests.destructive.support.model_workflows import COMMON_NODE, collect_model_workflow
+    collect_model_workflow(*owned_authoring_layout_node, nodeid=COMMON_NODE)
+
+
+def test_authoring_model_2025_file_state_toggle(owned_authoring_layout_node):
+    from tests.destructive.support.model_workflows import FILE_NODE, collect_model_workflow
+    collect_model_workflow(*owned_authoring_layout_node, nodeid=FILE_NODE)
+
+
+def test_authoring_layout_owned_registration_and_switch(owned_authoring_layout_node):
+    _, call = owned_authoring_layout_node
+    original, name = _owned_layout_start(call)
+    assert call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances'] == []
+    _owned_layout_remove(call, original, name)
+
+
+def test_authoring_layout_2024_construction_arrangement(owned_authoring_layout_node):
+    from tests.destructive.support.layout_workflows import COMMON_NODE, collect_layout_workflow
+    collect_layout_workflow(*owned_authoring_layout_node, nodeid=COMMON_NODE, strong_effect=_layout_effect)
+
+
+def test_authoring_layout_2025_construction_close_reset(owned_authoring_layout_node):
+    from tests.destructive.support.layout_workflows import CLOSE_NODE, collect_layout_workflow
+    collect_layout_workflow(*owned_authoring_layout_node, nodeid=CLOSE_NODE, strong_effect=_layout_effect)
+
+
+@pytest.mark.parametrize('initial_position', [(), ('--initial-x', '17'), ('--initial-y', '29'),
+    ('--initial-x', '17', '--initial-y', '29')], ids=['omitted', 'x-only', 'y-only', 'both'])
+def test_authoring_layout_owned_view_lifecycle(owned_authoring_layout_node, initial_position):
+    batch, call = owned_authoring_layout_node
+    original, name = _owned_layout_start(call)
+    assert call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances'] == []
+    types = call(['layout-read', 'types'])['result']['viewTypes']
+    assert any(row.get('viewName') == 'ProjectExplorer' for row in types), 'Owned fixture requires the live ProjectExplorer type'
+    owned = call(['layout-inspect', '--layout-name', name])
+    _layout_effect(call, 'getOrCreateView', layout_handle=owned['layout_handle'],
+        fields=['--view-type', 'ProjectExplorer', *initial_position])
+    created = call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances']
+    identities = {row['viewID'] for row in created if row.get('viewName') == 'ProjectExplorer'}
+    assert len(identities) == 1
+    owned = call(['layout-inspect', '--layout-name', name])
+    _layout_effect(call, 'getOrCreateView', layout_handle=owned['layout_handle'], fields=['--view-type', 'ProjectExplorer'])
+    reused = call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances']
+    assert {row['viewID'] for row in reused if row.get('viewName') == 'ProjectExplorer'} == identities
+    if batch.runtime.version == '2025.1':
+        owned = call(['layout-inspect', '--layout-name', name])
+        views = [row for row in owned['views'] if row['kind'] == 'ProjectExplorer']
+        assert len(views) == 1
+        _layout_effect(call, 'closeView', layout_handle=owned['layout_handle'], fields=['--view-handle', views[0]['handle']])
+        closed = call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances']
+        assert not identities.intersection(row.get('viewID') for row in closed)
+    _owned_layout_remove(call, original, name)
+
+
+MEDIA_DIAGNOSTIC_NODE = (__name__.replace('.', '/') +
+    '.py::test_authoring_2024_media_preservation_metadata_diagnostic')
+MEDIA_DIAGNOSTIC_SESSIONS = (
+    ('{9C02096E-8E29-4029-9D49-778F85015C87}', 'MIDI'),
+    ('{1C5BA931-9550-4DC8-B1C7-13689B8AE813}', 'Minigun'),
+    ('{F4B8069C-3C15-4157-B570-8A41AB2463C2}', 'Music'),
+)
+
+
+def _media_diagnostic_settings(project, *, owned_root):
+    """Hash project-local settings, retaining only the observed RTPC whitelist."""
+    from wwise_waapi.operation_soundbank import capture_file_proof, open_regular_artifact_file
+    assert project.resolve(strict=True).is_relative_to(owned_root.resolve(strict=True))
+    files, entries = [], 0
+    for path in project.parent.iterdir():
+        entries += 1
+        assert entries <= 512, 'Owned settings directory exceeds diagnostic entry bound'
+        if not (path.name.casefold().startswith(project.stem.casefold() + '.')
+                and path.suffix.casefold() == '.wsettings'):
+            continue
+        assert len(files) < 4, 'Owned settings file count exceeds diagnostic bound'
+        limit = 1024 * 1024
+        proof = capture_file_proof(path, field='owned diagnostic settings', max_bytes=limit, io_root=owned_root)
+        _, descriptor, before = open_regular_artifact_file(path, field='owned diagnostic settings', io_root=owned_root)
+        with os.fdopen(descriptor, 'rb') as stream:
+            raw = stream.read(limit + 1)
+            after = os.fstat(stream.fileno())
+        assert (len(raw) == proof['size'] and hashlib.sha256(raw).hexdigest() == proof['sha256']
+            and all(getattr(before, key) == getattr(after, key)
+                    for key in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns'))
+            and capture_file_proof(path, field='owned diagnostic settings', max_bytes=limit, io_root=owned_root) == proof), 'Owned settings changed while observed'
+        assert b'<!DOCTYPE' not in raw.upper() and b'<!ENTITY' not in raw.upper(), 'Settings XML declarations are outside this diagnostic'
+        root = ET.fromstring(raw)
+        assert root.tag == 'WwiseDocument' and root.get('Type') == 'UserProjectSettings'
+        nodes, fields, seen = list(root.iter()), [], set()
+        assert len(nodes) <= 4096, 'Settings XML exceeds diagnostic node bound'
+        for item in nodes:
+            name = item.get('Name', '')
+            if item.tag != 'Property' or not re.fullmatch(
+                    r'RTPC\\GameParameterSimValue\\\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}', name):
+                continue
+            assert name.upper() not in seen and len(fields) < 256, 'Duplicate or oversized settings whitelist'
+            seen.add(name.upper())
+            value = item.get('Value')
+            assert item.get('Type') == 'Real64' and value is not None and len(value) <= 128 and math.isfinite(float(value)) and not list(item), 'Unknown RTPC settings shape'
+            fields.append({'name': name, 'type': item.get('Type'), 'value': value})
+        files.append({'relative_path': path.name, 'file_proof': proof, 'fields': fields,
+            'whitelist': 'RTPC\\GameParameterSimValue\\<canonical GUID> only',
+            'unlisted_fields_retained': False})
+    return {'complete': True, 'files': sorted(files, key=lambda row: row['relative_path']),
+        'scope': 'owned project directory only; no global user settings',
+        'state_switch_value_observer': 'not established'}
+
+
+def test_authoring_2024_media_preservation_metadata_diagnostic(owned_authoring_layout_node):
+    """Diagnostic reads only; a successful collection grants no media credit."""
+    batch, call = owned_authoring_layout_node
+    assert batch.runtime.version == '2024.1' and batch.info['version']['build'] == 9056
+    runtime = batch.node_runtimes[MEDIA_DIAGNOSTIC_NODE]
+    destination = Path(runtime.runner_environment['WWISE_EVIDENCE_DIR'])
+    destination.mkdir(parents=True, exist_ok=True)
+    path = destination / 'media-preservation-diagnostic.json'
+    report = {'contract': 'waapi-skill.media-preservation-diagnostic/v1',
+        'complete': False, 'business_preservation_verified': False,
+        'completeness_scope': 'permitted bounded diagnostic reads; not complete Soundcaster runtime state',
+        'runtime_session_values_observed': False, 'media_operation_executed': False,
+        'opaque_plugin_payload': 'not interpreted or modified',
+        'coverage_credit': 'none; diagnostic observation only', 'host': batch.info,
+        'sessions': [], 'field_details': [], 'plugin': {}, 'logs': {}, 'settings': {},
+        'requests': [], 'errors': [], 'detail_limit_reached': False,
+        'limits': {'public_calls': 32, 'reply_bytes': 256 * 1024, 'total_reply_bytes': 2 * 1024 * 1024,
+            'name_pages_per_session': 4, 'names_per_page': 64, 'field_details': 6,
+            'plugin_type_pages': 2, 'log_rows_per_channel': 40,
+            'settings_files': 4, 'settings_file_bytes': 1024 * 1024,
+            'settings_whitelist_rows_per_file': 256}}
+    assert not path.exists() and not path.is_symlink(), 'Diagnostic cannot overwrite an earlier observation'
+    path.write_text(json.dumps(report, ensure_ascii=False) + '\n', encoding='utf-8')
+    total = 0
+    def read(argv):
+        nonlocal total
+        assert len(report['requests']) < 32, 'Public diagnostic call bound exceeded'
+        entry = {'argv': argv}
+        report['requests'].append(entry)
+        payload = call(argv)  # Original replies/errors remain in owner receipts.
+        size = len(json.dumps(payload, ensure_ascii=False).encode('utf-8'))
+        total += size
+        assert size <= 256 * 1024 and total <= 2 * 1024 * 1024, 'Public diagnostic byte bound exceeded'
+        entry.update(reply_bytes=size, complete_reply_retained_by_owner=True)
+        return payload
+    project = batch.runtime.sandbox.sandbox_project
+    try:
+        report['settings']['before'] = _media_diagnostic_settings(project, owned_root=batch.runtime.owned_root)
+        for identity, name in MEDIA_DIAGNOSTIC_SESSIONS:
+            result = read(['query-object', '--exact-id', identity, '--include', 'class-id', '--max-results', '1'])
+            rows = result['objects']
+            assert len(rows) == 1 and rows[0]['id'] == identity and rows[0]['name'] == name and rows[0]['type'] == 'SoundcasterSession', 'Exact source session identity changed'
+            session = {'id': identity, 'name': name, 'identity': rows[0], 'field_names': [], 'names_complete': False}
+            report['sessions'].append(session)
+            page, seen_pages, selections = None, set(), []
+            for _ in range(4):
+                argv = ['metadata', 'list', '--exact-id', identity, '--page-size', '64']
+                if page is not None:
+                    argv += ['--page', page]
+                listed = read(argv)['agent_result']
+                for field in listed['fields']:
+                    token = field.get('name')
+                    assert isinstance(token, str) and token not in session['field_names'], 'Incomplete or duplicate disclosed field name'
+                    session['field_names'].append(token)
+                    if any(word in token.casefold() for word in ('rtpc', 'state', 'switch', 'gameparameter')):
+                        selections.append((token, field['selection']))
+                page = listed['next_page']
+                if page is None:
+                    assert listed['complete'] is True and len(session['field_names']) == listed['total_count'], 'Incomplete disclosed field inventory'
+                    session['names_complete'] = True
+                    break
+                assert page not in seen_pages, 'Repeated metadata page'
+                seen_pages.add(page)
+            assert session['names_complete'], 'Metadata inventory exceeds diagnostic page bound; not complete'
+            for token, selection in selections:
+                if len(report['field_details']) == 6:
+                    report['detail_limit_reached'] = True
+                    break
+                detail = read(['metadata', 'detail', '--exact-id', identity, '--selection', selection])['agent_result']
+                report['field_details'].append({'object_id': identity, 'disclosed_field': token, **detail})
+        rev = '{29975930-6548-4A1B-BEE0-7AA549180D4F}'
+        result = read(['query-object', '--exact-id', rev, '--include', 'class-id', '--include', 'plugin-name', '--max-results', '1'])
+        assert len(result['objects']) == 1 and result['objects'][0]['id'] == rev, 'Exact REV source identity changed'
+        report['plugin']['identity'] = result['objects'][0]
+        report['plugin']['types'] = []
+        page = None
+        for _ in range(2):
+            argv = ['metadata', 'types', '--meaning', 'CrankcaseAudio REV', '--page-size', '64']
+            if page is not None:
+                argv += ['--page', page]
+            result = read(argv)['agent_result']
+            report['plugin']['types'].extend(result['types'])
+            page = result['next_page']
+            if page is None:
+                break
+        assert page is None, 'Plugin type discovery exceeds diagnostic page bound'
+        report['plugin']['native_backend_availability_proven'] = False
+        for channel in ('project-load', 'general'):
+            report['logs'][channel] = read(['core-call', 'ak.wwise.core.log.get', '--log-channel', channel, '--max-results', '40'])['agent_result']
+    except Exception as exc:
+        report['errors'].append({'type': type(exc).__name__, 'message': str(exc)[:2048],
+            'original_gateway_replies': 'owner receipts and dispatcher evidence'})
+    finally:
+        try:
+            report['settings']['after'] = _media_diagnostic_settings(project, owned_root=batch.runtime.owned_root)
+        except Exception as exc:
+            report['errors'].append({'phase': 'settings_after', 'type': type(exc).__name__, 'message': str(exc)[:2048]})
+        report['complete'] = not report['errors']
+        report['public_call_count'] = len(report['requests'])
+        report['total_reply_bytes'] = total
+        temporary = path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        temporary.replace(path)
+    assert report['complete'], report['errors']
+
+
+SOUNDCASTER_IMAGE_DIAGNOSTIC_NODE = ('tests/destructive/test_authoring_ui_business_live.py::'
+    'test_authoring_2024_soundcaster_frontend_image_diagnostic')
+
+
+def _soundcaster_source_witness(batch, destination):
+    """Retain original saved expectations; never interpret these as live values."""
+    from tests.destructive.support.console_file_observation import observe_console_file
+    source = batch.runtime.sandbox.source_root
+    files, sessions, members, total = [], [], {}, 0
+    for directory in ('Soundcaster Sessions', 'States', 'Switches'):
+        entries = []
+        for entry in (source / directory).iterdir():
+            assert len(entries) < 32, 'Source diagnostic directory exceeds entry bound'
+            entries.append(entry)
+        for path in sorted(entries):
+            assert path.is_file() and path.suffix == '.wwu', 'Unexpected source diagnostic entry'
+            observed = observe_console_file(path, io_root=source)
+            raw = base64.b64decode(observed['content_base64'], validate=True)
+            total += len(raw)
+            assert len(raw) <= 1024 * 1024 and total <= 2 * 1024 * 1024, 'Source diagnostic byte bound exceeded'
+            assert b'<!DOCTYPE' not in raw.upper() and b'<!ENTITY' not in raw.upper()
+            root = ET.fromstring(raw)
+            assert root.tag == 'WwiseDocument' and root.get('Type') == 'WorkUnit'
+            assert len(list(root.iter())) <= 16384, 'Source diagnostic XML node bound exceeded'
+            relative = path.relative_to(source).as_posix()
+            archive = destination / 'original-source' / relative
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            with archive.open('xb') as stream:
+                stream.write(raw)
+            files.append({'source_path': relative, 'artifact_path': archive.relative_to(destination).as_posix(),
+                'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(), 'source_file_proof': observed['file_proof']})
+            if directory == 'Soundcaster Sessions':
+                for session in root.iter('SoundcasterSession'):
+                    bindings = []
+                    for row in session.findall('./RTPCValueList/RTPCValue'):
+                        ref = row.find('GameParameterRef')
+                        assert ref is not None and row.findtext('Value') is not None
+                        bindings.append({'kind': 'RTPC', 'id': ref.attrib['ID'], 'name': ref.attrib['Name'],
+                            'value': row.findtext('Value')})
+                    for kind in ('State', 'Switch'):
+                        for ref in session.findall(f'./Current{kind}List/Current{kind}Ref'):
+                            bindings.append({'kind': kind, 'id': ref.attrib['ID'], 'name': ref.attrib['Name']})
+                    sessions.append({'id': session.attrib['ID'], 'name': session.attrib['Name'],
+                        'source_path': relative, 'bindings': bindings})
+            else:
+                kind = 'State' if directory == 'States' else 'Switch'
+                for group in root.iter(kind + 'Group'):
+                    for member in group.findall('./ChildrenList/' + kind):
+                        key = (kind, member.attrib['ID'])
+                        assert key not in members, 'Duplicate original group member'
+                        members[key] = {'id': group.attrib['ID'], 'name': group.attrib['Name'],
+                            'member_name': member.attrib['Name']}
+    assert sorted((row['id'], row['name']) for row in sessions) == sorted(MEDIA_DIAGNOSTIC_SESSIONS)
+    assert len({row['name'] for row in sessions}) == 3, 'Original session names are not unique'
+    counts = {kind: 0 for kind in ('RTPC', 'State', 'Switch')}
+    for session in sessions:
+        for binding in session['bindings']:
+            counts[binding['kind']] += 1
+            if binding['kind'] != 'RTPC':
+                group = members[(binding['kind'], binding['id'])]
+                assert binding['name'] == group['member_name'], 'Original member identity/name mismatch'
+                binding['group'] = {'id': group['id'], 'name': group['name']}
+    assert counts == {'RTPC': 72, 'State': 16, 'Switch': 12}, 'Original saved binding set changed'
+    return {'full_tree_hash': batch.runtime.source_hash_before.digest,
+        'project_mtime_ns': batch.runtime.source_mtime_before_ns, 'files': files,
+        'sessions': sessions, 'binding_counts': counts,
+        'scope': 'original saved expectations only; not loaded session state'}
+
+
+def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_layout_node):
+    """Inspect one exact Minigun object; session activation requires image review."""
+    batch, call = owned_authoring_layout_node
+    assert batch.runtime.version == '2024.1' and batch.info['version']['build'] == 9056
+    runtime = batch.node_runtimes[SOUNDCASTER_IMAGE_DIAGNOSTIC_NODE]
+    destination = Path(runtime.runner_environment['WWISE_EVIDENCE_DIR'])
+    destination.mkdir(parents=True, exist_ok=True)
+    path = destination / 'soundcaster-frontend-diagnostic.json'
+    assert not path.exists() and not path.is_symlink(), 'Diagnostic cannot overwrite an earlier observation'
+    report = {'contract': 'waapi-skill.soundcaster-frontend-diagnostic/v1', 'complete': False,
+        'business_preservation_verified': False, 'runtime_session_values_observed': False,
+        'coverage_credit': 'none; diagnostic observation only', 'visual_review': 'unobserved; independent review required',
+        'media_operation_executed': False, 'host': batch.info, 'candidate': batch.candidate,
+        'source_context': batch.source_context, 'sessions': [], 'requests': [], 'errors': [],
+        'activation_request': 'Inspect one exact Minigun object; Soundcaster session loading is unproven',
+        'remaining_preservation_scope': 'Music and the complete original 100 saved bindings remain unresolved',
+        'limits': {'public_calls': 48, 'reply_bytes': 1024 * 1024, 'total_reply_bytes': 4 * 1024 * 1024,
+            'image_base64_chars': 1024 * 1024, 'image_count': 1}}
+    path.write_text(json.dumps(report) + '\n', encoding='utf-8')
+    operator_enabled = runtime.runner_environment.get('WWISE_SOUNDCASTER_OPERATOR_OBSERVATION') == '1'
+    if operator_enabled:
+        report['limits']['image_count'] = 2
+    total, executed = 0, {}
+    def bounded_call(argv):
+        nonlocal total
+        assert len(report['requests']) < report['limits']['public_calls'], 'Diagnostic call bound exceeded'
+        entry = {'argv': list(argv)}
+        report['requests'].append(entry)
+        payload = call(argv)
+        size = len(json.dumps(payload, ensure_ascii=False).encode('utf-8'))
+        total += size
+        assert size <= report['limits']['reply_bytes'] and total <= report['limits']['total_reply_bytes'], 'Diagnostic reply bound exceeded'
+        entry.update(reply_bytes=size, complete_reply_retained_by_owner=True)
+        if argv[0] == 'execute':
+            executed[payload['transaction_id']] = payload
+        return payload
+    def effect(operation, fields):
+        preview = _preview_business_plan(operation, fields, owner_call=bounded_call)
+        verified = _execute_and_verify(preview, owner_call=bounded_call)
+        assert verified['state'] == TransactionState.RESULT_SCHEMA_CHECKED.value, verified
+        assert verified['verification']['business_state_verified'] is False, verified
+        return {'transaction_id': preview['transaction_id'], 'artifact_hash': preview['artifact_hash'],
+            'state': verified['state'], 'business_state_verified': False}
+    def observe_inspection():
+        selected = bounded_call(['selected'])
+        current = bounded_call(['layout-read', 'current'])
+        layout = current['result'].get('name')
+        assert isinstance(layout, str) and layout, 'No exact current layout for inspection observation'
+        instances = bounded_call(['layout-read', 'instances', '--layout-name', layout])
+        return {'selected': selected, 'current_layout': current, 'instances': instances,
+            'scope': 'active-view selection and current-layout views; not saved session values'}
+    def capture_image(session, fields, image_scope, filename):
+        capture = effect('ui.captureScreen', fields)
+        original = executed[capture['transaction_id']]
+        assert original['artifact_hash'] == capture['artifact_hash']
+        captured = original['dispatch_result'].get('result')
+        if not isinstance(captured, dict):
+            # Execute deliberately digests large successes. Read its one
+            # already-sealed offline event; never capture again or lift caps.
+            shown = bounded_call(['transaction-show', capture['transaction_id']])
+            assert (shown['transaction_id'] == capture['transaction_id']
+                and shown['artifact_hash'] == capture['artifact_hash']
+                and shown['state'] == TransactionState.RESULT_SCHEMA_CHECKED.value)
+            events = [event for event in shown['events'] if event['event_type'] == 'execution_completed']
+            assert len(events) == 1 and events[0]['artifact_hash'] == capture['artifact_hash']
+            captured = events[0]['details']['dispatch_result']['result']
+            capture['image_source'] = {'kind': 'public_transaction_show_execution_completed',
+                'event_hash': events[0]['event_hash']}
+        else:
+            capture['image_source'] = {'kind': 'public_execute_dispatch_result'}
+        assert isinstance(captured, dict), 'Exact image absent from bounded public result; session remains unobserved'
+        encoded = captured.get('contentBase64')
+        assert captured.get('contentType') == 'image/png' and isinstance(encoded, str) and 0 < len(encoded) <= 1024 * 1024
+        raw = base64.b64decode(encoded, validate=True)
+        assert raw.startswith(b'\x89PNG\r\n\x1a\n'), 'Capture does not contain PNG bytes'
+        image_path = destination / filename
+        with image_path.open('xb') as stream:
+            stream.write(raw)
+        from wwise_waapi.operation_soundbank import capture_file_proof
+        image_proof = capture_file_proof(image_path, field='Soundcaster diagnostic image',
+            max_bytes=1024 * 1024, io_root=destination)
+        assert image_proof['size'] == len(raw) and image_proof['sha256'] == hashlib.sha256(raw).hexdigest()
+        image = {'scope': image_scope, 'file_proof': image_proof, 'path': image_path.name, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+            'content_type': captured['contentType'], 'capture_transaction_id': capture['transaction_id'],
+            'command_transaction_id': session['command']['transaction_id'], 'session_id': session['id'],
+            'visual_review': 'unobserved; image/schema success grants no business credit'}
+        return capture, image
+    def publish():
+        report['public_call_count'], report['total_reply_bytes'] = len(report['requests']), total
+        temporary = path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        temporary.replace(path)
+    def block_operator(reason):
+        report.setdefault('operator', {}).update(status='blocked', reason=reason)
+        pytest.skip('Operator observation incomplete: ' + reason)
+    def exact_selected(payload, session):
+        rows = payload.get('objects', [])
+        return len(rows) == 1 and all(rows[0].get(field) == session['identity'].get(field)
+            for field in ('id', 'name', 'type', 'path'))
+    def simulation_values():
+        results = []
+        for identity, name in (('{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}', 'Engine_Load'),
+                ('{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}', 'RPM')):
+            payload = bounded_call(['query-object', '--exact-id', identity,
+                '--include-field', 'SimulationValue', '--max-results', '1'])
+            rows = payload['objects']
+            assert len(rows) == 1 and rows[0]['id'] == identity and rows[0]['name'] == name and rows[0]['type'] == 'GameParameter', 'Exact GameParameter identity changed'
+            results.append(payload)
+        return results
+    def operator_wait(session):
+        # Developer-only synchronization in this owned node, never a Skill UI fallback.
+        from wwise_waapi.operation_soundbank import capture_file_proof, open_regular_artifact_file
+        if not exact_selected(session['after']['selected'], session):
+            block_operator('Exact Minigun selection was not observed after Inspect')
+        session['pre_operator_capture'], session['pre_operator_image'] = capture_image(session, [],
+            {'kind': 'main-ui', 'phase': 'before-operator'}, 'minigun-before-operator.png')
+        marker_path = destination / 'operator-resume.json'
+        if marker_path.exists() or marker_path.is_symlink():
+            block_operator('Operator marker already exists; stale gate cannot resume collection')
+        saved = next(row for row in report['source']['sessions'] if row['id'] == session['id'])
+        deadline = _operator_monotonic() + 180
+        ready = {'contract': 'waapi-skill.developer-soundcaster-operator/v1', 'gate_id': uuid.uuid4().hex,
+            'candidate': batch.candidate, 'nodeid': SOUNDCASTER_IMAGE_DIAGNOSTIC_NODE,
+            'owner_root': str(batch.runtime.owned_root), 'node_root': str(runtime.owned_root),
+            'evidence_root': str(batch.runtime.evidence_root), 'native_evidence_root': str(destination),
+            'host': batch.info, 'endpoint': {'host': runtime.host, 'port': runtime.port},
+            'launch_pid': batch.launch_pid, 'sandbox_project': str(batch.runtime.sandbox.sandbox_project),
+            'selected': session['after']['selected']['objects'][0], 'pre_image': session['pre_operator_image'],
+            'saved_value_checklist': saved['bindings'], 'marker_path': str(marker_path), 'timeout_seconds': 180,
+            'deadline_monotonic': deadline,
+            'instructions': 'First inventory CUA apps and identify this exact owned Wwise/Wine host/project. If unrecognized, do not launch an installed app: report blocked. Click only the documented RTPC Show All display button in the loaded Minigun ObjectTab. Do not change values, sliders, States, Switches, playback, reset, save, or user projects. Write the exact nonce/context-bound marker to resume collection only; it certifies no values or effect.',
+            'marker_example': {'gate_id': None, 'decision': 'resume', 'host_session_id': batch.info['sessionId'],
+                'host_process_id': batch.info['processId'], 'sandbox_project': str(batch.runtime.sandbox.sandbox_project),
+                'owned_app_identified': True, 'action': 'rtpc-show-all-only'},
+            'blocked_marker': 'Use the same gate_id with decision=blocked and a bounded reason if the owned app/control cannot be identified.'}
+        ready['marker_example']['gate_id'] = ready['gate_id']
+        ready_path = destination / 'operator-ready.json'
+        with ready_path.open('x', encoding='utf-8') as stream:
+            stream.write(json.dumps(ready, ensure_ascii=False, indent=2) + '\n')
+        report['operator'] = {'status': 'waiting', 'ready_path': str(ready_path),
+            'marker_path': str(marker_path), 'gate_id': ready['gate_id'], 'timeout_seconds': 180,
+            'deadline_monotonic': deadline,
+            'marker_certifies_values': False, 'scope': 'explicit developer operator observation only'}
+        publish()
+        print('SOUNDCASTER_OPERATOR_READY ' + str(ready_path), flush=True)
+        while _operator_monotonic() < deadline:
+            if marker_path.exists() or marker_path.is_symlink():
+                try:
+                    proof = capture_file_proof(marker_path, field='Operator marker', max_bytes=4096, io_root=destination)
+                    _, descriptor, before = open_regular_artifact_file(marker_path, field='Operator marker', io_root=destination)
+                    with os.fdopen(descriptor, 'rb') as stream:
+                        raw = stream.read(4097)
+                        after = os.fstat(stream.fileno())
+                    assert len(raw) <= 4096 and len(raw) == proof['size'] and hashlib.sha256(raw).hexdigest() == proof['sha256']
+                    assert all(getattr(before, key) == getattr(after, key)
+                        for key in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns'))
+                    assert capture_file_proof(marker_path, field='Operator marker', max_bytes=4096, io_root=destination) == proof
+                    marker = json.loads(raw)
+                    report['operator']['marker'] = marker
+                    report['operator']['marker_file_proof'] = proof
+                    assert marker.get('gate_id') == ready['gate_id'], 'Marker belongs to a different gate'
+                    if marker.get('decision') == 'blocked':
+                        block_operator(str(marker.get('reason', 'Owned app/control unavailable'))[:2048])
+                    assert marker == ready['marker_example'], 'Marker does not identify the exact owned app/context and permitted action'
+                except Exception as exc:
+                    block_operator('Invalid operator marker: ' + str(exc)[:1024])
+                report['operator']['status'] = 'resumed'
+                return
+            _operator_sleep(min(0.25, max(0, deadline - _operator_monotonic())))
+        block_operator('No operator marker before the fixed 180-second deadline')
+    try:
+        report['source'] = _soundcaster_source_witness(batch, destination)
+        # This controlled activation experiment selects only Minigun. Keep all
+        # original saved expectations, but verify the selected identity before UI writes.
+        for identity, name in MEDIA_DIAGNOSTIC_SESSIONS[1:2]:
+            rows = bounded_call(['query-object', '--exact-id', identity, '--include', 'class-id', '--max-results', '1'])['objects']
+            assert (len(rows) == 1 and rows[0]['id'] == identity and rows[0]['name'] == name
+                and rows[0]['type'] == 'SoundcasterSession' and rows[0]['class_id'] == 1703952), 'Exact source session identity/class changed'
+            report['sessions'].append({'id': identity, 'name': name, 'identity': rows[0]})
+        for session in report['sessions']:
+            session['before'] = observe_inspection()
+            if operator_enabled:
+                session['simulation_values'] = {'before': simulation_values(),
+                    'scope': 'global GameParameter SimulationValue before/after Inspect; relationship to session presets unproven'}
+            session['command'] = effect('ui.commands.execute', ['--command-id', 'Inspect', '--command-object', session['id']])
+            session['after'] = observe_inspection()
+            if operator_enabled:
+                session['simulation_values']['after'] = simulation_values()
+            layout = session['after']['current_layout']['result']['name']
+            types = bounded_call(['layout-read', 'types'])['result'].get('viewTypes', [])
+            registered = [row for row in types if row.get('viewDisplayName') == 'Soundcaster']
+            names = {row['viewName'] for row in registered if row.get('viewName')}
+            instances = session['after']['instances']['result'].get('viewInstances', [])
+            matches = [row for row in instances if row.get('viewName') in names]
+            unique = (len(registered) == 1 and len(matches) == 1 and bool(matches[0].get('viewID'))
+                and type(matches[0].get('viewIsDocked')) is bool)
+            session['view_locator'] = {'complete': unique, 'layout_name': layout,
+                'registered_types': registered, 'instances': matches, 'session_id': session['id'],
+                'command_transaction_id': session['command']['transaction_id'],
+                'binding_scope': 'observed view instance only; selected session requires independent image review'}
+            if unique:
+                session['view_locator']['instance'] = matches[0]
+                fields = ['--view-name', matches[0]['viewName']]
+                image_scope = {'kind': 'soundcaster-view', 'view_name': matches[0]['viewName']}
+            else:
+                # Normal absence/ambiguity must not hide Inspect's other UI
+                # effects. This is one diagnostic main image, not a retry.
+                fields = []
+                image_scope = {'kind': 'main-ui',
+                    'reason': 'Soundcaster instance absent or ambiguous; observe generic inspection effect'}
+            if operator_enabled:
+                operator_wait(session)
+                fields, image_scope = [], {'kind': 'main-ui', 'phase': 'after-operator',
+                    'marker_certifies_values': False}
+            session['capture'], session['image'] = capture_image(session, fields, image_scope,
+                session['name'].lower() + '.png')
+            if operator_enabled:
+                session['operator_selected_after'] = bounded_call(['selected'])
+                if not exact_selected(session['operator_selected_after'], session):
+                    block_operator('Exact Minigun selection changed during operator observation')
+        report['complete'] = True
+    except Exception as exc:
+        report['errors'].append({'type': type(exc).__name__, 'message': str(exc)[:2048]})
+    finally:
+        publish()
+    assert report['complete'], report['errors']
 
 
 def _gateway_env(tmp_path: Path, *, version: str) -> dict[str, str]:
@@ -91,11 +752,13 @@ def _preview_business_plan(
     operation: str,
     declaration_args: list[str],
     *,
-    env: dict[str, str],
-    state_dir: Path,
+    env: dict[str, str] | None = None,
+    state_dir: Path | None = None,
+    owner_call=None,
     registration_key: str | None = None,
 ) -> dict[str, object]:
-    started = _call(
+    invoke = (lambda argv, **_: owner_call(argv)) if owner_call else (lambda argv, **_: _call(argv, env=env, state_dir=state_dir))
+    started = invoke(
         ["draft-start", operation],
         env=env,
         state_dir=state_dir,
@@ -104,7 +767,7 @@ def _preview_business_plan(
     assert isinstance(draft, dict)
     draft_id = str(draft["draft_id"])
     authority = str(started["task_authority"])
-    declared = _call(
+    declared = invoke(
         [
             "draft-declare-ui-plan",
             draft_id,
@@ -121,7 +784,7 @@ def _preview_business_plan(
     assert isinstance(current, dict)
     if operation == "ui.commands.register":
         assert registration_key is not None
-        current = _call(
+        current = invoke(
             [
                 "draft-add-ui-command",
                 draft_id,
@@ -140,7 +803,7 @@ def _preview_business_plan(
             state_dir=state_dir,
         )["draft"]
         assert isinstance(current, dict)
-    checked = _call(
+    checked = invoke(
         [
             "draft-check",
             draft_id,
@@ -154,7 +817,7 @@ def _preview_business_plan(
     )
     checked_draft = checked["draft"]
     assert isinstance(checked_draft, dict)
-    return _call(
+    return invoke(
         [
             "preview-from-draft",
             draft_id,
@@ -231,28 +894,31 @@ def _preview_host_plan(
 def _execute_and_verify(
     preview: dict[str, object],
     *,
-    env: dict[str, str],
-    state_dir: Path,
+    env: dict[str, str] | None = None,
+    state_dir: Path | None = None,
+    owner_call=None,
 ) -> dict[str, object]:
     transaction_id = str(preview["transaction_id"])
-    snapshot = TransactionStore(state_dir).load_snapshot(transaction_id)
-    _call(
+    invoke = (lambda argv, **_: owner_call(argv)) if owner_call else (lambda argv, **_: _call(argv, env=env, state_dir=state_dir))
+    token = (owner_call(["transaction-show", transaction_id])["confirmation"]["token"]
+             if owner_call else TransactionStore(state_dir).load_snapshot(transaction_id).confirmation_token)
+    invoke(
         [
             "confirm",
             transaction_id,
             "--confirmation-token",
-            snapshot.confirmation_token,
+            token,
         ],
         env=env,
         state_dir=state_dir,
     )
-    executed = _call(
+    executed = invoke(
         ["execute", transaction_id],
         env=env,
         state_dir=state_dir,
     )
     assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value
-    return _call(
+    return invoke(
         ["verify", transaction_id],
         env=env,
         state_dir=state_dir,
@@ -792,9 +1458,12 @@ def test_runtime_business_profiler_and_transport_lifecycle_on_authoring(
             env=env,
             state_dir=state_dir,
         )
-        assert stopped_verified["state"] == (
-            TransactionState.RESULT_SCHEMA_CHECKED.value
-        )
+        assert stopped_verified["state"] == TransactionState.VERIFIED.value
+        stop_observation = stopped_verified["verification"]["verification_scope"]["observation"]
+        assert stop_observation["membership_matches"] is True
+        assert len(stop_observation["targets"]) == 1
+        assert stop_observation["targets"][0]["observed_state"] == "stopped"
+        assert stop_observation["targets"][0]["outcome"] == "matched"
 
         destroyed = _preview_runtime_plan(
             "ak.wwise.core.transport.destroy",

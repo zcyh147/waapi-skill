@@ -72,6 +72,11 @@ def test_object_create_compiles_named_hierarchy_without_native_types_or_paths(
             "parent": {"kind": "id", "value": PARENT_ID},
             "type": "ActorMixer",
             "name": "Weather",
+            # Every declared ordinary occurrence retains its own result identity.
+            "graph_result_bindings": [
+                {"request_path": "$", "result_handle": weather_handle},
+                {"request_path": "$.children[0]", "result_handle": session.declarations[1].result_handle},
+            ],
             "children": [
                 {
                     "type": "Sound",
@@ -111,6 +116,7 @@ def test_object_create_accepts_one_gateway_bound_long_tail_kind_handle() -> None
         "parent": {"kind": "id", "value": PARENT_ID},
         "type": "Event",
         "name": "Play_Weather",
+        "graph_result_bindings": [{"request_path": "$", "result_handle": session.declarations[0].result_handle}],
     }
 
 
@@ -185,6 +191,7 @@ def test_object_create_compiles_common_and_bound_fields_without_tokens() -> None
         "parent": {"kind": "id", "value": PARENT_ID},
         "type": "Sound",
         "name": "Rain",
+        "graph_result_bindings": [{"request_path": "$", "result_handle": session.declarations[0].result_handle}],
         "platform": "Windows",
         "properties": [
             {"name": "IsLoopingEnabled", "value": True},
@@ -652,6 +659,7 @@ def test_object_create_keeps_game_sync_value_as_a_normal_child(
         "parent": {"kind": "id", "value": parent.object_id},
         "type": child_kind.title(),
         "name": "Storm",
+        "graph_result_bindings": [{"request_path": "$", "result_handle": session.declarations[0].result_handle}],
     }
 
 
@@ -690,7 +698,7 @@ def test_object_set_compiles_voice_language_platform_and_subordinate_media() -> 
                     "name": "Storm Warning",
                     "language": "English(US)",
                     "platform": "Windows",
-                    "properties": [{"name": "Volume", "value": -3.0}],
+                    "properties": [{"name": "Volume", "value": -3.0}, {"name": "IsVoice", "value": True}],
                     "import": {
                         "files": [
                             {
@@ -812,7 +820,7 @@ def test_object_set_rejects_empty_list_clear_without_replace_all() -> None:
     assert captured.value.error_code == "OBJECT_SET_EMPTY_LIST_REQUIRES_REPLACE"
 
 
-def test_object_create_rejects_voice_outcome_that_native_route_cannot_express() -> None:
+def test_object_create_compiles_empty_voice_with_native_sound_flag() -> None:
     session, parent_handle = _session("2025.1")
     session = session.with_new_declaration(
         declaration_id="voice",
@@ -824,11 +832,13 @@ def test_object_create_rejects_voice_outcome_that_native_route_cannot_express() 
         fields={},
     )
 
-    with pytest.raises(BusinessDeclarationError) as captured:
-        business_adapter("object.create").materialize(session)
-
-    assert captured.value.error_code == "OBJECT_CREATE_VOICE_UNAVAILABLE"
-    assert captured.value.repair["choices"] == ["audio.import", "object.set"]
+    request = business_adapter("object.create").materialize(session)
+    assert request["arguments"] == {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": "Sound", "name": "Storm Warning",
+        "graph_result_bindings": [{"request_path": "$", "result_handle": session.declarations[0].result_handle}],
+        "properties": [{"name": "IsVoice", "value": True}],
+    }
 
 
 def test_create_plugin_rejects_type_handle_from_the_wrong_role() -> None:

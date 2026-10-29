@@ -1,0 +1,82 @@
+{
+  "selection": "mf1.1792523920.5.b0b8ba06d0ab1f1cd69dd5db5db03c2f42aa5f1a11716e7b140ee3ade4390bbf",
+  "scope": {
+    "kind": "object_type",
+    "requested": "MediaPoolFilter",
+    "resolved": {
+      "classId": 5767184,
+      "name": "MediaPoolFilter",
+      "type": "WObject"
+    }
+  },
+  "metadata": {
+    "name": "FieldName",
+    "type": "string",
+    "default": "",
+    "audioEngineId": 4294967295,
+    "supports": {
+      "rtpc": "None",
+      "randomizer": false,
+      "unlink": false
+    },
+    "display": {
+      "name": "Field",
+      "index": 1868,
+      "group": ""
+    },
+    "dependencies": [
+      {
+        "type": "property",
+        "action": "Show",
+        "property": "CriteriaType",
+        "context": "Self",
+        "conditions": [
+          {
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "value": 0,
+                  "displayName": "0"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "restriction": {},
+    "ui": {
+      "value": {
+        "min": 0.0,
+        "max": 0.0,
+        "decimals": 0,
+        "step": 0.0,
+        "fine": 0.0,
+        "infinity": 0
+      },
+      "displayAs": {
+        "lrMix": false,
+        "musicNote": false,
+        "bitfield": false,
+        "percentage": false
+      },
+      "dataMeaning": "None",
+      "autoUpdate": false
+    },
+    "unit": {
+      "status": "unknown",
+      "value": null
+    },
+    "availability": {
+      "type": "known",
+      "default": "known",
+      "restriction": "known",
+      "dependencies": "known",
+      "supports": "known",
+      "ui": "known"
+    }
+  },
+  "complete": true,
+  "mutation_authority": false
+}

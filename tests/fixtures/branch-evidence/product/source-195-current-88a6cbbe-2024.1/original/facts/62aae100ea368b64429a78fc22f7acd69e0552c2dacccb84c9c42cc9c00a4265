@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-source195-current-88a6cbbe-r1/test_modern_collector_preserve2/native/1793224818154081000-4fa7d0c3df2d4c109fcf89ec2718190a-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Base Frequency"
+    },
+    "name": "BaseFrequency",
+    "type": "Real32"
+  },
+  "risk_level": "low",
+  "timeout": 9.998169499915093,
+  "version": "2024.1"
+}

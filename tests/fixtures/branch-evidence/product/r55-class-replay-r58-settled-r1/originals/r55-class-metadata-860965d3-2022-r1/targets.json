@@ -1,0 +1,17 @@
+[
+  {
+    "scope": "MusicStinger",
+    "field": "CustomCueMatchName",
+    "status": "captured",
+    "list_receipt": "005",
+    "detail_receipt": "006",
+    "whole_inventory_complete": true,
+    "detail_agent_result_sha256": "cfbfe357138dc6c63899625dc6afbbc53c80d7f407afcdb981af02d270fd3648",
+    "native_receipt": "dispatcher-evidence/1792528788320188000-e69b675e73024209b8db8a32678244b3-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2022-r1/dispatcher-evidence/1792528788320188000-e69b675e73024209b8db8a32678244b3-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "2f6081a00cf54d29b67d748ae17587843630469f45dc3994912331dd9bffbded",
+    "native_bytes": 1228,
+    "default_present": true,
+    "observed_default": ""
+  }
+]

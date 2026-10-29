@@ -1,0 +1,41 @@
+{
+  "contract": "waapi-skill.core-accepted-history/v1",
+  "authority": [
+    "docs/plans/full-waapi-coverage/SPEC.md",
+    "docs/plans/full-waapi-coverage/SPECIALIZED_LIGHTWEIGHT.md",
+    "tests/TEST_INVENTORY.md"
+  ],
+  "retained_native_facts": [
+    {
+      "record": "tests/TEST_INVENTORY.md#2026-10-23-r90-attenuation-and-retained-object-identity",
+      "scope": "GET exact versioned choice disclosure is program proof; DSF GET and HSF SET are distinct, no new curve-effect observation"
+    },
+    {
+      "root": "r90-blend-d0b68da9-2024-r1/root-review.json",
+      "candidate": "d0b68da9",
+      "host_build": "wwise-console|2024.1.13.9056",
+      "raw_outcome": "FAIL with teardown error",
+      "scope": "one addAssignment executed; negative index appended and adjacent Automatic geometry changed; missing final lifecycle record gives no cleanup/source PASS"
+    },
+    {
+      "record": "docs/plans/full-waapi-coverage/SPECIALIZED_LIGHTWEIGHT.md",
+      "scope": "native clamp materialization and partial Automatic edge observation repairs are code-validated; failed native receipt is unchanged"
+    },
+    {
+      "record": "tests/TEST_INVENTORY.md#scope-and-validation",
+      "candidate": "3b93202bc968b09aa0cfa0659849427359c0e435",
+      "raw_outcome": "PASS",
+      "scope": "macOS and native Windows 2022.1/2025.1 selected object.diff/pasteProperties workflow; exact volume readback and cleanup only; no all-mode effect claim"
+    },
+    {
+      "record": "tests/TEST_INVENTORY.md#scope-and-validation",
+      "candidate": "3a31a05dd3636319cd228c648d462b5e1799fef6",
+      "raw_outcome": "cumulative PASS",
+      "scope": "integration Footsteps assignment/remove on macOS and native Windows 2022.1/2025.1; separately previewed effects, original earlier failures retained"
+    }
+  ],
+  "active_source": "project_setting_business_contracts.active_source_native_limitations preserves exact Tone current-platform Console build/context rejections only",
+  "source_copy_and_native_reconciliation": "Main-owned; pointers only, no copied/upgraded native receipt or new native coverage requirement",
+  "new_native_or_fresh": false,
+  "global_completion": false
+}

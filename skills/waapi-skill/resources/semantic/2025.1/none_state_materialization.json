@@ -1,0 +1,167 @@
+{
+  "schema": "waapi-skill.none-state-materialization-sources/v1",
+  "version": "2025.1",
+  "installed_build": "2025.1.7.9143",
+  "archives": {
+    "authoring": {
+      "file": "WwiseHelp_en.chm",
+      "sha256": "2c17662af99cdc7476b2dee1c3e1274a9df8b9e98550197d68e8d25a543491db"
+    },
+    "sdk": {
+      "file": "WwiseSDK-Windows.chm",
+      "sha256": "c54b729388040e9df540a2f58d0d0eda966ac5da6410d3cd715ae256d898166d"
+    }
+  },
+  "facts": {
+    "none_mandatory_unremovable_initial_no_parameter_changes": {
+      "archive_kind": "sdk",
+      "member": "soundengine_states.html",
+      "member_sha256": "f3e737532cf1c9434a33a89b598eb4552991228c28b3cdfa6d6c4803ee46f62e",
+      "document_title": "Integration Details - States",
+      "quote": "Every state group has a state called \"None\". The \"None\" state represents the initial state of the group, and cannot be removed. In the \"None\" state, no parameter changes have been applied."
+    },
+    "per_group_state_names_unique": {
+      "archive_kind": "authoring",
+      "member": "ch17s01.html",
+      "member_sha256": "e39addb0f805ebffa9bcdabd47ad860ac42298cff30a3435497b553a67c3199e",
+      "document_title": "Working with State Groups",
+      "quote": "Each State name in a State Group must be unique and consist only of letters, digits, and underscores. Use either a letter or underscore as the first character."
+    },
+    "subscription_automatically_assigns_all_states": {
+      "archive_kind": "authoring",
+      "member": "ch17s03.html",
+      "member_sha256": "ee29686edb8972c1bfb75236f578b5813f408db0e59736dcedfd3adadc24db41",
+      "document_title": "Assigning States to objects and busses",
+      "quote": "An object must first subscribe to one or multiple State Groups, and then all States within those State Groups are automatically assigned to the object."
+    },
+    "media_cli_forces_all_work_units_save": {
+      "archive_kind": "sdk",
+      "member": "ak_wwise_cli_movemediaidstosinglefile.html",
+      "member_sha256": "d5c2eddac02b47e531cacf7c0fdf809b7affbe87299880d4cabfda5ebe76f43e",
+      "document_title": "move-media-ids-to-single-file",
+      "quote": "Moves the project's media IDs from its work units (.wwu) to a single file, <project-name>.mediaid. This command forces a save of all the project's work units."
+    }
+  },
+  "xsd": {
+    "file": "ObjectDataSchema.133.xsd",
+    "sha256": "ea0179a01b1825db5c97810aab06f96f57338d06a918b3c76f005b1e2ea2aeeb",
+    "state_info_direct_owners": [
+      "PropertyContainer",
+      "Bus",
+      "AuxBus",
+      "Effect",
+      "Metadata",
+      "AudioDevice",
+      "MotionFX",
+      "MotionSource",
+      "BlendContainer",
+      "EffectSlot",
+      "MusicPlaylistContainer",
+      "MusicSegment",
+      "MusicSwitchContainer",
+      "MusicTrack",
+      "RandomSequenceContainer",
+      "Sound",
+      "SourcePlugin",
+      "SwitchContainer"
+    ],
+    "shape": {
+      "state_info_top_level_compositor": "all",
+      "state_info_lists": [
+        {
+          "name": "StatePropertyList",
+          "minOccurs": "0"
+        },
+        {
+          "name": "StateGroupList",
+          "minOccurs": "0"
+        },
+        {
+          "name": "CustomStateList",
+          "minOccurs": "0"
+        }
+      ],
+      "custom_state_list_repetition": {
+        "minOccurs": "0",
+        "maxOccurs": "unbounded"
+      },
+      "custom_state_wrapper_sequence": [
+        {
+          "name": "StateRef",
+          "type": "ObjectRefType"
+        },
+        {
+          "ref": "CustomState",
+          "minOccurs": "0"
+        }
+      ],
+      "custom_state_object_base": {
+        "base": "ObjectType"
+      },
+      "custom_state_object_optional_children": [
+        {
+          "ref": "Comment",
+          "minOccurs": "0"
+        },
+        {
+          "ref": "PropertyList",
+          "minOccurs": "0"
+        }
+      ],
+      "object_type_attributes": [
+        {
+          "name": "Name",
+          "type": "xs:string",
+          "use": "required"
+        },
+        {
+          "name": "ID",
+          "type": "GUIDType",
+          "use": "required"
+        },
+        {
+          "name": "ShortID",
+          "type": "ShortIDType",
+          "use": "optional"
+        },
+        {
+          "name": "ExcludeFromStore",
+          "type": "xs:boolean",
+          "use": "optional"
+        }
+      ],
+      "object_ref_type_attributes": [
+        {
+          "name": "Name",
+          "type": "xs:string",
+          "use": "required"
+        },
+        {
+          "name": "ID",
+          "type": "GUIDType",
+          "use": "required"
+        },
+        {
+          "name": "WorkUnitID",
+          "type": "GUIDType",
+          "use": "optional"
+        }
+      ],
+      "state_group_info_object": {
+        "base": "ObjectType",
+        "optional_children": [
+          "Comment",
+          "PropertyList"
+        ],
+        "definition_xml_sha256": "2368f1e8c7c36d152c93449f19a74c78a0ba7a929607b5b8582b27d16f7eb25f"
+      },
+      "state_property_rows_min_occurs": 1
+    }
+  },
+  "limits": [
+    "Documentation does not establish that a forced save must create or retain a previously absent per-object GUID-bearing empty CustomState.",
+    "Valid-project mandatory None plus per-group name uniqueness permits exact-group/exact-name identity deduction; no special native identity flag or ShortID sentinel is established.",
+    "No assumption that None has ShortID 0.",
+    "XSD permits XML shapes and identifies direct owner elements; it does not prescribe automatic runtime materialization or business semantics."
+  ]
+}

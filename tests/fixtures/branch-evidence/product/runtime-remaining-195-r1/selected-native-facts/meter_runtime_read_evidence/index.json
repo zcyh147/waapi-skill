@@ -1,0 +1,37 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": "../../../../../../..",
+  "entries": [
+    {
+      "id": "runtime195-native-meter_runtime_read_evidence-native-00-",
+      "bindings": {
+        "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/meter_runtime_read_evidence/native-00-bindings.json",
+        "sha256": "a77488e1a8f2b2a1a4693e0e213e7fea8ac48d40198ee2107ff421300447a4b7"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/meter_runtime_read_evidence/native-00-bindings.json",
+          "sha256": "a77488e1a8f2b2a1a4693e0e213e7fea8ac48d40198ee2107ff421300447a4b7"
+        },
+        "program": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/meter_runtime_read_evidence/native-00-program.json",
+          "sha256": "312fde6b20fa15e14d3362dd296afb14b8e6cb43d85160c93d685a686df9aca1"
+        },
+        "capture": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/meter_runtime_read_evidence/native-00-capture.json",
+          "sha256": "952288d605ad7220b1bcf3b89b6f6a02bec3e8c6d45e7d8fd79623d5e6d136b1"
+        },
+        "requirements": {
+          "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/meter_runtime_read_evidence/native-00-requirements.json",
+          "sha256": "ad79561f3b666479cf04218ae058494b13fb55f51fba5918deda89a154aa7788"
+        }
+      }
+    }
+  ],
+  "qualified_runtime_read_attachments": [
+    {
+      "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-facts/meter_runtime_read_evidence/native-00-attachment.json",
+      "sha256": "dadaa5aa6045c08080185f7a2ee8242acdfcc9902e8ddd1c9d3e040b5a20688e"
+    }
+  ]
+}

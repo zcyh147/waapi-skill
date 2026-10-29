@@ -1,0 +1,23 @@
+{
+  "api": "ak.wwise.core.object.getPropertyAndReferenceNames",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2021-r1/dispatcher-evidence/1792528697672810000-5b360eb363db416fbf62f673158c2702-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      "Color",
+      "OverrideColor",
+      "CustomCueMatchName",
+      "DontPlayAgainTime",
+      "NumSegmentAdvance",
+      "PlaySegmentAt"
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 29.96981062501436,
+  "version": "2021.1"
+}

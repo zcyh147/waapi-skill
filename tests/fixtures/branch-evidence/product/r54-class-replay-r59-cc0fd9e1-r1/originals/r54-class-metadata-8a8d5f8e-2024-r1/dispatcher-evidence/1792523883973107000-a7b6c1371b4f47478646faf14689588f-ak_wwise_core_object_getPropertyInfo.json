@@ -1,0 +1,61 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2024-r1/dispatcher-evidence/1792523883973107000-a7b6c1371b4f47478646faf14689588f-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 48,
+    "default": false,
+    "dependencies": [
+      {
+        "action": "Enable",
+        "conditions": [
+          {
+            "referenceIsSet": true
+          }
+        ],
+        "context": "Self",
+        "property": "Effect",
+        "type": "reference"
+      }
+    ],
+    "display": {
+      "group": "",
+      "index": 1854,
+      "name": "Bypass"
+    },
+    "name": "Bypass",
+    "restriction": {},
+    "supports": {
+      "randomizer": false,
+      "rtpc": "None",
+      "unlink": false
+    },
+    "type": "bool",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false,
+        "percentage": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.96463820899953,
+  "version": "2024.1"
+}

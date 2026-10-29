@@ -10,6 +10,9 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
+from .authoring_layout import LAYOUT_READ_URIS, LAYOUT_VERSIONS, PINNED_SHA256, layout_read_contract, load_layout_read_evidence
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, layout_business_contract_data
+from .authoring_model_business import MODEL_OPERATIONS, model_business_contract
 from .builders.common import DEFAULT_MANIFEST_ROOT
 from .capabilities import CapabilityCatalog
 from .execution_contracts import AUTHORING_UI_EXECUTION_PROFILE
@@ -246,11 +249,26 @@ def load_definition_graph(
     )
 
 
+def load_authoring_definition_graph(version: str) -> DefinitionGraph:
+    """Use the sealed independent Authoring graph without changing Console truth."""
+    from .native_catalog import load_native_catalog
+    catalog = load_native_catalog(version, 'wwise-authoring')
+    payload = catalog['definitions']
+    unsigned = {key: value for key, value in payload.items() if key != 'inventory_sha256'}
+    if (payload.get('contract') != DEFINITION_GRAPH_CONTRACT or payload.get('version') != version
+            or payload.get('wwise_build') != catalog['provenance']['build']
+            or _canonical_sha256(unsigned) != payload.get('inventory_sha256')):
+        raise SchemaInventoryError('Independent Authoring definition graph identity/digest mismatch')
+    return DefinitionGraph(contract=payload['contract'], version=version, wwise_build=payload['wwise_build'],
+        source_file_names=tuple(payload['source_file_names']), documents=MappingProxyType(payload['documents']),
+        inventory_sha256=payload['inventory_sha256'])
+
+
 def validate_packaged_typed_request_surface(
     *,
     root: Path = DEFAULT_MANIFEST_ROOT,
 ) -> dict[str, Any]:
-    """Validate and return the immutable 824-lane typed surface contract."""
+    """Validate the immutable versioned construction surface contract."""
 
     selected_root = Path(root)
     path = selected_root / TYPED_REQUEST_SURFACE_FILENAME
@@ -308,6 +326,7 @@ def build_typed_request_surface(
     unique_topics: set[str] = set()
     function_lanes = 0
     topic_lanes = 0
+    native_result_definition_graphs: dict[str, Any] = {}
 
     for version in SUPPORTED_WWISE_VERSION_KEYS:
         graph = load_definition_graph(version, root=selected_root)
@@ -387,6 +406,31 @@ def build_typed_request_surface(
                     f"Unsupported reflected item type: {capability.item_type!r}"
                 )
 
+            route_graph = graph
+            closed_layout_read = capability.uri in LAYOUT_READ_URIS
+            closed_layout_mutation = capability.uri in LAYOUT_MUTATION_URIS
+            closed_model = capability.uri in MODEL_OPERATIONS
+            if closed_layout_read or closed_layout_mutation:
+                native = load_layout_read_evidence(selected_root, version)
+                if native['build'] != graph.wwise_build:
+                    raise SchemaInventoryError('Authoring UI definitions differ from the exact base graph build')
+                document = native['definitions']
+                retained = {'documents': {'waapi_ui_definitions.json': document},
+                            'source_supplement_sha256': PINNED_SHA256[version],
+                            'build': native['build'], 'host': native['host'],
+                            'semantics': 'native_source_preserved_without_normalization'}
+                retained['sha256'] = _canonical_sha256(retained)
+                native_result_definition_graphs[version] = retained
+                route_graph = DefinitionGraph(contract=graph.contract, version=version,
+                    wwise_build=graph.wwise_build,
+                    source_file_names=(*graph.source_file_names, 'waapi_ui_definitions.json'),
+                    documents=MappingProxyType({**graph.documents, 'waapi_ui_definitions.json': document}),
+                    inventory_sha256=_canonical_sha256({'base': graph.inventory_sha256,
+                        'native_result_graph': retained['sha256']}))
+            if closed_model:
+                route_graph = load_authoring_definition_graph(version)
+                if route_graph.wwise_build != graph.wwise_build:
+                    raise SchemaInventoryError('Authoring model definitions differ from the exact base graph build')
             schema = capability.schema
             unknown_keywords.extend(
                 validate_schema_envelope(
@@ -451,7 +495,7 @@ def build_typed_request_surface(
                             resolve_schema_reference(
                                 reference,
                                 root_schema=section,
-                                graph=graph,
+                                graph=route_graph,
                             )
                         except SchemaInventoryError as exc:
                             unresolved_references.append(
@@ -477,15 +521,15 @@ def build_typed_request_surface(
                 ),
                 "schema_sha256": _canonical_sha256(schema),
                 "construction_shape": (
-                    _function_construction_shape(
+                    "closed_read" if closed_layout_read else "closed_business" if closed_layout_mutation or closed_model else _function_construction_shape(
                         schema,
-                        graph=graph,
+                        graph=route_graph,
                         execution_policy=capability.execution_contract,
                     )
                     if capability.item_type == "function"
                     else "topic"
                 ),
-                "definition_graph_sha256": graph.inventory_sha256,
+                "definition_graph_sha256": route_graph.inventory_sha256,
                 "schema_keywords": sorted(schema_keywords),
                 "reference_count": reference_count,
                 "intentionally_blocked_fields": list(
@@ -499,6 +543,34 @@ def build_typed_request_surface(
                     )
                 ),
             }
+            if closed_layout_read:
+                business = layout_read_contract(version, capability.uri)
+                unresolved = capability.uri.endswith('.getLayout')
+                row['business_read_contract'] = business
+                row['native_result_definition_graph_sha256'] = native_result_definition_graphs[version]['sha256']
+                row['result_semantics'] = {
+                    'status': 'definition_semantics_unresolved' if unresolved else 'closed_result_validated',
+                    'business_arrangement_verified': False,
+                    'native_input_schema_is_not_public_construction': True,
+                    'issues': [
+                        {'pointer': '/definitions/Element/OneOf', 'issue': 'native capital OneOf retained without reinterpretation'},
+                        {'pointer': '/definitions/Splitter', 'issue': 'required undeclared @Children conflicts with closed properties'},
+                        {'pointer': '/definitions/ViewHolder', 'issue': 'holder tag and closed properties conflict with allOf Element'},
+                    ] if unresolved else [],
+                }
+            elif closed_layout_mutation or closed_model:
+                row['business_contract'] = (model_business_contract(capability.uri, version) if closed_model
+                                            else layout_business_contract_data(capability.uri, version))
+                row['native_request_schema_is_not_public_construction'] = True
+                if closed_model:
+                    row['native_authoring_definition_graph_sha256'] = route_graph.inventory_sha256
+                else:
+                    row['native_ui_definition_graph_sha256'] = native_result_definition_graphs[version]['sha256']
+                row['request_semantics'] = {
+                    'status': 'definition_semantics_unresolved' if capability.uri == LAYOUT_SET_URI else 'closed_business_constructors' if closed_model else 'closed_reflected_fields',
+                    'native_write_acceptance': 'pending_owned_native_observation',
+                    'original_native_definitions_retained': True,
+                }
             rows.append(row)
 
     rows.sort(key=lambda row: (row["version"], row["item_type"], row["uri"]))
@@ -535,6 +607,7 @@ def build_typed_request_surface(
                 item["keyword"],
             ),
         ),
+        "native_result_definition_graphs": native_result_definition_graphs,
         "lanes": rows,
     }
     return {**unsigned, "inventory_sha256": _canonical_sha256(unsigned)}
@@ -1122,6 +1195,128 @@ def _is_legacy_implicit_property(
         and f"{node_path}/{_encode_pointer_token(keyword)}" in allowed_paths
         and isinstance(schema.get(keyword), Mapping)
     )
+
+
+def topic_publish_schema(version: str, uri: str, schema: Mapping[str, Any]) -> dict[str, Any]:
+    """Project known legacy Topic members using the inventory's exact parser.
+
+    The immutable reflected resource and its native branch pointers stay intact.
+    Only the already reviewed 2021 SoundBank implicit properties are moved into
+    the normal properties wrapper for construction and delivered-event checks.
+    """
+    allowed = (
+        LEGACY_2021_SOUNDBANK_IMPLICIT_PROPERTY_PATHS
+        if version == "2021.1" and uri == "ak.wwise.core.soundbank.generated"
+        else frozenset()
+    )
+
+    def project(value: Any, path: str) -> Any:
+        if isinstance(value, list):
+            return [project(child, f"{path}/{index}") for index, child in enumerate(value)]
+        if not isinstance(value, Mapping):
+            return value
+        result = {key: project(child, f"{path}/{_encode_pointer_token(key)}") for key, child in value.items()}
+        implicit = [key for key in value if _is_legacy_implicit_property(
+            value, key, node_path=path, allowed_paths=allowed,
+        )]
+        if implicit:
+            properties = result.setdefault("properties", {})
+            for key in implicit:
+                if key in properties:
+                    raise SchemaInventoryError(f"Conflicting legacy Topic property at {path}/{key}")
+                properties[key] = result.pop(key)
+        return result
+
+    publish = schema.get("publishSchema")
+    if not isinstance(publish, Mapping):
+        raise SchemaInventoryError(f"Topic {uri!r} has no reflected publish schema")
+    return project(publish, "/publishSchema")
+
+
+# Native object.set observations on these exact Console builds proved unchanged
+# canonical unpadded WAV bytes in Originals. The reflected resources stay
+# immutable. A changed definition requires review before this rule can apply.
+_INLINE_WAV_REQUEST_COMPATIBILITY = {
+    "2023.1": ("e98c169fbd4c3fbe76d961020a251e5f87d10f981fc29838c9cb2c88f84ce9ac", "2023.1.19.8928"),
+    "2024.1": ("e98c169fbd4c3fbe76d961020a251e5f87d10f981fc29838c9cb2c88f84ce9ac", "2024.1.13.9056"),
+    "2025.1": ("e98c169fbd4c3fbe76d961020a251e5f87d10f981fc29838c9cb2c88f84ce9ac", "2025.1.7.9143"),
+}
+
+
+_MEDIA_SINGLE_RESULT_BUILDS = {
+    "2021.1": "2021.1.14.8108",
+    "2022.1": "2022.1.19.8584",
+    "2023.1": "2023.1.19.8928",
+}
+
+
+def observed_console_result_schema(version, uri, schema, value):
+    """Admit the exact process result observed on earlier Console builds.
+
+    The immutable reflected empty-object schema stays available for its empty
+    result. This compatibility rule is not a wildcard for undocumented fields,
+    other media commands, result codes, or changed source schemas.
+    """
+    build = _MEDIA_SINGLE_RESULT_BUILDS.get(version)
+    if (build is None or uri != "ak.wwise.cli.moveMediaIdsToSingleFile"
+            or not isinstance(value, Mapping) or set(value) != {"result"}):
+        return schema, None
+    digest = "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa"
+    if _canonical_sha256(schema) != digest:
+        raise SchemaInventoryError("The observed Console media-result source changed; review the new schema before use")
+    return {"type": "object", "additionalProperties": False, "required": ["result"],
+        "properties": {"result": {"type": "integer", "enum": [0, 1, 2]}}}, {
+        "rule_id": "console-media-single-observed-process-result/v1",
+        "uri": uri, "version": version, "section": "result",
+        "reflected_schema_sha256": digest, "native_observation_build": build,
+    }
+
+
+def resolved_request_schema(
+    version: str,
+    uri: str,
+    resolved: ResolvedSchemaReference,
+    value: Any,
+) -> tuple[Mapping[str, Any], Mapping[str, Any] | None]:
+    """Project one proven request delta without changing the native source.
+
+    Like topic_publish_schema, this is an exact source/URI/version projection,
+    never a global pattern override. All other members retain their constraints.
+    The original canonicalizer continues owning business input normalization;
+    a compiled native value must already be canonical and bounded here.
+    """
+    binding = _INLINE_WAV_REQUEST_COMPATIBILITY.get(version)
+    if (binding is None or uri != "ak.wwise.core.object.set"
+            or resolved.document_name != "waapi_definitions.json"
+            or resolved.pointer != "/definitions/oneImportFile"
+            or not isinstance(value, Mapping) or "audioFileBase64" not in value):
+        return resolved.target, None
+    digest, build = binding
+    if _canonical_sha256(resolved.target) != digest:
+        raise SchemaInventoryError("The object.set inline WAV compatibility definition changed; review the new schema before use")
+    field = resolved.target["properties"]["audioFileBase64"]
+    native_value = value["audioFileBase64"]
+    from .operation_import import ImportContractError, normalize_inline_audio_file
+
+    try:
+        canonical, _proof = normalize_inline_audio_file(native_value, field="audioFileBase64")
+    except ImportContractError as exc:
+        raise SchemaInventoryError(f"Compiled object.set inline WAV is invalid: {exc}") from exc
+    if canonical != native_value:
+        raise SchemaInventoryError("Compiled object.set inline WAV must already use its canonical path and Base64")
+    # Keep the original lower-case .wav path grammar. The single corrected
+    # alternative admits complete four-character groups without mandatory '='.
+    projected = {**resolved.target, "properties": {
+        **resolved.target["properties"], "audioFileBase64": {
+            **field, "pattern": r"^(.+\.wav\|(?:[A-Za-z0-9\+\/]{4})*(?:[A-Za-z0-9\+\/]{2}==|[A-Za-z0-9\+\/]{3}=)?)$",
+        },
+    }}
+    return projected, {
+        "rule_id": "object-set-inline-wav-canonical-base64/v1",
+        "uri": uri, "version": version, "document": resolved.document_name,
+        "definition_pointer": resolved.pointer, "field": "audioFileBase64",
+        "reflected_definition_sha256": digest, "native_observation_build": build,
+    }
 
 
 def _read_json_object(path: Path) -> dict[str, Any]:

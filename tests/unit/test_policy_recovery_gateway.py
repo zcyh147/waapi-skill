@@ -64,10 +64,10 @@ def test_side_effect_free_failures_disclose_bounded_continuation_without_retry(t
 
 
 def attempted_write(tmp_path, version, *, ambiguous):
-    from tests.unit.test_gateway_connection_binding import BindingClient
+    from tests.unit.test_gateway_connection_binding import BindingClient, project_save_preview
     env = configured_env(tmp_path, version=version, policy="ask_before_changes")
     env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
-    api = "ak.wwise.core.project.save" if version == "2021.1" else "ak.wwise.core.undo.undo"
+    api = "ak.wwise.core.project.save"
     class Writer(BindingClient):
         writes = 0
         def call(self, uri, args=None, options=None):
@@ -78,13 +78,7 @@ def attempted_write(tmp_path, version, *, ambiguous):
                 return {}
             return super().call(uri, args, options)
     client = Writer(version)
-    code, schema = gateway.execute_gateway(["request-schema", api], env=env)
-    assert code == 0, schema
-    argv = list(schema["continuation"]["gateway_argv"])
-    if "--apply" not in argv:
-        argv.append("--apply")
-    code, preview = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
-    assert code == 0, preview
+    preview = project_save_preview(env, client)
     tx = preview["transaction_id"]
     code, shown = gateway.execute_gateway(["transaction-show", tx], env=env)
     assert code == 0, shown

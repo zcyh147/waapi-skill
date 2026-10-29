@@ -5,6 +5,12 @@ batch, classifying a failure, changing a grader, or deciding what to rerun.
 It governs future test coordination and acceptance reports, including Windows
 impact assessment. Historical results retain their original contracts.
 
+For table-based import acceptance and rerun decisions, apply the
+[2026-10-27 lightweight policy](../../docs/plans/full-waapi-coverage/SPEC.md#user-approved-lightweight-table-audio-acceptance--2026-10-27):
+closed wrappers/code tests suffice in each supported lane, including multilingual
+audio and SoundBank Definition files; no additional native table-import validation is required. Ordinary
+import acceptance and the retained exact-host safety guard remain separate.
+
 ## 1. Judge the outcome, then classify the discrepancy
 
 Report three separate facts for each unit: independent business checks, material
@@ -46,6 +52,87 @@ votes on the same sealed notice is not a substitute for that diagnosis.
 
 ## 3. Prove the affected chain and rerun proportionally
 
+### Test selection and evidence reuse (approved 2026-10-23)
+
+The user reconfirmed representative functional testing on 2026-10-26.
+Keep complete native-to-public parameter/option mapping against all five pinned
+definitions. Aim for one or two representative public cases per meaningful
+parameter branch or shared mechanism; remaining legal values stay selectable.
+Simple APIs use an ordinary happy path and reusable relevant proof. Structural
+mapping rows, enum values, optional-field permutations and collection sizes are
+not individual execution or evidence-ID quotas.
+
+When matching primary sources establish a version introduction, disclose the
+older-version limit and test the version gate in code. Do not create older
+Wwise samples just to reproduce absence. Unclear documentation is not proof of
+a native limit. The twelve finite declared query return choices approved on
+2026-10-26 need shared transport/preservation checks, not per-spelling native
+samples or invented alias-equivalence proof; see the coverage specification.
+
+Select real Wwise checks for actual business risk, independent behavior and
+host/version differences. Reuse matching valid observations; preserve original
+failed outcomes. CRUD, queries and compound changes retain appropriate identity,
+policy, execute-once, outcome and cleanup checks. Unsupported normal-user
+functions and missing required business proof remain unresolved. The completion
+checker must distinguish complete option mapping from selected representative
+evidence; necessary reconciliation is owned by #195, not a new per-leaf test
+framework. Fresh remains under #194 with budget zero until separately approved;
+#195 coordinates the required stable-candidate full Program/Non-live gates.
+
+Apply the explicit API exceptions in the [coverage specification](../../docs/plans/full-waapi-coverage/SPEC.md):
+internal Debug needs no further verification; Tone acceptance is correct invocation
+and requested-file creation only. Use its exact-URI scope classifications.
+
+Select tests from the changed implementation and its callers. Group independent
+cases into one affected run while retaining separate assertions, outcomes and
+isolated mutable state. Share expensive setup only when it cannot leak state
+between cases. Similar ticket titles or matching schema shapes alone do not
+establish equivalent behavior or justify omitting a version.
+
+For each implementation slice, record the requested business outcome, changed
+shared mechanism, reusable evidence, selected test nodes and remaining version
+differences. Parameterize common mechanisms over the five pinned definitions;
+use targeted native cases for behavior that code tests or retained matching-host
+evidence do not establish. One native workflow may support several obligations
+only when its actual observations prove each one individually.
+
+Build one public Gateway business flow end to end in code tests first, then
+perform the necessary native validation. Extend the flow to new shapes and
+version differences after its shared path works. Fresh separately tests Agent
+discovery/use of that interface; it is not required for every code integration
+test and still needs an explicitly approved case budget.
+
+When expanding that flow, keep every new group connected to the ordinary
+consumer and finalizer, including a missing-required-evidence control. Check
+scope, dependency closure and metadata contracts before expensive producers.
+Isolated development may use a frozen dependency that passed its focused tests;
+integration and publication still require independent review.
+
+For a new or changed native evidence collector, that code test must reach the
+existing final report/category writer and its persisted result, not stop at the
+collector's returned dictionary. Substitute the external Wwise execution while
+exercising the real collector, outcome checks and finalizer. Cover successful
+and failed outcomes, including retained partial evidence; exercise bounded
+fallbacks when changed. Reuse this proof while those consumers remain unchanged.
+Do not spend a native attempt discovering missing report fields or incompatible
+producer/consumer shapes that this code test can establish.
+
+Classify a failure before selecting reruns. Wrong Wwise state, changed unrelated
+objects or missing material authorization require the affected business checks.
+A report, directory, stale test expectation or inventory-accounting defect
+requires focused checks of that producer/consumer chain. Reuse original native
+observations when their relevant source, contracts and material evidence remain
+valid; missing or ambiguous outcome evidence still requires targeted collection.
+Preserve the original failed verdict and record the separate assessment. A new
+commit or unrelated documentation edit alone does not invalidate native effects.
+
+Before materially increasing verification depth, test cost or required runtime
+behavior, present the current proof, remaining user-visible risk and proposed
+extra work to the user for a decision. Keep the unresolved requirement assigned
+to its existing parent while awaiting that decision. Do not silently remove it
+or expand it into a stronger completion requirement. This applies to complete
+waveform mathematical verification as well as other costly special cases.
+
 Use the existing focused tests and `notice-fast` command during repair. For
 changed evidence plumbing, exercise the actual producer, Broker/consumer,
 judgment input and archive/verify-only path together, with a meaningful negative
@@ -56,6 +143,12 @@ Finish a frozen batch before repairing ordinary failures. Stop for systemic
 source, evidence, authorization or cleanup faults that make further runs unsafe
 or uninterpretable. Consolidate confirmed repairs, then test the failed and
 directly affected units in fresh roots. Change no code or options mid-batch.
+During code repair, rerun the failed cases and callers affected by the fix;
+retain unaffected passing results. A single failed case does not by itself
+justify rerunning the whole Program, Non-live or native selection.
+For an existing large test file, select the specific affected test nodes.
+Sharing a file with an affected consumer does not justify rerunning every test
+in that file; broader selection needs a shared behavior that the change affects.
 
 At promotion, run the required development gate once on the combined change.
 Choose additional Fresh coverage by what the change could invalidate. A new

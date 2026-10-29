@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from test_gateway_connection_binding import BindingClient
+from test_gateway_connection_binding import BindingClient, project_save_preview
 from test_gateway_session_context import configured_env, waapi_gateway as gateway
 from wwise_waapi.transactions import TransactionStore, new_transaction_id
 
@@ -12,11 +12,7 @@ from wwise_waapi.transactions import TransactionStore, new_transaction_id
 def legacy_preview(tmp_path, version="2022.1", kind="discard-case-owned-project-copy-and-output-root"):
     env = configured_env(tmp_path, version=version)
     env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
-    api = "ak.wwise.core.project.save" if version == "2021.1" else "ak.wwise.core.undo.undo"
-    code, schema = gateway.execute_gateway(["request-schema", api], env=env)
-    assert code == 0, schema
-    code, preview = gateway.execute_gateway(schema["continuation"]["gateway_argv"], env=env, client_factory=lambda _: BindingClient(version))
-    assert code == 0, preview
+    preview = project_save_preview(env, BindingClient(version))
     code, shown = gateway.execute_gateway(["transaction-show", preview["transaction_id"]], env=env)
     assert code == 0, shown
     artifact = shown["artifact"]
