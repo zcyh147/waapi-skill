@@ -137,17 +137,36 @@
   ],
   "native_lane_rules": [
     {
-      "id": "authoring-layout-partial",
-      "disposition": "migration_required",
-      "owner_issue": 188,
-      "match": {"uris": ["ak.wwise.ui.layout.closeView", "ak.wwise.ui.layout.dockView", "ak.wwise.ui.layout.getCurrentLayoutName", "ak.wwise.ui.layout.getOrCreateView", "ak.wwise.ui.layout.getElementRectangle", "ak.wwise.ui.layout.getLayout", "ak.wwise.ui.layout.getLayoutNames", "ak.wwise.ui.layout.getViewHandle", "ak.wwise.ui.layout.getViewInstances", "ak.wwise.ui.layout.getViewTypes", "ak.wwise.ui.layout.moveSplitter", "ak.wwise.ui.layout.removeLayout", "ak.wwise.ui.layout.resetLayouts", "ak.wwise.ui.layout.setLayout", "ak.wwise.ui.layout.switchLayout", "ak.wwise.ui.layout.undockView"]},
+      "id": "authoring-layout-closed-wrapper",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {
+        "uris": [
+          "ak.wwise.ui.layout.closeView",
+          "ak.wwise.ui.layout.dockView",
+          "ak.wwise.ui.layout.getCurrentLayoutName",
+          "ak.wwise.ui.layout.getOrCreateView",
+          "ak.wwise.ui.layout.getElementRectangle",
+          "ak.wwise.ui.layout.getLayout",
+          "ak.wwise.ui.layout.getLayoutNames",
+          "ak.wwise.ui.layout.getViewHandle",
+          "ak.wwise.ui.layout.getViewInstances",
+          "ak.wwise.ui.layout.getViewTypes",
+          "ak.wwise.ui.layout.moveSplitter",
+          "ak.wwise.ui.layout.removeLayout",
+          "ak.wwise.ui.layout.resetLayouts",
+          "ak.wwise.ui.layout.setLayout",
+          "ak.wwise.ui.layout.switchLayout",
+          "ak.wwise.ui.layout.undockView"
+        ]
+      },
       "leaked_mechanics": [],
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit."
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate."
     },
     {
-      "id": "authoring-model-partial",
-      "disposition": "migration_required",
-      "owner_issue": 189,
+      "id": "authoring-model-closed-wrapper",
+      "disposition": "already_deep",
+      "owner_issue": null,
       "match": {
         "uris": [
           "ak.wwise.ui.model.createHandle",
@@ -162,7 +181,7 @@
         ]
       },
       "leaked_mechanics": [],
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit."
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate."
     },
     {
       "id": "generic-topics",
@@ -261,14 +280,18 @@
       "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. Game Parameter names use a Gateway-fixed typed-name binding and dedicated range flags. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Packaged candidate 98d9e70 passed macOS Program 4126/2 skipped; final evidence candidate a0a0178 passed native-Windows Program 4111/17 skipped and macOS Non-live 9324/111 skipped/27 deselected. The 2025.1 project-setting plus external source-control proportional real workflow passed on both hosts at 590a416, and the final packaged Skill passed Fresh Agent plus verify-only cumulatively on macOS and Windows with clean task/process teardown."
     }
   ],
-  "ticket_blueprints": {
-    "authoring-model-partial": {"title": "Complete owned Authoring model/window/signal behavior and evidence", "scope": "Retain the exact 2024.1/2025.1 closed routes under #189 while native constructor effects, resource cleanup, delivered signals and exact branch evidence remain unresolved."},
-    "authoring-layout-partial": {
-      "title": "Complete ordinary Authoring layout business contracts and evidence",
-      "scope": "Retain the exact 2024.1/2025.1 layout read and switch rows while #188 resolves native definition interpretation, remaining layout constructors and mutations, public-route validation, and required effect evidence."
-    }
-  },
+  "ticket_blueprints": {},
   "completed_family_seals": {
+    "authoring-layout-closed-wrapper": {
+      "github_issue": 188,
+      "row_count": 30,
+      "rows_sha256": "ce35bc537d44419f735e74285ed52659c3483e1037dde5d085013e198be98c28"
+    },
+    "authoring-model-closed-wrapper": {
+      "github_issue": 189,
+      "row_count": 18,
+      "rows_sha256": "e8e9e05a471620cedbc3f55c6d77fc082e5b9f1a7411b87ebb27c9ceaf46ca88"
+    },
     "generic-core-project-object": {
       "github_issue": 84,
       "row_count": 55,
@@ -310,7 +333,7 @@
       "rows_sha256": "7446dd701ea343d3a089f452c82ad1ec40c3ca261764d78adfda4a147e31db18"
     }
   },
-  "ticket_issue_numbers": {"authoring-model-partial": 189, "authoring-layout-partial": 188},
+  "ticket_issue_numbers": {},
   "field_ownership_rules": {
     "gateway_derivation_names": ["acknowledge", "transform"],
     "fixed_gateway_derivation_names": ["advanced_return", "api", "array_handle", "choice_handle", "map_handle", "member_key", "parent_schema_token", "return", "return_field", "schema_digest", "select", "shape", "typed_advanced", "typed_append", "typed_choose", "typed_choose_dynamic", "typed_map_correct", "typed_map_put", "typed_map_remove", "typed_present", "typed_schema_digest", "typed_set", "typed_structured", "page", "selection"],

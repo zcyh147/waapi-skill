@@ -355,3 +355,105 @@ Wwise nor Fresh. No full Program/Non-live gate, branch-coverage generation,
 canonical evidence import/evaluation, proof refresh or functional credit
 transfer is claimed. Current source admission and the original failed gates
 remain separate work under #195.
+
+
+## #195 UI wrapper migration reconciliation — 2026-10-29
+
+The accepted lightweight policy in `SPEC.md` (2026-10-27), the
+[#188 close](https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019)
+and [#189 close](https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769)
+accept functional wrapper completion. The
+[no-further-native reaffirmation](https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116)
+retains the window failures and consumed startup BLOCKED attempt. The previous
+`authoring-*-partial` policy rationales incorrectly treated the retained native
+uncertainties as unfinished caller-interface migration. They are replaced by
+`authoring-layout-closed-wrapper` and `authoring-model-closed-wrapper`, each with
+its own exact completed-family seal; the eight historical seals remain unchanged.
+The completed ticket blueprints/issue rollups are removed through the existing
+policy mechanism. No native input/effect/delivery or cleanup proof is added.
+
+The review compared all 48 exact current rows against the accepted closeout
+candidate `7e4def957f9246c8f1ab7fa46c8e655df41a8022`, which includes layout closeout
+`c5ba64e56d66632a6987913c934d1e729128f954`. Separate interpreter processes loaded
+each worktree's existing `build_typed_request_surface`,
+`_public_continuation_rows` and `_typed_field_rows`. Every complete lane record,
+actual public continuation/parser projection and field-ownership projection
+matched, not merely counts or empty leak arrays. Both 48-record canonical
+SHA-256 values are
+`b54835e2392e127eb3eff706faf714d465f5e486fc4be298df97a75d41b7c2e0`.
+The dedicated layout read/handle/business, model business and WAFM/blueprint
+constructor modules and their pinned native supplements/catalogs were inspected
+against the accepted mappings; no new ordinary input or route gap was found.
+The highest seams remain the following exact closed business contracts.
+
+| Exact URI suffix after `ak.wwise.ui.` | Versions | Highest public seam and caller values |
+| --- | --- | --- |
+| `layout.closeView` | 2025.1 | `draft-declare-layout-plan`; `layout_handle`, `view_handle` |
+| `layout.dockView` | 2024.1, 2025.1 | `draft-declare-layout-plan`; `layout_handle`, `view_handle`, `target_element_handle`, `dock_side` |
+| `layout.getCurrentLayoutName` | 2024.1, 2025.1 | `layout-read current`; no caller values |
+| `layout.getElementRectangle` | 2024.1, 2025.1 | `layout-read rectangle`; `element_handle` |
+| `layout.getLayout` | 2024.1, 2025.1 | `layout-read contents`; `layout_name` |
+| `layout.getLayoutNames` | 2024.1, 2025.1 | `layout-read names`; no caller values |
+| `layout.getOrCreateView` | 2024.1, 2025.1 | `draft-declare-layout-plan`; `layout_handle`, `view_type`, `initial_x`, `initial_y` |
+| `layout.getViewHandle` | 2024.1, 2025.1 | `layout-read frontend`; `view_handle` |
+| `layout.getViewInstances` | 2024.1, 2025.1 | `layout-read instances`; `layout_name` |
+| `layout.getViewTypes` | 2024.1, 2025.1 | `layout-read types`; no caller values |
+| `layout.moveSplitter` | 2024.1, 2025.1 | `draft-declare-layout-plan`; `layout_handle`, `splitter_handle`, `pixel_delta` |
+| `layout.removeLayout` | 2024.1, 2025.1 | `draft-declare-layout-plan`; `layout_handle` |
+| `layout.resetLayouts` | 2025.1 | `draft-declare-layout-plan`; `layout_handle`, `reset_scope`, `reset_layout_handles` |
+| `layout.setLayout` | 2024.1, 2025.1 | `draft-declare-layout-plan`; `layout_handle`, `new_layout_name`, `blueprint` |
+| `layout.switchLayout` | 2024.1, 2025.1 | `draft-declare-layout-plan`; `layout_handle` |
+| `layout.undockView` | 2024.1, 2025.1 | `draft-declare-layout-plan`; `layout_handle`, `view_handle`, `position_x`, `position_y` |
+| `model.createHandle` | 2024.1, 2025.1 | `draft-declare-model-plan`; `window`, `template`, `template_key` |
+| `model.destroyHandle` | 2024.1, 2025.1 | `draft-declare-model-plan`; `model` |
+| `model.getState` | 2024.1, 2025.1 | `draft-declare-model-plan`; `model`, `widgets` |
+| `model.registerWafm` | 2024.1, 2025.1 | `draft-declare-model-plan`; `template_key`, `root_widget`, `widgets`, `layouts`, `registration_medium`, `registration_form`, `template_version`, `metadata`, `templates` |
+| `model.setState` | 2024.1, 2025.1 | `draft-declare-model-plan`; `model`, `widgets` |
+| `signal.emit` | 2024.1, 2025.1 | `draft-declare-model-plan`; `model`, `widget`, `signal` |
+| `window.close` | 2024.1, 2025.1 | `draft-declare-model-plan`; `window` |
+| `window.create` | 2024.1, 2025.1 | `draft-declare-model-plan`; `title`, `width`, `height` |
+| `window.present` | 2024.1, 2025.1 | `draft-declare-model-plan`; `window` |
+
+Layout reads construct native names/IDs inside the Gateway; rectangle/frontend
+reads require issued layout/view handles. Mutations derive native envelopes,
+constructor IDs, native docking topology and splitter axis from scoped live
+identities. The actual contracts retain automatic Authoring-host/version checks,
+configuration/session/project binding, all modification policies, immutable
+Preview, drift revalidation, execute-once, non-retry and bounded state readbacks.
+The pinned 2021.1–2023.1 Authoring catalogs omit these exact layout routes.
+`LAYOUT_CONSTRUCTION.md` records the accepted 30-row mapping, closed named
+constructors, optional/empty/repeated forms and Gateway capacity limits. The
+unsatisfiable Splitter request definition, capital OneOf/sidebar/ViewHolder
+questions and read-only extra fields remain explicit source boundaries, not
+invented setter grammar or native absence. Preferred-height/sidebar/frontend,
+arrangement and reset uncertainty remain; reset still has schema-only strength
+and `business_state_verified=false`. Representative controls remain in
+`test_authoring_layout_{gateway,mutation_gateway,blueprint_gateway,splitter_gateway}.py`:
+closed reads/non-bypass, scoped drift, all policies, exact nested construction,
+raw-map rejection, one write and requested-state comparison. These unchanged
+runtime controls are retained evidence, not a new native run.
+
+Model/window/signal plans use bounded typed construction and copied opaque
+resources, never native GUIDs, XML, payloads or executable content. The actual
+contracts bind configuration/host/build/session/project and active parents,
+freeze generated-file proofs, keep separately previewed close/destroy, reject
+stale ownership and missing creation identities, and do not retry unknown
+creation outcomes. All 18 disclose `native_effect_evidence=not_independently_verified`
+before authorization. State assignment readback remains independent; other
+results retain schema-only strength and `business_state_verified=false`.
+Emission is not delivery, and consumed cleanup authority is not independent
+native closure proof. Templates retire at session end without an invented
+unregister route. Earlier exact-route/build absence is not universal business
+absence. `AUTHORING_MODEL_TOPIC_CLOSEOUT.md` and existing model Gateway controls
+retain the accepted source interpretation, ownership, file drift, rejected
+registration, pending-model cleanup ordering and original native FAIL/BLOCKED
+history. No native or Fresh test is authorized by this reconciliation.
+
+The completed seals bind exactly 30 layout identities
+(`ce35bc537d44419f735e74285ed52659c3483e1037dde5d085013e198be98c28`)
+and 18 model/window/signal identities
+(`e8e9e05a471620cedbc3f55c6d77fc082e5b9f1a7411b87ebb27c9ceaf46ca88`).
+Native row identities, field/argument contracts, all four source-contract seals,
+operation rows, uniform-depth rules and raw escape prohibitions remain unchanged.
+Completion here means accepted bounded functional wrapper depth only; native
+PASS/support and final #195 gate acceptance are separate claims.
