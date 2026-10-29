@@ -244,3 +244,90 @@ failure. The original attachments, branch artifacts and evidence index were not
 modified or re-sealed. Branch `--check` and completion checks remain unrun until
 that explicit bridge reconciliation is accepted; no complete branch generation
 or current branch-coverage consistency is claimed by this partial result.
+
+
+## #195 derived surface reconciliation — 2026-10-29
+
+Reviewed runtime integration base: `4bc5952bc1830ccc183d54082f15d896d47cf06a`.
+This is derived publication only: no public runtime contract, reflected native
+schema, route identity, ownership rule, completion disposition or functional
+receipt is changed. The prior review history above remains unchanged.
+
+The preceding policy's four exact projections were reproduced in a separate
+immutable worktree/interpreter at `e557cea9ce5d60f78821fd7b13d14121f6937536`.
+Both comparisons load the matching repository's existing parser, operation and
+continuation producers. Current typed data is produced by
+`build_typed_request_surface` with `DeterministicJsonWriter`, using all five
+pinned definition graphs and the existing Authoring supplements. There are no
+added/removed rows, native schema/definition digests, execution-policy changes,
+construction-shape changes, unresolved references or unknown schema keywords.
+The native maximum-profile surface remains 897 lanes: 737 functions/160 Topics,
+193/35 unique URIs; named operations retain 153 versioned identities.
+
+### Exact public projection deltas
+
+- Typed surface: 21 existing 2024.1/2025.1 UI business-contract rows change;
+  every other lane field and the native result-definition graphs stay exact.
+  Two `setLayout` rows disclose the existing closed blueprint constructor's
+  ObjectPanel/ObjectTabPanel, floating windows, position history, optional root,
+  explicit type inclusion and typed bounded ViewData entries. Gateway-derived
+  IDs/native tags, 128-item bounds, depth/byte ceilings and known splitter,
+  sidebar, holder/allOf and read-vs-request limits remain explicit. No retained
+  schema is rewritten and no native setLayout input acceptance is inferred.
+  The 2025.1 reset selection text labels its 32-entry cap as Gateway capacity,
+  preserving omission/empty/ordered selection distinctions and the unproved
+  default-state oracle. Eighteen owned model/window/signal rows change only
+  `native_effect_evidence` from `required_unfinished` to
+  `not_independently_verified`; visible window effects and signal delivery are
+  still not proved by a result. These existing source/code disclosures follow
+  the 2026-10-27 lightweight policy in the full-coverage SPEC; they do not change
+  #188/#189 ownership, unfinished interface dispositions or native credit.
+- Parser: 79 command rows remain; 11 change. `core-call` adds nine existing
+  semantic projection/language/platform flags. `draft-add-media` adds explicit
+  source-control choices; `draft-bind-object` adds the issued created-result
+  handle; `draft-declare-core-plan` adds closed type/empty declarations. Existing
+  import declaration/revision commands add the six bound DialogueEvent/condition
+  flags. SoundBank declarations add explicit all/empty/language/temporary/disk
+  choices and their source alternative. Existing query and source-control output
+  choices gain declared finite outputs. No root flag or command identity changes;
+  native envelopes, property paths, lookup identities and execution mechanics
+  remain Gateway-owned.
+- Named public contracts: 45 rows change across ten existing operations:
+  `audio.import` (5), `object.create` (5), `object.createPlugin` (4),
+  `object.set` (4), `object.setName` (5), `object.setRTPC` (4),
+  `soundbank.convertExternalSources` (4), `soundbank.generate` (5),
+  `soundbank.processDefinitionFiles` (4), and `waapi.undoGroup` (5).
+  These record the existing bound Source/Switch/DialogueEvent import choices;
+  source-certified Action, Query, WorkUnit and ControlSurface creation/name
+  boundaries; version-correct owned Metadata placement and anonymous List/music/
+  MediaPool construction; explicit mixed-platform ControlInput replacement and
+  preservation; optional external-source destination; all/empty SoundBank
+  generation and Definition identity forms; and source List admission separated
+  from optional history restoration observers. Closed declarations, exact user
+  artifacts, scoped handles, Preview/authorization/execute-once and truthful
+  weaker-verification modes remain in force. None becomes raw native args/options
+  or model-authored mutation WAQL, and no named operation identity is added.
+- Continuations: 897 identities remain; 108 rows change. Eighty-two repeat the
+  existing shared core-call parser additions only. Five object.get rows also
+  update their fixed parser and current closed business/advanced query layers.
+  Twenty-one carry the UI declaration changes above. Fixed reflected native
+  inputs are not promoted to public model-authored payloads.
+
+The uniform deep-interface invariant and all ownership/migration/completed-family
+rules are unchanged. Existing layout/model rows remain assigned to #188/#189;
+this source reconciliation neither closes those obligations nor transfers any
+historical Program/native/Fresh PASS. The previously documented continuation
+projection limit still applies: it is not a claim that every dynamically
+returned verification description was re-executed.
+
+| Seal | Previous reviewed value | Reconciled value |
+| --- | --- | --- |
+| `gateway_parser_sha256` | `73309b23de133e29fea37cdd7fb15eccc913cc3f0d5eff6fd98f92143184c5f9` | `5a640976764f6ba0684217143c4470a5048a5a0c4ab012a39d024dfd9b51abd9` |
+| `operation_contract_sha256` | `b2d76899195fbd342375b80651c80b8d5229af2330cd0ee8d991645d242b5b59` | `cf67ed6bf215060cdb1aec78c5c7ca0137d520cbd00c1f52fa3f87a5400d8137` |
+| `public_continuation_sha256` | `74461fb6908cb5e2f66b89765cf07db12a6887895d06966883d93672c20f827b` | `dea44f6f11c71e91c4c917f21980437b6b8afdefa22fd3bd3b912fe1bb00b82e` |
+| `typed_request_surface_sha256` | `829f71b2cca1e2779e14f7c681cc3802b94945f9a9a9e111c070c82478151150` | `36bb15ba469c614c5428ef847214d1466d2b6ee49d012bd405936bc52a997edc` |
+
+Generation and focused validation results for this reconciliation are recorded
+below only after the corresponding commands actually finish. Canonical branch
+coverage index/requirements, Source/native/applicability proofs, class-replay
+bridges and current CODE receipts are outside this publication slice.
