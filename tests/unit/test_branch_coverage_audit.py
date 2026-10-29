@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 
 from tests.maintenance.branch_coverage_audit import schema_branches
+from tests.unit.test_branch_coverage_completion_cli import ping_scope, portable_representative_case
 
 
 @pytest.fixture(scope="module")
@@ -319,72 +320,68 @@ def _copy_runtime_common_base_file(source, destination):
     destination.write_bytes(raw)
 
 
-@pytest.fixture(scope='module')
-def runtime_common_base_stage(tmp_path_factory):
+@pytest.fixture
+def runtime_common_base_stage(tmp_path, portable_representative_case):
+    """Disjoint current mappings, one retained packet and exact Source origins."""
     import hashlib
     import json
-    from pathlib import Path
+    import os
     from tests.maintenance import branch_coverage_audit as audit
+    from tests.support.runtime_observation_evidence import write_runtime_composition
     source = audit.ROOT / 'tests/fixtures/branch-evidence/product'
     component = source / 'runtime-fixed-reads-r121'
-    global_index = json.loads((audit.ROOT / 'docs/branch-coverage-evidence-index.json').read_bytes())
-    fixed_index = json.loads((component / 'index.json').read_bytes())
-    assert not ({e['id'] for e in global_index['entries']} & {e['id'] for e in fixed_index['entries']})
-    stage = tmp_path_factory.mktemp('runtime-common-base')
-    base = stage / 'evidence'
-    seen = {}
-    def retain(value):
-        if isinstance(value, dict):
-            # The existing importer projects original program locators from
-            # each entry's origin; local provenance locators are not reads.
-            if value.get('contract') == 'waapi-skill.branch-bindings/v1': return
-            if value.get('contract') == 'waapi-skill.class-metadata-read/v1':
-                # This existing archive owns a root-relative sealed file list,
-                # rather than ordinary nested artifact descriptors.
-                seal = json.loads((source / value['seal']['artifact']).read_bytes())
-                for item in seal['files']:
-                    retain({'artifact':str(Path(value['root']) / item['path']),
-                        'sha256':item['sha256']})
-            if isinstance(value.get('artifact'), str) and isinstance(value.get('sha256'), str):
-                name = value['artifact']
-                if not Path(name).is_absolute():
-                    original = source / name
-                    assert original.resolve().is_relative_to(source.resolve())
-                    raw = original.read_bytes()
-                    assert hashlib.sha256(raw).hexdigest() == value['sha256']
-                    assert name not in seen or seen[name] == value['sha256']
-                    if name not in seen:
-                        seen[name] = value['sha256']
-                        _copy_runtime_common_base_file(original, base / name)
-                        if original.suffix in {'.json', '.jsonl'}:
-                            try:
-                                records = [json.loads(raw)]
-                            except json.JSONDecodeError as error:
-                                if error.msg != 'Extra data': raise
-                                records = [json.loads(line) for line in raw.splitlines() if line.strip()]
-                            for row in records: retain(row)
-            for child in value.values(): retain(child)
-        elif isinstance(value, list):
-            for child in value: retain(child)
-    retain(global_index)
+    stage = tmp_path / 'runtime-common-base'
+    stage.mkdir()
+    selected = []
+    for label, packet_index, identity in (
+            ('source', 'source-r92-final-29b34d4c-2022.1/portable/index.json', 'source-r92-final-29b34d4c-2022.1'),
+            ('retained-log', 'runtime-read-log-195-r1/native-index.json', 'runtime195-native-0')):
+        packet = audit.load(source / packet_index)
+        entry = next(e for e in packet['entries'] if e['id'] == identity)
+        index = {'contract': packet['contract'], 'base': os.path.relpath(source, stage), 'entries': [entry]}
+        policy = audit.load(source / entry['origin']['requirements']['artifact'])
+        if label == 'source':
+            for key in ('source_attachments', 'source_native_attachments'):
+                index[key] = packet[key]
+                assert len(index[key]) == 1
+        else:
+            index['qualified_runtime_read_attachments'] = [next(d for d in packet['qualified_runtime_read_attachments']
+                if audit.load(source / d['artifact'])['branch_id'] in policy['branches'])]
+            assert len(index['qualified_runtime_read_attachments']) == 1
+        path = stage / (label + '-index.json')
+        path.write_text(json.dumps(index), encoding='utf-8')
+        selected.append((path, policy))
+    case = portable_representative_case
+    original, original_policy = write_runtime_composition(stage / 'existing',
+        [(case['index_path'], case['requirements']), *selected])
+    reader_index, reader_policy = write_runtime_composition(stage / 'reader-control',
+        [(case['index_path'], case['requirements'])])
+    source_index, source_policy = write_runtime_composition(stage / 'source-control', [selected[0]])
+    freshness_index, freshness_policy = write_runtime_composition(stage / 'source-with-current-mapping',
+        [(case['index_path'], case['requirements']), selected[0]])
+    global_index = audit.load(original)
+    original_base = original.parent / global_index['base']
+    seen = {path.relative_to(original_base).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in original_base.rglob('*') if path.is_file()}
+    fixed_index = audit.load(component / 'index.json')
+    fixed_policy = audit.load(component / 'requirements.json')
+    assert not (original_policy['branches'].keys() & fixed_policy['branches'].keys())
+    index, policy = write_runtime_composition(stage / 'combined',
+        [(case['index_path'], case['requirements']), *selected, (component / 'index.json', fixed_policy)])
+    base = index.parent / 'evidence'
+    # Preserve the original complete fixed-component publication as well as its
+    # consumer-reachable closure. Existing path collisions still reject changes.
     for path in component.rglob('*'):
         if path.is_file():
-            # Every local locator remains unchanged, including profile-owned
-            # category/archive/map names and nested proof/source-review edges.
             _copy_runtime_common_base_file(path, base / path.relative_to(component))
-    policy = json.loads((audit.ROOT / 'docs/branch-coverage-requirements.json').read_bytes())
-    fixed_policy = json.loads((component / 'requirements.json').read_bytes())
-    assert not policy['branches'].keys() & fixed_policy['branches'].keys()
-    policy['branches'].update(fixed_policy['branches'])
-    combined = {**global_index, 'base':'evidence', 'entries':global_index['entries']+fixed_index['entries'],
-        'runtime_observation_attachments':fixed_index['runtime_observation_attachments']}
-    index = stage / 'index.json';index.write_text(json.dumps(combined,indent=2)+'\n')
-    (stage / 'requirements.json').write_text(json.dumps(policy,indent=2)+'\n')
-    fixed_only = stage / 'fixed-index.json'
-    fixed_only.write_text(json.dumps({**fixed_index, 'base':'evidence'},indent=2)+'\n')
-    return {'index':index,'fixed_only':fixed_only,'policy':policy,'fixed_policy':fixed_policy,
-        'component':component,'base':base,'old_index':global_index,
-        'fixed_index':fixed_index,'existing_closure':seen}
+    fixed_only = index.parent / 'fixed-index.json'
+    fixed_only.write_text(json.dumps({**fixed_index, 'base': 'evidence'}), encoding='utf-8')
+    return {'index': index, 'fixed_only': fixed_only, 'policy': policy, 'fixed_policy': fixed_policy,
+        'component': component, 'base': base, 'old_index': global_index, 'original_index': original,
+        'original_policy': original_policy, 'reader_index': reader_index, 'reader_policy': reader_policy,
+        'source_index': source_index, 'source_policy': source_policy,
+        'freshness_index': freshness_index, 'freshness_policy': freshness_policy,
+        'fixed_index': fixed_index, 'existing_closure': seen}
 
 
 def test_runtime_fixed_component_imports_from_unchanged_common_base(runtime_common_base_stage):
@@ -395,9 +392,11 @@ def test_runtime_fixed_component_imports_from_unchanged_common_base(runtime_comm
     document, base, inputs = audit.portable_binding_inputs(stage['fixed_only'], stage['fixed_policy'])
     expected = set(stage['fixed_policy']['branches'])
     assert set(document['bindings']) == expected
-    assert len(stage['old_index']['entries']) == 41
+    assert {e['id'] for e in stage['old_index']['entries']} == {
+        'original-0', 'original-1', 'original-2', 'original-3',
+        'source-r92-final-29b34d4c-2022.1', 'runtime195-native-0'}
     assert len(stage['fixed_index']['entries']) == 334
-    assert len({entry['id'] for entry in json.loads(stage['index'].read_bytes())['entries']}) == 375
+    assert len({entry['id'] for entry in json.loads(stage['index'].read_bytes())['entries']}) == 340
     native = {identity for identity,binding in document['bindings'].items() if binding.get('runtime_observation_attachment')}
     assert len(native) == 445
     closure = {}
@@ -410,7 +409,7 @@ def test_runtime_fixed_component_imports_from_unchanged_common_base(runtime_comm
     assert len(closure) == 3127
     (stage['index'].parent / 'import-proof.json').write_text(json.dumps({
         'consumer':'branch_coverage_audit.portable_binding_inputs','selected_ids':sorted(expected),
-        'selected_count':len(expected),'imported_entries':334,'composed_entries':375,
+        'selected_count':len(expected),'imported_entries':334,'composed_entries':340,
         'runtime_native_attachments':len(native),
         'original_component_relative_closure':closure,'existing_closure':stage['existing_closure'],
         'inventory_or_final_evaluator_run':False,'inputs':inputs},indent=2)+'\n')
@@ -429,19 +428,14 @@ def test_runtime_common_base_refuses_different_bytes_at_an_existing_profile_path
 
 def test_runtime_common_base_preserves_existing_global_source_freshness(runtime_common_base_stage):
     from tests.maintenance import branch_coverage_audit as audit
-    from tests.support.source_copy_native_evidence import successor_dependency_review
-    from tests.support.source_copy_branch_evidence import source_seals
     stage = runtime_common_base_stage
-    reviewed = successor_dependency_review()['current_sources']
-    current = source_seals(reviewed)
-    if current != reviewed:
-        # Existing global seals remain authoritative after locator transport.
-        # This composition must not turn unrelated source drift into credit.
-        with pytest.raises(ValueError, match='^Source successor current dependency changed$'):
-            audit.portable_binding_inputs(stage['index'], stage['policy'])
-    else:
-        document, _, _ = audit.portable_binding_inputs(stage['index'], stage['policy'])
-        assert set(document['bindings']) == set(stage['policy']['branches'])
+    # These retained Source bytes precede the current dependency review. Prove
+    # the original reader rejection first: composition cannot freshen that seal.
+    reason = '^Complete reviewed Source successor context differs$'
+    with pytest.raises(ValueError, match=reason):
+        audit.portable_binding_inputs(stage['source_index'], stage['source_policy'])
+    with pytest.raises(ValueError, match=reason):
+        audit.portable_binding_inputs(stage['freshness_index'], stage['freshness_policy'])
 
 
 def test_runtime_prefixed_families_share_one_base_without_overwrite_or_duplicate_credit(tmp_path):
@@ -523,23 +517,123 @@ def test_runtime_publication_plan_assigns_native_facts_before_unique_program_row
     assert all(p['version'] == '2025.1' for p in plan['console_packets'] if p['category'] == 'voices')
 
 
-def test_runtime_common_base_keeps_existing_global_attachment_rosters_and_bytes(tmp_path):
-    """Projection preserves existing41/655 transport; it grants no new credit."""
-    import json
+def test_runtime_common_base_keeps_existing_global_attachment_rosters_and_bytes(tmp_path, runtime_common_base_stage):
+    """Current composition keeps reviewed mappings and immutable origin bytes."""
     import hashlib
+    import json
+    import os
     from tests.maintenance import branch_coverage_audit as audit
     from tests.support.runtime_observation_evidence import write_runtime_composition
-    source = audit.ROOT / 'docs/branch-coverage-evidence-index.json'
-    original = json.loads(source.read_bytes())
-    policy = json.loads((audit.ROOT / 'docs/branch-coverage-requirements.json').read_bytes())
+    stage = runtime_common_base_stage
+    source = stage['reader_index']
+    original = audit.load(source)
+    policy = stage['reader_policy']
     target, observed_policy = write_runtime_composition(tmp_path / 'projection', [(source, policy)])
-    observed = json.loads(target.read_bytes())
-    assert observed['entries'] == original['entries'] and len(observed['entries']) == 41
-    assert observed_policy == policy and len(policy['branches']) == 655
-    for key in ('metadata_attachments', 'source_attachments', 'source_native_attachments'):
-        assert observed[key] == original[key]
-    original_base = (source.parent / original['base']).resolve()
-    for path in (target.parent / observed['base']).rglob('*'):
-        if path.is_file():
-            relative = path.relative_to(target.parent / observed['base'])
-            assert path.read_bytes() == (original_base / relative).read_bytes()
+    observed = audit.load(target)
+    assert observed['entries'] == original['entries']
+    assert observed_policy == policy
+    assert observed_policy['representative_mechanisms']
+    original_base = source.parent / original['base']
+    base = target.parent / observed['base']
+    # The consumer owns indexed origins, not unreachable sidecars left over
+    # from an earlier composition. Every selected original keeps its bytes.
+    for entry in original['entries']:
+        for descriptor in [entry['bindings'], *entry['origin'].values()]:
+            name = descriptor['artifact']
+            assert (base / name).read_bytes() == (original_base / name).read_bytes()
+    # Packet-local proof remains under its exact packet namespace, with no root alias.
+    proof = 'runtime-read-log-195-r1/packets/packet-8/195-successor-retained-log-support.json'
+    original_packet = audit.ROOT / 'tests/fixtures/branch-evidence/product' / proof
+    assert (stage['base'] / proof).read_bytes() == original_packet.read_bytes()
+    assert not (stage['base'] / '195-successor-retained-log-support.json').exists()
+    transported = audit.load(stage['index'])
+    assert transported['qualified_runtime_read_attachments'] == stage['old_index']['qualified_runtime_read_attachments']
+    mapping = audit.load(base / observed['mapping_attachments'][0]['artifact'])
+    assert mapping['requirements_sha256'] == audit.digest(policy)
+    original_mapping = audit.load(original_base / original['mapping_attachments'][0]['artifact'])
+    assert mapping == original_mapping
+    bindings, consumed_base, _ = audit.portable_binding_inputs(target, observed_policy)
+    assert consumed_base == base and len(bindings['bindings']) == 44
+    # A structurally valid mapping still needs its actual original predecessor.
+    wrong_mapping = json.loads(json.dumps(original_mapping))
+    prior = next(value for value in wrong_mapping['predecessors'].values() if value is not None)
+    prior['binding_sha256'] = '0' * 64
+    wrong_path = original_base / 'invalid-predecessor.json'
+    wrong_path.write_text(json.dumps(wrong_mapping), encoding='utf-8')
+    wrong_index = dict(original, base=os.path.relpath(original_base, tmp_path), mapping_attachments=[{
+        'artifact': wrong_path.name, 'sha256': hashlib.sha256(wrong_path.read_bytes()).hexdigest()}])
+    wrong_source = tmp_path / 'invalid-predecessor-index.json'
+    wrong_source.write_text(json.dumps(wrong_index), encoding='utf-8')
+    with pytest.raises(ValueError, match='mapping successor lacks its exact original binding/policy'):
+        write_runtime_composition(tmp_path / 'invalid-predecessor', [(wrong_source, policy)])
+    # A missing sealed origin cannot be replaced by the composed mapping.
+    origin = observed['entries'][0]['origin']['program']
+    (base / origin['artifact']).unlink()
+    with pytest.raises(FileNotFoundError):
+        audit.portable_binding_inputs(target, observed_policy)
+    changed_policy = json.loads(json.dumps(policy))
+    first = next(iter(changed_policy['branches'].values()))
+    first['reason'] += ' Unreviewed input policy.'
+    with pytest.raises(ValueError, match='closed reviewed mapping attachment required'):
+        write_runtime_composition(tmp_path / 'unreviewed-policy', [(source, changed_policy)])
+
+
+def test_runtime_composition_retains_sealed_applicability_transport_without_admission(tmp_path):
+    """Transport existing proof bytes; this is not a current applicability join."""
+    import hashlib
+    import json
+    import os
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.support.applicability_completion_mapping import PROOF_PATH, PROOF_SHA256
+    from tests.support.runtime_observation_evidence import write_runtime_composition
+    original = (audit.ROOT / PROOF_PATH).read_bytes()
+    assert hashlib.sha256(original).hexdigest() == PROOF_SHA256
+    descriptor = {'artifact': PROOF_PATH, 'sha256': PROOF_SHA256}
+    index = {'contract': 'waapi-skill.branch-evidence-index/v1',
+        'base': os.path.relpath(audit.ROOT, tmp_path), 'entries': [],
+        'installed_applicability_attachments': [descriptor]}
+    source = tmp_path / 'transport-index.json'
+    source.write_text(json.dumps(index), encoding='utf-8')
+    policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    target, observed_policy = write_runtime_composition(tmp_path / 'projection', [(source, policy)])
+    composed = audit.load(target)
+    assert observed_policy == policy
+    assert composed['installed_applicability_attachments'] == [descriptor]
+    assert (target.parent / composed['base'] / PROOF_PATH).read_bytes() == original
+
+
+@pytest.mark.parametrize('locator', (
+    r'packets\packet-8',
+    r'packets/packet-8\proof',
+    'packets/../packet-8',
+    r'packets\..\packet-8',
+    r'C:\packets\packet-8',
+    r'C:packets\packet-8',
+    r'\\server\share\packet-8',
+    '/packets/packet-8',
+), ids=('backslash-relative', 'mixed-separators', 'posix-traversal', 'windows-traversal',
+        'drive-absolute', 'drive-relative', 'unc', 'posix-absolute'))
+def test_runtime_composition_rejects_noncanonical_native_packet_locator(tmp_path, locator):
+    """Portable packet identities reject before host filesystem interpretation."""
+    import json
+    from tests.semantic.support.codex_archive_paths import ArchiveRelativePathError
+    from tests.support.runtime_observation_evidence import write_json, write_runtime_composition
+    source = tmp_path / 'source'
+    source.mkdir()
+    packet = source / 'packets/packet-8'
+    packet.mkdir(parents=True)
+    (packet / 'proof.json').write_text('{"controlled_transport_only":true}', encoding='utf-8')
+    policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    binding = write_json(source / 'bindings.json', {'contract': 'waapi-skill.branch-bindings/v1',
+        'bindings': {'controlled-namespace': {'native_only_base': locator}}})
+    index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': 'source',
+        'entries': [{'id': 'controlled-namespace', 'bindings': binding,
+            'origin': {'bindings': binding,
+                'requirements': write_json(source / 'requirements.json', policy),
+                'program': write_json(source / 'program.json', {'controlled_transport_only': True}),
+                'capture': write_json(source / 'capture.json', {'controlled_transport_only': True})}}]}
+    index_path = tmp_path / 'index.json'
+    index_path.write_text(json.dumps(index), encoding='utf-8')
+    with pytest.raises(ArchiveRelativePathError):
+        write_runtime_composition(tmp_path / 'projection', [(index_path, policy)])
+    assert not (tmp_path / 'projection/index.json').exists()
