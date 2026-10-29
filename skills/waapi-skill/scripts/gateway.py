@@ -10776,7 +10776,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "host_surface": "wwise-console",
             }
             namespace_defaults = {"ak.wwise.ui.layout.": {"host_surface": "wwise-authoring",
-                "supported_versions": list(LAYOUT_VERSIONS)}, "ak.wwise.ui.": {"host_surface": "wwise-authoring"},
+                "supported_versions": [version for version in versions if version in LAYOUT_VERSIONS]},
+                "ak.wwise.ui.": {"host_surface": "wwise-authoring"},
                 "ak.soundengine.": {"intent": "perform one closed SoundEngine runtime business operation"},
                 "ak.wwise.core.profiler.": {"intent": "read bounded Profiler state from a named time position and result view",
                     "host_requirement": "wwise-console-or-authoring"},

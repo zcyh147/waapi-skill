@@ -165,7 +165,7 @@ def test_wait_partial_timeout_preserves_matching_count(tmp_path):
         "subscription_established": True, "requested_event_count": 2,
         "event_count": 1, "target_completed": False, "termination": "timeout",
     }
-    assert result["cleanup"] == "unsubscribed"
+    assert result["cleanup"] == "unsubscribed", result
     assert client.unsubscribed == 1
 
 
@@ -194,7 +194,8 @@ def test_nested_log_definitions_preserve_native_required_and_enum_fields(tmp_pat
     event = {"channel": "general", "item": {"severity": severity, "time": 0,
              "messageId": "test", "message": "Test", "platform": {"id": GUID}, "parameters": []}}
     # This checks reflected enum/required fields, not a 30ms scheduler deadline.
-    code, result, client, _ = run(tmp_path, version, "wait-topic", "ak.wwise.core.log.itemAdded", [event], timeout_seconds=1.0)
+    code, result, client, _ = run(tmp_path, version, "wait-topic", "ak.wwise.core.log.itemAdded", [event],
+        timeout_seconds=1.0, is_command_line=False)
     assert code == 0, result
     assert result["event"] == event
     assert result["event_validation"]["unresolved_refs"] == []

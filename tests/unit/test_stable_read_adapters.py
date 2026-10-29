@@ -803,6 +803,7 @@ def test_gateway_voice_contributions_resolves_identity_in_every_exact_lane(
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": _live_info(version),
+            "ak.wwise.core.profiler.getCursorTime": {"return": 1200},
             GET_VOICES_URI: {
                 "return": [
                     {
@@ -836,7 +837,7 @@ def test_gateway_voice_contributions_resolves_identity_in_every_exact_lane(
         {
             "voicePipelineID": 17,
             "bussesPipelineID": [],
-            "time": "capture",
+            "time": 1200,
         },
         {},
     )
@@ -1057,6 +1058,7 @@ def test_gateway_voice_contributions_returns_bounded_semantic_ambiguity(
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": _live_info("2025.1"),
+            "ak.wwise.core.profiler.getCursorTime": {"return": 1200},
             GET_VOICES_URI: {
                 "return": [
                     {
