@@ -505,6 +505,13 @@ def build_audio_import_plan(
             )
             dispatch["importLanguage"] = language
             oracle_row["requested_language"] = language
+        elif oracle_row["media_expected"]:
+            if (str(oracle_row.get("requested_object_type", "")).casefold() == "sound voice"
+                    or str(oracle_row.get("requested_source_owner_type", "")).casefold() == "sound voice"):
+                raise ImportContractError("INVALID_ARGUMENT", "Voice media requires its exact project import_language.")
+            # Omission retains native SFX dispatch semantics; ownership still
+            # needs the effective language to detect competing Source claims.
+            oracle_row["requested_language"] = "SFX"
         if "originals_subfolder" in effective:
             if not oracle_row["media_expected"]:
                 raise ImportContractError(

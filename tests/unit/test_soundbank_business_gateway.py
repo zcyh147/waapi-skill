@@ -621,7 +621,7 @@ def test_soundbank_draft_derives_type_for_one_exact_name_without_a_separate_quer
         (
             "ak.wwise.core.object.get",
             {"waql": 'from type SoundBank where name = "Harbor" take 2'},
-            {"return": ["id", "name", "type", "path"]},
+            {"return": ["id", "name", "type", "path", "classId"]},
         )
     ]
 

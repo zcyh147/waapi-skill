@@ -10776,7 +10776,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "host_surface": "wwise-console",
             }
             namespace_defaults = {"ak.wwise.ui.layout.": {"host_surface": "wwise-authoring",
-                "supported_versions": list(LAYOUT_VERSIONS)}, "ak.wwise.ui.": {"host_surface": "wwise-authoring"},
+                "supported_versions": [version for version in versions if version in LAYOUT_VERSIONS]},
+                "ak.wwise.ui.": {"host_surface": "wwise-authoring"},
                 "ak.soundengine.": {"intent": "perform one closed SoundEngine runtime business operation"},
                 "ak.wwise.core.profiler.": {"intent": "read bounded Profiler state from a named time position and result view",
                     "host_requirement": "wwise-console-or-authoring"},
@@ -26975,6 +26976,20 @@ def layout_blueprint_terminal_budget(request: Any) -> int:
 def transaction_verify_terminal_budget(request: Any) -> int:
     """Select bounded exceptional capacity only for reviewed closed requests."""
     ordinary = TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+    if (isinstance(request, Mapping)
+            and request.get("operation") in {"object.create", "object.set"}):
+        try:
+            parse_operation_request(request, expected_version=request.get("version"))
+        except (ValueError, TypeError, KeyError):
+            return ordinary
+        # Keep the exact legal graph request and verified occurrence receipts.
+        # Their ordinary envelope allowance is separate from a large rendered
+        # request, as for the existing exact-message terminal projection.
+        observed = gateway_json_document_size({'agent_result': {'request': request}},
+            stop_after_bytes=MAX_OPERATION_DRAFT_EVIDENCE_BYTES)
+        if observed > MAX_OPERATION_DRAFT_EVIDENCE_BYTES:
+            raise GatewayInputError('Graph request exceeds its bounded terminal UTF-8 capacity')
+        return ordinary if observed <= TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES else observed + ordinary
     layout_budget = layout_blueprint_terminal_budget(request)
     if layout_budget != ordinary:
         return layout_budget

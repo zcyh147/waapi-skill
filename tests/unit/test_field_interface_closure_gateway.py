@@ -216,7 +216,8 @@ def test_create_conflict_declaration_reaches_preview_without_writing(
     }
     if conflict == "replace":
         expected["replace_owned_root"] = {"kind": "id", "value": FIRST}
-    assert artifact["request"]["arguments"] == expected
+    binding = {"request_path": "$", "result_handle": declared["draft"]["declared_object"]["result_handle"]}
+    assert artifact["request"]["arguments"] == {**expected, "graph_result_bindings": [binding]}
     assert artifact["prepared_operation"]["dispatch"]["args"]["onNameConflict"] == conflict
 
 
@@ -292,7 +293,13 @@ def test_create_schema_does_not_advertise_unavailable_action_durations(
     for key in ("stable_fields", "field_value_types", "field_semantics"):
         assert not {"fade_time_ms", "delay_ms"}.intersection(declaration.get(key, {}))
     action = schema["business_adapter"]["creation_boundaries"]["Action"]
-    assert action['status'] == 'supported_fail_mode'
+    assert action['status'] == 'supported'
+    assert action['name_conflict'] == {
+        'fail': 'fresh_creation',
+        'rename': 'append_fresh_occurrences_and_preserve_existing_Event_roster',
+        'merge': 'one_unique_empty_name_collision_and_one_declaration; exact_existing_object_metadata; preserve_existing_notes',
+        'replace': 'one_unique_empty_name_collision_and_one_declaration; exact_old_subtree_absence_and_fresh_GUID; object.create_requires_reviewed_replacement_owner',
+    }
     assert action['required_class_fields'] == ['ActionType', 'Target']
     assert action['native_execution'] == 'not_claimed_from_SDK_example'
 

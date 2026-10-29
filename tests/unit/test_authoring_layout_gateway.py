@@ -268,7 +268,7 @@ def test_layout_directory_discloses_compact_authoring_namespace_defaults(tmp_pat
     code, directory = gateway.execute_gateway(['operations'], env=env)
     assert code == 0, directory
     assert directory['request_schema_route_defaults_by_namespace']['ak.wwise.ui.layout.'] == {
-        'host_surface': 'wwise-authoring', 'supported_versions': ['2024.1', '2025.1']}
+        'host_surface': 'wwise-authoring', 'supported_versions': ['2025.1']}
     assert gateway.gateway_json_document_size(directory) < 26 * 1024
 
 

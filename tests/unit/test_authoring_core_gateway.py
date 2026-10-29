@@ -54,6 +54,22 @@ def test_every_catalog_schema_link_resolves_or_discloses_a_reviewed_boundary(tmp
     code, catalog = gateway.execute_gateway(["operations"], env=env, client_factory=no_client)
     assert code == 0, catalog
     assert gateway.gateway_json_document_size(catalog) < 26 * 1024
+    code, detailed = gateway.execute_gateway(["operations", "--detail"], env=env, client_factory=no_client)
+    assert code == 0, detailed
+    # Detail spans all versions and may retain an older native description.
+    # The affected layout namespace uses stable business intents in both views.
+    expanded = {row["api"]: expand_operations_directory_row(catalog, row)
+                for row in catalog["request_schema_routes"] if row["api"].startswith("ak.wwise.ui.layout.")}
+    expected = {}
+    for row in detailed["request_schema_routes"]:
+        if version not in row["supported_versions"] or not row["api"].startswith("ak.wwise.ui.layout."):
+            continue
+        selected = expand_operations_directory_row(detailed, row)
+        selected["supported_versions"] = [version]
+        if "host_surface_by_version" in selected:
+            selected["host_surface"] = selected.pop("host_surface_by_version")[version]
+        expected[row["api"]] = selected
+    assert expanded == expected
     for row in catalog["request_schema_routes"]:
         row = expand_operations_directory_row(catalog, row)
         assert row["supported_versions"] == [version]

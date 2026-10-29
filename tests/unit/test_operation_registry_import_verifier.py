@@ -1058,29 +1058,14 @@ def test_use_existing_localized_directive_boundary_still_rejects_unowned_semanti
         }
     )
 
+    reader = ScriptedReader([], version="2022.1")
     with pytest.raises(OperationContractError) as caught:
-        prepare_operation(
-            request,
-            read_call=ScriptedReader(
-                [
-                    {"return": [anchor]},
-                    {"return": [existing]},
-                    {"return": [anchor]},
-                    {"return": []},
-                ], version='2022.1'
-            ),
-        )
-
-    assert caught.value.error_code == "LOCALIZED_EXISTING_IMPORT_FIELDS"
-    assert caught.value.details["call_wide_rejection"] is True
-    assert caught.value.details["rows"] == [
-        {
-            "index": 0,
-            "target_path": existing_path,
-            "import_language": "Japanese",
-            "unsupported_fields": ["dialogue_event"],
-        }
-    ]
+        prepare_operation(request, read_call=reader)
+    # Native directive strings are no longer canonical business inputs, even
+    # for localized media. Reject before observing or changing project state.
+    assert caught.value.error_code == "INVALID_ARGUMENT"
+    assert "native directive strings are not accepted" in str(caught.value)
+    assert reader.calls == []
 
 
 @pytest.mark.parametrize("version", ["2021.1", "2022.1"])
@@ -1108,70 +1093,54 @@ def test_tab_originals_column_has_source_proven_2023_introduction(tmp_path: Path
         "introduced_version": "2023.1", "source_change": "WG-60834"}
 
 
-def test_use_existing_live_sfx_preserves_inline_base64_and_native_directives(
-    tmp_path: Path,
-) -> None:
-    target_path = OLD_ROOT + r"\ExistingSfx"
-    anchor = {
-        "id": PARENT_GUID,
-        "name": "Default Work Unit",
-        "type": "WorkUnit", "classId": 1638416,
-        "path": OLD_ROOT,
-        "parent": {"id": SECOND_GUID},
-        "notes": "",
-    }
-    existing = {
-        "id": OLD_GUID,
-        "name": "ExistingSfx",
-        "type": "Sound", "classId": 65552,
-        "path": target_path,
-        "parent": {"id": PARENT_GUID},
-        "notes": "preserved",
-    }
-    inline_wav = b"RIFF\x04\x00\x00\x00WAVE"
-    inline_source = (
-        "SFX/existing.wav|" + base64.b64encode(inline_wav).decode("ascii")
-    )
-    request = parse_operation_request(
-        {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": "2022.1",
-            "operation": "audio.import",
-            "arguments": {
-                "import_operation": "useExisting",
-                "imports": [
-                    {
-                        "object_path": target_path,
-                        "audio_file_base64": inline_source,
-                        "import_language": "SFX",
-                        "dialogue_event": r"\Dialogue Events\Existing",
-                        "switch_assignment": r"\Switches\Footwear\Boots",
-                    }
-                ],
-            },
-        }
-    )
+def test_use_existing_live_sfx_preserves_inline_base64_and_native_directives(tmp_path: Path) -> None:
+    from tests.unit.test_import_dialogue_association_gateway import DialogueImportClient
+    from tests.unit.test_import_switch_assignment_gateway import WAV_BYTES
+    from tests.unit.test_audio_import_business_gateway import _project_path
 
-    prepared = prepare_operation(
-        request,
-        read_call=ScriptedReader(
-            [{"return": [anchor]}, {"return": [existing]}], version='2022.1',
-            project_root=tmp_path,
-        ),
-    ).as_dict()
-
-    assert prepared["dispatch"]["args"]["imports"] == [
-        {
-            "objectPath": target_path,
-            "audioFileBase64": (
-                "SFX\\existing.wav|"
-                + base64.b64encode(inline_wav).decode("ascii")
-            ),
-            "importLanguage": "SFX",
-            "dialogueEvent": r"\Dialogue Events\Existing",
-            "switchAssignation": r"\Switches\Footwear\Boots",
-        }
-    ]
+    # Reuse the current closed association fixture: a real SwitchContainer
+    # parent and bound existing Dynamic Dialogue event, not raw path directives.
+    client = DialogueImportClient(tmp_path, "2022.1", existing=True)
+    _project_path(tmp_path)
+    client.switch_requested = True
+    client.event_created = True
+    client.parent.update(type="SwitchContainer", classId=655376,
+        SwitchGroupOrStateGroup={"id": client.GROUP})
+    inline = "SFX/Footsteps/Snow.wav|" + base64.b64encode(WAV_BYTES).decode("ascii")
+    request = parse_operation_request({
+        "contract": OPERATION_REQUEST_CONTRACT, "version": "2022.1", "operation": "audio.import",
+        "arguments": {"import_operation": "useExisting", "imports": [{
+            "object_path": client.child["path"], "audio_file_base64": inline, "import_language": "SFX",
+            "dialogue_event": {"path": client.event["path"], "existing_id": client.EVENT},
+            "switch_assignment": "Snow",
+        }]},
+    })
+    wrong_filename = parse_operation_request({
+        "contract": OPERATION_REQUEST_CONTRACT, "version": "2022.1", "operation": "audio.import",
+        "arguments": {"import_operation": "useExisting", "imports": [{
+            **request.arguments["imports"][0],
+            "audio_file_base64": inline.replace("Snow.wav|", "Other.wav|", 1),
+        }]},
+    })
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(wrong_filename, read_call=client.call)
+    assert rejected.value.error_code == "AMBIGUOUS_SFX_SOURCE"
+    prepared = prepare_operation(request, read_call=client.call).as_dict()
+    owner, source = prepared["dispatch"]["args"]["imports"]
+    assert owner["objectPath"] == client.child["path"]
+    assert owner["dialogueEvent"] == client.event["path"]
+    assert owner["switchAssignation"] == "<Switch Group:Surface>Snow"
+    assert "audioFileBase64" not in owner
+    assert source["audioFileBase64"] == inline.replace("/", "\\", 2)
+    assert source["objectPath"] == client.child["path"] + r"\<AudioFileSource>Snow"
+    assert source["importLanguage"] == "SFX"
+    assert "dialogueEvent" not in source and "switchAssignation" not in source
+    target = prepared["verification_plan"]["targets"][0]
+    assert target["dialogue_association_binding"]["event_id"] == client.EVENT
+    assert target["switch_assignment_binding"]["container_id"] == client.parent["id"]
+    assert target["switch_assignment_binding"]["value_id"] == client.VALUE
+    assert target["existing_sfx_source_id"] == client.source["id"]
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
 
 
 def test_use_existing_live_localized_row_has_exact_three_field_wire_shape(

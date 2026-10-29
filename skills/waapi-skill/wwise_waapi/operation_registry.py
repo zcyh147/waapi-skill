@@ -20,7 +20,7 @@ import time
 import stat
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
@@ -10214,6 +10214,10 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None, af
 
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=(), compound_path_context=None):
     """Keep the exact selected condition metadata valid through verification."""
+    if pre_state is None:
+        pre_state = {}  # Historical prepared records predate condition metadata.
+    elif not isinstance(pre_state, Mapping):
+        raise OperationContractError("INVALID_PREVIEW", "Prepared condition metadata must be an object.")
     assertions = _new_object_class_metadata_assertions(pre_state, read=read, after_write=True) if after_write else []
     if pre_state.get("inner_name_scope") is not None:
         assertions.append(_inner_name_scope_assertion(pre_state["inner_name_scope"], read=read, after_write=after_write))
@@ -15157,7 +15161,10 @@ def _normalize_existing_sfx_imports(
             relative = original.relative_to(originals / "SFX")
         except ValueError as exc:
             raise OperationContractError("UNSAFE_ORIGINALS_PATH", "Existing SFX media must remain inside the live Originals/SFX root.") from exc
-        if original.name != Path(target["source_file"].get("path", target["source_file"].get("relative_path", ""))).name:
+        source_proof = target["source_file"]
+        requested_filename = (PureWindowsPath(source_proof.get("relative_path", "")).name
+            if source_proof.get("kind") == "inline_base64" else Path(source_proof.get("path", "")).name)
+        if original.name != requested_filename:
             raise OperationContractError("SFX_SOURCE_FILENAME_MISMATCH", "Existing SFX replacement must retain its attested source filename.")
         if version == "2021.1":
             active_id = _legacy_sfx_active_source(before[0], snapshot, source_class=target.get("audio_source_class_id"))
@@ -21116,6 +21123,11 @@ def verify_prepared_operation(
     plan = prepared.get("verification_plan")
     if not isinstance(plan, Mapping):
         raise OperationContractError("INVALID_PREVIEW", "Prepared operation lacks a verification plan.")
+    pre_state = prepared.get("pre_state")
+    if pre_state is None:
+        pre_state = {}
+    elif not isinstance(pre_state, Mapping):
+        raise OperationContractError("INVALID_PREVIEW", "Prepared condition metadata must be an object.")
     try:
         clear_field = _require_stored_reference_clear_observation(prepared)
     except OperationContractError as exc:
@@ -21162,7 +21174,6 @@ def verify_prepared_operation(
     def check(name: str, passed: bool, evidence: Any) -> None:
         assertions.append({"name": name, "passed": bool(passed), "evidence": evidence})
 
-    pre_state = prepared.get("pre_state")
     related = pre_state.get("related_conditions", []) if isinstance(pre_state, Mapping) else []
     related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
     assertions.extend(related_assertions)
