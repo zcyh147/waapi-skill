@@ -223,7 +223,8 @@ def test_r54_assigns_only_observed_versioned_leaves_to_sixteen_original_scenario
     owners=producer.r54_case_assignments(rows,edges,contexts)
     assert len(owners)==16 and sum(map(len,owners.values()))==41
     assert {i for ids in owners.values() for i in ids}==selected
-    unobserved=next(r for r in inventory['native_coverage']['obligations'] if r['id'] in collection_plan('2022.1',cohort='r55')['eligible_branch_ids'])
+    unobserved_ids=set(collection_plan('2022.1',cohort='r55')['eligible_branch_ids'])
+    unobserved=next(r for r in inventory['native_coverage']['obligations'] if r['id'] in unobserved_ids)
     with pytest.raises(ValueError,match='do not witness'):
         producer.r54_case_assignments(rows+[unobserved],edges,contexts)
 
