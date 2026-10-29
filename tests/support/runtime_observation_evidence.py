@@ -2270,8 +2270,11 @@ def retained_runtime_native(binding, branch, root, base):
         # stored descriptor seals before scoped historical checks are enabled.
         records = {key: completion.read_sealed_artifact(member[key], root)
             for key in ('assessment', 'capture', 'program', 'qualification', *(['binding'] if 'binding' in member else []))}
-        packet = (base / binding['native_only_base']).resolve()
-        if not packet.is_relative_to(base.resolve()) or packet != (root / member['base']).resolve():
+        # The reviewed packet owns the original mapping. Locator-only converters
+        # may transport the same sealed facts under a distinct current packet;
+        # evidence_result separately confines those descriptors to that packet.
+        packet = (root / member['base']).resolve()
+        if not packet.is_relative_to(root.resolve()):
             raise ValueError('Selected runtime original packet differs')
         original_binding = records.get('binding', {}).get('bindings', {}).get(branch['id'])
         if original_binding is None:
