@@ -18,12 +18,12 @@ from tests.maintenance.branch_coverage_audit import digest, load
 from tests.maintenance.branch_audit_completion import installed_obligations
 from tests.support.condition_source_resolution import reconcile_sources, _scope, _pointer, _catalog_identity
 
-NEW_OBJECT_PROOF_SHA256 = 'f8e1c64cae348dd48a6906b8789bdb1212595b5666038e97e935c6767e7a20f9'
+NEW_OBJECT_PROOF_SHA256 = 'b23010115436244760bc16da476eaf2a6bda631a994ec7dc451faa613b7ee294'
 REVIEW_PATH = 'tests/fixtures/metadata-conditions/condition-completion-review.json'
 PROOF_PATH = 'tests/fixtures/metadata-conditions/condition-completion-proof-inputs.json.gz'
 REVIEW_SHA256 = '56fe04bfe969fdafa404184a1166002a827c702561918dcc03a7948605acff84'
 SOURCE_RECONCILIATION_PATH = 'tests/fixtures/metadata-conditions/condition-source-reconciliation.json'
-SOURCE_RECONCILIATION_SHA256 = 'a7878fdc332b5e2b1b9764d09f05468fab7e2974ec77015a6bf8075543977963'
+SOURCE_RECONCILIATION_SHA256 = '0997c09ec8daabd5090971536d573aa2d82f616cbfe61820f7fc23842792f30d'
 FIELDLESS_REVIEW_PATH = 'tests/fixtures/metadata-conditions/condition-fieldless-structure-review.json'
 FIELDLESS_REVIEW_SHA256 = 'ad1abc319b41b1bfc157a09ed6630bd9af65d8a68cfe56a963a2d618c751d794'
 BATCH_EXCLUSION_REVIEW_PATH = 'tests/fixtures/metadata-conditions/batch-rename-settings-exclusion-review.json'
