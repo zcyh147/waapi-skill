@@ -653,7 +653,7 @@ CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'aft
                                               'before': None},
  'tests/support/imports_completion_mapping.py': {'after': '0263061ba417a4bb9dcebb77c6207dcd225733bdb3f244b7971cc23344fa6b1d',
                                                  'before': None},
- 'tests/support/loaded_media_runtime_evidence.py': {'after': '9afe45d5ebd6f516efa663c17a7b74ffa8bf9d6d22d5dbf45eb8dcf5ad3c75b3',
+ 'tests/support/loaded_media_runtime_evidence.py': {'after': '2bc6ef5fb87077721a615a21d4690aafdc842e67e4c8d60381a19fe8cdc96305',
                                                     'before': None},
  'tests/support/meter_runtime_read_evidence.py': {'after': 'f2516b984c9ab45175f58fcff2a2ce452b390b151d9266d0260d12235b59b6b3',
                                                   'before': None},

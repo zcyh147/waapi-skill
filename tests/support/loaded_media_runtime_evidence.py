@@ -499,7 +499,7 @@ def composite_review(root=audit.ROOT):
     prior = subprocess.check_output(['git','show',baseline['candidate']+':'+baseline['path']],cwd=root)
     if runtime.sha(prior) != baseline['sha256'] or set(result['entries']) & set(json.loads(prior)['branches']):
         raise ValueError('Older LoadedMedia immutable policy-absence baseline differs')
-    published = json.loads((root / baseline['path']).read_bytes())['branches']
+    published = audit.load(root / baseline['path'])['branches']
     if any(identity in published and {key: value for key, value in published[identity].items() if key != 'representative_mechanism'} != composite_policy(entry)
            for identity,entry in result['entries'].items()):
         raise ValueError('Unreviewed published older LoadedMedia policy differs')
