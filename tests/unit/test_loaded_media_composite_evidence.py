@@ -15,6 +15,31 @@ from tests.unit.test_loaded_media_runtime_evidence import ROW, URI
 BUILDS = {'2023.1': '2023.1.19.8928', '2024.1': '2024.1.13.9056', '2025.1': '2025.1.7.9143'}
 
 
+def test_composite_review_reads_current_requirements_without_weakening_baseline(monkeypatch):
+    import subprocess
+    from tests.support import loaded_media_runtime_evidence as loaded
+    reviewed = loaded.composite_review(audit.ROOT)
+    baseline = reviewed['prior_policy_absent']
+    path = audit.ROOT / baseline['path']
+    document = audit.load(path)
+    assert set(reviewed['entries']) <= document['branches'].keys()
+    original_load = audit.load
+    changed = deepcopy(document)
+    identity = next(iter(reviewed['entries']))
+    changed['branches'][identity]['categories'] = []
+    with monkeypatch.context() as current_policy:
+        current_policy.setattr(audit, 'load', lambda source: changed if source == path else original_load(source))
+        with pytest.raises(ValueError, match='Unreviewed published older LoadedMedia policy differs'):
+            loaded.composite_review(audit.ROOT)
+    original_git = subprocess.check_output
+    with monkeypatch.context() as historical_policy:
+        historical_policy.setattr(subprocess, 'check_output', lambda argv, **kwargs:
+            path.read_bytes() if argv == ['git', 'show', baseline['candidate'] + ':' + baseline['path']]
+            else original_git(argv, **kwargs))
+        with pytest.raises(ValueError, match='immutable policy-absence baseline differs'):
+            loaded.composite_review(audit.ROOT)
+
+
 def public_read(path, version, rows, position):
     path.mkdir(parents=True)
     context = runtime.program_source_context(flow=URI)

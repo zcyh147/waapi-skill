@@ -37,7 +37,7 @@ def review(root=audit.ROOT):
     if (original_blob.returncode or runtime.sha(original) != baseline['sha256']
             or set(result['entries']) & set(json.loads(original)['branches'])):
         raise ValueError('LoadedMedia prior-policy absence baseline changed')
-    published = json.loads((root / baseline['path']).read_bytes())['branches']
+    published = audit.load(root / baseline['path'])['branches']
     if any(identity in published and {key: value for key, value in published[identity].items() if key != 'representative_mechanism'} != policy(entry)
             for identity, entry in result['entries'].items()):
         raise ValueError('Unreviewed published LoadedMedia policy differs')
