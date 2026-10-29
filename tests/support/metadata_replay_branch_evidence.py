@@ -147,7 +147,7 @@ R51_CURRENT_FIXED_SOURCES = frozenset(('docs/branch-coverage-requirements.json',
  'tests/unit/test_metadata_default_branch_evidence.py',
  'tests/unit/test_metadata_discovery_gateway.py',
  'tests/unit/test_metadata_replay_attachments.py'))
-CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'after': '15c4424bd0fe606773dd76fe766c54ee3a8aef31e8e973d11761a8d3b2055348',
+CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'after': '2b3ca5cb6112a86073f0286029d40d1f3bdab2df925974e7a92292d113b83429',
                                             'before': '99ad508b7fca40ea0db30542115ce90e421e46ed276200d5fbb63a8e39cada3a'},
  'skills/waapi-skill/evals/request_mapping_registry.json': {'after': '7f821850b53941554061aea7d2acc473ac92817b4dac02368a843abbdea79a87',
                                                             'before': '081457f1ec1c901342eaf7b0432abdff719d388737e81f9b094c27079e2a3f77'},
@@ -690,7 +690,7 @@ CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'aft
  'tests/support/source_copy_branch_evidence.py': {'after': 'de255dc11e0cb81e625eb23b1a4c63ac61f61529673b8bf1f609988470ee974a',
                                                   'before': 'd4d1e5ae5e5736c01362ed25f7ec0745c4a324bddca5a88695811e852cc88e06'},
  # Source followup: raw current reader changed only its normalized accounting-review pin; before/semantic target remain exact.
- 'tests/support/source_copy_native_evidence.py': {'after': 'bee29c6ee8246c81060df0ccd62b472cc596ed03bec1cc6dcced2e4b34df8010',
+ 'tests/support/source_copy_native_evidence.py': {'after': 'bc79b63e729681b25d42acd065a37acfb6b30ddde3d994533e644df787113ef5',
                                                   'before': 'a7ac635f8b4964cab93d84479d64f6af1ca6dad2f1d2bfc2daffb5c3b6ec38d6'},
  'tests/support/test_run_result.py': {'after': '711a2240e8515515e81abd0624bfdd197b7ad798a32812aee7fd7713c2c528a4',
                                       'before': None},

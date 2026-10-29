@@ -1,0 +1,685 @@
+{
+  "capture_or_inventory_refresh": false,
+  "changed_policies": 60,
+  "current_Source_reader_raw_sha256": "bc79b63e729681b25d42acd065a37acfb6b30ddde3d994533e644df787113ef5",
+  "current_Source_review_sha256": "83d78b34ae2bc599cce9820997b2b286876c71792dda8c6233579262dc4276d7",
+  "decoder_program_boundaries_preserved": 5,
+  "exact_changes": [
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue",
+      "native_shape_sha256": "22847d91f3637d43e6327275c2fe13d383d09228d57cd19b1312998ccc8f07ab"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0",
+      "native_shape_sha256": "42b09415fddee82f32b0357566fe8e53f3cf8f67d699e484a619527f6052e767"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0/@nullable",
+      "native_shape_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1",
+      "native_shape_sha256": "69d888691b4f11baf8639ef0933567057d6a67a741d3cc8b7853dc617d8130d3"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1/@empty/string",
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2",
+      "native_shape_sha256": "58a1b0b1e43666d40400a2b0b13e1fbcf176ed74218eed18a01ae44587d98b2e"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3",
+      "native_shape_sha256": "32d547ec133f5b88dbf85d1ccd09c4ea7faf6c4f2a97c5125c6928d555abfbbf"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false",
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true",
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+      "native_shape_sha256": "9a14d1334f5f8ff1b254295c32a51aa1861f8b429b0b044705bf36df871afa0c"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+      "native_shape_sha256": "a04a6b3a933a767581af4230e5dbb37001d54701c6b2cadc672cd0b6a8ad4146"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present",
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue",
+      "native_shape_sha256": "22847d91f3637d43e6327275c2fe13d383d09228d57cd19b1312998ccc8f07ab"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0",
+      "native_shape_sha256": "42b09415fddee82f32b0357566fe8e53f3cf8f67d699e484a619527f6052e767"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0/@nullable",
+      "native_shape_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1",
+      "native_shape_sha256": "69d888691b4f11baf8639ef0933567057d6a67a741d3cc8b7853dc617d8130d3"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1/@empty/string",
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2",
+      "native_shape_sha256": "58a1b0b1e43666d40400a2b0b13e1fbcf176ed74218eed18a01ae44587d98b2e"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3",
+      "native_shape_sha256": "32d547ec133f5b88dbf85d1ccd09c4ea7faf6c4f2a97c5125c6928d555abfbbf"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false",
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true",
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+      "native_shape_sha256": "9a14d1334f5f8ff1b254295c32a51aa1861f8b429b0b044705bf36df871afa0c"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+      "native_shape_sha256": "a04a6b3a933a767581af4230e5dbb37001d54701c6b2cadc672cd0b6a8ad4146"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present",
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue",
+      "native_shape_sha256": "22847d91f3637d43e6327275c2fe13d383d09228d57cd19b1312998ccc8f07ab"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0",
+      "native_shape_sha256": "42b09415fddee82f32b0357566fe8e53f3cf8f67d699e484a619527f6052e767"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0/@nullable",
+      "native_shape_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1",
+      "native_shape_sha256": "69d888691b4f11baf8639ef0933567057d6a67a741d3cc8b7853dc617d8130d3"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1/@empty/string",
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2",
+      "native_shape_sha256": "58a1b0b1e43666d40400a2b0b13e1fbcf176ed74218eed18a01ae44587d98b2e"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3",
+      "native_shape_sha256": "32d547ec133f5b88dbf85d1ccd09c4ea7faf6c4f2a97c5125c6928d555abfbbf"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false",
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true",
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+      "native_shape_sha256": "9a14d1334f5f8ff1b254295c32a51aa1861f8b429b0b044705bf36df871afa0c"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+      "native_shape_sha256": "a04a6b3a933a767581af4230e5dbb37001d54701c6b2cadc672cd0b6a8ad4146"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present",
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue",
+      "native_shape_sha256": "22847d91f3637d43e6327275c2fe13d383d09228d57cd19b1312998ccc8f07ab"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0",
+      "native_shape_sha256": "42b09415fddee82f32b0357566fe8e53f3cf8f67d699e484a619527f6052e767"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0/@nullable",
+      "native_shape_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1",
+      "native_shape_sha256": "69d888691b4f11baf8639ef0933567057d6a67a741d3cc8b7853dc617d8130d3"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1/@empty/string",
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/2",
+      "native_shape_sha256": "58a1b0b1e43666d40400a2b0b13e1fbcf176ed74218eed18a01ae44587d98b2e"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3",
+      "native_shape_sha256": "32d547ec133f5b88dbf85d1ccd09c4ea7faf6c4f2a97c5125c6928d555abfbbf"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false",
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true",
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+      "native_shape_sha256": "0bb4d988158a9ec4b15c46a8a508ee640137cb8bb1a400e825d85a953898a6f9"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+      "native_shape_sha256": "b2bb1aa4e219428ee22fed20e92dbeea36f33df1cb10427c557175f0a4ddf2b4"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present",
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue",
+      "native_shape_sha256": "22847d91f3637d43e6327275c2fe13d383d09228d57cd19b1312998ccc8f07ab"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0",
+      "native_shape_sha256": "42b09415fddee82f32b0357566fe8e53f3cf8f67d699e484a619527f6052e767"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0/@nullable",
+      "native_shape_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1",
+      "native_shape_sha256": "69d888691b4f11baf8639ef0933567057d6a67a741d3cc8b7853dc617d8130d3"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1/@empty/string",
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/2",
+      "native_shape_sha256": "58a1b0b1e43666d40400a2b0b13e1fbcf176ed74218eed18a01ae44587d98b2e"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3",
+      "native_shape_sha256": "32d547ec133f5b88dbf85d1ccd09c4ea7faf6c4f2a97c5125c6928d555abfbbf"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false",
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true",
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+      "native_shape_sha256": "0bb4d988158a9ec4b15c46a8a508ee640137cb8bb1a400e825d85a953898a6f9"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+      "native_shape_sha256": "b2bb1aa4e219428ee22fed20e92dbeea36f33df1cb10427c557175f0a4ddf2b4"
+    },
+    {
+      "after": [
+        "program",
+        "live_metadata"
+      ],
+      "before": [
+        "program"
+      ],
+      "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present",
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06"
+    }
+  ],
+  "historical_before_maps_packets_execution_unchanged": true,
+  "historical_requirements_candidate": "4e3c28007093bb7a90aad5d93e2565d498eba7c0",
+  "historical_requirements_raw_sha256": "99ad508b7fca40ea0db30542115ce90e421e46ed276200d5fbb63a8e39cada3a",
+  "requirements_sha256": "30936a28b0da53615936362d6ac6d02eebf890931d79ac2958ca5f2e448f6a41",
+  "semantic_requirements_before": "15c4424bd0fe606773dd76fe766c54ee3a8aef31e8e973d11761a8d3b2055348",
+  "semantic_requirements_sha256": "2b3ca5cb6112a86073f0286029d40d1f3bdab2df925974e7a92292d113b83429",
+  "shapes_or_mapping_or_member_changes": false,
+  "source_prefix": {
+    "artifact": "canonical-195-d73-r1/policy-freeze-v3-r51-restoration-r2/source-prefix-mapping.json",
+    "sha256": "373e5d1049dae3abbe210a8daf8138ee4f11bfc3bec63931f06906b32b4e940b"
+  },
+  "source_prefix_predecessor": {
+    "artifact": "canonical-195-d73-r1/policy-freeze-v2/source-prefix-mapping.json",
+    "sha256": "d7e5fcc1abf4104d03022e9c0795fefa4c693960cc44061092eceb9decbfd8b1"
+  },
+  "unchanged_other_policies": 272253
+}

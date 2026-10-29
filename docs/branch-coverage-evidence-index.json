@@ -4,8 +4,8 @@
   "entries": [],
   "mapping_attachments": [
     {
-      "artifact": "canonical-195-d73-r1/policy-freeze-v2/source-prefix-mapping.json",
-      "sha256": "d7e5fcc1abf4104d03022e9c0795fefa4c693960cc44061092eceb9decbfd8b1"
+      "artifact": "canonical-195-d73-r1/policy-freeze-v3-r51-restoration-r2/source-prefix-mapping.json",
+      "sha256": "373e5d1049dae3abbe210a8daf8138ee4f11bfc3bec63931f06906b32b4e940b"
     }
   ]
 }
