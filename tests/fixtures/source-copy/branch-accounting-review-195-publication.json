@@ -127,8 +127,8 @@
     "docs/branch-coverage-current-business.json": "e8cef211be75c0435a0dafe7d7694043cfbe30256634a300da287192e0ee3e37",
     "docs/branch-coverage-ownership.json": "d4f55b82d8da83d18422aa027c3c134b6ab52d950827a7c3cc2aa50679859d9c",
     "docs/branch-coverage-requirements.json": "e0b7ff81f7224ed23690048bd8df641dc520e17039a6b0175c2851a6ab0810f6",
-    "docs/interface-depth-inventory.json": "881b3737308e0654e0119a903a10e62e75a5d7ce15a5be8e8249ca9646d60636",
-    "docs/interface-depth-review-policy.json": "cab3a35d37245862c0128a3d02731f1b7faa5b5ee483490846db9162513408a9",
+    "docs/interface-depth-inventory.json": "81f3fb01bd917a917af63207da200ab0ad31aa86b40bfd2c07c85688576dfc8a",
+    "docs/interface-depth-review-policy.json": "e5af44e84c5a65d39ba9eeea3dee5f46a77bc522d6389f81cca849db0dc0cae1",
     "skills/waapi-skill/resources/manifest/2021.1/authoring-ui-commands-supplement.json": "dc07c4bac1c90bc92bfecf59d12ddc39a0bf7aa95f502f6c576977cb7a9764b8",
     "skills/waapi-skill/resources/manifest/2021.1/definitions.json": "1e23d3f4d2d9a654c4fd90655c955c20a43aadbccea4f393158cc4925e3139b4",
     "skills/waapi-skill/resources/manifest/2021.1/functions.json": "e15e00bbdb8260113b6e75e8fbae59ab00e5477ef7e7d78013b7f801e70437f3",
@@ -164,7 +164,7 @@
     "skills/waapi-skill/resources/manifest/2025.1/functions.json": "18b909203f591ca5ce3eb25c15f9f1041028949f000b28231f040a27de92ad36",
     "skills/waapi-skill/resources/manifest/2025.1/schemas.json": "1d6d6e32ec042c19c5ebd99b7b964c88410f9b90d26b073eb0869950b1a39c60",
     "skills/waapi-skill/resources/manifest/2025.1/topics.json": "1508989ded3645d79bbf58e98eaaa14d52ad6dce94ce56fc5dac167321474570",
-    "skills/waapi-skill/resources/manifest/typed-request-surface.json": "02ae01f17c25e8a291f6492c877e6d10c3d96867033611d96627cfe6aae5169a",
+    "skills/waapi-skill/resources/manifest/typed-request-surface.json": "b98bc190245da02e443ab4b2f24e66cb2c9d9830b2f1d883fb769e9fefc09571",
     "skills/waapi-skill/resources/native_surface_policy.json": "258877cc25df78df2f3418459720d823730eee7b5336d8349ef5c1b4345be810",
     "skills/waapi-skill/scripts/gateway.py": "f5c7f537836a4483070085a07fd58336dc54f0d14c9891480b664fdf556e1d04",
     "skills/waapi-skill/wwise_waapi/audio_import_business.py": "3e7e92a19dc4d2ec4170cb536d98986e3b9b3643a0bc6ec0d9b5bd4f9d8d36fb",
@@ -438,7 +438,7 @@
     "skills/waapi-skill/resources/manifest/2025.1/manifest.json": "1b17b9c7726d70d4f5b5f4fac81b4e33efbfb778bae70ec7a37fbf449d106b95",
     "skills/waapi-skill/resources/manifest/2025.1/schemas.json": "1d6d6e32ec042c19c5ebd99b7b964c88410f9b90d26b073eb0869950b1a39c60",
     "skills/waapi-skill/resources/manifest/2025.1/topics.json": "1508989ded3645d79bbf58e98eaaa14d52ad6dce94ce56fc5dac167321474570",
-    "skills/waapi-skill/resources/manifest/typed-request-surface.json": "02ae01f17c25e8a291f6492c877e6d10c3d96867033611d96627cfe6aae5169a",
+    "skills/waapi-skill/resources/manifest/typed-request-surface.json": "b98bc190245da02e443ab4b2f24e66cb2c9d9830b2f1d883fb769e9fefc09571",
     "skills/waapi-skill/resources/metadata/2021.1/documented-list-fields.json": "4d41f3e0b19c8a82f211b55f2888168eceeeff152edbccfb74fee05a1779726f",
     "skills/waapi-skill/resources/metadata/2021.1/installed-owned-list-fields.json": "bdbc5b33059de0b86bb8f1fd8b791a8dd738a03546e241fa4a9e7f6b222e4e6b",
     "skills/waapi-skill/resources/metadata/2021.1/object-types.json": "d35b51d3a4bbf06146215dec68f9a30924ad5902df59901bc4177c31fdcfd479",
@@ -923,6 +923,11 @@
     "tests/support/host_path_relatives.py": "8d5bcc6266540e702c70373b62128b142c8a1f7faddf8699cb299860b661480d"
   },
   "execution_source_changes": {
+    "skills/waapi-skill/resources/manifest/typed-request-surface.json": {
+      "captured_sha256": "02ae01f17c25e8a291f6492c877e6d10c3d96867033611d96627cfe6aae5169a",
+      "current_sha256": "b98bc190245da02e443ab4b2f24e66cb2c9d9830b2f1d883fb769e9fefc09571",
+      "reason": "Reviewed097273ec derived delta changes only21 existing2024/25 UI business declarations; all897 lanes/native schemas/definition graphs/execution policies remain unchanged. Exact object.copy/Save/Synth selected Source declarations are unchanged. Retained Source execution stays historical; no new UI/native credit."
+    },
     "skills/waapi-skill/scripts/gateway.py": {
       "captured_sha256": "045a61aa50047aefd5e0544122fcba4d0cf4be2811cf3a8e4a3027684f38e6b3",
       "current_sha256": "f5c7f537836a4483070085a07fd58336dc54f0d14c9891480b664fdf556e1d04",
@@ -1667,6 +1672,21 @@
       "captured_sha256": "f8743423b43e06eb07bfe383193a0adfa61b794bab3c2d91bffe04271d36b638",
       "current_sha256": "e0b7ff81f7224ed23690048bd8df641dc520e17039a6b0175c2851a6ab0810f6",
       "reason": "Current requirements after-seal is explicitly the shared requirements-publication-identity/v1 semantic projection; historical captured before-seal remains raw. Full final requirements/member/descriptor seals are independently enforced at ordinary consumer admission."
+    },
+    "docs/interface-depth-inventory.json": {
+      "captured_sha256": "881b3737308e0654e0119a903a10e62e75a5d7ce15a5be8e8249ca9646d60636",
+      "current_sha256": "81f3fb01bd917a917af63207da200ab0ad31aa86b40bfd2c07c85688576dfc8a",
+      "reason": "Reviewed097273ec regenerates45 named-operation references/2 interned argument records and source seals, retaining all897 native rows/218 field records/owners/classifications. Accounting artifact after-seal only; native Source facts unchanged."
+    },
+    "docs/interface-depth-review-policy.json": {
+      "captured_sha256": "cab3a35d37245862c0128a3d02731f1b7faa5b5ee483490846db9162513408a9",
+      "current_sha256": "e5af44e84c5a65d39ba9eeea3dee5f46a77bc522d6389f81cca849db0dc0cae1",
+      "reason": "Reviewed097273ec changes only4 authoritative parser/operation/continuation/typed source seals; deep-interface invariants and owners/dispositions unchanged. This is current accounting publication metadata, not new Source execution."
+    },
+    "skills/waapi-skill/resources/manifest/typed-request-surface.json": {
+      "captured_sha256": "02ae01f17c25e8a291f6492c877e6d10c3d96867033611d96627cfe6aae5169a",
+      "current_sha256": "b98bc190245da02e443ab4b2f24e66cb2c9d9830b2f1d883fb769e9fefc09571",
+      "reason": "Reviewed097273ec derived delta changes only21 existing2024/25 UI business declarations; all897 lanes/native schemas/definition graphs/execution policies remain unchanged. Exact object.copy/Save/Synth selected Source declarations are unchanged. Retained Source execution stays historical; no new UI/native credit."
     },
     "skills/waapi-skill/scripts/gateway.py": {
       "captured_sha256": "045a61aa50047aefd5e0544122fcba4d0cf4be2811cf3a8e4a3027684f38e6b3",
