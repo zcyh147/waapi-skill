@@ -65,6 +65,83 @@ def _authority(root, heading):
         'native_absence_claim': False, 'execution_credit': False}
 
 
+CREATION_LIMIT_HEADING = '## User-approved remaining creation limits — 2026-10-29'
+_CREATION_LIMIT_BUILDS = dict(zip(VERSIONS, ('2021.1.14.8108', '2022.1.19.8584',
+    '2023.1.19.8928', '2024.1.13.9056', '2025.1.7.9143')))
+# Exact registered identities, not a type-name denylist. Only NEW applicability
+# roles without a known public constructor receive this user scope decision.
+_CREATION_LIMIT_CLASSES = {
+    3342352: ('UserProjectSettings', VERSIONS),
+    3538960: ('PluginDataSource', VERSIONS),
+    3670032: ('ExternalSourceFile', VERSIONS),
+    3735568: ('ExternalSource', VERSIONS),
+    4128784: ('MidiParameter', VERSIONS),
+    4915216: ('Language', VERSIONS),
+    2555920: ('MusicFade', VERSIONS),
+    2752528: ('Panner', VERSIONS),
+    786448: ('Position', VERSIONS),
+    1966096: ('BlendTrack', VERSIONS[:3]),
+    2359312: ('MusicPlaylistItem', VERSIONS[:2]),
+    2424848: ('MusicTransition', VERSIONS[:2]),
+    5177360: ('CustomState', VERSIONS),
+    5570576: ('StateGroupInfo', VERSIONS[-1:]),
+    4980752: ('ActionException', VERSIONS),
+    655360016: ('MultiSwitchEntry', VERSIONS[:2]),
+    1441808: ('ParamControl', VERSIONS[:1]),
+    917520: ('Curve', VERSIONS[:1]),
+    5701648: ('MediaPoolQuery', VERSIONS[-1:]),
+}
+
+
+def _apply_approved_creation_limit(root, row):
+    if row['kind'] != 'target_applicability' or row['operation_mode'] != 'new-object':
+        return
+    version = row['version']; name = row['class_name']
+    class_id = row['source_dimensions']['class_id']
+    expected_name, versions = (_CREATION_LIMIT_CLASSES.get(class_id, (None, ()))
+        if class_id != 720912 else ('Path' if version == '2021.1' else 'Path2D', VERSIONS))
+    if (row['kind'] != 'target_applicability' or row['operation_mode'] != 'new-object'
+            or name != expected_name or version not in versions
+            or row['build'] != _CREATION_LIMIT_BUILDS[version]
+            or row['id'] != f"{version}|metadata|{row['build']}|target|{class_id}|new-object"):
+        return
+    if row['state'] != 'implementation_dependency':
+        raise ValueError('Approved creation limit cannot replace an implemented public role')
+    authority = _authority(root, CREATION_LIMIT_HEADING)
+    authority.update(scope='only the unresolved NEW creation role for this exact version/build/class; existing query/edit/copy and known creation methods retained',
+        version=version, build=row['build'], class_id=class_id, class_name=name,
+        operation_mode='new-object', original_dependencies=deepcopy(row['dependencies']))
+    correspondence = row['correspondence']
+    # Keep the original source/owner investigation and any already implemented
+    # partial role. Approval resolves scope; it does not rewrite source facts.
+    correspondence['unresolved_constructor_path'] = correspondence['path']
+    correspondence['path'] = 'accepted_current_skill_creation_limit'
+    correspondence['admission'] = 'user-approved current Skill limit for the unresolved creation role; no native impossibility or execution credit; exact existing fields, donor copy and known public methods retained'
+    known = correspondence.setdefault('partial_roles', [])
+    if name == 'Curve':
+        known.append({'role': 'attenuation_curve_setter',
+            'operations': ['ak.wwise.core.object.setAttenuationCurve'],
+            'admission': 'existing closed attenuation curve setter only; other Curve birth roles receive the approved limit'})
+    if name in {'CustomState', 'StateGroupInfo'} and version in VERSIONS[2:]:
+        known.append({'role': 'state_group_and_property_association',
+            'operations': ['ak.wwise.core.object.setStateGroups', 'ak.wwise.core.object.setStateProperties'],
+            'admission': 'existing closed association methods retained; no class birth or per-State GUID acquisition inferred'})
+    if name == 'MultiSwitchEntry':
+        authority['scope'] = 'older MusicSwitch entry construction only; existing Dialogue conditions-owned audio.import association retained'
+        known[0]['other_roles'] = 'older MusicSwitch entry construction receives the approved current Skill limit; no native absence claimed'
+    if name == 'Language':
+        authority['scope'] = 'adding Language to an existing project only; initial languages in cli.createNewProject and existing Language configuration retained'
+        correspondence['retained_methods'] = ['ak.wwise.cli.createNewProject initial languages', 'exact existing Language fields']
+    if known:
+        correspondence['operations'] = list(dict.fromkeys(op for role in known for op in role['operations']))
+        correspondence['approved_creation_boundary'] = authority
+        row['state'] = 'source_definition_verified'
+    else:
+        row['state'] = 'approved_exclusion'
+        row['approved_exclusion'] = authority
+    row['dependencies'] = []
+
+
 def _plugin_correspondence(version, category, mode):
     if mode == 'existing-object':
         return 'exact_existing_object_fields', ['object.setProperty', 'object.setReference'], 'source_definition_verified', None
@@ -493,6 +570,7 @@ def definition_mapping(root):
                         'admission': 'explicit Dialogue conditions; fresh live MultiSwitchEntry AudioNode admission; preserve nondefault WorkUnit import-group boundary and exact older Container/RandomSequenceContainer guard',
                         'verification': 'owner/referrers and requested numeric fields checked; decision-path order readback unobserved',
                         'other_roles': 'older MusicSwitch entry construction remains unresolved; no arbitrary hierarchy constructor'}]
+            _apply_approved_creation_limit(root, row)
             row['correspondence']['entrypoint'] = ENTRYPOINT
             rows.append(row)
     rows.sort(key=lambda r: r['id'])

@@ -531,3 +531,45 @@ from native absence, writable-field proof and successful mutation evidence.
 code tests. No new Fresh or native run is authorized or required for this
 decision. This resolves the Music controller question left open above; the
 remaining integrated coverage and final gates are still required.
+
+
+## User-approved remaining creation limits — 2026-10-29
+
+The user accepts explicit current Skill creation limits where the completed,
+bounded investigation found no public creation method, and requests completion
+of every known public method without further constructor investigation. This
+supersedes the earlier pending Language, MusicFade and standalone-class scope
+questions. It is a scope decision, not proof of native impossibility. Record
+`native_absence_claim=false` and `execution_credit=false`; retain original
+identities, shapes, sources, missing facts and failed/indeterminate diagnostics.
+
+| Exact NEW role limited by this decision | Wwise versions |
+| --- | --- |
+| Standalone UserProjectSettings, PluginDataSource, ExternalSourceFile, ExternalSource and MidiParameter creation | 2021.1–2025.1 |
+| Add Language to an existing project; allocate or resolve a new MusicFade role | 2021.1–2025.1 |
+| Panner and Position role construction; spatial Path (2021.1) / Path2D (2022.1–2025.1) construction and spatial-point contract | 2021.1–2025.1 |
+| Older BlendTrack construction | 2021.1–2023.1 |
+| Older MusicPlaylistItem and MusicTransition construction | 2021.1–2022.1 |
+| CustomState birth/per-State identity; StateGroupInfo birth/identity | CustomState 2021.1–2025.1; StateGroupInfo 2025.1 |
+| ActionException collection/factory construction | 2021.1–2025.1 |
+| Older MusicSwitch MultiSwitchEntry construction | 2021.1–2022.1 |
+| ParamControl creation and unresolved Curve birth roles | 2021.1 |
+| Save/create a MediaPoolQuery | 2025.1 |
+
+This reconciles 73 exact NEW applicability ledger rows, not 73 functions or
+native tests. Existing queries, exact selected-GUID field edits, compatible
+donor copy and known public creation methods stay supported under their own
+contracts. In particular, retain the 2021 attenuation curve setter; older
+Dialogue conditions-owned imports; initial new-project languages; 2023+
+State-group/property association methods; and the delivered modern Playlist,
+Transition, BlendTrack, Media Pool database/directory and Control Surface
+factories. An association method does not certify which owned class is born.
+Rows mixing a known method with an unresolved birth role retain their program
+obligation and a role-scoped approval; they are not whole-class exclusions.
+
+Use the existing completion reader's exact version/build/class/NEW-mode
+authority and existing closed-interface refusals. Do not add native absence,
+successful execution or per-API coverage credit from this decision; do not
+exclude an unrelated row, an existing-object mode, a known factory or an actual
+implementation defect. #195/#174 remain subject to current-source evidence,
+combined gates and review. No new native or Fresh work is authorized here.
