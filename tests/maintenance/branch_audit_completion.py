@@ -646,7 +646,8 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
         raise ValueError('Exact reviewed metadata changed-file proof missing; runtime drift is not equivalent')
     replay = read_sealed_artifact(record['replay'], base)
     if (replay['relevant_sources'] != after or record['invocation'] != replay['invocation']
-            or replay.get('current_requirements_identity') != producer.CURRENT_REQUIREMENTS_IDENTITY):
+            or replay.get('current_requirements_identity') != producer.CURRENT_REQUIREMENTS_IDENTITY
+            or replay.get('current_applicability_mapper_identity') != producer.CURRENT_APPLICABILITY_MAPPER_IDENTITY):
         raise ValueError('Current replay source/node receipt differs')
     if scope_kind == 'product':
         # Product replay must come from its actual clean committed source pin.
@@ -746,6 +747,7 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
             or record['invocation']!={'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':nodeid,'outcome':'PASS'}]}
             or record['replay']['nodeid']!=nodeid or replay['relevant_sources']!=after
             or replay.get('current_requirements_identity')!=producer.CURRENT_REQUIREMENTS_IDENTITY
+            or replay.get('current_applicability_mapper_identity')!=producer.CURRENT_APPLICABILITY_MAPPER_IDENTITY
             or context['observation_origin']!='native_scenario_lifecycle' or replay['original_case']!=case):
         raise ValueError('Original R54 origin/current replay final node changed')
     if scope_kind=='product':

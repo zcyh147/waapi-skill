@@ -11,6 +11,18 @@ import hashlib
 from pathlib import Path
 import re
 
+MAPPER_SOURCE = 'tests/support/applicability_completion_mapping.py'
+MAPPER_IDENTITY_KIND = 'waapi-skill.applicability-proof-pin-identity/v1'
+
+
+def normalized_mapper_source(raw):
+    """Keep the existing single self-record pin cut shared with metadata seals."""
+    raw, count = re.subn(rb"(?m)^PROOF_SHA256 = '[^']*'$",
+        b"PROOF_SHA256 = '<self-record-digest>'", raw)
+    if count != 1:
+        raise ValueError('One exact applicability proof digest declaration required')
+    return raw
+
 
 def program_sources(root):
     selected = {p.relative_to(root).as_posix() for directory in ('scripts', 'wwise_waapi', 'resources')
@@ -61,11 +73,9 @@ def program_sources(root):
     result = {}
     for name in sorted(selected):
         raw = (root / name).read_bytes()
-        if name == 'tests/support/applicability_completion_mapping.py':
+        if name == MAPPER_SOURCE:
             # Only the digest of this very record is normalized; all executable
             # reader/classification logic and every other source pin stay sealed.
-            raw, count = re.subn(rb"(?m)^PROOF_SHA256 = '[^']*'$", b"PROOF_SHA256 = '<self-record-digest>'", raw)
-            if count != 1:
-                raise ValueError('One exact applicability proof digest declaration required')
+            raw = normalized_mapper_source(raw)
         result[name] = hashlib.sha256(raw).hexdigest()
     return result

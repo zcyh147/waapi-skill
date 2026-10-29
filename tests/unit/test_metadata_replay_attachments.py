@@ -333,6 +333,68 @@ def test_original_r54_and_current_replay_keep_distinct_full_source_and_public_in
         source_root=audit.ROOT,reference_edges=capture['edges'])==('passed',None)
 
 
+def test_current_metadata_keeps_applicability_proof_pin_out_of_source_feedback(inventory, tmp_path, monkeypatch):
+    """A real current replay admits pin-only publication, not mapper changes."""
+    import re
+    capture, program, record, descriptor, branch, binding = r54_control(tmp_path, inventory)
+    def result():
+        return completion.evidence_result(descriptor, branch, 'c' * 64, 'live_metadata',
+            'controlled', tmp_path, binding, source_root=audit.ROOT, reference_edges=capture['edges'])
+    assert result() == ('passed', None)
+    path = audit.ROOT / 'tests/support/applicability_completion_mapping.py'
+    original_read = Path.read_bytes
+    original = original_read(path)
+    pin_only, count = re.subn(rb"(?m)^PROOF_SHA256 = '[^']*'$",
+        b"PROOF_SHA256 = '" + b'9' * 64 + b"'", original)
+    assert count == 1
+    changed = pin_only
+    monkeypatch.setattr(Path, 'read_bytes', lambda source: changed if source == path else original_read(source))
+    assert result() == ('passed', None)
+    for extra in (b'\n# unreviewed mapper body change\n', b"\nSECOND_PROOF_SHA256 = '" + b'8' * 64 + b"'\n"):
+        changed = pin_only + extra
+        outcome, reason = result()
+        assert outcome == 'missing' and 'runtime drift is not equivalent' in reason
+
+
+def test_current_metadata_git_mapper_identity_owns_bytes_except_the_one_proof_pin(tmp_path):
+    import re
+    import subprocess
+    from tests.support import applicability_program
+    name = applicability_program.MAPPER_SOURCE
+    raw = (audit.ROOT / name).read_bytes()
+    root = tmp_path / 'git-source'
+    target = root / name
+    target.parent.mkdir(parents=True)
+    def git(*args):
+        return subprocess.check_output(['git', *args], cwd=root, text=True).strip()
+    git('init', '-q')
+    git('config', 'user.name', 'Mapper pin control')
+    git('config', 'user.email', 'mapper-pin@example.invalid')
+    target.write_bytes(raw)
+    git('add', '.')
+    git('commit', '-qm', 'Exact current mapper bytes')
+    first = git('rev-parse', 'HEAD')
+    actual_app_seal = applicability_program.program_sources(audit.ROOT)[name]
+    assert producer.CURRENT_APPLICABILITY_MAPPER_IDENTITY == applicability_program.MAPPER_IDENTITY_KIND
+    assert producer.git_current_source_seals(first, {name}, root=root) == {name: actual_app_seal}
+    pin_only, count = re.subn(rb"(?m)^PROOF_SHA256 = '[^']*'$",
+        b"PROOF_SHA256 = '" + b'7' * 64 + b"'", raw)
+    assert count == 1
+    target.write_bytes(pin_only)
+    git('add', '.')
+    git('commit', '-qm', 'Publish only actual proof pin')
+    second = git('rev-parse', 'HEAD')
+    assert producer.git_source_seals(first, {name}, root=root) != producer.git_source_seals(second, {name}, root=root)
+    assert producer.git_current_source_seals(second, {name}, root=root) == {name: actual_app_seal}
+    for extra in (b'\n# different owned mapper body\n', b"\nSECOND_PROOF_SHA256 = '" + b'6' * 64 + b"'\n"):
+        target.write_bytes(pin_only + extra)
+        git('add', '.')
+        git('commit', '-qm', 'Different current mapper semantics')
+        foreign = git('rev-parse', 'HEAD')
+        assert producer.git_current_source_seals(foreign, {name}, root=root) != {name: actual_app_seal}
+        assert producer.git_current_source_seals(first, {name}, root=root) == {name: actual_app_seal}
+
+
 
 def test_r55_original_and_current_replay_keep_distinct_sources_inputs_and_ten_leaf_scope(inventory,tmp_path):
     capture,program,record,descriptor,branch,binding=r54_control(tmp_path,inventory,

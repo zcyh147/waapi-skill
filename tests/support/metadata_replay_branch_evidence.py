@@ -11,9 +11,17 @@ from pathlib import Path
 from tests.maintenance import branch_coverage_audit as audit
 from tests.support.metadata_read_branch_evidence import source_seals as metadata_source_seals
 from tests.support.media_pool_branch_evidence import public_read_observation
+from tests.support.applicability_program import (MAPPER_SOURCE as APPLICABILITY_MAPPER_SOURCE,
+    MAPPER_IDENTITY_KIND as CURRENT_APPLICABILITY_MAPPER_IDENTITY, normalized_mapper_source)
 
 REQUIREMENTS_SOURCE = 'docs/branch-coverage-requirements.json'
 CURRENT_REQUIREMENTS_IDENTITY = 'waapi-skill.requirements-publication-identity/v1'
+
+
+def current_applicability_mapper_source_seal(raw=None):
+    """Current-only single-pin identity; original source maps remain raw bytes."""
+    raw = (audit.ROOT / APPLICABILITY_MAPPER_SOURCE).read_bytes() if raw is None else raw
+    return hashlib.sha256(normalized_mapper_source(raw)).hexdigest()
 
 
 def current_requirements_source_seal(document=None, mapping_bindings=None):
@@ -28,6 +36,8 @@ def r51_current_sources():
     sources[REQUIREMENTS_SOURCE] = current_requirements_source_seal()
     name = 'tests/maintenance/branch_audit_mapping.py'
     sources[name] = hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest()
+    if APPLICABILITY_MAPPER_SOURCE in sources:
+        sources[APPLICABILITY_MAPPER_SOURCE] = current_applicability_mapper_source_seal()
     return sources
 
 
@@ -35,9 +45,16 @@ def git_current_source_seals(candidate, names, *, root=None):
     """Own current semantic policy with that Git pin, never the live document."""
     root = audit.ROOT if root is None else Path(root)
     names = set(names)
-    sources = git_source_seals(candidate, names - {REQUIREMENTS_SOURCE}, root=root)
+    sources = git_source_seals(candidate, names - {REQUIREMENTS_SOURCE, APPLICABILITY_MAPPER_SOURCE}, root=root)
     if REQUIREMENTS_SOURCE in names:
         sources[REQUIREMENTS_SOURCE] = _git_requirements_source_seal(str(root.resolve()), candidate)
+    if APPLICABILITY_MAPPER_SOURCE in names:
+        import subprocess
+        result = subprocess.run(['git', '--no-replace-objects', 'show', candidate + ':' + APPLICABILITY_MAPPER_SOURCE],
+            cwd=root, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode or len(result.stdout) > audit.AUDIT_MAX_DOCUMENT_BYTES:
+            raise ValueError('Current metadata Git applicability mapper unavailable or oversized')
+        sources[APPLICABILITY_MAPPER_SOURCE] = current_applicability_mapper_source_seal(result.stdout)
     return sources
 
 
@@ -602,9 +619,9 @@ CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'aft
                                                              'before': '37841446878515c1484dfecf0cf35ac304c87b9f13ee39c6e0ec35c66d3d4189'},
  'tests/semantic/support/codex_typed_input_profile.py': {'after': 'fe5ea90a892b89fb4690bc143982c9c440ac912ab2be24134a5fb888103c7304',
                                                          'before': 'a03eb5afc5b633030a62bfe042ea6b40b9e9abbec35a2fa8b956377e73de9a8e'},
- 'tests/support/applicability_completion_mapping.py': {'after': 'f7b350ccb1f43b7d8b44808ea646969ba0afd1df2075afe3cd8d9f6ed66fab06',
+ 'tests/support/applicability_completion_mapping.py': {'after': 'eb38a4ebc2a9c14d64fef8e69192714d4554df12ba1f82512ddbe5a853bab1ec',
                                                        'before': None},
- 'tests/support/applicability_program.py': {'after': '80c4eddfacdd7ed418be89395099bda776851f43aba9fbcd61b773952ca9a279',
+ 'tests/support/applicability_program.py': {'after': 'd2cc2b9f67abcf62faffac7cfc3d6da1ac896365dd28d7be8491462816e0e4ab',
                                             'before': None},
  'tests/support/condition_branch_evidence.py': {'after': 'e52ecc05ca5b41d13be691de7f5d226418a00c2b210885b56141ad1c5b042018',
                                                 'before': '93b603a66b612af84758d0273415d34467aee60ef8773ea1736b4e9b805116f2'},
@@ -1238,6 +1255,7 @@ def r54_current_sources():
     sources[REQUIREMENTS_SOURCE] = current_requirements_source_seal()
     name = 'tests/maintenance/branch_audit_mapping.py'
     sources[name] = hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest()
+    sources[APPLICABILITY_MAPPER_SOURCE] = current_applicability_mapper_source_seal()
     return sources
 
 
@@ -1247,6 +1265,7 @@ def make_r54_replay_receipt(capture,case,observed,reports):
     record={'candidate_sha256':capture['candidate_sha256'],'scope_kind':capture.get('scope_kind','product'),
         'evidence_kind':'injected_client_program','git_candidate':capture['git_candidate'],
         'current_requirements_identity': CURRENT_REQUIREMENTS_IDENTITY,
+        'current_applicability_mapper_identity': CURRENT_APPLICABILITY_MAPPER_IDENTITY,
         'relevant_sources':deepcopy(capture['relevant_sources']),
         'invocation':{'phase':'final','outcome':outcome,'node_outcomes':[{'nodeid':class_original_profile(capture.get('cohort','r54'))['node']+'['+case+']','outcome':outcome}]},
         **deepcopy(observed),'branch_assertions':{}}
@@ -1471,6 +1490,7 @@ def make_replay_receipt(capture, field, observed, reports):
     record = {'candidate_sha256': capture['candidate_sha256'], 'scope_kind': capture.get('scope_kind', 'product'),
         'evidence_kind': 'injected_client_program', 'git_candidate': capture['git_candidate'],
         'current_requirements_identity': CURRENT_REQUIREMENTS_IDENTITY,
+        'current_applicability_mapper_identity': CURRENT_APPLICABILITY_MAPPER_IDENTITY,
         'relevant_sources': deepcopy(capture['relevant_sources']), 'invocation': {'phase': 'final', 'outcome': outcome,
             'node_outcomes': [{'nodeid': NODE+'['+CASES[field]+']', 'outcome': outcome}]},
         **deepcopy(observed), 'branch_assertions': {}}
