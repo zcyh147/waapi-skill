@@ -127,8 +127,8 @@
     "docs/branch-coverage-current-business.json": "e8cef211be75c0435a0dafe7d7694043cfbe30256634a300da287192e0ee3e37",
     "docs/branch-coverage-ownership.json": "d4f55b82d8da83d18422aa027c3c134b6ab52d950827a7c3cc2aa50679859d9c",
     "docs/branch-coverage-requirements.json": "e0b7ff81f7224ed23690048bd8df641dc520e17039a6b0175c2851a6ab0810f6",
-    "docs/interface-depth-inventory.json": "81f3fb01bd917a917af63207da200ab0ad31aa86b40bfd2c07c85688576dfc8a",
-    "docs/interface-depth-review-policy.json": "e5af44e84c5a65d39ba9eeea3dee5f46a77bc522d6389f81cca849db0dc0cae1",
+    "docs/interface-depth-inventory.json": "619f5d540d0266a7fb1eb325ac8439781e32c1074b21419dbab185b67e74b374",
+    "docs/interface-depth-review-policy.json": "1184a48181cc28c73c2168f5b375c5c014ba9144a78b7cbd44eb1f260355b70e",
     "skills/waapi-skill/resources/manifest/2021.1/authoring-ui-commands-supplement.json": "dc07c4bac1c90bc92bfecf59d12ddc39a0bf7aa95f502f6c576977cb7a9764b8",
     "skills/waapi-skill/resources/manifest/2021.1/definitions.json": "1e23d3f4d2d9a654c4fd90655c955c20a43aadbccea4f393158cc4925e3139b4",
     "skills/waapi-skill/resources/manifest/2021.1/functions.json": "e15e00bbdb8260113b6e75e8fbae59ab00e5477ef7e7d78013b7f801e70437f3",
@@ -204,8 +204,8 @@
     "tests/fixtures/source-copy/branch-successor-review-r123.json": "4f2ccb1aad3e3826b0db88e484919dce06b909d6136a5a3794dc8fc469c2f714",
     "tests/fixtures/source-copy/branch-successor-review-r92.json": "278fcf8f3f404aba71d12995a6e42cc447bdabb2606800f6456a2751f9bd032f",
     "tests/maintenance/__init__.py": "93f800e18500f291b23ed63fc6eb6a36245cd75a3605534a564c4913e05c1104",
-    "tests/maintenance/branch_audit_completion.py": "905233005d68383579b02394085864da340cf46f43ee383f9d178e0d6b4c1711",
-    "tests/maintenance/branch_audit_mapping.py": "c478ef9bd0e45bd78ace24da0cad4d399b5af0398d0874b36d00d668ffd3b534",
+    "tests/maintenance/branch_audit_completion.py": "7ff5f378467f6b1b8dbcae9fd8d7c93019534979e48a4ea961a77c73c027e7d5",
+    "tests/maintenance/branch_audit_mapping.py": "c3966b611d0b70219967761d041cffff01500c96a573255a256bf908d6acc74e",
     "tests/maintenance/branch_coverage_audit.py": "3e82dfa6deefad025532628e48a1715ba621b7cc7bac41f9b5136d9f7107e2f5",
     "tests/maintenance/interface_depth_inventory.py": "212ca04d24244e043898656332db0a73d0d207058f7d26c9cbfb633c20a83280",
     "tests/maintenance/source_identity.py": "14d65a3c776f4d18a52e5d525b58bec55b1fd4710c7870ff1bbbbe3ce4cb9d45",
@@ -215,7 +215,7 @@
     "tests/support/new_condition_completion.py": "ee989f858d4ccacb6b8328ee7b114b4cbbb463f844f950f43fa7665506eda912",
     "tests/support/platform_filesystem.py": "827467a6bb7af0fb74827841fbf8c67b79a020bc0563b4f73504b64fbfb7b95d",
     "tests/support/source_copy_branch_evidence.py": "de255dc11e0cb81e625eb23b1a4c63ac61f61529673b8bf1f609988470ee974a",
-    "tests/support/source_copy_native_evidence.py": "eacfac54551c5f969627b58b0f135d69d9034be7c417a09bd60bbf9945c8b64f",
+    "tests/support/source_copy_native_evidence.py": "ed8c6998a997da60f8a9d862ee487c2ba4fceb4fa026994c8ffe881bbe8d7a04",
     "tests/unit/test_conditional_reference_gateway.py": "a6802e122c7893936d5aa66e73a68605825416d62baf32b97b3e8f3d9c5a14b6",
     "tests/unit/test_field_interface_closure_gateway.py": "8c6d1fb76e830a0f1091f2bb9a178f86a4676fd12d5db150f01e8da073326371",
     "tests/unit/test_gameparameter_class_fields_gateway.py": "92f81472bba7ff5006bffd170e6d502b56ff03ae12dd0d00ed717657830bcada",
@@ -225,7 +225,7 @@
     "tests/unit/test_object_graph_owned_choices_gateway.py": "00f0cbb909ddefb690459ea40b4983b13d18b1534da85ad3dc1f4da2ea5a6668",
     "tests/unit/test_plugin_shareset_gateway.py": "12b278738bb4f4d2b789d41e3734e4b4654313b52bf76cf384a80c5d2d79b9ff",
     "tests/unit/test_source_copy_branch_evidence.py": "f6e6efdf7a359b6a575badf36668782a790bef311265089b3128ed36af6667d6",
-    "tests/unit/test_source_copy_capture.py": "67d431e701ce55f93a2356081d5d32b3658e5c629201194b453c51b661cbc6f1",
+    "tests/unit/test_source_copy_capture.py": "a9ac3e18a075b7cc01fc63d6fafe8ca4705b733a097012223201e837b2dfc184",
     "tests/unit/test_source_copy_modern_collector.py": "bb57de305574935a7a0ca80bbe85aa5fc2d135fca37f7ef176b74bce908db3e2",
     "tests/unit/test_source_copy_repeated_fixture.py": "e581b38eb4e89720e90b618c0bed05e788af5f7995f013b3a60be12877e82ee6",
     "tests/unit/test_source_copy_saved_continuation_gateway.py": "c06386ee2205bc1c06925aa4f11a74c4437585bda111a5b0849a3662c53732f3",
@@ -1675,13 +1675,13 @@
     },
     "docs/interface-depth-inventory.json": {
       "captured_sha256": "881b3737308e0654e0119a903a10e62e75a5d7ce15a5be8e8249ca9646d60636",
-      "current_sha256": "81f3fb01bd917a917af63207da200ab0ad31aa86b40bfd2c07c85688576dfc8a",
-      "reason": "Reviewed097273ec regenerates45 named-operation references/2 interned argument records and source seals, retaining all897 native rows/218 field records/owners/classifications. Accounting artifact after-seal only; native Source facts unchanged."
+      "current_sha256": "619f5d540d0266a7fb1eb325ac8439781e32c1074b21419dbab185b67e74b374",
+      "reason": "Reviewed097273ec regenerates45 named-operation references/2 interned argument records and source seals, retaining all897 native rows/218 field records/owners/classifications. Accounting artifact after-seal only; native Source facts unchanged. Followup: Reviewed UI15252 publishes accepted #188/#189 wrapper completion with native limitations; stable native row/field identities and Source execution unchanged. Current accounting artifact only."
     },
     "docs/interface-depth-review-policy.json": {
       "captured_sha256": "cab3a35d37245862c0128a3d02731f1b7faa5b5ee483490846db9162513408a9",
-      "current_sha256": "e5af44e84c5a65d39ba9eeea3dee5f46a77bc522d6389f81cca849db0dc0cae1",
-      "reason": "Reviewed097273ec changes only4 authoritative parser/operation/continuation/typed source seals; deep-interface invariants and owners/dispositions unchanged. This is current accounting publication metadata, not new Source execution."
+      "current_sha256": "1184a48181cc28c73c2168f5b375c5c014ba9144a78b7cbd44eb1f260355b70e",
+      "reason": "Reviewed097273ec changes only4 authoritative parser/operation/continuation/typed source seals; deep-interface invariants and owners/dispositions unchanged. This is current accounting publication metadata, not new Source execution. Followup: Reviewed UI15252 updates the matching completion/source policy seals with accepted wrapper/native boundaries; no Source execution delta."
     },
     "skills/waapi-skill/resources/manifest/typed-request-surface.json": {
       "captured_sha256": "02ae01f17c25e8a291f6492c877e6d10c3d96867033611d96627cfe6aae5169a",
@@ -1705,13 +1705,13 @@
     },
     "tests/maintenance/branch_audit_completion.py": {
       "captured_sha256": "e5ab72ba26cf4f392b8982120fb91bb1622241ee42afca8272453a524a9c20cf",
-      "current_sha256": "905233005d68383579b02394085864da340cf46f43ee383f9d178e0d6b4c1711",
-      "reason": "Candidate requirements source uses the shared semantic projection only; full category and representative completion checks retain their complete identities."
+      "current_sha256": "7ff5f378467f6b1b8dbcae9fd8d7c93019534979e48a4ea961a77c73c027e7d5",
+      "reason": "Candidate requirements source uses the shared semantic projection only; full category and representative completion checks retain their complete identities. Followup: Reviewed metadata8c5a50 current-only semantic requirements/Git ownership bridge preserves raw historical R51/R54/R55 maps, and keeps Source category and representative admission exact. Accounting helper change only."
     },
     "tests/maintenance/branch_audit_mapping.py": {
       "captured_sha256": "b69341d96185b92127751aafd3bcdf3914be391660c46af8c61dae1b2facd4ea",
-      "current_sha256": "c478ef9bd0e45bd78ace24da0cad4d399b5af0398d0874b36d00d668ffd3b534",
-      "reason": "Bounded candidate-independent requirements projection preserves Source policy/current mapping/immutable facts; full mapping/predecessor/protected metadata admission remains exact."
+      "current_sha256": "c3966b611d0b70219967761d041cffff01500c96a573255a256bf908d6acc74e",
+      "reason": "Bounded candidate-independent requirements projection preserves Source policy/current mapping/immutable facts; full mapping/predecessor/protected metadata admission remains exact. Followup: Reviewed metadata8c5a50 supplies optional immutable Git-owned index to existing Source identity resolver; reviewed UI15252 changes two accepted wrapper finding strings. P2 canonical-POSIX read guard rejects raw descriptor aliases before filesystem reads. Full mapping admission remains independent."
     },
     "tests/maintenance/branch_coverage_audit.py": {
       "captured_sha256": "6a7046d2b66fdeb8718b870e85457d59043e3deaf66f46f4f4ef09a2d5543a39",
@@ -1730,8 +1730,8 @@
     },
     "tests/support/source_copy_native_evidence.py": {
       "captured_sha256": "94b2dfca59e04a63c5e986c620412a9616fba060d482dccaed58e77611788111",
-      "current_sha256": "eacfac54551c5f969627b58b0f135d69d9034be7c417a09bd60bbf9945c8b64f",
-      "reason": "Qualified accounting route separates immutable88a6 historical review/context from exact explained current execution after-map; direct/current successor guards unchanged. Publication requirements identity cut is limited to the declared derived descriptor fields; complete final admission seals remain."
+      "current_sha256": "ed8c6998a997da60f8a9d862ee487c2ba4fceb4fa026994c8ffe881bbe8d7a04",
+      "reason": "Qualified accounting route separates immutable88a6 historical review/context from exact explained current execution after-map; direct/current successor guards unchanged. Publication requirements identity cut is limited to the declared derived descriptor fields; complete final admission seals remain. Followup: P2 canonical-POSIX guard on actual Source context descriptors rejects alias reads before filesystem access. Single review pin remains normalized by the existing exact-literal mechanism; historical captures/reviews and direct current validation remain unchanged."
     },
     "tests/unit/test_field_interface_closure_gateway.py": {
       "captured_sha256": "12743d4ff7c31a2f05644f60b82a942c423c6b0e30db2147f686bef44467bf10",
@@ -1750,8 +1750,8 @@
     },
     "tests/unit/test_source_copy_capture.py": {
       "captured_sha256": "ceece769cefd6af10803de9247689571ae878041a0e06fea15ec5701d98a0e95",
-      "current_sha256": "67d431e701ce55f93a2356081d5d32b3658e5c629201194b453c51b661cbc6f1",
-      "reason": "Bounded actual2022 Source packet/current Object mapping/publication reread and tamper regressions; no producer/capture behavior change."
+      "current_sha256": "a9ac3e18a075b7cc01fc63d6fafe8ca4705b733a097012223201e837b2dfc184",
+      "reason": "Bounded actual2022 Source packet/current Object mapping/publication reread and tamper regressions; no producer/capture behavior change. Followup: P2 actual sealed-mapping and actual Source-context alias negatives exercise canonical-path read guards; existing real packet/publication/tail controls retained. No capture/collector behavior change."
     }
   }
 }
