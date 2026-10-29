@@ -366,9 +366,11 @@ accept functional wrapper completion. The
 [no-further-native reaffirmation](https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116)
 retains the window failures and consumed startup BLOCKED attempt. The previous
 `authoring-*-partial` policy rationales incorrectly treated the retained native
-uncertainties as unfinished caller-interface migration. They are replaced by
-`authoring-layout-closed-wrapper` and `authoring-model-closed-wrapper`, each with
-its own exact completed-family seal; the eight historical seals remain unchanged.
+uncertainties as unfinished caller-interface migration. Their stable family IDs
+`authoring-layout-partial` and `authoring-model-partial` are retained for branch
+producer compatibility; each now has its own exact completed-family seal. The
+legacy ID spelling is not the current disposition. The eight historical seals
+remain unchanged.
 The completed ticket blueprints/issue rollups are removed through the existing
 policy mechanism. No native input/effect/delivery or cleanup proof is added.
 

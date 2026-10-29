@@ -3535,7 +3535,7 @@
   "completed_family_seals": [
     {
       "github_issue": 188,
-      "id": "authoring-layout-closed-wrapper",
+      "id": "authoring-layout-partial",
       "row_count": 30,
       "rows": [
         "2024.1|function|ak.wwise.ui.layout.dockView",
@@ -3573,7 +3573,7 @@
     },
     {
       "github_issue": 189,
-      "id": "authoring-model-closed-wrapper",
+      "id": "authoring-model-partial",
       "row_count": 18,
       "rows": [
         "2024.1|function|ak.wwise.ui.model.createHandle",
@@ -174747,7 +174747,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 897
   },
-  "inventory_sha256": "dc1299dddce8eb80d6d9cb1757761dde11285395042490926ccb28ee88bf1a12",
+  "inventory_sha256": "f2ec456e51f759a8c863cca9a9a403f7061a289acce15f3f76124f39ad3f5fcf",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -194953,7 +194953,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -194986,7 +194986,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -195020,7 +195020,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -195054,7 +195054,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -195088,7 +195088,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -195122,7 +195122,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195155,7 +195155,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -195189,7 +195189,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -195223,7 +195223,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -195257,7 +195257,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195290,7 +195290,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195323,7 +195323,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195356,7 +195356,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195389,7 +195389,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195422,7 +195422,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195455,7 +195455,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195488,7 +195488,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195521,7 +195521,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195554,7 +195554,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195686,7 +195686,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195719,7 +195719,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195752,7 +195752,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -195785,7 +195785,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -202450,7 +202450,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -202483,7 +202483,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -202516,7 +202516,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -202550,7 +202550,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -202584,7 +202584,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -202618,7 +202618,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -202652,7 +202652,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -202685,7 +202685,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -202719,7 +202719,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -202753,7 +202753,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
@@ -202787,7 +202787,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -202820,7 +202820,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -202853,7 +202853,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -202886,7 +202886,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -202919,7 +202919,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -202952,7 +202952,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
-      "classification": "authoring-layout-closed-wrapper",
+      "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -202985,7 +202985,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -203018,7 +203018,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -203051,7 +203051,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -203084,7 +203084,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -203117,7 +203117,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -203249,7 +203249,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -203282,7 +203282,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -203315,7 +203315,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
@@ -203348,7 +203348,7 @@
     },
     {
       "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
-      "classification": "authoring-model-closed-wrapper",
+      "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"

@@ -137,7 +137,7 @@
   ],
   "native_lane_rules": [
     {
-      "id": "authoring-layout-closed-wrapper",
+      "id": "authoring-layout-partial",
       "disposition": "already_deep",
       "owner_issue": null,
       "match": {
@@ -164,7 +164,7 @@
       "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate."
     },
     {
-      "id": "authoring-model-closed-wrapper",
+      "id": "authoring-model-partial",
       "disposition": "already_deep",
       "owner_issue": null,
       "match": {
@@ -282,12 +282,12 @@
   ],
   "ticket_blueprints": {},
   "completed_family_seals": {
-    "authoring-layout-closed-wrapper": {
+    "authoring-layout-partial": {
       "github_issue": 188,
       "row_count": 30,
       "rows_sha256": "ce35bc537d44419f735e74285ed52659c3483e1037dde5d085013e198be98c28"
     },
-    "authoring-model-closed-wrapper": {
+    "authoring-model-partial": {
       "github_issue": 189,
       "row_count": 18,
       "rows_sha256": "e8e9e05a471620cedbc3f55c6d77fc082e5b9f1a7411b87ebb27c9ceaf46ca88"
