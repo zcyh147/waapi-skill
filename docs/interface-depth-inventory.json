@@ -3534,6 +3534,70 @@
   ],
   "completed_family_seals": [
     {
+      "github_issue": 188,
+      "id": "authoring-layout-partial",
+      "row_count": 30,
+      "rows": [
+        "2024.1|function|ak.wwise.ui.layout.dockView",
+        "2024.1|function|ak.wwise.ui.layout.getCurrentLayoutName",
+        "2024.1|function|ak.wwise.ui.layout.getElementRectangle",
+        "2024.1|function|ak.wwise.ui.layout.getLayout",
+        "2024.1|function|ak.wwise.ui.layout.getLayoutNames",
+        "2024.1|function|ak.wwise.ui.layout.getOrCreateView",
+        "2024.1|function|ak.wwise.ui.layout.getViewHandle",
+        "2024.1|function|ak.wwise.ui.layout.getViewInstances",
+        "2024.1|function|ak.wwise.ui.layout.getViewTypes",
+        "2024.1|function|ak.wwise.ui.layout.moveSplitter",
+        "2024.1|function|ak.wwise.ui.layout.removeLayout",
+        "2024.1|function|ak.wwise.ui.layout.setLayout",
+        "2024.1|function|ak.wwise.ui.layout.switchLayout",
+        "2024.1|function|ak.wwise.ui.layout.undockView",
+        "2025.1|function|ak.wwise.ui.layout.closeView",
+        "2025.1|function|ak.wwise.ui.layout.dockView",
+        "2025.1|function|ak.wwise.ui.layout.getCurrentLayoutName",
+        "2025.1|function|ak.wwise.ui.layout.getElementRectangle",
+        "2025.1|function|ak.wwise.ui.layout.getLayout",
+        "2025.1|function|ak.wwise.ui.layout.getLayoutNames",
+        "2025.1|function|ak.wwise.ui.layout.getOrCreateView",
+        "2025.1|function|ak.wwise.ui.layout.getViewHandle",
+        "2025.1|function|ak.wwise.ui.layout.getViewInstances",
+        "2025.1|function|ak.wwise.ui.layout.getViewTypes",
+        "2025.1|function|ak.wwise.ui.layout.moveSplitter",
+        "2025.1|function|ak.wwise.ui.layout.removeLayout",
+        "2025.1|function|ak.wwise.ui.layout.resetLayouts",
+        "2025.1|function|ak.wwise.ui.layout.setLayout",
+        "2025.1|function|ak.wwise.ui.layout.switchLayout",
+        "2025.1|function|ak.wwise.ui.layout.undockView"
+      ],
+      "rows_sha256": "ce35bc537d44419f735e74285ed52659c3483e1037dde5d085013e198be98c28"
+    },
+    {
+      "github_issue": 189,
+      "id": "authoring-model-partial",
+      "row_count": 18,
+      "rows": [
+        "2024.1|function|ak.wwise.ui.model.createHandle",
+        "2024.1|function|ak.wwise.ui.model.destroyHandle",
+        "2024.1|function|ak.wwise.ui.model.getState",
+        "2024.1|function|ak.wwise.ui.model.registerWafm",
+        "2024.1|function|ak.wwise.ui.model.setState",
+        "2024.1|function|ak.wwise.ui.signal.emit",
+        "2024.1|function|ak.wwise.ui.window.close",
+        "2024.1|function|ak.wwise.ui.window.create",
+        "2024.1|function|ak.wwise.ui.window.present",
+        "2025.1|function|ak.wwise.ui.model.createHandle",
+        "2025.1|function|ak.wwise.ui.model.destroyHandle",
+        "2025.1|function|ak.wwise.ui.model.getState",
+        "2025.1|function|ak.wwise.ui.model.registerWafm",
+        "2025.1|function|ak.wwise.ui.model.setState",
+        "2025.1|function|ak.wwise.ui.signal.emit",
+        "2025.1|function|ak.wwise.ui.window.close",
+        "2025.1|function|ak.wwise.ui.window.create",
+        "2025.1|function|ak.wwise.ui.window.present"
+      ],
+      "rows_sha256": "e8e9e05a471620cedbc3f55c6d77fc082e5b9f1a7411b87ebb27c9ceaf46ca88"
+    },
+    {
       "github_issue": 89,
       "id": "generic-cli-console",
       "row_count": 65,
@@ -174683,7 +174747,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 897
   },
-  "inventory_sha256": "cc77b7ff838f9dd6148cae1b58e4f7b4cd3f0c4f6f1f64ce1874dbb30f90e5a4",
+  "inventory_sha256": "f2ec456e51f759a8c863cca9a9a403f7061a289acce15f3f76124f39ad3f5fcf",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -194888,13 +194952,13 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "26ee1be1c4363d5f03cba481e719e07fd0b2b5b025ac5677372ef47dc4dd4603",
       "field_contract_sha256": "0df7537fddd2fa8af68fcaa22c2651bb3ea732930f80a1f483deb21d489190db",
       "host": "wwise-authoring",
@@ -194914,21 +194978,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "3f8b83e28a1943a27487510cbb04f1df845d876ec4390ea994322d833e5772de",
       "uri": "ak.wwise.ui.layout.dockView",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "ee2e34e1c582385dc8fcfeaed7f6795a1c61af080400d085fe5d679bb7a5b67f",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-authoring",
@@ -194948,21 +195012,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "e27f85da443119045960314bc0a167e11cecb46e43e072368a043cd879a37460",
       "uri": "ak.wwise.ui.layout.getCurrentLayoutName",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "6ee587d507363de21d0f01a5d88ba0e86ff27632b68995f9a356eb18c376109b",
       "field_contract_sha256": "d674220a1a095ce1d47cc02d26acd064f1e042209a02c1a19df4c712be08dd8c",
       "host": "wwise-authoring",
@@ -194982,21 +195046,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "53c4c5d4a0262e489e6c17c22ba31e0a515030889a86e1f75e456dcd04bb314f",
       "uri": "ak.wwise.ui.layout.getElementRectangle",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "49372e88c4c7803d419495588fcccd293c5e12e399d221477d0ec9885ccd0fbf",
       "field_contract_sha256": "bb935168759ad4c1aa9ab3262815764ac395225366e4993ba434bf5f2091933c",
       "host": "wwise-authoring",
@@ -195016,21 +195080,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "14893302243e7da4686b59998be43da9ea9e18557060fb2a1e2fe8f2a80db788",
       "uri": "ak.wwise.ui.layout.getLayout",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "dbc77385694dd1f0a67793cb27a04c4ea46527962a3b2936448d75c00d7059f7",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-authoring",
@@ -195050,20 +195114,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "8abc5c244886f6ba46dd219f025f4c0e75549e6d46a1359fcd1bec12fdc44b59",
       "uri": "ak.wwise.ui.layout.getLayoutNames",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "ea1d96bc716e06cb54a922031b9de18d3f6a3554c69e04e639771c3eb386bb5a",
       "field_contract_sha256": "a0f421bd8b50bb5f3a807846e58f1976908b0f3418f4a44707a3b816ec3bc0c7",
       "host": "wwise-authoring",
@@ -195083,21 +195147,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "7c7cf90a6219b0ecdeb4e7d44abd878a8980feebc5ae2564858393130cc74e4d",
       "uri": "ak.wwise.ui.layout.getOrCreateView",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "a830bb09881de09ef27886277502196dc0df6f10d5778722104d2fc681e57b52",
       "field_contract_sha256": "923acb046868126421b5a0a8f9b71d6e3f88bbf9e4d9ec1756240a6cc0ce3c65",
       "host": "wwise-authoring",
@@ -195117,21 +195181,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "fa65797b4a242e4d9bca5383024149df64ca13a2bb4eb676dbd01de19c4730ab",
       "uri": "ak.wwise.ui.layout.getViewHandle",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "5187962bbaf27a9c628900ef724583d351731dee661f49301e0311785af0ec32",
       "field_contract_sha256": "bb935168759ad4c1aa9ab3262815764ac395225366e4993ba434bf5f2091933c",
       "host": "wwise-authoring",
@@ -195151,21 +195215,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "7f90e37164e6832cde50e3b2f75ef87b54735dc9026f9abd1c31f0e42802e8ba",
       "uri": "ak.wwise.ui.layout.getViewInstances",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "d0bb3d7372759a1e21f2db23444e84d11119ab87640ffaa4d9b39d0e193ed260",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-authoring",
@@ -195185,20 +195249,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "f0e7d91f0becb1dc68bd400fbe4db465420b607000197c6b0846065b38430bcc",
       "uri": "ak.wwise.ui.layout.getViewTypes",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "ed6b7d37317f27ec0a0e0697c5fb842b5894697c666f417b06e10226548b0ad1",
       "field_contract_sha256": "731b3b732c732364e9d0df409e165b70f608d52cbaab542df97bcf9ab5be8d1c",
       "host": "wwise-authoring",
@@ -195218,20 +195282,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "6bde605bdb5c00386cfae03a1c482bf2e3f9b5d6c96040cec0639b1b271940b3",
       "uri": "ak.wwise.ui.layout.moveSplitter",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "20f92c2985dcecb4eb75a93a0c7aa340b7c620e79465cbdb8ae89180836c084d",
       "field_contract_sha256": "eec51f5e2eb971ebdb5bde4d87c688501b4c7a4fe154937ca2200b893973ab19",
       "host": "wwise-authoring",
@@ -195251,20 +195315,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "2487a853cb9188aea76e59f1dd8f5dfb6821081dcf39896d8952c9bf40ad7509",
       "uri": "ak.wwise.ui.layout.removeLayout",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "94ba5d13c6331c039425a980a4424cfa8e6d6ded3983504c6445a2d25296f856",
       "field_contract_sha256": "846b52264b09c6bfefe8546c2fc6e078f10fec999cf79c19a2394652f4b2ba81",
       "host": "wwise-authoring",
@@ -195284,20 +195348,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "32ae4afd74a9b546445096d2766d35e3ffaf60b6d6e4b2a83e2331e742c2c6e7",
       "uri": "ak.wwise.ui.layout.setLayout",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "a294f3e619dad582a7ee4f31d3a92baca1753d629a694233f85838f63e8a700f",
       "field_contract_sha256": "eec51f5e2eb971ebdb5bde4d87c688501b4c7a4fe154937ca2200b893973ab19",
       "host": "wwise-authoring",
@@ -195317,20 +195381,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "1860b63155ffc2e02201cdf1330d038a30f998d38f75c3401e4cd564b1bc9305",
       "uri": "ak.wwise.ui.layout.switchLayout",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "ccdddb2a3761baa17359a5c02425ed312acd86612ad105f21eb343ad08968793",
       "field_contract_sha256": "54e2ef673a1d612b17c60c2aef7c73c54b2f58fa6865ded1d339d2bcbd77f061",
       "host": "wwise-authoring",
@@ -195350,20 +195414,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "22b298a7c0068aca4731061a9d157315b881da5ab2a0681ea86269d9abc09edf",
       "uri": "ak.wwise.ui.layout.undockView",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "485bfd894ed145546236b957475f1fdb90f6f2ca55c4ed2584f7965873aa8a68",
       "field_contract_sha256": "6d0a58b675341a2ad720291d28972d010bfd4a42c97c92d0e43ec45b78d08b25",
       "host": "wwise-authoring",
@@ -195383,20 +195447,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "6cb9941396bafdda738cd2afb28bdcc3e2e2e50fbf8a837044f6f467f2f9105e",
       "uri": "ak.wwise.ui.model.createHandle",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "8d687472043d04bf2ef460cced0e4119911f2045f2c04d97e62e71566c45f919",
       "field_contract_sha256": "16fdbe3ce56dd0f05e5884e18eb8c1147d9454fec67f3c8eac06c05ef975a848",
       "host": "wwise-authoring",
@@ -195416,20 +195480,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "5e3e61d11d95a97ce23500672c5f81486f55fb80e469c749d0f15cdd9932f0f3",
       "uri": "ak.wwise.ui.model.destroyHandle",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "6e41db6f51b43b398fd20d2ef15bc5910d94b23d9fe952ab562e90cf0bfd9c6b",
       "field_contract_sha256": "dc00a376f6e81d69c0c7706441f974151c3804c876bc00f9d85cef05af14edf3",
       "host": "wwise-authoring",
@@ -195449,20 +195513,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "c1894d0318c32f63b88b1270fa5ac26e573ad3e3570eda164b42feca46c4ab52",
       "uri": "ak.wwise.ui.model.getState",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "15cf5bd0e3b02a6addc8da5d2c990ecfdb7125f2fdf9dc5ac69c1f0daff085ba",
       "field_contract_sha256": "9ea129382514bea37543add483ac1ddfbd95f99d54ff3b4194b266b59f687488",
       "host": "wwise-authoring",
@@ -195482,20 +195546,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "461a3d995a7ffa8ccc075f08e33a94a4e7208c6915eed8908b8529a359912654",
       "uri": "ak.wwise.ui.model.registerWafm",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "54a9bd946b304f42dbf2d129bf9b761c5614ce1e8176038d8371dfd59630237f",
       "field_contract_sha256": "462fe89a47392940a02f3447f851ad2be25923e6f39ead47b2a9172b6d9cd6c2",
       "host": "wwise-authoring",
@@ -195515,7 +195579,7 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "2089b094a98e0b8e8178201d13b3562ab9edc8af0ac686a58c5a40a5cfa7b0c3",
       "uri": "ak.wwise.ui.model.setState",
@@ -195621,13 +195685,13 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "002be5e7d26909a8d957cf65b693e9e19a248eff3760b34cdbc57afa6ed68a5c",
       "field_contract_sha256": "4c35c878647e343579d627f56cfffae8eeafa575d36fb9f0dfb24e765c1bf890",
       "host": "wwise-authoring",
@@ -195647,20 +195711,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "8d87d50be48abbc78777e63811ed988429fd67ff83d5c8205afff8352a4c78e3",
       "uri": "ak.wwise.ui.signal.emit",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "5f87d69f63099147bd6695045f7bca0107a2c3399f6ae5664d1671638fea8376",
       "field_contract_sha256": "c1123fc8ad818998eb52bfe91321005ff2ff6c0d0ab171971863a8f926b704b4",
       "host": "wwise-authoring",
@@ -195680,20 +195744,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "f0b5d95000f76a582be11fa7280ad27dfe9f7b2bd62dbadd1dcba7d4d9ea2992",
       "uri": "ak.wwise.ui.window.close",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "d98227af68c2a4d1b0682a89ec879af5643f8a5126f7753aaf7c6272c3ad4197",
       "field_contract_sha256": "29318e482c8e6ab2453becc164ab43d6d480806c0980953ad179e2d1f39f4038",
       "host": "wwise-authoring",
@@ -195713,20 +195777,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "eff9f71509aeb3ded8f9e53e2cf4902a86405546d25083c385d0ccf5b9dc2718",
       "uri": "ak.wwise.ui.window.create",
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "646b165b63415c6eb6e55f2735fc0f29fd46e87ba2d7680eddf0424cfaadf0a2",
       "field_contract_sha256": "c1123fc8ad818998eb52bfe91321005ff2ff6c0d0ab171971863a8f926b704b4",
       "host": "wwise-authoring",
@@ -195746,7 +195810,7 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "84d0d9159c1310588f876c9f49094121c9eb26d8f925386063929332af6b8084",
       "uri": "ak.wwise.ui.window.present",
@@ -202385,13 +202449,13 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "322e68215e6a7f25a231eceda9f4ce8a4ccb5dc27ba18e305d8077e01a1ec7c0",
       "field_contract_sha256": "b875242e1969647f4f9057eb396ffcb1f6a4164ee60d6a5763470a5896333a1b",
       "host": "wwise-authoring",
@@ -202411,20 +202475,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "18d300276d68134db9f0bdb7c228054d90c496f2f516e50a7eeb0988e310bc3d",
       "uri": "ak.wwise.ui.layout.closeView",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "8f2d6a9706f1ccdfce8665abf99b51532055860cfe4578845a60843b0751d6af",
       "field_contract_sha256": "0df7537fddd2fa8af68fcaa22c2651bb3ea732930f80a1f483deb21d489190db",
       "host": "wwise-authoring",
@@ -202444,21 +202508,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "235b10653a6ded9e97b77cffb5f1ef8101b984f80647e926658535dfa203a40d",
       "uri": "ak.wwise.ui.layout.dockView",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "998f9d9892da78f0e5880fe416675466cdb5d7350e195e08ef62385a2aadc06f",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-authoring",
@@ -202478,21 +202542,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "e27f85da443119045960314bc0a167e11cecb46e43e072368a043cd879a37460",
       "uri": "ak.wwise.ui.layout.getCurrentLayoutName",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "f413615498b8b209ca9858f33735e90864de22aae96f2137f8f9b70bb87b4c71",
       "field_contract_sha256": "d674220a1a095ce1d47cc02d26acd064f1e042209a02c1a19df4c712be08dd8c",
       "host": "wwise-authoring",
@@ -202512,21 +202576,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "53c4c5d4a0262e489e6c17c22ba31e0a515030889a86e1f75e456dcd04bb314f",
       "uri": "ak.wwise.ui.layout.getElementRectangle",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "640e6ed51a5b3e9728d9940ba7d0f61c5067d76554d7775445414497732f4802",
       "field_contract_sha256": "bb935168759ad4c1aa9ab3262815764ac395225366e4993ba434bf5f2091933c",
       "host": "wwise-authoring",
@@ -202546,21 +202610,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "14893302243e7da4686b59998be43da9ea9e18557060fb2a1e2fe8f2a80db788",
       "uri": "ak.wwise.ui.layout.getLayout",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "aa098f8e2506d1e925c83780390b6dd486f1024ab288911eadf5802bbe632ed1",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-authoring",
@@ -202580,20 +202644,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "8abc5c244886f6ba46dd219f025f4c0e75549e6d46a1359fcd1bec12fdc44b59",
       "uri": "ak.wwise.ui.layout.getLayoutNames",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "86e85ebed51d3b9c1a5d3cbad079cea17f04b2595257845056e4695964dba4e2",
       "field_contract_sha256": "a0f421bd8b50bb5f3a807846e58f1976908b0f3418f4a44707a3b816ec3bc0c7",
       "host": "wwise-authoring",
@@ -202613,21 +202677,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "b9e22f9c77b690f5fd58df96abf9f54f95de2c2d9ac436e52a9b1089191ce3e9",
       "uri": "ak.wwise.ui.layout.getOrCreateView",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "e9323658904f305433e7a5e31d6e8a3ea38a7ae8067d601c27d0d87c5f32d74e",
       "field_contract_sha256": "923acb046868126421b5a0a8f9b71d6e3f88bbf9e4d9ec1756240a6cc0ce3c65",
       "host": "wwise-authoring",
@@ -202647,21 +202711,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "fa65797b4a242e4d9bca5383024149df64ca13a2bb4eb676dbd01de19c4730ab",
       "uri": "ak.wwise.ui.layout.getViewHandle",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "116595b54c3e3eac78a1db6415438643c53cc817ba5d91f02e2e73d7845ca71d",
       "field_contract_sha256": "bb935168759ad4c1aa9ab3262815764ac395225366e4993ba434bf5f2091933c",
       "host": "wwise-authoring",
@@ -202681,21 +202745,21 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "7f90e37164e6832cde50e3b2f75ef87b54735dc9026f9abd1c31f0e42802e8ba",
       "uri": "ak.wwise.ui.layout.getViewInstances",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
         "request-schema",
         "layout-read"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "8d7c87c700a7ade31944f3d139d3a1a445a875b6ebbf6ab8c9ee50c14a4b34da",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-authoring",
@@ -202715,20 +202779,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "f0e7d91f0becb1dc68bd400fbe4db465420b607000197c6b0846065b38430bcc",
       "uri": "ak.wwise.ui.layout.getViewTypes",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "b0df5ba59ed89703840589b86c6e751b4a78d43a134b79ae1109e7ac29ebd196",
       "field_contract_sha256": "731b3b732c732364e9d0df409e165b70f608d52cbaab542df97bcf9ab5be8d1c",
       "host": "wwise-authoring",
@@ -202748,20 +202812,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "6bde605bdb5c00386cfae03a1c482bf2e3f9b5d6c96040cec0639b1b271940b3",
       "uri": "ak.wwise.ui.layout.moveSplitter",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "03bc86f0d4433cf48f19a5049bfbc683d5fe5368af9caae3fe3931fdaa55eb3e",
       "field_contract_sha256": "eec51f5e2eb971ebdb5bde4d87c688501b4c7a4fe154937ca2200b893973ab19",
       "host": "wwise-authoring",
@@ -202781,20 +202845,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "2487a853cb9188aea76e59f1dd8f5dfb6821081dcf39896d8952c9bf40ad7509",
       "uri": "ak.wwise.ui.layout.removeLayout",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "e2b46967c963e7f1cbe01d2468096265aa64836834d970a2836f33407230e2c8",
       "field_contract_sha256": "284a15ed323214863c252c1a111c8d0dcfe38b28cec322f4905411d96638112f",
       "host": "wwise-authoring",
@@ -202814,20 +202878,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "5dd712e76fe57bc00c997c95aa7d97b8dccc753713fa328a762becb5f32fbfd5",
       "uri": "ak.wwise.ui.layout.resetLayouts",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "2d7462c569f17fdcc2f1fc74ee80453c722f4b023526f2c081a8066bbd61b088",
       "field_contract_sha256": "846b52264b09c6bfefe8546c2fc6e078f10fec999cf79c19a2394652f4b2ba81",
       "host": "wwise-authoring",
@@ -202847,20 +202911,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "32ae4afd74a9b546445096d2766d35e3ffaf60b6d6e4b2a83e2331e742c2c6e7",
       "uri": "ak.wwise.ui.layout.setLayout",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "709b8eba750030600057892b1d0e08bb1f9d77924a3df0e5a220e08d3f0ebf67",
       "field_contract_sha256": "eec51f5e2eb971ebdb5bde4d87c688501b4c7a4fe154937ca2200b893973ab19",
       "host": "wwise-authoring",
@@ -202880,20 +202944,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "1860b63155ffc2e02201cdf1330d038a30f998d38f75c3401e4cd564b1bc9305",
       "uri": "ak.wwise.ui.layout.switchLayout",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #188 and the user-approved 2026-10-27 lightweight bounded-interface policy (docs/plans/full-waapi-coverage/LAYOUT_CONSTRUCTION.md, bounded functional closeout; https://github.com/zcyh147/waapi-skill/issues/188#issuecomment-6433636019). Seven closed reads and seven closed mutations on 2024.1, plus close/reset on 2025.1, cover all 30 exact applicable rows. The Gateway derives native envelopes, generated constructor IDs, scoped layout/view/element identities, docking topology and splitter axis; automatic Authoring-host/version detection, configuration/session/project binding, modification policies, immutable Preview, drift checks, execute-once and bounded independent readbacks remain required. All satisfiable named input mechanisms are wrapped within the disclosed Gateway capacities; no raw request escape is exposed. The pinned Splitter contradiction and OneOf/sidebar/ViewHolder issues, output-only/read-versus-input differences, height/sidebar/frontend/arrangement/reset uncertainty and original R1/R2 failures remain unchanged. Reset retains result-schema-only strength and business_state_verified=false. This seal records functional wrapper depth only: native input acceptance/effects are not independently established, native absence is not inferred, and no native PASS or historical host/UI family credit is transferred. Further vendor QA is not required for this accepted scope; #195 combined gates remain separate.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "e30fc4847b157bd18f396c48f04a617b042ead164cbaee80fd53776ad95e55cb",
       "field_contract_sha256": "54e2ef673a1d612b17c60c2aef7c73c54b2f58fa6865ded1d339d2bcbd77f061",
       "host": "wwise-authoring",
@@ -202913,20 +202977,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 188,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "b98c44e6620cee4d291c88d5d1973b9af884fcc1e14ca8f9074168c24fa703da",
       "uri": "ak.wwise.ui.layout.undockView",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "ff3807595f192fb8dbb0e3fb0e61678d9ccda7ca86645323e0a5f9ebdcc04ec5",
       "field_contract_sha256": "6d0a58b675341a2ad720291d28972d010bfd4a42c97c92d0e43ec45b78d08b25",
       "host": "wwise-authoring",
@@ -202946,20 +203010,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "6cb9941396bafdda738cd2afb28bdcc3e2e2e50fbf8a837044f6f467f2f9105e",
       "uri": "ak.wwise.ui.model.createHandle",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "bc426d9b5ef40941c4055db63846632dcb15f682d08a00ef021fba3674fa2dce",
       "field_contract_sha256": "16fdbe3ce56dd0f05e5884e18eb8c1147d9454fec67f3c8eac06c05ef975a848",
       "host": "wwise-authoring",
@@ -202979,20 +203043,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "5e3e61d11d95a97ce23500672c5f81486f55fb80e469c749d0f15cdd9932f0f3",
       "uri": "ak.wwise.ui.model.destroyHandle",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "b9c403c249fd6a9514d04235e4b4aad205e0917342dfcd59789e1e589e6db9a8",
       "field_contract_sha256": "dc00a376f6e81d69c0c7706441f974151c3804c876bc00f9d85cef05af14edf3",
       "host": "wwise-authoring",
@@ -203012,20 +203076,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "c1894d0318c32f63b88b1270fa5ac26e573ad3e3570eda164b42feca46c4ab52",
       "uri": "ak.wwise.ui.model.getState",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "a69c208c721aa4813659fc920c0e5b19cb1a302e7c18943c25e0aad042cd289b",
       "field_contract_sha256": "213a150e2ef8bda5204c6a2b8884e9d9c9cc8682509e51450884d92be96a6e5e",
       "host": "wwise-authoring",
@@ -203045,20 +203109,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "461a3d995a7ffa8ccc075f08e33a94a4e7208c6915eed8908b8529a359912654",
       "uri": "ak.wwise.ui.model.registerWafm",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "bc0b4003ed960825eee4d341ef1b2ba0825b423a957136c72698709460fba5ad",
       "field_contract_sha256": "462fe89a47392940a02f3447f851ad2be25923e6f39ead47b2a9172b6d9cd6c2",
       "host": "wwise-authoring",
@@ -203078,7 +203142,7 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "2089b094a98e0b8e8178201d13b3562ab9edc8af0ac686a58c5a40a5cfa7b0c3",
       "uri": "ak.wwise.ui.model.setState",
@@ -203184,13 +203248,13 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "3c426cf528f9199cb880d6bc1c2bcea330b345c4c05ce842bcf6f408ee0482a8",
       "field_contract_sha256": "4c35c878647e343579d627f56cfffae8eeafa575d36fb9f0dfb24e765c1bf890",
       "host": "wwise-authoring",
@@ -203210,20 +203274,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "8d87d50be48abbc78777e63811ed988429fd67ff83d5c8205afff8352a4c78e3",
       "uri": "ak.wwise.ui.signal.emit",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "15589f19bb367333e7f5d12abf7d9a875673415e8250747fb4aae1d68f9a4e26",
       "field_contract_sha256": "c1123fc8ad818998eb52bfe91321005ff2ff6c0d0ab171971863a8f926b704b4",
       "host": "wwise-authoring",
@@ -203243,20 +203307,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "f0b5d95000f76a582be11fa7280ad27dfe9f7b2bd62dbadd1dcba7d4d9ea2992",
       "uri": "ak.wwise.ui.window.close",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "d58c370819306df427ddb30b9c77052352b1470e3117f58a26e7f00009ae1985",
       "field_contract_sha256": "29318e482c8e6ab2453becc164ab43d6d480806c0980953ad179e2d1f39f4038",
       "host": "wwise-authoring",
@@ -203276,20 +203340,20 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "eff9f71509aeb3ded8f9e53e2cf4902a86405546d25083c385d0ccf5b9dc2718",
       "uri": "ak.wwise.ui.window.create",
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Functional wrapper migration completed under #189 and the user-approved 2026-10-27 lightweight policy (docs/plans/full-waapi-coverage/AUTHORING_MODEL_TOPIC_CLOSEOUT.md; https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6434676769; reaffirmed https://github.com/zcyh147/waapi-skill/issues/189#issuecomment-6436636116). Nine closed functions on each captured 2024.1/2025.1 Authoring lane expose bounded typed widget/state construction, named/single templates and immutable Gateway-generated WAFM files; no source-established ordinary input or route omission remains. Native envelopes and identifiers are Gateway-owned; opaque receipts bind configuration/host/build/session/project and active parents. Modification policies, immutable Preview, one execution, drift/file checks, state readback, atomic lifetime retirement and recovery of known creation identities remain required; no arbitrary container GUID, native payload, XML or executable input is admitted. Native effects remain not_independently_verified: window identity failures and the consumed normal-startup BLOCKED attempt are retained; emission is not delivery, consuming cleanup authority is not independent closure proof, and schema-only results retain business_state_verified=false. Templates retire at session end without an invented unregister route. Older captured catalogs omit these exact routes, not all business alternatives. This seal records functional wrapper depth only, grants no native PASS or historical host/UI family credit, and authorizes no further native/Fresh attempt. #195 combined gates remain separate.",
       "classification": "authoring-model-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "63474fbe1ef2156bfa28e82532aa8c64bb947899c7bda30240a4d9608b0f2da9",
       "field_contract_sha256": "c1123fc8ad818998eb52bfe91321005ff2ff6c0d0ab171971863a8f926b704b4",
       "host": "wwise-authoring",
@@ -203309,7 +203373,7 @@
         "shell_quoting": "gateway_owned",
         "wire_type": "gateway_owned"
       },
-      "owner_issue": 189,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "84d0d9159c1310588f876c9f49094121c9eb26d8f925386063929332af6b8084",
       "uri": "ak.wwise.ui.window.present",
@@ -208755,10 +208819,9 @@
     "typed_request_surface_sha256": "36bb15ba469c614c5428ef847214d1466d2b6ee49d012bd405936bc52a997edc"
   },
   "summary": {
-    "migration_ticket_families": 2,
+    "migration_ticket_families": 0,
     "native_dispositions": {
-      "already_deep": 710,
-      "migration_required": 48,
+      "already_deep": 758,
       "prohibited_boundary": 139
     },
     "native_lanes": 897,
@@ -208769,76 +208832,7 @@
     "operation_lanes": 153,
     "unowned_migration_rows": 0
   },
-  "ticket_families": [
-    {
-      "github_issue": 188,
-      "id": "authoring-layout-partial",
-      "row_count": 30,
-      "rows": [
-        "2024.1|function|ak.wwise.ui.layout.dockView",
-        "2024.1|function|ak.wwise.ui.layout.getCurrentLayoutName",
-        "2024.1|function|ak.wwise.ui.layout.getElementRectangle",
-        "2024.1|function|ak.wwise.ui.layout.getLayout",
-        "2024.1|function|ak.wwise.ui.layout.getLayoutNames",
-        "2024.1|function|ak.wwise.ui.layout.getOrCreateView",
-        "2024.1|function|ak.wwise.ui.layout.getViewHandle",
-        "2024.1|function|ak.wwise.ui.layout.getViewInstances",
-        "2024.1|function|ak.wwise.ui.layout.getViewTypes",
-        "2024.1|function|ak.wwise.ui.layout.moveSplitter",
-        "2024.1|function|ak.wwise.ui.layout.removeLayout",
-        "2024.1|function|ak.wwise.ui.layout.setLayout",
-        "2024.1|function|ak.wwise.ui.layout.switchLayout",
-        "2024.1|function|ak.wwise.ui.layout.undockView",
-        "2025.1|function|ak.wwise.ui.layout.closeView",
-        "2025.1|function|ak.wwise.ui.layout.dockView",
-        "2025.1|function|ak.wwise.ui.layout.getCurrentLayoutName",
-        "2025.1|function|ak.wwise.ui.layout.getElementRectangle",
-        "2025.1|function|ak.wwise.ui.layout.getLayout",
-        "2025.1|function|ak.wwise.ui.layout.getLayoutNames",
-        "2025.1|function|ak.wwise.ui.layout.getOrCreateView",
-        "2025.1|function|ak.wwise.ui.layout.getViewHandle",
-        "2025.1|function|ak.wwise.ui.layout.getViewInstances",
-        "2025.1|function|ak.wwise.ui.layout.getViewTypes",
-        "2025.1|function|ak.wwise.ui.layout.moveSplitter",
-        "2025.1|function|ak.wwise.ui.layout.removeLayout",
-        "2025.1|function|ak.wwise.ui.layout.resetLayouts",
-        "2025.1|function|ak.wwise.ui.layout.setLayout",
-        "2025.1|function|ak.wwise.ui.layout.switchLayout",
-        "2025.1|function|ak.wwise.ui.layout.undockView"
-      ],
-      "rows_sha256": "ce35bc537d44419f735e74285ed52659c3483e1037dde5d085013e198be98c28",
-      "scope": "Retain the exact 2024.1/2025.1 layout read and switch rows while #188 resolves native definition interpretation, remaining layout constructors and mutations, public-route validation, and required effect evidence.",
-      "title": "Complete ordinary Authoring layout business contracts and evidence"
-    },
-    {
-      "github_issue": 189,
-      "id": "authoring-model-partial",
-      "row_count": 18,
-      "rows": [
-        "2024.1|function|ak.wwise.ui.model.createHandle",
-        "2024.1|function|ak.wwise.ui.model.destroyHandle",
-        "2024.1|function|ak.wwise.ui.model.getState",
-        "2024.1|function|ak.wwise.ui.model.registerWafm",
-        "2024.1|function|ak.wwise.ui.model.setState",
-        "2024.1|function|ak.wwise.ui.signal.emit",
-        "2024.1|function|ak.wwise.ui.window.close",
-        "2024.1|function|ak.wwise.ui.window.create",
-        "2024.1|function|ak.wwise.ui.window.present",
-        "2025.1|function|ak.wwise.ui.model.createHandle",
-        "2025.1|function|ak.wwise.ui.model.destroyHandle",
-        "2025.1|function|ak.wwise.ui.model.getState",
-        "2025.1|function|ak.wwise.ui.model.registerWafm",
-        "2025.1|function|ak.wwise.ui.model.setState",
-        "2025.1|function|ak.wwise.ui.signal.emit",
-        "2025.1|function|ak.wwise.ui.window.close",
-        "2025.1|function|ak.wwise.ui.window.create",
-        "2025.1|function|ak.wwise.ui.window.present"
-      ],
-      "rows_sha256": "e8e9e05a471620cedbc3f55c6d77fc082e5b9f1a7411b87ebb27c9ceaf46ca88",
-      "scope": "Retain the exact 2024.1/2025.1 closed routes under #189 while native constructor effects, resource cleanup, delivered signals and exact branch evidence remain unresolved.",
-      "title": "Complete owned Authoring model/window/signal behavior and evidence"
-    }
-  ],
+  "ticket_families": [],
   "uniform_migration_invariant": {
     "allowed_final_dispositions": [
       "deep business or domain declaration",
