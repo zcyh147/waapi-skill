@@ -8,6 +8,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from wwise_waapi.canonical import canonical_json
+
 from tests.maintenance import branch_coverage_audit as audit
 from tests.support.metadata_read_branch_evidence import source_seals as metadata_source_seals
 from tests.support.media_pool_branch_evidence import public_read_observation
@@ -1283,8 +1285,8 @@ def metadata_replay_category_inputs(record, replay, context):
             or inputs['historical'] != context['gateway']['argv'] or inputs['replay'] != argv
             or not isinstance(argv, list) or len(argv) != len(prefix) + 1 or argv[:-1] != prefix
             or not isinstance(argv[-1], str) or not argv[-1].startswith('mf1.')
-            or public['selection'] != argv[-1] or public['scope'] != original['scope']
-            or native['uri'] != URI or native['args'] != expected_args or native['options'] != {}
+            or public['selection'] != argv[-1] or canonical_json(public['scope']) != canonical_json(original['scope'])
+            or native['uri'] != URI or canonical_json(native['args']) != canonical_json(expected_args) or native['options'] != {}
             or replay['replayed_original_native_sha256'] != context['native_sha256']
             or json.dumps(native['result'], sort_keys=True, allow_nan=False)
                 != json.dumps(context['native_result'], sort_keys=True, allow_nan=False)):
@@ -1295,7 +1297,8 @@ def metadata_replay_category_inputs(record, replay, context):
     matches = []
     for page in pages:
         payload = page['payload']
-        if payload.get('ok') is not True or payload['agent_result']['scope'] != original['scope']:
+        if (payload.get('ok') is not True
+                or canonical_json(payload['agent_result']['scope']) != canonical_json(original['scope'])):
             raise ValueError('Current metadata selector discovery scope differs')
         matches.extend(row for row in payload['agent_result']['fields'] if row['name'] == field)
     if len(matches) != 1 or matches[0]['selection'] != argv[-1]:

@@ -621,6 +621,7 @@ def read_metadata_run(descriptor, base, *, historical_class=False):
 def validate_r51_metadata_replay(record, branch, candidate, binding, context, base, root, scope_kind, reference_edges):
     """Historical native facts and current program replay, never current native."""
     import json
+    from wwise_waapi.canonical import canonical_json
     from tests.support import metadata_replay_branch_evidence as producer
     prefix = '2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|'
     definition = '/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue'
@@ -665,7 +666,8 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
     # Retained bindings may carry the exact raw inputs; current portable imports
     # use the semantic selector view. Neither form changes receipt validation.
     if (not isinstance(inputs, dict) or set(inputs) != {'historical','replay'}
-            or bound_inputs not in (inputs, semantic_inputs) or inputs['historical'] != context['gateway']['argv']
+            or canonical_json(bound_inputs) not in (canonical_json(inputs), canonical_json(semantic_inputs))
+            or inputs['historical'] != context['gateway']['argv']
             or inputs['replay'] != replay['gateway']['argv']
             or context['native_result']['name'] != field
             or record['replay']['nodeid'] != producer.NODE+'['+producer.CASES[field]+']'):
@@ -728,6 +730,7 @@ def validate_current_class_metadata(record,branch,binding,context,scope_kind):
 def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,root,scope_kind,reference_edges):
     """Original8a native facts plus exact current public replay, never current native."""
     import json
+    from wwise_waapi.canonical import canonical_json
     from tests.support import metadata_replay_branch_evidence as producer
     from tests.maintenance.collect_class_metadata import collection_plan
     cohort=context['cohort'];profile=producer.class_original_profile(cohort)
@@ -765,7 +768,8 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
     semantic_inputs=producer.metadata_replay_category_inputs(record,replay,context)
     # Both accepted binding forms still authenticate the same raw receipts.
     if (record['category_inputs']!=inputs
-            or binding.get('category_inputs',{}).get('live_metadata') not in (inputs,semantic_inputs)):
+            or canonical_json(binding.get('category_inputs',{}).get('live_metadata'))
+                not in (canonical_json(inputs),canonical_json(semantic_inputs))):
         raise ValueError('R54 native and current inputs must bind their own receipts')
     def same(a,b):return json.dumps(a,sort_keys=True,allow_nan=False)==json.dumps(b,sort_keys=True,allow_nan=False)
     native=replay['native_call'];public=replay['gateway']['payload'];original=context['gateway']['payload']['agent_result']

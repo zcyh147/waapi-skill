@@ -1308,3 +1308,42 @@ def test_imported_selection_identity_rejects_forged_view_and_raw_receipts(
         path.write_text(json.dumps(index))
         with pytest.raises(ValueError, match='selector|discovered field'):
             audit.portable_binding_inputs(path, policy)
+
+
+def test_imported_selection_identity_rejects_equal_number_with_wrong_json_type(inventory, tmp_path):
+    path, index, base, attachment, branch = portable_r54_control(tmp_path, inventory)
+    policy = audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')
+    imported, _, _ = audit.portable_binding_inputs(path, policy)
+    binding = imported['bindings'][branch['id']]
+    edges = {row['id']: row for row in inventory['native_coverage']['obligations'] if row['kind'] == 'reference'}
+    def result(changed, descriptor=attachment['evidence']):
+        return completion.evidence_result(descriptor, branch, 'c' * 64, 'live_metadata',
+            'controlled', base, changed, source_root=audit.ROOT, reference_edges=edges)
+    assert result(binding) == ('passed', None)
+    changed = deepcopy(binding)
+    scope = changed['category_inputs']['live_metadata']['replay'][-1]['scope']
+    assert type(scope['resolved']['classId']) is int
+    scope['resolved']['classId'] = float(scope['resolved']['classId'])
+    assert result(changed)[0] == 'missing'
+    record = completion.read_sealed_artifact(attachment['evidence'], base)
+    replay = completion.read_sealed_artifact(record['replay'], base)
+    for damage in ('scope', 'native-argument', 'discovery-scope'):
+        program = deepcopy(replay)
+        if damage == 'scope':
+            value = program['gateway']['payload']['agent_result']['scope']['resolved']
+            value['classId'] = float(value['classId'])
+        elif damage == 'native-argument':
+            program['native_call']['args']['classId'] = float(program['native_call']['args']['classId'])
+        else:
+            value = program['discovery_pages'][0]['payload']['agent_result']['scope']['resolved']
+            value['classId'] = float(value['classId'])
+        changed_record = deepcopy(record)
+        changed_record['replay'] = write(base / 'wrong-type-program.json', program,
+            nodeid=record['replay']['nodeid'])
+        descriptor = write(base / 'wrong-type-record.json', changed_record,
+            nodeid=attachment['evidence']['nodeid'])
+        # Both explicit binding representations must retain the native JSON type.
+        for inputs in (binding['category_inputs']['live_metadata'], record['category_inputs']):
+            changed = deepcopy(binding)
+            changed['category_inputs']['live_metadata'] = deepcopy(inputs)
+            assert result(changed, descriptor)[0] == 'missing', damage
