@@ -8,9 +8,10 @@ from tests.support.source_copy_branch_evidence import dependency_review
 
 SUCCESSOR_REVIEW_PATH = 'tests/fixtures/source-copy/branch-successor-review-195.json'
 SUCCESSOR_REVIEW_SHA256 = '4cd9a81b3d413f46d7ecca6eec191984e338c5b3657b0d4e6955a167dac09a9b'
-ACCOUNTING_REVIEW_PATH = 'tests/fixtures/source-copy/branch-accounting-review-195.json'
-ACCOUNTING_REVIEW_SHA256 = 'd29975974367c1268da5cc0d6f1d14a33ef533d237a7cad777d78a216b7c006c'
+ACCOUNTING_REVIEW_PATH = 'tests/fixtures/source-copy/branch-accounting-review-195-publication.json'
+ACCOUNTING_REVIEW_SHA256 = '7d0cd456c18338e50b43228e62b9de6f2c11b0ea88334f347bba5f9ac4ba13ad'
 ACCOUNTING_READER = 'tests/support/source_copy_native_evidence.py'
+REQUIREMENTS_SOURCE = 'docs/branch-coverage-requirements.json'
 ACCOUNTING_DEPENDENCIES = (
     'tests/support/new_condition_completion.py',
     'tests/unit/test_new_condition_completion_reader.py',
@@ -19,14 +20,20 @@ ACCOUNTING_DEPENDENCIES = (
 )
 
 
-def accounting_source_seals(names):
-    """Seal every byte, normalizing only this review's single digest literal."""
+def accounting_source_seals(names, *, requirements_document=None, mapping_bindings=None):
+    """Seal live sources with the explicit requirements and single-pin projections."""
     import ast
     import hashlib
     from tests.maintenance import branch_coverage_audit as audit
     from tests.support.source_copy_branch_evidence import source_seals
     names = set(names)
     result = source_seals(names)
+    if REQUIREMENTS_SOURCE in names:
+        from tests.maintenance.branch_audit_mapping import requirements_identity_projection
+        document = (audit.load(audit.ROOT / REQUIREMENTS_SOURCE)
+                    if requirements_document is None else requirements_document)
+        result[REQUIREMENTS_SOURCE] = audit.digest(requirements_identity_projection(
+            document, mapping_bindings, root=audit.ROOT))
     if ACCOUNTING_READER not in names:
         raise ValueError('Source accounting closure omits its reader')
     raw = (audit.ROOT / ACCOUNTING_READER).read_bytes()
@@ -70,16 +77,16 @@ def accounting_dependency_review():
     review = json.loads(raw)
     fields = {'contract', 'scope', 'captured_git_candidate', 'captured_candidate_sha256',
               'relevant_sources', 'captured_capture_sources', 'current_accounting_sources',
-              'source_changes', 'additional_sources', 'pin_normalization', 'packets', 'causal_review'}
-    if (set(review) != fields or review['contract'] != 'waapi-skill.source-copy-accounting-review/v1'
+              'source_changes', 'additional_sources', 'pin_normalization', 'packets', 'causal_review',
+              'current_execution_sources', 'execution_source_changes'}
+    if (set(review) != fields or review['contract'] != 'waapi-skill.source-copy-accounting-review/v2'
             or review['scope'] != 'retained-source-program-and-native-accounting-only'
             or review['captured_git_candidate'] != '88a6cbbeccee1b8f5934f61f7b75503e2a084073'
             or review['captured_candidate_sha256'] != '0383d01b4b400a52c94b1f3924a9234915e32a06583c89cd9aaaf8cb628ebdc3'
             or review['relevant_sources'] != successor_dependency_review()['current_sources']
             or set(review['additional_sources']) != set(ACCOUNTING_DEPENDENCIES)
             or len(review['additional_sources']) != len(ACCOUNTING_DEPENDENCIES)
-            or review['pin_normalization'] != {'path': ACCOUNTING_READER,
-                'assignment': 'ACCOUNTING_REVIEW_SHA256', 'normalized_value': '0' * 64}
+            or review['pin_normalization'] != accounting_normalization()
             or not review['causal_review']
             or not isinstance(review['packets'], list) or len(review['packets']) != 5):
         raise ValueError('Complete reviewed Source accounting closure differs')
@@ -96,10 +103,30 @@ def accounting_dependency_review():
             or any(changes[name][key] != value for key, value in row.items())
             for name, row in expected.items())):
         raise ValueError('Source accounting delta is not exact and complete')
+    execution = review['current_execution_sources']
+    before = review['relevant_sources']
+    if not isinstance(execution, dict) or set(execution) != set(before):
+        raise ValueError('Source accounting current execution source set differs')
+    expected_execution = {name: {'captured_sha256': before[name], 'current_sha256': seal}
+                          for name, seal in execution.items() if before[name] != seal}
+    transition = review['execution_source_changes']
+    if (not isinstance(transition, dict) or set(transition) != set(expected_execution)
+            or any(not isinstance(transition[name], dict)
+                or set(transition[name]) != {'captured_sha256', 'current_sha256', 'reason'}
+                or not isinstance(transition[name]['reason'], str) or not transition[name]['reason'].strip()
+                or any(transition[name][key] != value for key, value in row.items())
+                for name, row in expected_execution.items())):
+        raise ValueError('Source accounting execution transition is not exact and explained')
     if (accounting_source_seals(current) != current
-            or source_seals(review['relevant_sources']) != review['relevant_sources']):
+            or source_seals(execution) != execution):
         raise ValueError('Source accounting current dependency changed')
     return review
+
+
+def accounting_normalization():
+    from tests.maintenance.branch_audit_mapping import REQUIREMENTS_IDENTITY_KIND
+    return {'path': ACCOUNTING_READER, 'assignment': 'ACCOUNTING_REVIEW_SHA256', 'normalized_value': '0' * 64,
+            'requirements_source': {'path': REQUIREMENTS_SOURCE, 'semantic_kind': REQUIREMENTS_IDENTITY_KIND}}
 
 
 def _accounting_context(context, base, candidate):
@@ -127,13 +154,36 @@ def _accounting_context(context, base, candidate):
     previous = _portable_source_document(index['source_native_attachments'][0], base)
     if previous.get('contract') != 'waapi-skill.source-copy-native-attachment/v2':
         raise ValueError('Source accounting requires its preserved v2 attachment')
-    old, predecessor = validate_successor_context(previous['successor_context'], base,
-        candidate=review['captured_candidate_sha256'])
+    # Only this exact accounting packet qualifies an old context as history.
+    # Direct v1/v2 validation below continues to require live source equality.
+    old = _portable_source_document(previous['successor_context'], base)
+    historical = successor_dependency_review()
+    fields = {'contract', 'review', 'predecessor', 'original_source_context',
+              'current_candidate_sha256', 'current_sources'}
+    if (set(old) != fields or old['contract'] != 'waapi-skill.source-copy-successor-context/v1'
+            or old['current_candidate_sha256'] != review['captured_candidate_sha256']
+            or old['current_sources'] != review['relevant_sources']
+            or not isinstance(old['review'], dict)
+            or old['review'].get('sha256') != SUCCESSOR_REVIEW_SHA256
+            or _portable_source_document(old['review'], base) != historical
+            or old['predecessor'] not in historical['predecessor_attachments']
+            or old['predecessor'] != previous['predecessor']):
+        raise ValueError('Source accounting historical context/review differs')
+    predecessor = _portable_source_document(old['predecessor'], base)
+    if (set(predecessor) != {'contract', 'branch_ids', 'business_fact_id', 'proof', 'evidence',
+                            'equivalence', 'native_equivalence'}
+            or predecessor['contract'] != 'waapi-skill.source-copy-native-attachment/v1'):
+        raise ValueError('Source accounting original predecessor differs')
+    native = _portable_source_document({key: predecessor['evidence'][key] for key in ('artifact', 'sha256')}, base)
+    original = _portable_source_document(old['original_source_context'], base)
+    if (old['original_source_context'] != native['source_context']
+            or original['current_sources'] != historical['historical_current_sources']):
+        raise ValueError('Source accounting original source context differs')
     if any(previous[name] != predecessor[name] for name in ('proof', 'evidence', 'branch_ids', 'business_fact_id')):
         raise ValueError('Source accounting original native attribution differs')
     return {**old, 'current_candidate_sha256': context['current_candidate_sha256'],
         'captured_candidate_sha256': review['captured_candidate_sha256'], 'accounting_origin': origin,
-        'accounting_attachment': previous}, predecessor
+        'current_execution_sources': review['current_execution_sources'], 'accounting_attachment': previous}, predecessor
 
 
 def successor_dependency_review():
@@ -168,6 +218,8 @@ def _portable_source_document(descriptor, base):
     if not isinstance(descriptor, dict) or set(descriptor) != {'artifact', 'sha256'}:
         raise ValueError('Closed Source successor descriptor required')
     relative = parse_archive_relative_path(descriptor['artifact']).canonical
+    if descriptor['artifact'] != relative:
+        raise ValueError('Source successor descriptor must use canonical POSIX spelling')
     boundary = Path(base).resolve(strict=True)
     path = boundary / relative
     if path.is_symlink() or not path.resolve(strict=True).is_relative_to(boundary):
@@ -308,7 +360,7 @@ def validate_source_equivalence(proof, branch, binding, root, *, evidence_base):
         if proof.get('source_copy_successor_context') != successor:
             raise ValueError('Source successor equivalence context differs')
         context, _ = validate_successor_context(successor, evidence_base, candidate=proof['to_candidate'])
-        current = context['current_sources']
+        current = context.get('current_execution_sources', context['current_sources'])
     elif proof.get('source_copy_successor_context') is not None:
         raise ValueError('Unbound Source successor equivalence')
     review_link = proof.get('source_copy_review', {})
@@ -707,18 +759,8 @@ def _publish_source_accounting_successor(program_index, predecessor, inventory, 
     if predecessor != old_native['predecessor']:
         raise ValueError('Source accounting original predecessor differs')
     requirements = _portable_source_document(old_index['entries'][0]['origin']['requirements'], product_base)
-    old_bindings, base, _ = audit.portable_binding_inputs(program_index, requirements)
-    if base != product_base:
-        raise ValueError('Source accounting original product boundary differs')
     candidate = inventory['native_coverage']['candidate_sha256']
     branches = {row['id']: row for row in inventory['native_coverage']['obligations']}
-    references = {key: row for key, row in branches.items() if row['kind'] == 'reference'}
-    for identity, binding in old_bindings['bindings'].items():
-        for category in ('program', 'native'):
-            if completion.evidence_result(binding['evidence'][category], branches[identity],
-                    review['captured_candidate_sha256'], category, 'product', product_base,
-                    binding, source_root=audit.ROOT, reference_edges=references) != ('passed', None):
-                raise ValueError('Source accounting retained evidence is incomplete')
     portable = destination / 'portable'
     portable.mkdir(parents=True, exist_ok=False)
     def emit(name, value):
@@ -731,11 +773,27 @@ def _publish_source_accounting_successor(program_index, predecessor, inventory, 
         'contract': 'waapi-skill.source-copy-successor-context/v2',
         'review': review_descriptor, 'previous_index': previous_index,
         'current_candidate_sha256': candidate})
+    # Validate the qualified historical packet before transporting its native
+    # metadata. Import its ordinary program projection without asking the
+    # unrelated direct-current v2 path to certify historical execution bytes.
+    validate_successor_context(context_descriptor, product_base, candidate=candidate)
+    bootstrap = {**deepcopy(old_index), 'base': os.path.relpath(product_base, portable)}
+    bootstrap.pop('source_native_attachments')
+    bootstrap_path = portable / 'retained-program-index.json'
+    write_json(bootstrap_path, bootstrap)
+    old_bindings, base, _ = audit.portable_binding_inputs(bootstrap_path, requirements)
+    if base != product_base:
+        raise ValueError('Source accounting original product boundary differs')
+    native_record = _portable_source_document({key: old_native['evidence'][key] for key in ('artifact', 'sha256')}, product_base)
     successor = {**deepcopy(old_native), 'contract': 'waapi-skill.source-copy-native-attachment/v3',
         'successor_context': context_descriptor, 'equivalence': {}, 'native_equivalence': {}, 'program_equivalence': {}}
     for ordinal, (identity, old_binding) in enumerate(old_bindings['bindings'].items()):
         binding = deepcopy(old_binding)
-        binding['source_copy_successor_context'] = context_descriptor
+        binding.update(source_copy_successor_context=context_descriptor,
+            source_copy_native_proof=deepcopy(old_native['proof']),
+            equivalence=deepcopy(old_native['equivalence'][identity]),
+            native_equivalence=deepcopy(old_native['native_equivalence'][identity]),
+            native_observations_sha256={key: value['sha256'] for key, value in native_record['observation_artifacts'].items()})
         semantics = audit.digest(completion.binding_semantics(binding))
         program = _portable_source_document({key: binding['evidence']['program'][key]
                                             for key in ('artifact', 'sha256')}, product_base)
@@ -746,7 +804,7 @@ def _publish_source_accounting_successor(program_index, predecessor, inventory, 
             'branch_id': identity, 'native_shape_sha256': branch['shape_sha256'], 'native_route': branch['route'],
             'evidence_sha256': binding['evidence']['program']['sha256'], 'binding_semantics_sha256': semantics,
             'sources': program['relevant_sources'],
-            'reviewed_reason': 'Retained 88a6 program; exact unchanged execution sources and separately reviewed accounting delta.'})
+            'reviewed_reason': 'Retained 88a6 program; original execution sources stay historical, with an exact separately reviewed current execution/accounting transition.'})
         for kind in ('equivalence', 'native_equivalence'):
             proof = _portable_source_document(old_native[kind][identity], product_base)
             successor[kind][identity] = emit(kind + '-' + str(ordinal) + '.json', {
@@ -759,6 +817,7 @@ def _publish_source_accounting_successor(program_index, predecessor, inventory, 
     index_path = portable / 'index.json'
     write_json(index_path, index)
     imported, _, _ = audit.portable_binding_inputs(index_path, requirements)
+    references = {key: row for key, row in branches.items() if row['kind'] == 'reference'}
     for identity, binding in imported['bindings'].items():
         for category in ('program', 'native'):
             result = completion.evidence_result(binding['evidence'][category], branches[identity], candidate,

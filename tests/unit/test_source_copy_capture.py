@@ -929,7 +929,9 @@ def source_current_mapping_case():
         mapping_inventory['object_routes_sha256'] = audit.digest(mapping_inventory['native_coverage']['routes'])
         case = current_mapping_successor(index, policies, mapping_inventory, mapper,
             output / 'current', selected_code=anchor)
-        case.update(inventory=inventory, anchor=anchor, source_ids=set(policies['branches']))
+        case.update(inventory=inventory, mapping_inventory=mapping_inventory, anchor=anchor,
+                    source_ids=set(policies['branches']), retained_index=old_index,
+                    retained_native=native, retained_policies=policies)
         yield case
 
 
@@ -952,6 +954,370 @@ def test_current_object_mapping_retains_source_categories_but_needs_selected_cur
     assert all({key: value for key, value in binding.items() if key != 'evidence'} ==
         {key: value for key, value in case['attachment']['bindings'][identity].items() if key != 'evidence'}
         for identity, binding in document['bindings'].items())
+
+
+@pytest.mark.parametrize('identity_kind', ('candidate', 'accounting'))
+def test_source_current_publication_identity_stays_stable(source_current_mapping_case, tmp_path, monkeypatch, identity_kind):
+    """Publish a real packet twice, then re-enter the ordinary full-seal readers."""
+    from copy import deepcopy
+    import os
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support import source_copy_native_evidence as source
+    from tests.support import object_completion_mapping as mapper
+    from tests.support.source_copy_branch_evidence import write_json
+    from tests.unit.test_runtime_selected_native_reuse import current_mapping_successor
+    case = source_current_mapping_case
+    canonical_requirements = audit.ROOT / 'docs/branch-coverage-requirements.json'
+    canonical_index = audit.ROOT / 'docs/branch-coverage-evidence-index.json'
+    reader_path = audit.ROOT / source.ACCOUNTING_READER
+    review_path = audit.ROOT / source.ACCOUNTING_REVIEW_PATH
+    reader_bytes = reader_path.read_bytes()
+    review = json.loads(review_path.read_bytes())
+    view = {}
+    original_open = Path.open
+    def published_open(path, *args, **kwargs):
+        return original_open(view.get(path, path), *args, **kwargs)
+    monkeypatch.setattr(Path, 'open', published_open)
+    def publish(selection, number):
+        directory = tmp_path / str(number)
+        directory.mkdir()
+        path = directory / canonical_requirements.name
+        audit.write_requirements(path, selection['requirements'])
+        index = json.loads(selection['index'].read_bytes())
+        index['base'] = os.path.relpath(case['base'], canonical_index.parent)
+        target = directory / canonical_index.name
+        write_json(target, index)
+        view[canonical_requirements] = path
+        view[canonical_index] = target
+        for descriptor in json.loads(path.read_bytes())['parts']:
+            view[canonical_requirements.parent / descriptor['path']] = directory / descriptor['path']
+    publish(case, 0)
+    # This is a test-owned current review, with the real raw captured maps and
+    # only the current requirements after-seal changed to this published scope.
+    required = canonical_requirements.relative_to(audit.ROOT).as_posix()
+    seal = source.accounting_source_seals({required, source.ACCOUNTING_READER})[required]
+    review['current_accounting_sources'][required] = seal
+    review['source_changes'][required] = {'captured_sha256': review['captured_capture_sources'][required],
+        'current_sha256': seal, 'reason': 'Publish this exact bounded current policy; original before bytes remain raw.'}
+    target = tmp_path / 'current-accounting-review.json'
+    descriptor = write_json(target, review)
+    view[review_path] = target
+    current_reader = tmp_path / 'current-accounting-reader.py'
+    current_reader.write_bytes(reader_bytes.replace(source.ACCOUNTING_REVIEW_SHA256.encode(), descriptor['sha256'].encode()))
+    view[reader_path] = current_reader
+    monkeypatch.setattr(source, 'ACCOUNTING_REVIEW_SHA256', descriptor['sha256'])
+    inventory = deepcopy(case['inventory'])
+    inventory['sources'] = {}
+    def identity():
+        if identity_kind == 'candidate':
+            return completion.candidate_identity(audit.ROOT, inventory,
+                inventory['native_coverage']['catalogs'], digest=audit.digest)
+        return source.accounting_source_seals({required, source.ACCOUNTING_READER})[required]
+    expected = identity()
+    candidate = completion.candidate_identity(audit.ROOT, inventory,
+        inventory['native_coverage']['catalogs'], digest=audit.digest)
+    inventory['native_coverage']['candidate_sha256'] = candidate
+    for number in (1, 2):
+        selected_inventory = deepcopy(case['mapping_inventory'])
+        selected_inventory['native_coverage']['candidate_sha256'] = candidate
+        path = source.publish_source_native_successor(case['retained_index'],
+            predecessor=case['retained_native']['predecessor'], inventory=inventory,
+            product_base=case['base'], destination=case['output'] / (identity_kind + '-accounting-' + str(number)),
+            accounting=True)
+        selected = current_mapping_successor(path, case['retained_policies'], selected_inventory, mapper,
+            case['output'] / (identity_kind + '-mapping-' + str(number)), selected_code=case['anchor'])
+        publish(selected, number)
+        assert identity() == expected, identity_kind + ' identity changed after publishing derived Source descriptors'
+        document, base, _ = audit.portable_binding_inputs(selected['index'], audit.load(canonical_requirements))
+        result = completion.evaluate_coverage(audit.ROOT, inventory, document, digest=audit.digest,
+            evidence_base=base, requirements_document=audit.load(canonical_requirements))
+        rows = {row['id']: row for row in result['obligations']}
+        assert all(rows[identity]['evidence_results'][category]['outcome'] == 'passed'
+            for identity in case['source_ids'] for category in ('program', 'native'))
+        assert rows[case['anchor']]['evidence_results']['program']['outcome'] == 'missing'
+        assert not result['completion']['complete']
+
+
+@pytest.mark.parametrize('change', ('policy', 'selected-proof', 'route', 'shape', 'choice',
+    'source-map', 'immutable-proof', 'protected-metadata', 'derived-presence'))
+def test_source_publication_identity_retains_policy_mapping_and_original_facts(source_current_mapping_case, change):
+    from copy import deepcopy
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_native_evidence import accounting_source_seals, ACCOUNTING_READER, REQUIREMENTS_SOURCE
+    case = source_current_mapping_case
+    requirements = deepcopy(case['requirements'])
+    bindings = deepcopy(case['attachment']['bindings'])
+    identity = min(case['source_ids'])
+    mechanism = bindings[identity]['representative_mechanism']
+    review = requirements['representative_mechanisms'][mechanism]
+    inventory = {**case['inventory'], 'sources': {}}
+    def identities():
+        return (completion.candidate_identity(audit.ROOT, inventory,
+            inventory['native_coverage']['catalogs'], digest=audit.digest,
+            requirements_document=requirements, mapping_bindings=bindings),
+            accounting_source_seals({ACCOUNTING_READER, REQUIREMENTS_SOURCE},
+                requirements_document=requirements, mapping_bindings=bindings)[REQUIREMENTS_SOURCE])
+    before = identities()
+    if change == 'policy': requirements['branches'][identity]['reason'] += '; changed policy'
+    elif change == 'selected-proof': review['selected_proofs']['program'] = [identity]
+    elif change == 'route': review['members'][identity]['native_route'] += '-foreign'
+    elif change == 'shape': review['members'][identity]['native_shape_sha256'] = '0' * 64
+    elif change == 'source-map': review['sources']['skills/waapi-skill/scripts/gateway.py'] = '0' * 64
+    else:
+        binding = bindings[identity]
+        if change == 'choice': binding['input']['correspondence']['unreviewed_choice'] = 'different'
+        elif change == 'immutable-proof': binding['source_copy_native_proof']['sha256'] = '0' * 64
+        elif change == 'protected-metadata': binding['native_observations_sha256']['source'] = '0' * 64
+        elif change == 'derived-presence': binding.pop('source_copy_program_equivalence')
+        review['members'][identity]['mapping_sha256'] = audit.digest({k: v for k, v in binding.items() if k != 'evidence'})
+    if change == 'shape':
+        with pytest.raises(ValueError, match='Source member/mapping'):
+            identities()
+    else:
+        after = identities()
+        assert all(old != new for old, new in zip(before, after))
+
+
+def _test_accounting_review_view(monkeypatch, output, review):
+    """Install test-owned sealed review bytes through the filesystem boundary."""
+    import hashlib
+    from tests.support import source_copy_native_evidence as source
+    from tests.support.source_copy_branch_evidence import write_json
+    path = output / 'current-review.json'
+    descriptor = write_json(path, review)
+    reader = (audit.ROOT / source.ACCOUNTING_READER).read_bytes()
+    reader = reader.replace(source.ACCOUNTING_REVIEW_SHA256.encode(), descriptor['sha256'].encode())
+    read_bytes = Path.read_bytes
+    def selected_bytes(target):
+        if target == audit.ROOT / source.ACCOUNTING_REVIEW_PATH: return read_bytes(path)
+        if target == audit.ROOT / source.ACCOUNTING_READER: return reader
+        return read_bytes(target)
+    monkeypatch.setattr(Path, 'read_bytes', selected_bytes)
+    monkeypatch.setattr(source, 'ACCOUNTING_REVIEW_SHA256', descriptor['sha256'])
+    return {'artifact': path.relative_to(audit.ROOT / 'tests/fixtures/branch-evidence/product').as_posix(),
+            'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
+@pytest.mark.parametrize('damage', ('missing-after-map', 'missing-transition', 'wrong-before', 'normalization-kind', 'live-drift'))
+def test_source_current_execution_transition_rejects_unexplained_drift(source_current_mapping_case, monkeypatch, tmp_path, damage):
+    from tests.support import source_copy_native_evidence as source
+    case = source_current_mapping_case
+    review = json.loads((audit.ROOT / source.ACCOUNTING_REVIEW_PATH).read_bytes())
+    if damage == 'live-drift':
+        target = audit.ROOT / 'skills/waapi-skill/wwise_waapi/source_copy_proof.py'
+        read_bytes = Path.read_bytes
+        monkeypatch.setattr(Path, 'read_bytes', lambda path: read_bytes(path) + b'\n# unexplained\n' if path == target else read_bytes(path))
+    else:
+        if damage == 'missing-after-map': review.pop('current_execution_sources')
+        elif damage == 'missing-transition': review['execution_source_changes'].pop('skills/waapi-skill/scripts/gateway.py')
+        elif damage == 'wrong-before': review['execution_source_changes']['skills/waapi-skill/scripts/gateway.py']['captured_sha256'] = '0' * 64
+        elif damage == 'normalization-kind': review['pin_normalization']['requirements_source']['semantic_kind'] = 'caller-selected'
+        output = case['output'] / damage
+        output.mkdir()
+        _test_accounting_review_view(monkeypatch, output, review)
+    with pytest.raises(ValueError, match='closure differs|execution transition|current dependency changed'):
+        audit.portable_binding_inputs(case['index'], case['requirements'])
+
+
+@pytest.mark.parametrize('damage', ('review', 'candidate', 'packet'))
+def test_source_accounting_cannot_relabel_historical_context(source_current_mapping_case, monkeypatch, damage):
+    from copy import deepcopy
+    import os
+    from tests.support import source_copy_native_evidence as source
+    from tests.support.source_copy_branch_evidence import write_json
+    from tests.maintenance import branch_audit_completion as completion
+    case = source_current_mapping_case
+    base = case['base']
+    output = case['output'] / ('historical-' + damage)
+    output.mkdir()
+    def emit(name, value):
+        path = output / name
+        return {**write_json(path, value), 'artifact': path.relative_to(base).as_posix()}
+    index = json.loads(case['index'].read_bytes())
+    native = completion.read_sealed_artifact(index['source_native_attachments'][0], base)
+    context = completion.read_sealed_artifact(native['successor_context'], base)
+    if damage == 'packet':
+        context['previous_index']['sha256'] = '0' * 64
+    else:
+        old_index = completion.read_sealed_artifact(context['previous_index'], base)
+        old_native = completion.read_sealed_artifact(old_index['source_native_attachments'][0], base)
+        historical = completion.read_sealed_artifact(old_native['successor_context'], base)
+        if damage == 'review': historical['review']['sha256'] = '0' * 64
+        else: historical['current_candidate_sha256'] = '0' * 64
+        old_native['successor_context'] = emit('old-context.json', historical)
+        old_index['source_native_attachments'] = [emit('old-native.json', old_native)]
+        previous = emit('old-index.json', old_index)
+        review = json.loads((audit.ROOT / source.ACCOUNTING_REVIEW_PATH).read_bytes())
+        review['packets'][review['packets'].index(context['previous_index'])] = previous
+        context['review'] = _test_accounting_review_view(monkeypatch, output, review)
+        context['previous_index'] = previous
+    native['successor_context'] = emit('context.json', context)
+    index['source_native_attachments'] = [emit('native.json', native)]
+    index['base'] = os.path.relpath(base, output)
+    path = output / 'index.json'
+    write_json(path, index)
+    with pytest.raises(ValueError, match='historical context/review differs|reviewed predecessor differs'):
+        audit.portable_binding_inputs(path, case['requirements'])
+
+
+def test_source_projection_cannot_authorize_a_caller_invented_roster(source_current_mapping_case):
+    from copy import deepcopy
+    from tests.maintenance import branch_audit_completion as completion
+    case = source_current_mapping_case
+    requirements = deepcopy(case['requirements'])
+    bindings = deepcopy(case['attachment']['bindings'])
+    original = min(case['source_ids'])
+    foreign = original.replace('ak.wwise.core.object.copy', 'ak.wwise.core.object.pasteProperties')
+    bindings[foreign] = deepcopy(bindings[original])
+    bindings[foreign]['branch_id'] = foreign
+    requirements['branches'][foreign] = deepcopy(requirements['branches'][original])
+    mechanism = bindings[original]['representative_mechanism']
+    member = requirements['representative_mechanisms'][mechanism]['members'][foreign] = deepcopy(
+        requirements['representative_mechanisms'][mechanism]['members'][original])
+    def identity():
+        member['mapping_sha256'] = audit.digest({k: v for k, v in bindings[foreign].items() if k != 'evidence'})
+        return completion.candidate_identity(audit.ROOT, {**case['inventory'], 'sources': {}},
+            case['inventory']['native_coverage']['catalogs'], digest=audit.digest,
+            requirements_document=requirements, mapping_bindings=bindings)
+    before = identity()
+    bindings[foreign]['source_copy_successor_context']['sha256'] = '0' * 64
+    assert identity() != before  # Foreign proof-like fields never receive the Source cut.
+
+
+@pytest.mark.parametrize('damage', ('mapping-seal', 'requirements-seal', 'escape', 'backslash-alias'))
+def test_source_identity_canonical_resolver_requires_sealed_current_mappings(source_current_mapping_case, tmp_path, monkeypatch, request, damage):
+    import os
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_branch_evidence import write_json
+    case = source_current_mapping_case
+    canonical = audit.ROOT / 'docs/branch-coverage-requirements.json'
+    canonical_index = audit.ROOT / 'docs/branch-coverage-evidence-index.json'
+    requirements_path = tmp_path / canonical.name
+    audit.write_requirements(requirements_path, case['requirements'])
+    view = {canonical: requirements_path}
+    for descriptor in json.loads(requirements_path.read_bytes())['parts']:
+        view[canonical.parent / descriptor['path']] = tmp_path / descriptor['path']
+    index = json.loads(case['index'].read_bytes())
+    index['base'] = os.path.relpath(case['base'], canonical_index.parent)
+    unchecked_alias = None
+    if damage == 'mapping-seal': index['mapping_attachments'][0]['sha256'] = '0' * 64
+    elif damage == 'escape': index['mapping_attachments'][0]['artifact'] = '../outside.json'
+    elif damage == 'requirements-seal':
+        mapping = json.loads((case['base'] / index['mapping_attachments'][0]['artifact']).read_bytes())
+        mapping['requirements_sha256'] = '0' * 64
+        path = case['output'] / 'wrong-requirements-identity.json'
+        index['mapping_attachments'] = [{**write_json(path, mapping), 'artifact': path.relative_to(case['base']).as_posix()}]
+    elif damage == 'backslash-alias':
+        raw = (case['base'] / index['mapping_attachments'][0]['artifact']).read_bytes()
+        directory = case['output'] / 'alias-control'
+        canonical_map = directory / 'maps/source.json'
+        canonical_map.parent.mkdir(parents=True)
+        canonical_map.write_bytes(raw)
+        spelling = (directory.relative_to(case['base']).as_posix() + '/maps/source.json').replace('/', '\\')
+        unchecked_alias = case['base'] / spelling
+        if os.name != 'nt':
+            outside = tmp_path / 'outside-map.json'
+            outside.write_bytes(raw)
+            unchecked_alias.symlink_to(outside)
+            request.addfinalizer(unchecked_alias.unlink)
+        index['mapping_attachments'][0]['artifact'] = spelling
+    index_path = tmp_path / canonical_index.name
+    write_json(index_path, index)
+    view[canonical_index] = index_path
+    original_open = Path.open
+    def published_open(path, *args, **kwargs):
+        assert unchecked_alias is None or path != unchecked_alias, 'Unchecked descriptor alias was read'
+        return original_open(view.get(path, path), *args, **kwargs)
+    monkeypatch.setattr(Path, 'open', published_open)
+    with pytest.raises(ValueError, match='digest mismatch|mapping document differs|duplicate Source|archive|traversal|canonical'):
+        completion.candidate_identity(audit.ROOT, {**case['inventory'], 'sources': {}},
+            case['inventory']['native_coverage']['catalogs'], digest=audit.digest)
+
+
+def test_source_accounting_context_rejects_noncanonical_alias_before_read(source_current_mapping_case, tmp_path, monkeypatch, request):
+    import os
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_native_evidence import validate_successor_context
+    case = source_current_mapping_case
+    index = json.loads(case['index'].read_bytes())
+    native = completion.read_sealed_artifact(index['source_native_attachments'][0], case['base'])
+    descriptor = dict(native['successor_context'])
+    raw = (case['base'] / descriptor['artifact']).read_bytes()
+    directory = case['output'] / 'context-alias-control'
+    canonical_context = directory / 'records/context.json'
+    canonical_context.parent.mkdir(parents=True)
+    canonical_context.write_bytes(raw)
+    descriptor['artifact'] = (directory.relative_to(case['base']).as_posix() + '/records/context.json').replace('/', '\\')
+    alias = case['base'] / descriptor['artifact']
+    if os.name != 'nt':
+        outside = tmp_path / 'outside-context.json'
+        outside.write_bytes(raw)
+        alias.symlink_to(outside)
+        request.addfinalizer(alias.unlink)
+    original_open = Path.open
+    def checked_open(path, *args, **kwargs):
+        assert path != alias, 'Unchecked Source context alias was read'
+        return original_open(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'open', checked_open)
+    with pytest.raises(ValueError, match='canonical'):
+        validate_successor_context(descriptor, case['base'],
+            candidate=case['inventory']['native_coverage']['candidate_sha256'])
+
+
+@pytest.mark.parametrize('damage', ('duplicate', 'non-source-seal', 'non-source-contract'))
+def test_source_identity_lookup_stops_but_full_admission_checks_the_tail(source_current_mapping_case, tmp_path, monkeypatch, damage):
+    from copy import deepcopy
+    import os
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_branch_evidence import write_json
+    case = source_current_mapping_case
+    output = case['output'] / ('identity-tail-' + damage)
+    output.mkdir()
+    mapping = deepcopy(case['attachment'])
+    if damage != 'duplicate':
+        mapping['bindings'] = {case['anchor']: mapping['bindings'][case['anchor']]}
+        mapping['predecessors'] = {case['anchor']: mapping['predecessors'][case['anchor']]}
+        assert not set(mapping['bindings']) & case['source_ids']
+    if damage == 'non-source-contract': mapping['contract'] = 'foreign-mapping'
+    tail = output / 'tail.json'
+    descriptor = {**write_json(tail, mapping), 'artifact': tail.relative_to(case['base']).as_posix()}
+    if damage == 'non-source-seal': descriptor['sha256'] = '0' * 64
+    canonical = audit.ROOT / 'docs/branch-coverage-requirements.json'
+    canonical_index = audit.ROOT / 'docs/branch-coverage-evidence-index.json'
+    requirements_path = tmp_path / canonical.name
+    audit.write_requirements(requirements_path, case['requirements'])
+    view = {canonical: requirements_path}
+    for part in json.loads(requirements_path.read_bytes())['parts']:
+        view[canonical.parent / part['path']] = tmp_path / part['path']
+    index = json.loads(case['index'].read_bytes())
+    index['base'] = os.path.relpath(case['base'], canonical_index.parent)
+    index['mapping_attachments'].append(descriptor)
+    index_path = tmp_path / canonical_index.name
+    write_json(index_path, index)
+    view[canonical_index] = index_path
+    original_open = Path.open
+    monkeypatch.setattr(Path, 'open', lambda path, *args, **kwargs: original_open(view.get(path, path), *args, **kwargs))
+    read_bytes = Path.read_bytes
+    reads = []
+    def observed_read(path):
+        if path == tail: reads.append(path)
+        return read_bytes(path)
+    monkeypatch.setattr(Path, 'read_bytes', observed_read)
+    completion.candidate_identity(audit.ROOT, {**case['inventory'], 'sources': {}},
+        case['inventory']['native_coverage']['catalogs'], digest=audit.digest)
+    assert reads == []  # All required Source rows are in the first sealed map.
+    index['base'] = os.path.relpath(case['base'], output)
+    full_path = output / 'full-index.json'
+    write_json(full_path, index)
+    with pytest.raises(ValueError, match='conflicting members|digest mismatch|closed reviewed mapping'):
+        audit.portable_binding_inputs(full_path, case['requirements'])
+    assert reads == [tail]  # The ordinary admission reader owns the whole index.
+
+
+def test_direct_old_source_context_still_requires_current_execution_sources(source_current_mapping_case):
+    case = source_current_mapping_case
+    with pytest.raises(ValueError, match='current dependency changed'):
+        audit.portable_binding_inputs(case['retained_index'], case['retained_policies'])
 
 
 @pytest.mark.parametrize('damage', ['current-mapping', 'current-review', 'predecessor', 'foreign-view', 'original-binding', 'capture'])
