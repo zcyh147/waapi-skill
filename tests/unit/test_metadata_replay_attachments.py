@@ -42,6 +42,191 @@ def write(path, value, **extra):
     return {'artifact':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),**extra}
 
 
+def test_current_metadata_requirements_seal_distinguishes_receipts_from_protected_code_metadata():
+    """Real ordinary anchors keep receipt hashes in evidence, not mapping metadata."""
+    from tests.maintenance.branch_audit_mapping import REQUIREMENTS_IDENTITY_KIND
+    binding = {'branch_id': 'controlled-metadata', 'native_shape_sha256': 'a' * 64,
+        'ordinary_test_run_attachment': True,
+        'relevant_sources': ['tests/maintenance/branch_audit_completion.py'],
+        'evidence': {'program': {'artifact': 'original-run.json', 'sha256': 'b' * 64}}}
+    document = {'contract': 'waapi-skill.branch-evidence-requirements/v1',
+        'branches': {'controlled-metadata': {'categories': ['program', 'live_metadata'],
+                                           'native_shape_sha256': 'a' * 64}},
+        'representative_mechanisms': {'controlled': {
+            'candidate_sha256': 'c' * 64, 'sources': {'owned-runtime.py': 'd' * 64},
+            'selected_proofs': {'program': ['controlled-metadata']},
+            'members': {'controlled-metadata': {'native_shape_sha256': 'a' * 64,
+                'mapping_sha256': audit.digest({k: v for k, v in binding.items() if k != 'evidence'})}}}}}
+    before = producer.current_requirements_source_seal(document, {'controlled-metadata': binding})
+    assert producer.CURRENT_REQUIREMENTS_IDENTITY == REQUIREMENTS_IDENTITY_KIND
+    binding['evidence']['program'] = {'artifact': 'completed-run.json', 'sha256': 'e' * 64}
+    document['representative_mechanisms']['controlled']['candidate_sha256'] = 'f' * 64
+    assert producer.current_requirements_source_seal(document, {'controlled-metadata': binding}) == before
+    for damage in ('policy', 'selection', 'protected-flag', 'source-roster', 'reviewed-source'):
+        changed, member = deepcopy(document), deepcopy(binding)
+        review = changed['representative_mechanisms']['controlled']
+        if damage == 'policy': changed['branches']['controlled-metadata']['categories'] = ['program']
+        elif damage == 'selection': review['selected_proofs']['program'] = []
+        elif damage == 'protected-flag': member['ordinary_test_run_attachment'] = False
+        elif damage == 'source-roster': member['relevant_sources'].append('another-owned-helper.py')
+        else: review['sources']['owned-runtime.py'] = '0' * 64
+        review['members']['controlled-metadata']['mapping_sha256'] = audit.digest(
+            {k: v for k, v in member.items() if k != 'evidence'})
+        assert producer.current_requirements_source_seal(changed, {'controlled-metadata': member}) != before
+
+
+@pytest.mark.parametrize('chunked', (False, True))
+def test_current_metadata_git_seal_uses_owned_policy_not_the_live_policy(tmp_path, chunked):
+    """Identity-only Source fixture; it contains no native or program evidence."""
+    import subprocess
+    from tests.support.source_copy_branch_evidence import REVIEW_PATH, REVIEW_SHA256
+    root = tmp_path / 'repository'
+    (root / 'docs').mkdir(parents=True)
+    (root / 'product').mkdir()
+    raw = (audit.ROOT / REVIEW_PATH).read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == REVIEW_SHA256
+    roster_path = root / REVIEW_PATH
+    roster_path.parent.mkdir(parents=True)
+    roster_path.write_bytes(raw)  # Exact original bytes in their original namespace.
+    identity, shape = next(iter(json.loads(raw)['selected_native_shapes'].items()))
+    def git(*args):
+        return subprocess.check_output(['git', *args], cwd=root, text=True).strip()
+    git('init', '-q')
+    git('config', 'user.name', 'Metadata source control')
+    git('config', 'user.email', 'metadata-control@example.invalid')
+    (root / 'owned.py').write_text('value = 1\n')
+    binding = {'branch_id': identity, 'native_shape_sha256': shape,
+        'ordinary_test_run_attachment': True, 'relevant_sources': ['owned.py'],
+        'source_copy_successor_context': {'artifact': 'source/context.json', 'sha256': 'a' * 64}}
+    policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1',
+        'branches': {identity: {'categories': ['program', 'live_metadata']}},
+        'representative_mechanisms': {'owned': {'candidate_sha256': 'c' * 64,
+            'selected_proofs': {'program': [identity]}, 'sources': {'owned.py': 'd' * 64},
+            'members': {identity: {'native_shape_sha256': shape}}}}}
+    path = root / producer.REQUIREMENTS_SOURCE
+    def publish(label):
+        policy['representative_mechanisms']['owned']['members'][identity]['mapping_sha256'] = audit.digest(binding)
+        if chunked: audit.write_requirements(path, policy)
+        else: path.write_text(json.dumps(policy))
+        mapping = {'contract': 'waapi-skill.branch-mapping-attachment/v1', 'scope_kind': 'product',
+            'requirements_sha256': audit.digest(policy), 'mechanisms': ['owned'],
+            'bindings': {identity: deepcopy(binding)}, 'predecessors': {identity: None}}
+        descriptor = write(root / 'product' / (label + '.json'), mapping)
+        descriptor['artifact'] = label + '.json'
+        (root / 'docs/branch-coverage-evidence-index.json').write_text(json.dumps(
+            {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': '../product',
+             'entries': [], 'mapping_attachments': [descriptor]}))
+        git('add', '.')
+        git('commit', '-qm', label)
+        return git('rev-parse', 'HEAD')
+    owned = publish('owned-policy')
+    # A final derived Source descriptor changes its raw member/index seals,
+    # while policy and ordinary CODE mapping metadata remain exactly owned.
+    binding['source_copy_successor_context']['sha256'] = 'b' * 64
+    published = publish('derived-source-publication')
+    policy['branches'][identity]['categories'] = ['program']
+    foreign = publish('different-policy')
+    names = [producer.REQUIREMENTS_SOURCE, 'owned.py']
+    # The live index now belongs to the foreign policy. Both earlier Git pins
+    # must resolve their own sealed mapping/index, including exact part bytes.
+    expected = producer.git_current_source_seals(owned, names, root=root)
+    assert producer.git_current_source_seals(published, names, root=root) == expected
+    foreign_seals = producer.git_current_source_seals(foreign, names, root=root)
+    assert expected['owned.py'] == foreign_seals['owned.py']
+    assert expected[producer.REQUIREMENTS_SOURCE] != foreign_seals[producer.REQUIREMENTS_SOURCE]
+    # A self-consistent foreign policy is not admitted as the earlier policy;
+    # nor may a cached semantic result hide later damage to its sealed sidecar.
+    (root / 'product/owned-policy.json').write_text('{}')
+    with pytest.raises(ValueError, match='digest'):
+        producer.git_current_source_seals(owned, names, root=root)
+
+
+@pytest.mark.parametrize('name', ('../escape.json', r'..\escape.json', r'C:\policy.json', 'C:policy.json'))
+def test_current_metadata_git_requirements_reject_nonadjacent_parts(tmp_path, name):
+    import subprocess
+    root = tmp_path / 'repository'
+    (root / 'docs').mkdir(parents=True)
+    def git(*args):
+        return subprocess.check_output(['git', *args], cwd=root, text=True).strip()
+    git('init', '-q')
+    git('config', 'user.name', 'Metadata source control')
+    git('config', 'user.email', 'metadata-control@example.invalid')
+    (root / producer.REQUIREMENTS_SOURCE).write_text(json.dumps({
+        'contract': audit.REQUIREMENTS_INDEX_CONTRACT, 'document_sha256': 'a' * 64,
+        'parts': [{'path': name, 'sha256': 'b' * 64}]}))
+    (root / 'docs/branch-coverage-evidence-index.json').write_text('{}')
+    git('add', '.')
+    git('commit', '-qm', 'Invalid adjacent part')
+    with pytest.raises(ValueError, match='adjacent'):
+        producer.git_current_source_seals(git('rev-parse', 'HEAD'),
+            [producer.REQUIREMENTS_SOURCE], root=root)
+
+
+@pytest.fixture(scope='module')
+def inventory_io_specimen(tmp_path_factory):
+    """Controlled descriptor I/O, not a current standard build or product proof."""
+    import shutil
+    root = tmp_path_factory.mktemp('metadata-inventory-io')
+    document = json.loads((audit.ROOT / 'docs/branch-coverage-inventory.json').read_bytes())
+    native = document['native_coverage']
+    native['completion'] = {'complete': False, 'evaluated': False}
+    # Keep real packed row bytes/denominator. A small current source vector
+    # isolates source/candidate admission from the old fixture's public joins.
+    name = 'tests/unit/test_metadata_replay_attachments.py'
+    text = (audit.ROOT / name).read_text()
+    document['sources'] = {name: audit.digest(text)}
+    document['source_index'] = {name: {'path': name, 'symbol': None,
+        'line': 1, 'sha256': audit.digest(text)}}
+    native['candidate_sha256'] = completion.candidate_identity(
+        audit.ROOT, document, native['catalogs'], digest=audit.digest)
+    shutil.copyfile(audit.ROOT / 'docs' / native['obligations_artifact']['path'],
+        root / native['obligations_artifact']['path'])
+    descriptor = write(root / 'inventory.json', document)
+    return root, document, descriptor
+
+
+def test_frozen_metadata_inventory_reuses_sealed_rows_without_building(inventory_io_specimen, monkeypatch):
+    root, document, descriptor = inventory_io_specimen
+    monkeypatch.setattr(audit, 'build_inventory', lambda *args, **kwargs: pytest.fail('rebuilt inventory'))
+    loaded = producer._capture_inventory(descriptor)
+    assert loaded['sources'] == document['sources']
+    assert len(loaded['native_coverage']['obligations']) == 272313
+    assert loaded['native_coverage']['candidate_sha256'] == document['native_coverage']['candidate_sha256']
+    with pytest.raises(ValueError, match='descriptor'):
+        producer._capture_inventory(loaded)
+
+
+@pytest.mark.parametrize('damage', ('root-bytes', 'native-bytes', 'native-row', 'candidate', 'source', 'source-join'))
+def test_frozen_metadata_inventory_rejects_damaged_artifacts_and_stale_identity(
+        inventory_io_specimen, tmp_path, damage):
+    import gzip
+    import shutil
+    root, original, accepted = inventory_io_specimen
+    document = deepcopy(original)
+    packed = document['native_coverage']['obligations_artifact']
+    target = tmp_path / packed['path']
+    shutil.copyfile(root / packed['path'], target)
+    path = tmp_path / 'inventory.json'
+    path.write_bytes((root / 'inventory.json').read_bytes())
+    descriptor = {**accepted, 'artifact': str(path)}
+    if damage == 'root-bytes': path.write_bytes(path.read_bytes() + b' ')
+    elif damage == 'native-bytes': target.write_bytes(target.read_bytes() + b' ')
+    elif damage == 'native-row':
+        raw = gzip.decompress(target.read_bytes())
+        assert b'getPropertyInfo' in raw
+        target.write_bytes(gzip.compress(raw.replace(b'getPropertyInfo', b'getPropertyInfX', 1)))
+        packed['sha256'] = hashlib.sha256(target.read_bytes()).hexdigest()
+        descriptor = write(path, document)  # Row digest still independently owns the original rows.
+    else:
+        if damage == 'candidate': document['native_coverage']['candidate_sha256'] = '0' * 64
+        if damage == 'source':
+            document['sources'][next(iter(document['sources']))] = '0' * 64
+        elif damage == 'source-join': next(iter(document['source_index'].values()))['sha256'] = '0' * 64
+        descriptor = write(path, document)
+    with pytest.raises(ValueError):
+        producer._capture_inventory(descriptor)
+
+
 
 def test_r55_original_class_reader_preserves_exact_860_source_and_six_raw_contexts():
     originals=producer.r55_original_reads()
@@ -159,6 +344,58 @@ def test_r55_original_and_current_replay_keep_distinct_sources_inputs_and_ten_le
         source_root=audit.ROOT,reference_edges=capture['edges'])==('passed',None)
 
 
+@pytest.mark.parametrize('cohort', ('r51', 'r54', 'r55'))
+@pytest.mark.parametrize('change', ('publication-stamp', 'policy', 'protected-code-member', 'identity-mode'))
+def test_current_metadata_reader_preserves_publication_identity_but_rejects_policy_drift(
+        original_root, inventory, tmp_path, monkeypatch, cohort, change):
+    import io
+    if cohort == 'r51':
+        capture, program, record, bindings, descriptor = controlled_attachment(
+            tmp_path, original_root, inventory, 'ControlInput')
+        branch = next(row for row in capture['branches'] if row['id'] in bindings)
+        binding = {**bindings[branch['id']], 'category_inputs': {'live_metadata': record['category_inputs']}}
+        current_sources = producer.r51_current_sources
+    else:
+        case = '2022.1|Wwise Delay|DelayTime' if cohort == 'r54' else '2021.1|MusicStinger|CustomCueMatchName'
+        capture, program, record, descriptor, branch, binding = r54_control(
+            tmp_path, inventory, case, cohort=cohort)
+        current_sources = producer.r54_current_sources
+    def result():
+        return completion.evidence_result(descriptor, branch, 'c' * 64, 'live_metadata',
+            'controlled', tmp_path, binding, source_root=audit.ROOT, reference_edges=capture['edges'])
+    assert result() == ('passed', None)
+    path = audit.ROOT / producer.REQUIREMENTS_SOURCE
+    document = audit.load(path)
+    if change == 'identity-mode':
+        program['current_requirements_identity'] = 'raw-source-map/v1'
+    else:
+        if change == 'publication-stamp':
+            for review in document['representative_mechanisms'].values():
+                review['candidate_sha256'] = '0' * 64
+        elif change == 'policy':
+            identity = next(key for key in document['branches'] if 'getPropertyInfo' not in key)
+            categories = document['branches'][identity]['categories']
+            document['branches'][identity]['categories'] = ['native'] if categories == ['program'] else ['program']
+        else:
+            review = next(iter(document['representative_mechanisms'].values()))
+            next(iter(review['members'].values()))['mapping_sha256'] = '0' * 64
+        raw = json.dumps(document).encode()
+        original_open = Path.open
+        monkeypatch.setattr(Path, 'open', lambda target, *args, **kwargs:
+            io.BytesIO(raw) if target == path else original_open(target, *args, **kwargs))
+        current = current_sources()
+        program['relevant_sources'] = record['source_bridge']['current_sources'] = current
+        record['source_bridge']['changed_files'] = producer.source_changes(
+            record['source_bridge']['historical_sources'], current)
+    record['replay'] = write(tmp_path / 'policy-program.json', program, nodeid=descriptor['nodeid'])
+    descriptor = write(tmp_path / 'policy-attachment.json', record, nodeid=descriptor['nodeid'])
+    outcome, reason = result()
+    if change == 'publication-stamp':
+        assert (outcome, reason) == ('passed', None)
+    else:
+        assert outcome == 'missing', reason
+
+
 
 @pytest.mark.parametrize('cohort',('r54','r55'))
 @pytest.mark.parametrize('damage',('future-tone','future-contract','future-aux','future-helper',
@@ -175,7 +412,8 @@ def test_class_bridge_requires_exact_accepted_runtime_and_auxiliary_blobs(invent
     fixture='tests/destructive/support/source_copy_fixture.py'
     assert bridge['attribution']=='historical_native_current_program_not_current_native'
     assert len(bridge['historical_sources'])==(560 if cohort=='r54' else 561)
-    assert len(bridge['current_sources'])==572
+    assert len(bridge['current_sources'])==771
+    assert 'tests/maintenance/branch_audit_mapping.py' in bridge['current_sources']
     assert helper not in bridge['historical_sources']
     assert bridge['changed_files'][helper]=={'before':None,
         'after':'b469b24ae64be096d314eb66da81b28833e0e45283d0cc66184199af2a089fdf'}
@@ -283,9 +521,10 @@ def test_r54_historical_replay_controls_start_from_valid_original_and_current_fl
         binding['category_inputs']['live_metadata']=record['category_inputs']
     elif damage=='attribution':record['source_bridge']['attribution']='current_native'
     elif damage=='product-git':
-        # This committed source contains the newly added module too: rejection
-        # must prove different source bytes, not merely a missing historical file.
-        wrong='411e8173949020bad26e4302f1e9428a21bcac7d'
+        # The reviewed runtime pin contains the complete current roster, but
+        # predates this replay reader/producer repair. Prove different owned
+        # bytes rather than rejection caused by an absent historical filename.
+        wrong='8c912c50c18b88f90b46fb299a491b3b88233471'
         assert producer.git_source_seals(wrong,program['relevant_sources'])!=program['relevant_sources']
         record['scope_kind']=program['scope_kind']='product';program['git_candidate']=wrong
     elif damage=='teardown':
@@ -355,7 +594,7 @@ def controlled_attachment(tmp_path, original_root, inventory, field):
     _run_original_r51_metadata_replay(tmp_path,field,expected,observed)
     rows = producer.selected_branches(inventory)
     capture = {'scope_kind':'controlled','candidate_sha256':'c'*64,'git_candidate':'controlled_current_program',
-        'relevant_sources':producer.source_seals(),'historical_sources':producer.historical_sources(),
+        'relevant_sources':producer.r51_current_sources(),'historical_sources':producer.historical_sources(),
         'branches':rows,'edges':{r['id']:r for r in inventory['native_coverage']['obligations']if r['kind']=='reference'},
         'originals':{field:original_read(original_root,field)}}
     replay, bindings = producer.make_replay_receipt(capture,field,observed,dict.fromkeys(('setup','call','teardown'),'passed'))
@@ -367,7 +606,7 @@ def controlled_attachment(tmp_path, original_root, inventory, field):
 
 @pytest.mark.parametrize('field',producer.CASES)
 def test_original_metadata_and_current_replay_have_separate_exact_inputs(original_root, inventory, tmp_path, field):
-    assert not any(name.startswith('tests/semantic/') for name in producer.source_seals())
+    assert not any(name.startswith('tests/semantic/') for name in producer.r51_current_sources())
     assert not any(name.startswith('tests/semantic/') for name in producer.historical_sources())
     capture,replay,record,replay_bindings,descriptor = controlled_attachment(tmp_path,original_root,inventory,field)
     assert record['category_inputs']['historical'] != record['category_inputs']['replay']
@@ -675,7 +914,7 @@ def test_metadata_bridge_rejects_new_runtime_drift_even_with_full_changed_file_p
         raw = original_read_bytes(path)
         return raw+b'\n# unreviewed runtime change\n' if path == gateway_path else raw
     monkeypatch.setattr(Path,'read_bytes',changed_source)
-    current = producer.source_seals()
+    current = producer.r51_current_sources()
     record['source_bridge']['current_sources'] = current
     record['source_bridge']['changed_files'] = producer.source_changes(record['source_bridge']['historical_sources'],current)
     replay['relevant_sources'] = current
@@ -695,7 +934,8 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
         return completion.evidence_result(descriptor,branch,'c'*64,'live_metadata','controlled',tmp_path,binding,
             source_root=audit.ROOT,reference_edges=capture['edges'])
     assert result() == ('passed',None)
-    source_pin = '7346d2f0f22e799e5324ebaa00e6e80e3eb03180'
+    # Exact current packaged runtime; original R51 source/native maps stay raw.
+    source_pin = '8c912c50c18b88f90b46fb299a491b3b88233471'
     packets = {}
     for name in ('operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py',
                  'object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py',
@@ -706,7 +946,7 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
     read_bytes = Path.read_bytes
     monkeypatch.setattr(Path,'read_bytes',lambda path:packets[path] if path in packets else read_bytes(path))
     def resign():
-        current = producer.source_seals()
+        current = producer.r51_current_sources()
         record['source_bridge']['current_sources'] = current
         record['source_bridge']['changed_files'] = producer.source_changes(record['source_bridge']['historical_sources'],current)
         replay['relevant_sources'] = current
@@ -768,8 +1008,8 @@ def test_r51_historical_source_map_does_not_grow_with_current_owned_dependencies
     original = producer.historical_sources()
     assert len(original) == 343
     assert audit.digest(original) == '9f59dd64d2d7e856fae5f55cd71e5b1f471e1d32883d78a6ad53b860cde3ee9a'
-    current = producer.source_seals()
-    assert len(current) == 356
+    current = producer.r51_current_sources()
+    assert len(current) == 486
     additions = {'skills/waapi-skill/wwise_waapi/topic_compatibility.py',
         'skills/waapi-skill/resources/semantic/2025.1/structure-changed-notes-compatibility.json',
         'skills/waapi-skill/wwise_waapi/owned_control_inputs.py', *(
@@ -787,7 +1027,7 @@ def test_new_owned_dependencies_reject_unreviewed_drift(original_root, inventory
         capture, program, record, bindings, descriptor = controlled_attachment(tmp_path, original_root, inventory, 'ControlInput')
         branch = next(row for row in capture['branches'] if row['id'] in bindings)
         binding = {**bindings[branch['id']], 'category_inputs': {'live_metadata': record['category_inputs']}}
-        current_sources = producer.source_seals
+        current_sources = producer.r51_current_sources
     else:
         case = '2022.1|Wwise Delay|DelayTime' if cohort == 'r54' else '2021.1|MusicStinger|CustomCueMatchName'
         capture, program, record, descriptor, branch, binding = r54_control(tmp_path, inventory, case, cohort=cohort)
@@ -796,7 +1036,7 @@ def test_new_owned_dependencies_reject_unreviewed_drift(original_root, inventory
         return completion.evidence_result(descriptor, branch, 'c' * 64, 'live_metadata', 'controlled',
             tmp_path, binding, source_root=audit.ROOT, reference_edges=capture['edges'])
     assert result() == ('passed', None)
-    assert len(record['source_bridge']['current_sources']) == (356 if cohort == 'r51' else 572)
+    assert len(record['source_bridge']['current_sources']) == (486 if cohort == 'r51' else 771)
     additions = ['skills/waapi-skill/wwise_waapi/topic_compatibility.py',
         'skills/waapi-skill/resources/semantic/2025.1/structure-changed-notes-compatibility.json',
         'skills/waapi-skill/wwise_waapi/owned_control_inputs.py', *(

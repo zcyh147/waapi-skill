@@ -2170,7 +2170,45 @@ RUNTIME_SOURCE_TRANSITION_SHA = '80415751fd42352fa9e45f3edccc11bcb0107a243da477d
 
 SELECTED_RUNTIME_SOURCE_SUCCESSOR = 'tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-source-successor.json'
 SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA = '575a91323408a7981e22f632c897924a5afcaf8942440fb895665cca846d7f01'
+CURRENT_RUNTIME_PACKAGED_SOURCES = 'tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/current-packaged-sources-15252.json'
+CURRENT_RUNTIME_PACKAGED_SOURCES_SHA = 'bb092f662a6f9645c528309a58079270321f16b4bd02fe2819441918b5ecf97e'
+CURRENT_RUNTIME_SOURCE_TRANSITION = 'tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/source-transition-15252-review.json'
+CURRENT_RUNTIME_SOURCE_TRANSITION_SHA = '1796b2703012a7d7a3d320e714a7b0d114b22ff7239c0b78d4614cf01113a6aa'
 _RETAINED_QUALIFIED_MEMBER = ContextVar('retained_qualified_runtime_member', default=None)
+
+
+def _current_runtime_packaged_sources(selected_review, root):
+    """Admit only the finite reviewed package delta; native575a stays immutable."""
+    original = {'artifact': SELECTED_RUNTIME_SOURCE_SUCCESSOR, 'sha256': SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA}
+    current = {'artifact': CURRENT_RUNTIME_PACKAGED_SOURCES, 'sha256': CURRENT_RUNTIME_PACKAGED_SOURCES_SHA}
+    descriptor = {'artifact': CURRENT_RUNTIME_SOURCE_TRANSITION, 'sha256': CURRENT_RUNTIME_SOURCE_TRANSITION_SHA}
+    for item in (original, current, descriptor):
+        _portable_descriptor(item, root)
+    transition = completion.read_sealed_artifact(descriptor, root)
+    if (set(transition) != {'contract', 'original', 'current', 'changed_files', 'reasons'}
+            or transition['contract'] != 'waapi-skill.runtime195-source-transition-review/v1'
+            or transition['original'] != original or transition['current'] != current):
+        raise ValueError('Runtime current package transition descriptors differ')
+    before = selected_review['packaged_sources']
+    after = completion.read_sealed_artifact(current, root)
+    if (not isinstance(after, dict) or len(after) != 483 or set(after) != set(before)
+            or after != program_source_context(root)['packaged']):
+        raise ValueError('Runtime exact current source transition target differs')
+    changes = {name: {'before': before[name], 'after': after[name]}
+        for name in before if before[name] != after[name]}
+    reasons = transition['reasons']
+    if (len(changes) != 4 or transition['changed_files'] != changes
+            or not isinstance(reasons, dict) or not reasons
+            or any(not isinstance(row, dict) or set(row) != {'paths', 'reason'}
+                or not isinstance(row['reason'], str) or not row['reason'].strip()
+                or not isinstance(row['paths'], list) or not row['paths']
+                or any(not isinstance(name, str) for name in row['paths'])
+                for row in reasons.values())):
+        raise ValueError('Runtime current package transition delta/reasons differ')
+    reviewed = [name for row in reasons.values() for name in row['paths']]
+    if len(reviewed) != 4 or set(reviewed) != set(changes):
+        raise ValueError('Runtime current package transition reasons omit or duplicate changed paths')
+    return after
 
 
 def selected_runtime_source_successor(root=audit.ROOT):
@@ -2183,9 +2221,9 @@ def selected_runtime_source_successor(root=audit.ROOT):
         'scope_ids', 'selected_program_ids'}
     if (set(review) != fields or review['contract'] != 'waapi-skill.runtime-read-source-successor/v1'
             or len(review['scope_ids']) != 35 or len(set(review['scope_ids'])) != 35
-            or not set(review['members']) <= set(review['scope_ids'])
-            or review['packaged_sources'] != program_source_context(root)['packaged']):
+            or not set(review['members']) <= set(review['scope_ids'])):
         raise ValueError('Selected runtime exact source/identity roster differs')
+    review['packaged_sources'] = _current_runtime_packaged_sources(review, root)
     maps = {audit.digest(value): value for value in review['historical_packaged_sources']}
     for member in review['members'].values():
         if 'source_map_sha256' in member:
@@ -2268,8 +2306,7 @@ def runtime_source_successor(root=audit.ROOT):
     if (set(target) != fields or target['contract'] != review['contract']
             or len(target['packaged_sources']) != 483 or len(target['scope_ids']) != 35
             or len(set(target['scope_ids'])) != 35
-            or not set(target['members']) <= set(target['scope_ids'])
-            or target['packaged_sources'] != program_source_context(root)['packaged']):
+            or not set(target['members']) <= set(target['scope_ids'])):
         raise ValueError('Runtime exact current source transition target differs')
     before, after = review['packaged_sources'], target['packaged_sources']
     changes = {name: {'before': before.get(name), 'after': after.get(name)}
@@ -2286,7 +2323,7 @@ def runtime_source_successor(root=audit.ROOT):
     reviewed = [name for row in reasons.values() for name in row['paths']]
     if len(reviewed) != 60 or set(reviewed) != set(changes):
         raise ValueError('Runtime source transition reasons omit or duplicate changed paths')
-    return dict(review, packaged_sources=after)
+    return dict(review, packaged_sources=_current_runtime_packaged_sources(target, root))
 
 
 def retained_runtime_mapping(binding):
