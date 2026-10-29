@@ -2103,6 +2103,8 @@ def runtime_publication_plan(root=audit.ROOT):
 # turns a historical fake Gateway capture into current program execution.
 RUNTIME_SOURCE_SUCCESSOR = 'tests/fixtures/branch-evidence/product/runtime-read-log-195-r1/source-successor.json'
 RUNTIME_SOURCE_SUCCESSOR_SHA = 'da83fa524df905daf8b3ced0b83269777f085d7bb4d23f54b05f34a055cc7381'
+RUNTIME_SOURCE_TRANSITION = 'tests/fixtures/branch-evidence/product/runtime-read-log-195-r1/source-transition-current-review.json'
+RUNTIME_SOURCE_TRANSITION_SHA = '80415751fd42352fa9e45f3edccc11bcb0107a243da477da5a6805e29a1ff4db'
 
 
 SELECTED_RUNTIME_SOURCE_SUCCESSOR = 'tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-source-successor.json'
@@ -2178,20 +2180,52 @@ def retained_qualified_capture(capture):
 
 
 def runtime_source_successor(root=audit.ROOT):
-    raw = (root / RUNTIME_SOURCE_SUCCESSOR).read_bytes()
-    if sha(raw) != RUNTIME_SOURCE_SUCCESSOR_SHA:
-        raise ValueError('Runtime source successor seal differs')
-    review = json.loads(raw)
+    """Transition only the package map; original native members stay immutable."""
+    original = {'artifact': RUNTIME_SOURCE_SUCCESSOR, 'sha256': RUNTIME_SOURCE_SUCCESSOR_SHA}
+    current = {'artifact': SELECTED_RUNTIME_SOURCE_SUCCESSOR, 'sha256': SELECTED_RUNTIME_SOURCE_SUCCESSOR_SHA}
+    descriptor = {'artifact': RUNTIME_SOURCE_TRANSITION, 'sha256': RUNTIME_SOURCE_TRANSITION_SHA}
+    for item in (original, current, descriptor):
+        _portable_descriptor(item, root)
+    review = completion.read_sealed_artifact(original, root)
     fields = {'contract', 'packaged_sources', 'historical_packaged_sources', 'members',
         'scope_ids', 'selected_program_ids'}
     if (set(review) != fields or review['contract'] != 'waapi-skill.runtime-read-source-successor/v1'
-            or review['packaged_sources'] != program_source_context(root)['packaged']
-            or not review['historical_packaged_sources'] or not review['members']
-            or not review['selected_program_ids']
+            or len(review['packaged_sources']) != 448 or len(review['historical_packaged_sources']) != 12
+            or len(review['members']) != 300 or len(review['scope_ids']) != 11366
+            or len(review['selected_program_ids']) != 10
             or len(set(review['scope_ids'])) != len(review['scope_ids'])
             or not set(review['members']) <= set(review['scope_ids'])):
-        raise ValueError('Runtime exact current source/cohort/selected-proof successor differs')
-    return review
+        raise ValueError('Runtime exact original source/cohort/selected-proof successor differs')
+    transition = completion.read_sealed_artifact(descriptor, root)
+    if (set(transition) != {'contract', 'original', 'current', 'changed_files', 'reasons'}
+            or transition['contract'] != 'waapi-skill.runtime195-source-transition-review/v1'
+            or transition['original'] != original or transition['current'] != current):
+        raise ValueError('Runtime source transition descriptors differ')
+    # The selected35 document supplies only a sealed package target here. Its
+    # native members never authorize any member of the original legacy300.
+    target = completion.read_sealed_artifact(transition['current'], root)
+    if (set(target) != fields or target['contract'] != review['contract']
+            or len(target['packaged_sources']) != 483 or len(target['scope_ids']) != 35
+            or len(set(target['scope_ids'])) != 35
+            or not set(target['members']) <= set(target['scope_ids'])
+            or target['packaged_sources'] != program_source_context(root)['packaged']):
+        raise ValueError('Runtime exact current source transition target differs')
+    before, after = review['packaged_sources'], target['packaged_sources']
+    changes = {name: {'before': before.get(name), 'after': after.get(name)}
+        for name in before.keys() | after.keys() if before.get(name) != after.get(name)}
+    reasons = transition['reasons']
+    if (len(changes) != 60 or transition['changed_files'] != changes
+            or not isinstance(reasons, dict) or not reasons
+            or any(not isinstance(row, dict) or set(row) != {'paths', 'reason'}
+                or not isinstance(row['reason'], str) or not row['reason'].strip()
+                or not isinstance(row['paths'], list) or not row['paths']
+                or any(not isinstance(name, str) for name in row['paths'])
+                for row in reasons.values())):
+        raise ValueError('Runtime source transition delta/reasons differ')
+    reviewed = [name for row in reasons.values() for name in row['paths']]
+    if len(reviewed) != 60 or set(reviewed) != set(changes):
+        raise ValueError('Runtime source transition reasons omit or duplicate changed paths')
+    return dict(review, packaged_sources=after)
 
 
 def retained_runtime_mapping(binding):
