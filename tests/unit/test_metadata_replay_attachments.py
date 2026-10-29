@@ -844,7 +844,10 @@ def test_portable_metadata_attachment_is_additive_and_keeps_original_program(ori
     assert binding['evidence']['program'] == original['evidence']['program']
     assert binding['input'] == original['input']
     assert binding['evidence']['live_metadata'] == attached['evidence']
-    assert binding['category_inputs']['live_metadata'] == attached['category_inputs']
+    inputs = binding['category_inputs']['live_metadata']
+    assert inputs['historical'] == attached['category_inputs']['historical']
+    assert inputs['replay'][:-1] == attached['category_inputs']['replay'][:-1]
+    assert inputs['replay'][-1]['field'] == 'ControlInput'
 
 
 def test_portable_originals_resolve_without_environment_or_original_absolute_paths(original_root,inventory,tmp_path,monkeypatch):
@@ -1169,3 +1172,178 @@ def test_r51_original_reader_requires_complete_exact_selected_anchor_bindings(tm
     monkeypatch.setattr(Path, 'read_bytes', lambda p: replacements[p] if p in replacements else read_bytes(p))
     with pytest.raises(ValueError, match='R51.*(anchor|binding|nine|shape|category|assertion)'):
         producer.portable_original_reads(path)
+
+
+@pytest.mark.parametrize('cohort', ('r51', 'r54', 'r55'))
+def test_imported_current_selection_keeps_stable_mapping_and_requirements_identity(
+        original_root, inventory, tmp_path, monkeypatch, cohort):
+    """Actual Gateway tokens vary; protected selected-field meaning does not."""
+    import time
+    from tests.maintenance.branch_audit_mapping import apply_mapping_attachments
+    policy = audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')
+    imported = []
+    tokens = []
+    for tick in (0, 2):
+        folder = tmp_path / str(tick)
+        folder.mkdir()
+        with monkeypatch.context() as clock:
+            clock.setattr(time, 'time', lambda: 1700000000 + tick)
+            if cohort == 'r51':
+                path, index, base, attachment, branch = portable_control(folder, original_root, inventory)
+            else:
+                path, index, base, attachment, branch = portable_r54_control(folder, inventory, cohort=cohort)
+        record = completion.read_sealed_artifact(attachment['evidence'], base)
+        program = completion.read_sealed_artifact(record['replay'], base)
+        raw_inputs = deepcopy(record['category_inputs'])
+        tokens.append(raw_inputs['replay'][-1])
+        current, actual_base, _ = audit.portable_binding_inputs(path, policy)
+        binding = current['bindings'][branch['id']]
+        edges = {row['id']: row for row in inventory['native_coverage']['obligations']
+                 if row['kind'] == 'reference'}
+        assert actual_base == base
+        assert completion.evidence_result(attachment['evidence'], branch, 'c' * 64,
+            'live_metadata', 'controlled', base, binding, source_root=audit.ROOT,
+            reference_edges=edges) == ('passed', None)
+        assert record['category_inputs'] == attachment['category_inputs'] == raw_inputs
+        assert completion.read_sealed_artifact(attachment['evidence'], base)['category_inputs'] == raw_inputs
+        assert program['gateway']['argv'] == raw_inputs['replay']
+        imported.append(binding)
+    assert tokens[0] != tokens[1]  # Both tokens were minted by real browse_metadata.
+    semantic = [{key: value for key, value in binding.items() if key != 'evidence'}
+                for binding in imported]
+    assert audit.digest(semantic[0]) == audit.digest(semantic[1])
+    view = semantic[0]['category_inputs']['live_metadata']
+    assert view['historical'] == raw_inputs['historical']
+    assert view['replay'][:-1] == raw_inputs['replay'][:-1]
+    selected = view['replay'][-1]
+    assert selected['contract'] == 'waapi-skill.metadata-replay-selection-identity/v1'
+    original = completion.read_metadata_run(record['metadata_run'], base, historical_class=cohort != 'r51')
+    assert selected == {'contract': 'waapi-skill.metadata-replay-selection-identity/v1',
+        'scope': original['gateway']['payload']['agent_result']['scope'],
+        'field': original['native_result']['name'], 'native_sha256': original['native_sha256']}
+    identity = branch['id']
+    def requirements_for(binding):
+        return {'contract': 'waapi-skill.branch-evidence-requirements/v1',
+            'branches': {identity: policy['branches'][identity]},
+            'representative_mechanisms': {'controlled-query': {
+                'candidate_sha256': 'c' * 64, 'sources': {'owned-runtime.py': 'd' * 64},
+                'selected_proofs': {'live_metadata': [identity]},
+                'members': {identity: {'native_shape_sha256': branch['shape_sha256'],
+                    'mapping_sha256': audit.digest({k: v for k, v in binding.items() if k != 'evidence'})}}}}}
+    before = producer.current_requirements_source_seal(requirements_for(imported[0]), {identity: imported[0]})
+    assert producer.current_requirements_source_seal(requirements_for(imported[1]), {identity: imported[1]}) == before
+    # The existing mapping merger still authenticates its exact predecessor and
+    # refuses to replace the protected category view, even with a valid policy.
+    old = deepcopy(imported[0])
+    proposed = deepcopy(old)
+    proposed['evidence'] = {}
+    predecessor = {'binding_sha256': audit.digest(old),
+                   'policy_sha256': audit.digest(policy['branches'][identity])}
+    reviewed = {'bindings': {identity: proposed}, 'predecessors': {identity: predecessor}}
+    merged = {identity: deepcopy(old)}
+    apply_mapping_attachments(reviewed, merged, {identity: policy['branches'][identity]})
+    assert merged[identity] == old
+    for damage in ('predecessor', 'category'):
+        rejected, state = deepcopy(reviewed), {identity: deepcopy(old)}
+        if damage == 'predecessor':
+            rejected['predecessors'][identity]['binding_sha256'] = '0' * 64
+        else:
+            rejected['bindings'][identity]['category_inputs']['live_metadata']['replay'][-1]['field'] = 'WrongField'
+        with pytest.raises(ValueError, match='original binding/policy|original proof metadata'):
+            apply_mapping_attachments(rejected, state, {identity: policy['branches'][identity]})
+        assert state == {identity: old}
+    for key in ('historical', 'replay'):
+        changed = deepcopy(imported[0])
+        changed['category_inputs']['live_metadata'][key][0] = 'changed-protected-input'
+        assert producer.current_requirements_source_seal(requirements_for(changed), {identity: changed}) != before
+
+
+@pytest.mark.parametrize('cohort', ('r51', 'r54', 'r55'))
+def test_imported_selection_identity_rejects_forged_view_and_raw_receipts(
+        original_root, inventory, tmp_path, cohort):
+    policy = audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')
+    if cohort == 'r51':
+        path, index, base, attachment, branch = portable_control(tmp_path, original_root, inventory)
+    else:
+        path, index, base, attachment, branch = portable_r54_control(tmp_path, inventory, cohort=cohort)
+    imported, _, _ = audit.portable_binding_inputs(path, policy)
+    binding = imported['bindings'][branch['id']]
+    edges = {row['id']: row for row in inventory['native_coverage']['obligations'] if row['kind'] == 'reference'}
+    def result(changed):
+        return completion.evidence_result(attachment['evidence'], branch, 'c' * 64,
+            'live_metadata', 'controlled', base, changed, source_root=audit.ROOT, reference_edges=edges)
+    assert result(binding) == ('passed', None)
+    for damage in ('field', 'scope', 'native-hash', 'extra', 'missing', 'contract', 'historical', 'argv'):
+        changed = deepcopy(binding)
+        inputs = changed['category_inputs']['live_metadata']
+        selected = inputs['replay'][-1]
+        if damage == 'field': selected['field'] = 'WrongField'
+        elif damage == 'scope': selected['scope'] = {'kind': 'object', 'object': 'wrong'}
+        elif damage == 'native-hash': selected['native_sha256'] = '0' * 64
+        elif damage == 'extra': selected['ignored'] = True
+        elif damage == 'missing': del selected['native_sha256']
+        elif damage == 'contract': selected['contract'] = 'unreviewed-selection-kind'
+        elif damage == 'historical': inputs['historical'][-1] = 'changed-original-token'
+        else: inputs['replay'][3] = 'changed-current-scope'
+        assert result(changed)[0] == 'missing', damage
+    # Reseal the raw artifacts to test semantic authentication, rather than only
+    # failing their outer file hashes. Every iteration starts from original data.
+    original_record = completion.read_sealed_artifact(attachment['evidence'], base)
+    original_program = completion.read_sealed_artifact(original_record['replay'], base)
+    program_path = base / original_record['replay']['artifact']
+    record_path = base / attachment['evidence']['artifact']
+    attachment_path = base / index['metadata_attachments'][0]['artifact']
+    for damage in ('raw-selection', 'field', 'scope', 'native-hash', 'historical'):
+        record, program, item = deepcopy(original_record), deepcopy(original_program), deepcopy(attachment)
+        if damage == 'raw-selection':
+            program['gateway']['argv'][-1] = record['category_inputs']['replay'][-1] = 'mf1.wrong-discovery-token'
+        elif damage == 'field': program['native_call']['args']['property'] = 'WrongField'
+        elif damage == 'scope': program['gateway']['payload']['agent_result']['scope'] = {'kind': 'class', 'classId': 0}
+        elif damage == 'native-hash': program['replayed_original_native_sha256'] = '0' * 64
+        else: record['category_inputs']['historical'][-1] = 'changed-original-token'
+        record['replay'] = {**record['replay'], 'sha256': write(program_path, program)['sha256']}
+        item['category_inputs'] = deepcopy(record['category_inputs'])
+        item['evidence'] = {**item['evidence'], 'sha256': write(record_path, record)['sha256']}
+        index['metadata_attachments'][0]['sha256'] = write(attachment_path, item)['sha256']
+        path.write_text(json.dumps(index))
+        with pytest.raises(ValueError, match='selector|discovered field'):
+            audit.portable_binding_inputs(path, policy)
+
+
+def test_imported_selection_identity_rejects_equal_number_with_wrong_json_type(inventory, tmp_path):
+    path, index, base, attachment, branch = portable_r54_control(tmp_path, inventory)
+    policy = audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')
+    imported, _, _ = audit.portable_binding_inputs(path, policy)
+    binding = imported['bindings'][branch['id']]
+    edges = {row['id']: row for row in inventory['native_coverage']['obligations'] if row['kind'] == 'reference'}
+    def result(changed, descriptor=attachment['evidence']):
+        return completion.evidence_result(descriptor, branch, 'c' * 64, 'live_metadata',
+            'controlled', base, changed, source_root=audit.ROOT, reference_edges=edges)
+    assert result(binding) == ('passed', None)
+    changed = deepcopy(binding)
+    scope = changed['category_inputs']['live_metadata']['replay'][-1]['scope']
+    assert type(scope['resolved']['classId']) is int
+    scope['resolved']['classId'] = float(scope['resolved']['classId'])
+    assert result(changed)[0] == 'missing'
+    record = completion.read_sealed_artifact(attachment['evidence'], base)
+    replay = completion.read_sealed_artifact(record['replay'], base)
+    for damage in ('scope', 'native-argument', 'discovery-scope'):
+        program = deepcopy(replay)
+        if damage == 'scope':
+            value = program['gateway']['payload']['agent_result']['scope']['resolved']
+            value['classId'] = float(value['classId'])
+        elif damage == 'native-argument':
+            program['native_call']['args']['classId'] = float(program['native_call']['args']['classId'])
+        else:
+            value = program['discovery_pages'][0]['payload']['agent_result']['scope']['resolved']
+            value['classId'] = float(value['classId'])
+        changed_record = deepcopy(record)
+        changed_record['replay'] = write(base / 'wrong-type-program.json', program,
+            nodeid=record['replay']['nodeid'])
+        descriptor = write(base / 'wrong-type-record.json', changed_record,
+            nodeid=attachment['evidence']['nodeid'])
+        # Both explicit binding representations must retain the native JSON type.
+        for inputs in (binding['category_inputs']['live_metadata'], record['category_inputs']):
+            changed = deepcopy(binding)
+            changed['category_inputs']['live_metadata'] = deepcopy(inputs)
+            assert result(changed, descriptor)[0] == 'missing', damage

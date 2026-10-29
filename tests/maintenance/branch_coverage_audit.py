@@ -669,7 +669,14 @@ def portable_binding_inputs(index_path, requirements):
                 if len(content)!=entry['bytes'] or hashlib.sha256(content).hexdigest()!=entry['sha256']:
                     raise ValueError('Original class metadata file digest/size mismatch')
             bindings[identity]['evidence']['live_metadata']=deepcopy(evidence)
-            bindings[identity]['category_inputs']={'live_metadata':deepcopy(attachment['category_inputs'])}
+            if historical:
+                from tests.support.metadata_replay_branch_evidence import metadata_replay_category_inputs
+                from tests.maintenance.branch_audit_completion import read_metadata_run
+                context = read_metadata_run(archive, base, historical_class=True)
+                inputs = metadata_replay_category_inputs(record, program, context)
+            else:
+                inputs = deepcopy(attachment['category_inputs'])
+            bindings[identity]['category_inputs']={'live_metadata':inputs}
             continue
         if (set(record) != {'candidate_sha256','scope_kind','evidence_kind','metadata_run','invocation','replay',
                 'replay_bindings','source_bridge','branch_assertions','category_inputs'}
@@ -698,7 +705,10 @@ def portable_binding_inputs(index_path, requirements):
         # Add only this category's evidence and independently bound input.
         # Existing program projections, source mappings and inputs stay exact.
         bindings[identity]['evidence']['live_metadata'] = deepcopy(evidence)
-        bindings[identity]['category_inputs'] = {'live_metadata':deepcopy(attachment['category_inputs'])}
+        from tests.support.metadata_replay_branch_evidence import metadata_replay_category_inputs
+        from tests.maintenance.branch_audit_completion import read_metadata_run
+        context = read_metadata_run(archive, base)
+        bindings[identity]['category_inputs'] = {'live_metadata':metadata_replay_category_inputs(record, program, context)}
     source_business_facts = []
     if 'source_attachments' in index:
         from tests.support.source_copy_branch_evidence import portable_source_attachments
