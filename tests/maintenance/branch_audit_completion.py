@@ -236,6 +236,7 @@ def candidate_identity(root, inventory, catalogs, *, digest, requirements_docume
                  'tests/fixtures/metadata-conditions/new-condition-current-program.json.gz',
                  'tests/fixtures/metadata-conditions/new-condition-current-program-r2.json.gz',
                  'tests/fixtures/metadata-conditions/new-condition-current-program-r3.json.gz',
+                 'tests/fixtures/metadata-conditions/new-condition-current-program-r4.json.gz',
                  'tests/fixtures/metadata-conditions/condition-completion-review.json',
                  'tests/fixtures/metadata-conditions/condition-completion-proof-inputs.json.gz'):
         path = root / name
