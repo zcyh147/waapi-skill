@@ -105,13 +105,14 @@ def _requirements_source_bindings(root, requirements, wanted):
     descriptors = index.get('mapping_attachments', [])
     if not isinstance(descriptors, list):
         raise ValueError('Requirements identity needs closed mapping sidecars')
+    requirements_sha256 = digest(requirements)
     for descriptor in descriptors:
         attachment = read(descriptor)
         if (not isinstance(attachment, dict) or set(attachment) != {'contract', 'scope_kind',
                 'requirements_sha256', 'mechanisms', 'bindings', 'predecessors'}
                 or attachment['contract'] != 'waapi-skill.branch-mapping-attachment/v1'
                 or attachment['scope_kind'] != 'product'
-                or attachment['requirements_sha256'] != digest(requirements)
+                or attachment['requirements_sha256'] != requirements_sha256
                 or not isinstance(attachment['bindings'], dict)):
             raise ValueError('Requirements identity mapping document differs')
         selected = wanted & attachment['bindings'].keys()

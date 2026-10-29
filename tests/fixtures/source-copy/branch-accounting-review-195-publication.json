@@ -205,7 +205,7 @@
     "tests/fixtures/source-copy/branch-successor-review-r92.json": "278fcf8f3f404aba71d12995a6e42cc447bdabb2606800f6456a2751f9bd032f",
     "tests/maintenance/__init__.py": "93f800e18500f291b23ed63fc6eb6a36245cd75a3605534a564c4913e05c1104",
     "tests/maintenance/branch_audit_completion.py": "905233005d68383579b02394085864da340cf46f43ee383f9d178e0d6b4c1711",
-    "tests/maintenance/branch_audit_mapping.py": "63dfccdf0a790d4aad228b5cbe71d36d2abb652d6c75b8a3392aacf5ce8b1eda",
+    "tests/maintenance/branch_audit_mapping.py": "23fb2384039dfcb2393a30342ec43ccf77b4fcbd941888b5d05f8c78aad68a6c",
     "tests/maintenance/branch_coverage_audit.py": "3e82dfa6deefad025532628e48a1715ba621b7cc7bac41f9b5136d9f7107e2f5",
     "tests/maintenance/interface_depth_inventory.py": "212ca04d24244e043898656332db0a73d0d207058f7d26c9cbfb633c20a83280",
     "tests/maintenance/source_identity.py": "14d65a3c776f4d18a52e5d525b58bec55b1fd4710c7870ff1bbbbe3ce4cb9d45",
@@ -1690,7 +1690,7 @@
     },
     "tests/maintenance/branch_audit_mapping.py": {
       "captured_sha256": "b69341d96185b92127751aafd3bcdf3914be391660c46af8c61dae1b2facd4ea",
-      "current_sha256": "63dfccdf0a790d4aad228b5cbe71d36d2abb652d6c75b8a3392aacf5ce8b1eda",
+      "current_sha256": "23fb2384039dfcb2393a30342ec43ccf77b4fcbd941888b5d05f8c78aad68a6c",
       "reason": "Bounded candidate-independent requirements projection preserves Source policy/current mapping/immutable facts; full mapping/predecessor/protected metadata admission remains exact."
     },
     "tests/maintenance/branch_coverage_audit.py": {
