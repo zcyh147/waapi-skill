@@ -102,6 +102,8 @@ def _requirements_source_bindings(root, requirements, wanted):
         if not isinstance(descriptor, dict) or set(descriptor) != {'artifact', 'sha256'}:
             raise ValueError('Requirements identity needs closed sealed descriptors')
         name = parse_archive_relative_path(descriptor['artifact']).canonical
+        if descriptor['artifact'] != name:
+            raise ValueError('Requirements identity descriptor must use canonical POSIX spelling')
         target = base / name
         if target.is_symlink() or not target.resolve(strict=True).is_relative_to(base):
             raise ValueError('Requirements identity descriptor escapes bundle')

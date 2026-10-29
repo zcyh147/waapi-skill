@@ -218,6 +218,8 @@ def _portable_source_document(descriptor, base):
     if not isinstance(descriptor, dict) or set(descriptor) != {'artifact', 'sha256'}:
         raise ValueError('Closed Source successor descriptor required')
     relative = parse_archive_relative_path(descriptor['artifact']).canonical
+    if descriptor['artifact'] != relative:
+        raise ValueError('Source successor descriptor must use canonical POSIX spelling')
     boundary = Path(base).resolve(strict=True)
     path = boundary / relative
     if path.is_symlink() or not path.resolve(strict=True).is_relative_to(boundary):

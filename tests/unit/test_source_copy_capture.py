@@ -1184,8 +1184,8 @@ def test_source_projection_cannot_authorize_a_caller_invented_roster(source_curr
     assert identity() != before  # Foreign proof-like fields never receive the Source cut.
 
 
-@pytest.mark.parametrize('damage', ('mapping-seal', 'requirements-seal', 'escape'))
-def test_source_identity_canonical_resolver_requires_sealed_current_mappings(source_current_mapping_case, tmp_path, monkeypatch, damage):
+@pytest.mark.parametrize('damage', ('mapping-seal', 'requirements-seal', 'escape', 'backslash-alias'))
+def test_source_identity_canonical_resolver_requires_sealed_current_mappings(source_current_mapping_case, tmp_path, monkeypatch, request, damage):
     import os
     from tests.maintenance import branch_audit_completion as completion
     from tests.support.source_copy_branch_evidence import write_json
@@ -1199,6 +1199,7 @@ def test_source_identity_canonical_resolver_requires_sealed_current_mappings(sou
         view[canonical.parent / descriptor['path']] = tmp_path / descriptor['path']
     index = json.loads(case['index'].read_bytes())
     index['base'] = os.path.relpath(case['base'], canonical_index.parent)
+    unchecked_alias = None
     if damage == 'mapping-seal': index['mapping_attachments'][0]['sha256'] = '0' * 64
     elif damage == 'escape': index['mapping_attachments'][0]['artifact'] = '../outside.json'
     elif damage == 'requirements-seal':
@@ -1206,14 +1207,61 @@ def test_source_identity_canonical_resolver_requires_sealed_current_mappings(sou
         mapping['requirements_sha256'] = '0' * 64
         path = case['output'] / 'wrong-requirements-identity.json'
         index['mapping_attachments'] = [{**write_json(path, mapping), 'artifact': path.relative_to(case['base']).as_posix()}]
+    elif damage == 'backslash-alias':
+        raw = (case['base'] / index['mapping_attachments'][0]['artifact']).read_bytes()
+        directory = case['output'] / 'alias-control'
+        canonical_map = directory / 'maps/source.json'
+        canonical_map.parent.mkdir(parents=True)
+        canonical_map.write_bytes(raw)
+        spelling = (directory.relative_to(case['base']).as_posix() + '/maps/source.json').replace('/', '\\')
+        unchecked_alias = case['base'] / spelling
+        if os.name != 'nt':
+            outside = tmp_path / 'outside-map.json'
+            outside.write_bytes(raw)
+            unchecked_alias.symlink_to(outside)
+            request.addfinalizer(unchecked_alias.unlink)
+        index['mapping_attachments'][0]['artifact'] = spelling
     index_path = tmp_path / canonical_index.name
     write_json(index_path, index)
     view[canonical_index] = index_path
     original_open = Path.open
-    monkeypatch.setattr(Path, 'open', lambda path, *args, **kwargs: original_open(view.get(path, path), *args, **kwargs))
-    with pytest.raises(ValueError, match='digest mismatch|mapping document differs|duplicate Source|archive|traversal'):
+    def published_open(path, *args, **kwargs):
+        assert unchecked_alias is None or path != unchecked_alias, 'Unchecked descriptor alias was read'
+        return original_open(view.get(path, path), *args, **kwargs)
+    monkeypatch.setattr(Path, 'open', published_open)
+    with pytest.raises(ValueError, match='digest mismatch|mapping document differs|duplicate Source|archive|traversal|canonical'):
         completion.candidate_identity(audit.ROOT, {**case['inventory'], 'sources': {}},
             case['inventory']['native_coverage']['catalogs'], digest=audit.digest)
+
+
+def test_source_accounting_context_rejects_noncanonical_alias_before_read(source_current_mapping_case, tmp_path, monkeypatch, request):
+    import os
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_native_evidence import validate_successor_context
+    case = source_current_mapping_case
+    index = json.loads(case['index'].read_bytes())
+    native = completion.read_sealed_artifact(index['source_native_attachments'][0], case['base'])
+    descriptor = dict(native['successor_context'])
+    raw = (case['base'] / descriptor['artifact']).read_bytes()
+    directory = case['output'] / 'context-alias-control'
+    canonical_context = directory / 'records/context.json'
+    canonical_context.parent.mkdir(parents=True)
+    canonical_context.write_bytes(raw)
+    descriptor['artifact'] = (directory.relative_to(case['base']).as_posix() + '/records/context.json').replace('/', '\\')
+    alias = case['base'] / descriptor['artifact']
+    if os.name != 'nt':
+        outside = tmp_path / 'outside-context.json'
+        outside.write_bytes(raw)
+        alias.symlink_to(outside)
+        request.addfinalizer(alias.unlink)
+    original_open = Path.open
+    def checked_open(path, *args, **kwargs):
+        assert path != alias, 'Unchecked Source context alias was read'
+        return original_open(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'open', checked_open)
+    with pytest.raises(ValueError, match='canonical'):
+        validate_successor_context(descriptor, case['base'],
+            candidate=case['inventory']['native_coverage']['candidate_sha256'])
 
 
 @pytest.mark.parametrize('damage', ('duplicate', 'non-source-seal', 'non-source-contract'))
