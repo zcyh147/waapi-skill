@@ -100,6 +100,7 @@ def test_older_loaded_media_composite_public_teardown_consumer(request, tmp_path
     captures = [public_read(tmp_path / str(i), version, rows, position)
                 for i, (rows, position) in enumerate(families)]
     def finalize(phases):
+        from unittest.mock import patch
         from tests.support.loaded_media_runtime_evidence import write_composite_bundle, write_loaded_media_bundle, BASIS
         paths = []
         for i, (receipt, native, context, trace) in enumerate(captures):
@@ -108,13 +109,27 @@ def test_older_loaded_media_composite_public_teardown_consumer(request, tmp_path
                 phase_reports=phases, source_context=context, native_reads=trace,
                 public_calls=[{'gateway': receipt, 'native_start': 0, 'native_end': len(trace)}])
             paths.append(path)
-        index = (write_loaded_media_bundle(tmp_path / 'bundle',paths,inventory=inventory,name_prefix='lm-2025-')
-                 if version == '2025.1' else
-                 write_composite_bundle(tmp_path / 'bundle', paths, inventory=inventory, version=version))
+        published_path = audit.ROOT / 'docs/branch-coverage-requirements.json'
+        original_load = audit.load
+        reads = []
+        def counted_load(path):
+            if path == published_path:
+                reads.append(path)
+            return original_load(path)
+        def publish(output):
+            return (write_loaded_media_bundle(output, paths, inventory=inventory, name_prefix='lm-2025-')
+                    if version == '2025.1' else
+                    write_composite_bundle(output, paths, inventory=inventory, version=version))
+        with patch.object(audit, 'load', counted_load):
+            index = publish(tmp_path / 'bundle')
+        assert len(reads) == 2  # One authenticated snapshot and one exit drift check.
         policies = json.loads((index.with_name(index.name.replace('index.json','requirements.json'))).read_bytes())
         document, base, _ = audit.portable_binding_inputs(index, policies)
-        result = completion.evaluate_coverage(audit.ROOT, inventory, document, digest=audit.digest,
-            evidence_base=base, requirements_document=policies)
+        reads.clear()
+        with patch.object(audit, 'load', counted_load):
+            result = completion.evaluate_coverage(audit.ROOT, inventory, document, digest=audit.digest,
+                evidence_base=base, requirements_document=policies)
+        assert len(reads) == 2
         rows = [r for r in result['obligations'] if r['route'].startswith(version + '|')]
         assert len(rows) == 31
         assert {r['state'] for r in rows} == {'verified'}, json.dumps(rows)
@@ -125,6 +140,20 @@ def test_older_loaded_media_composite_public_teardown_consumer(request, tmp_path
             'older_nonempty_native_execution': False, 'older_parent_outcome': 'BLOCKED'})
         published_packets.append((index,policies))
         if version != '2025.1':
+            reads.clear()
+            def drifted_load(path):
+                value = counted_load(path)
+                if path == published_path and len(reads) == 2:
+                    value = deepcopy(value)
+                    value['branches'][anchor['id']]['categories'] = []
+                return value
+            with patch.object(audit, 'load', drifted_load):
+                with pytest.raises(ValueError, match='requirements changed during operation'):
+                    publish(tmp_path / 'drift-bundle')
+            assert len(reads) == 2
+            assert not (tmp_path / 'drift-bundle').exists()
+            failed = list(tmp_path.glob('drift-bundle-pending-*/publication-status.json'))
+            assert len(failed) == 1 and json.loads(failed[0].read_text())['status'] == 'FAIL'
             composite_damage_controls(tmp_path,inventory,document,base,policies,anchor['id'])
         else:
             # All three publishers create their own namespace; no recursive

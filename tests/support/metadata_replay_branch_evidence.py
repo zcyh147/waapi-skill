@@ -653,7 +653,7 @@ CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'aft
                                               'before': None},
  'tests/support/imports_completion_mapping.py': {'after': '0263061ba417a4bb9dcebb77c6207dcd225733bdb3f244b7971cc23344fa6b1d',
                                                  'before': None},
- 'tests/support/loaded_media_runtime_evidence.py': {'after': '2bc6ef5fb87077721a615a21d4690aafdc842e67e4c8d60381a19fe8cdc96305',
+ 'tests/support/loaded_media_runtime_evidence.py': {'after': '485d9822d43245d9f3ccea8a91a968cb0e36818e7b15333f6bbb015a6aa94ae5',
                                                     'before': None},
  'tests/support/meter_runtime_read_evidence.py': {'after': 'f2516b984c9ab45175f58fcff2a2ce452b390b151d9266d0260d12235b59b6b3',
                                                   'before': None},
@@ -690,7 +690,7 @@ CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'aft
  'tests/support/source_copy_branch_evidence.py': {'after': 'de255dc11e0cb81e625eb23b1a4c63ac61f61529673b8bf1f609988470ee974a',
                                                   'before': 'd4d1e5ae5e5736c01362ed25f7ec0745c4a324bddca5a88695811e852cc88e06'},
  # Source followup: raw current reader changed only its normalized accounting-review pin; before/semantic target remain exact.
- 'tests/support/source_copy_native_evidence.py': {'after': '2fd0015267a68e39fdcfb38205c580de9c6fcf31c771baef0098ab771ef1e03e',
+ 'tests/support/source_copy_native_evidence.py': {'after': 'bee29c6ee8246c81060df0ccd62b472cc596ed03bec1cc6dcced2e4b34df8010',
                                                   'before': 'a7ac635f8b4964cab93d84479d64f6af1ca6dad2f1d2bfc2daffb5c3b6ec38d6'},
  'tests/support/test_run_result.py': {'after': '711a2240e8515515e81abd0624bfdd197b7ad798a32812aee7fd7713c2c528a4',
                                       'before': None},

@@ -1,8 +1,12 @@
 """One reviewed 9262 LoadedMedia fact; no alternate-build execution mechanism."""
 from copy import deepcopy
+from contextlib import contextmanager
+from contextvars import ContextVar
+from functools import wraps
 import json
 from pathlib import Path, PurePosixPath
 import shutil
+import tempfile
 
 from tests.maintenance import branch_coverage_audit as audit
 from tests.maintenance import branch_audit_completion as completion
@@ -19,6 +23,64 @@ PREFIX = '/private/tmp/waapi-r122-demo-native-r4/evidence/'
 CATEGORY = 'profiler-loaded-media-observation'
 BASIS = {'catalog_build': '2025.1.7.9143', 'observed_build': '2025.1.11.9262',
          'basis': 'exact_reviewed_representative_support'}
+
+_CURRENT_POLICY_OPERATION = ContextVar('loaded_media_current_policy_operation', default=None)
+
+
+@contextmanager
+def current_policy_operation(root, *, independent=False):
+    """Reuse only this operation's validated current policy, then check drift."""
+    root = Path(root).resolve()
+    active = _CURRENT_POLICY_OPERATION.get()
+    if not independent and active is not None and active['root'] == root:
+        yield
+        return
+    state = {'root': root, 'documents': {}}
+    token = _CURRENT_POLICY_OPERATION.set(state)
+    try:
+        yield
+    finally:
+        try:
+            for path, (_, identity) in state['documents'].items():
+                if audit.digest(audit.load(path)) != identity:
+                    raise ValueError('LoadedMedia current requirements changed during operation')
+        finally:
+            _CURRENT_POLICY_OPERATION.reset(token)
+
+
+def _published_branches(root, relative):
+    path = Path(root) / relative
+    active = _CURRENT_POLICY_OPERATION.get()
+    if active is None or active['root'] != Path(root).resolve():
+        return audit.load(path)['branches']
+    if path not in active['documents']:
+        document = audit.load(path)
+        active['documents'][path] = (document, audit.digest(document))
+    return active['documents'][path][0]['branches']
+
+
+def _validated_publication(function):
+    """Expose no bundle until operation-exit policy validation succeeds."""
+    @wraps(function)
+    def publish(output, *args, **kwargs):
+        output = Path(output)
+        if output.exists():
+            raise ValueError('LoadedMedia output already exists')
+        output.parent.mkdir(parents=True, exist_ok=True)
+        pending = Path(tempfile.mkdtemp(prefix=output.name + '-pending-', dir=output.parent))
+        staged = pending / output.name
+        try:
+            with current_policy_operation(audit.ROOT, independent=True):
+                result = function(staged, *args, **kwargs)
+            if output.exists():
+                raise ValueError('LoadedMedia output appeared during publication')
+            staged.rename(output)
+            return output / result.relative_to(staged)
+        except BaseException as error:
+            (pending / 'publication-status.json').write_text(json.dumps(
+                {'status': 'FAIL', 'published': False, 'reason': str(error)}, sort_keys=True) + '\n')
+            raise
+    return publish
 
 
 def review(root=audit.ROOT):
@@ -37,7 +99,7 @@ def review(root=audit.ROOT):
     if (original_blob.returncode or runtime.sha(original) != baseline['sha256']
             or set(result['entries']) & set(json.loads(original)['branches'])):
         raise ValueError('LoadedMedia prior-policy absence baseline changed')
-    published = audit.load(root / baseline['path'])['branches']
+    published = _published_branches(root, baseline['path'])
     if any(identity in published and {key: value for key, value in published[identity].items() if key != 'representative_mechanism'} != policy(entry)
             for identity, entry in result['entries'].items()):
         raise ValueError('Unreviewed published LoadedMedia policy differs')
@@ -343,6 +405,7 @@ def accepts_native_context(context,branch,binding,record,base,root):
     return True
 
 
+@_validated_publication
 def write_loaded_media_bundle(output,captures,*,inventory,originals=None,name_prefix=''):
     """Publish the closed31-branch slice through the existing portable importer."""
     if name_prefix not in ('','lm-2025-'):
@@ -499,7 +562,7 @@ def composite_review(root=audit.ROOT):
     prior = subprocess.check_output(['git','show',baseline['candidate']+':'+baseline['path']],cwd=root)
     if runtime.sha(prior) != baseline['sha256'] or set(result['entries']) & set(json.loads(prior)['branches']):
         raise ValueError('Older LoadedMedia immutable policy-absence baseline differs')
-    published = audit.load(root / baseline['path'])['branches']
+    published = _published_branches(root, baseline['path'])
     if any(identity in published and {key: value for key, value in published[identity].items() if key != 'representative_mechanism'} != composite_policy(entry)
            for identity,entry in result['entries'].items()):
         raise ValueError('Unreviewed published older LoadedMedia policy differs')
@@ -705,6 +768,7 @@ def _validate_loaded_program(record, binding, branch, root, edges, profile):
 
 
 
+@_validated_publication
 def write_composite_bundle(output,captures,*,inventory,version):
     """Publish the closed31-branch slice through the existing portable importer."""
     name_prefix='lm-composite-'+version[:4]+'-'
@@ -1002,6 +1066,7 @@ def validate_console_source(proof,sources,branch,binding,root,base):
         raise ValueError('Console LoadedMedia original full413 source bridge differs')
 
 
+@_validated_publication
 def write_console_bundle(output,captures,*,inventory,version):
     """The existing portable format, exactly31 Console IDs and one result gate."""
     from tests.support import runtime_remaining_evidence as remaining
