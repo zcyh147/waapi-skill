@@ -892,3 +892,100 @@ def test_source_successor_rejects_incomplete_capture_phases(source_successor_cas
     write_json(changed, index)
     with pytest.raises(ValueError, match='complete successful capture phases'):
         audit.portable_binding_inputs(changed, case['requirements'])
+
+
+@pytest.fixture(scope='module')
+def source_current_mapping_case():
+    """One complete cached Source packet and current Object mapping, no producer."""
+    from copy import deepcopy
+    import tempfile
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support import object_completion_mapping as mapper
+    from tests.support.source_copy_native_evidence import publish_source_native_successor
+    from tests.support.source_copy_branch_evidence import native_route
+    from tests.unit.test_runtime_log_branch_evidence import log_inventory
+    from tests.unit.test_runtime_selected_native_reuse import current_mapping_successor
+    product = audit.ROOT / 'tests/fixtures/branch-evidence/product'
+    old_index = product / 'source-195-current-88a6cbbe-2022.1/portable/index.json'
+    old = json.loads(old_index.read_bytes())
+    native = completion.read_sealed_artifact(old['source_native_attachments'][0], product)
+    policies = completion.read_sealed_artifact(old['entries'][0]['origin']['requirements'], product)
+    inventory = log_inventory(native_route('2022.1'))
+    with tempfile.TemporaryDirectory(prefix='.source-current-mapping-', dir=product) as temporary:
+        output = Path(temporary)
+        index = publish_source_native_successor(old_index, predecessor=native['predecessor'],
+            inventory=inventory, product_base=product, destination=output / 'accounting', accounting=True)
+        anchor = native_route('2022.1') + '|/resultSchema'
+        ids = set(policies['branches']) | {anchor}
+        # Reference rows stay available for exact Source pointer-chain checks.
+        inventory['native_coverage']['obligations'] = [row for row in inventory['native_coverage']['obligations']
+            if row['id'] in ids or row['kind'] == 'reference']
+        _, locations = mapper.discover_objects(audit.ROOT)
+        mapping_inventory = deepcopy(inventory)
+        mapping_inventory['native_coverage']['obligations'] = [row for row in inventory['native_coverage']['obligations'] if row['id'] in ids]
+        mapping_inventory['native_locations'] = {identity: locations[identity] for identity in ids}
+        mapping_inventory['object_roster_sha256'] = audit.digest([(row['id'], row['shape_sha256'])
+            for row in mapping_inventory['native_coverage']['obligations']])
+        mapping_inventory['object_routes_sha256'] = audit.digest(mapping_inventory['native_coverage']['routes'])
+        case = current_mapping_successor(index, policies, mapping_inventory, mapper,
+            output / 'current', selected_code=anchor)
+        case.update(inventory=inventory, anchor=anchor, source_ids=set(policies['branches']))
+        yield case
+
+
+def test_current_object_mapping_retains_source_categories_but_needs_selected_current_code(source_current_mapping_case):
+    from tests.maintenance import branch_audit_completion as completion
+    case = source_current_mapping_case
+    document, base, _ = audit.portable_binding_inputs(case['index'], case['requirements'])
+    assert all(binding['input'].get('correspondence') for binding in document['bindings'].values())
+    result = completion.evaluate_coverage(audit.ROOT, case['inventory'], document, digest=audit.digest,
+        evidence_base=base, requirements_document=case['requirements'])
+    rows = {row['id']: row for row in result['obligations']}
+    for identity in case['source_ids']:
+        assert rows[identity]['evidence_results']['program']['outcome'] == 'passed', rows[identity]['evidence_results']
+        assert rows[identity]['evidence_results']['native']['outcome'] == 'passed', rows[identity]['evidence_results']
+        assert document['bindings'][identity]['evidence'] == case['original']['bindings'][identity]['evidence']
+    assert rows[case['anchor']]['evidence_results']['program']['outcome'] == 'missing'
+    assert rows[case['anchor']]['state'] != 'verified'
+    assert result['completion']['complete'] is False
+    assert 'program' not in document['bindings'][case['anchor']]['evidence']
+    assert all({key: value for key, value in binding.items() if key != 'evidence'} ==
+        {key: value for key, value in case['attachment']['bindings'][identity].items() if key != 'evidence'}
+        for identity, binding in document['bindings'].items())
+
+
+@pytest.mark.parametrize('damage', ['current-mapping', 'current-review', 'predecessor', 'foreign-view', 'original-binding', 'capture'])
+def test_current_source_mapping_cannot_bypass_review_or_original_guards(source_current_mapping_case, damage):
+    from tests.unit.test_runtime_selected_native_reuse import reject_current_mapping_damage
+    case = source_current_mapping_case
+    reject_current_mapping_damage(case, damage, min(case['source_ids']))
+
+
+@pytest.mark.parametrize('damage', ['shape', 'program-seal', 'equivalence-seal', 'equivalence-identity', 'foreign-category-view'])
+def test_current_source_category_cannot_borrow_foreign_mapping_or_seals(source_current_mapping_case, damage):
+    from copy import deepcopy
+    import hashlib
+    import uuid
+    from tests.maintenance import branch_audit_completion as completion
+    case = source_current_mapping_case
+    document, base, _ = audit.portable_binding_inputs(case['index'], case['requirements'])
+    identity = min(case['source_ids'])
+    binding = deepcopy(document['bindings'][identity])
+    branch = deepcopy(next(row for row in case['inventory']['native_coverage']['obligations'] if row['id'] == identity))
+    descriptor = deepcopy(binding['evidence']['program'])
+    if damage == 'shape':
+        branch['shape_sha256'] = '0' * 64
+    elif damage == 'program-seal':
+        descriptor['sha256'] = '0' * 64
+    elif damage == 'foreign-category-view':
+        binding['category_evidence_mapping'] = deepcopy(case['original']['bindings'][identity]['input'])
+    else:
+        proof = completion.read_sealed_artifact(binding['source_copy_program_equivalence'], base)
+        proof['binding_semantics_sha256' if damage == 'equivalence-seal' else 'branch_id'] = '0' * 64
+        path = case['output'] / ('false-equivalence-' + uuid.uuid4().hex + '.json')
+        path.write_text(json.dumps(proof), encoding='utf-8')
+        binding['source_copy_program_equivalence'] = {'artifact': path.relative_to(base).as_posix(),
+            'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    result = completion.evidence_result(descriptor, branch, case['inventory']['native_coverage']['candidate_sha256'],
+        'program', 'product', base, binding=binding, source_root=audit.ROOT)
+    assert result[0] == 'missing', result
