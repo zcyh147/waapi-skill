@@ -512,3 +512,94 @@ def test_focused_subset_requires_exact_effective_failure_and_error_counts(ordina
     else: context['run']['result']['errors'] = 0
     reseal_subset(context)
     assert read(context)[0] == 'missing'
+
+
+def parameterized_failed_subset(context):
+    context = focused_failed_subset(context)
+    review, run, base = context['subset_review'], context['run'], context['base']
+    nodes = review['collected_nodes']
+    nodes.insert(1, nodes[0].replace('[kept]', '[second]'))
+    selectors = ['tests/unit/test_code.py::test_selected_mechanism',
+                 'tests/unit/test_code.py::test_unselected']
+    argv = ['ci/test.sh', '--mode', 'nonlive', '--', '-q', '-ra', *selectors]
+    run['plan']['argv'] = run['result']['argv'] = argv
+    run['plan']['interpreter'] = run['result']['interpreter'] = '/controlled/python'
+    run['log'] = '\n'.join(['mode:         nonlive', 'pytest args:  ' + ' '.join(argv[4:]),
+        '_ ERROR at teardown of test_unselected[teardown] _',
+        'FAILED ' + nodes[2], 'ERROR ' + nodes[3], '1 failed, 4 passed, 1 error in 0.3s'])
+    run['summary'].update(passed=4)
+    review.pop('original_summary')
+    review.update(contract='waapi-skill.focused-successful-subset-review/v2',
+        failed_nodes=[nodes[2]], error_nodes=[{'nodeid': nodes[3], 'phase': 'teardown'}],
+        successful_nodes=[nodes[0], nodes[1], nodes[4]], successful_selectors=[selectors[0]])
+    context['attachment']['mechanism']['selected_tests'] = [selectors[0]]
+    collection_argv = ['ci/test.sh', '--mode', 'nonlive', '--', '--collect-only', '-q', *selectors]
+    collection = base / 'collection.log'
+    collection.write_text('\n'.join(['mode:         nonlive', 'pytest args:  ' + ' '.join(collection_argv[4:]),
+        *nodes, '5 tests collected in 0.01s']))
+    review['collection'] = sealed(collection)
+    sources = review['collection_source_review']['sources']
+    receipt = {'candidate': context['attachment']['original_candidate'], 'argv': collection_argv,
+        'interpreter': '/controlled/python', 'git_status_before': '', 'sources_before': sources,
+        'exit_code': 0, 'head_after': context['attachment']['original_candidate'],
+        'git_status_after': '', 'sources_after': sources, 'log_sha256': sealed(collection)['sha256']}
+    context['collection_receipt'] = receipt
+    review['collection_receipt'] = write_json(base / 'collection-result.json', receipt)
+    reseal_subset(context)
+    return context
+
+
+def test_parameterized_successful_subset_requires_complete_original_selector_group(ordinary_run):
+    context = parameterized_failed_subset(ordinary_run)
+    assert read(context) == (OUTCOME, None)
+    assert context['subset_review']['successful_selectors'] == context['attachment']['mechanism']['selected_tests']
+    assert context['run']['result']['status'] == 'FAIL'
+    assert context['run']['summary']['failed'] == context['run']['summary']['errors'] == 1
+    assert 'node_outcomes' not in context['attachment']
+
+
+@pytest.mark.parametrize('damage', ('partial-selected-group', 'failed-group', 'teardown-group',
+    'missing-case', 'extra-case', 'duplicate-case', 'overlap', 'unknown-failure',
+    'collection-source', 'dirty-collection', 'collection-exit', 'collection-candidate', 'qualified-groups'))
+def test_parameterized_successful_subset_rejects_unproved_selector_expansion(ordinary_run, damage):
+    context = parameterized_failed_subset(ordinary_run)
+    review, run, base = context['subset_review'], context['run'], context['base']
+    nodes = review['collected_nodes']
+    old_argv = list(run['plan']['argv'])
+    if damage == 'partial-selected-group':
+        context['attachment']['mechanism']['selected_tests'] = [nodes[0]]
+    elif damage == 'failed-group':
+        context['attachment']['mechanism']['selected_tests'] = [old_argv[-1]]
+    elif damage == 'teardown-group':
+        run['log'] = run['log'].replace('test_unselected[teardown]', 'test_selected_mechanism[second]')
+        review['error_nodes'] = [{'nodeid': nodes[1], 'phase': 'teardown'}]
+        review['successful_nodes'] = [nodes[0], nodes[3], nodes[4]]
+    elif damage == 'missing-case':
+        removed = nodes.pop(1)
+        review['successful_nodes'].remove(removed)
+    elif damage == 'extra-case': nodes.append('tests/unit/test_code.py::test_unknown[extra]')
+    elif damage == 'duplicate-case': nodes.append(nodes[0])
+    elif damage == 'overlap':
+        run['plan']['argv'] = run['result']['argv'] = [*old_argv, nodes[0]]
+    elif damage == 'unknown-failure':
+        run['log'] = run['log'].replace('FAILED ' + nodes[2], 'FAILED tests/unit/test_code.py::test_unselected[unknown]')
+    elif damage == 'collection-source':
+        review['collection_source_review']['sources']['tests/unit/test_code.py'] = '0' * 64
+    elif damage == 'dirty-collection': context['collection_receipt']['git_status_before'] = ' M tests/unit/test_code.py\n'
+    elif damage == 'collection-exit': context['collection_receipt']['exit_code'] = 1
+    elif damage == 'collection-candidate': context['collection_receipt']['head_after'] = '0' * 40
+    else: review['successful_selectors'].append(old_argv[-1])
+    # Keep the envelope coherent so selector/count controls, rather than stale
+    # outer hashes, own rejection of the altered controlled collection.
+    argv = run['plan']['argv']
+    run['log'] = run['log'].replace('pytest args:  ' + ' '.join(old_argv[4:]),
+                                   'pytest args:  ' + ' '.join(argv[4:]))
+    collection_argv = ['ci/test.sh', '--mode', 'nonlive', '--', '--collect-only', '-q', *argv[6:]]
+    collection = base / 'collection.log'
+    collection.write_text('\n'.join(['mode:         nonlive', 'pytest args:  ' + ' '.join(collection_argv[4:]),
+        *nodes, f'{len(nodes)} tests collected in 0.01s']))
+    review['collection'] = sealed(collection)
+    context['collection_receipt'].update(argv=collection_argv, log_sha256=sealed(collection)['sha256'])
+    review['collection_receipt'] = write_json(base / 'collection-result.json', context['collection_receipt'])
+    reseal_subset(context)
+    assert read(context)[0] == 'missing'

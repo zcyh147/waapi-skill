@@ -227,17 +227,22 @@ def _review_focused_successful_subset(record, raw, argv, summary, base, root):
     review = json.loads(_bytes(record['successful_subset_review'], base))
     fields = {'contract', 'collection', 'collection_source_review', 'collected_nodes',
         'failed_nodes', 'error_nodes', 'successful_nodes', 'file_sha256', 'reviewed_reason'}
-    if (set(review) not in (fields, fields | {'original_summary'})
-            or review['contract'] != 'waapi-skill.focused-successful-subset-review/v1'
+    expanded = review.get('contract') == 'waapi-skill.focused-successful-subset-review/v2'
+    expected = fields | ({'collection_receipt', 'successful_selectors'} if expanded else set())
+    if (set(review) not in (expected, expected | {'original_summary'})
+            or review['contract'] not in {'waapi-skill.focused-successful-subset-review/v1',
+                                          'waapi-skill.focused-successful-subset-review/v2'}
             or not isinstance(review['reviewed_reason'], str) or not review['reviewed_reason'].strip()
             or review['file_sha256'] != {name: hashlib.sha256(value).hexdigest() for name, value in raw.items()}
             or argv[:6] != ['ci/test.sh', '--mode', 'nonlive', '--', '-q', '-ra']
-            or review['collected_nodes'] != argv[6:] or len(set(argv[6:])) != len(argv[6:])):
+            or (not expanded and review['collected_nodes'] != argv[6:])
+            or len(set(argv[6:])) != len(argv[6:])):
         raise ValueError('closed exact focused successful-subset review required')
     collection = _bytes(review['collection'], base).decode('utf-8').splitlines()
     collected = [line for line in collection if re.fullmatch(r'tests/unit/test_[A-Za-z0-9_]+\.py::test_\w+(?:\[[^\s\]]+\])?', line)]
     count = re.fullmatch(r'(\d+) tests? collected in \d+(?:\.\d+)?s', collection[-1] if collection else '')
-    if collected != argv[6:] or count is None or int(count[1]) != len(collected):
+    if (collected != (review['collected_nodes'] if expanded else argv[6:])
+            or count is None or int(count[1]) != len(collected)):
         raise ValueError('original exact complete focused collection required')
     source_review = review['collection_source_review']
     required = {node.split('::')[0] for node in collected} | {'tests/conftest.py', 'pyproject.toml', 'ci/test.sh', 'ci/test_driver.py'}
@@ -249,6 +254,43 @@ def _review_focused_successful_subset(record, raw, argv, summary, base, root):
     for name, seal in source_review['sources'].items():
         _original_source(root, source_review['collection_basis'], name, seal)
         _original_source(root, record['original_candidate'], name, seal)
+    groups = None
+    if expanded:
+        collection_argv = ['ci/test.sh', '--mode', 'nonlive', '--', '--collect-only', '-q', *argv[6:]]
+        receipt = json.loads(_bytes(review['collection_receipt'], base))
+        receipt_fields = {'candidate', 'argv', 'interpreter', 'git_status_before', 'sources_before',
+                          'exit_code', 'head_after', 'git_status_after', 'sources_after', 'log_sha256'}
+        plan = json.loads(raw['plan'])
+        if (set(receipt) != receipt_fields or receipt['argv'] != collection_argv
+                or receipt['candidate'] != record['original_candidate']
+                or source_review['collection_basis'] != record['original_candidate']
+                or receipt['head_after'] != receipt['candidate']
+                or receipt['git_status_before'] != '' or receipt['git_status_after'] != ''
+                or receipt['exit_code'] != 0 or type(receipt['exit_code']) is not int
+                or not isinstance(receipt['interpreter'], str) or not receipt['interpreter']
+                or receipt['interpreter'] != plan.get('interpreter')
+                or receipt['sources_before'] != source_review['sources']
+                or receipt['sources_after'] != source_review['sources']
+                or receipt['log_sha256'] != review['collection']['sha256']
+                or sum(bool(re.fullmatch(r'(\d+) tests? collected in \d+(?:\.\d+)?s', line))
+                       for line in collection) != 1
+                or 'mode:         nonlive' not in collection
+                or collection.count('pytest args:  ' + ' '.join(collection_argv[4:])) != 1
+                or len(set(collected)) != len(collected)
+                or any(line.startswith('tests/') and line not in collected for line in collection)
+                or any(token in line for line in collection for token in
+                       ('ERROR', 'Interrupted', 'KeyboardInterrupt', 'INTERNALERROR'))):
+            raise ValueError('exact clean original selector collection receipt required')
+        groups = {selector: [] for selector in argv[6:]}
+        for node in collected:
+            owners = [selector for selector in groups if node == selector
+                      or ('[' not in selector and node.startswith(selector + '['))]
+            if len(owners) != 1:
+                raise ValueError('focused selector expansion is unknown or overlapping')
+            groups[owners[0]].append(node)
+        if (any(not cases for cases in groups.values())
+                or [node for cases in groups.values() for node in cases] != collected):
+            raise ValueError('focused selector expansion is missing or unordered')
     lines = raw['log'].decode('utf-8').splitlines()
     terminal = FOCUSED_TERMINAL.fullmatch(lines[-1] if lines else '')
     if (terminal is None or sum(bool(FOCUSED_TERMINAL.fullmatch(line)) for line in lines) != 1
@@ -274,8 +316,11 @@ def _review_focused_successful_subset(record, raw, argv, summary, base, root):
             or len(collected) != passed + failed + sum(row['phase'] == 'setup' for row in phases)):
         raise ValueError('focused failure/error/count/phase scope differs')
     successful = [node for node in collected if node not in set(failed_nodes + error_nodes)]
+    qualified = ([selector for selector, cases in groups.items() if set(cases) <= set(successful)]
+                 if expanded else successful)
     if (not successful or review['successful_nodes'] != successful
-            or not set(record['mechanism']['selected_tests']) <= set(successful)):
+            or (expanded and review['successful_selectors'] != qualified)
+            or not set(record['mechanism']['selected_tests']) <= set(qualified)):
         raise ValueError('selected focused mechanism has failed or incomplete phases')
     if 'original_summary' in review:
         original = json.loads(_bytes(review['original_summary'], base))
