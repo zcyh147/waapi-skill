@@ -11,6 +11,8 @@ from tests.support.topic_completion_mapping import _path
 LIB = 'skills/waapi-skill/wwise_waapi/'
 GATEWAY = 'skills/waapi-skill/scripts/gateway.py'
 BASE = 'tests/fixtures/branch-evidence/product/object-195-r1/'
+BUSINESS_RECONCILIATION = BASE + 'business-source-reconciliation.json'
+BUSINESS_RECONCILIATION_SHA256 = 'd44322042ec680c8bb8ef9f59e3bfdff10235a79feca9aad85bf0410490c00e0'
 POLICY = 'docs/plans/full-waapi-coverage/SPEC.md'
 OWNERS = {"ak.wwise.core." + name: 180 for name in (
     "object.copy", "object.create", "object.delete", "object.diff", "object.isLinked", "object.move",
@@ -24,7 +26,7 @@ SOURCES = [GATEWAY, *[LIB + name + '.py' for name in (
     'documented_list_fields', 'planned_references', 'business_declarations', 'business_fields',
     'metadata_condition_contracts', 'action_construction', 'reference_kind_evidence', 'new_object_defaults', 'operation_registry', 'builders/schema')],
     'tests/support/object_completion_mapping.py', 'tests/support/topic_completion_mapping.py',
-    'tests/maintenance/map_object_completion.py', POLICY, BASE + 'source-roster.json', BASE + 'business-source-roster.json',
+    'tests/maintenance/map_object_completion.py', POLICY, BASE + 'source-roster.json', BASE + 'business-source-roster.json', BUSINESS_RECONCILIATION,
     'skills/waapi-skill/resources/metadata/action-constructor-sources.json',
     'skills/waapi-skill/resources/metadata/reference-kind-sources.json',
     *['skills/waapi-skill/resources/metadata/' + version + '/' + name + '.json'
@@ -102,8 +104,7 @@ def object_component(root):
     sources = debug_control_component(root)['sources']
     sources.update({name: digest((root / name).read_text(encoding='utf-8')) for name in SOURCES})
     business = business_correspondence(root)
-    if json.loads((root / BASE / 'business-source-roster.json').read_bytes()) != business_source_roster(business):
-        raise ValueError('Object class/plugin/List source member roster differs from reviewed inputs')
+    _validate_business_source_roster(root, business)
     inventory = {'business_correspondence': business, 'component': 'object-195-r1', 'routes': public, 'sources': sources, 'native_locations': locations, 'native_coverage': native}
     native['candidate_sha256'] = candidate_identity(root, inventory, native['catalogs'], digest=digest)
     inventory['object_roster_sha256'] = digest([(r['id'], r['shape_sha256']) for r in native['obligations']])
@@ -149,6 +150,50 @@ def business_correspondence(root):
 def business_source_roster(business):
     return {version: {key: digest(lane[key]) for key in ('class_inputs', 'parent_choices', 'owned_lists', 'plugin_inputs')}
         for version, lane in business['lanes'].items()}
+
+
+def _validate_business_source_roster(root, business):
+    """Reverse only reviewed member deltas, then require the complete old roster.
+
+    As with condition-source reconciliation, the successor is independently
+    pinned and keeps its original predecessor intact. Table membership never
+    supplies constructor permission or native execution evidence.
+    """
+    error = 'Object class/plugin/List source member roster differs from reviewed inputs'
+    raw = (root / BUSINESS_RECONCILIATION).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != BUSINESS_RECONCILIATION_SHA256:
+        raise ValueError(error + ': exact reconciliation changed')
+    review = json.loads(raw)
+    original = (root / BASE / 'business-source-roster.json').read_bytes()
+    if (set(review) != {'contract', 'original_roster_sha256', 'scope', 'member_changes', 'review_provenance'}
+            or review['contract'] != 'waapi-skill.object-business-source-reconciliation/v1'
+            or hashlib.sha256(original).hexdigest() != review['original_roster_sha256']):
+        raise ValueError(error + ': original predecessor changed')
+    if any(hashlib.sha256((root / name).read_bytes()).hexdigest() != seal
+            for name, seal in review['review_provenance']['source_seals'].items()):
+        raise ValueError(error + ': reviewed source changed')
+    predecessor = deepcopy(business)
+    for version, changes in review['member_changes'].items():
+        lane = predecessor['lanes'][version]
+        for name, change in changes['parent_choices'].items():
+            if lane['parent_choices'].get(name) != change['after']:
+                raise ValueError(error + ': reviewed parent member changed')
+            if change['before'] is None:
+                del lane['parent_choices'][name]
+            else:
+                lane['parent_choices'][name] = change['before']
+        lists = lane['owned_lists']
+        for name, change in changes.get('owned_lists_class_changes', {}).items():
+            indices = [i for i, row in enumerate(lists['classes']) if row['name'] == name]
+            if len(indices) != 1 or lists['classes'][indices[0]] != change['after']:
+                raise ValueError(error + ': reviewed List class member changed')
+            lists['classes'][indices[0]] = change['before']
+        for key, change in changes.get('owned_lists_metadata_changes', {}).items():
+            if lists[key] != change['after']:
+                raise ValueError(error + ': reviewed List source metadata changed')
+            lists[key] = change['before']
+    if json.loads(original) != business_source_roster(predecessor):
+        raise ValueError(error)
 
 
 LIFECYCLE = {'copy', 'delete', 'move', 'setName', 'setNotes'}
