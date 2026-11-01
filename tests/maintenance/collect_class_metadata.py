@@ -6,6 +6,8 @@ Same owned lifecycle/public subprocess/receipt flow; no agent or mutation lane.
 """
 from __future__ import annotations
 import argparse
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import asdict
 import hashlib
 import json
@@ -58,6 +60,55 @@ MAX_SEALED_FILES, MAX_SEALED_BYTES = 512, 128 * 1024 * 1024
 COLLECTION_SOURCE_SCOPES = ('skills/waapi-skill','tests/semantic/support','tests/support','tests/destructive/support')
 STALE = {'METADATA_SELECTION_SCOPE_CHANGED', 'METADATA_SELECTION_EXPIRED'}
 UNRESOLVED = {'METADATA_DETAIL_TOO_LARGE', 'LIVE_METADATA_LIMIT_EXCEEDED', 'DISCOVERY_RESULT_LIMIT_EXCEEDED'}
+
+_COLLECTION_POLICY_OPERATION = ContextVar('class_metadata_policy_operation', default=None)
+
+
+@contextmanager
+def _collection_policy_operation(root):
+    """Reuse a private validated policy baseline only inside this operation."""
+    root = Path(root).resolve()
+    active = _COLLECTION_POLICY_OPERATION.get()
+    if active is not None and active['root'] == root:
+        yield
+        return
+    state = {'root': root, 'policy': None, 'envelopes': None}
+    token = _COLLECTION_POLICY_OPERATION.set(state)
+    try:
+        yield
+    finally:
+        try:
+            if state['policy'] is not None:
+                from tests.maintenance.branch_coverage_audit import load
+                load(root / 'docs/branch-coverage-requirements.json')
+                if _collection_policy_envelopes(root) != state['envelopes']:
+                    raise ValueError('Class metadata policy changed during operation')
+        finally:
+            _COLLECTION_POLICY_OPERATION.reset(token)
+
+
+def _collection_policy_envelopes(root):
+    return tuple((root / 'docs' / name).read_bytes() for name in (
+        'branch-coverage-requirements.json', 'branch-coverage-evidence-index.json'))
+
+
+def _collection_requirements_match(identities):
+    """Never return cached mutable policy authority to a collection caller."""
+    from tests.maintenance.branch_coverage_audit import load
+    active = _COLLECTION_POLICY_OPERATION.get()
+    if active is None or active['root'] != Path(REPO).resolve():
+        requirements = load(REPO / 'docs/branch-coverage-requirements.json')
+    else:
+        if active['policy'] is None:
+            envelopes = _collection_policy_envelopes(active['root'])
+            requirements = load(REPO / 'docs/branch-coverage-requirements.json')
+            if _collection_policy_envelopes(active['root']) != envelopes:
+                raise ValueError('Class metadata policy changed during operation')
+            active['envelopes'] = envelopes
+            active['policy'] = requirements
+        requirements = active['policy']
+    return all(requirements['branches'].get(identity, {}).get('categories') == ['program', 'live_metadata']
+               for identity in identities)
 
 class HostFailure(ValueError):
     pass
@@ -122,9 +173,7 @@ def collection_plan(version, *, cohort='r54'):
         if version in ('2023.1','2024.1'):pointers += [definition+'/anyOf/3/@boolean/true']
     prefix = version+'|wwise-console|'+BUILDS[version]+'|function|ak.wwise.core.object.getPropertyInfo|'
     identities = sorted(prefix+pointer for pointer in pointers)
-    from tests.maintenance.branch_coverage_audit import load
-    requirements = load(REPO/'docs/branch-coverage-requirements.json')['branches']
-    if any(requirements.get(identity,{}).get('categories') != ['program','live_metadata'] for identity in identities):
+    if not _collection_requirements_match(identities):
         raise ValueError('Exact default requirement assignment changed')
     return {**({'cohort':'r55'} if cohort == 'r55' else {}),'kind':'class_metadata_only','agent_started':False,'project_mutation_commands':0,
         'version':version,'host':'wwise-console','build':BUILDS[version],

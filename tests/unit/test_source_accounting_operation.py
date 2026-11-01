@@ -9,7 +9,7 @@ from tests.support import source_copy_native_evidence as source
 
 
 @pytest.fixture
-def accounting_packet(tmp_path, monkeypatch):
+def accounting_packet(tmp_path, monkeypatch, request):
     """Real immutable packet with a tiny, filesystem-selected current policy."""
     from tests.support.source_copy_branch_evidence import write_json, native_route
     from tests.maintenance import branch_audit_completion as completion
@@ -20,7 +20,12 @@ def accounting_packet(tmp_path, monkeypatch):
     native = completion.read_sealed_artifact(index['source_native_attachments'][0], product)
     requirements = completion.read_sealed_artifact(index['entries'][0]['origin']['requirements'], product)
     policy = tmp_path / 'requirements.json'
-    audit.write_requirements(policy, {'contract': audit.REQUIREMENTS_CONTRACT, 'branches': {}})
+    branches = {}
+    if getattr(request, 'param', False):
+        identity = ('2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|'
+            '/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true')
+        branches[identity] = {'categories': ['program', 'live_metadata']}
+    audit.write_requirements(policy, {'contract': audit.REQUIREMENTS_CONTRACT, 'branches': branches})
     view = {audit.ROOT / source.REQUIREMENTS_SOURCE: policy}
     for part in json.loads(policy.read_bytes())['parts']:
         view[audit.ROOT / 'docs' / part['path']] = policy.parent / part['path']

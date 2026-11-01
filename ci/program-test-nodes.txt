@@ -263,6 +263,7 @@ tests/unit/test_empty_candidate_evidence.py
 tests/unit/test_metadata_default_branch_evidence.py
 tests/unit/test_metadata_replay_attachments.py
 tests/unit/test_class_metadata_collection.py
+tests/unit/test_class_metadata_policy_operation.py
 tests/unit/test_class_metadata_product_attachments.py
 tests/unit/test_created_topic_branch_evidence.py
 

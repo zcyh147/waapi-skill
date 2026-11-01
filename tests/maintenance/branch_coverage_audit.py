@@ -482,7 +482,8 @@ def write_inventory(path, inventory):
 
 def portable_binding_inputs(index_path, requirements):
     from tests.support.source_copy_native_evidence import accounting_operation
-    with accounting_operation(ROOT):
+    from tests.maintenance.collect_class_metadata import _collection_policy_operation
+    with accounting_operation(ROOT), _collection_policy_operation(ROOT):
         return _portable_binding_inputs(index_path, requirements)
 
 
