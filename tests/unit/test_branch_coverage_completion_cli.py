@@ -132,12 +132,10 @@ def test_historical_product_inputs_select_portable_stale_receipt_without_busines
 @pytest.mark.parametrize('damage,reason', [
     ('duplicate', 'duplicate exact branch'), ('program-byte', 'artifact digest mismatch'),
     ('missing-descriptor', 'original descriptors missing'), ('projection', 'changed more than')])
-def test_cli_rejects_damaged_portable_inputs_without_omitting_them(tmp_path, capsys, damage, reason):
-    import shutil
-    base = tmp_path / 'product'
-    shutil.copytree(audit.ROOT / 'tests/fixtures/branch-evidence/product', base)
-    index = json.loads((audit.ROOT / 'docs/branch-coverage-evidence-index.json').read_bytes())
-    index['base'] = 'product'
+def test_cli_rejects_damaged_portable_inputs_without_omitting_them(
+        tmp_path, capsys, damage, reason, historical_move_single_case):
+    source, requirements, base = historical_move_single_case
+    index = audit.load(source)
     entry = index['entries'][0]
     if damage == 'duplicate':
         index['entries'].append({**deepcopy(entry), 'id': 'second-authority-for-same-branch'})
@@ -151,21 +149,24 @@ def test_cli_rejects_damaged_portable_inputs_without_omitting_them(tmp_path, cap
         altered = json.loads(projection.read_bytes())
         next(iter(altered['bindings'].values()))['input']['gateway_argv'][-1] = 'forged-transaction'
         entry['bindings']['sha256'] = write_json(projection, altered)
-    source = tmp_path / 'index.json'
     write_json(source, index)
     output = tmp_path / 'ledger.json'
-    assert audit.main(['--binding-index', str(source), '--output', str(output), '--require-complete']) == 1
+    assert audit.main(['--binding-index', str(source), '--requirements', str(requirements),
+                       '--output', str(output), '--require-complete']) == 1
     message = json.loads(capsys.readouterr().out)
     assert message['structural_check'] == 'invalid' and reason in message['errors'][0]
     assert not output.exists()
 
 
-def test_default_portable_input_keeps_absent_explicit_requirement_unresolved(tmp_path, capsys):
+def test_default_portable_input_keeps_absent_explicit_requirement_unresolved(
+        tmp_path, capsys, historical_move_single_case):
+    index_path, _, _ = historical_move_single_case
     policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
     requirements = tmp_path / 'requirements.json'
     write_json(requirements, policy)
     output = tmp_path / 'incomplete.json'
-    assert audit.main(['--requirements', str(requirements), '--output', str(output), '--require-complete']) == 2
+    assert audit.main(['--binding-index', str(index_path), '--requirements', str(requirements),
+                       '--output', str(output), '--require-complete']) == 2
     message = json.loads(capsys.readouterr().out)
     assert message['structural_check'] == 'consistent' and message['business_coverage'] == 'incomplete'
     coverage = audit.load(output)['native_coverage']
