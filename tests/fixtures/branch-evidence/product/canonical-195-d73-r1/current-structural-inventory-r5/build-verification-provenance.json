@@ -1,0 +1,30 @@
+{
+  "build_seconds": 24.605896949768066,
+  "build_write_seal_seconds": 27.12625813484192,
+  "built_unix": 1793518484.8555598,
+  "candidate_sha256": "daf963d146d800004981cca4f7f4aedd0a62eb9827dd60e0e0af4574caa82e89",
+  "current_candidate_recomputed": true,
+  "current_source_and_symbol_joins": true,
+  "git_build_candidate": "b897745821ce4b3993ad2bfc2d0ee4475535d9b3",
+  "historical_native_catalog_route_digests_unchanged": true,
+  "inventory_descriptor": {
+    "artifact": "tests/fixtures/branch-evidence/product/canonical-195-d73-r1/current-structural-inventory-r5/structural-inventory.json",
+    "sha256": "b4aa2197496575321c57e8cf42a99946c5e2ef3e9ff7417358ac40500cbf3ffc"
+  },
+  "native_catalogs_sha256": "ded92d1c537c81619f7eb519d1875e53ab2f0728ed0badcf32d03f9ada908219",
+  "native_rows": 272313,
+  "native_rows_sha256": "df91f91c8edd9c7df122ce85e9e17e94ad960f1655a13b7736139a9089d1a6f0",
+  "route_rows": 897,
+  "routes_sha256": "506a715bb048e66153e7ee1bf1210365d08a6415f6070d9a0218bdc564fa7a4b",
+  "source_index": 91,
+  "source_index_sha256": "e8a4e455a19f8ad7cf7f511dfae0fea8d744f4c49b72e797e1f8e437e490a748",
+  "sources": 79,
+  "sources_sha256": "e62510631fcbf6fce99955e886db14020f6cccd062e1a49d96d3862f497f99e7",
+  "standard_build_calls": 1,
+  "structural_only_unevaluated": true,
+  "terminal_unix": 1793518487.375921,
+  "verification": "PASS",
+  "verification_log": "/tmp/waapi-195-current-inventory-r5-verification.log",
+  "verification_method": "existing _capture_inventory with independently explicit descriptor; no build fallback",
+  "verification_seconds": 10.046442985534668
+}
