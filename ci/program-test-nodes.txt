@@ -263,6 +263,7 @@ tests/unit/test_empty_candidate_evidence.py
 tests/unit/test_metadata_default_branch_evidence.py
 tests/unit/test_metadata_replay_attachments.py
 tests/unit/test_class_metadata_collection.py
+tests/unit/test_class_metadata_policy_operation.py
 tests/unit/test_class_metadata_product_attachments.py
 tests/unit/test_created_topic_branch_evidence.py
 
@@ -369,6 +370,7 @@ tests/unit/test_fixed_runtime_read_branch_evidence.py
 tests/unit/test_runtime_result_reference_gateway.py
 tests/unit/test_source_copy_branch_evidence.py
 tests/unit/test_source_copy_capture.py
+tests/unit/test_source_accounting_operation.py
 tests/unit/test_source_copy_modern_collector.py
 tests/unit/test_source_copy_repeated_fixture.py
 tests/unit/test_switch_child_context_gateway.py
