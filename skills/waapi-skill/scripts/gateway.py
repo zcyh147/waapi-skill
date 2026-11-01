@@ -3958,7 +3958,7 @@ def _execute_gateway_unconstrained(
             and transaction_verify_cleanup_projection_safe(payload.get("cleanup"))
         ):
             payload = project_successful_transaction_verify_payload(
-                payload, state_dir=resolve_transaction_state_directory(args, env=env))
+                payload, state_dir=resolve_transaction_state_directory(args, env=source_env))
         if (
             args.command == "query-object"
             and not original_file_reference_match_requested(args)
