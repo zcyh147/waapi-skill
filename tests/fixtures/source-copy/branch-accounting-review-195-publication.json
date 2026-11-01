@@ -204,9 +204,9 @@
     "tests/fixtures/source-copy/branch-successor-review-r123.json": "4f2ccb1aad3e3826b0db88e484919dce06b909d6136a5a3794dc8fc469c2f714",
     "tests/fixtures/source-copy/branch-successor-review-r92.json": "278fcf8f3f404aba71d12995a6e42cc447bdabb2606800f6456a2751f9bd032f",
     "tests/maintenance/__init__.py": "93f800e18500f291b23ed63fc6eb6a36245cd75a3605534a564c4913e05c1104",
-    "tests/maintenance/branch_audit_completion.py": "8fc5150f57e797f76131bb1fba588b830f21f26a77ff3355750b0094d33d13ab",
+    "tests/maintenance/branch_audit_completion.py": "7f14fdef0c5138a382622f735a11adeebda2519eb165e8c303c49d1c032ff126",
     "tests/maintenance/branch_audit_mapping.py": "c3966b611d0b70219967761d041cffff01500c96a573255a256bf908d6acc74e",
-    "tests/maintenance/branch_coverage_audit.py": "c7ac210c0d642e1b238dc592f707eaa1496e8136beb528fdfcb6dcdda58b5c47",
+    "tests/maintenance/branch_coverage_audit.py": "fc61a0f3eb6815af6251c3a32457f6c9f034e360d199e64fc5b84f378f7535f5",
     "tests/maintenance/interface_depth_inventory.py": "212ca04d24244e043898656332db0a73d0d207058f7d26c9cbfb633c20a83280",
     "tests/maintenance/source_identity.py": "14d65a3c776f4d18a52e5d525b58bec55b1fd4710c7870ff1bbbbe3ce4cb9d45",
     "tests/support/condition_completion_mapping.py": "454f2161ef805f1b61f72c0b49cf65b51cbfd27eea4ad1dece4e371a80e9be4d",
@@ -215,7 +215,7 @@
     "tests/support/new_condition_completion.py": "6d4ef487d4cfcac624cb2f5a5a3f3bd013770b1076b5215dd93ff9c863313f3d",
     "tests/support/platform_filesystem.py": "827467a6bb7af0fb74827841fbf8c67b79a020bc0563b4f73504b64fbfb7b95d",
     "tests/support/source_copy_branch_evidence.py": "de255dc11e0cb81e625eb23b1a4c63ac61f61529673b8bf1f609988470ee974a",
-    "tests/support/source_copy_native_evidence.py": "ed8c6998a997da60f8a9d862ee487c2ba4fceb4fa026994c8ffe881bbe8d7a04",
+    "tests/support/source_copy_native_evidence.py": "a33c4f0e869f1709f935272c4c573b7c6c5070748907ca7339df42d0085c94f1",
     "tests/unit/test_conditional_reference_gateway.py": "a6802e122c7893936d5aa66e73a68605825416d62baf32b97b3e8f3d9c5a14b6",
     "tests/unit/test_field_interface_closure_gateway.py": "8c6d1fb76e830a0f1091f2bb9a178f86a4676fd12d5db150f01e8da073326371",
     "tests/unit/test_gameparameter_class_fields_gateway.py": "92f81472bba7ff5006bffd170e6d502b56ff03ae12dd0d00ed717657830bcada",
@@ -1705,8 +1705,8 @@
     },
     "tests/maintenance/branch_audit_completion.py": {
       "captured_sha256": "e5ab72ba26cf4f392b8982120fb91bb1622241ee42afca8272453a524a9c20cf",
-      "current_sha256": "8fc5150f57e797f76131bb1fba588b830f21f26a77ff3355750b0094d33d13ab",
-      "reason": "Candidate requirements source uses the shared semantic projection only; full category and representative completion checks retain their complete identities. Followup: Reviewed metadata8c5a50 current-only semantic requirements/Git ownership bridge preserves raw historical R51/R54/R55 maps, and keeps Source category and representative admission exact. Accounting helper change only. Final staging: Reviewed0c0d71f9 exact raw/semantic metadata selector view checks and strict canonical JSON comparisons; reviewed3e823374 new-condition-r4 candidate hook; prepared actual app-r8 candidate hook. No Source captured/native execution changed. Scoped performance fix: internally authenticated current LoadedMedia policy is reused only within an evidence/coverage operation, revalidated at exit; standalone reads remain fresh and raw historical/native/policy checks unchanged. Genuine applicability r9 successor hook after independently reviewed exact R51 full-policy scope repair; r8 bytes and original facts remain immutable, no app/native credit until actual r9 producer finalizer."
+      "current_sha256": "7f14fdef0c5138a382622f735a11adeebda2519eb165e8c303c49d1c032ff126",
+      "reason": "Candidate requirements source uses the shared semantic projection only; full category and representative completion checks retain their complete identities. Followup: Reviewed metadata8c5a50 current-only semantic requirements/Git ownership bridge preserves raw historical R51/R54/R55 maps, and keeps Source category and representative admission exact. Accounting helper change only. Final staging: Reviewed0c0d71f9 exact raw/semantic metadata selector view checks and strict canonical JSON comparisons; reviewed3e823374 new-condition-r4 candidate hook; prepared actual app-r8 candidate hook. No Source captured/native execution changed. Scoped performance fix: internally authenticated current LoadedMedia policy is reused only within an evidence/coverage operation, revalidated at exit; standalone reads remain fresh and raw historical/native/policy checks unchanged. Genuine applicability r9 successor hook after independently reviewed exact R51 full-policy scope repair; r8 bytes and original facts remain immutable, no app/native credit until actual r9 producer finalizer. Reviewed c2487bba operation-local Source review and class-metadata policy reuse: full entry/exit validation, exact raw policy/index drift and per-binding/native attribution remain enforced; no captured execution or historical observation changes."
     },
     "tests/maintenance/branch_audit_mapping.py": {
       "captured_sha256": "b69341d96185b92127751aafd3bcdf3914be391660c46af8c61dae1b2facd4ea",
@@ -1715,8 +1715,8 @@
     },
     "tests/maintenance/branch_coverage_audit.py": {
       "captured_sha256": "6a7046d2b66fdeb8718b870e85457d59043e3deaf66f46f4f4ef09a2d5543a39",
-      "current_sha256": "c7ac210c0d642e1b238dc592f707eaa1496e8136beb528fdfcb6dcdda58b5c47",
-      "reason": "Existing portable importer carries each exact four-descriptor importing origin into Source accounting admission; legacy lanes keep their existing capture content. Current retained native importer forwards the reviewed portable evidence base; original proof identity and source guards remain exact. Final staging: Reviewed0c0d71f9 portable metadata import derives the exact authenticated stable CURRENT selection view; raw receipts/history and full source/origin checks remain separate and exact. No Source/category/general mapping relaxation."
+      "current_sha256": "fc61a0f3eb6815af6251c3a32457f6c9f034e360d199e64fc5b84f378f7535f5",
+      "reason": "Existing portable importer carries each exact four-descriptor importing origin into Source accounting admission; legacy lanes keep their existing capture content. Current retained native importer forwards the reviewed portable evidence base; original proof identity and source guards remain exact. Final staging: Reviewed0c0d71f9 portable metadata import derives the exact authenticated stable CURRENT selection view; raw receipts/history and full source/origin checks remain separate and exact. No Source/category/general mapping relaxation. Reviewed c2487bba operation-local Source review and class-metadata policy reuse: full entry/exit validation, exact raw policy/index drift and per-binding/native attribution remain enforced; no captured execution or historical observation changes."
     },
     "tests/support/condition_completion_mapping.py": {
       "captured_sha256": null,
@@ -1730,8 +1730,8 @@
     },
     "tests/support/source_copy_native_evidence.py": {
       "captured_sha256": "94b2dfca59e04a63c5e986c620412a9616fba060d482dccaed58e77611788111",
-      "current_sha256": "ed8c6998a997da60f8a9d862ee487c2ba4fceb4fa026994c8ffe881bbe8d7a04",
-      "reason": "Qualified accounting route separates immutable88a6 historical review/context from exact explained current execution after-map; direct/current successor guards unchanged. Publication requirements identity cut is limited to the declared derived descriptor fields; complete final admission seals remain. Followup: P2 canonical-POSIX guard on actual Source context descriptors rejects alias reads before filesystem access. Single review pin remains normalized by the existing exact-literal mechanism; historical captures/reviews and direct current validation remain unchanged."
+      "current_sha256": "a33c4f0e869f1709f935272c4c573b7c6c5070748907ca7339df42d0085c94f1",
+      "reason": "Qualified accounting route separates immutable88a6 historical review/context from exact explained current execution after-map; direct/current successor guards unchanged. Publication requirements identity cut is limited to the declared derived descriptor fields; complete final admission seals remain. Followup: P2 canonical-POSIX guard on actual Source context descriptors rejects alias reads before filesystem access. Single review pin remains normalized by the existing exact-literal mechanism; historical captures/reviews and direct current validation remain unchanged. Reviewed c2487bba operation-local Source review and class-metadata policy reuse: full entry/exit validation, exact raw policy/index drift and per-binding/native attribution remain enforced; no captured execution or historical observation changes."
     },
     "tests/unit/test_field_interface_closure_gateway.py": {
       "captured_sha256": "12743d4ff7c31a2f05644f60b82a942c423c6b0e30db2147f686bef44467bf10",

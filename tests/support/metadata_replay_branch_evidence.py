@@ -621,9 +621,9 @@ CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'aft
                                                              'before': '37841446878515c1484dfecf0cf35ac304c87b9f13ee39c6e0ec35c66d3d4189'},
  'tests/semantic/support/codex_typed_input_profile.py': {'after': 'fe5ea90a892b89fb4690bc143982c9c440ac912ab2be24134a5fb888103c7304',
                                                          'before': 'a03eb5afc5b633030a62bfe042ea6b40b9e9abbec35a2fa8b956377e73de9a8e'},
- 'tests/support/applicability_completion_mapping.py': {'after': '3d34ae0ba239c8301a8f523cee54b0ec7a9aaea169ec0a2797d77bf0a964267e',
+ 'tests/support/applicability_completion_mapping.py': {'after': 'ab69b38ca9e46e634e7b4fe528358c1955220505df8c356123b5ae6ba108c6b4',
                                                        'before': None},
- 'tests/support/applicability_program.py': {'after': '75575f1f446c77dc13d0a888761ef4b59f95261be79d9ec75d02191950f815b8',
+ 'tests/support/applicability_program.py': {'after': 'd394aaa57410ff4ec2bf86eae13e6d24af40e881c5e1eac766f34417b7d64e61',
                                             'before': None},
  'tests/support/condition_branch_evidence.py': {'after': 'e52ecc05ca5b41d13be691de7f5d226418a00c2b210885b56141ad1c5b042018',
                                                 'before': '93b603a66b612af84758d0273415d34467aee60ef8773ea1736b4e9b805116f2'},
@@ -689,8 +689,8 @@ CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'aft
                                                  'before': None},
  'tests/support/source_copy_branch_evidence.py': {'after': 'de255dc11e0cb81e625eb23b1a4c63ac61f61529673b8bf1f609988470ee974a',
                                                   'before': 'd4d1e5ae5e5736c01362ed25f7ec0745c4a324bddca5a88695811e852cc88e06'},
- # Source followup: raw current reader changed only its normalized accounting-review pin; before/semantic target remain exact.
- 'tests/support/source_copy_native_evidence.py': {'after': '79b46e3b7a0c3567cec6136409c6b7c6c5e29ce13e7b5a8f451352870713db42',
+ # Source followup: reviewed accounting helper/review-pin after-seal; original before, semantic policy and native facts remain exact.
+ 'tests/support/source_copy_native_evidence.py': {'after': 'b25c7a739e7ec99d09ff3562c0536186c6ee3a7d7703044e655fb7370999289b',
                                                   'before': 'a7ac635f8b4964cab93d84479d64f6af1ca6dad2f1d2bfc2daffb5c3b6ec38d6'},
  'tests/support/test_run_result.py': {'after': '711a2240e8515515e81abd0624bfdd197b7ad798a32812aee7fd7713c2c528a4',
                                       'before': None},
