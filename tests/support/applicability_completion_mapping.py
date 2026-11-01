@@ -17,7 +17,7 @@ from tests.maintenance.branch_audit_completion import installed_obligations
 
 VERSIONS = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
 PROOF_PATH = 'tests/fixtures/metadata-conditions/applicability-current-program-r11.json.gz'
-PROOF_SHA256 = 'feda3ea913145809426c9bf148dbe19abf792e747a4b289777e7654e46651eff'
+PROOF_SHA256 = 'b2eee1ced0df528258d64ae374feeb901ecb95333e6107f7b983ef3ab6bbd421'
 PREVIOUS_PROOF = {'path': 'tests/fixtures/metadata-conditions/applicability-current-program-r10.json.gz',
     'sha256': 'feda3ea913145809426c9bf148dbe19abf792e747a4b289777e7654e46651eff'}
 SNAPSHOT = 'tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz'
