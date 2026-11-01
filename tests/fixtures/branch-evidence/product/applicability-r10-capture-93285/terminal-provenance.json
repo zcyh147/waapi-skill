@@ -1,0 +1,43 @@
+{
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_applicability_public_program.py::test_representative_applicability_public_mechanisms",
+    "--junitxml=/tmp/waapi-195-app-r10-capture.xml"
+  ],
+  "cwd": "/tmp/waapi-195-publication-cycle",
+  "capture_git": "93285ea4b100aed964eabf1f1dcfd81078a542d8",
+  "pid": 71931,
+  "started_unix": 1793513645.0557451,
+  "terminal_unix": 1793513678.542208,
+  "exit_code": 0,
+  "log": "/tmp/waapi-195-app-r10-capture.log",
+  "log_sha256": "61b19e2810615cc6ef1b125609586d6b0327c25eca8eecbde39dad87bb3fbec9",
+  "capture": "/tmp/waapi-195-applicability-current-r10.json.gz",
+  "WAAPI_TEST_PYTHON": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+  "tracked_proof": "/private/tmp/waapi-195-publication-cycle/tests/fixtures/metadata-conditions/applicability-current-program-r10.json.gz",
+  "sha256": "feda3ea913145809426c9bf148dbe19abf792e747a4b289777e7654e46651eff",
+  "sources": 592,
+  "exact_before_capture_after_equal": true,
+  "phase_reports": {
+    "call": "passed",
+    "setup": "passed",
+    "teardown": "passed"
+  },
+  "genuine_predecessor": {
+    "path": "tests/fixtures/metadata-conditions/applicability-current-program-r9.json.gz",
+    "sha256": "27e12ec1db296a2926125e6592c8625e6a380903ee5aee853deb896a746a2a33"
+  },
+  "pytest": "1 passed in 33.05s",
+  "existing_program_review": "PASS",
+  "r9_preserved": true,
+  "native_effect": "not_observed",
+  "per_class_execution": false,
+  "finalized_unix": 1793513712.51507,
+  "new_inventory_started": false,
+  "metadata_captures_started": false
+}
