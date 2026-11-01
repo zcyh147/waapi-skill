@@ -6,7 +6,7 @@ results below are historical, not current acceptance requirements. Retain the
 ordinary reflection/API/parameter comparison and product tests described in
 [the current specification](../SPEC.md).
 
-Status: reopened on 2026-10-24 for the synthetic-empty regression below.
+Historical status: reopened on 2026-10-24 for the synthetic-empty regression below.
 The 2026-10-17 integration (`cd9ccae07`) and its original evidence remain
 historical completed work. Published as [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176).
 
