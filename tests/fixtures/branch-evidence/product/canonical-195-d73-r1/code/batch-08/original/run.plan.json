@@ -1,0 +1,26 @@
+{
+  "candidate": "8c912c50c18b88f90b46fb299a491b3b88233471",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_audio_import_business_gateway.py::test_exact_table_guid_cells_are_blocked_on_observed_2025_console_before_preview",
+    "tests/unit/test_audio_import_business_gateway.py::test_localized_existing_fields_do_not_verify_missing_requested_effects",
+    "tests/unit/test_authoring_core_gateway.py::test_remote_connect_reuses_closed_preview_and_verification",
+    "tests/unit/test_authoring_core_gateway.py::test_selected_files_uses_disclosed_zero_input_and_validates_result",
+    "tests/unit/test_conversion_plugin_gateway.py::test_conversion_type_handle_invokes_setter_without_claiming_codec_or_platform_effect",
+    "tests/unit/test_import_dialogue_association_gateway.py::test_explicit_dialogue_conditions_bind_values_and_verify_requested_numeric_effects",
+    "tests/unit/test_import_switch_assignment_gateway.py::test_import_assigns_new_owner_to_bound_switch_and_preserves_unrelated_pairs",
+    "tests/unit/test_object_metadata_business_gateway.py::test_property_draft_discovers_opaque_field_and_materializes_business_value",
+    "tests/unit/test_soundbank_business_gateway.py::test_definition_ordered_repeated_bank_files_disclose_result_only_before_authorization",
+    "tests/unit/test_typed_request_gateway.py::test_zero_input_mutation_cannot_bypass_preview_before_connection"
+  ],
+  "cwd": "/Users/xiye/Documents/Git/waapi-skills",
+  "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+  "git_index_sha256": "927de33f29ec6c4a5a407202ce95eb9e6f8050b8e21eb1dd13d3f461c0807a13",
+  "git_status_before": "",
+  "started_unix": 1793270447.320053
+}

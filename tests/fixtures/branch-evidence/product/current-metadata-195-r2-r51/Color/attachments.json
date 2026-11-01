@@ -1,0 +1,24 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "current-metadata-195-r2-r51/Color/attachment-0.json",
+      "sha256": "c721bdef0456e877f274c2507a7c50994a78582667f0d892c5b567d0568d2149"
+    },
+    {
+      "artifact": "current-metadata-195-r2-r51/Color/attachment-1.json",
+      "sha256": "439e18b5e964fa71c1b330995a42afffd7bb76b4537c3c065703614426d1a6db"
+    },
+    {
+      "artifact": "current-metadata-195-r2-r51/Color/attachment-2.json",
+      "sha256": "2673879d59e235ff0354522bb21d17531d0abc9f1e663f9333d264904489cfa1"
+    },
+    {
+      "artifact": "current-metadata-195-r2-r51/Color/attachment-3.json",
+      "sha256": "ec54b9b78fed1d5d6a78c936d41f06db88bc68ed901f5c7d4ab833fd73bab1b6"
+    },
+    {
+      "artifact": "current-metadata-195-r2-r51/Color/attachment-4.json",
+      "sha256": "e06f4eabcb34da3066663b841a67b89ff8ea7897ec4cd1c3a6df3e254902d9c6"
+    }
+  ]
+}

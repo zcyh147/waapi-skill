@@ -1,0 +1,14 @@
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.001175, "reason": "locked developer interpreter ready", "automatic_repair_attempted": false}
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.000287, "reason": "selected Non-live prerequisites ready", "automatic_repair_attempted": false}
+== Test Context ==
+version:      none
+mode:         nonlive
+console:      <unset>
+project:      <unset>
+sandbox_root: <unset>
+test_config:  <unset>
+pytest args:  -q -ra tests/unit/test_audio_import_business_gateway.py::test_exact_table_guid_cells_are_blocked_on_observed_2025_console_before_preview tests/unit/test_audio_import_business_gateway.py::test_localized_existing_fields_do_not_verify_missing_requested_effects tests/unit/test_authoring_core_gateway.py::test_remote_connect_reuses_closed_preview_and_verification tests/unit/test_authoring_core_gateway.py::test_selected_files_uses_disclosed_zero_input_and_validates_result tests/unit/test_conversion_plugin_gateway.py::test_conversion_type_handle_invokes_setter_without_claiming_codec_or_platform_effect tests/unit/test_import_dialogue_association_gateway.py::test_explicit_dialogue_conditions_bind_values_and_verify_requested_numeric_effects tests/unit/test_import_switch_assignment_gateway.py::test_import_assigns_new_owner_to_bound_switch_and_preserves_unrelated_pairs tests/unit/test_object_metadata_business_gateway.py::test_property_draft_discovers_opaque_field_and_materializes_business_value tests/unit/test_soundbank_business_gateway.py::test_definition_ordered_repeated_bank_files_disclose_result_only_before_authorization tests/unit/test_typed_request_gateway.py::test_zero_input_mutation_cannot_bypass_preview_before_connection
+
+........................................................................ [ 88%]
+.........                                                                [100%]
+81 passed in 30.54s

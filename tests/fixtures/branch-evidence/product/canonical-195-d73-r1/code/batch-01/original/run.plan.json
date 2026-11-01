@@ -1,0 +1,32 @@
+{
+  "candidate": "d73b6d88c380ff06ccbf68e83b85547016efad2a",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_branch_coverage_completion_cli.py::test_mapping_attachment_rejects_non_reflected_member",
+    "tests/unit/test_owned_signal_topics_gateway.py::test_signal_observation_derives_native_filter_from_owned_model",
+    "tests/unit/test_remaining_core_business_gateway.py::test_source_control_move_preserves_multiple_bound_rows_and_literal_pairs",
+    "tests/unit/test_remaining_core_business_gateway.py::test_source_control_object_file_accessor_drift_stops_before_provider_write",
+    "tests/unit/test_remaining_core_business_gateway.py::test_source_control_per_file_status_read_preserves_native_responses_under_read_only_policy",
+    "tests/unit/test_remaining_core_business_gateway.py::test_source_file_usage_outputs_are_disclosed_and_sealed_through_public_draft",
+    "tests/unit/test_remaining_core_business_gateway.py::test_source_file_usage_outputs_do_not_advertise_unpinned_source_control_route",
+    "tests/unit/test_soundengine_business_gateway.py::test_state_switch_write_is_verified_by_independent_exact_scope_getter",
+    "tests/unit/test_topic_business.py::test_all_160_topic_lanes_compile_one_handle_free_business_contract",
+    "tests/unit/test_topic_business.py::test_exact_accessor_entries_compile_scalar_object_and_object_list_values",
+    "tests/unit/test_topic_business.py::test_object_created_business_values_compile_exact_options_and_match",
+    "tests/unit/test_topic_monitoring_contracts.py::test_2021_recursive_soundbank_children_keep_reflected_nested_arrays",
+    "tests/unit/test_topic_monitoring_contracts.py::test_modern_recursive_soundbank_children_keep_object_items[2025.1]",
+    "tests/unit/test_topic_monitoring_contracts.py::test_nonmatching_malformed_event_cannot_hide_behind_filter",
+    "tests/unit/test_topic_monitoring_contracts.py::test_stream_count_reached_with_failed_cleanup_is_not_completed",
+    "tests/unit/test_topic_monitoring_contracts.py::test_structure_notes_rows_match_the_observed_old_notes_fields"
+  ],
+  "cwd": "/Users/xiye/Documents/Git/waapi-skills",
+  "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+  "git_index_sha256": "e82f2aeb50beba49ad52bc8636550e97d06afc5000e671fd4c444a99476ad97c",
+  "git_status_before": "",
+  "started_unix": 1793272119.408545
+}

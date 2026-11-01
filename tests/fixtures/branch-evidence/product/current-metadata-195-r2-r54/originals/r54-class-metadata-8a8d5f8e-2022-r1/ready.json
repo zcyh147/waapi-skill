@@ -1,0 +1,43 @@
+{
+  "get_info": {
+    "displayName": "Wwise",
+    "platform": "x64",
+    "version": {
+      "displayName": "v2022.1.19",
+      "year": 2022,
+      "major": 1,
+      "minor": 19,
+      "build": 8584,
+      "nickname": "",
+      "schema": 110
+    },
+    "sessionId": "{6CE7626F-A3F2-4523-8C59-43315D4BA978}",
+    "apiVersion": 1,
+    "branch": "wwise_v2022.1.19",
+    "copyright": "(C) 2006-2025. Audiokinetic Inc. All rights reserved.",
+    "configuration": "release",
+    "isCommandLine": true,
+    "processId": 364,
+    "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2022.1.19.8584\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+    "directories": {
+      "user": "Y:\\Library\\Application Support\\Audiokinetic\\Wwise",
+      "install": "Z:\\Applications\\Audiokinetic\\Wwise2022.1.19.8584\\",
+      "authoring": "c:\\Program Files\\Audiokinetic\\Wwise 2022.1.19.8584\\Authoring\\",
+      "bin": "c:\\Program Files\\Audiokinetic\\Wwise 2022.1.19.8584\\Authoring\\x64\\Release\\bin\\",
+      "help": "c:\\Program Files\\Audiokinetic\\Wwise 2022.1.19.8584\\Authoring\\Help\\"
+    }
+  },
+  "host": "127.0.0.1",
+  "port": 32651,
+  "home": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/scenario/owned/wwise-user-home",
+  "prefix": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/scenario/owned/wwise-user-home/Library/Application Support/Wwise2019/Bottles/Wwise2019x64",
+  "sandbox": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/scenario/owned/sandbox-root/sample-project-188cbf3336da424f9ba83be4f5bdd546/SampleProject.wproj",
+  "source_hash_before": {
+    "algorithm": "sha256",
+    "strategy": "full",
+    "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+    "file_count": 84,
+    "bytes_hashed": 3788783
+  },
+  "source_mtime_before_ns": 1792521230214769230
+}

@@ -1,0 +1,115 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 32651,
+    "url": "ws://127.0.0.1:32651/waapi"
+  },
+  "detected_version": "2022.1",
+  "is_command_line": true,
+  "operation": "list",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 2,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyAndReferenceNames",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2022.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523814287627000-68f5545db93d44f892a40cb7dfce084c-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "timeout": 29.954711792001035
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 32651,
+      "url": "ws://127.0.0.1:32651/waapi"
+    },
+    "adapter_version": "2022.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:32651/waapi",
+        "adapter_version": "2022.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "contract": "waapi-skill.metadata-page/v1",
+    "scope": {
+      "kind": "object_type",
+      "requested": "Wwise Delay",
+      "resolved": {
+        "classId": 6946819,
+        "name": "Wwise Delay",
+        "type": "Effect"
+      }
+    },
+    "snapshot": "9da802450f4c347ac03bcecca089f800e20c6e7f04115a7a217a0c1eda9669d6",
+    "snapshot_kind": "live-property-reference-inventory",
+    "fields": [
+      {
+        "name": "DelayTime",
+        "selection": "mf1.1792523814.0.e758070dcfe62a8a74977a8d0dfe1dfe2eb02b94372bbcde817fbd8327bbb011"
+      },
+      {
+        "name": "Feedback",
+        "selection": "mf1.1792523814.1.380978b1dab6c2b0480d041e9a0a0cbefda45332594ef20b89e249bafd298533"
+      },
+      {
+        "name": "FeedbackEnabled",
+        "selection": "mf1.1792523814.2.18ae44215707b1ec3483daa1a2de5b0be6e75b9cabbc728f816b0714f860fc75"
+      },
+      {
+        "name": "OutputLevel",
+        "selection": "mf1.1792523814.3.d9560cf475e897e47b64778e732bf2feadf12e0f118b71f4bc5c0b26972dc261"
+      },
+      {
+        "name": "ProcessLFE",
+        "selection": "mf1.1792523814.4.9c13c4e2e2e33e080cab51cb0da10c4d756ccb8e93a34f5f064cea2b84c39015"
+      },
+      {
+        "name": "WetDryMix",
+        "selection": "mf1.1792523814.5.84ea7d3a59ca6e19d50071c11b1bedfd9c9d1de116f5c47173cb3b5c641442f2"
+      }
+    ],
+    "total_count": 6,
+    "offset": 0,
+    "remaining_count": 0,
+    "complete": true,
+    "next_page": null,
+    "expires_at": 1792524714,
+    "mutation_authority": false
+  }
+}

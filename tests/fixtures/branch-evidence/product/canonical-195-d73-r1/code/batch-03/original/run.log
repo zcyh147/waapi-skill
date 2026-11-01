@@ -1,0 +1,13 @@
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.001138, "reason": "locked developer interpreter ready", "automatic_repair_attempted": false}
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.000397, "reason": "selected Non-live prerequisites ready", "automatic_repair_attempted": false}
+== Test Context ==
+version:      none
+mode:         nonlive
+console:      <unset>
+project:      <unset>
+sandbox_root: <unset>
+test_config:  <unset>
+pytest args:  -q -ra tests/unit/test_compound_undo_business_gateway.py::test_compound_cancellation_does_not_turn_acknowledgement_or_missing_reads_into_rollback tests/unit/test_compound_undo_business_gateway.py::test_compound_failure_cancellation_keeps_native_choices_and_observes_partial_state tests/unit/test_compound_undo_business_gateway.py::test_older_compound_native_default_is_observed_without_inventing_undo_option tests/unit/test_compound_undo_business_gateway.py::test_public_compound_undo_snapshots_checked_business_children_into_one_preview tests/unit/test_core_business_gateway.py::test_blend_assignment_documented_positions_and_retained_edges tests/unit/test_core_business_gateway.py::test_blend_assignment_prewrite_snapshot_drift_never_dispatches tests/unit/test_core_business_gateway.py::test_blend_automatic_neighbor_geometry_remains_disclosed_partial_observation tests/unit/test_core_business_gateway.py::test_paste_accepts_both_documented_lists_without_claiming_combined_effect tests/unit/test_core_business_gateway.py::test_randomizer_core_plan_discovers_field_by_meaning_then_closes_values tests/unit/test_core_business_gateway.py::test_state_replacement_explicit_empty_is_callable_and_result_only tests/unit/test_soundengine_business_gateway.py::test_getter_binds_custom_field_meanings_to_live_state_class_before_one_dispatch tests/unit/test_soundengine_business_gateway.py::test_getter_custom_fields_reject_raw_meanings_duplicates_limits_and_unrelated_options[extra3] tests/unit/test_soundengine_business_gateway.py::test_getter_existing_related_list_form_preserves_native_or_grouped_value_provenance tests/unit/test_soundengine_business_gateway.py::test_getter_related_projection_uses_the_final_native_getter_value tests/unit/test_specialized_core_choices_gateway.py::test_blend_schema_discloses_closed_edge_modes_shapes_and_order tests/unit/test_specialized_core_choices_gateway.py::test_paste_schema_discloses_all_list_outcomes_and_documented_default
+
+..............................................................           [100%]
+62 passed in 24.45s
