@@ -5,6 +5,13 @@ batch, classifying a failure, changing a grader, or deciding what to rerun.
 It governs future test coordination and acceptance reports, including Windows
 impact assessment. Historical results retain their original contracts.
 
+The user resumed #174/#195 on 2026-11-01 and authorized the remaining 95 failed
+cases' repair, starting with the 22 public workflow cases. Follow the
+[focused repair authorization](../../docs/plans/full-waapi-coverage/SPEC.md#repair-authorization-after-ledger-removal--2026-11-01):
+repair shared causes, run only failed and directly affected cases, then decide
+the final broad regression separately. This supersedes the earlier repair pause
+without restoring the removed ledger or authorizing native/Fresh runs.
+
 For #174/#195 closeout, apply the user's
 [2026-11-01 ledger-removal decision](../../docs/plans/full-waapi-coverage/SPEC.md#latest-user-decision--remove-the-additional-completion-ledger-2026-11-01).
 Delete the additional branch/evidence completion ledger and its dedicated tests,
