@@ -1,0 +1,41 @@
+{
+  "api": "ak.wwise.core.getInfo",
+  "category": "core",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523813792644000-edd4f9ae47d046a0a92f8d760e6e112e-ak_wwise_core_getInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "apiVersion": 1,
+    "branch": "wwise_v2022.1.19",
+    "configuration": "release",
+    "copyright": "(C) 2006-2025. Audiokinetic Inc. All rights reserved.",
+    "directories": {
+      "authoring": "c:\\Program Files\\Audiokinetic\\Wwise 2022.1.19.8584\\Authoring\\",
+      "bin": "c:\\Program Files\\Audiokinetic\\Wwise 2022.1.19.8584\\Authoring\\x64\\Release\\bin\\",
+      "help": "c:\\Program Files\\Audiokinetic\\Wwise 2022.1.19.8584\\Authoring\\Help\\",
+      "install": "Z:\\Applications\\Audiokinetic\\Wwise2022.1.19.8584\\",
+      "user": "Y:\\Library\\Application Support\\Audiokinetic\\Wwise"
+    },
+    "displayName": "Wwise",
+    "isCommandLine": true,
+    "platform": "x64",
+    "processId": 364,
+    "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2022.1.19.8584\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+    "sessionId": "{6CE7626F-A3F2-4523-8C59-43315D4BA978}",
+    "version": {
+      "build": 8584,
+      "displayName": "v2022.1.19",
+      "major": 1,
+      "minor": 19,
+      "nickname": "",
+      "schema": 110,
+      "year": 2022
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.980238749994896,
+  "version": "2022.1"
+}

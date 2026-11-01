@@ -1,0 +1,11 @@
+118 actual matching ordinary CODE receipts admitted; unchanged original candidates/outcomes
+Traceback (most recent call last):
+  File "/tmp/waapi-195-publish-final-inputs-r4.py", line 97, in <module>
+    original=P/f'source-195-current-88a6cbbe-{version}/portable/index.json';oi=a.load(original);native=read(oi['source_native_attachments'][0]);ip=source.publish_source_native_successor(original,predecessor=native['predecessor'],inventory=inv,product_base=P,destination=OUT/'source'/version,accounting=True)
+                                                                                                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/waapi-195-publication-cycle/tests/support/source_copy_native_evidence.py", line 717, in publish_source_native_successor
+    pending = _publish_source_accounting_successor(program_index, predecessor, inventory, product_base, destination)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/waapi-195-publication-cycle/tests/support/source_copy_native_evidence.py", line 833, in _publish_source_accounting_successor
+    raise ValueError('Source accounting review transport changed bytes')
+ValueError: Source accounting review transport changed bytes

@@ -1,0 +1,24 @@
+{
+  "api": "ak.wwise.core.object.get",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523816659582000-491b870368b546968c8da0c221ac0cee-ak_wwise_core_object_get.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2022-r1\\scenario\\owned\\sandbox-root\\sample-project-188cbf3336da424f9ba83be4f5bdd546\\SampleProject.wproj",
+        "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+        "name": "SampleProject",
+        "path": "\\",
+        "type": "Project"
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 29.97461283399025,
+  "version": "2022.1"
+}
