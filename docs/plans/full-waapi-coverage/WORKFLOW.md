@@ -20,9 +20,11 @@ Keep the complete five-version native-to-public parameter/option mapping, but
 select one or two representative cases for each meaningful branch or shared
 mechanism. Reuse matching evidence and run native cases for actual business risk
 or host/version differences. Simple APIs need an ordinary happy path; inventory
-leaves and enum values are not individual execution quotas. #195 owns any
-required completion-checker adaptation to this policy and the stable combined
-Program/Non-live gates. #194 remains the sole Fresh owner, with budget zero.
+leaves and enum values are not individual execution quotas. The additional
+completion ledger and its tests are removed under the 2026-11-01 user decision.
+#195 coordinates product validation; #194 remains the sole Fresh owner, with
+budget zero. The current removal needs collection and directly affected checks,
+not another full regression; unrelated repairs await user judgment.
 
 For a shared mechanism repair, inspect the complete operation's declared
 changes and its affected consumers before handoff. Review that mechanism and
@@ -75,15 +77,11 @@ affected nodes after the fix. Any broader gate belongs to the stable batch below
    selects its affected existing public-route matrix rows. Confirm negative tests reach the
    intended boundary from a valid baseline. Keep later successors separate and
    merge only the selected refs with one integration source owner.
-2. Identify which generated artifacts the batch actually changes. Reconcile
-   their reviewed source seals before regeneration; preserve unchanged artifacts
-   and evidence. When both inventories are affected, finish
-   `tests/maintenance/generate_interface_depth_inventory.py`, then generate
-   `tests/maintenance/branch_coverage_audit.py`; use their `--check` modes to prove
-   the final artifacts are current. Preserve all native IDs, owners and evidence.
-   A documentation-only change does not itself call for inventory regeneration
-   or recapturing native behavior. Keep unvalidated source-dependency changes
-   explicit until the affected checks establish that reuse is valid.
+2. Update reflected API/parameter comparisons or the existing interface-depth
+   inventory only when the changed wrapper requires it. Do not generate branch
+   obligations, evidence mappings or completion tables. Preserve raw historical
+   observations. A documentation-only change does not call for regeneration or
+   another native run.
 3. Deduplicate the affected selection and run one proportional combined focus
    for behavior beyond the preflight. Keep each original verdict bound to its
    tested candidate; an unchanged worker check need not be repeated wholesale.

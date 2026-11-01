@@ -67,8 +67,8 @@ The deliverable is a usable interface with no remaining known in-scope rejection
 24. As an Agent, I want invalid-field errors to identify the field and permitted alternatives when known, so that a recoverable mistake has an actionable next step.
 25. As a user, I want the three existing modification policies, configuration binding and execute-once rules retained, so that broader coverage does not weaken authorization.
 26. As a user, I want unknown write outcomes diagnosed without replaying the original write, so that additional coverage does not duplicate changes.
-27. As a maintainer, I want every native branch linked to its public input, implementation and required evidence, so that omissions cannot hide behind a family-level completion label.
-28. As a maintainer, I want deleting a branch, enum choice, version or required proof to fail the completion check, so that coverage cannot regress silently.
+27. As a maintainer, I want reflected APIs and parameter alternatives compared with their public wrappers, so that missing supported inputs are visible.
+28. As a maintainer, I want focused checks to catch removal of a supported route, enum choice or version, without a separate evidence-completion ledger.
 29. As a maintainer, I want implementation gaps, native limitations and unavailable test environments distinguished, so that unsupported labels do not conceal unfinished work.
 30. As a user paying for Agent tests, I want deterministic validation to carry most coverage, so that Fresh testing remains small and useful.
 31. As a user, I want every newly discovered omission assigned implementation work, so that investigation cannot end by moving the problem outside the agreed scope.
@@ -112,30 +112,30 @@ The deliverable is a usable interface with no remaining known in-scope rejection
 - Preserve bounded output with complete pagination or structured continuation where appropriate. A resource ceiling is not a Wwise capability limit and must not silently remove supported fields.
 - Keep configuration-only connection identity, host/version checks, the three modification policies, execute-once behavior, uncertainty reporting and required cleanup. Scope expansion grants no direct-client or arbitrary-code bypass.
 
-### 5. Make completion evidence-driven
+### 5. Finish the product changes with proportional validation
 
-- Track at least: unresolved, missing implementation, implemented but missing required evidence, blocked by environment, verified, proven native absence, and explicitly approved exclusion. Missing Skill support must never be classified as native absence.
-- Completion is computed from exact mappings, reachable public contracts and required evidence, not a fixed incomplete flag, a declared family status or a test-definition filename. Reproducibility and functional coverage are separate results.
+- Keep known wrapper gaps and approved limitations explicit. Missing Skill support must never be classified as native absence.
+- Complete the required implementations, retained product tests and review. Do not compute delivery from a per-branch evidence ledger or introduce a replacement completion framework.
 - Keep complete five-version native-to-public field/option mappings as the gap detector. Prove public behavior with representative cases for meaningful branches and shared mechanisms under the 2026-10-26 policy below; mapping rows are not separate execution obligations. Reuse relevant unchanged evidence and select native checks for actual business or host/version risk.
 - An explicit native observation limitation may require a truthfully weaker public result. Missing Skill verifier implementation is not such a limitation and remains work. Never claim verified business state from a schema-only success.
 - An execution profile's count includes only correctly classified rows. Approved exclusions and proven native absence remain visible but are not successful execution credit. An API's absence does not by itself prove the requested business outcome has no supported alternative.
-- Every discovered in-scope gap receives a linked implementation/evidence obligation before the discovery task closes. Investigation milestones may finish; the implementation parent cannot close while any such obligation remains unresolved.
+- Keep discovered in-scope functional gaps in the existing tickets until fixed or explicitly accepted by the user.
 - No new ordinary capability may be excluded merely because implementation, test setup or verification is difficult. Broader exclusions require a new user decision. Missing environments/licenses remain blockers, not passes.
-- Final completion requires all in-scope branches resolved, all required gates satisfied, reviewed source/evidence seals reconciled, and no open obligation hidden in a deferred list. Incremental merging does not change that condition.
+- Final completion requires the agreed functional gaps resolved, required product validation and review complete, and limitations accurately reported. Historical evidence reconciliation and per-leaf proof records are not completion requirements.
 
 ## Testing Decisions
 
 - Use the existing public Gateway parser and execution entrypoint as the primary seam. Drive real public schemas, continuations and requests with injected native clients and isolated configuration/state; assert observable outputs, exact native dispatch and absence of unintended effects. Internal helper tests supplement this seam rather than substituting for it.
 - Prior art includes the current metadata list/detail/change chain, five-version configuration-binding tests, GameParameter class-field and staged-workflow tests, independent ShareSet topology tests, policy recovery tests and authenticated query-refinement archive tests.
 - Parameterize structural contract and option-mapping checks over the five pinned definitions. Aim for one or two representative public cases for each meaningful parameter branch or shared mechanism, with negative controls for material risks such as invalid shapes, stale identity, conflicts and partial outcomes. Defaults, omission and alternatives remain selectable where legal; each option value does not require its own execution.
-- Test the completeness checker against missing routes, legal choices, versions and mappings, unchanged-count URI substitutions, false native-absence claims and missing required representative proof. Keep structural coverage separate from the selected functional evidence; a missing per-leaf receipt alone is not a failure when that leaf is mapped to a tested shared mechanism.
+- Keep reflection/wrapper checks for missing routes, legal choices, versions, mappings and unchanged-count URI substitutions. Keep direct tests of public behavior and safety; remove the separate completion checker and its proof-admission tests.
 - Run focused tests while implementing, then the established full five-version Program and full Non-live gates on the combined candidate. Rerun affected gates after material changes; preserve exact candidate attribution instead of relabeling historical counts.
 - Run deterministic real Wwise validation sequentially in the existing owned sandbox lifecycle. Prove the business effect and preservation appropriate to the API, including real event delivery/resource cleanup where relevant. Use matching versions/hosts for native differences and record explicit proof for any proposed equivalence-based reuse.
 - Separate reflection, fake-client proof and real execution evidence. Reflection alone proves neither a usable Gateway wrapper nor a successful business outcome.
 - Before spending Fresh quota, prove the actual producer-to-Gateway-to-Broker-to-grader-to-archive chain deterministically, including legal argument forms, generated continuations, legitimate refinement and safely rejected commands. A harness must not prohibit a valid public path merely because its first fixture used another spelling.
 - Use only the existing formal Fresh Codex campaign/matrix harness. Fresh is Mac-only, selected by distinct routing/interaction mechanisms rather than every API multiplied by every version. Propose exact cases, turns, transactions and maximum attempts before launch. Preserve the established Terra / medium / default baseline unless separately changed; this specification authorizes no Fresh run or automatic retry.
 - Freeze code/options during each Fresh batch; retain raw failures, stop on systemic evidence/cleanup faults, and replay only originally all-PASS roots with identical verify-only options. Record cumulative evidence honestly. Windows-shaped program tests are not native-Windows execution evidence.
-- At handoff, report unresolved obligations as unresolved. Do not lower the success criterion to make the current ledger pass.
+- At handoff, report unresolved functional gaps accurately; removing the ledger does not make a failed product test pass.
 
 ## Out of Scope
 
@@ -269,10 +269,9 @@ does not exclude other versions or other RTPC functionality.
 
 CRUD, queries and compound changes retain appropriate identity, policy,
 execute-once, outcome and cleanup checks. A shared mechanism pass does not
-conceal an unsupported normal-user function. The final checker must accept
-this representative evidence policy while continuing to detect missing routes,
-fields, options, versions and required business proof. Any necessary checker or
-ledger adaptation remains owned by #195; it does not require a new framework.
+conceal an unsupported normal-user function. Retained reflection checks detect
+missing routes, fields, options and versions; representative product tests check
+behavior. The later user decision removes the additional completion ledger.
 
 Fresh remains centralized in #194 with budget zero until separately approved.
 #195 coordinates the required full Program/Non-live gates on the stable combined
@@ -580,8 +579,9 @@ identities, shapes, sources, missing facts and failed/indeterminate diagnostics.
 | ParamControl creation and unresolved Curve birth roles | 2021.1 |
 | Save/create a MediaPoolQuery | 2025.1 |
 
-This reconciles 73 exact NEW applicability ledger rows, not 73 functions or
-native tests. Existing queries, exact selected-GUID field edits, compatible
+The historical ledger represented this scope with 73 NEW applicability rows;
+that count was not 73 functions or native tests and is no longer a delivery
+mechanism. Existing queries, exact selected-GUID field edits, compatible
 donor copy and known public creation methods stay supported under their own
 contracts. In particular, retain the 2021 attenuation curve setter; older
 Dialogue conditions-owned imports; initial new-project languages; 2023+
@@ -591,8 +591,8 @@ factories. An association method does not certify which owned class is born.
 Rows mixing a known method with an unresolved birth role retain their program
 obligation and a role-scoped approval; they are not whole-class exclusions.
 
-Use the existing completion reader's exact version/build/class/NEW-mode
-authority and existing closed-interface refusals. Do not add native absence,
+Preserve the approved version/build/class/new-object scope and existing
+closed-interface refusals without the removed completion reader. Do not add native absence,
 successful execution or per-API coverage credit from this decision; do not
 exclude an unrelated row, an existing-object mode, a known factory or an actual
 implementation defect. #195/#174 remain subject to current-source evidence,
@@ -611,20 +611,20 @@ necessary tests, run the product regressions, fix actual failures, review, and
 deliver. Wwise 2021.1–2025.1 functionality, legal parameter support, approved
 boundaries, and Gateway safety requirements remain unchanged.
 
-The additional branch/evidence accounting tool is no longer a release gate.
-Stop expanding its representative-proof rules, historical receipt bridges and
-publication machinery. Its saved incomplete result remains incomplete; do not
-rewrite historical outcomes, remove evidence, or describe that tool as passing.
-Its own accounting and historical-record tests may be reported separately from
-product acceptance and do not block this delivery.
+The later user decision at the top of this specification removes the additional
+branch/evidence accounting tool, its dedicated tests and generated tables.
+Its saved incomplete result remains incomplete; preserve raw historical outcomes
+without maintaining an executable history-reconciliation or proof-admission
+system for them.
 
-Use the existing Program/Non-live runners for product regression. Record the
-exact selected and excluded test nodes; exclude only accounting-tool self-tests,
-not tests of packaged Skill behavior, five-version API/schema/parameter coverage,
-authorization, identities, Preview, execute-once behavior, cleanup, or bounded
-results. Preserve product tests in mixed modules. Do not add another test
-framework or turn a product failure into an accounting exclusion. Repair failed
-and affected product cases before considering another broad run.
+Use the existing Program/Non-live runners for product regression. Remove the
+deleted tool's tests and retain tests of packaged Skill behavior, five-version
+API/schema/parameter coverage, authorization, identities, Preview, execute-once
+behavior, cleanup and bounded results. Preserve product assertions in mixed
+modules without the ledger. Do not add another test framework or relabel a
+product failure. After the authorized removal and focused checks, report the
+interrupted run's remaining failures for user judgment before other repairs or
+another broad run.
 
 Delivery requires passing selected product regressions, independent code review,
 accurate limitations and validation reports, and the existing PR workflow. No

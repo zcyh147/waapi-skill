@@ -1,5 +1,11 @@
 # 02: Make branch completion and gap ownership executable
 
+Superseded on 2026-11-01: the user requested deletion of this additional
+completion ledger and all its dedicated tests. Its original implementation and
+results below are historical, not current acceptance requirements. Retain the
+ordinary reflection/API/parameter comparison and product tests described in
+[the current specification](../SPEC.md).
+
 Status: reopened on 2026-10-24 for the synthetic-empty regression below.
 The 2026-10-17 integration (`cd9ccae07`) and its original evidence remain
 historical completed work. Published as [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176).
@@ -70,6 +76,6 @@ no full-gate or current global completion result is claimed.
 
 ### Original delivery
 
-See [LEDGER.md](../LEDGER.md) for the existing audit CLI, exact binding and evidence requirements, original-producer readers, reviewed reuse, and controlled proof scope. The generated product inventory retains 272,313 obligations across 1,683 native host/build routes: 268,559 unresolved, 3,638 missing implementation and 116 exact approved exclusions; none has received verified execution credit. Every functional obligation is owned by #177–#193. #194 owns the formal Fresh archive bridge; #195 remains acceptance only.
+The now-removed `LEDGER.md` described the old audit CLI, binding and evidence requirements, original-producer readers, reviewed reuse, and controlled proof scope. Its historical inventory had 272,313 obligations across 1,683 native host/build routes: 268,559 unresolved, 3,638 missing implementation and 116 exact approved exclusions; none had received verified execution credit. These are preserved historical statements, not current quotas or completion requirements.
 
 The combined focused suite passed 66 tests. Subsequent narrow guards passed the three affected boundary tests and five reader tests; a final current-candidate receipt pass passed 9 tests with exact argv, raw log and immutable controlled receipts preserved outside Git. No Wwise process, native effect test, Fresh task, full Program gate or broad Non-live gate was launched for this maintainer-only change. Generation and `--check --require-complete` both report structural consistency and expected exit 2 for incomplete product coverage.

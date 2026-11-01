@@ -39,7 +39,8 @@ integration. Exact tested scope and results are in
 Parent: [#174](https://github.com/zcyh147/waapi-skill/issues/174).
 These observations unblock implementation decisions. Each row stays open until
 the implementation and its required verification are complete. The full scope
-and existing obligations remain in SPEC.md and LEDGER.md.
+and approved limitations remain in SPEC.md. The additional completion ledger
+was retired by the user's 2026-11-01 decision.
 
 ## R41 selection and Source construction evidence limits
 

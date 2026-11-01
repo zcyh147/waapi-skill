@@ -1,10 +1,10 @@
 # Topic monitoring implementation and required native proof (#187)
 
-This is a partial implementation checkpoint, not completion of #187 or #174.
-The independent native denominator remains
-`docs/branch-coverage-inventory.native-obligations.json.gz`. Its original route,
-pointer, shape, owner and required-evidence identities remain authoritative;
-this document grants no native, Fresh, family or descendant acceptance credit.
+This is a historical implementation checkpoint, not a current completion gate.
+The 2026-11-01 user decision removed the additional branch/evidence ledger and
+its generated obligation inventory. Retain the native comparison and observed
+business outcomes below as scoped historical facts; they do not impose new
+per-branch proof or Fresh requirements.
 
 ## Native comparison
 

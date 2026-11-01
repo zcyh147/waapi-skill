@@ -152,7 +152,8 @@ references. No main merge is authorized.
   passed the focused 66-test baseline and subsequent affected guard checks;
   the final-candidate preserved selection passed 9 tests. Post-merge `--check`
   exited 0 with structural consistency; product completion remains false.
-  [Ledger usage and evidence contracts](LEDGER.md) guide the functional tickets.
+  Those results are historical. The 2026-11-01 decision in [SPEC.md](SPEC.md)
+  removes that checker and its dedicated tests; it no longer guides delivery.
 - Current work covers remaining new-object conditions and graph effects
   (#178/#180), Console project/artifact behavior (#184), Authoring layout
   semantics (#188), bounded diagnostics (#193), and exact evidence attachments.
