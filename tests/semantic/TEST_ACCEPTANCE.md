@@ -6,15 +6,17 @@ It governs future test coordination and acceptance reports, including Windows
 impact assessment. Historical results retain their original contracts.
 
 For #174/#195 closeout, apply the user's
-[2026-11-01 product-test decision](../../docs/plans/full-waapi-coverage/SPEC.md#user-approved-product-test-closeout--2026-11-01).
-The additional branch/evidence accounting tool and its historical-record
-self-tests no longer block delivery. Preserve their actual results separately.
-Use existing Program/Non-live runners with an explicit, reviewed product-test
-selection; retain five-version API/schema/parameter coverage and all material
-Gateway safety and behavior tests. Mixed modules require node-level separation.
-Do not add another framework, weaken a product assertion, relabel a failure, or
-run new Wwise/Fresh work to make accounting records current. Earlier requirements
-for a fully reconciled accounting inventory are superseded for this closeout.
+[2026-11-01 ledger-removal decision](../../docs/plans/full-waapi-coverage/SPEC.md#latest-user-decision--remove-the-additional-completion-ledger-2026-11-01).
+Delete the additional branch/evidence completion ledger and its dedicated tests,
+rather than keeping them behind test filters. Preserve raw historical results.
+Retain five-version reflection/API/parameter gap checks and material Gateway
+safety and behavior tests. Extract genuine product assertions from mixed files
+without their ledger dependencies. Keep necessary existing Fresh harness
+protections; this decision does not authorize deleting all harness tests.
+Do not replace the ledger with a new framework, weaken a product assertion,
+relabel a failure, or run new Wwise/Fresh work to reconcile old records. Validate
+the removal with collection/import checks and directly affected retained tests;
+another full regression and unrelated failure repairs await the user's decision.
 
 For table-based import acceptance and rerun decisions, apply the
 [2026-10-27 lightweight policy](../../docs/plans/full-waapi-coverage/SPEC.md#user-approved-lightweight-table-audio-acceptance--2026-10-27):
@@ -84,11 +86,11 @@ Select real Wwise checks for actual business risk, independent behavior and
 host/version differences. Reuse matching valid observations; preserve original
 failed outcomes. CRUD, queries and compound changes retain appropriate identity,
 policy, execute-once, outcome and cleanup checks. Unsupported normal-user
-functions and missing required business proof remain unresolved. The completion
-checker must distinguish complete option mapping from selected representative
-evidence; necessary reconciliation is owned by #195, not a new per-leaf test
-framework. Fresh remains under #194 with budget zero until separately approved;
-#195 coordinates the required stable-candidate full Program/Non-live gates.
+functions and missing required business proof remain unresolved. Reflection
+comparison identifies wrapper gaps; it does not impose one test or proof record
+per schema leaf. Fresh remains under #194 with budget zero until separately
+approved. #195 coordinates ordinary product validation under the latest
+user-approved scope; the additional completion ledger is removed.
 
 Apply the explicit API exceptions in the [coverage specification](../../docs/plans/full-waapi-coverage/SPEC.md):
 internal Debug needs no further verification; Tone acceptance is correct invocation

@@ -1,5 +1,29 @@
 # Eliminate Skill-origin WAAPI coverage gaps across Wwise 2021.1–2025.1
 
+## Latest user decision — remove the additional completion ledger (2026-11-01)
+
+The user explicitly authorized stopping the slow Non-live run and deleting the
+additional per-branch completion/evidence ledger and all tests dedicated to it.
+This supersedes the earlier instruction merely to make that tool non-gating.
+Remove its executable completion, historical-evidence admission, source-seal
+reconciliation, generated obligation/requirements tables, dedicated collectors,
+tests, and active runner/documentation references. Do not replace it with a new
+ledger or retain it behind an exclusion filter.
+
+Keep the existing five-version WAAPI reflection and public-wrapper gap checks,
+including API/parameter availability and public routing. Keep direct Gateway
+behavior, version, identity, authorization, execute-once and cleanup tests, and
+the necessary existing Fresh harness protections. Mixed files must retain those
+product assertions without importing or evaluating the removed ledger. Raw
+historical execution records and ignored campaign data remain preserved; their
+original failures do not become passes when the ledger is removed.
+
+The interrupted regression is incomplete, not a release pass. Other functional
+failures require the user's judgment before repair. Validate this removal with
+collection/import checks and only directly affected retained tests; do not start
+another full regression, Wwise process, or Fresh Agent campaign without a new
+decision.
+
 Date: 2026-10-17. Baseline: merged repair PR #173, commit `07c20232`.
 Status: specification for review and subsequent ticket decomposition. No implementation or Fresh execution is authorized merely by publishing this specification.
 
