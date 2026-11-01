@@ -26,8 +26,32 @@ Completed-case JUnit durations show 2,873.03 seconds in
 harness files. These observations support removing the additional ledger and
 separating real product assertions; they do not justify deleting all existing
 harness tests. The current [user decision](../docs/plans/full-waapi-coverage/SPEC.md#latest-user-decision--remove-the-additional-completion-ledger-2026-11-01)
-governs cleanup and the limited follow-up validation. No post-removal pass is
-claimed by this entry.
+governs cleanup and the limited follow-up validation.
+
+Removal candidate `f17fd60c0a004f12d33ecacb4864bd258bef338a` deletes 118 files,
+including 45 dedicated test files and the generated ledger tables. Packaged
+Skill code, raw fixture archives and committed source projects are unchanged.
+Mixed suites retain direct Gateway assertions without completion-ledger hooks.
+Both independent static review axes are clear after the five-file import and
+diagnostic-expectation correction. The initial collection errors remain
+recorded as removal-integration failures, not product regression passes.
+
+The corrected Non-live collection succeeded with **33,285 selected / 47
+deselected** in 23.35s (before the subsequent assertion-text-only correction).
+The exact removal candidate's fixed Program collection succeeded with **20,930
+collected** in 6.05s. Collection is not test execution. One focused selection
+passed **116 tests in 33.53s**; the six retained diagnostic-query cases that had
+previously failed in deleted ledger helpers passed separately, **6 in 10.79s**.
+These disjoint selections total 122 focused passes, not a full Program or
+Non-live gate and not native/Fresh evidence.
+
+Of the interrupted run's 159 failed cases, 58 dedicated tests were retired and
+the six retained diagnostic-query cases now pass their direct product checks.
+The other **95 historical failed cases remain unrepaired and unrerun**, pending
+the user's judgment. They cover import fixtures/expectations (21), Agent harness
+and contract expectations (49), public platform-copy/Bus-rename/large-layout
+workflows (22), and test-launcher version/mode guards (3). These are case groups,
+not a claim of 95 independent product defects. The original run stays incomplete.
 
 ## 2026-10-28 #195 condition accounting and bounded playlist diagnosis
 
