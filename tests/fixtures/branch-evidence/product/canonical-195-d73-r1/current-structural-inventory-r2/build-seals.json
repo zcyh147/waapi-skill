@@ -1,0 +1,29 @@
+{
+  "actual_standard_build": true,
+  "candidate_sha256": "026fdeb4e4dc61181e9b9865e7482d14c062761c7a36ea31f8119e73c67196b2",
+  "completion": {
+    "complete": false,
+    "evaluated": false,
+    "states": {
+      "missing_implementation": 116,
+      "unresolved": 272197
+    }
+  },
+  "elapsed_seconds": 28.81,
+  "git_build_candidate": "a739bd10a6b576ac2de59fba32aa09acc49d68a2",
+  "inventory_descriptor": {
+    "artifact": "tests/fixtures/branch-evidence/product/canonical-195-d73-r1/current-structural-inventory-r2/structural-inventory.json",
+    "sha256": "0c712e67b835e164e0f06662ab5d767db8fa934098e8828e3350ffcd808358f8"
+  },
+  "native_descriptor": {
+    "compact_bytes": 67605556,
+    "compressed_bytes": 2773517,
+    "path": "structural-inventory.native-obligations.json.gz",
+    "rows": 272313,
+    "rows_sha256": "df91f91c8edd9c7df122ce85e9e17e94ad960f1655a13b7736139a9089d1a6f0",
+    "sha256": "7e6a599d47e20b1255e7ec77df4a1ea3640fb24c63532cfb6c48063bd0aa24fd"
+  },
+  "native_rows": 272313,
+  "routes": 897,
+  "routes_equal_frozen_staging": true
+}
