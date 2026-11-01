@@ -212,3 +212,11 @@ def test_operation_never_snapshots_an_unvalidated_requirements_part(accounting_p
     with pytest.raises(ValueError, match='requirements part'):
         _publish(case)
     assert not (case['output'] / 'publication/portable/index.json').exists()
+
+
+def test_current_accounting_review_preserves_exact_standard_transport_bytes(tmp_path):
+    from tests.support.source_copy_branch_evidence import write_json
+    original = (audit.ROOT / source.ACCOUNTING_REVIEW_PATH).read_bytes()
+    transported = tmp_path / 'accounting-review.json'
+    write_json(transported, json.loads(original))
+    assert transported.read_bytes() == original

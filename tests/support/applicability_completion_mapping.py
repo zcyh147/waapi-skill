@@ -16,10 +16,10 @@ from tests.maintenance.branch_coverage_audit import digest, load
 from tests.maintenance.branch_audit_completion import installed_obligations
 
 VERSIONS = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
-PROOF_PATH = 'tests/fixtures/metadata-conditions/applicability-current-program-r10.json.gz'
+PROOF_PATH = 'tests/fixtures/metadata-conditions/applicability-current-program-r11.json.gz'
 PROOF_SHA256 = 'feda3ea913145809426c9bf148dbe19abf792e747a4b289777e7654e46651eff'
-PREVIOUS_PROOF = {'path': 'tests/fixtures/metadata-conditions/applicability-current-program-r9.json.gz',
-    'sha256': '27e12ec1db296a2926125e6592c8625e6a380903ee5aee853deb896a746a2a33'}
+PREVIOUS_PROOF = {'path': 'tests/fixtures/metadata-conditions/applicability-current-program-r10.json.gz',
+    'sha256': 'feda3ea913145809426c9bf148dbe19abf792e747a4b289777e7654e46651eff'}
 SNAPSHOT = 'tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz'
 SDK_PATH = 'tests/fixtures/metadata-conditions/applicability-sdk-sources.json.gz'
 SDK_SHA256 = '646336b2e4cb7324831d6a8b5c4be5b00417764eaf044adeccb6719ddd2a771b'
