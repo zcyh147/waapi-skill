@@ -576,6 +576,12 @@ combined gates and review. No new native or Fresh work is authorized here.
 
 ## User-approved product-test closeout — 2026-11-01
 
+The user's original request to generalize the gap audit means reading the WAAPI
+reflection inventory, comparing APIs and parameters against existing wrappers,
+and implementing missing wrapper support. It does not mean assigning a separate
+test or evidence obligation to every reflected schema item. Wrapper inventory
+comparison and tests of code behavior are separate tasks.
+
 The user clarified the delivery sequence: finish the functional changes, add
 necessary tests, run the product regressions, fix actual failures, review, and
 deliver. Wwise 2021.1–2025.1 functionality, legal parameter support, approved
