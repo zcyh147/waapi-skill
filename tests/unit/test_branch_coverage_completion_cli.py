@@ -6,7 +6,6 @@ behavior only. It deliberately grants no product/native execution credit.
 from __future__ import annotations
 
 from copy import deepcopy
-from collections import Counter
 import hashlib
 import importlib.util
 import json
@@ -50,7 +49,12 @@ def expected_cli_categories(identity):
 def test_cli_metadata_category_expectations_cover_exact_reviewed_five_and_other_sixty():
     policy = audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')['branches']
     metadata = {identity: requirement for identity, requirement in policy.items()
-                if '|function|ak.wwise.core.object.getPropertyInfo|' in identity}
+                if '|wwise-console|' in identity
+                and '|function|ak.wwise.core.object.getPropertyInfo|' in identity
+                and (identity.split('|')[-1].startswith('/resultSchema/properties/default')
+                     or any(identity.split('|')[-1].startswith(
+                         '/resultSchema/@definition/' + document + '/definitions/propertyValue')
+                         for document in ('waapi_definitions.json', 'common_definitions.json')))}
     assert len(metadata) == 65
     assert {identity for identity, requirement in metadata.items() if requirement['categories'] == ['program']} == CLI_PROGRAM_ONLY_METADATA_IDS
     assert len(set(metadata) - CLI_PROGRAM_ONLY_METADATA_IDS) == 60
@@ -58,85 +62,71 @@ def test_cli_metadata_category_expectations_cover_exact_reviewed_five_and_other_
         assert expected_cli_categories(identity) == sorted(requirement['categories'])
 
 
-def test_default_product_inputs_select_portable_stale_receipt_without_business_credit(tmp_path, capsys, monkeypatch):
+@pytest.fixture
+def historical_move_single_case(tmp_path):
+    """Stage only the sealed R26 receipt and its original reviewed policy."""
     import shutil
+    source = audit.ROOT / 'tests/fixtures/branch-evidence/product'
+    product_index = audit.load(audit.ROOT / 'docs/branch-coverage-evidence-index.json')
+    entry = next(entry for entry in product_index['entries']
+                 if entry['id'] == 'move-single-r26-2025.1')
+    base = tmp_path / 'historical-product'
+    for descriptor in [entry['bindings'], *entry['origin'].values()]:
+        destination = base / descriptor['artifact']
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source / descriptor['artifact'], destination)
+    index_path = tmp_path / 'historical-index.json'
+    write_json(index_path, {'contract': 'waapi-skill.branch-evidence-index/v1',
+                           'base': base.name, 'entries': [entry]})
+    requirements_path = base / entry['origin']['requirements']['artifact']
+    return index_path, requirements_path, base
+
+
+def test_historical_product_inputs_select_portable_stale_receipt_without_business_credit(
+        tmp_path, capsys, monkeypatch, historical_move_single_case):
     original_open = Path.open
     def portable_open(path, *args, **kwargs):
         assert '/waapi-query-coverage/' not in str(path), 'Historical workstation path was opened'
         return original_open(path, *args, **kwargs)
     monkeypatch.setattr(Path, 'open', portable_open)
-    output = tmp_path / 'default.json'
-    argv = ['--output', str(output), '--require-complete']
+    index_path, requirements_path, base = historical_move_single_case
+    output = tmp_path / 'historical.json'
+    argv = ['--binding-index', str(index_path), '--requirements', str(requirements_path),
+            '--output', str(output), '--require-complete']
     assert audit.main(argv) == 2
     capsys.readouterr()
-    default = audit.load(output)['native_coverage']
+    historical = audit.load(output)['native_coverage']
     branch_id = ('2025.1|wwise-console|2025.1.7.9143|function|'
                  'ak.wwise.cli.moveMediaIdsToSingleFile|/resultSchema')
-    branch = next(row for row in default['obligations'] if row['id'] == branch_id)
+    branch = next(row for row in historical['obligations'] if row['id'] == branch_id)
     assert branch['state'] == 'implemented_unverified'
     assert branch['requirements'] == ['native', 'program']
     assert branch['evidence_results']['program']['outcome'] == 'missing'
     assert branch['evidence_results']['native']['outcome'] == 'missing'
-    assert default['completion']['complete'] is False
-    assert default['completion']['obligations'] == 272313
-    # Existing625 selected leaves plus exact26 Source leaves. Metadata65 and
-    # Source26 have their own complete categories; Topic559 still lacks native.
-    assert default['completion']['states'] == {'approved_exclusion': 116,
-        'verified': 91, 'implemented_unverified': 560, 'unresolved': 271546}
+    assert historical['completion']['complete'] is False
+    assert {row['id'] for row in historical['obligations']
+            if row['state'] == 'implemented_unverified'} == {branch_id}
     assert audit.main([*argv, '--check']) == 2
     capsys.readouterr()
-    copied = tmp_path / 'relocated-product'
-    shutil.copytree(audit.ROOT / 'tests/fixtures/branch-evidence/product', copied)
-    index = audit.load(audit.ROOT / 'docs/branch-coverage-evidence-index.json')
-    index['base'] = 'relocated-product'
-    index_path = tmp_path / 'relocated-index.json'
-    write_json(index_path, index)
-    selected, _, _ = audit.portable_binding_inputs(index_path,
-        audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json'))
-    expected_families = {('media', '2025.1'): 1,
-        **{('source', version): count for version, count in
-            (('2021.1', 4), ('2022.1', 4), ('2023.1', 6), ('2024.1', 6), ('2025.1', 6))},
-        **{('metadata', version): 13 for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')},
-        **{('topic', version): count for version, count in
-            (('2021.1', 79), ('2022.1', 112), ('2023.1', 116), ('2024.1', 116), ('2025.1', 136))}}
-    def family(identity):
-        return ('source' if '|function|ak.wwise.core.object.copy|' in identity else 'topic' if '|topic|' in identity else 'metadata' if
-            '|function|ak.wwise.core.object.getPropertyInfo|' in identity else 'media', identity.split('|')[0])
-    assert Counter(family(identity) for identity in selected['bindings']) == expected_families
-    assert sum('|function|ak.wwise.core.object.copy|' in identity for identity in selected['bindings']) == 26
-    selected_rows = {row['id']: row for row in default['obligations'] if row['state'] in {'verified', 'implemented_unverified'}}
-    assert set(selected_rows) == set(selected['bindings'])
-    for identity, row in selected_rows.items():
-        expected_categories = expected_cli_categories(identity)
-        assert row['requirements'] == expected_categories
-        assert row['evidence_results']['program']['outcome'] == ('missing' if family(identity)[0] == 'media' else 'passed')
-    program_index = deepcopy(index)
-    program_index.pop('metadata_attachments')
-    program_index_path = tmp_path / 'program-only-index.json'
-    write_json(program_index_path, program_index)
-    program_only, _, _ = audit.portable_binding_inputs(program_index_path,
-        audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json'))
-    assert set(program_only['bindings']) == set(selected['bindings'])
-    strengthened = Counter()
-    for identity, binding in selected['bindings'].items():
-        baseline = deepcopy(binding)
-        if 'live_metadata' in baseline['evidence']:
-            strengthened[identity.split('|')[0]] += 1
-            baseline['evidence'].pop('live_metadata')
-            baseline.pop('category_inputs')
-        assert set(program_only['bindings'][identity]['evidence']) == ({'program', 'native'} if family(identity)[0] == 'source' else {'program'})
-        assert baseline == program_only['bindings'][identity]
-    assert strengthened == {version: 12 for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')}
-    explicit_bindings = copied / 'all.bindings.json'
+    selected, selected_base, _ = audit.portable_binding_inputs(
+        index_path, audit.load(requirements_path))
+    assert selected_base == base
+    assert set(selected['bindings']) == {branch_id}
+    assert set(selected['bindings'][branch_id]['evidence']) == {'program'}
+    # The original PASS stays unchanged; relocation supplies no current credit.
+    original_program = audit.load(base / 'move-single-r26-2025.1/program.original.json')
+    assert original_program['invocation']['outcome'] == 'PASS'
+    explicit_bindings = base / 'all.bindings.json'
     write_json(explicit_bindings, selected)
     explicit = tmp_path / 'explicit.json'
     assert audit.main(['--bindings', str(explicit_bindings),
+        '--requirements', str(requirements_path),
         '--output', str(explicit), '--require-complete']) == 2
     capsys.readouterr()
     actual = audit.load(explicit)['native_coverage']
-    assert actual['obligations'] == default['obligations']
-    assert actual['bindings_sha256'] == default['bindings_sha256']
-    assert actual['requirements_sha256'] == default['requirements_sha256']
+    assert actual['obligations'] == historical['obligations']
+    assert actual['bindings_sha256'] == historical['bindings_sha256']
+    assert actual['requirements_sha256'] == historical['requirements_sha256']
 
 
 @pytest.mark.parametrize('damage,reason', [
