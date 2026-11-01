@@ -1,0 +1,243 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 30607,
+    "url": "ws://127.0.0.1:30607/waapi"
+  },
+  "detected_version": "2025.1",
+  "is_command_line": true,
+  "operation": "list",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 2,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyAndReferenceNames",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2025.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2025-r1/dispatcher-evidence/1792523915367119000-2a7ef219f7a240b5a795df7a0371be4c-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "timeout": 29.965484165993985
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 30607,
+      "url": "ws://127.0.0.1:30607/waapi"
+    },
+    "adapter_version": "2025.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:30607/waapi",
+        "adapter_version": "2025.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "contract": "waapi-skill.metadata-page/v1",
+    "scope": {
+      "kind": "object_type",
+      "requested": "Sound",
+      "resolved": {
+        "classId": 65552,
+        "name": "Sound",
+        "type": "WObject"
+      }
+    },
+    "snapshot": "0c0028dbf78b21ec252f0a7d78359246393ec992c58e9dc08d41d2ece91cf23c",
+    "snapshot_kind": "live-property-reference-inventory",
+    "fields": [
+      {
+        "name": "OverrideMetadata",
+        "selection": "mf1.1792523914.64.f9c4c7fe1ad661d6c6f258ff791d3419386d87dbc1cc2c4ea697539ee440fcfa"
+      },
+      {
+        "name": "OverrideMidiEventsBehavior",
+        "selection": "mf1.1792523914.65.1c30b61c483cfb77a3190144d4c069b8d541bb3dc4380c6c118cb3e63bd00278"
+      },
+      {
+        "name": "OverrideMidiNoteTracking",
+        "selection": "mf1.1792523914.66.4d76a7fddac667261b4e2deb9e29a5f13d69a702f8b3da7a8d4fc2ec871f17ca"
+      },
+      {
+        "name": "OverrideOutput",
+        "selection": "mf1.1792523914.67.52612df34d6e05603595fe0d95f602e417304578875b9beb910c6aa0a50a4698"
+      },
+      {
+        "name": "OverridePositioning",
+        "selection": "mf1.1792523914.68.301123a8c29130455740c2262c18582829b7101b9e13a772cd783cbb54782bb5"
+      },
+      {
+        "name": "OverridePriority",
+        "selection": "mf1.1792523914.69.e74510ce4adad7faffdb1073bd01474ccc168c04c8c97031149a20108992f16f"
+      },
+      {
+        "name": "OverrideUserAuxSends",
+        "selection": "mf1.1792523914.70.6963a50c50e6f7262387d6d2c91b937774d792e20e4ceb7ffa2c3418ebf424cd"
+      },
+      {
+        "name": "OverrideVirtualVoice",
+        "selection": "mf1.1792523914.71.283298c28636a4e7dfccf7e402aed4c313d96d90b0bbb10966549bf1fd9858aa"
+      },
+      {
+        "name": "Pitch",
+        "selection": "mf1.1792523914.72.d7f90cb8a04e7ec0f0736296b82141fa7c9e733cbbd27e48e3d614f71fae5c5d"
+      },
+      {
+        "name": "PreFetchLength",
+        "selection": "mf1.1792523914.73.f3c85c8f5d8c3d5434f61fc487d92577f58559e236d794af67f026f422bf0a9e"
+      },
+      {
+        "name": "Priority",
+        "selection": "mf1.1792523914.74.d6a36f9ef352b211bf3267a69c436b8731feebdf608952d8468836b7b1e3e88e"
+      },
+      {
+        "name": "PriorityDistanceFactor",
+        "selection": "mf1.1792523914.75.eb45367cc7e180f730f42c6c842eac468d40907234c2b26866cd191626b678bc"
+      },
+      {
+        "name": "PriorityDistanceOffset",
+        "selection": "mf1.1792523914.76.443f0c322a1a03b16c7d0dd0c8377fa647c51ca501b7c0072a52b99d004a118d"
+      },
+      {
+        "name": "ReflectionsAuxSend",
+        "selection": "mf1.1792523914.77.da1d5bb514a6be40846f49a28feea45800a71f86141652360bec038ef293f954"
+      },
+      {
+        "name": "ReflectionsVolume",
+        "selection": "mf1.1792523914.78.7b6866b7b59040c951cca118f8e19f2e71e02e84f6ed6544047738ba1e7ef985"
+      },
+      {
+        "name": "SpeakerPanning",
+        "selection": "mf1.1792523914.79.d9d1f754c356e7bc08a9f7c553434ad28ad6ad41cdbe8512b212ddc4489a56a1"
+      },
+      {
+        "name": "SpeakerPanning3DSpatializationMix",
+        "selection": "mf1.1792523914.80.aff521a4653d31bd102e03deb8702e78c3db733222dbc67adc6800ecd913e59a"
+      },
+      {
+        "name": "UseGameAuxSends",
+        "selection": "mf1.1792523914.81.b25eb20ede9062e09a6e337b2b613a3730a15a59d6d2a9af1aba2384605e4807"
+      },
+      {
+        "name": "UseMaxSoundPerInstance",
+        "selection": "mf1.1792523914.82.6705e71de289370943a022e90aeb2d5c5eea2caea2f25b1e364d3b08c6133a4e"
+      },
+      {
+        "name": "UserAuxSend0",
+        "selection": "mf1.1792523914.83.f4818171b6b3c6cc7da7e9a01bef044bbe1cfc0d2c1a08764345feddbcf176f7"
+      },
+      {
+        "name": "UserAuxSend1",
+        "selection": "mf1.1792523914.84.892bbe4e2f6c4f6763236f6e14eba22a10f69faa15ce49506d1ed347a14cb0b3"
+      },
+      {
+        "name": "UserAuxSend2",
+        "selection": "mf1.1792523914.85.c53a5453d072cb10b2ab793cd7771c409805ef9897b92ce94d8bd8e692993ba0"
+      },
+      {
+        "name": "UserAuxSend3",
+        "selection": "mf1.1792523914.86.300a46e492877e9588e5676d2355317680757c44cc138a4edea348580a2cb4f2"
+      },
+      {
+        "name": "UserAuxSendHPF0",
+        "selection": "mf1.1792523914.87.35b65e09b0991ff1438316b3b83f09e1644311971a8ec180fe1b03e015c67f4e"
+      },
+      {
+        "name": "UserAuxSendHPF1",
+        "selection": "mf1.1792523914.88.da46f80d5dfcf6985c067d427b74393643456e4aa6aded6b43f037d845182288"
+      },
+      {
+        "name": "UserAuxSendHPF2",
+        "selection": "mf1.1792523914.89.e531da7f5e923063123dfe2e553ba892ad5404bcb0fca05c3f04a9dfa0af0072"
+      },
+      {
+        "name": "UserAuxSendHPF3",
+        "selection": "mf1.1792523914.90.535bd80bef8a054975fc46f0025ff7edab97648a6e95ccef0f4151e7743be6ec"
+      },
+      {
+        "name": "UserAuxSendLPF0",
+        "selection": "mf1.1792523914.91.892e611725b50c529ccdb8741585c28466e90810e2015c064a8f9f68fb6d970a"
+      },
+      {
+        "name": "UserAuxSendLPF1",
+        "selection": "mf1.1792523914.92.3691a3a1b800d502a6708c1439f87d0e5c865cc3fb29da24547f6188c1d26f46"
+      },
+      {
+        "name": "UserAuxSendLPF2",
+        "selection": "mf1.1792523914.93.61e6925592d7f6d0bf958140f7a8bd24bbbb61c3f68c5c35f8a47be514fa15a7"
+      },
+      {
+        "name": "UserAuxSendLPF3",
+        "selection": "mf1.1792523914.94.5c1589224c1d0beb0643c7e579a30d2a488d0233b32a84b65bf9e44e7c59d2c2"
+      },
+      {
+        "name": "UserAuxSendVolume0",
+        "selection": "mf1.1792523914.95.d86f5f536729de881ec349989fa15af3820707f348c88b4cdb0f7c674f37481a"
+      },
+      {
+        "name": "UserAuxSendVolume1",
+        "selection": "mf1.1792523914.96.9e34c871e0446e278f28cd7028f8866b6225e868331ef61a06cedc478539f253"
+      },
+      {
+        "name": "UserAuxSendVolume2",
+        "selection": "mf1.1792523914.97.1d05c882fe620cbcfc0cb65ed8052fcb24e17d55e22b145c591ce6fb29824124"
+      },
+      {
+        "name": "UserAuxSendVolume3",
+        "selection": "mf1.1792523914.98.b896ff39321c29e2f6c7e05ada6b9f417903582b8487936ea3cda1bca2039193"
+      },
+      {
+        "name": "VirtualVoiceQueueBehavior",
+        "selection": "mf1.1792523914.99.befc0469fc9440f6ae7604d0a76f8de8c5198d595ab8b8c26e6bae081d348615"
+      },
+      {
+        "name": "Volume",
+        "selection": "mf1.1792523914.100.2c9a75d08d18c1d9c0549dc17772676719b40eb5538d05c5208090cfe55ef7a3"
+      },
+      {
+        "name": "Weight",
+        "selection": "mf1.1792523914.101.b1af0d9ed6e9e2de03537f7cec7ed3440f904e0ddf7c8d15d2b69c6908615cbc"
+      }
+    ],
+    "total_count": 102,
+    "offset": 64,
+    "remaining_count": 0,
+    "complete": true,
+    "next_page": null,
+    "expires_at": 1792524814,
+    "mutation_authority": false
+  }
+}
