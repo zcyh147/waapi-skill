@@ -1,5 +1,7 @@
 """Narrow original Source category ownership; diagnostic verdicts stay immutable."""
 from pathlib import Path
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 from tests.maintenance import branch_audit_completion as completion
 from tests.support.source_copy_branch_evidence import dependency_review
@@ -18,6 +20,44 @@ ACCOUNTING_DEPENDENCIES = (
     'tests/support/condition_completion_mapping.py',
     'tests/fixtures/metadata-conditions/new-condition-current-program-r3.json.gz',
 )
+
+_ACCOUNTING_OPERATION = ContextVar('source_accounting_operation', default=None)
+
+
+@contextmanager
+def accounting_operation(root, *, independent=False):
+    """Lazily reuse a reviewed closure, with fresh full checks at both ends."""
+    root = Path(root).resolve()
+    active = _ACCOUNTING_OPERATION.get()
+    if not independent and active is not None and active['root'] == root:
+        yield
+        return
+    state = {'root': root, 'review': None, 'policy_bytes': None}
+    token = _ACCOUNTING_OPERATION.set(state)
+    try:
+        yield
+    finally:
+        try:
+            if state['review'] is not None:
+                if (_accounting_dependency_review() != state['review']
+                        or _accounting_policy_bytes(root, state['policy_bytes'][0]) != state['policy_bytes']):
+                    raise ValueError('Source accounting policy changed during operation')
+        finally:
+            _ACCOUNTING_OPERATION.reset(token)
+
+
+def _accounting_policy_bytes(root, reviewed_requirements):
+    import json
+    requirements = root / REQUIREMENTS_SOURCE
+    raw = requirements.read_bytes()
+    if raw != reviewed_requirements:
+        raise ValueError('Source accounting policy changed during operation')
+    document = json.loads(raw)
+    # The full review loads these through audit.load, including each part's
+    # bounds, digest and assembled identity. Retain their exact raw bytes too.
+    parts = tuple((item['path'], (requirements.parent / item['path']).read_bytes())
+                  for item in document.get('parts', []))
+    return raw, parts, (root / 'docs/branch-coverage-evidence-index.json').read_bytes()
 
 
 def accounting_source_seals(names, *, requirements_document=None, mapping_bindings=None):
@@ -66,6 +106,24 @@ def accounting_source_seals(names, *, requirements_document=None, mapping_bindin
 
 
 def accounting_dependency_review():
+    from copy import deepcopy
+    from tests.maintenance import branch_coverage_audit as audit
+    active = _ACCOUNTING_OPERATION.get()
+    if active is None or active['root'] != Path(audit.ROOT).resolve():
+        return _accounting_dependency_review()
+    if active['review'] is None:
+        requirements_bytes = (active['root'] / REQUIREMENTS_SOURCE).read_bytes()
+        index_bytes = (active['root'] / 'docs/branch-coverage-evidence-index.json').read_bytes()
+        review = _accounting_dependency_review()
+        policy_bytes = _accounting_policy_bytes(active['root'], requirements_bytes)
+        if policy_bytes[2] != index_bytes:
+            raise ValueError('Source accounting policy changed during operation')
+        active['policy_bytes'] = policy_bytes
+        active['review'] = review
+    return deepcopy(active['review'])
+
+
+def _accounting_dependency_review():
     """An exact reviewed accounting delta; execution sources never get an exemption."""
     import hashlib
     import json
@@ -655,7 +713,11 @@ def publish_source_native_successor(program_index, *, predecessor, inventory, pr
             or any(parent.is_symlink() for parent in destination.parents)):
         raise ValueError('Source successor needs a new owned product destination')
     if accounting:
-        return _publish_source_accounting_successor(program_index, predecessor, inventory, product_base, destination)
+        with accounting_operation(audit.ROOT, independent=True):
+            pending = _publish_source_accounting_successor(program_index, predecessor, inventory, product_base, destination)
+        index_path = pending.with_name('index.json')
+        pending.rename(index_path)
+        return index_path
     requirements = json.loads((program_index.parent / 'requirements.json').read_bytes())
     program_bindings, _, _ = audit.portable_binding_inputs(program_index, requirements)
     candidate = inventory['native_coverage']['candidate_sha256']
@@ -814,7 +876,7 @@ def _publish_source_accounting_successor(program_index, predecessor, inventory, 
     index = {**deepcopy(old_index), 'base': os.path.relpath(product_base, portable),
              'source_native_attachments': [native_descriptor]}
     index['entries'][0]['id'] = destination.name
-    index_path = portable / 'index.json'
+    index_path = portable / 'index.json.pending'
     write_json(index_path, index)
     imported, _, _ = audit.portable_binding_inputs(index_path, requirements)
     references = {key: row for key, row in branches.items() if row['kind'] == 'reference'}

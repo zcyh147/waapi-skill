@@ -481,6 +481,12 @@ def write_inventory(path, inventory):
     path.write_text(render_inventory({**inventory, 'native_coverage': native}), encoding='utf-8')
 
 def portable_binding_inputs(index_path, requirements):
+    from tests.support.source_copy_native_evidence import accounting_operation
+    with accounting_operation(ROOT):
+        return _portable_binding_inputs(index_path, requirements)
+
+
+def _portable_binding_inputs(index_path, requirements):
     """Select sealed original receipts through reviewed locator-only projections.
 
     This maintainer code is in candidate_identity's existing source closure.

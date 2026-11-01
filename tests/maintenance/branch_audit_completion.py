@@ -1459,8 +1459,9 @@ def _created_topic_catalog(catalog_root, version, seal):
 
 def evidence_result(descriptor, branch, candidate, category, scope_kind, base, binding=None, source_root=None, reference_edges=None, historical_sources=None):
     from tests.support.loaded_media_runtime_evidence import current_policy_operation
+    from tests.support.source_copy_native_evidence import accounting_operation
     from tests.maintenance.branch_coverage_audit import ROOT as default_root
-    with current_policy_operation(source_root or default_root):
+    with current_policy_operation(source_root or default_root), accounting_operation(source_root or default_root):
         return _evidence_result(descriptor, branch, candidate, category, scope_kind, base,
             binding, source_root, reference_edges, historical_sources)
 
@@ -1862,7 +1863,8 @@ def apply_representative_mechanisms(native, bindings, requirements, root, *, dig
 
 def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None, evidence_base=None, requirements_document=None):
     from tests.support.loaded_media_runtime_evidence import current_policy_operation
-    with current_policy_operation(root):
+    from tests.support.source_copy_native_evidence import accounting_operation
+    with current_policy_operation(root), accounting_operation(root):
         return _evaluate_coverage(root, inventory, bindings_document, digest=digest,
             scope=scope, evidence_base=evidence_base, requirements_document=requirements_document)
 
