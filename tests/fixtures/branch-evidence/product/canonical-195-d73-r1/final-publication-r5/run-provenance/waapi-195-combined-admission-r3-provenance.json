@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "/tmp/waapi-195-combined-admission-r3.py"
+  ],
+  "cwd": "/tmp/waapi-195-publication-cycle",
+  "exit_code": 1,
+  "frozen_git": "fe3e8f9be9b81a8d9f83d7b88bdff86a15e32d60",
+  "log": "/tmp/waapi-195-combined-admission-r3.log",
+  "log_sha256": "2e8ffff8696b110fe003ffadef46fce68bea23eeae1fc73c87ae14a0002d9597",
+  "pid": 11459,
+  "started_unix": 1793522420.385171,
+  "terminal_unix": 1793522438.098647
+}
