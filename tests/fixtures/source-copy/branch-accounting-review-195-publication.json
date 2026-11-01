@@ -126,7 +126,7 @@
     "docs/branch-coverage-condition-sources.json": "b51b1227a381938be503fb9065928a2fb8928808fe24a864679305c647bd0fcd",
     "docs/branch-coverage-current-business.json": "e8cef211be75c0435a0dafe7d7694043cfbe30256634a300da287192e0ee3e37",
     "docs/branch-coverage-ownership.json": "d4f55b82d8da83d18422aa027c3c134b6ab52d950827a7c3cc2aa50679859d9c",
-    "docs/branch-coverage-requirements.json": "2b3ca5cb6112a86073f0286029d40d1f3bdab2df925974e7a92292d113b83429",
+    "docs/branch-coverage-requirements.json": "715e563304f7c8209e9d0f785a1d3c2447cf584ebd80ba7f739538beea52d8fb",
     "docs/interface-depth-inventory.json": "619f5d540d0266a7fb1eb325ac8439781e32c1074b21419dbab185b67e74b374",
     "docs/interface-depth-review-policy.json": "1184a48181cc28c73c2168f5b375c5c014ba9144a78b7cbd44eb1f260355b70e",
     "skills/waapi-skill/resources/manifest/2021.1/authoring-ui-commands-supplement.json": "dc07c4bac1c90bc92bfecf59d12ddc39a0bf7aa95f502f6c576977cb7a9764b8",
@@ -1670,8 +1670,8 @@
   "source_changes": {
     "docs/branch-coverage-requirements.json": {
       "captured_sha256": "f8743423b43e06eb07bfe383193a0adfa61b794bab3c2d91bffe04271d36b638",
-      "current_sha256": "2b3ca5cb6112a86073f0286029d40d1f3bdab2df925974e7a92292d113b83429",
-      "reason": "Current requirements after-seal is explicitly the shared requirements-publication-identity/v1 semantic projection; historical captured before-seal remains raw. Full final requirements/member/descriptor seals are independently enforced at ordinary consumer admission. Final staging: Actual final272313 policy/member mapping staging includes all60 authenticated stable current metadata selection views and118 protected CODE identities. Shared requirements identity remains exact except already-approved four Source-derived descriptors/selfstamps; historical before-seal stays raw. Current13 retained CODE anchors still require their actual new receipts. Exact R51 data restoration: restore only60 original4e3c2800 default evidence categories program+live_metadata; preserve5 decoder program boundaries, all65 shapes, all current mapping/member metadata and other272253 policies. No new native observation or missing-row credit."
+      "current_sha256": "715e563304f7c8209e9d0f785a1d3c2447cf584ebd80ba7f739538beea52d8fb",
+      "reason": "Current requirements after-seal is explicitly the shared requirements-publication-identity/v1 semantic projection; historical captured before-seal remains raw. Full final requirements/member/descriptor seals are independently enforced at ordinary consumer admission. Final staging: Actual final272313 policy/member mapping staging includes all60 authenticated stable current metadata selection views and118 protected CODE identities. Shared requirements identity remains exact except already-approved four Source-derived descriptors/selfstamps; historical before-seal stays raw. Current13 retained CODE anchors still require their actual new receipts. Exact R51 data restoration: restore only60 original4e3c2800 default evidence categories program+live_metadata; preserve5 decoder program boundaries, all65 shapes, all current mapping/member metadata and other272253 policies. No new native observation or missing-row credit. Restore only the five query195 metadata mechanism live_metadata selections to existing actual Console getPropertyInfo default anchors; all 272313 branch policies, existing program selections and original observations remain unchanged."
     },
     "docs/interface-depth-inventory.json": {
       "captured_sha256": "881b3737308e0654e0119a903a10e62e75a5d7ce15a5be8e8249ca9646d60636",

@@ -1,0 +1,40 @@
+{
+  "Source_historical_execution_native_and_normalization_declarations": "unchanged",
+  "all_metadata_before_values_and_exemption_rosters": "unchanged",
+  "branch_policies": 272313,
+  "changed_existing_metadata_after_pairs": [
+    "docs/branch-coverage-requirements.json",
+    "tests/support/applicability_completion_mapping.py",
+    "tests/support/applicability_program.py",
+    "tests/support/source_copy_native_evidence.py"
+  ],
+  "cohorts": {
+    "r51": {
+      "existing_current_source_declaration_validator": "valid",
+      "requirements_identity": "715e563304f7c8209e9d0f785a1d3c2447cf584ebd80ba7f739538beea52d8fb",
+      "source_count": 486,
+      "this_does_not_admit_captured_r5_under_new_sources": true
+    },
+    "r54": {
+      "existing_current_source_declaration_validator": "valid",
+      "requirements_identity": "715e563304f7c8209e9d0f785a1d3c2447cf584ebd80ba7f739538beea52d8fb",
+      "source_count": 771,
+      "this_does_not_admit_captured_r5_under_new_sources": true
+    },
+    "r55": {
+      "existing_current_source_declaration_validator": "valid",
+      "requirements_identity": "715e563304f7c8209e9d0f785a1d3c2447cf584ebd80ba7f739538beea52d8fb",
+      "source_count": 771,
+      "this_does_not_admit_captured_r5_under_new_sources": true
+    }
+  },
+  "exact_Source_standard_writer_roundtrip": "valid",
+  "existing_Source_accounting_validator": "valid",
+  "prepared_r13_source_count": 595,
+  "prepared_r13_sources_sha256": "30ae247355738a6d1c9da145780f508c88c0a1515370fbd9bd5106c548f96a24",
+  "r13_actual_proof": "ABSENT; no capture or admission",
+  "seconds": 50.49121403694153,
+  "semantic_identity": "715e563304f7c8209e9d0f785a1d3c2447cf584ebd80ba7f739538beea52d8fb",
+  "source_candidate_identity_before_new_proof": "e09452de59f505b063422a215668c1cf0c2bb3f3c9a3d33319c2184ac8a03e95",
+  "status": "FINITE_DECLARATION_AND_SOURCE_CHECKS_ONLY_NOT_EVIDENCE_PASS"
+}

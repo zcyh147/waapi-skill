@@ -11,7 +11,7 @@ from tests.support.source_copy_branch_evidence import dependency_review
 SUCCESSOR_REVIEW_PATH = 'tests/fixtures/source-copy/branch-successor-review-195.json'
 SUCCESSOR_REVIEW_SHA256 = '4cd9a81b3d413f46d7ecca6eec191984e338c5b3657b0d4e6955a167dac09a9b'
 ACCOUNTING_REVIEW_PATH = 'tests/fixtures/source-copy/branch-accounting-review-195-publication.json'
-ACCOUNTING_REVIEW_SHA256 = 'fc32a7684b78c0d6e751e98b9512c5a1a7e54fc35aea31ef0758d54e41df9398'
+ACCOUNTING_REVIEW_SHA256 = '8c1a323397149162d683b2827fa9a52a0d248cb4377872125758498eeca525f4'
 ACCOUNTING_READER = 'tests/support/source_copy_native_evidence.py'
 REQUIREMENTS_SOURCE = 'docs/branch-coverage-requirements.json'
 ACCOUNTING_DEPENDENCIES = (
