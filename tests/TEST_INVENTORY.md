@@ -5,6 +5,30 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-11-01 interrupted regression and retirement of the completion ledger
+
+Candidate `304b733bf0079f7cf4182b5fde41ab7e5d20f6c3` started one Non-live
+selection of 34,275 cases, including the 21,821 selected Program cases. It was
+not two separate gate runs. The user authorized stopping the slow run and
+deleting the additional completion/evidence ledger and its dedicated tests.
+The verified owned pytest process received SIGINT; the driver exited 2 and no
+owned processes remained. The candidate stayed unchanged and clean.
+
+The interrupted report records **18,211 passed, 159 failed, 159 skipped and
+1,162 deselected in 13,641.23 seconds**. This is incomplete regression evidence,
+not a passing gate. The original log, JUnit and failures are retained; removal
+of ledger tests does not regrade this run or authorize unrelated failure fixes.
+Neither Wwise nor Fresh Agent execution was started by this run.
+
+Completed-case JUnit durations show 2,873.03 seconds in
+`test_fixed_runtime_read_branch_evidence.py`, 1,855.70 seconds in the mixed
+`test_class_metadata_collection.py`, and 1,054.78 seconds across the semantic
+harness files. These observations support removing the additional ledger and
+separating real product assertions; they do not justify deleting all existing
+harness tests. The current [user decision](../docs/plans/full-waapi-coverage/SPEC.md#latest-user-decision--remove-the-additional-completion-ledger-2026-11-01)
+governs cleanup and the limited follow-up validation. No post-removal pass is
+claimed by this entry.
+
 ## 2026-10-28 #195 condition accounting and bounded playlist diagnosis
 
 Reviewed integration `2d4ed137` incorporates exact source-structure accounting
