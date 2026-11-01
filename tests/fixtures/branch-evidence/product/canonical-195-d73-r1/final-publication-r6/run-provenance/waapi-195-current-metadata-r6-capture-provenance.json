@@ -1,0 +1,75 @@
+{
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "--junitxml=/tmp/waapi-195-current-metadata-r6-capture.xml",
+    "tests/unit/test_metadata_discovery_gateway.py::test_original_r51_metadata_default_replays_through_current_public_gateway",
+    "tests/unit/test_metadata_discovery_gateway.py::test_original_r54_class_metadata_replays_through_current_public_gateway",
+    "tests/unit/test_metadata_discovery_gateway.py::test_original_r55_class_metadata_replays_through_current_public_gateway"
+  ],
+  "cwd": "/private/tmp/waapi-195-publication-cycle",
+  "git_capture_candidate": "64e9f1e15e8013f546fd949ca8cf5e32c974f207",
+  "inventory_source": {
+    "artifact": "tests/fixtures/branch-evidence/product/canonical-195-d73-r1/current-structural-inventory-r6/structural-inventory.json",
+    "sha256": "3f317ca124140f025dbfc3f704835c1e8675cd9b40c702d416976f9bb6ab1feb"
+  },
+  "pid": 63121,
+  "started_unix": 1793524232.352593,
+  "terminal_unix": 1793524786.906997,
+  "exit_code": 0,
+  "log": "/tmp/waapi-195-current-metadata-r6-capture.log",
+  "log_sha256": "aa6856d869d8eea9b4fc117459de56f1a0ea8b52451891bf74a741e6275c360f",
+  "WAAPI_TEST_PYTHON": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+  "contexts": {
+    "r51": {
+      "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-64e9f1e1-r6-prep2/current-metadata-195-r6-r51/context.json",
+      "sha256": "5c517d2a55764d01005ead1dbd6b6e48bb0cfa6d1b10ec1ae513bbffd81f3798",
+      "cases": [
+        "Color",
+        "ControlInput",
+        "OverrideColor"
+      ],
+      "branches": 9
+    },
+    "r54": {
+      "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-64e9f1e1-r6-prep2/current-metadata-195-r6-r54/context.json",
+      "sha256": "e255626f0fbbd87ea77b53d1c22218be54b31ce1acccb404defda9252fd57b06",
+      "cases": [
+        "2021.1|ModulatorTime|EnvelopeStopPlayback",
+        "2022.1|Sound|BypassEffect0",
+        "2022.1|Sound|Effect0",
+        "2022.1|Wwise Delay|DelayTime",
+        "2022.1|Wwise Delay|FeedbackEnabled",
+        "2023.1|Action|Scope",
+        "2023.1|EffectSlot|Bypass",
+        "2023.1|EffectSlot|Effect",
+        "2024.1|EffectSlot|Bypass",
+        "2024.1|EffectSlot|Effect",
+        "2024.1|Sound|AttenuationDistanceScaling",
+        "2025.1|EffectSlot|Bypass",
+        "2025.1|EffectSlot|Effect",
+        "2025.1|MediaPoolFilter|FieldName",
+        "2025.1|ModulatorTime|EnvelopeStopPlayback",
+        "2025.1|Sound|Weight"
+      ],
+      "branches": 41
+    },
+    "r55": {
+      "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-64e9f1e1-r6-prep2/current-metadata-195-r6-r55/context.json",
+      "sha256": "a2699088d4186d5933fcdd0277220f6a0f849c98b28a2ef2cfe095942954fa09",
+      "cases": [
+        "2021.1|MusicStinger|CustomCueMatchName",
+        "2022.1|MusicStinger|CustomCueMatchName",
+        "2023.1|ModulatorTime|EnvelopeStopPlayback",
+        "2023.1|MusicStinger|CustomCueMatchName",
+        "2024.1|ModulatorTime|EnvelopeStopPlayback",
+        "2024.1|MusicStinger|CustomCueMatchName"
+      ],
+      "branches": 10
+    }
+  }
+}

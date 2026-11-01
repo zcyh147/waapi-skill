@@ -1,0 +1,43 @@
+{
+  "get_info": {
+    "displayName": "WwiseConsole",
+    "platform": "x64",
+    "version": {
+      "displayName": "v2023.1.19",
+      "year": 2023,
+      "major": 1,
+      "minor": 19,
+      "build": 8928,
+      "nickname": "",
+      "schema": 119
+    },
+    "sessionId": "{F4AF7118-B386-4607-AC90-5AD7D51687F7}",
+    "apiVersion": 1,
+    "branch": "wwise_v2023.1.19",
+    "copyright": "(C) 2006-2026. Audiokinetic Inc. All rights reserved.",
+    "configuration": "release",
+    "isCommandLine": true,
+    "processId": 364,
+    "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2023.1.19.8928\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+    "directories": {
+      "user": "Y:\\Library\\Application Support\\Audiokinetic\\WwiseConsole",
+      "install": "Z:\\Applications\\Audiokinetic\\Wwise2023.1.19.8928\\",
+      "authoring": "c:\\Program Files\\Audiokinetic\\Wwise 2023.1.19.8928\\Authoring\\",
+      "bin": "c:\\Program Files\\Audiokinetic\\Wwise 2023.1.19.8928\\Authoring\\x64\\Release\\bin\\",
+      "help": "c:\\Program Files\\Audiokinetic\\Wwise 2023.1.19.8928\\Authoring\\Help\\"
+    }
+  },
+  "host": "127.0.0.1",
+  "port": 30068,
+  "home": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1/scenario/owned/wwise-user-home",
+  "prefix": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1/scenario/owned/wwise-user-home/Library/Application Support/Wwise2019/Bottles/Wwise2019x64",
+  "sandbox": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1/scenario/owned/sandbox-root/sample-project-8583c7244fac45378aaf73aab5f172a8/SampleProject.wproj",
+  "source_hash_before": {
+    "algorithm": "sha256",
+    "strategy": "full",
+    "digest": "bda96b3d9cb9ba99b92421ed4bb13c2b64afee1f1b12d7761e1633fdd72af590",
+    "file_count": 67,
+    "bytes_hashed": 3694760
+  },
+  "source_mtime_before_ns": 1792524475765129180
+}

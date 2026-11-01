@@ -1,0 +1,65 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523817132868000-3bbfe1f2df8f44c4ad2715cdc463f5ed-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 4294967295,
+    "default": null,
+    "dependencies": [
+      {
+        "action": "Enable",
+        "context": "Self",
+        "property": "OverrideEffect",
+        "type": "override"
+      }
+    ],
+    "display": {
+      "group": "Audio/Effects/Effect 0",
+      "index": 1448,
+      "name": "Effect 0"
+    },
+    "name": "Effect0",
+    "restriction": {
+      "restrictions": [
+        {
+          "sharedOnlyTypes": [],
+          "type": [
+            "Effect"
+          ]
+        }
+      ],
+      "type": "reference"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "None",
+      "unlink": true
+    },
+    "type": "",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.965789750014665,
+  "version": "2022.1"
+}
