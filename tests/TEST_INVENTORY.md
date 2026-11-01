@@ -5,6 +5,38 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-11-01 focused repair of the 95 retained failures
+
+The user resumed the existing Goal and authorized focused repairs before the
+final regression. Public-flow repair `d295d42b1` fixes one product defect:
+successful CLI verification resolved its terminal state projection with the
+optional original `env=None`, rather than the normalized environment already
+used for dispatch. The corrected `source_env` preserves environment-selected
+state directories and both strong and result-schema-only verification outputs.
+The other two changes repair a duplicate saved-XML PropertyList fixture and an
+incorrect child-conflict rename assumption; wrong target names still fail
+verification. All 22 assigned original failures are covered by **45 unique
+focused passing cases**. The 45-case run took 111.98s and overlaps the earlier
+five-case GREEN run; these are not 50 unique passes.
+
+Test-contract repair `139a60757` changes ten test/fixture files, not product
+runtime. It repairs missing pinned class/relationship data, local version-valid
+TSV fixtures, Broker/readiness/runner expectations and command inventories.
+Frozen suites, profiles and original execution evidence remain unchanged;
+unsupported original 2022 TSV subfolder cases retain explicit refusal checks.
+All 73 assigned original failures have passing follow-ups, with **133 unique
+latest focused passing cases** including directly affected controls. The
+intermediate 76-pass/3-fail and later fixture-error runs remain preserved.
+
+Combined candidate `024c2772ae08409b80e7faa00a4f9fe2bed13e12` contains both
+repairs. Both Standards and Spec reviews are clear for each bounded diff.
+An independent comparison of the 95 retained original node IDs with the focused
+JUnit results found a passing follow-up for every original node. This is
+cumulative focused evidence, not a single-candidate full regression pass.
+No Wwise or Fresh Agent process was launched. The final selected gate is one
+ordinary Non-live run, which includes Program's unit selection; do not duplicate
+the overlapping Program execution. Its result is pending.
+
 ## 2026-11-01 interrupted regression and retirement of the completion ledger
 
 Candidate `304b733bf0079f7cf4182b5fde41ab7e5d20f6c3` started one Non-live

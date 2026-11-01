@@ -13,6 +13,14 @@ After the repairs are stable, decide the final regression scope separately;
 another full regression, native Wwise run or Fresh campaign is not authorized by
 this repair step. This supersedes the earlier pause-before-repair instruction.
 
+Final regression selection after the focused repairs and both reviews: run the
+existing Non-live code gate once on the stable combined candidate. It includes
+the Program unit selection, so do not execute that overlapping gate a second
+time. Use ordinary verbose pytest output and durations to identify slow cases.
+No ledger generation, Wwise or Fresh execution accompanies this gate. Preserve
+any failures and repair only failed/affected cases rather than automatically
+repeating the entire gate.
+
 ## Latest user decision — remove the additional completion ledger (2026-11-01)
 
 The user explicitly authorized stopping the slow Non-live run and deleting the
