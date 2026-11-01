@@ -589,7 +589,8 @@ def test_business_declaration_enters_existing_immutable_preview_pipeline(
             "ak.wwise.core.object.getTypes": [
                 {
                     "return": [
-                        {"classId": 65552, "name": "Sound", "type": "WObject"}
+                        {"classId": 65552, "name": "Sound", "type": "WObject"},
+                        {"classId": 16, "name": "AudioFileSource", "type": "WObject"},
                     ]
                 }
             ],
@@ -652,6 +653,7 @@ def test_business_declaration_enters_existing_immutable_preview_pipeline(
                 "path",
                 "parent",
                 "notes",
+                "classId",
                 "activeSource",
                 "originalFilePath",
                 "sound:originalWavFilePath",
@@ -812,7 +814,7 @@ def test_fixed_fake_gateway_cases_use_real_compiler_and_immutable_preview(
         "dispatch"
     ]
     assert any(
-        row.get("switchAssignation") == "Snow"
+        row.get("switchAssignation") == "<Switch Group:Surface>Snow"
         for row in footsteps_dispatch["args"]["imports"]
     )
 

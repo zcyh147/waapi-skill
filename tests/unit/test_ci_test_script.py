@@ -197,7 +197,13 @@ def test_real_driver_owned_authoring_retains_explicit_only_collection(tmp_path, 
 def test_real_driver_owned_authoring_preserves_host_version_mode_guards(tmp_path, monkeypatch, version, mode, windows):
     code, calls = _record_driver_selection(tmp_path, monkeypatch, mode=mode, version=version, windows=windows,
         pytest_args=("tests/destructive/test_exact.py::test_one", "--owned-authoring-batch-root", str(tmp_path / "owned")))
-    assert code == (2 if windows else 1) and calls == []
+    if mode == "destructive" and version in SUPPORTED_VERSIONS and not windows:
+        assert code == 0 and len(calls) == 1
+        assert calls[0][1]["env"]["WWISE_VERSION"] == version
+        assert calls[0][1]["env"]["WWISE_AUTHORING_LIVE"] == "1"
+        assert calls[0][1]["env"]["WWISE_DESTRUCTIVE"] == "1"
+    else:
+        assert code == (2 if windows else 1) and calls == []
 
 
 def test_live_config_resolver_uses_host_native_pathlib_and_aliases(tmp_path: Path) -> None:

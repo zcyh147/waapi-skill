@@ -1363,6 +1363,10 @@ def _install_task_fakes(
     infrastructure_error = CodexInfrastructureError(failure, infrastructure_result)  # type: ignore[arg-type]
 
     class FakeBroker:
+        def bind_source_copy_user_turn(self, index: int, prompt: str) -> None:
+            # These fixtures have no Source-copy selection role.
+            assert type(index) is int and index >= 1 and isinstance(prompt, str)
+
         def __init__(self, **_: object) -> None:
             self.active = False
             self.consumed_count = 0
@@ -1467,6 +1471,10 @@ def _install_terminal_indeterminate_task_fakes(
     graded_gateway_counts: list[int] = []
 
     class FakeBroker:
+        def bind_source_copy_user_turn(self, index: int, prompt: str) -> None:
+            # These fixtures have no Source-copy selection role.
+            assert type(index) is int and index >= 1 and isinstance(prompt, str)
+
         def __init__(self, **_: object) -> None:
             self.active = False
             self.consumed_count = 0
@@ -2265,6 +2273,10 @@ def test_incomplete_codex_command_lifecycle_is_archived_as_non_retryable_blocked
     }
 
     class FakeBroker:
+        def bind_source_copy_user_turn(self, index: int, prompt: str) -> None:
+            # These fixtures have no Source-copy selection role.
+            assert type(index) is int and index >= 1 and isinstance(prompt, str)
+
         def __init__(self, **_: object) -> None:
             self.evidence_value = _FakeBrokerEvidence(
                 expected_names=("first", "second"),

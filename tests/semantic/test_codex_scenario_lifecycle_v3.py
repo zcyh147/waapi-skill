@@ -944,11 +944,18 @@ def test_failed_authoring_readiness_retains_owning_diagnostics_in_start_proof(mo
     if reply == 'probe-error':
         assert retained['diagnostics']['last_exception'] == {'type': 'RuntimeError', 'message': 'fixture exact getInfo failed'}
     else:
-        assert calls == ['ak.wwise.core.getInfo']
+        assert calls and set(calls) == {'ak.wwise.core.getInfo'}
+        if reply != 'malformed':
+            assert len(calls) == 1
         observed = retained['diagnostics']['observed_host_info']
         assert observed['result_type'] == ('NoneType' if reply == 'malformed' else 'dict')
-        assert observed['is_command_line'] == (None if reply == 'malformed' else reply == 'console')
-        assert observed['exact_build'] == (None if reply == 'malformed' else '2024.1.13.9057' if reply == 'wrong-build' else '2024.1.13.9056')
+        if reply == 'malformed':
+            assert observed == {'result_type': 'NoneType', 'classification': 'identity_pending', 'client_result': {
+                'boundary': 'waapi-client.call', 'uri': 'ak.wwise.core.getInfo', 'value': None,
+                'value_present': True, 'complete': True, 'omitted': {}}}
+        else:
+            assert observed['is_command_line'] == (reply == 'console')
+            assert observed['exact_build'] == ('2024.1.13.9057' if reply == 'wrong-build' else '2024.1.13.9056')
     assert proof['primary_error'] == 'start:' + type(captured['error']).__name__ + ':' + str(captured['error'])
     assert proof['wwise_stop_status'] == 'stopped-by-launch-helper' and proof['errors'] == []
     assert proof['source_hash_before'] == proof['source_hash_after']
