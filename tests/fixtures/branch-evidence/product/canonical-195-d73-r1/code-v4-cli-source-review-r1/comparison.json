@@ -1,0 +1,31 @@
+{
+  "affected_anchors": 32,
+  "consumer_script": "/tmp/waapi-195-publish-final-inputs-r7.py",
+  "independent_review_required_before_publication": true,
+  "original_files_receipts_outcomes_and_selected_nodes_unchanged": true,
+  "records": [
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2025.1|wwise-console|2025.1.7.9143|topic|ak.wwise.core.object.structureChanged|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v4-cli-source-review-r1/anchors/117.json",
+        "sha256": "bd99c0e8052703fb395dd321d48c1e81625c3e353f902d0dcf25dda3c58c9a8f"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/023.json",
+        "sha256": "1f3420ec1b6d753b883b77cd84d2143f0c5198680053baee7fd269aacf8b3884"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    }
+  ],
+  "source_path": "tests/unit/test_branch_coverage_completion_cli.py"
+}
