@@ -33,7 +33,8 @@ class PlatformCopyTask(CliProjectTask):
             ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value', Platform='Windows').text = 'Keep Windows text'
         tree.write(self.unit)
         tree = ET.parse(self.project_file)
-        props = ET.SubElement(tree.find('./ProjectInfo/Project'), 'PropertyList')
+        props = tree.find('./ProjectInfo/Project/PropertyList')
+        assert props is not None
         for name, text in [('SoundBankPaths', r'GeneratedSoundBanks\Windows'),
                            ('ExternalSourcesOutputPath', r'External\Windows')]:
             field = ET.SubElement(props, 'Property', Name=name, Type='string')

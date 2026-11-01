@@ -178,23 +178,34 @@ def test_existing_bus_applicability_preserves_explicit_graph_name_and_notes_edit
         extra = ['--field', 'notes' if edit == 'source-notes' else 'new_name', 'Edited']
     if edit == 'rename-policy':
         extra += ['--field', 'name_conflict', 'rename']
-        original = task.call
-        def call(uri, args=None, options=None):
-            value = original(uri, args, options)
-            if uri.endswith('object.set'):
-                assert args['objects'][0]['name'] == 'Edited'
-                row = task.objects[FIRST]
-                row['name'] = 'Edited_1'  # A native outcome, never predicted by the Gateway.
-                row['path'] = row['path'].rsplit('\\', 1)[0] + '\\' + row['name']
-                value['objects'][0]['name'] = row['name']
-            return value
-        task.call = call
     declare_existing(task, extra=extra)
     tx, shown = task.preview()
     code, verified = task.finish(tx, shown)
     if code:
         (tmp_path / 'unexpected-verification.json').write_text(json.dumps(verified))
     assert code == 0 and verified['verified'] is True, verified
+    assert len(writes) == 1
+
+
+def test_existing_bus_name_conflict_policy_does_not_allow_an_unrequested_target_rename(tmp_path):
+    """Reflected object.set conflict modes concern children, not the exact-ID target."""
+    task, writes = existing_task(tmp_path)
+    declare_existing(task, extra=['--field', 'new_name', 'Edited', '--field', 'name_conflict', 'rename'])
+    tx, shown = task.preview()
+    original = task.call
+    def call(uri, args=None, options=None):
+        value = original(uri, args, options)
+        if uri.endswith('object.set'):
+            assert args['objects'][0]['name'] == 'Edited'
+            row = task.objects[FIRST]
+            row['name'] = 'Edited_1'
+            row['path'] = row['path'].rsplit('\\', 1)[0] + '\\' + row['name']
+            value['objects'][0]['name'] = row['name']
+        return value
+    task.call = call
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified['verified'] is False, verified
+    assert verified['state'] == 'verification_failed', verified
     assert len(writes) == 1
 
 
