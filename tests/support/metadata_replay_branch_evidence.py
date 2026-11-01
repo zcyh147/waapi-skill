@@ -621,9 +621,9 @@ CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'aft
                                                              'before': '37841446878515c1484dfecf0cf35ac304c87b9f13ee39c6e0ec35c66d3d4189'},
  'tests/semantic/support/codex_typed_input_profile.py': {'after': 'fe5ea90a892b89fb4690bc143982c9c440ac912ab2be24134a5fb888103c7304',
                                                          'before': 'a03eb5afc5b633030a62bfe042ea6b40b9e9abbec35a2fa8b956377e73de9a8e'},
- 'tests/support/applicability_completion_mapping.py': {'after': '96c0ca08fd52a9d0a3f99f49ccfce00fc72d5829690e213b5fc7ac61c14126e5',
+ 'tests/support/applicability_completion_mapping.py': {'after': '5cf9468c31cd3ba7da8c7ba8db49836e5ec7a27d2679bf85b564798b24334dc8',
                                                        'before': None},
- 'tests/support/applicability_program.py': {'after': '0fbd7b8bfd019b908f9d0e2d94970d628be3bd20ebf901442b52537aacc313b1',
+ 'tests/support/applicability_program.py': {'after': '40c991f4f87947f614e23910fb367110b217386d680c36a72743e2c95cb7e0f8',
                                             'before': None},
  'tests/support/condition_branch_evidence.py': {'after': 'e52ecc05ca5b41d13be691de7f5d226418a00c2b210885b56141ad1c5b042018',
                                                 'before': '93b603a66b612af84758d0273415d34467aee60ef8773ea1736b4e9b805116f2'},
@@ -698,7 +698,7 @@ CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'aft
                                                'before': None},
  'tests/support/ui_completion_mapping.py': {'after': 'b77f98185f76725f632c56b8c5fa236315cc21ae092e4d36cd448b2fca47444b',
                                             'before': None},
- 'tests/unit/test_branch_coverage_completion_cli.py': {'after': 'cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10',
+ 'tests/unit/test_branch_coverage_completion_cli.py': {'after': 'b0d84b0ed00854a91d6ad2df55e4e481939c8c233a3f9f625061744f979674c2',
                                                        'before': 'b6fcec39b5994eae73205ac9616b03a02e2c8475340e8036b1092485bd516ead'}}
 
 
