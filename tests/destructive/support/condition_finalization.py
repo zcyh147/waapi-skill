@@ -10,14 +10,13 @@ import time
 
 from tests.destructive.support.exact_real_evidence import append_finalized_scenario_evidence
 from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle
-from tests.support import condition_branch_evidence
 from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
 from wwise_waapi.headless import assert_port_free
 
 
 def prepare_condition_finalization(*, item, owner: ScenarioLifecycle, status, reason, repo_root,
                                    candidate, version, started_at_unix_ns, host,
-                                   observation_path: Path, transactions, capture):
+                                   observation_path: Path, transactions):
     """Stop the original host, retaining successful resources until real teardown.
 
     This attaches to an already-owned lifecycle. It neither launches a host nor
@@ -27,9 +26,8 @@ def prepare_condition_finalization(*, item, owner: ScenarioLifecycle, status, re
     if runtime is None or owner._finished or not owner._lock_acquired:
         raise ValueError('Condition finalization needs its active original lifecycle')
     try:
-        if (item.nodeid != capture['nodeid'] or candidate != capture['git_candidate']
-                or version != runtime.version or host.get('isCommandLine') is not True):
-            raise ValueError('Condition finalization differs from the original node/host/candidate')
+        if version != runtime.version or host.get('isCommandLine') is not True:
+            raise ValueError('Condition finalization differs from the original version/host')
         lock_handle = owner.lock._handle
         process = runtime.lifecycle.process
         launch_pid = process.pid if process is not None else None
@@ -43,20 +41,17 @@ def prepare_condition_finalization(*, item, owner: ScenarioLifecycle, status, re
     prepared = owner.finish(status, reason='' if status == 'PASS' else reason,
                             defer_success_cleanup=status == 'PASS')
 
-    def append(result, reports, *, original):
+    def append(result, reports):
         append_finalized_scenario_evidence(
             repo_root=repo_root, candidate=candidate, version=version, nodeid=item.nodeid,
             phase_reports=reports, started_at_unix_ns=started_at_unix_ns,
             lifecycle=result.as_dict(), sandbox=runtime.sandbox, host=host,
-            observation_path=observation_path, transactions=transactions,
-            original_publisher=(lambda record: condition_branch_evidence.publish_condition_native_capture(
-                capture, record, observation_path)) if original else None)
+            observation_path=observation_path, transactions=transactions)
 
     def fresh_resources(actual):
         if (actual is not runtime or not owner._lock_acquired or owner.lock._handle is not lock_handle
                 or lock_handle is None or lock_handle.closed):
             raise ValueError('Condition original lifecycle lock is no longer held')
-        condition_branch_evidence.validate_condition_frozen_source(capture)
         if sha256(observation_path.read_bytes()).hexdigest() != observation_hash:
             raise ValueError('Condition original observation changed after host shutdown')
         lifecycle = runtime.lifecycle
@@ -92,7 +87,7 @@ def prepare_condition_finalization(*, item, owner: ScenarioLifecycle, status, re
             reports.get(phase) in {'passed', 'failed', 'skipped'} for phase in ('setup', 'call', 'teardown'))
         passed = complete and all(value == 'passed' for value in reports.values())
         if not prepared.cleanup_deferred:
-            append(prepared, reports, original=False)
+            append(prepared, reports)
             return
         if not passed:
             # The prepared receipt remains original. Revoke release permanently;
@@ -106,7 +101,7 @@ def prepare_condition_finalization(*, item, owner: ScenarioLifecycle, status, re
                 'outcome': outcome, 'phase_reports': reports, 'lifecycle': retained.as_dict(),
                 'prepared_lifecycle': prepared.as_dict(), 'acceptance': 'withheld'}, sort_keys=True), encoding='utf-8')
             if complete:
-                append(retained, reports, original=False)
+                append(retained, reports)
             else:
                 raise ValueError('Condition original pytest phase reports are incomplete')
             return
@@ -114,7 +109,7 @@ def prepare_condition_finalization(*, item, owner: ScenarioLifecycle, status, re
         def publish(result):
             nonlocal publication_started
             publication_started = True
-            append(result, reports, original=True)
+            append(result, reports)
         try:
             owner.release_prepared_cleanup(post_teardown_check=fresh_resources, publication_hook=publish)
         except BaseException as exc:

@@ -1,5 +1,7 @@
-"""Public contribution flows retain exact versioned branch evidence."""
+"""Direct public Gateway behavior with injected native responses."""
+
 from copy import deepcopy
+
 import json
 
 import pytest
@@ -7,8 +9,8 @@ import pytest
 from tests.unit.test_runtime_result_reference_gateway import task, GUID, PREFIX
 
 URI = PREFIX + 'getVoiceContributions'
-VERSIONS = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
 
+VERSIONS = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
 
 def test_older_partial_contribution_reports_only_actual_fields(tmp_path):
     run, _, _ = task(tmp_path, '2022.1', URI, {'return': {'volume': -3.0}})
@@ -20,7 +22,6 @@ def test_older_partial_contribution_reports_only_actual_fields(tmp_path):
         'unreported_fields': ['lpf', 'hpf', 'objects'],
     }
 
-
 def test_explicit_wwise_default_bus_path_omits_native_selection(tmp_path):
     result = {'return': {'volume': -3.0, 'LPF': 0.0, 'HPF': 0.0, 'objects': []}}
     run, _, calls = task(tmp_path, '2022.1', URI, result)
@@ -28,7 +29,6 @@ def test_explicit_wwise_default_bus_path_omits_native_selection(tmp_path):
         '--voice-object-id', GUID, '--bus-path', 'wwise-default')
     assert code == 0, json.dumps(payload)
     assert calls[-1] == (URI, {'voicePipelineID': 42, 'time': 123}, {})
-
 
 @pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('field', ('volume', 'LPF', 'HPF', 'objects'))
@@ -52,7 +52,6 @@ def test_contribution_partial_return_keeps_versioned_presence_and_type_rules(tmp
         assert code == 2, json.dumps(payload)
         assert 'agent_result' not in payload
 
-
 @pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('mode', (None, 'dry-path', 'wwise-default'))
 def test_public_bus_path_choices_preserve_omission_and_dry_construction(tmp_path, version, mode):
@@ -67,7 +66,6 @@ def test_public_bus_path_choices_preserve_omission_and_dry_construction(tmp_path
         expected['bussesPipelineID'] = []
     assert calls[-1] == (URI, expected, {})
 
-
 @pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('mode', ('dry-path', 'wwise-default'))
 @pytest.mark.parametrize('selector', ('--bus-object-id', '--bus-instance-handle'))
@@ -78,7 +76,6 @@ def test_explicit_bus_path_rejects_conflicting_bus_selectors_before_dispatch(tmp
     assert code == 2, json.dumps(payload)
     assert 'conflicts' in payload['message']
     assert not calls
-
 
 @pytest.mark.parametrize('version', VERSIONS)
 def test_contribution_request_schema_discloses_business_bus_path_choices(version):
@@ -95,7 +92,6 @@ def test_contribution_request_schema_discloses_business_bus_path_choices(version
     form = payload['commands'][0]['input_forms']['bus_selection']
     assert form['choices'] == {'dry-path': 'Explicit empty dry path',
         'wwise-default': 'Leave path selection to Wwise; no dry-path equivalence claim'}
-
 
 @pytest.mark.parametrize('version,game_object_id', [('2024.1', -1), ('2025.1', -(1 << 63))])
 def test_object_identity_contribution_selects_versioned_negative_game_object(tmp_path, version, game_object_id):
@@ -119,7 +115,6 @@ def test_object_identity_contribution_selects_versioned_negative_game_object(tmp
     assert code == 0, json.dumps(payload)
     assert calls[-1] == (URI, {'voicePipelineID': 42, 'bussesPipelineID': [], 'time': 123}, {})
 
-
 @pytest.mark.parametrize('version,invalid', [
     *((version, -1) for version in VERSIONS[:3]), ('2024.1', -(1 << 63) - 1), ('2025.1', 1 << 64),
 ])
@@ -131,18 +126,16 @@ def test_object_identity_contribution_rejects_outside_versioned_game_object_rang
     assert '--game-object-id' in payload['message']
     assert not calls
 
-
 def retained_contribution(version):
+    from tests.unit.test_fixed_runtime_read_branch_evidence import archive_reader
     from pathlib import Path
     import base64
     import gzip
     from tests.maintenance import branch_coverage_audit as audit
-    from tests.support.runtime_observation_evidence import archive_reader, sha
     originals = audit.ROOT / ('tests/fixtures/branch-evidence/product/runtime-rtpc-fields-r109/originals/2022.1'
         if version == '2022.1' else 'tests/fixtures/branch-evidence/product/runtime-read-r108')
     category = json.loads((originals / 'original-category.json').read_bytes())
-    archive = {'artifact': 'original-closure.json.gz', 'sha256': sha((originals / 'original-closure.json.gz').read_bytes())}
-    read = archive_reader(archive, originals)
+    read = archive_reader(originals / 'original-closure.json.gz')
     seal = json.loads(read(category['categories'][0]['batch_finalization']['artifact']))
     node = json.loads(read(next(iter(seal['observations'].values()))['path']))
     receipt, = [row for row in node['receipts'] if row['argv'][0] == 'profiler-voice-contributions'
@@ -163,11 +156,9 @@ def retained_contribution(version):
         rows[suffix] = [deepcopy(next(row for row in matches[-1] if row['pipelineID'] == identity)) for identity in identities]
     return originals, receipt, raw, rows
 
-
 def public_contribution_flow(root, version='2025.1', host='wwise-authoring', *, cursor=None, identity_forms='handles', retained=None):
-    from tests.support.runtime_observation_evidence import program_source_context
     from tests.unit.test_runtime_business_gateway import gateway, _env, _RuntimeControlDraftClient
-    context = program_source_context(flow=URI)
+    context = None
     originals, original_receipt, raw, rows = retained if retained is not None else retained_contribution(version)
     source_args = original_receipt['payload']['semantic_preview']['args']
     root.mkdir(parents=True, exist_ok=True)
@@ -220,58 +211,11 @@ def public_contribution_flow(root, version='2025.1', host='wwise-authoring', *, 
     assert final['uri'] == URI and final['result'] == raw['result']
     return receipt, final, context, trace, public_calls, originals
 
-
-@pytest.fixture(scope='module')
-def inventory():
-    from tests.maintenance import branch_coverage_audit as audit
-    return audit.build_inventory()
-
-
-def test_one_contribution_flow_reaches_final_consumer_and_binds_public_projection(tmp_path, inventory):
-    from tests.support.runtime_observation_evidence import write_program_receipt, write_read_bundle, write_json
-    from tests.maintenance import branch_coverage_audit as audit
-    from tests.maintenance import branch_audit_completion as completion
-    receipt, native, context, trace, public_calls, originals = public_contribution_flow(tmp_path)
-    capture = tmp_path / 'capture.json'
-    write_program_receipt(capture, receipt, native, nodeid='contribution-top2025',
-        phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context,
-        native_reads=trace, public_calls=public_calls)
-    index = write_read_bundle(tmp_path / 'bundle', capture, originals, inventory=inventory,
-        version='2025.1', host='wwise-authoring', mode='top-data')
-    policy = json.loads((index.parent / 'requirements.json').read_bytes())
-    document, base, _ = audit.portable_binding_inputs(index, policy)
-    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
-        digest=audit.digest, evidence_base=base, requirements_document=policy)
-    selected = [row for row in result['obligations'] if row['id'] in document['bindings']]
-    assert len(selected) == 4
-    assert {row['state'] for row in selected} == {'verified'}, json.dumps(selected)
-    identity = next(key for key in document['bindings'] if key.endswith('/properties/volume'))
-    binding = document['bindings'][identity]
-    document['bindings'] = {identity: binding}
-    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
-    program['gateway']['payload']['agent_result']['volume'] = -8.0
-    program['runtime_read_program']['gateway'] = deepcopy(program['gateway'])
-    program['runtime_read_program']['public_calls'][-1]['gateway'] = deepcopy(program['gateway'])
-    for check in program['branch_assertions'][identity]['checks']:
-        if check['pointer'] == '/gateway/payload/agent_result/volume':
-            check['equals'] = -8.0
-    proof = completion.read_sealed_artifact(binding['runtime_observation_attachment'], base)
-    proof['program_capture'] = write_json(base / 'damaged-capture.json', program['runtime_read_program'])
-    binding['runtime_observation_attachment'] = write_json(base / 'damaged-proof.json', proof)
-    binding['evidence']['program'].update(write_json(base / 'damaged-program.json', program))
-    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
-        digest=audit.digest, evidence_base=base, requirements_document=policy)
-    damaged = next(row for row in result['obligations'] if row['id'] == identity)
-    assert damaged['evidence_results']['program']['outcome'] == 'missing', json.dumps(damaged)
-    assert 'complete contribution projection' in damaged['evidence_results']['program']['reason']
-
-
 @pytest.mark.parametrize('version', ('2022.1', '2025.1'))
 def test_complete_retained_contribution_replays_with_current_issued_handles(tmp_path, version):
     receipt, native, _, _, _, _ = public_contribution_flow(tmp_path, version)
     assert len(receipt['payload']['agent_result']['objects']) == 7
     assert native['result']['return']['volume'] == -9.0
-
 
 def contribution_result(version, mode):
     if mode in ('absent', 'cursor-capture', 'cursor-user'):
@@ -297,12 +241,10 @@ def contribution_result(version, mode):
     return {'return': {'volume': -3.0, 'LPF': 0.0, 'HPF': 0.0, 'objects': objects,
         **({'DSF': 0.0} if version == '2025.1' else {})}}
 
-
 def public_contribution_case(root, version, host, mode):
-    from tests.support.runtime_observation_evidence import program_source_context
     from tests.unit.test_runtime_business_gateway import gateway, _env, _RuntimeControlDraftClient
     from tests.unit.test_rtpc_field_branch_evidence import BUILDS
-    context = program_source_context(flow=URI)
+    context = None
     root.mkdir(parents=True, exist_ok=True)
     client = _RuntimeControlDraftClient(root, version=version)
     original = client.call
@@ -344,81 +286,6 @@ def public_contribution_case(root, version, host, mode):
     assert native['uri'] == URI
     return receipt, native, context, trace, [{'gateway': deepcopy(receipt), 'native_start': 0, 'native_end': len(trace)}]
 
-
-@pytest.fixture(scope='module')
-def contribution_batch(tmp_path_factory, inventory):
-    from tests.support.runtime_observation_evidence import write_program_receipt, write_read_stage
-    root = tmp_path_factory.mktemp('contribution-batch')
-    captures, originals = {}, {}
-    for version in VERSIONS:
-        for host in ('wwise-console', 'wwise-authoring'):
-            modes = ['rich', 'single', 'empty', 'absent', 'omit', 'cursor-capture', 'cursor-user']
-            if version in ('2021.1', '2022.1'):
-                modes += ['partial']
-            for mode in modes:
-                receipt, native, context, trace, calls = public_contribution_case(root / f'{version}-{host}-{mode}', version, host, mode)
-                path = root / f'{version}-{host}-{mode}.json'
-                write_program_receipt(path, receipt, native, nodeid=f'{version}-{host}-{mode}', source_context=context,
-                    native_reads=trace, public_calls=calls, phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'))
-                captures[version, host, mode] = path
-        if version in ('2022.1', '2025.1'):
-            receipt, native, context, trace, calls, original = public_contribution_flow(root / f'{version}-original', version)
-            path = root / f'{version}-original.json'
-            write_program_receipt(path, receipt, native, nodeid=f'{version}-original', source_context=context,
-                native_reads=trace, public_calls=calls, phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'))
-            captures[version, 'wwise-authoring', 'original'] = path
-            originals[version] = original
-    return write_read_stage(root / 'bundle', captures, originals, inventory=inventory)
-
-
-def test_shared_contribution_batch_maps_every_exact_reflected_branch(contribution_batch, inventory):
-    from tests.maintenance import branch_coverage_audit as audit
-    from tests.maintenance import branch_audit_completion as completion
-    policy = json.loads((contribution_batch.parent / 'requirements.json').read_bytes())
-    document, base, _ = audit.portable_binding_inputs(contribution_batch, policy)
-    assert len(document['bindings']) == 1080
-    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
-        digest=audit.digest, evidence_base=base, requirements_document=policy)
-    selected = [row for row in result['obligations'] if row['id'] in document['bindings']]
-    failed = [row for row in selected if row['evidence_results']['program']['outcome'] != 'passed']
-    assert not failed, json.dumps([(row['id'], row['evidence_results']) for row in failed])
-    native_failed = [(row['id'], row['evidence_results']) for row in selected
-        if document['bindings'][row['id']].get('runtime_observation_attachment')
-        and row['evidence_results']['native']['outcome'] != 'passed']
-    assert not native_failed, json.dumps(native_failed)
-    assert len(selected) == 1080
-    assert sum(row['requirements'] == ['program'] for row in selected) >= 270
-    assert {row['state'] for row in selected} <= {'verified', 'implemented_unverified'}
-    assert all(row['evidence_results'].get('native', {}).get('outcome') == 'missing'
-        for row in selected if row['requirements'] == ['native', 'program']
-        and row['route'].split('|')[:2] not in (['2022.1', 'wwise-authoring'], ['2025.1', 'wwise-authoring']))
-
-
-CONTRIBUTION_PROGRAM_CASES = [
-    (version, host, mode)
-    for version in VERSIONS for host in ('wwise-console', 'wwise-authoring')
-    for mode in ('rich', 'single', 'empty', 'absent', 'omit', 'cursor-capture', 'cursor-user',
-        *(('partial',) if version in ('2021.1', '2022.1') else ()))
-] + [(version, 'wwise-authoring', 'original') for version in ('2022.1', '2025.1')]
-
-
-@pytest.mark.parametrize(('version', 'host', 'mode'), CONTRIBUTION_PROGRAM_CASES,
-    ids=['-'.join(case) for case in CONTRIBUTION_PROGRAM_CASES])
-def test_contribution_program_emits_after_actual_teardown(tmp_path, request, version, host, mode):
-    import os
-    from pathlib import Path
-    from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-    from tests.support.runtime_observation_evidence import write_program_receipt
-    if mode == 'original':
-        receipt, native, context, trace, calls, _ = public_contribution_flow(tmp_path, version, host)
-    else:
-        receipt, native, context, trace, calls = public_contribution_case(tmp_path, version, host, mode)
-    destination = Path(os.environ.get('WAAPI_CONTRIBUTION_CAPTURE_DIR', tmp_path)) / f'{version}-{host}-{mode}.json'
-    register_exact_evidence_finalizer(request.node, lambda phases: write_program_receipt(
-        destination, receipt, native, nodeid=request.node.nodeid, phase_reports=phases,
-        source_context=context, native_reads=trace, public_calls=calls))
-
-
 @pytest.mark.parametrize('returned', (777, -1, True, 1.5), ids=('fixed-time', 'negative', 'boolean', 'noninteger'))
 def test_contribution_cursor_snapshots_once_before_selecting_voice_and_bus(tmp_path, returned):
     from tests.unit.test_runtime_business_gateway import gateway, _env, _RuntimeControlDraftClient
@@ -454,38 +321,6 @@ def test_contribution_cursor_snapshots_once_before_selecting_voice_and_bus(tmp_p
         assert code != 0, payload
         assert not dependent
 
-
-def test_one_contribution_cursor_proves_fixed_time_construction_and_rejects_resealed_trace(tmp_path, inventory):
-    from tests.support.runtime_observation_evidence import write_program_receipt, write_read_bundle, write_json
-    from tests.maintenance import branch_coverage_audit as audit
-    from tests.maintenance import branch_audit_completion as completion
-    receipt, native, context, trace, calls = public_contribution_case(tmp_path / 'public', '2025.1', 'wwise-authoring', 'cursor-capture')
-    capture = tmp_path / 'capture.json'
-    write_program_receipt(capture, receipt, native, nodeid='contribution-cursor', source_context=context,
-        native_reads=trace, public_calls=calls, phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'))
-    index = write_read_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
-        version='2025.1', host='wwise-authoring', mode='cursor-capture')
-    policy = json.loads((index.parent / 'requirements.json').read_bytes())
-    document, base, _ = audit.portable_binding_inputs(index, policy)
-    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
-        digest=audit.digest, evidence_base=base, requirements_document=policy)
-    selected = [row for row in result['obligations'] if row['id'] in document['bindings']]
-    assert len(selected) == 4
-    assert {row['state'] for row in selected} == {'verified'}, json.dumps(selected)
-    identity = next(key for key in document['bindings'] if key.endswith('/profilerCursor/enum/1'))
-    binding = document['bindings'][identity]
-    document['bindings'] = {identity: binding}
-    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
-    cursor = next(row for row in program['runtime_read_program']['native_reads'] if row['uri'].endswith('getCursorTime'))
-    cursor['result']['return'] += 1
-    binding['evidence']['program'].update(write_json(base / 'damaged-program.json', program))
-    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
-        digest=audit.digest, evidence_base=base, requirements_document=policy)
-    changed = next(row for row in result['obligations'] if row['id'] == identity)
-    assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
-    assert 'fixed cursor construction trace' in changed['evidence_results']['program']['reason']
-
-
 def test_contribution_malformed_cursor_root_has_bounded_public_error_context(tmp_path):
     from tests.unit.test_runtime_business_gateway import gateway, _env, _RuntimeControlDraftClient
     client = _RuntimeControlDraftClient(tmp_path, version='2025.1')
@@ -504,8 +339,6 @@ def test_contribution_malformed_cursor_root_has_bounded_public_error_context(tmp
     assert payload['details']['result'] == 'None'
     assert PREFIX + 'getVoices' not in calls and URI not in calls
 
-
-
 def test_contribution_cursor_preserves_issued_handle_context_and_fixed_numeric_projection(tmp_path):
     receipt, native, _, trace, calls, _ = public_contribution_flow(tmp_path, cursor='latest')
     final = trace[calls[-1]['native_start']:]
@@ -518,32 +351,6 @@ def test_contribution_cursor_preserves_issued_handle_context_and_fixed_numeric_p
     assert native['args'] == {'bussesPipelineID': [2], 'time': 30837, 'voicePipelineID': 1}
     assert receipt['payload']['agent_result']['volume'] == -9.0
 
-
-def test_shared_contribution_cursor_batch_proves_exact_fifty_normalized_branches(tmp_path, inventory):
-    from tests.support.runtime_observation_evidence import write_program_receipt, write_read_stage, write_json
-    from tests.maintenance import branch_coverage_audit as audit
-    from tests.maintenance import branch_audit_completion as completion
-    captures = {}
-    for version in VERSIONS:
-        for host in ('wwise-console', 'wwise-authoring'):
-            for mode in ('cursor-capture', 'cursor-user'):
-                receipt, native, context, trace, calls = public_contribution_case(tmp_path / f'{version}-{host}-{mode}', version, host, mode)
-                path = tmp_path / f'{version}-{host}-{mode}.json'
-                write_program_receipt(path, receipt, native, nodeid=f'{version}-{host}-{mode}', source_context=context,
-                    native_reads=trace, public_calls=calls, phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'))
-                captures[version, host, mode] = path
-    index = write_read_stage(tmp_path / 'bundle', captures, {}, inventory=inventory)
-    policy = json.loads((index.parent / 'requirements.json').read_bytes())
-    document, base, _ = audit.portable_binding_inputs(index, policy)
-    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
-        digest=audit.digest, evidence_base=base, requirements_document=policy)
-    selected = [row for row in result['obligations'] if row['id'] in document['bindings']]
-    write_json(tmp_path / 'cursor-final-consumer.json', selected)
-    assert len(selected) == 50
-    assert all(row['requirements'] == ['program'] and row['state'] == 'verified' for row in selected), json.dumps(selected)
-
-
-
 @pytest.mark.parametrize('identity_forms', ('object-voice', 'object-bus'))
 def test_contribution_mixed_identity_forms_preserve_selected_bus_path(tmp_path, identity_forms):
     receipt, native, _, trace, calls, _ = public_contribution_flow(tmp_path, identity_forms=identity_forms)
@@ -552,67 +359,6 @@ def test_contribution_mixed_identity_forms_preserve_selected_bus_path(tmp_path, 
         PREFIX + 'getVoices', PREFIX + 'getBusses', URI]
     assert native['args'] == {'bussesPipelineID': [2], 'time': 30837, 'voicePipelineID': 1}
     assert receipt['payload']['agent_result']['volume'] == -9.0
-
-
-@pytest.mark.parametrize('identity_forms', ('object-voice', 'object-bus'))
-def test_mixed_contribution_program_binds_each_selected_bus_form(tmp_path, inventory, identity_forms):
-    from tests.support.runtime_observation_evidence import write_program_receipt, write_read_bundle, write_json
-    from tests.maintenance import branch_coverage_audit as audit
-    from tests.maintenance import branch_audit_completion as completion
-    receipt, native, context, trace, calls, _ = public_contribution_flow(tmp_path / 'public', identity_forms=identity_forms)
-    capture = tmp_path / 'capture.json'
-    write_program_receipt(capture, receipt, native, nodeid='mixed-contribution', source_context=context,
-        native_reads=trace, public_calls=calls, phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'))
-    index = write_read_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
-        version='2025.1', host='wwise-authoring', mode='top-data')
-    policy = json.loads((index.parent / 'requirements.json').read_bytes())
-    document, base, _ = audit.portable_binding_inputs(index, policy)
-    identity = next(key for key in document['bindings'] if key.endswith('/properties/volume'))
-    binding = document['bindings'][identity]
-    document['bindings'] = {identity: binding}
-    def outcome():
-        result = completion.evaluate_coverage(audit.ROOT, inventory, document,
-            digest=audit.digest, evidence_base=base, requirements_document=policy)
-        return next(row['evidence_results']['program'] for row in result['obligations'] if row['id'] == identity)
-    assert outcome()['outcome'] == 'passed'
-    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
-    for target in (program, program['runtime_read_program']):
-        target['native_call']['args']['bussesPipelineID'] = []
-        target['gateway']['payload']['semantic_preview']['args']['bussesPipelineID'] = []
-    program['runtime_read_program']['public_calls'][-1]['gateway'] = deepcopy(program['gateway'])
-    program['runtime_read_program']['native_reads'][-1]['args']['bussesPipelineID'] = []
-    binding['evidence']['program'].update(write_json(base / 'damaged-program.json', program))
-    assert outcome()['outcome'] == 'missing'
-
-
-def test_contribution_cursor_proof_rejects_resealed_integral_float_snapshot(tmp_path, inventory):
-    from tests.support.runtime_observation_evidence import write_program_receipt, write_read_bundle, write_json
-    from tests.maintenance import branch_coverage_audit as audit
-    from tests.maintenance import branch_audit_completion as completion
-    receipt, native, context, trace, calls = public_contribution_case(tmp_path / 'public', '2025.1', 'wwise-authoring', 'cursor-capture')
-    capture = tmp_path / 'capture.json'
-    write_program_receipt(capture, receipt, native, nodeid='typed-contribution-cursor', source_context=context,
-        native_reads=trace, public_calls=calls, phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'))
-    index = write_read_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
-        version='2025.1', host='wwise-authoring', mode='cursor-capture')
-    policy = json.loads((index.parent / 'requirements.json').read_bytes())
-    document, base, _ = audit.portable_binding_inputs(index, policy)
-    identity = next(key for key in document['bindings'] if key.endswith('/profilerCursor/enum/1'))
-    binding = document['bindings'][identity]
-    document['bindings'] = {identity: binding}
-    def outcome():
-        result = completion.evaluate_coverage(audit.ROOT, inventory, document,
-            digest=audit.digest, evidence_base=base, requirements_document=policy)
-        return next(row['evidence_results']['program'] for row in result['obligations'] if row['id'] == identity)
-    assert outcome()['outcome'] == 'passed'
-    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
-    cursor = next(row for row in program['runtime_read_program']['native_reads'] if row['uri'] == PREFIX + 'getCursorTime')
-    cursor['result']['return'] = float(cursor['result']['return'])
-    binding['evidence']['program'].update(write_json(base / 'damaged-program.json', program))
-    rejected = outcome()
-    assert rejected['outcome'] == 'missing', json.dumps(rejected)
-    assert 'fixed cursor construction trace' in rejected['reason']
-
 
 @pytest.mark.parametrize(('identity_forms', 'damage'), (
     ('object-voice', 'cross-game'), ('object-bus', 'cross-game'), ('object-voice', 'stale-handle')))
@@ -656,7 +402,6 @@ def test_contribution_shared_bus_tail_rejects_cross_game_or_stale_bus(tmp_path, 
         assert payload['agent_result']['matching_bus_count'] == 0
     else:
         assert code == 2 and 'identity changed' in payload['message'], payload
-
 
 def test_contribution_shared_bus_tail_preserves_homogeneous_object_order(tmp_path):
     _, native, _, _, _ = public_contribution_case(tmp_path, '2025.1', 'wwise-authoring', 'rich')

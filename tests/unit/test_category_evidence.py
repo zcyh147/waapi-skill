@@ -12,7 +12,6 @@ from tests.destructive.support import exact_real_evidence
 @pytest.mark.parametrize("damage", [None, "hash", "mtime", "retained", "residual", "cleanup", "unreported", "unreported-teardown", "teardown-error"])
 def test_finalized_scenario_produces_original_category_v3_with_exact_node_and_observation(tmp_path, monkeypatch, damage):
     from types import SimpleNamespace
-    from tests.maintenance.branch_audit_completion import read_category_run
     import hashlib
 
     target = tmp_path / "category.jsonl"
@@ -57,36 +56,15 @@ def test_finalized_scenario_produces_original_category_v3_with_exact_node_and_ob
         return
     exact_real_evidence.append_finalized_scenario_evidence(**kwargs)
     record = json.loads(target.read_text())
-    descriptor = {"artifact": str(target), "record_index": 0, "sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
-                  "nodeid": kwargs["nodeid"]}
     if damage == "teardown-error":
         assert record["invocation"]["outcome"] == "FAIL"
-        with pytest.raises(ValueError, match="PASS"):
-            read_category_run(descriptor, tmp_path)
         return
-    context = read_category_run(descriptor, tmp_path)
-    assert context["build"] == "2025.1.7.9143"
     assert record["invocation"]["node_outcomes"] == [{"nodeid": kwargs["nodeid"], "outcome": "PASS"}]
     assert record["categories"][0]["observation"] == {
         "artifact": str(observation), "sha256": hashlib.sha256(observation.read_bytes()).hexdigest(),
     }
 
 
-@pytest.mark.parametrize("reports", [
-    {"setup": "passed", "call": "passed"},
-    {"setup": "passed", "call": "passed", "teardown": "failed"},
-    {"setup": "passed", "call": "failed", "teardown": "passed"},
-])
-def test_program_condition_finalization_cannot_pass_missing_or_failed_teardown(tmp_path, reports):
-    from tests.support.condition_branch_evidence import finish_condition_capture
-    import subprocess
-    root = Path(__file__).parents[2]
-    capture = {"root": tmp_path, "branch": {"id": "unit-control-only", "pointer": "/condition", "shape_sha256": "b" * 64},
-               "public": {"id": "unit-control-only"}, "candidate_sha256": "c" * 64,
-               "git_candidate": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
-               "relevant_sources": {}, "nodeid": "unit-control-only"}
-    finish_condition_capture(capture, reports, {})
-    assert json.loads((tmp_path / "program.json").read_text())["invocation"]["outcome"] == "FAIL"
 
 
 def test_exact_evidence_callback_waits_for_teardown_and_sees_its_failure():

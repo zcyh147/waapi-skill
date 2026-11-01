@@ -1437,7 +1437,7 @@ def test_cli_migration_compact_identity_proofs_preserve_every_row(tmp_path, chan
         'language-id', 'other-language', 'duplicate-source', 'duplicate-media', 'missing-media',
         'mode-unchanged', 'work-unit-ids-remain', 'unrelated-property', 'unrelated-same-name-property']],
 ])
-def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_path, version, source_kind, change, media_id_product_capture):
+def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_path, version, source_kind, change):
     class MoveMediaTask(CliProjectTask):
         def __init__(self, *args, **kwargs):
             self.public_invocations = []
@@ -1653,25 +1653,8 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     assert observation['work_unit_media_id_count_before'] == (0 if change == 'already-central' else 1)
     assert observation['work_unit_media_id_count_after'] == 0
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
-    if source_kind == 'AudioFileSource' and change is None:
-        from tests.support.media_id_branch_evidence import public_media_id_observation
-        media_id_product_capture.update(public_media_id_observation(
-            gateway=task.public_invocations[-1], public_invocations=task.public_invocations,
-            native_observations=task.native_observations))
 
 
-@pytest.fixture
-def media_id_product_capture(request):
-    import os
-    from pathlib import Path
-    observed = {}
-    context_path = os.environ.get('WAAPI_MEDIA_ID_BRANCH_CAPTURE_CONTEXT')
-    if context_path:
-        from tests.support.media_id_branch_evidence import load_media_id_capture, finish_media_id_capture
-        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-        capture = load_media_id_capture(Path(context_path), request.node.nodeid)
-        register_exact_evidence_finalizer(request.node, lambda reports: finish_media_id_capture(capture, reports, observed))
-    return observed
 
 
 @pytest.mark.parametrize('version,change', [

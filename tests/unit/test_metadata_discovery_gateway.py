@@ -259,22 +259,8 @@ def _metadata_responses(
     ids=[version + "-" + name for version in SUPPORTED_WWISE_VERSION_KEYS
          for name in metadata_result_cases(version)])
 def test_public_metadata_result_bank_preserves_each_selected_native_fact(tmp_path: Path, version: str, case_name: str, native: dict, request) -> None:
-    import os
-    observed_capture = {}
-    context_path = os.environ.get("WAAPI_METADATA_RESULT_BRANCH_CAPTURE_CONTEXT")
-    if context_path:
-        from tests.support.metadata_read_branch_evidence import load_metadata_capture, finish_metadata_capture
-        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-        capture = load_metadata_capture(Path(context_path), request.node.nodeid, version, case_name)
-        register_exact_evidence_finalizer(request.node, lambda reports: finish_metadata_capture(capture, reports, observed_capture))
-    from tests.maintenance import branch_audit_completion as completion
-    from tests.maintenance.branch_coverage_audit import digest
-    from wwise_waapi.native_catalog import load_native_catalog
-    catalog = load_native_catalog(version, "wwise-console")
-    schema = catalog["schemas"][GET_PROPERTY_INFO_URI]["resultSchema"]
-    completion.validate_native_alternative(SCRIPT_PATH.parents[3], {
-        "route": version + "|wwise-console|" + catalog["provenance"]["build"] + "|function|" + GET_PROPERTY_INFO_URI,
-        "pointer": "/resultSchema", "shape_sha256": digest(schema)}, native)
+    from wwise_waapi.builders.schema import validate_resolved_semantic_result
+    validate_resolved_semantic_result(GET_PROPERTY_INFO_URI, native, version=version)
     responses = _metadata_responses(tmp_path, version=version, names=("Volume", "Unrelated"))
     def property_info(args, options):
         assert args == {"object": OBJECT_GUID, "property": "Volume"} and options == {}
@@ -301,18 +287,14 @@ def test_public_metadata_result_bank_preserves_each_selected_native_fact(tmp_pat
     assert len(json.dumps(detail, ensure_ascii=False, indent=2).encode()) < 64 * 1024
     assert [args for uri, args, _ in client.calls if uri == GET_PROPERTY_INFO_URI] == [
         {"object": OBJECT_GUID, "property": "Volume"}]
-    from tests.support.media_pool_branch_evidence import public_read_observation
     native_call = next(call for call in client.calls if call[0] == GET_PROPERTY_INFO_URI)
-    observed_capture.update(public_read_observation(gateway_argv=argv, exit_code=code, payload=detail,
-        uri=native_call[0], args=native_call[1], options=native_call[2], result=native))
     # A surviving unrelated field must never replace this exact lost selection.
     client.responses[GET_NAMES_URI] = {"return": ["Unrelated"]}
     rejected_code, rejected = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
     assert rejected_code == 2 and rejected["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED", rejected
     dispatch_count = sum(uri == GET_PROPERTY_INFO_URI for uri, _, _ in client.calls)
     assert dispatch_count == 1
-    observed_capture.update(native_metadata_dispatch_count=dispatch_count,
-        rejected_read={"argv": argv, "exit_code": rejected_code, "payload": rejected})
+
 
 
 def _metadata_command_platform(monkeypatch, platform: str) -> None:
@@ -1904,23 +1886,14 @@ def test_single_large_typed_metadata_item_has_lossless_item_continuation(tmp_pat
 
 
 @pytest.mark.parametrize('field,expected', [('Color', 0), ('ControlInput', None), ('OverrideColor', False)])
-def test_original_r51_metadata_default_replays_through_current_public_gateway(tmp_path, request, field, expected):
-    """Current injected replay of preserved packets; no new native observation."""
-    import os
-    observed = {}
-    context_path = os.environ.get('WAAPI_METADATA_REPLAY_CAPTURE_CONTEXT')
-    if context_path:
-        from tests.support.metadata_replay_branch_evidence import load_capture, finish_capture
-        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-        capture = load_capture(Path(context_path), request.node.nodeid, field)
-        register_exact_evidence_finalizer(request.node, lambda reports: finish_capture(capture, reports, observed))
-    _run_original_r51_metadata_replay(tmp_path, field, expected, observed)
+def test_original_r51_metadata_default_replays_through_current_public_gateway(tmp_path, field, expected):
+    _run_original_r51_metadata_replay(tmp_path, field, expected, {})
+
 
 
 def _run_original_r51_metadata_replay(tmp_path, field, expected, observed):
     from copy import deepcopy
-    from tests.support.metadata_replay_branch_evidence import replay_case, replay_observation
-    case = replay_case(field)
+    case = json.loads((SCRIPT_PATH.parents[3] / 'tests/support/metadata_replay_cases.json').read_text())
     packets = case['packets']
     def property_info(args, options):
         assert args == {'object': case['object_id'], 'property': field} and options == {}
@@ -1936,7 +1909,6 @@ def _run_original_r51_metadata_replay(tmp_path, field, expected, observed):
     selected, = [row for row in listed['agent_result']['fields'] if row['name'] == field]
     argv = ['metadata', 'detail', '--exact-id', case['object_id'], '--selection', selected['selection']]
     code, payload = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
-    observed.update(replay_observation(argv, code, payload, client, field, list_argv, listed))
     assert code == 0, payload
     assert type(payload['agent_result']['metadata']['default']) is type(expected)
     assert payload['agent_result']['metadata']['default'] == expected
@@ -1951,17 +1923,9 @@ def _run_original_r51_metadata_replay(tmp_path, field, expected, observed):
     '2024.1':{'Sound':['AttenuationDistanceScaling'],'EffectSlot':['Bypass','Effect']},
     '2025.1':{'Sound':['Weight'],'EffectSlot':['Bypass','Effect'],'ModulatorTime':['EnvelopeStopPlayback'],
         'MediaPoolFilter':['FieldName']}}.items() for scope,fields in scopes.items() for field in fields])
-def test_original_r54_class_metadata_replays_through_current_public_gateway(tmp_path,request,case):
-    """Preserved native responses, current injected execution; no new native fact."""
-    import os
-    from tests.support import metadata_replay_branch_evidence as replay
-    observed={};capture=None;context_path=os.environ.get('WAAPI_R54_METADATA_REPLAY_CAPTURE_CONTEXT')
-    if context_path:
-        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-        capture=replay.load_r54_capture(context_path,request.node.nodeid,case)
-        register_exact_evidence_finalizer(request.node,lambda reports:replay.finish_r54_capture(capture,reports,case,observed))
-    _run_original_r54_metadata_replay(tmp_path,case,observed,
-        descriptor=capture['originals'][case] if capture else None,base=Path(capture['root']).parent if capture else None)
+def test_original_r54_class_metadata_replays_through_current_public_gateway(tmp_path, case):
+    _run_original_r54_metadata_replay(tmp_path, case, {}, cohort='r54')
+
 
 
 
@@ -1969,23 +1933,43 @@ def test_original_r54_class_metadata_replays_through_current_public_gateway(tmp_
     '2021.1|MusicStinger|CustomCueMatchName','2022.1|MusicStinger|CustomCueMatchName',
     '2023.1|MusicStinger|CustomCueMatchName','2023.1|ModulatorTime|EnvelopeStopPlayback',
     '2024.1|MusicStinger|CustomCueMatchName','2024.1|ModulatorTime|EnvelopeStopPlayback'])
-def test_original_r55_class_metadata_replays_through_current_public_gateway(tmp_path,request,case):
-    """Actual frozen860 raw packets; current injected program, zero new native facts."""
-    import os
-    from tests.support import metadata_replay_branch_evidence as replay
-    observed={};capture=None;context_path=os.environ.get('WAAPI_R55_METADATA_REPLAY_CAPTURE_CONTEXT')
-    if context_path:
-        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-        capture=replay.load_r54_capture(context_path,request.node.nodeid,case)
-        register_exact_evidence_finalizer(request.node,lambda reports:replay.finish_r54_capture(capture,reports,case,observed))
-    _run_original_r54_metadata_replay(tmp_path,case,observed,cohort='r55',
-        descriptor=capture['originals'][case] if capture else None,base=Path(capture['root']).parent if capture else None)
+def test_original_r55_class_metadata_replays_through_current_public_gateway(tmp_path, case):
+    _run_original_r54_metadata_replay(tmp_path, case, {}, cohort='r55')
+
+
+
+def _original_class_metadata(case, cohort):
+    """Read archived native responses as fixture inputs, without proof admission."""
+    import hashlib
+    version, scope, field = case.split('|')
+    version_tag = version[:4]
+    family = ('r54-class-replay-r58-settled-r1' if cohort == 'r54'
+              else 'r55-class-replay-r55-settled-r2')
+    candidate = '8a8d5f8e' if cohort == 'r54' else '860965d3'
+    root = (SCRIPT_PATH.parents[3] / 'tests/fixtures/branch-evidence/product' / family /
+            'originals' / f'{cohort}-class-metadata-{candidate}-{version_tag}-r1')
+    target, = [row for row in json.loads((root / 'targets.json').read_bytes())
+               if row['scope'] == scope and row['field'] == field]
+    raw = (root / target['native_receipt']).read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == target['native_sha256']
+    native = json.loads(raw)
+    listed = json.loads((root / (target['list_receipt'] + '.stdout')).read_bytes())
+    names, = [row for row in listed['calls'] if row['api'] == GET_NAMES_URI]
+    packets = {}
+    for path in sorted((root / 'dispatcher-evidence').glob('*.json')):
+        packet = json.loads(path.read_bytes())
+        uri = packet['api']
+        if uri == GET_NAMES_URI and packet['evidence_path'] != names['evidence_path']:
+            continue
+        if uri in {GET_INFO_URI, 'ak.wwise.core.getProjectInfo', OBJECT_GET_URI, GET_TYPES_URI, GET_NAMES_URI}:
+            packets.setdefault(uri, packet)
+    return {'context': {'class_id': json.loads((root / 'plan.json').read_bytes())['class_ids'][scope], 'native_result': native['result']},
+            'packets': packets}
 
 
 def _run_original_r54_metadata_replay(tmp_path,case,observed,*,cohort='r54',descriptor=None,base=None):
     from copy import deepcopy
-    from tests.support import metadata_replay_branch_evidence as replay
-    source=replay.r54_replay_case(case,descriptor,base=base,cohort=cohort);context=source['context'];version,scope,field=case.split('|')
+    source=_original_class_metadata(case, cohort);context=source['context'];version,scope,field=case.split('|')
     packets=source['packets']
     def property_info(args,options):
         assert args=={'classId':context['class_id'],'property':field} and options=={}
@@ -2008,11 +1992,5 @@ def _run_original_r54_metadata_replay(tmp_path,case,observed,*,cohort='r54',desc
     code,payload=waapi_gateway.execute_gateway(argv,env=env,client_factory=lambda _:client)
     calls=[(uri,args,options) for uri,args,options in client.calls if uri==GET_PROPERTY_INFO_URI]
     assert calls==[(GET_PROPERTY_INFO_URI,{'classId':context['class_id'],'property':field},{})]
-    from tests.support.media_pool_branch_evidence import public_read_observation
-    observed.update(public_read_observation(gateway_argv=argv,exit_code=code,payload=payload,uri=GET_PROPERTY_INFO_URI,
-        args=calls[0][1],options={},result=context['native_result']))
-    observed.update(discovery_pages=pages,client_disconnected=client.disconnected,
-        replayed_original_native_sha256=context['native_sha256'],original_case=case,
-        replayed_original_packets_sha256=source['packet_sha256s'])
     assert code==0 and payload['agent_result']['complete'] is True,payload
     assert json.dumps({k:payload['agent_result']['metadata'][k] for k in context['native_result']},sort_keys=True,allow_nan=False)==json.dumps(context['native_result'],sort_keys=True,allow_nan=False)

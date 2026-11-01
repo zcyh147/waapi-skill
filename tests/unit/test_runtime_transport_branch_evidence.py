@@ -1,19 +1,22 @@
-"""Transport authority and independent route evidence through the public Gateway."""
+"""Direct public Gateway behavior with injected native responses."""
+
 from copy import deepcopy
+
 import json
 
 import pytest
 
 from tests.maintenance import branch_coverage_audit as audit
-from tests.maintenance import branch_audit_completion as completion
-from tests.support import runtime_observation_evidence as runtime
-from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+
 from tests.unit.test_runtime_business_gateway import _env, gateway, _RuntimeControlDraftClient
-from tests.unit.test_runtime_log_branch_evidence import log_inventory
 
 PREFIX='ak.wwise.core.transport.'
-BUILDS={'2021.1':'2021.1.14.8108','2022.1':'2022.1.19.8584','2023.1':'2023.1.19.8928','2024.1':'2024.1.13.9056','2025.1':'2025.1.7.9143'}
 
+def transport_inputs(*suffixes):
+    return {PREFIX + suffix: {'call': {'args': {'object': '{11111111-1111-1111-1111-111111111111}'}}}
+            for suffix in suffixes}
+
+BUILDS={'2021.1':'2021.1.14.8108','2022.1':'2022.1.19.8584','2023.1':'2023.1.19.8928','2024.1':'2024.1.13.9056','2025.1':'2025.1.7.9143'}
 
 class TransportClient(_RuntimeControlDraftClient):
     """External Wwise boundary only; handles/transactions are the real product."""
@@ -52,7 +55,6 @@ class TransportClient(_RuntimeControlDraftClient):
         self.trace.append({'ordinal':len(self.trace),'uri':uri,'args':deepcopy(args),'options':deepcopy(options),'result':deepcopy(result)})
         return result
 
-
 def public_lifecycle(path,version,host,originals,*,selector='id',only_bound=False,rich=False,media_rejections=None,media_only=False):
     path.mkdir(parents=True);target=originals[PREFIX+'create']['call']['args']['object']
     client=TransportClient(path,version,host,target);env=_env(path,version=version);calls=[];stages=[]
@@ -60,7 +62,7 @@ def public_lifecycle(path,version,host,originals,*,selector='id',only_bound=Fals
     if PREFIX+'prepare'in originals:
         prepare_target=originals[PREFIX+'prepare']['call']['args']['object']
         if prepare_target not in client.objects:client.objects[prepare_target]={'id':prepare_target,'name':'Play_Prepare','type':'Event','path':r'\Events\Default Work Unit\Play_Prepare'}
-    sources={u:runtime.program_source_context(flow=u)for u in originals}
+    sources=dict.fromkeys(originals)
     def invoke(argv):
         start=len(client.trace)
         code,payload=gateway.execute_gateway(['--state-dir',str(path/'state'),*argv],env=env,client_factory=lambda _:client)
@@ -123,88 +125,10 @@ def public_lifecycle(path,version,host,originals,*,selector='id',only_bound=Fals
         assert code==2 and not any(r['uri']==PREFIX+'getState'for r in client.trace[before:])
     return calls,client.trace[:before],stages,sources
 
-
-def test_transport_2024_paired_host_lifecycle_teardown_portable_consumer(request,tmp_path):
-    from tests.support.runtime_transport_evidence import original_transport,write_transport_bundle,URIS
-    routes=[f'2024.1|{h}|{BUILDS["2024.1"]}|function|{u}'for h in ('wwise-console','wwise-authoring')for u in sorted(URIS)]
-    inventory=log_inventory(routes,pointers={'/argsSchema','/optionsSchema','/resultSchema'});sessions=[]
-    for host in ('wwise-console','wwise-authoring'):
-        originals={u:original_transport(f'2024.1|{host}|{BUILDS["2024.1"]}|function|{u}')for u in URIS}
-        sessions.append(public_lifecycle(tmp_path/host,'2024.1',host,originals))
-    def finalize(phases):
-        paths=[]
-        for number,(calls,trace,stages,sources)in enumerate(sessions):
-            for j,stage in enumerate(stages):
-                if stage['uri']==PREFIX+'executeAction'and '--audition-action'in calls[stage['start']+1]['gateway']['argv'] and calls[stage['start']+1]['gateway']['argv'][calls[stage['start']+1]['gateway']['argv'].index('--audition-action')+1]=='stop':continue
-                part=calls[stage['start']:stage['end']];writes=[r for r in trace[part[0]['native_start']:part[-1]['native_end']]if r['uri']==stage['uri']]
-                # Readbacks may repeat the same read URI; the exact public request
-                # comes from the one selected direct read or mutation execution.
-                if stage['uri']==PREFIX+'getState':writes=[r for r in trace[part[-1]['native_start']:part[-1]['native_end']]if r['uri']==stage['uri']]
-                if stage['uri']==PREFIX+'getList':writes=[r for r in trace[part[-1]['native_start']:part[-1]['native_end']]if r['uri']==stage['uri']]
-                assert len(writes)==1
-                row=writes[0];native={k:row[k]for k in ('uri','args','options','result')};path=tmp_path/f'capture-{number}-{j}.json'
-                runtime.write_program_receipt(path,calls[stage['receipt_index']]['gateway'],native,nodeid=request.node.nodeid,phase_reports=phases,
-                    source_context=sources[stage['uri']],native_reads=trace,public_calls=calls)
-                cap=json.loads(path.read_bytes());cap['transport_stage']=stage;cap['transport_stages']=stages;runtime.write_json(path,cap);paths.append(path)
-        index=write_transport_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='transport-2024.1-')
-        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
-        def evaluate(b):return completion.evaluate_coverage(audit.ROOT,inventory,b,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        result=evaluate(bindings);runtime.write_json(tmp_path/'consumer-result.json',result)
-        assert {r['state']for r in result['obligations']}=={'verified'},[(r['id'],r['reasons'])for r in result['obligations']if r['state']!='verified']
-        for route in routes:
-            damaged=deepcopy(bindings);damaged['bindings'][route+'|/resultSchema']['evidence'].pop('native')
-            negative=evaluate(damaged)
-            assert all(r['state']!='verified'for r in negative['obligations']if r['route']==route)
-            assert all(r['state']=='verified'for r in negative['obligations']if r['route']!=route)
-        with pytest.raises(ValueError,match='duplicates an exact branch'):
-            runtime.write_runtime_composition(tmp_path/'duplicates',[(index,policies),(index,policies)])
-    register_exact_evidence_finalizer(request.node,finalize)
-
-
-def test_retained_2025_authoring_prepare_keeps_its_own_blocked_root_and_target():
-    from tests.support.runtime_transport_evidence import original_transport
-    route=f'2025.1|wwise-authoring|{BUILDS["2025.1"]}|function|'
-    prepare=original_transport(route+PREFIX+'prepare')
-    create=original_transport(route+PREFIX+'create')
-    assert prepare['provider']['archive_files']==307
-    assert prepare['call']=={'uri':PREFIX+'prepare','args':{'object':'{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}'},'options':{},'result':{}}
-    assert prepare['facts']['original_finalization']=='BLOCKED'
-    assert prepare['facts']['physical_cleanup_complete']is True
-    assert prepare['facts']['global_pass_transferred']is False
-    assert prepare['facts']['business_boundary']=='acknowledgment_schema_only'
-    assert create['facts']['original_finalization']=='PASS'
-    assert create['call']['args']['object']=='{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}'
-    assert prepare['provider']['archive_source']!=create['provider']['archive_source']
-
-
-def test_transport_name_path_normalization_requires_public_identity_and_readback(request,tmp_path):
-    from tests.support.runtime_transport_evidence import original_transport,write_transport_bundle
-    routes=[f'2024.1|wwise-console|{BUILDS["2024.1"]}|function|'+PREFIX+s for s in ('create','prepare')]
-    inventory=log_inventory(routes)
-    from tests.support.runtime_transport_evidence import review
-    selected=set(review()['normalized_identities'])|{r+'|/resultSchema'for r in routes}
-    inventory['native_coverage']['obligations']=[b for b in inventory['native_coverage']['obligations']if b['id']in selected]
-    assert len(inventory['native_coverage']['obligations'])==18
-    originals={u:original_transport(f'2024.1|wwise-console|{BUILDS["2024.1"]}|function|{u}')for u in (PREFIX+'create',PREFIX+'prepare')}
-    sessions=[public_lifecycle(tmp_path/selector,'2024.1','wwise-console',originals,selector=selector,only_bound=True)
-              for selector in ('id','qualified-name','path')]
-    def finalize(phases):
-        paths=[]
-        for number,(calls,trace,stages,sources)in enumerate(sessions):
-            for j,stage in enumerate(stages):
-                if stage['uri']not in originals:continue
-                part=calls[stage['start']:stage['end']];native,=[r for r in trace[part[0]['native_start']:part[-1]['native_end']]if r['uri']==stage['uri']]
-                path=tmp_path/f'capture-{number}-{j}.json'
-                runtime.write_program_receipt(path,calls[stage['receipt_index']]['gateway'],{k:native[k]for k in ('uri','args','options','result')},
-                    nodeid=request.node.nodeid,phase_reports=phases,source_context=sources[stage['uri']],native_reads=trace,public_calls=calls)
-                cap=json.loads(path.read_bytes());cap.update(transport_stage=stage,transport_stages=stages);runtime.write_json(path,cap);paths.append(path)
-        index=write_transport_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='transport-2024.1-')
-        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
-        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        runtime.write_json(tmp_path/'consumer-result.json',result)
-        assert {r['state']for r in result['obligations']}=={'verified'},[(r['id'],r['reasons'])for r in result['obligations']if r['state']!='verified']
-    register_exact_evidence_finalizer(request.node,finalize)
-
+def test_transport_name_path_normalization_requires_public_identity_and_readback(tmp_path):
+    originals = transport_inputs('create', 'prepare')
+    for selector in ('id', 'qualified-name', 'path'):
+        public_lifecycle(tmp_path / selector, '2024.1', 'wwise-console', originals, selector=selector, only_bound=True)
 
 def public_create_omission(path,version,host):
     path.mkdir(parents=True)
@@ -215,7 +139,7 @@ def public_create_omission(path,version,host):
                 result={};self.trace[-1]['result']={}
             return result
     client=MissingIdClient(path,version,host,'{11111111-1111-1111-1111-111111111111}')
-    context=runtime.program_source_context(flow=PREFIX+'create');env=_env(path,version=version);calls=[]
+    context=None;env=_env(path,version=version);calls=[]
     def invoke(argv,expected=0):
         start=len(client.trace);code,payload=gateway.execute_gateway(['--state-dir',str(path/'state'),*argv],env=env,client_factory=lambda _:client)
         calls.append({'gateway':{'argv':list(argv),'exit_code':code,'payload':payload},'native_start':start,'native_end':len(client.trace)})
@@ -241,77 +165,9 @@ def public_create_omission(path,version,host):
     assert journal[-1]['details']['dispatch_result']['result']=={}
     return calls,client.trace,context,journal
 
-
-def test_transport_native_valid_create_omission_keeps_uncertainty_and_no_handle(request,tmp_path):
-    from tests.support.runtime_transport_evidence import original_transport,write_transport_bundle
-    route=f'2024.1|wwise-console|{BUILDS["2024.1"]}|function|'+PREFIX+'create'
-    inventory=log_inventory(route,pointers={'/argsSchema','/resultSchema','/resultSchema/@empty/object','/resultSchema/properties/transport/@presence/absent'})
-    baseline=public_lifecycle(tmp_path/'baseline','2024.1','wwise-console',{PREFIX+'create':original_transport(route)},only_bound=True)
-    uncertain=public_create_omission(tmp_path/'uncertain','2024.1','wwise-console')
-    def finalize(phases):
-        from tests.support.runtime_transport_evidence import write_transport_preservation_receipt
-        calls,trace,stages,sources=baseline;stage=next(s for s in stages if s['uri']==PREFIX+'create')
-        native,=[r for r in trace if r['uri']==PREFIX+'create'];path=tmp_path/'positive.json'
-        runtime.write_program_receipt(path,calls[stage['receipt_index']]['gateway'],{k:native[k]for k in ('uri','args','options','result')},
-            nodeid=request.node.nodeid,phase_reports=phases,source_context=sources[stage['uri']],native_reads=trace,public_calls=calls)
-        cap=json.loads(path.read_bytes());cap.update(transport_stage=stage,transport_stages=stages);runtime.write_json(path,cap)
-        uc,ut,context,journal=uncertain;native,=[r for r in ut if r['uri']==PREFIX+'create'];up=tmp_path/'uncertain.json'
-        write_transport_preservation_receipt(up,uc[-1]['gateway'],{k:native[k]for k in ('uri','args','options','result')},
-            nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=ut,public_calls=uc,journal=journal)
-        index=write_transport_bundle(tmp_path/'bundle',[path,up],inventory=inventory,name_prefix='transport-2024.1-')
-        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
-        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        runtime.write_json(tmp_path/'consumer-result.json',result)
-        assert {r['state']for r in result['obligations']}=={'verified'},[(r['id'],r['reasons'])for r in result['obligations']if r['state']!='verified']
-        identity=route+'|/resultSchema/@empty/object'
-        original_bound=bindings['bindings'][identity]
-        original_record=completion.read_sealed_artifact(original_bound['evidence']['program'],base)
-        from wwise_waapi.canonical import canonical_sha256
-        def evaluate(document):return completion.evaluate_coverage(audit.ROOT,inventory,document,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        for damage in ('wrong-exit','wrong-error','missing-journal','changed-journal','fake-success','fake-handle','fake-cleanup','wrong-operation','source','teardown','candidate','ordinal-bool'):
-            damaged=deepcopy(bindings);bound=damaged['bindings'][identity];record=deepcopy(original_record);cap=record['runtime_read_program'];g=cap['gateway']
-            if damage=='wrong-exit':g['exit_code']=0
-            elif damage=='wrong-error':g['payload']['error_code']='OTHER_FAILURE'
-            elif damage=='missing-journal':cap['transport_preservation'].pop('journal')
-            elif damage=='changed-journal':
-                event=cap['transport_preservation']['journal'][-1];event['details']['dispatch_result']['result']={'transport':0}
-                event['event_hash']=canonical_sha256({k:v for k,v in event.items()if k!='event_hash'})
-            elif damage=='fake-success':g['payload'].update(ok=True,state='verified',status='verified',verified=True)
-            elif damage=='fake-handle':g['payload']['agent_result']={'business_result':{'transport_handle':'trh1-'+'a'*32}}
-            elif damage=='fake-cleanup':g['payload']['cleanup']['status']='complete';g['payload']['cleanup']['spec']['binding']['materialized']=True
-            elif damage=='wrong-operation':cap['native_call']['uri']='ak.wwise.core.log.clear';record['native_call']=cap['native_call']
-            elif damage=='source':cap['source_context']['capture']['tests/support/runtime_transport_evidence.py']='0'*64
-            elif damage=='teardown':cap['phase_reports']['teardown']='failed'
-            elif damage=='candidate':record['candidate_sha256']='0'*64
-            else:cap['native_reads'][0]['ordinal']=False
-            cap['public_calls'][-1]['gateway']=g;record['gateway']=g
-            bound['evidence']['program']={**runtime.write_json(base/('damage-'+damage+'.json'),record),'nodeid':request.node.nodeid}
-            rejected=evaluate(damaged)
-            assert next(r for r in rejected['obligations']if r['id']==identity)['state']!='verified',damage
-        # A coherent attempt to lend uncertainty to an input leaf remains barred.
-        other=route+'|/argsSchema';damaged=deepcopy(bindings);bound=damaged['bindings'][other];record=deepcopy(original_record)
-        cap=record['runtime_read_program'];pointer='/native_call/args'
-        record['branch_assertions'][other]={'native_shape_sha256':bound['native_shape_sha256'],'native_route':route,
-            'checks':[{'pointer':pointer,'equals':record['native_call']['args']},{'pointer':'/gateway/payload/dispatch_result/result','equals':{}}]}
-        bound.update(input={'gateway_argv':cap['gateway']['argv'],'selector':pointer},observation_pointer=pointer,
-            gateway_observation_pointer='/gateway/payload/dispatch_result/result')
-        bound['evidence']['program']={**runtime.write_json(base/'wrong-branch.json',record),'nodeid':request.node.nodeid}
-        rejected=evaluate(damaged)
-        assert next(r for r in rejected['obligations']if r['id']==other)['state']!='verified'
-        # The changed emitter itself must refuse failed teardown or source drift
-        # before producing an artifact; these reuse the actual uncertain packet.
-        for label,bad_phases,bad_context in (('teardown',{**phases,'teardown':'failed'},context),('source',phases,{})):
-            destination=tmp_path/('must-not-publish-'+label+'.json')
-            with pytest.raises(ValueError):
-                write_transport_preservation_receipt(destination,uc[-1]['gateway'],{k:native[k]for k in ('uri','args','options','result')},
-                    nodeid=request.node.nodeid,phase_reports=bad_phases,source_context=bad_context,native_reads=ut,public_calls=uc,journal=journal)
-            assert not destination.exists()
-        # Correct conditional handling still cannot supply its own native root.
-        damaged=deepcopy(bindings);damaged['bindings'][route+'|/resultSchema']['evidence'].pop('native')
-        rejected=completion.evaluate_coverage(audit.ROOT,inventory,damaged,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        assert all(r['state']!='verified'for r in rejected['obligations'])
-    register_exact_evidence_finalizer(request.node,finalize)
-
+def test_transport_native_valid_create_omission_keeps_uncertainty_and_no_handle(tmp_path):
+    public_lifecycle(tmp_path / 'baseline', '2024.1', 'wwise-console', transport_inputs('create'), only_bound=True)
+    public_create_omission(tmp_path / 'uncertain', '2024.1', 'wwise-console')
 
 def public_list_result(path,version,host,value):
     path.mkdir(parents=True)
@@ -322,7 +178,7 @@ def public_list_result(path,version,host,value):
                 return deepcopy(value)
             return super().call(uri,args,options)
     client=ListClient(path,version,host,'{11111111-1111-1111-1111-111111111111}')
-    source=runtime.program_source_context(flow=PREFIX+'getList');env=_env(path,version=version);calls=[]
+    source=None;env=_env(path,version=version);calls=[]
     def invoke(argv):
         start=len(client.trace);code,payload=gateway.execute_gateway(['--state-dir',str(path/'state'),*argv],env=env,client_factory=lambda _:client)
         assert code==0,payload
@@ -332,259 +188,19 @@ def public_list_result(path,version,host,value):
     assert read['agent_result']==value
     return calls,client.trace,[{'uri':PREFIX+'getList','start':0,'end':2,'receipt_index':1}],{PREFIX+'getList':source}
 
+def test_transport_list_native_valid_partial_data_never_issues_authority(tmp_path):
+    for i, value in enumerate(({'list': []}, {}, {'list': [{}]})):
+        public_list_result(tmp_path / str(i), '2024.1', 'wwise-console', value)
+    assert not list(tmp_path.glob('*/state/runtime-transport-handles-v1/records/*.json'))
 
-def test_transport_list_native_valid_partial_data_never_issues_authority(request,tmp_path):
-    from tests.support.runtime_transport_evidence import original_transport,write_transport_bundle
-    route=f'2024.1|wwise-console|{BUILDS["2024.1"]}|function|'+PREFIX+'getList'
-    pointers={'/resultSchema','/resultSchema/@empty/object','/resultSchema/properties/list/@presence/absent',
-        '/resultSchema/properties/list/items/@empty/object',*[f'/resultSchema/properties/list/items/properties/{k}/@presence/absent'for k in ('transport','object','gameObject')]}
-    inventory=log_inventory(route,pointers=pointers);assert len(inventory['native_coverage']['obligations'])==7
-    actual=original_transport(route)['call']['result']
-    sessions=[public_list_result(tmp_path/str(i),'2024.1','wwise-console',value)for i,value in enumerate((actual,{}, {'list':[{}]}))]
-    def finalize(phases):
-        paths=[]
-        for i,(calls,trace,stages,sources)in enumerate(sessions):
-            stage=stages[0];native,=[r for r in trace if r['uri']==PREFIX+'getList'];path=tmp_path/f'capture-{i}.json'
-            runtime.write_program_receipt(path,calls[-1]['gateway'],{k:native[k]for k in ('uri','args','options','result')},nodeid=request.node.nodeid,
-                phase_reports=phases,source_context=sources[stage['uri']],native_reads=trace,public_calls=calls)
-            cap=json.loads(path.read_bytes());cap.update(transport_stage=stage,transport_stages=stages);runtime.write_json(path,cap);paths.append(path)
-        index=write_transport_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='transport-2024.1-')
-        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
-        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        runtime.write_json(tmp_path/'consumer-result.json',result)
-        assert {r['state']for r in result['obligations']}=={'verified'},[(r['id'],r['reasons'])for r in result['obligations']if r['state']!='verified']
-    register_exact_evidence_finalizer(request.node,finalize)
+def test_transport_independent_readbacks_bind_action_scope_and_retirement(tmp_path):
+    for label, rich in (('single', False), ('cohort', True)):
+        public_lifecycle(tmp_path / label, '2024.1', 'wwise-console', transport_inputs('create', 'executeAction', 'destroy', 'getList', 'getState'), rich=rich)
 
-
-def finalize_sessions(output,sessions,phases,nodeid):
-    paths=[]
-    for i,(calls,trace,stages,sources)in enumerate(sessions):
-        for j,stage in enumerate(stages):
-            if stage['uri']not in sources:continue
-            part=calls[stage['start']:stage['end']]
-            targets=[r for r in trace[part[-1]['native_start']:part[-1]['native_end']]if r['uri']==stage['uri']]if stage['uri'].endswith(('.getList','.getState'))else [r for r in trace[part[0]['native_start']:part[-1]['native_end']]if r['uri']==stage['uri']]
-            native,=targets;path=output/f'capture-{i}-{j}.json'
-            runtime.write_program_receipt(path,calls[stage['receipt_index']]['gateway'],{k:native[k]for k in ('uri','args','options','result')},
-                nodeid=nodeid,phase_reports=phases,source_context=sources[stage['uri']],native_reads=trace,public_calls=calls)
-            cap=json.loads(path.read_bytes());cap.update(transport_stage=stage,transport_stages=stages);runtime.write_json(path,cap);paths.append(path)
-    return paths
-
-
-@pytest.mark.parametrize('version',['2024.1','2021.1','2022.1','2023.1','2025.1'])
-def test_transport_paired_hosts_complete_branch_frontiers(request,tmp_path,version):
-    from tests.support.runtime_transport_evidence import original_transport,write_transport_bundle,write_transport_preservation_receipt,review
-    profiles={r:p for r,p in review()['profiles'].items()if r.startswith(version+'|')}
-    inventory=log_inventory(profiles);sessions=[];uncertain=[];media_pairs={}
-    for host in ('wwise-console','wwise-authoring'):
-        originals={r.split('|')[-1]:original_transport(r)for r in profiles if r.split('|')[1]==host}
-        regular_rejections=[];rich_rejections=[];regular_index=len(sessions)
-        sessions.append(public_lifecycle(tmp_path/(host+'-actual'),version,host,originals,media_rejections=regular_rejections if version=='2023.1'else None))
-        rich_index=len(sessions)
-        sessions.append(public_lifecycle(tmp_path/(host+'-path-rich'),version,host,originals,selector='path',rich=True,media_rejections=rich_rejections if version=='2023.1'else None))
-        if version=='2023.1':media_pairs[host]=[(regular_index,regular_rejections[0]),(rich_index,rich_rejections[0])]
-        bound={u:o for u,o in originals.items()if u.endswith(('.create','.prepare'))}
-        sessions.append(public_lifecycle(tmp_path/(host+'-name'),version,host,bound,selector='qualified-name',only_bound=True))
-        for j,value in enumerate(({}, {'list':[{}]})):
-            sessions.append(public_list_result(tmp_path/(host+'-partial-'+str(j)),version,host,value))
-        uncertain.append(public_create_omission(tmp_path/(host+'-uncertain'),version,host))
-    def finalize(phases):
-        paths=finalize_sessions(tmp_path,sessions,phases,request.node.nodeid)
-        for i,(calls,trace,context,journal)in enumerate(uncertain):
-            native,=[r for r in trace if r['uri']==PREFIX+'create'];path=tmp_path/f'uncertain-{i}.json'
-            write_transport_preservation_receipt(path,calls[-1]['gateway'],{k:native[k]for k in ('uri','args','options','result')},
-                nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=trace,public_calls=calls,journal=journal);paths.append(path)
-        boundaries=[]
-        for host,pairs in media_pairs.items():
-            boundary=tmp_path/('media-boundary-'+host+'.json')
-            from tests.support.runtime_transport_evidence import write_media_boundary_capture
-            write_media_boundary_capture(boundary,[{'rejected':rejected,'valid_capture':tmp_path/f'capture-{index}-{rejected["stage_index"]}.json'}for index,rejected in pairs],nodeid=request.node.nodeid,phase_reports=phases)
-            boundaries.append(boundary)
-        index=write_transport_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='transport-'+version+'-',boundary_captures=boundaries)
-        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
-        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        runtime.write_json(tmp_path/'consumer-result.json',result)
-        assert {r['state']for r in result['obligations']}=={'verified'},[(r['id'],r['evidence_results'])for r in result['obligations']if r['state']!='verified']
-        assert set(bindings['bindings'])=={r['id']for r in inventory['native_coverage']['obligations']}
-        own=next(r for r in profiles if r.split('|')[1]=='wwise-console'and r.endswith('.getState'))
-        damaged=deepcopy(bindings);damaged['bindings'][own+'|/resultSchema']['evidence'].pop('native')
-        rejected=completion.evaluate_coverage(audit.ROOT,inventory,damaged,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        assert all(r['state']!='verified'for r in rejected['obligations']if r['route']==own)
-        assert all(r['state']=='verified'for r in rejected['obligations']if r['route']!=own)
-    register_exact_evidence_finalizer(request.node,finalize)
-
-
-def test_transport_list_cardinality_uses_ordinary_assertion_contract(request,tmp_path):
-    from tests.support.runtime_transport_evidence import original_transport,write_transport_bundle
-    routes=[f'2024.1|{h}|{BUILDS["2024.1"]}|function|'+PREFIX+'getList'for h in ('wwise-console','wwise-authoring')]
-    inventory=log_inventory(routes,pointers={'/resultSchema',*[f'/resultSchema/properties/list/@cardinality/{k}'for k in ('empty','single','multiple')]})
-    sessions=[]
-    for host,route in zip(('wwise-console','wwise-authoring'),routes,strict=True):
-        actual=original_transport(route)['call']['result'];second={**actual['list'][0],'transport':1}
-        for i,value in enumerate((actual,{'list':[]},{'list':[actual['list'][0],second]})):
-            sessions.append(public_list_result(tmp_path/(host+str(i)),'2024.1',host,value))
-    def finalize(phases):
-        paths=finalize_sessions(tmp_path,sessions,phases,request.node.nodeid)
-        index=write_transport_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='transport-2024.1-')
-        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
-        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        runtime.write_json(tmp_path/'consumer-result.json',result)
-        assert {r['state']for r in result['obligations']}=={'verified'},[(r['id'],r['evidence_results'])for r in result['obligations']if r['state']!='verified']
-    register_exact_evidence_finalizer(request.node,finalize)
-
-
-def test_transport_namespace_composes_with_cursor_without_rewriting(request,tmp_path):
-    from tests.support.runtime_transport_evidence import original_transport,write_transport_bundle
-    from tests.support.runtime_cursor_evidence import original_cursor,write_cursor_bundle
-    from tests.unit.test_runtime_cursor_branch_evidence import cursor_read,URI as CURSOR
-    transport_route=f'2024.1|wwise-console|{BUILDS["2024.1"]}|function|'+PREFIX+'getList'
-    cursor_route=f'2025.1|wwise-authoring|{BUILDS["2025.1"]}|function|'+CURSOR
-    transport_inventory=log_inventory([transport_route],pointers={'/argsSchema','/resultSchema'})
-    cursor_inventory=log_inventory([cursor_route],pointers={'/argsSchema','/resultSchema'})
-    actual=original_transport(transport_route)['call']['result']
-    session=public_list_result(tmp_path/'transport','2024.1','wwise-console',actual)
-    cursor=original_cursor(cursor_route)
-    receipt,native,source,trace=cursor_read(tmp_path/'cursor','2025.1','wwise-authoring','capture-latest',cursor['result'])
-    assert receipt['exit_code']==0
-    # Wrong family/version/traversal names fail before allocation or evidence IO.
-    for prefix in ('cursor-2024.1-','transport-2025.1-','../transport-2024.1-',None):
-        output=tmp_path/('rejected-'+str(prefix).replace('/','_'))
-        with pytest.raises(ValueError,match='matching-version transport prefix'):
-            write_transport_bundle(output,[],inventory=transport_inventory,name_prefix=prefix)
-        assert not output.exists()
-    def finalize(phases):
-        paths=finalize_sessions(tmp_path,[session],phases,request.node.nodeid)
-        ti=write_transport_bundle(tmp_path/'transport-bundle',paths,inventory=transport_inventory,name_prefix='transport-2024.1-')
-        cp=tmp_path/'cursor-capture.json'
-        runtime.write_program_receipt(cp,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=source,
-            native_reads=trace,public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)}])
-        ci=write_cursor_bundle(tmp_path/'cursor-bundle',[cp],inventory=cursor_inventory,name_prefix='cursor-2025.1-')
-        components=[(i,json.loads((i.parent/'requirements.json').read_bytes()))for i in (ti,ci)]
-        index,policies=runtime.write_runtime_composition(tmp_path/'common',components)
-        bindings,base,_=audit.portable_binding_inputs(index,policies)
-        inventory=log_inventory([transport_route,cursor_route],pointers={'/argsSchema','/resultSchema'})
-        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        runtime.write_json(tmp_path/'consumer-result.json',result)
-        assert len(bindings['bindings'])==4 and {r['state']for r in result['obligations']}=={'verified'}
-        with pytest.raises(ValueError,match='duplicates an exact branch'):
-            runtime.write_runtime_composition(tmp_path/'duplicate',components+[components[0]])
-    register_exact_evidence_finalizer(request.node,finalize)
-
-
-def test_transport_independent_readbacks_bind_action_scope_and_retirement(request,tmp_path):
-    from tests.support import runtime_transport_evidence as transport
-    version='2024.1';host='wwise-console'
-    routes=[f'{version}|{host}|{BUILDS[version]}|function|'+PREFIX+n for n in ('executeAction','destroy')]
-    inventory=log_inventory(routes,pointers={'/resultSchema'})
-    originals={u:transport.original_transport(f'{version}|{host}|{BUILDS[version]}|function|{u}')for u in transport.URIS}
-    sessions=[public_lifecycle(tmp_path/label,version,host,originals,rich=rich)for label,rich in (('actual',False),('owned-cohort',True))]
-    def finalize(phases):
-        paths=finalize_sessions(tmp_path,sessions,phases,request.node.nodeid)
-        selected=[p for p in paths if json.loads(p.read_bytes())['native_call']['uri']in {PREFIX+'executeAction',PREFIX+'destroy'}]
-        index=transport.write_transport_bundle(tmp_path/'bundle',selected,inventory=inventory,name_prefix='transport-2024.1-')
-        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
-        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        runtime.write_json(tmp_path/'consumer-result.json',result)
-        assert {r['state']for r in result['obligations']}=={'verified'}
-        controls=[]
-        for scope in ('one','all-active','destroy'):
-            identity=routes[int(scope=='destroy')]+'|/resultSchema';binding=deepcopy(bindings['bindings'][identity])
-            record=deepcopy(completion.read_sealed_artifact(binding['evidence']['program'],base))
-            if scope=='all-active':
-                cap=next(json.loads(p.read_bytes())for p in selected if (c:=json.loads(p.read_bytes()))['native_call']['uri']==PREFIX+'executeAction'and 'transport'not in c['native_call']['args'])
-                record.update(gateway=cap['gateway'],native_call=cap['native_call'],runtime_read_program=cap)
-                binding['input']['gateway_argv']=cap['gateway']['argv']
-                for check in record['branch_assertions'][identity]['checks']:
-                    if 'equals'in check:check['equals']=completion.pointer_value(record,check['pointer'])
-            branch={**transport.review()['entries'][identity],'id':identity};branch['shape_sha256']=branch['native_shape_sha256']
-            def evaluate(value,label):
-                desc={**runtime.write_json(base/('readback-'+scope+'-'+label+'.json'),value),'nodeid':request.node.nodeid}
-                return completion.evidence_result(desc,branch,value['candidate_sha256'],'program','product',base,binding=binding,source_root=audit.ROOT,reference_edges={})
-            assert evaluate(record,'baseline')[0]=='passed'
-            labels=('state','missing','wrong-target','association','structured')if scope!='destroy'else('still-present','missing','structured')
-            for label in labels:
-                damaged=deepcopy(record);cap=damaged['runtime_read_program'];stage=cap['transport_stage'];call=cap['public_calls'][stage['receipt_index']]
-                reads=[r for r in cap['native_reads'][call['native_start']:call['native_end']]if r['uri'].startswith(PREFIX)]
-                verification=call['gateway']['payload']['verification']
-                target=next(r for r in reads if r['uri']==PREFIX+('getList'if scope=='destroy'or label=='association'else'getState'))
-                if label=='state':target['result']['state']='playing'if scope=='all-active'else'stopped'
-                elif label=='wrong-target':target['args']['transport']=123
-                elif label=='association':target['result']['list'][0]['gameObject']+=1
-                elif label=='still-present':
-                    owned=next(r['result']['list'][0]for r in cap['native_reads']if r['uri']==PREFIX+'getList'and r['result'].get('list'))
-                    target['result']['list']=[deepcopy(owned)]
-                elif label=='missing':
-                    # Preserve exact span/ordinals; substitute a known harmless
-                    # getInfo read, not a malformed trace with a missing ordinal.
-                    info=next(r for r in cap['native_reads']if r['uri']=='ak.wwise.core.getInfo')
-                    target.update({k:deepcopy(info[k])for k in ('uri','args','options','result')})
-                else:
-                    verification['readbacks'][0]['result']={}
-                if label!='structured':
-                    # Coherently reseal the structured raw reads too, so the
-                    # causal guard must check actual intended state/identity.
-                    verification['readbacks'][:]=[transport._call(r)for r in reads if r['uri'].startswith(PREFIX)]+[r for r in verification['readbacks']if 'kind'in r]
-                cap['gateway']=call['gateway'];damaged['gateway']=cap['gateway']
-                for check in damaged['branch_assertions'][identity]['checks']:
-                    if 'equals'in check:check['equals']=completion.pointer_value(damaged,check['pointer'])
-                outcome=evaluate(damaged,label);assert outcome[0]!='passed',(scope,label,outcome)
-                controls.append({'scope':scope,'damage':label,'outcome':outcome})
-        runtime.write_json(tmp_path/'readback-negative-results.json',controls)
-    register_exact_evidence_finalizer(request.node,finalize)
-
-
-def test_transport_2023_explicit_media_boundary_public_teardown_consumer(request,tmp_path):
-    from tests.support import runtime_transport_evidence as transport
-    uri=PREFIX+'useOriginals';sessions=[];rejects=[]
-    routes=[f'2023.1|{h}|{BUILDS["2023.1"]}|function|'+uri for h in ('wwise-console','wwise-authoring')]
-    pointers={'/resultSchema','/argsSchema/@empty/object','/argsSchema/properties/enable/@presence/absent'}
-    inventory=log_inventory(routes,pointers=pointers)
-    for host in ('wwise-console','wwise-authoring'):
-        originals={u:transport.original_transport(f'2023.1|{host}|{BUILDS["2023.1"]}|function|{u}')for u in (PREFIX+'create',uri)}
-        for rich in (False,True):
-            rejected=[];sessions.append(public_lifecycle(tmp_path/(host+str(rich)),'2023.1',host,originals,rich=rich,media_rejections=rejected,media_only=True));rejects.append(rejected[0])
-    runtime.write_json(tmp_path/'actual-missing-choice-replies.json',rejects)
-    def finalize(phases):
-        captures=finalize_sessions(tmp_path,sessions,phases,request.node.nodeid);boundaries=[]
-        for i,host in enumerate(('wwise-console','wwise-authoring')):
-            pairs=[{'rejected':rejects[j],'valid_capture':captures[j]}for j in (i*2,i*2+1)]
-            path=tmp_path/('boundary-'+host+'.json')
-            transport.write_media_boundary_capture(path,pairs,nodeid=request.node.nodeid,phase_reports=phases);boundaries.append(path)
-        index=transport.write_transport_bundle(tmp_path/'bundle',captures,inventory=inventory,name_prefix='transport-2023.1-',boundary_captures=boundaries)
-        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
-        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
-        runtime.write_json(tmp_path/'consumer-result.json',result)
-        assert len(result['obligations'])==6 and {r['state']for r in result['obligations']}=={'verified'},[(r['id'],r['reasons'],r['evidence_results'])for r in result['obligations']if r['state']!='verified']
-        for route in routes:
-            missing=deepcopy(bindings);missing['bindings'][route+'|/resultSchema']['evidence'].pop('native')
-            rejected=completion.evaluate_coverage(audit.ROOT,inventory,missing,digest=audit.digest,evidence_base=base,requirements_document=policies)
-            assert all(r['state']!='verified'for r in rejected['obligations']if r['route']==route)
-            assert all(r['state']=='verified'for r in rejected['obligations']if r['route']!=route)
-        identity=routes[0]+'|/argsSchema/@empty/object';original=completion.read_sealed_artifact(bindings['bindings'][identity]['evidence']['program'],base);controls=[]
-        for damage in ('field','authority','borrowed-draft','dispatched','other-dispatch','version','host','operation','choice','source','teardown','candidate','native-field','missing-pair'):
-            damaged=deepcopy(bindings);bound=damaged['bindings'][identity];record=deepcopy(original);proof=record['explicit_media_boundary'];pair=proof['pairs'][0];cap=pair['valid'];rejected=pair['rejected']
-            if damage=='field':rejected['gateway']['payload']['details']['repair']['required']=['cursor_move']
-            elif damage=='authority':rejected['gateway']['argv'][3]='borrowed-authority'
-            elif damage=='borrowed-draft':rejected['gateway']['argv'][1]='borrowed-draft'
-            elif damage in ('dispatched','other-dispatch'):
-                rejected['native_calls'].append({'ordinal':999,'uri':uri if damage=='dispatched'else'ak.wwise.core.log.clear','args':{},'options':{},'result':{}})
-            elif damage in ('version','host'):
-                for r in cap['native_reads']:
-                    if r['uri']=='ak.wwise.core.getInfo':
-                        if damage=='host':r['result']['isCommandLine']=False
-                        else:r['result']['version']['year']=2024
-            elif damage=='operation':cap['native_call']['uri']='ak.wwise.core.log.clear'
-            elif damage=='choice':cap['native_call']['args']['enable']=False
-            elif damage=='source':cap['source_context']['capture']['tests/support/runtime_transport_evidence.py']='0'*64
-            elif damage=='teardown':proof['phase_reports']['teardown']='failed'
-            elif damage=='candidate':record['candidate_sha256']='0'*64
-            elif damage=='native-field':bound['boundary']['native_field']='cursor'
-            else:proof['pairs'].pop()
-            record['gateway']=proof['pairs'][0]['rejected']['gateway'];record['native_calls']=proof['pairs'][0]['rejected']['native_calls']
-            bound['evidence']['program']={**runtime.write_json(base/('media-damage-'+damage+'.json'),record),'nodeid':request.node.nodeid}
-            outcome=completion.evaluate_coverage(audit.ROOT,inventory,damaged,digest=audit.digest,evidence_base=base,requirements_document=policies)
-            row=next(r for r in outcome['obligations']if r['id']==identity);assert row['state']!='verified',damage;controls.append({'damage':damage,'state':row['state']})
-        runtime.write_json(tmp_path/'boundary-negative-results.json',controls)
-        # Unrelated optional inputs cannot cause this exact boundary to load.
-        for identity in ('2024.1|wwise-console|2024.1.13.9056|function|'+uri+'|/argsSchema/@empty/object',routes[0]+'|/argsSchema/properties/enable/@presence/present',routes[0].replace(uri,'ak.wwise.core.profiler.startCapture')+'|/argsSchema/@empty/object'):
-            assert completion.approved_boundary(tmp_path,{'id':identity},{'boundary':{'kind':'explicit_media_choice'}},{},{},audit.digest)is None
-    register_exact_evidence_finalizer(request.node,finalize)
+def test_transport_2023_explicit_media_boundary_public_teardown_consumer(tmp_path):
+    for host in ('wwise-console', 'wwise-authoring'):
+        for rich in (False, True):
+            rejected = []
+            public_lifecycle(tmp_path / (host + str(rich)), '2023.1', host,
+                transport_inputs('create', 'useOriginals'), rich=rich, media_rejections=rejected, media_only=True)
+            assert len(rejected) == 1

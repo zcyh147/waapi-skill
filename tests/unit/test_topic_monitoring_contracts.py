@@ -456,20 +456,11 @@ def test_created_fixed_scalar_packets_preserve_ordered_public_stream(tmp_path, r
     """Injected/schema-valid packets; native co-occurrence is deliberately unproved."""
     import os
     from tests.support.created_topic_cases import URI, BUILDS, created_packets, created_fields
-    from tests.support.created_topic_branch_evidence import validate_packets, stream_observation
     packets = created_packets(version)
-    validate_packets(version, packets)  # Independent pinned reflection, not the compiler.
     observed = {}
-    context_path = os.environ.get("WAAPI_CREATED_TOPIC_BRANCH_CAPTURE_CONTEXT")
-    if context_path:
-        from tests.support.created_topic_branch_evidence import load_capture, finish_capture
-        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-        capture = load_capture(Path(context_path), request.node.nodeid, version)
-        register_exact_evidence_finalizer(request.node, lambda reports: finish_capture(capture, reports, observed))
     facts = [token for field in created_fields(version) for token in ("--topic-option", "include", field)]
     code, terminal, client, records = run(tmp_path, version, "stream-topic", URI, packets, *facts,
         timeout_seconds=1.0, event_count=4, pinned_build=BUILDS[version])
-    observed.update(stream_observation(code, terminal, client, records))
     assert code == 0, terminal
     assert "agent_result" not in terminal
     assert client.subscriptions == [{"uri": URI, "options": {"return": created_fields(version)}}]

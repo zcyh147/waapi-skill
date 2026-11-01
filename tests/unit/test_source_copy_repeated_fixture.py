@@ -189,8 +189,6 @@ def test_repeated_collector_gates_copy_on_actual_baseline_serialization(tmp_path
     assert receipt['budget']['archive_bytes'] == sum(path.stat().st_size for path in artifact_files)
     print('R57 actual repeated collector budget:', json.dumps(receipt['budget']))
     (tmp_path / 'repeated-budget.json').write_text(json.dumps(receipt['budget'], indent=2))
-    from tests.support.source_copy_branch_evidence import register_source_capture
-    register_source_capture(request.node, Path(category['observation_path']))
 
 
 @pytest.mark.parametrize('fault', ['missing-serialization', 'lost-graph'])

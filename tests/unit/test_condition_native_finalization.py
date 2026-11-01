@@ -6,8 +6,21 @@ from types import SimpleNamespace
 import pytest
 
 from tests.unit.test_authoring_batch_adapter import owned_authoring
-from tests.unit.test_condition_native_evidence import inputs
+from pathlib import Path
 from tests.support.exact_evidence_finalization import finalize_reported_node_evidence
+
+
+def inputs(tmp_path, monkeypatch):
+    from tests.destructive.support import category_evidence
+    monkeypatch.setattr(category_evidence, 'current_evidence_platform', lambda: 'macos')
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(tmp_path / 'category.jsonl'))
+    nodeid = 'tests/destructive/test_condition_visibility_gateway.py::test_show_visibility_does_not_change_native_prerequisite[Self]'
+    observation = tmp_path / 'original-observation.json'
+    observed = {'observations': [{'after': {'SlewRateUp': 37.0}}]}
+    observation.write_text(json.dumps(observed))
+    return {'nodeid': nodeid, 'root': tmp_path / 'unused-publisher'}, {
+        'repo_root': Path(__file__).parents[2], 'candidate': 'a' * 40,
+        'version': '2025.1', 'started_at_unix_ns': 1, 'observation_path': observation}, observed
 
 
 @pytest.fixture
@@ -39,7 +52,7 @@ def prepare(owner, tmp_path, monkeypatch, *, item=None):
     prepared = condition_finalization.prepare_condition_finalization(
         item=item, owner=owner, status='PASS', reason='', repo_root=kwargs['repo_root'],
         candidate=kwargs['candidate'], version=kwargs['version'], started_at_unix_ns=kwargs['started_at_unix_ns'],
-        host=observed['host'], observation_path=kwargs['observation_path'], transactions=[], capture=capture)
+        host=observed['host'], observation_path=kwargs['observation_path'], transactions=[])
     return item, capture, prepared
 
 
@@ -64,38 +77,29 @@ def test_actual_late_or_missing_teardown_retains_original_sandbox_and_withholds_
 
 
 def test_successful_final_reports_release_and_publish_once_under_original_lock(condition_owner, tmp_path, monkeypatch):
-    from tests.support import condition_branch_evidence
-    calls = []
-    original = condition_branch_evidence.publish_condition_native_capture
-    def publish(*args):
-        assert condition_owner._lock_acquired
-        assert not condition_owner.runtime.owned_root.exists()
-        calls.append('publish')
-        original(*args)
-    monkeypatch.setattr(condition_branch_evidence, 'publish_condition_native_capture', publish)
-    item, capture, _ = prepare(condition_owner, tmp_path, monkeypatch)
+    item, _, _ = prepare(condition_owner, tmp_path, monkeypatch)
     item._waapi_phase_reports['teardown'] = 'passed'
     report = SimpleNamespace(when='teardown', outcome='passed')
     finalize_reported_node_evidence(item, report)
     assert report.outcome == 'passed', getattr(report, 'longrepr', None)
-    assert calls == ['publish'] and not condition_owner._lock_acquired
-    assert (capture['root'] / 'native.json').exists()
+    assert not condition_owner._lock_acquired
     assert not condition_owner.runtime.sandbox.sandbox_path.exists()
+    first = (tmp_path / 'category.jsonl').read_bytes()
     finalize_reported_node_evidence(item, report)
-    assert calls == ['publish']
+    assert (tmp_path / 'category.jsonl').read_bytes() == first
+
 
 
 def test_publication_failure_withholds_acceptance_without_rewriting_truthful_cleanup(condition_owner, tmp_path, monkeypatch):
-    from tests.support import condition_branch_evidence
-    def broken(*args):
+    from tests.destructive.support import condition_finalization
+    def broken(**kwargs):
         raise OSError('publication failed after native cleanup')
-    monkeypatch.setattr(condition_branch_evidence, 'publish_condition_native_capture', broken)
-    item, capture, _ = prepare(condition_owner, tmp_path, monkeypatch)
+    monkeypatch.setattr(condition_finalization, 'append_finalized_scenario_evidence', broken)
+    item, _, _ = prepare(condition_owner, tmp_path, monkeypatch)
     item._waapi_phase_reports['teardown'] = 'passed'
     report = SimpleNamespace(when='teardown', outcome='passed')
     finalize_reported_node_evidence(item, report)
     assert report.outcome == 'failed'
-    assert not capture['root'].exists()
     assert not condition_owner.runtime.owned_root.exists()
     final = json.loads((condition_owner.runtime.evidence_root / 'lifecycle-final.json').read_text())
     assert final['final_status'] == 'PASS' and final['sandbox_retained'] is False
@@ -104,16 +108,18 @@ def test_publication_failure_withholds_acceptance_without_rewriting_truthful_cle
     assert not condition_owner._lock_acquired
 
 
+
 def test_failed_preparation_still_stops_original_native_owner_and_retains_resources(condition_owner, tmp_path, monkeypatch):
     from tests.destructive.support import condition_finalization
     capture, kwargs, observed = inputs(tmp_path, monkeypatch)
+    observed['host'] = deepcopy(condition_owner.runtime.lifecycle.ready_result)
     kwargs['observation_path'].unlink()
     with pytest.raises(FileNotFoundError):
         condition_finalization.prepare_condition_finalization(
             item=SimpleNamespace(nodeid=capture['nodeid']), owner=condition_owner, status='PASS', reason='',
             repo_root=kwargs['repo_root'], candidate=kwargs['candidate'], version=kwargs['version'],
             started_at_unix_ns=1, host=observed['host'], observation_path=kwargs['observation_path'],
-            transactions=[], capture=capture)
+            transactions=[])
     assert condition_owner._finished
     assert condition_owner.runtime.lifecycle.process is None
     assert not condition_owner._lock_acquired
@@ -147,7 +153,8 @@ def test_real_pytest_module_teardown_precedes_condition_cleanup_and_acceptance(c
     assert not condition_owner._lock_acquired
     _, capture, _ = original[0]
     assert condition_owner.runtime.sandbox.sandbox_path.exists() is late_failure
-    assert (capture['root'] / 'native.json').exists() is (not late_failure)
+    rows = [json.loads(line) for line in (tmp_path / 'category.jsonl').read_text().splitlines()]
+    assert any(row['invocation']['outcome'] == 'PASS' for row in rows) is (not late_failure)
 
 
 @pytest.mark.parametrize('damage', ['source-seal', 'observation', 'owned-process', 'released-lock'])
@@ -155,8 +162,8 @@ def test_fresh_post_teardown_fault_retains_resources_and_cannot_publish_native_p
     from wwise_waapi.headless import HeadlessLifecycle
     item, capture, _ = prepare(condition_owner, tmp_path, monkeypatch)
     if damage == 'source-seal':
-        name = next(iter(capture['relevant_sources']))
-        capture['relevant_sources'][name] = '0' * 64
+        source = condition_owner.runtime.sandbox.source_root / 'SampleProject.wproj'
+        source.write_bytes(source.read_bytes() + b'changed')
     elif damage == 'observation':
         (tmp_path / 'original-observation.json').write_text('{}')
     elif damage == 'owned-process':

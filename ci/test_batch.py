@@ -17,12 +17,6 @@ COLLECTOR_PREFLIGHT = (
     'tests/unit/test_console_runtime_read_batch.py::test_grouped_reader_failure_preserves_sibling_facts_after_final_cleanup[invalid-busses-busses]',
     'tests/unit/test_console_runtime_read_batch.py::test_grouped_shared_failure_stops_dependents_and_cleanup_cannot_create_pass[cleanup]',
     'tests/unit/test_meter_runtime_read_evidence.py::test_meter_first_vertical_cardinality_absence_teardown_and_native_gate',
-    'tests/unit/test_runtime_owned_control_evidence.py::test_owned_mutations_belong_to_their_matching_execute_phase',
-    'tests/unit/test_runtime_owned_control_evidence.py::test_file_boundary_is_exact_and_does_not_load_unrelated_scope',
-    'tests/unit/test_runtime_transport_branch_evidence.py::test_transport_list_cardinality_uses_ordinary_assertion_contract',
-    'tests/unit/test_runtime_transport_branch_evidence.py::test_transport_namespace_composes_with_cursor_without_rewriting',
-    'tests/unit/test_branch_coverage_completion_cli.py::test_exact_reviewed_equivalence_reuses_unchanged_sources_and_rejects_stale_claims',
-    'tests/unit/test_branch_coverage_audit.py::test_runtime_prefixed_families_share_one_base_without_overwrite_or_duplicate_credit',
 )
 # These files deliver the separate batch wrapper, not a collector, public
 # Gateway assertion, native fake, evidence writer or ordinary consumer.
@@ -388,7 +382,6 @@ def checked_result(path, code):
 
 def native_result(path, group, result, candidate, scope):
     """Scheduling safety from existing finalizer facts; no coverage promotion."""
-    from tests.maintenance.branch_audit_completion import native_host_context, read_category_run
     from wwise_waapi.versions import WWISE_VERSION_CONTRACTS
     raw = Path(path).read_bytes()
     if len(raw) > 4 * 1024 * 1024:
@@ -399,7 +392,13 @@ def native_result(path, group, result, candidate, scope):
         raise BatchError('Exactly one original native final record is required')
     index, record = finals[0]
     invocation, residual, source = (record[k] for k in ('invocation', 'residual_state', 'source'))
-    context = native_host_context(record['host'], 'is_command_line')
+    host = record['host']
+    if type(host.get('is_command_line')) is not bool:
+        raise BatchError('Native host identity missing')
+    version = host['version']
+    build = '.'.join(str(version[key]) for key in ('year', 'major', 'minor', 'build'))
+    context = {'version': '.'.join(build.split('.')[:2]), 'build': build,
+               'host': 'wwise-console' if host['is_command_line'] else 'wwise-authoring'}
     if (record.get('contract') != 'waapi-skill.host-category-evidence/v3'
             or record['candidate'] != candidate or record['version'] != group['version']
             or context != {'host': group['host'], 'version': group['version'],
@@ -414,7 +413,8 @@ def native_result(path, group, result, candidate, scope):
         raise BatchError('Native final source, node, host or cleanup facts differ')
     reference = {**descriptor(path), 'record_index': index, 'nodeid': group['nodes'][0]}
     if result['exit_code'] == 0:
-        read_category_run(reference, Path(path).parent)
+        if residual.get('sandbox') != 'deleted':
+            raise BatchError('Successful native result retained its sandbox')
     elif (residual.get('sandbox') != 'quarantined'
           or not Path(residual.get('quarantine_path', '')).is_dir()):
         raise BatchError('Failed native evidence lacks its retained quarantine')

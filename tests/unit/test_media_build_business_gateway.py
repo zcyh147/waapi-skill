@@ -1330,21 +1330,11 @@ def test_media_pool_continuation_rejects_a_changed_exact_field_binding_before_qu
     assert [call[0] for call in client.calls].count(MEDIA_POOL_GET_URI) == 1
 
 
-@pytest.fixture
-def media_pool_product_capture(request):
-    import os
-    context_path = os.environ.get("WAAPI_MEDIA_POOL_BRANCH_CAPTURE_CONTEXT")
-    observed = {}
-    if context_path:
-        from tests.support.media_pool_branch_evidence import load_media_pool_capture, finish_media_pool_capture
-        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-        capture = load_media_pool_capture(Path(context_path), request.node.nodeid)
-        register_exact_evidence_finalizer(request.node, lambda reports: finish_media_pool_capture(capture, reports, observed))
-    return observed
+
 
 
 def test_product_media_pool_discovery_to_exact_filtered_projection_preserves_native_field_identity(
-    tmp_path: Path, media_pool_product_capture: dict,
+    tmp_path: Path,
 ) -> None:
     names = ["IXML/Scene", "IXML/SCENE", "scene", "scene", "场景", "A/B", "A B", "Filename"]
     raw_row = {"Path": "/Audio/Rain.wav", "FileId": "rain", "Db": {"id": MEDIA_DB_ID, "name": "Project Originals"},
@@ -1386,14 +1376,6 @@ def test_product_media_pool_discovery_to_exact_filtered_projection_preserves_nat
         assert rejected["details"]["field_choices"] == expected
         errors.append({"argv": rejected_argv, "exit_code": rejected_code, "payload": rejected})
     assert [call[0] for call in client.calls].count(MEDIA_POOL_GET_URI) == 1
-    media_pool_product_capture.update({
-        "gateway": {"argv": argv, "exit_code": code, "payload": payload},
-        "discovery": {"argv": discovery_argv, "exit_code": 0, "payload": discovery},
-        "no_match": {"argv": no_match_argv, "exit_code": 0, "payload": no_match},
-        "native_call": {"uri": MEDIA_POOL_GET_URI, "args": expected_args, "options": expected_options, "result": {"return": [raw_row]}},
-        "field_discovery_call": {"uri": "ak.wwise.core.mediaPool.getFields", "args": {}, "options": {}, "result": {"return": names}},
-        "rejected_reads": errors, "media_pool_dispatch_count": 1,
-    })
 
 
 def test_media_pool_exact_choice_does_not_hide_malformed_native_inventory_entries(tmp_path: Path) -> None:
@@ -1409,7 +1391,7 @@ def test_media_pool_exact_choice_does_not_hide_malformed_native_inventory_entrie
     assert MEDIA_POOL_GET_URI not in [call[0] for call in client.calls]
 
 
-def test_media_pool_return_only_score_size_markers_and_regions_do_not_require_discovered_fields(tmp_path: Path, media_pool_product_capture: dict) -> None:
+def test_media_pool_return_only_score_size_markers_and_regions_do_not_require_discovered_fields(tmp_path: Path) -> None:
     schema_code, schema = gateway.execute_gateway(["request-schema", MEDIA_POOL_GET_URI], env=_env(tmp_path),
         client_factory=lambda _: pytest.fail("return-only field schema connected"))
     assert schema_code == 0, schema
@@ -1438,10 +1420,6 @@ def test_media_pool_return_only_score_size_markers_and_regions_do_not_require_di
     rejected_code, rejected = gateway.execute_gateway(rejected_argv, env=_env(tmp_path), client_factory=lambda _: client)
     assert rejected_code == 2 and "return-only" in rejected["message"], rejected
     assert [call[0] for call in client.calls].count(MEDIA_POOL_GET_URI) == 1
-    media_pool_product_capture.update({"gateway": {"argv": argv, "exit_code": code, "payload": payload},
-        "native_call": {"uri": native_call[0], "args": native_call[1], "options": native_call[2], "result": raw},
-        "media_pool_dispatch_count": 1,
-        "rejected_reads": [{"argv": rejected_argv, "exit_code": rejected_code, "payload": rejected}]})
 
 
 @pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
@@ -1452,12 +1430,6 @@ def test_large_peak_read_follows_bounded_exact_result_pages_without_losing_chann
     import struct
     import os
     observed_capture = {}
-    context_path = os.environ.get("WAAPI_PEAK_BRANCH_CAPTURE_CONTEXT")
-    if context_path and envelope == "posix":
-        from tests.support.peak_query_branch_evidence import load_peak_capture, finish_peak_capture
-        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-        capture = load_peak_capture(Path(context_path), request.node.nodeid, version, operation)
-        register_exact_evidence_finalizer(request.node, lambda reports: finish_peak_capture(capture, reports, observed_capture))
 
     if envelope == "windows":
         class WindowsEnvelopeOS:
@@ -1493,10 +1465,6 @@ def test_large_peak_read_follows_bounded_exact_result_pages_without_losing_chann
         code, payload = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
         assert code == 0, payload
         result = payload["agent_result"]
-        if not page_count:
-            from tests.support.media_pool_branch_evidence import public_read_observation
-            observed_capture.update(public_read_observation(gateway_argv=argv, exit_code=code, payload=payload,
-                uri=operation, args=client.calls[-1][1], options=client.calls[-1][2], result=native))
         assert result["channel_count"] == 2 and result["peak_pair_count"] == pair_count
         assert result["requested_peak_pair_count"] == pair_count and result["complete_requested_count"] is True
         assert result["normalization_divisor"] == 32768

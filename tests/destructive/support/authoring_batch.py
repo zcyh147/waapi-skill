@@ -624,7 +624,7 @@ def candidate_source_context(repo_root: Path):
     import subprocess
     roots = ['skills/waapi-skill', 'tests/destructive/support', 'tests/destructive/test_authoring_ui_business_live.py',
              'tests/semantic/support', 'tests/conftest.py', 'tests/support/exact_evidence_finalization.py',
-             'tests/maintenance/branch_audit_completion.py', 'ci/test_driver.py',
+             'ci/test_driver.py',
              'ci/run_live_test_command.py', 'ci/resolve_live_test_config.py', 'ci/test_readiness.py']
     changed = subprocess.run(['git', 'status', '--porcelain', '--untracked-files=normal', '--', *roots],
         cwd=repo_root, text=True, capture_output=True, check=True).stdout

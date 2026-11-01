@@ -1156,23 +1156,11 @@ def test_original_file_reference_scan_compiles_requested_return_scope(tmp_path: 
     assert client.calls[0][2] == {"return": ["id", "path", "originalFilePath"], "platform": "Windows", "language": "SFX"}
 
 
-@pytest.fixture
-def short_id_product_capture(request, version):
-    import os
-    context = os.environ.get("WAAPI_SHORT_ID_BRANCH_CAPTURE_CONTEXT")
-    observed = {}
-    # This historical capture owns the native from.id branch. The 2021
-    # alternative now uses WAQL and must not receive that branch's credit.
-    if context and version != "2021.1":
-        from tests.support.short_id_query_branch_evidence import load_short_id_capture, finish_short_id_capture
-        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-        capture = load_short_id_capture(Path(context), request.node.nodeid, version)
-        register_exact_evidence_finalizer(request.node, lambda reports: finish_short_id_capture(capture, reports, observed))
-    return observed
+
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
-def test_short_id_source_resolves_native_candidates_then_applies_business_read_semantics(tmp_path: Path, version: str, short_id_product_capture: dict) -> None:
+def test_short_id_source_resolves_native_candidates_then_applies_business_read_semantics(tmp_path: Path, version: str) -> None:
     object_id = "{11111111-1111-1111-1111-111111111111}"
     class Client(_AdvancedQueryClient):
         def call(self, uri, args=None, options=None):
@@ -1196,11 +1184,6 @@ def test_short_id_source_resolves_native_candidates_then_applies_business_read_s
     assert payload["source_resolution"]["candidate_count"] == 1
     assert payload["source_resolution"]["mutation_authority"] is False
     assert payload["mutation_selection"]["candidates"][0]["id"] == object_id
-    short_id_product_capture.update({"gateway": {"argv": ["query-object", "--short-id", "123456", "--short-id-kind", "event", "--max-results", "5",
-        "--predicate", "name-is", "Rain", "--include", "notes", "--platform", "Windows", "--language", "English(US)", "--detail"],
-        "exit_code": code, "payload": payload},
-        "native_call": {"uri": queries[0][0], "args": queries[0][1], "options": queries[0][2]},
-        "final_call": {"uri": queries[1][0], "args": queries[1][1], "options": queries[1][2]}})
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)

@@ -11,21 +11,10 @@ import pytest
 from tests.unit.test_field_interface_closure_gateway import FieldTask, FIRST, SECOND, VERSIONS, gateway
 
 
-@pytest.fixture
-def condition_product_capture(request, tmp_path):
-    from tests.support.condition_branch_evidence import prepare_condition_capture, finish_condition_capture
-    root = Path(os.environ.get("WAAPI_CONDITION_BRANCH_EVIDENCE_ROOT", str(tmp_path / "condition-product-evidence"))).resolve()
-    case_name = getattr(request, "param", "slew-rate-show")
-    if case_name != "slew-rate-show":
-        root = root / case_name
-    capture = prepare_condition_capture(root, request.node.nodeid, case_name=case_name)
-    observed = {}
-    from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-    register_exact_evidence_finalizer(request.node, lambda reports: finish_condition_capture(capture, reports, observed))
-    yield observed
 
 
-def test_product_slew_rate_show_condition_changes_only_the_selected_field(tmp_path, condition_product_capture):
+
+def test_product_slew_rate_show_condition_changes_only_the_selected_field(tmp_path):
     task = ScalarPropertyTask(tmp_path, "2025.1")
     dependency = {"type": "property", "action": "Show", "context": "Self", "property": "RTPCRamping",
                   "conditions": [{"restriction": {"type": "enum", "values": [{"value": 1}]}}]}
@@ -58,11 +47,6 @@ def test_product_slew_rate_show_condition_changes_only_the_selected_field(tmp_pa
     writes = [{"uri": uri, "args": args, "options": options} for uri, args, options in task.calls
               if uri.endswith(("setProperty", "setReference", "object.set"))]
     assert len(writes) == 1 and writes[0]["args"]["property"] == "SlewRateUp"
-    condition_product_capture.update(
-        gateway={"argv": ["--state-dir", str(task.path / "state"), "verify", tx], "exit_code": code, "payload": verified},
-        native_call=writes[0], observations={"wwise-console": {"metadata": deepcopy(task.metadata["SlewRateUp"]),
-            "observations": [{"controller_before": before, "controller_after": after, "before": before, "after": after}]}},
-    )
 
 
 def test_product_media_pool_filter_show_string_metadata_linkage(tmp_path):
@@ -1722,9 +1706,8 @@ def test_master_bus_device_visibility_uses_structural_proof_without_topology_cha
     assert not any(uri.endswith("isPropertyEnabled") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version,condition_product_capture", [
-    ("2024.1", "master-bus-device-2024.1"), ("2025.1", "master-bus-device-2025.1")], indirect=["condition_product_capture"])
-def test_product_master_bus_audio_device_show_condition_changes_only_the_selected_reference(tmp_path, version, condition_product_capture):
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_product_master_bus_audio_device_show_condition_changes_only_the_selected_reference(tmp_path, version):
     task = MasterBusDeviceTask(tmp_path, version)
     before = deepcopy(task.objects)
     source, target = task.bind(FIRST), task.bind(SECOND)
@@ -1752,14 +1735,6 @@ def test_product_master_bus_audio_device_show_condition_changes_only_the_selecte
     structural = shown["artifact"]["prepared_operation"]["pre_state"]["condition_metadata"]["structural_applicability"][0]
     ancestry_before = structural["rows"][1:]
     ancestry_after = [{key: task.objects[row["id"]][key] for key in row} for row in ancestry_before]
-    condition_product_capture.update(
-        gateway={"argv": ["--state-dir", str(task.path / "state"), "verify", tx], "exit_code": code, "payload": verified},
-        native_call=writes[0], observations={"wwise-console": {"metadata": deepcopy(task.metadata["AudioDevice"]),
-            "observations": [{"before": before[FIRST], "after": deepcopy(task.objects[FIRST]),
-                "target_before": before[SECOND], "target_after": deepcopy(task.objects[SECOND]),
-                "applicability": structural, "native_enabled_state": "not_queried",
-                "ancestry_before": ancestry_before, "ancestry_after": ancestry_after}]}},
-    )
 
 
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
