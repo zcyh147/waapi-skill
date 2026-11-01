@@ -4,7 +4,8 @@ from __future__ import annotations
 import pytest
 
 from tests.maintenance.branch_coverage_audit import schema_branches
-from tests.unit.test_branch_coverage_completion_cli import ping_scope, portable_representative_case
+from tests.unit.test_branch_coverage_completion_cli import (
+    historical_move_single_case, ping_scope, portable_representative_case)
 
 
 @pytest.fixture(scope="module")
@@ -93,12 +94,16 @@ def test_checker_rejects_removed_branch_mapping_and_shareset_false_completion(fr
     assert "business ledger differs" in check_inventory(dishonest, expected=frozen_inventory)
 
 
-def test_cli_distinguishes_reproducible_inventory_from_complete_coverage(tmp_path):
+def test_cli_distinguishes_reproducible_inventory_from_complete_coverage(
+        tmp_path, historical_move_single_case):
     import subprocess
     import sys
     from tests.maintenance.branch_coverage_audit import ROOT
     path = tmp_path / "audit.json"
-    command = [sys.executable, str(ROOT / "tests/maintenance/branch_coverage_audit.py"), "--output", str(path)]
+    index, requirements, _ = historical_move_single_case
+    command = [sys.executable, str(ROOT / "tests/maintenance/branch_coverage_audit.py"),
+               "--binding-index", str(index), "--requirements", str(requirements),
+               "--output", str(path)]
     generated = subprocess.run(command, capture_output=True, text=True)
     assert generated.returncode == 0, generated.stderr
     checked = subprocess.run(command + ["--check", "--require-complete"], capture_output=True, text=True)
@@ -292,20 +297,24 @@ def test_union_empty_values_have_distinct_branch_identities():
     assert len({r['pointer'] for r in rows}) == len(rows)
 
 
-def test_cli_preserves_all_native_rows_in_a_sealed_companion(tmp_path, capsys):
+def test_cli_preserves_all_native_rows_in_a_sealed_companion(
+        tmp_path, capsys, historical_move_single_case):
     import json
     from tests.maintenance.branch_coverage_audit import main, load
     target = tmp_path / 'ledger.json'
-    assert main(['--output', str(target), '--require-complete']) == 2
+    index, requirements, _ = historical_move_single_case
+    command = ['--binding-index', str(index), '--requirements', str(requirements),
+               '--output', str(target)]
+    assert main([*command, '--require-complete']) == 2
     raw = json.loads(target.read_text())
     descriptor = raw['native_coverage']['obligations_artifact']
     hydrated = load(target)
     assert len(hydrated['native_coverage']['obligations']) == descriptor['rows']
     assert len({r['id'] for r in hydrated['native_coverage']['obligations']}) == descriptor['rows']
-    assert main(['--output', str(target), '--check', '--require-complete']) == 2
+    assert main([*command, '--check', '--require-complete']) == 2
     artifact = target.parent / descriptor['path']
     artifact.write_bytes(artifact.read_bytes()[:-1])
-    assert main(['--output', str(target), '--check']) == 1
+    assert main([*command, '--check']) == 1
     assert 'digest mismatch' in capsys.readouterr().out
 
 
