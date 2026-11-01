@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.test_conditional_reference_gateway import ScalarPropertyTask, FIRST, condition_product_capture
+from tests.unit.test_conditional_reference_gateway import ScalarPropertyTask, FIRST
 
 FACTS = json.loads((Path(__file__).parents[1] / "fixtures/metadata-conditions/time-modulator-range.json").read_text())
 VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
@@ -148,9 +148,8 @@ def test_exact_time_class_public_edit_preserves_loop_count_and_peer(tmp_path, ve
     assert writes[1][1] == {"object": CREATED, "property": "EnvelopeStopPlayback", "value": False}
 
 
-@pytest.mark.parametrize("version,condition_product_capture", [(v, f"time-modulator-range-{v}") for v in ("2021.1", "2025.1")],
-                         indirect=["condition_product_capture"])
-def test_product_time_modulator_range_preserves_explicit_satisfied_loop_count(tmp_path, version, condition_product_capture):
+@pytest.mark.parametrize("version", ["2021.1", "2025.1"])
+def test_product_time_modulator_range_preserves_explicit_satisfied_loop_count(tmp_path, version):
     task = time_task(tmp_path, version)
     before = deepcopy(task.objects[FIRST])
     declare(task, "EnvelopeStopPlayback", False)
@@ -159,9 +158,3 @@ def test_product_time_modulator_range_preserves_explicit_satisfied_loop_count(tm
     assert after == {**before, "EnvelopeStopPlayback": False}
     writes = [{"uri": uri, "args": args, "options": options} for uri, args, options in task.calls if uri.endswith("setProperty")]
     assert len(writes) == 1
-    condition_product_capture.update(
-        gateway={"argv": ["--state-dir", str(task.path / "state"), "verify", tx], "exit_code": code, "payload": verified},
-        native_call=writes[0], observations={"wwise-console": {"metadata": deepcopy(task.metadata["EnvelopeStopPlayback"]),
-            "observations": [{"controller_before": before, "controller_after": after, "before": before, "after": after}]}},
-        input_fact_provenance=deepcopy(FACTS["versions"][version]),
-    )

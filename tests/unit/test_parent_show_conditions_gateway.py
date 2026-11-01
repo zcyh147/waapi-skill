@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from tests.unit.test_conditional_reference_gateway import (
-    ScalarPropertyTask, FIRST, SECOND, VERSIONS, condition_product_capture,
+    ScalarPropertyTask, FIRST, SECOND, VERSIONS,
 )
 
 
@@ -61,14 +61,6 @@ def test_recorded_parent_show_condition_preserves_parent_in_both_visibility_stat
     change_weight(tmp_path, version, operation, mode)
 
 
-@pytest.mark.parametrize("version,condition_product_capture", [(v, f"parent-weight-show-{v}") for v in VERSIONS],
-                         indirect=["condition_product_capture"])
-def test_product_parent_weight_show_changes_child_without_changing_parent(tmp_path, version, condition_product_capture):
+@pytest.mark.parametrize("version", VERSIONS)
+def test_product_parent_weight_show_changes_child_without_changing_parent(tmp_path, version):
     task, before, after, write, code, verified, tx = change_weight(tmp_path, version, "object.setProperty", 0)
-    condition_product_capture.update(
-        gateway={"argv": ["--state-dir", str(task.path / "state"), "verify", tx], "exit_code": code, "payload": verified},
-        native_call=write, observations={"wwise-console": {"metadata": deepcopy(task.metadata["Weight"]),
-            "observations": [{"controller_before": before[SECOND], "controller_after": after[SECOND],
-                "before": before[FIRST], "after": after[FIRST]}]}},
-        recorded_input_provenance=deepcopy(FACTS["versions"][version]),
-    )

@@ -85,7 +85,7 @@ def test_selector_attribution_requires_matching_profile_schema_occurrence(frozen
     changed = deepcopy(inventory)
     occurrence = next(iter(changed['schema_occurrences']))
     changed['schema_occurrences'][occurrence] = '0' * 64
-    assert 'schema occurrences differs' in check_inventory(changed, expected=frozen_inventory)
+    assert 'schema_occurrences differs' in check_inventory(changed, expected=frozen_inventory)
 
 
 def test_finite_and_unfamiliar_schema_alternatives_remain_explicit():

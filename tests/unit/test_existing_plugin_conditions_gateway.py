@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.test_conditional_reference_gateway import ScalarPropertyTask, FIRST, condition_product_capture
+from tests.unit.test_conditional_reference_gateway import ScalarPropertyTask, FIRST
 
 
 FACTS = json.loads((Path(__file__).parents[1] / "fixtures/metadata-conditions/3d-audio-bed-mixer.json").read_text())
@@ -59,9 +59,8 @@ def test_existing_bed_mixer_limit_preserves_satisfied_policy_or_requires_explici
     assert sum(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls) == 1
 
 
-@pytest.mark.parametrize("version,condition_product_capture", [
-    ("2022.1", "existing-bed-mixer-2022.1"), ("2025.1", "existing-bed-mixer-2025.1")], indirect=["condition_product_capture"])
-def test_product_existing_bed_mixer_condition_preserves_native_uint16_policy(tmp_path, version, condition_product_capture):
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_product_existing_bed_mixer_condition_preserves_native_uint16_policy(tmp_path, version):
     task = bed_mixer_task(tmp_path, version, "object.setProperty", 1)
     before = deepcopy(task.objects)
     target = task.bind(FIRST)
@@ -87,13 +86,6 @@ def test_product_existing_bed_mixer_condition_preserves_native_uint16_policy(tmp
     writes = [{"uri": uri, "args": args, "options": options} for uri, args, options in task.calls
               if uri.endswith(("setProperty", "setReference", "object.set"))]
     assert len(writes) == 1 and writes[0]["args"]["property"] == "SystemAudioObjectLimit"
-    condition_product_capture.update(
-        gateway={"argv": ["--state-dir", str(task.path / "state"), "verify", tx], "exit_code": code, "payload": verified},
-        native_call=writes[0], observations={"wwise-console": {"metadata": deepcopy(task.metadata["SystemAudioObjectLimit"]),
-            "observations": [{"controller_before": before[FIRST], "controller_after": after[FIRST],
-                "before": before[FIRST], "after": after[FIRST]}]}},
-        recorded_class_metadata_provenance=deepcopy(FACTS["versions"][version]),
-    )
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])

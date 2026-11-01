@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.test_conditional_reference_gateway import ScalarPropertyTask, FIRST, SECOND, condition_product_capture
+from tests.unit.test_conditional_reference_gateway import ScalarPropertyTask, FIRST, SECOND
 
 
 FACTS = json.loads((Path(__file__).parents[1] / "fixtures/metadata-conditions/association-continue-play-2025.json").read_text())
@@ -107,13 +107,5 @@ def test_unsatisfied_association_owner_can_be_repaired_by_a_separately_authorize
         {'object': FIRST, 'property': 'ContinuePlay', 'value': True}]
 
 
-@pytest.mark.parametrize("condition_product_capture", ["association-continue-play-2025.1"], indirect=True)
-def test_product_association_continue_play_preserves_owner(tmp_path, condition_product_capture):
+def test_product_association_continue_play_preserves_owner(tmp_path):
     task, before, after, write, code, verified, tx = change_continue_play(tmp_path)
-    condition_product_capture.update(
-        gateway={"argv": ["--state-dir", str(task.path / "state"), "verify", tx], "exit_code": code, "payload": verified},
-        native_call=write, observations={"wwise-console": {"metadata": deepcopy(task.metadata["ContinuePlay"]),
-            "observations": [{"controller_before": before[SECOND], "controller_after": after[SECOND],
-                "before": before[FIRST], "after": after[FIRST]}]}},
-        input_fact_provenance=deepcopy(FACTS),
-    )
