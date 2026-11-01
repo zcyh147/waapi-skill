@@ -1,0 +1,506 @@
+{
+  "git_candidate": "8f3745ded14dcd8ea3d354e5fbdbf659e157dfb0",
+  "inventory_source": {
+    "artifact": "tests/fixtures/branch-evidence/product/canonical-195-d73-r1/current-structural-inventory-r4/structural-inventory.json",
+    "sha256": "0cb69f8253ca307ad138c16eb7c6f091512a4f92c5bd77e0489f8b8b3cd63bb6"
+  },
+  "native_candidate": "43d338b1229a7ed52283e3da7bf661525b6961917841d049a9689aebd83064be",
+  "common_base": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4",
+  "test_log": "/tmp/waapi-195-current-metadata-r4-capture.log",
+  "junit": "/tmp/waapi-195-current-metadata-r4-capture.xml",
+  "pytest_exit_code": 0,
+  "pytest_passed": 25,
+  "pytest_seconds": 555.5,
+  "cohorts": {
+    "r51": {
+      "cases": 3,
+      "attachments": 9,
+      "sources": 486,
+      "before_equals_capture_equals_after": true,
+      "context": {
+        "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r51/context.json",
+        "sha256": "21e1ccfb0621da63b44103bcc18518f21aca95a4a7b147a860bdd544f0cf6d14",
+        "cases": [
+          "Color",
+          "ControlInput",
+          "OverrideColor"
+        ],
+        "branches": 9
+      },
+      "phase_receipts": [
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r51/Color/capture.json",
+          "sha256": "79446cc87dd8a68df058b8bcf8d8e5ec287e4944705f9b1fa1a06ca7c6c66ff0",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue",
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2",
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r51/ControlInput/capture.json",
+          "sha256": "d5651185c6c1c251929e4eb67b8c4af9d95948f3b6e502c50855cb1781eadd4e",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0",
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0/@nullable"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r51/OverrideColor/capture.json",
+          "sha256": "de052bf49adfc2993e9208c49ef39bb468f704863d1059930d7475df5becf760",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3",
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        }
+      ]
+    },
+    "r54": {
+      "cases": 16,
+      "attachments": 41,
+      "sources": 771,
+      "before_equals_capture_equals_after": true,
+      "context": {
+        "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/context.json",
+        "sha256": "936c3c9ac9fe129a167f2a5e93f8caf7f7d6f08dd34a70c3f4ac85983ad77b3d",
+        "cases": [
+          "2021.1|ModulatorTime|EnvelopeStopPlayback",
+          "2022.1|Sound|BypassEffect0",
+          "2022.1|Sound|Effect0",
+          "2022.1|Wwise Delay|DelayTime",
+          "2022.1|Wwise Delay|FeedbackEnabled",
+          "2023.1|Action|Scope",
+          "2023.1|EffectSlot|Bypass",
+          "2023.1|EffectSlot|Effect",
+          "2024.1|EffectSlot|Bypass",
+          "2024.1|EffectSlot|Effect",
+          "2024.1|Sound|AttenuationDistanceScaling",
+          "2025.1|EffectSlot|Bypass",
+          "2025.1|EffectSlot|Effect",
+          "2025.1|MediaPoolFilter|FieldName",
+          "2025.1|ModulatorTime|EnvelopeStopPlayback",
+          "2025.1|Sound|Weight"
+        ],
+        "branches": 41
+      },
+      "phase_receipts": [
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-0/capture.json",
+          "sha256": "08b00684886c7efcb43b55608bd1d134db6c6b8fa49c1b1579addf691ed657a6",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-1/capture.json",
+          "sha256": "b6244ff938f641e4916ab41f4bdd5f56bd017a31bb114c9cf81c0a8ed7ffb20c",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-10/capture.json",
+          "sha256": "6c039ecf3619e446245e0dfce7559d37763071fc2ac7796342cff75dfa0e2f33",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue",
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/2",
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-11/capture.json",
+          "sha256": "1e62634cdc83f42416378745ad8a805cb43dc6145950311d2860d69aed6fa497",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3",
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-12/capture.json",
+          "sha256": "f87933fcf551157bf80696f4fce2f738436c8c0add7a72eab2f161286f2656e2",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0",
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0/@nullable"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-13/capture.json",
+          "sha256": "a272d66aa72c694d702a7b0a571106cef1a8af53da6d7dc9b1fbbb3213d87aab",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1",
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1/@empty/string"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-14/capture.json",
+          "sha256": "365842c5a2df10ad7b416e75619e40ac43faac8548794dca83cfc1cd7c396878",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-15/capture.json",
+          "sha256": "aa5fad5b5f981c5a90d32ede7a0a58c9affbf65572f62c920562c58d1d61636d",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue",
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/2",
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-2/capture.json",
+          "sha256": "bfac0a4b64f191dc0054f146e5543fd376b3363efc756667690006bfa27f03f9",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0",
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0/@nullable"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-3/capture.json",
+          "sha256": "a7e14d584d2ccbc6456d41b830c688af5d8b227f5c17f40d694d885eeb746883",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue",
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2",
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-4/capture.json",
+          "sha256": "6f8c8027bf8f8b5d61045680c9d2680d6991ebfe50f97b1f56f94ca285985c47",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3",
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-5/capture.json",
+          "sha256": "94ab8a48bd95b47ea8bf6c6abf323d2cdd1545adb252ce20e14b36a81ca1614e",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue",
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2",
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-6/capture.json",
+          "sha256": "40b3e2871c308593da6dfc131b1ecef9eff60ce2c4c884666487a5e6eaaffec9",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3",
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-7/capture.json",
+          "sha256": "01a314cc975f5522681709383f3f55b39c9778a9c993146a5e9a35a6a8609d3c",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0",
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0/@nullable"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-8/capture.json",
+          "sha256": "569a1ff82d2667ce19753f141f7dfb95eba42f300c5b4d6ab97e001c3e612ae2",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3",
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r54/case-9/capture.json",
+          "sha256": "7e426d92d0934a1857ead3895e6732479df72fb577f5723abc5c58fe76b2dca7",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0",
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0/@nullable"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        }
+      ]
+    },
+    "r55": {
+      "cases": 6,
+      "attachments": 10,
+      "sources": 771,
+      "before_equals_capture_equals_after": true,
+      "context": {
+        "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r55/context.json",
+        "sha256": "56c4eee7f9efdf5600a0fff9bbcc81bddd378a8aedb01f5f0d79e62f15445181",
+        "cases": [
+          "2021.1|MusicStinger|CustomCueMatchName",
+          "2022.1|MusicStinger|CustomCueMatchName",
+          "2023.1|ModulatorTime|EnvelopeStopPlayback",
+          "2023.1|MusicStinger|CustomCueMatchName",
+          "2024.1|ModulatorTime|EnvelopeStopPlayback",
+          "2024.1|MusicStinger|CustomCueMatchName"
+        ],
+        "branches": 10
+      },
+      "phase_receipts": [
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r55/case-0/capture.json",
+          "sha256": "18593da3d0ff589d1c2c4e0d87a92cb1defe43f7f2770279e6fa16d873643dad",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1",
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1/@empty/string"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r55/case-1/capture.json",
+          "sha256": "bc27ca6bc773607c3d1965d356c883a964b0b9996293541b63d80aec38236788",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1",
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1/@empty/string"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r55/case-2/capture.json",
+          "sha256": "4408fb2128a91a6ecd62625dca4be4959ef519574a89aa44cf6bea9d4e25af64",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r55/case-3/capture.json",
+          "sha256": "b8a971f33c9827f9854bf7d590c0a6b77ac76ec988fae887547951f087b6133f",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1",
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1/@empty/string"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r55/case-4/capture.json",
+          "sha256": "7180addd544250128228bb9620902de2da1b7699411e2ce118bd152a8253e418",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        },
+        {
+          "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/current-metadata-195-r4-r55/case-5/capture.json",
+          "sha256": "ed02528d1cdffa954a33e39e257cd0720835e4d55d81efc65fc8a8ce657c6caa",
+          "attribution": "historical_native_current_program_not_current_native",
+          "observed_branch_ids": [
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1",
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1/@empty/string"
+          ],
+          "outcome": "PASS",
+          "phase_reports": {
+            "call": "passed",
+            "setup": "passed",
+            "teardown": "passed"
+          },
+          "source_unchanged": true
+        }
+      ]
+    }
+  },
+  "attribution": "historical_native_current_program_not_current_native",
+  "terminal_manifest": {
+    "artifact": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4/terminal-metadata-index.json",
+    "sha256": "a041d8d1bab7d3accf5e75cb1fe850ab4359032cc966334849532e3efb8d08a2",
+    "base": "/private/tmp/waapi-195-publication-cycle/.waapi-skill-state/195-current-metadata-8f3745de-r4"
+  },
+  "phase_receipts": 25,
+  "metadata_attachments": 60,
+  "source_clean": true,
+  "terminal_unix": 1793517121.1027782
+}

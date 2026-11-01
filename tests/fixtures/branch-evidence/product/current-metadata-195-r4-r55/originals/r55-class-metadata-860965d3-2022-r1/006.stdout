@@ -1,0 +1,129 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 32115,
+    "url": "ws://127.0.0.1:32115/waapi"
+  },
+  "detected_version": "2022.1",
+  "is_command_line": true,
+  "operation": "detail",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 3,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2022.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2022-r1/dispatcher-evidence/1792528788320188000-e69b675e73024209b8db8a32678244b3-ak_wwise_core_object_getPropertyInfo.json",
+      "timeout": 29.96768620799412
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 32115,
+      "url": "ws://127.0.0.1:32115/waapi"
+    },
+    "adapter_version": "2022.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:32115/waapi",
+        "adapter_version": "2022.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "selection": "mf1.1792528787.1.88c9e071fdc4f0a9050b8437f51c21665307d579ad6303e44b9b71efaf056cac",
+    "scope": {
+      "kind": "object_type",
+      "requested": "MusicStinger",
+      "resolved": {
+        "classId": 2490384,
+        "name": "MusicStinger",
+        "type": "WObject"
+      }
+    },
+    "metadata": {
+      "type": "string",
+      "name": "CustomCueMatchName",
+      "default": "",
+      "display": {
+        "name": "Custom cue match name",
+        "index": 1527,
+        "group": "Audio/Stingers"
+      },
+      "dependencies": [],
+      "audioEngineId": 4294967295,
+      "supports": {
+        "unlink": false,
+        "rtpc": "None",
+        "randomizer": false
+      },
+      "restriction": {},
+      "ui": {
+        "value": {
+          "max": 0.0,
+          "min": 0.0,
+          "decimals": 0,
+          "step": 0.0,
+          "fine": 0.0,
+          "infinity": 0.0
+        },
+        "displayAs": {
+          "lrMix": false,
+          "musicNote": false,
+          "bitfield": false
+        },
+        "dataMeaning": "None",
+        "autoUpdate": false
+      },
+      "unit": {
+        "status": "unknown",
+        "value": null
+      },
+      "availability": {
+        "type": "known",
+        "default": "known",
+        "restriction": "known",
+        "dependencies": "known",
+        "supports": "known",
+        "ui": "known"
+      }
+    },
+    "complete": true,
+    "mutation_authority": false
+  }
+}

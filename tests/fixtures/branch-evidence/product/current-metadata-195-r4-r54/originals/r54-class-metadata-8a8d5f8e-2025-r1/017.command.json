@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "/Users/xiye/.codex/worktrees/waapi-class-metadata/waapi-skills/skills/waapi-skill/.venv/bin/python",
+    "/Users/xiye/.codex/worktrees/waapi-class-metadata/waapi-skills/skills/waapi-skill/scripts/run.py",
+    "gateway.py",
+    "--state-dir",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2025-r1/gateway-state",
+    "--timeout",
+    "30",
+    "--evidence-dir",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2025-r1/dispatcher-evidence",
+    "metadata",
+    "detail",
+    "--custom-kind",
+    "MediaPoolFilter",
+    "--selection",
+    "mf1.1792523920.5.b0b8ba06d0ab1f1cd69dd5db5db03c2f42aa5f1a11716e7b140ee3ade4390bbf"
+  ],
+  "gateway_arguments": [
+    "metadata",
+    "detail",
+    "--custom-kind",
+    "MediaPoolFilter",
+    "--selection",
+    "mf1.1792523920.5.b0b8ba06d0ab1f1cd69dd5db5db03c2f42aa5f1a11716e7b140ee3ade4390bbf"
+  ],
+  "started_at_unix": 1792523920.090383
+}
