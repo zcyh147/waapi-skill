@@ -573,3 +573,31 @@ successful execution or per-API coverage credit from this decision; do not
 exclude an unrelated row, an existing-object mode, a known factory or an actual
 implementation defect. #195/#174 remain subject to current-source evidence,
 combined gates and review. No new native or Fresh work is authorized here.
+
+## User-approved product-test closeout — 2026-11-01
+
+The user clarified the delivery sequence: finish the functional changes, add
+necessary tests, run the product regressions, fix actual failures, review, and
+deliver. Wwise 2021.1–2025.1 functionality, legal parameter support, approved
+boundaries, and Gateway safety requirements remain unchanged.
+
+The additional branch/evidence accounting tool is no longer a release gate.
+Stop expanding its representative-proof rules, historical receipt bridges and
+publication machinery. Its saved incomplete result remains incomplete; do not
+rewrite historical outcomes, remove evidence, or describe that tool as passing.
+Its own accounting and historical-record tests may be reported separately from
+product acceptance and do not block this delivery.
+
+Use the existing Program/Non-live runners for product regression. Record the
+exact selected and excluded test nodes; exclude only accounting-tool self-tests,
+not tests of packaged Skill behavior, five-version API/schema/parameter coverage,
+authorization, identities, Preview, execute-once behavior, cleanup, or bounded
+results. Preserve product tests in mixed modules. Do not add another test
+framework or turn a product failure into an accounting exclusion. Repair failed
+and affected product cases before considering another broad run.
+
+Delivery requires passing selected product regressions, independent code review,
+accurate limitations and validation reports, and the existing PR workflow. No
+additional native Wwise or Fresh Agent run is authorized. This decision
+supersedes earlier requirements to make the branch/evidence accounting program
+report complete before closing #195/#174; it does not reduce product scope.

@@ -5,6 +5,17 @@ batch, classifying a failure, changing a grader, or deciding what to rerun.
 It governs future test coordination and acceptance reports, including Windows
 impact assessment. Historical results retain their original contracts.
 
+For #174/#195 closeout, apply the user's
+[2026-11-01 product-test decision](../../docs/plans/full-waapi-coverage/SPEC.md#user-approved-product-test-closeout--2026-11-01).
+The additional branch/evidence accounting tool and its historical-record
+self-tests no longer block delivery. Preserve their actual results separately.
+Use existing Program/Non-live runners with an explicit, reviewed product-test
+selection; retain five-version API/schema/parameter coverage and all material
+Gateway safety and behavior tests. Mixed modules require node-level separation.
+Do not add another framework, weaken a product assertion, relabel a failure, or
+run new Wwise/Fresh work to make accounting records current. Earlier requirements
+for a fully reconciled accounting inventory are superseded for this closeout.
+
 For table-based import acceptance and rerun decisions, apply the
 [2026-10-27 lightweight policy](../../docs/plans/full-waapi-coverage/SPEC.md#user-approved-lightweight-table-audio-acceptance--2026-10-27):
 closed wrappers/code tests suffice in each supported lane, including multilingual
