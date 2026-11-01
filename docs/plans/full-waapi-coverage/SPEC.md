@@ -1,5 +1,18 @@
 # Eliminate Skill-origin WAAPI coverage gaps across Wwise 2021.1–2025.1
 
+## Repair authorization after ledger removal — 2026-11-01
+
+The user has resumed the existing Goal and authorized repair of the remaining
+95 failed regression cases. Start with the 22 public workflow cases, distinguish
+product defects from outdated fixtures or expectations, and repair shared causes
+once. Then address the import, Agent harness and launcher groups. Reproduce only
+representative failures where needed; after each fix run failed and directly
+affected cases. Preserve the original interrupted result and meaningful safety
+assertions. Do not restore the deleted ledger or expand testing into vendor QA.
+After the repairs are stable, decide the final regression scope separately;
+another full regression, native Wwise run or Fresh campaign is not authorized by
+this repair step. This supersedes the earlier pause-before-repair instruction.
+
 ## Latest user decision — remove the additional completion ledger (2026-11-01)
 
 The user explicitly authorized stopping the slow Non-live run and deleting the
@@ -18,8 +31,8 @@ product assertions without importing or evaluating the removed ledger. Raw
 historical execution records and ignored campaign data remain preserved; their
 original failures do not become passes when the ledger is removed.
 
-The interrupted regression is incomplete, not a release pass. Other functional
-failures require the user's judgment before repair. Validate this removal with
+The interrupted regression is incomplete, not a release pass. The subsequent
+repair authorization above now permits the remaining focused repairs. Validate this removal with
 collection/import checks and only directly affected retained tests; do not start
 another full regression, Wwise process, or Fresh Agent campaign without a new
 decision.
