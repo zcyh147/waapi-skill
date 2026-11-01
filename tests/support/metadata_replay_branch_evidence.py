@@ -698,7 +698,7 @@ CURRENT_REPLAY_SOURCE_CHANGES = {'docs/branch-coverage-requirements.json': {'aft
                                                'before': None},
  'tests/support/ui_completion_mapping.py': {'after': 'b77f98185f76725f632c56b8c5fa236315cc21ae092e4d36cd448b2fca47444b',
                                             'before': None},
- 'tests/unit/test_branch_coverage_completion_cli.py': {'after': '9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea',
+ 'tests/unit/test_branch_coverage_completion_cli.py': {'after': 'cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10',
                                                        'before': 'b6fcec39b5994eae73205ac9616b03a02e2c8475340e8036b1092485bd516ead'}}
 
 
