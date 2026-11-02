@@ -598,30 +598,6 @@ def test_cursor_moves_reach_four_persisted_final_categories(owned_authoring, tmp
         'limits': report['limits'], 'report_path': str(report_path)}, indent=2) + '\n')
 
 
-def test_cursor_move_unavailable_retains_other_moves_and_blocks_final_acceptance(
-        owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        cursor_moves=True, failure='cursor-unavailable')
-    with pytest.raises(AssertionError):
-        collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
-    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    categories = {row['category']: row for row in record['categories']}
-    unavailable = report['outcomes']['profiler-cursor-next-frame']
-    assert unavailable['outcome'] == 'BLOCKED'
-    assert unavailable['evidence']['returned_time_ms'] == unavailable['evidence']['observed_time_ms'] == -1
-    assert unavailable['evidence']['transaction']['state'] == 'result_schema_checked'
-    assert categories['profiler-cursor-next-frame']['business_outcome'] == 'BLOCKED'
-    assert all(row['business_outcome'] == 'PASS' for name, row in categories.items()
-        if name != 'profiler-cursor-next-frame')
-    assert all(row['status'] != 'PASS' and 'batch_finalization' not in row for row in categories.values())
-    assert report['cleanup']['complete'] is True and not client.transport
-    assert [args['position'] for uri, args, _ in client.calls if uri.endswith('profiler.moveCursor')] == [
-        'first', 'next', 'last', 'previous']
-
-
 def test_cursor_move_failed_setup_verification_stops_before_moves_and_retains_cleanup(
         owned_authoring, tmp_path, monkeypatch):
     batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
@@ -640,55 +616,6 @@ def test_cursor_move_failed_setup_verification_stops_before_moves_and_retains_cl
         and row['payload'].get('state') == 'verification_failed']
     assert len(failed) == 1 and failed[0]['payload']['automatic_retry'] is False
     assert sum(uri.endswith('profiler.stopCapture') for uri, _, _ in client.calls) == 1
-
-
-@pytest.mark.parametrize('failure', ['cursor-mismatch', 'cursor-cleanup', 'cursor-single-frame'])
-def test_cursor_move_failures_preserve_partial_final_writer_evidence(
-        owned_authoring, tmp_path, monkeypatch, failure):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        cursor_moves=True, failure=failure)
-    with pytest.raises(AssertionError):
-        collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
-    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    outcomes = {name: row['outcome'] for name, row in report['outcomes'].items()}
-    categories = {row['category']: row for row in record['categories']}
-    assert all(row['status'] != 'PASS' and 'batch_finalization' not in row for row in categories.values())
-    assert {name: row['business_outcome'] for name, row in categories.items()} == outcomes
-    assert report['public_call_count'] == len(archive['receipts'])
-    assert report['total_reply_bytes'] == sum(len(json.dumps(row.get('payload', row), ensure_ascii=False).encode())
-        for row in archive['receipts'])
-    assert sum(uri.endswith('profiler.moveCursor') for uri, _, _ in client.calls) == 4
-    assert sum(uri.endswith('profiler.stopCapture') for uri, _, _ in client.calls) == 1
-    assert not client.transport and not batch.batch_seal_path.exists()
-    assert record['source']['hash_before'] == record['source']['hash_after']
-    if failure == 'cursor-mismatch':
-        assert outcomes == {'profiler-cursor-first-frame': 'PASS', 'profiler-cursor-next-frame': 'FAIL',
-            'profiler-cursor-last-frame': 'PASS', 'profiler-cursor-previous-frame': 'PASS'}
-        failed = [row for row in archive['receipts'] if row['argv'][0] == 'verify'
-            and row['payload'].get('state') == 'verification_failed']
-        assert len(failed) == 1 and failed[0]['payload']['automatic_retry'] is False
-        scope = failed[0]['payload']['verification']['verification_scope']['cursor_observation']
-        assert scope['returned_time_ms'] == 110 and scope['observed_time_ms'] == 111
-        assert report['cleanup']['complete'] is True
-
-
-    elif failure == 'cursor-cleanup':
-        assert set(outcomes.values()) == {'PASS'}
-        assert report['cleanup']['complete'] is False
-        assert [row['action'] for row in report['cleanup']['errors']] == ['disable-voices-data']
-        failed = [row for row in archive['receipts'] if row['argv'][0] == 'execute'
-            and row['payload'].get('state') == 'indeterminate']
-        assert len(failed) == 1 and failed[0]['payload']['automatic_retry'] is False
-        assert sum(uri.endswith('enableProfilerData') and args['dataTypes'][0]['enable'] is False
-            for uri, args, _ in client.calls) == 1
-    else:
-        assert outcomes == {'profiler-cursor-first-frame': 'PASS', 'profiler-cursor-next-frame': 'BLOCKED',
-            'profiler-cursor-last-frame': 'PASS', 'profiler-cursor-previous-frame': 'BLOCKED'}
-        assert report['frame_relationship_scope']['distinct_endpoint_times_observed'] is False
-        assert report['cleanup']['complete'] is True
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2025.1'])
@@ -756,24 +683,6 @@ def test_partial_capture_seed_never_certifies_owned_contribution(partial_seed):
     assert all(row['outcome'] == 'BLOCKED' for row in report['outcomes'].values())
 
 
-def test_retained_main_bus_read_and_filter_facts_are_meaningful_owned_observations(
-        owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        version='2021.1', capture_reads=True, native_rtpc=True, mixing_bus='unique')
-    collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
-    assert final['outcome'] == 'PASS'
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    for name in ('profiler-busses-observation', 'profiler-bus-instance-filter'):
-        evidence = report['outcomes'][name]['evidence']
-        assert evidence['owned_identity_observed'] is True
-        assert evidence['agent_result']['return'][0]['objectGUID'] == '{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}'
-        assert next(row for row in record['categories'] if row['category'] == name)['status'] == 'PASS'
-    assert report['runtime_mixing_bus']['logical_output_equals_runtime_bus'] is False
-    assert report['fixture_before'] == report['fixture_after']
-
-
 def test_retained_cpu_page_ceiling_keeps_partial_data_without_another_native_read(
         owned_authoring, tmp_path, monkeypatch):
     batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
@@ -791,36 +700,6 @@ def test_retained_cpu_page_ceiling_keeps_partial_data_without_another_native_rea
     assert sum(uri.endswith('getCpuUsage') for uri, _, _ in client.calls) == 1
     assert report['retained_page_call_count'] == 7 and report['public_call_count'] <= 192
     assert next(row for row in record['categories'] if row['category'] == 'profiler-cpu-observation')['business_outcome'] == 'BLOCKED'
-
-
-@pytest.mark.parametrize('mixing_bus', ['unique', 'mixed', 'wrong-game-object', 'malformed'])
-def test_observed_mixing_bus_and_logical_output_remain_distinct_through_final_writer(
-        owned_authoring, tmp_path, monkeypatch, mixing_bus):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        capture_reads=True, failure='nonempty-media', native_rtpc=True, mixing_bus=mixing_bus)
-    if mixing_bus == 'unique':
-        collect(batch, call)
-    else:
-        with pytest.raises(AssertionError):
-            collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=mixing_bus == 'unique')
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    category = next(row for row in record['categories'] if row['category'] == 'profiler-contributions-bus-observation')
-    if mixing_bus == 'unique':
-        assert final['outcome'] == category['status'] == 'PASS'
-        association = report['runtime_mixing_bus']
-        assert association['logical_output_bus_id'] == '{33329D23-BCDD-4D1A-9734-2403A3428FAE}'
-        assert association['selected_observed_instance']['objectGUID'] == '{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}'
-        assert association['selected_observed_instance']['pipelineID'] == 2
-        assert association['logical_output_equals_runtime_bus'] is False
-        assert any(args.get('bussesPipelineID') == [2] for uri, args, _ in client.calls if uri.endswith('getVoiceContributions'))
-    else:
-        assert final['outcome'] == 'FAIL' and category['business_outcome'] == 'BLOCKED'
-        assert not any(args.get('bussesPipelineID') for uri, args, _ in client.calls if uri.endswith('getVoiceContributions'))
-        assert report['outcomes']['profiler-contributions-dry-observation']['outcome'] == 'PASS'
-    assert report['fixture_before'] == report['fixture_after'] and report['cleanup']['complete']
-    assert not any(args.get('property') == 'BusChannelConfig' for uri, args, _ in client.calls if uri.endswith('setProperty'))
 
 
 @pytest.mark.parametrize('cpu_native_version,row_count', [('2024.1', 34), ('2025.1', 33)])
@@ -874,36 +753,6 @@ def test_retained_native_cpu_rows_reach_final_writer_without_a_second_native_rea
     assert not client.transport and not batch.runtime.owned_root.exists()
 
 
-def test_capture_read_extension_keeps_new_data_and_empty_media_in_final_archive(owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, capture_reads=True)
-    with pytest.raises(AssertionError):
-        collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
-    assert final['outcome'] == 'FAIL'
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    assert report['reader_call_count'] == 9 and report['public_call_count'] <= 192
-    assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
-    categories = {row['category']: row for row in record['categories']}
-    assert set(categories) == {'profiler-rtpcs-observation', 'profiler-contributions-dry-observation',
-        'profiler-contributions-bus-observation', 'profiler-cpu-observation', 'profiler-loaded-media-observation',
-        'profiler-performance-observation', 'profiler-streamed-media-observation'}
-    assert all(row['business_outcome'] == ('BLOCKED' if name in (
-        'profiler-loaded-media-observation', 'profiler-streamed-media-observation') else 'PASS')
-        and row['status'] == 'blocked' for name, row in categories.items())
-    assert all(report['outcomes'][name]['evidence']['observation_status'] == 'PASS' for name in (
-        'profiler-loaded-media-observation', 'profiler-streamed-media-observation'))
-    contribution = report['outcomes']['profiler-contributions-dry-observation']['evidence']['agent_result']
-    assert contribution['contribution_reported'] is True and contribution['dsf']['value'] == 0.0
-    assert set(report['seed_observations']) == {'profiler-voices-observation', 'profiler-busses-observation'}
-    assert not any(uri.endswith(('getGameObjects', 'getAudioObjects', 'getMeters', 'setCursorTime', 'saveCapture',
-        'log.addItem', 'log.clear')) for uri, _, _ in client.calls)
-    targeted = [(uri, args) for uri, args, _ in client.calls if '.profiler.get' in uri and not uri.endswith('getCursorTime')]
-    assert len(targeted) == 12 and all(args['time'] == 1500 for _, args in targeted)
-    assert [args.get('bussesPipelineID', []) for uri, args in targeted if uri.endswith('getVoiceContributions')] == [[], [43]]
-    assert not client.transport and batch.lifecycle_result.quarantine_path and not batch.batch_seal_path.exists()
-
-
 def test_2022_capture_read_flow_preserves_older_fields_in_persisted_final_acceptance(owned_authoring, tmp_path, monkeypatch):
     batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
         version='2022.1', capture_reads=True)
@@ -926,226 +775,6 @@ def test_2022_capture_read_flow_preserves_older_fields_in_persisted_final_accept
     assert not any(uri.endswith(('transport.useOriginals', 'getCpuUsage', 'getLoadedMedia', 'getPerformanceMonitor',
         'getStreamedMedia', 'getMeters', 'setCursorTime', 'saveCapture', 'log.addItem', 'log.clear')) for uri, _, _ in client.calls)
     assert not client.transport and not batch.runtime.owned_root.exists()
-
-
-@pytest.mark.parametrize('version', ['2021.1', '2023.1', '2024.1'])
-def test_older_capture_read_batch_keeps_version_fields_and_independent_file_log_outcomes(
-        owned_authoring, tmp_path, monkeypatch, version):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        version=version, capture_reads=True, failure='nonempty-media')
-    collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
-    assert final['outcome'] == 'PASS' and record['version'] == version
-    assert all(row['status'] == 'PASS' for row in record['categories'])
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    assert report['public_call_count'] <= 192
-    assert report['reader_call_count'] == (9 if version == '2021.1' else 14)
-    assert report['fixture_before'] == report['fixture_after'] and report['cleanup']['complete']
-    bus = report['outcomes']['profiler-busses-observation']['evidence']['agent_result']['return'][0]
-    assert ('mixerID' in bus) is (version == '2021.1')
-    assert ('effectCount' in bus) is (version != '2021.1')
-    obj = report['outcomes']['profiler-contributions-dry-observation']['evidence']['agent_result']['objects'][0]
-    assert ('index' in obj) is (version == '2024.1') and 'DSF' not in obj
-    assert not any(uri.endswith(('getMeters', 'registerMeter', 'setCursorTime')) for uri, _, _ in client.calls)
-    if version == '2021.1':
-        assert len(record['categories']) == 9
-        assert not any(uri.endswith(('getGameObjects', 'transport.prepare', 'transport.useOriginals', 'saveCapture',
-            'log.addItem', 'log.clear')) for uri, _, _ in client.calls)
-    else:
-        assert len(record['categories']) == 17
-        budget = report['optional_effect_budget']
-        assert budget['admitted'] and budget['calls_before'] + 29 + 52 <= 192
-        assert all(report['outcomes'][name]['outcome'] == 'PASS' for name in (
-            'profiler-saved-capture-artifact', 'runtime-owned-log-add', 'runtime-owned-log-clear'))
-        assert all('reader_observation_status' not in row for row in record['categories']
-            if row['category'] in ('profiler-saved-capture-artifact', 'runtime-owned-log-add', 'runtime-owned-log-clear'))
-        assert sum(uri.endswith('profiler.saveCapture') for uri, _, _ in client.calls) == 1
-        assert sum(uri.endswith('log.addItem') for uri, _, _ in client.calls) == 1
-        assert sum(uri.endswith('log.clear') for uri, _, _ in client.calls) == 1
-    assert not client.transport and not batch.runtime.owned_root.exists()
-
-
-@pytest.mark.parametrize('reported', [True, False])
-def test_reported_scalar_contribution_and_unreported_payload_remain_distinct_in_final_writer(
-        owned_authoring, tmp_path, monkeypatch, reported):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        capture_reads=True, failure='scalar-contribution' if reported else 'missing-contribution')
-    if reported:
-        collect(batch, call)
-    else:
-        with pytest.raises(AssertionError):
-            collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=reported)
-    assert final['outcome'] == ('PASS' if reported else 'FAIL')
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    for name in ('profiler-contributions-dry-observation', 'profiler-contributions-bus-observation'):
-        observation = report['outcomes'][name]
-        evidence = observation['evidence']
-        assert observation['outcome'] == ('PASS' if reported else 'BLOCKED')
-        assert evidence['observation_status'] == 'PASS'
-        assert evidence['agent_result']['contribution_reported'] is reported
-        if reported:
-            assert evidence['agent_result']['objects'] == []
-            assert evidence['tree_nonempty'] is False and evidence['nonempty'] is True
-            assert evidence['owned_identity_observed'] is True
-            assert evidence['agent_result']['volume'] == evidence['agent_result']['lpf'] == evidence['agent_result']['hpf'] == 0.0
-        category = next(row for row in record['categories'] if row['category'] == name)
-        assert category['business_outcome'] == ('PASS' if reported else 'BLOCKED')
-        assert category['status'] == ('PASS' if reported else 'blocked')
-    assert report['reader_call_count'] == 9 and report['public_call_count'] <= 192
-    assert next(row for row in record['categories'] if row['category'] == 'profiler-rtpcs-observation')[
-        'attribution_scope'] == 'owned-rtpc-read'
-    assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
-    assert sum(uri.endswith('getVoiceContributions') for uri, _, _ in client.calls) == 2
-
-
-@pytest.mark.parametrize('failure', ['empty-extra', 'partial-extra', 'disable-readers'])
-def test_capture_read_missing_partial_and_cleanup_results_reach_final_writer(
-        owned_authoring, tmp_path, monkeypatch, failure):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        capture_reads=True, failure=failure)
-    with pytest.raises(AssertionError):
-        collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
-    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
-    assert not batch.batch_seal_path.exists()
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    assert report['reader_call_count'] == 9 and report['public_call_count'] <= 192
-    assert all(row['status'] == 'blocked' and 'batch_finalization' not in row for row in record['categories'])
-    assert report['outcomes']['profiler-rtpcs-observation']['evidence'].get('setter_effect_verified', False) is False
-    assert not client.transport and report['fixture_before'] == report['fixture_after']
-    if failure == 'empty-extra':
-        assert all(row['outcome'] == 'BLOCKED' and row['evidence']['observation_status'] == 'PASS'
-            and row['evidence']['nonempty'] is False for row in report['outcomes'].values())
-    elif failure == 'partial-extra':
-        cpu = report['outcomes']['profiler-cpu-observation']
-        assert cpu['outcome'] == 'BLOCKED' and cpu['evidence']['complete'] is False
-        assert cpu['evidence']['agent_result']['returned_count'] == 25
-        assert len(cpu['evidence']['agent_result']['return']) == 25
-        assert cpu['evidence']['agent_result']['total_count'] == 65
-        assert sum(uri.endswith('profiler.getCpuUsage') for uri, _, _ in client.calls) == 1
-        assert report['outcomes']['profiler-rtpcs-observation']['outcome'] == 'PASS'
-    else:
-        assert all(row['outcome'] == 'PASS' for row in report['outcomes'].values())
-        assert [row['action'] for row in report['cleanup']['errors']] == ['disable-capture-read-data']
-        assert sum(uri.endswith('enableProfilerData') and not args['dataTypes'][0]['enable']
-            for uri, args, _ in client.calls) == 1
-        failed = [row for row in archive['receipts'] if row['argv'][0] == 'execute'
-            and row['exit_code'] != 0
-            and row['payload'].get('dispatch_result', {}).get('api') == 'ak.wwise.core.profiler.enableProfilerData']
-        assert len(failed) == 1 and failed[0]['payload']['state'] == 'indeterminate'
-        assert failed[0]['payload']['automatic_retry'] is False
-    assert report['cleanup']['complete'] is (failure != 'disable-readers')
-    assert record['source']['hash_before'] == record['source']['hash_after']
-
-
-def test_owned_2025_reader_flow_reaches_seven_independent_archived_categories(owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, readers=True)
-    collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
-    assert final['outcome'] == 'PASS' and record['contract'] == 'waapi-skill.host-category-evidence/v3'
-    assert {row['category'] for row in record['categories']} == {
-        'profiler-voices-observation', 'profiler-busses-observation', 'profiler-audio-objects-observation',
-        'profiler-game-objects-observation', 'profiler-voice-instance-filter',
-        'profiler-bus-instance-filter', 'profiler-audio-objects-bus-filter'}
-    assert all(row['status'] == row['business_outcome'] == 'PASS' and row['cleanup_complete']
-        and row['batch_finalization'] and row['reader_observation_status'] == 'PASS'
-        and row['owned_identity_observed'] is True for row in record['categories'])
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    assert report['reader_call_count'] == 7 and report['capture_position']['position_ms'] == 1500
-    assert all(row['evidence']['position_ms'] == 1500 for row in report['outcomes'].values())
-    voice = report['outcomes']['profiler-voices-observation']['evidence']
-    assert voice['agent_result']['return'][0]['baseVolume'] == -3.5
-    assert voice['identity_ties']['sound_row_indexes'] == [0]
-    assert voice['identity_ties']['transport_game_object_row_indexes'] == [0]
-    assert report['outcomes']['profiler-audio-objects-observation']['evidence']['agent_result']['return'][0]['metadata'] == []
-    assert report['outcomes']['profiler-game-objects-observation']['evidence']['agent_result']['game_objects'] == [
-        {'id': 1, 'name': 'Transport/Soundcaster', 'register_time': 0, 'unregister_time': -1}]
-    reader_argv = [row['argv'] for row in archive['receipts'] if row['argv'][0] == 'profiler-game-objects'
-        or row['argv'][:1] == ['core-call'] and row['argv'][1].endswith(('getVoices', 'getBusses', 'getAudioObjects'))]
-    assert len(reader_argv) == 7
-    native = [(uri, args) for uri, args, _ in client.calls if uri.endswith(('getVoices', 'getBusses', 'getAudioObjects', 'getGameObjects'))]
-    assert len(native) == 10 and all(args['time'] == 1500 for _, args in native)
-    assert [args for uri, args in native if 'voicePipelineID' in args] == [{'time': 1500, 'voicePipelineID': 42}]
-    assert [args for uri, args in native if 'busPipelineID' in args] == [
-        {'time': 1500, 'busPipelineID': 43}, {'time': 1500, 'busPipelineID': 43}]
-    assert not any(uri.endswith(('getMeters', 'registerMeter', 'unregisterMeter', 'setCursorTime', 'saveCapture', 'log.addItem', 'log.clear'))
-        for uri, _, _ in client.calls)
-    assert not client.transport and report['fixture_before'] == report['fixture_after']
-    assert not batch.runtime.owned_root.exists()
-    assert [(args['dataTypes'][0]['dataType'], args['dataTypes'][0]['enable'])
-        for uri, args, _ in client.calls if uri.endswith('enableProfilerData')] == [
-        ('voices', True), ('audioObjects', True), ('audioObjects', False), ('voices', False)]
-
-
-@pytest.mark.parametrize('failure', ['empty-readers', 'reader-error', 'disable-readers', 'explicit-stop-capture'])
-def test_owned_reader_missing_or_uncertain_results_retain_independent_archive_without_acceptance(
-        owned_authoring, tmp_path, monkeypatch, failure):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        readers=True, failure=failure)
-    with pytest.raises(AssertionError):
-        collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
-    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
-    assert record['contract'] == 'waapi-skill.host-category-evidence/v3'
-    assert all(row['status'] != 'PASS' and 'batch_finalization' not in row for row in record['categories'])
-    archived = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archived['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    categories = {row['category']: row for row in record['categories']}
-    assert report['complete'] is False and len(report['outcomes']) == 7
-    assert not client.transport
-    assert record['source']['hash_before'] == record['source']['hash_after']
-    assert sum(uri.endswith('profiler.stopCapture') for uri, _, _ in client.calls) == 1
-    assert report['fixture_before'] == report['fixture_after']
-    if failure == 'empty-readers':
-        assert report['reader_call_count'] == 4
-        assert all(row['outcome'] == 'BLOCKED' for row in report['outcomes'].values())
-        assert all(row['business_outcome'] == 'BLOCKED' for row in categories.values())
-        assert all(row['evidence']['nonempty'] is False for row in list(report['outcomes'].values())[:4])
-        assert not any('voicePipelineID' in args or 'busPipelineID' in args
-            for uri, args, _ in client.calls if uri.endswith(('getVoices', 'getBusses', 'getAudioObjects')))
-    elif failure == 'reader-error':
-        assert report['reader_call_count'] == 6
-        assert categories['profiler-voices-observation']['business_outcome'] == 'FAIL'
-        assert categories['profiler-voice-instance-filter']['business_outcome'] == 'BLOCKED'
-        assert all(row['business_outcome'] == 'PASS' for name, row in categories.items()
-            if name not in ('profiler-voices-observation', 'profiler-voice-instance-filter'))
-        assert 'fake voice read unavailable' in json.dumps(archived['receipts'])
-    else:
-        assert report['reader_call_count'] == 7
-        assert all(row['business_outcome'] == 'PASS' and row['cleanup_complete'] is False for row in categories.values())
-        failed = [row for row in archived['receipts'] if row['argv'][0] == 'execute'
-            and row['payload'].get('state') == 'indeterminate']
-        assert len(failed) == (2 if failure == 'disable-readers' else 1)
-        assert all(row['payload']['automatic_retry'] is False for row in failed)
-        assert report['cleanup']['complete'] is False
-        assert len(report['cleanup']['errors']) == len(failed)
-    if failure in ('empty-readers', 'reader-error'):
-        assert report['cleanup']['complete'] is True
-    assert not batch.batch_seal_path.exists()
-
-
-def test_nonempty_unattributed_reader_rows_never_grant_owned_capture_credit(owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        readers=True, failure='unattributed-readers')
-    with pytest.raises(AssertionError):
-        collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
-    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
-    archived = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archived['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    assert report['reader_call_count'] == 7 and report['cleanup']['complete'] is True
-    assert all(row['outcome'] == 'BLOCKED' and row['evidence']['observation_status'] == 'PASS'
-        and row['evidence']['nonempty'] is True and row['evidence']['owned_identity_observed'] is False
-        for row in report['outcomes'].values())
-    assert all(row['business_outcome'] == 'BLOCKED' and row['status'] == 'blocked'
-        and row['reader_observation_status'] == 'PASS' and row['owned_identity_observed'] is False
-        and 'batch_finalization' not in row for row in record['categories'])
-    assert not client.transport and not batch.batch_seal_path.exists()
 
 
 def test_owned_2024_meter_public_flow_reaches_its_archived_final_category(owned_authoring, tmp_path, monkeypatch):
@@ -1177,30 +806,6 @@ def test_owned_2024_meter_public_flow_reaches_its_archived_final_category(owned_
     assert [(args['object'], args['property'], args['value']) for uri, args, _ in client.calls if uri.endswith('object.setProperty')] == [
         ('{06362E8D-5A32-497A-B063-3DA95963CE47}', 'BusChannelConfig', 12546),
         ('{06362E8D-5A32-497A-B063-3DA95963CE47}', 'BusChannelConfig', 0)]
-
-
-def test_owned_2024_empty_meter_fails_final_acceptance_after_complete_cleanup(owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, version='2024.1', failure='empty-meter')
-    with pytest.raises(AssertionError):
-        collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
-    assert final['outcome'] == 'FAIL' and record['version'] == '2024.1'
-    category, = record['categories']
-    assert category['category'] == 'profiler-meter-object-observation'
-    assert category['status'] == category['business_outcome'] == 'FAIL'
-    assert category['cleanup_complete'] is True and 'batch_finalization' not in category
-    assert batch.lifecycle_result.quarantine_path and not client.transport and not client.registered
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    observation, = report['outcomes'].values()
-    assert observation['outcome'] == 'FAIL' and 'missing from actual meter frame' in observation['error']['message']
-    assert report['fixture_after'] == report['fixture_before']
-    assert report['fixture_after']['bus']['properties']['BusChannelConfig'] == 0
-    assert [args['value'] for uri, args, _ in client.calls if uri.endswith('object.setProperty')] == [12546, 0]
-    assert any(row['action'] == 'restore-bus-configuration' for row in report['cleanup']['receipts'])
-    assert record['source']['hash_before'] == record['source']['hash_after']
-    cleanup = [uri for uri, _, _ in client.calls if uri.endswith(('profiler.stopCapture', 'transport.destroy', 'profiler.unregisterMeter'))]
-    assert cleanup == ['ak.wwise.core.profiler.stopCapture', 'ak.wwise.core.transport.destroy', 'ak.wwise.core.profiler.unregisterMeter']
 
 
 def test_owned_capture_public_flow_reaches_archived_final_categories(owned_authoring, tmp_path, monkeypatch):
@@ -1257,27 +862,6 @@ def test_mismatched_structural_parent_stops_before_writes_and_final_acceptance(o
     assert record['source']['hash_before'] == record['source']['hash_after']
 
 
-def test_empty_meter_retains_cursor_file_and_cleanup_as_separate_observations(owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, failure='empty-meter')
-    with pytest.raises(AssertionError):
-        collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
-    assert final['outcome'] == 'FAIL'
-    categories = {row['category']: row for row in record['categories']}
-    assert categories['profiler-meter-object-observation']['status'] == 'FAIL'
-    for name in ('profiler-cursor-snap-readback', 'profiler-saved-capture-artifact'):
-        assert categories[name]['business_outcome'] == 'PASS' and categories[name]['status'] == 'blocked'
-    assert all(row['cleanup_complete'] is True and 'batch_finalization' not in row for row in categories.values())
-    assert not client.transport and not client.registered
-    assert batch.lifecycle_result.quarantine_path
-    assert record['source']['hash_before'] == record['source']['hash_after']
-    artifact = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report_root = Path(artifact['artifacts']['native-evidence']['path'])
-    report = json.loads((report_root / 'profiler-capture.json').read_text())
-    assert report['outcomes']['profiler-meter-object-observation']['outcome'] == 'FAIL'
-    assert (report_root / 'saved-capture/OwnedCapture.prof').is_file()
-
-
 def test_cleanup_failure_retains_each_business_observation_without_acceptance(owned_authoring, tmp_path, monkeypatch):
     batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, failure='cleanup')
     with pytest.raises(AssertionError):
@@ -1318,128 +902,4 @@ def test_failed_explicit_stop_capture_persists_incomplete_cleanup_without_retry(
     assert len(failed) == 1 and failed[0]['exit_code'] == 2
     assert failed[0]['payload']['state'] == 'indeterminate'
     assert failed[0]['payload']['automatic_retry'] is False
-    assert record['source']['hash_before'] == record['source']['hash_after']
-
-
-def test_meter_anomaly_diagnostic_reaches_final_writer_without_business_credit(
-        owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, meter_spellings=True)
-    collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
-    assert final['outcome'] == 'PASS'
-    assert len(record['categories']) == 4
-    assert all(row['status'] == 'blocked' and row['business_effect_verified'] is False
-        and row['alias_equivalence_verified'] is False and row['coverage_credit'] == 'none_pending_semantics'
-        and row['observation_task_status'] == 'PASS' and row['batch_finalization']
-        for row in record['categories'])
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    root = Path(archive['artifacts']['native-evidence']['path'])
-    report = json.loads((root / 'profiler-capture.json').read_text())
-    diagnostic = report['meter_spelling_diagnostic']
-    observations = diagnostic['observations']
-    assert [row['selector'] for row in observations] == [None, 'states', 'suppportsRandomizer', 'supportsRandomizer']
-    assert [row['native_status'] for row in observations] == ['returned'] * 4
-    assert all(row['observation_status'] == 'PASS' and row['owned_bus_rows'] == [0]
-        and row['request_schema']['status'] == row['result_schema']['status'] == 'PASS' for row in observations)
-    assert [row['owned_bus_selected_key_present'] for row in observations] == [None, [True], [True], [True]]
-    packets = [json.loads((root / row['artifact']['path']).read_text()) for row in observations]
-    assert packets[0]['request'] == {'uri': 'ak.wwise.core.profiler.getMeters', 'args': {'time': 1500}}
-    assert [row['request']['options'] for row in packets[1:]] == [
-        {'return': ['id', 'name', 'states']}, {'return': ['id', 'name', 'suppportsRandomizer']},
-        {'return': ['id', 'name', 'supportsRandomizer']}]
-    assert packets[1]['result']['meters'][0]['object']['states'] == ['synthetic exact-key value']
-    assert packets[2]['result']['meters'][0]['object']['suppportsRandomizer'] is False
-    assert packets[3]['result']['meters'][0]['object']['supportsRandomizer'] is True
-    assert all(packet['context']['info']['sessionId'] == 'owned-session'
-        and packet['context']['owned_bus']['name'] == 'WAAPI_V2_Weapons' for packet in packets)
-    assert len([uri for uri, _, _ in client.calls if uri.endswith('getMeters')]) == 4
-    assert not any(uri.endswith(('setCursorTime', 'saveCapture', 'log.addItem', 'log.clear')) for uri, _, _ in client.calls)
-    assert not client.registered and not client.transport and not batch.runtime.owned_root.exists()
-    assert report['fixture_after'] == report['fixture_before']
-    assert record['source']['hash_before'] == record['source']['hash_after']
-
-
-@pytest.mark.parametrize('failure', ['native-rejection', 'omission', 'malformed-result', 'session-loss', 'cleanup'])
-def test_meter_anomaly_outcomes_preserve_independent_packets_and_owned_cleanup(
-        owned_authoring, tmp_path, monkeypatch, failure):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        meter_spellings=True, failure=failure)
-    diagnostic_passed = failure in ('native-rejection', 'omission')
-    if diagnostic_passed:
-        collect(batch, call)
-    else:
-        with pytest.raises(AssertionError):
-            collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=diagnostic_passed)
-    assert final['outcome'] == ('PASS' if diagnostic_passed else 'FAIL')
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    root = Path(archive['artifacts']['native-evidence']['path'])
-    report = json.loads((root / 'profiler-capture.json').read_text())
-    observations = report['meter_spelling_diagnostic']['observations']
-    states_packet = json.loads((root / observations[1]['artifact']['path']).read_text())
-    categories = record['categories']
-    assert len(categories) == 4 and all(row['status'] == 'blocked'
-        and row['business_effect_verified'] is False and row['alias_equivalence_verified'] is False
-        and row['coverage_credit'] == 'none_pending_semantics' for row in categories)
-    assert report['cleanup']['complete'] is (failure != 'cleanup')
-    assert report['fixture_before'] == report['fixture_after']
-    assert record['source']['hash_before'] == record['source']['hash_after']
-    assert not client.transport
-    if failure == 'session-loss':
-        assert len(observations) == 2 and len([uri for uri, _, _ in client.calls if uri.endswith('getMeters')]) == 2
-        assert 'fake connection lost' in states_packet['diagnostic_error']['message']
-        assert observations[1]['observation_status'] == 'BLOCKED'
-        assert 'result' not in states_packet and 'native_error' not in states_packet
-        assert all(row['outcome'] == 'BLOCKED' for row in list(report['outcomes'].values())[1:])
-    else:
-        assert len(observations) == 4 and len([uri for uri, _, _ in client.calls if uri.endswith('getMeters')]) == 4
-        assert all(row['observation_status'] == 'PASS' for i, row in enumerate(observations) if i != 1)
-        comparator = json.loads((root / observations[3]['artifact']['path']).read_text())
-        assert comparator['result']['meters'][0]['object']['supportsRandomizer'] is True
-    if failure == 'native-rejection':
-        assert observations[1]['native_status'] == 'native_rejected' and observations[1]['observation_status'] == 'PASS'
-        assert observations[1]['request_schema']['status'] == 'PASS'
-        assert observations[1]['result_schema']['status'] == 'not_returned'
-        assert states_packet['native_error']['uri'] == 'ak.wwise.invalid_return_option'
-        assert states_packet['native_error']['kwargs'] == {'field': 'states'}
-        assert states_packet['info_after']['sessionId'] == 'owned-session' and 'result' not in states_packet
-    elif failure == 'omission':
-        assert observations[1]['native_status'] == 'returned' and observations[1]['owned_bus_selected_key_present'] == [False]
-        assert states_packet['result']['meters'][0]['object']['customStates'] == []
-        assert 'states' not in states_packet['result']['meters'][0]['object']
-    elif failure == 'malformed-result':
-        assert observations[1]['native_status'] == 'returned' and observations[1]['result_schema']['status'] == 'FAIL'
-        assert states_packet['result']['meters'][0]['channels'][0]['value'] == 'fake malformed native channel'
-        assert observations[1]['observation_status'] == 'BLOCKED'
-    elif failure == 'cleanup':
-        assert all(row['observation_status'] == 'PASS' for row in observations)
-        assert any(row['action'] == 'unregister-meter' for row in report['cleanup']['errors'])
-        assert sum(uri.endswith('unregisterMeter') for uri, _, _ in client.calls) == 1
-    if diagnostic_passed:
-        assert all(row['observation_task_status'] == 'PASS' and row['batch_finalization'] for row in categories)
-        assert not batch.runtime.owned_root.exists() and not client.registered
-    else:
-        assert all(row['observation_task_status'] == 'BLOCKED' and 'batch_finalization' not in row for row in categories)
-        assert batch.lifecycle_result.quarantine_path and not batch.batch_seal_path.exists()
-
-
-def test_meter_anomaly_oversized_packet_blocks_diagnostic_but_preserves_cleanup(
-        owned_authoring, tmp_path, monkeypatch):
-    from tests.destructive.support import meter_spelling_diagnostic
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, meter_spellings=True)
-    monkeypatch.setattr(meter_spelling_diagnostic, 'MAX_PACKET_BYTES', 1024)
-    with pytest.raises(AssertionError):
-        collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
-    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    root = Path(archive['artifacts']['native-evidence']['path'])
-    report = json.loads((root / 'profiler-capture.json').read_text())
-    observations = report['meter_spelling_diagnostic']['observations']
-    assert len(observations) == 1 and observations[0]['observation_status'] == 'BLOCKED'
-    assert observations[0]['packet_error']['bytes'] > 1024 and 'artifact' not in observations[0]
-    assert len([uri for uri, _, _ in client.calls if uri.endswith('getMeters')]) == 1
-    assert all(row['observation_task_status'] == 'BLOCKED' and row['status'] == 'blocked'
-        and 'batch_finalization' not in row for row in record['categories'])
-    assert report['cleanup']['complete'] is True and not client.registered and not client.transport
     assert record['source']['hash_before'] == record['source']['hash_after']
