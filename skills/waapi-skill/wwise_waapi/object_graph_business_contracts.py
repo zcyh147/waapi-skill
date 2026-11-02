@@ -63,8 +63,41 @@ def _sound_semantics(operation):
         "generic_Sound_Type_Handle": "explicit_class_fields_remain_available",
         "verification": "actual_Boolean_IsVoice_and_bound_fields_identity_and_metadata",
         "language_and_media": ("use_audio_import_for_localized_media" if operation == "object.create"
-            else "requested_media_language_independently_verified;new_empty_Voice_language_is_optional_validated_Gateway_context_not_emitted_on_Sound_no_native_language_effect;existing_merge_language_effect_unresolved;declared_Source_plugins_have_separate_language_and_closed_childset_verification"),
+            else "verify_media_language; empty_Voice_language_is_optional_validated_context_without_Sound_native_effect; existing_merge_language_effect_unresolved; Source_plugins_verify_language_and_closed_childset_separately"),
     }
+
+
+def _anonymous_list_profiles(version):
+    """Disclose authoring choices without duplicating the sealed SDK examples.
+
+    The authority readers still validate the complete packaged sources. Their
+    native sample requests and archive/index bookkeeping are audit evidence,
+    not values a Business Declaration caller supplies.
+    """
+    marker = manual_marker_profile(version)
+    if marker is not None:
+        marker = {key: value for key, value in marker.items()
+                  if key not in {"sdk_example", "list_source", "source_sha256"}}
+        marker["source"] = {key: value for key, value in marker["source"].items()
+                            if key in {"build", "member", "member_sha256"}}
+    directory = media_pool_database_authority(version)
+    if directory is not None:
+        directory = {key: value for key, value in directory.items()
+                     if key not in {"list_source", "example_parent", "sdk_member"}}
+    return {
+        "effect_slot": {"class": "EffectSlot", "collection": "Effects"},
+        "manual_marker": marker,
+        "media_pool_directory": directory,
+    }
+
+
+def _anonymous_list_mode_source(version):
+    source = anonymous_list_mode_authority(version)
+    if source is None:
+        return None
+    # The rule is already disclosed beside this versioned source digest.
+    # The sealed authority retains the complete SDK member/archive envelope.
+    return {key: value for key, value in source.items() if key not in {"sdk", "rule"}}
 
 
 def object_graph_business_contract_data(
@@ -316,28 +349,26 @@ def object_graph_business_contract_data(
                         "scope": "new_member_with_inline_PlaylistObject; append_or_replaceAll; older_list_representations_remain_separate"}],
                     "name_meaning": "declaration_label_not_intrinsic_Wwise_name",
                     "observed_native_name": "", "identity": "actual_GUID_class_owner_ordered_collection",
-                    "other_profiles": "require_their_own_source_and_representation_proof"},
+                    "other_profiles": "require_matching_source_and_representation_proof"},
                 "anonymous_list_member": {
                     "subcommand": "draft-declare-new", "omit": ["name"],
                     "requires": ["selected_profile_Type_Handle", "source_proven_owner_List_Field_Handle"],
                     "versions": ["2023.1", "2024.1", "2025.1"],
-                    "profiles": {"effect_slot": {"class": "EffectSlot", "collection": "Effects"},
-                        "manual_marker": manual_marker_profile(version),
-                        "media_pool_directory": media_pool_database_authority(version)},
+                    "profiles": _anonymous_list_profiles(version),
                     "media_pool_directory_version_scope": {"supported_versions": ["2025.1"],
                         "other_versions": "matching_source_unproved; constructor_not_admitted",
                         "native_absence_claim": False},
                     "native_name": "Gateway_owned_empty_string",
                     "on_name_conflict": {"supported": ["fail", "rename", "merge", "replace"],
-                        "scope": "source_certified_anonymous_profiles_only; List_mode_controls_new_member_population; existing_Render_and_Marker_prerequisites_apply",
+                        "scope": "source_certified_anonymous_profiles; List_mode_controls_population; retain_Render_and_Marker_prerequisites",
                         "list_modes": ["append", "replaceAll"],
                         "duplicate_restrictions": "per_List_metadata_and_profile_restrictions_remain_authoritative",
-                        "source": anonymous_list_mode_authority(version)},
+                        "source": _anonymous_list_mode_source(version)},
                     "result_binding": "independent_ordered_owner_membership_then_exact_GUID_class_owner_and_values",
                     "render_conditions": {
                         "applies_to": "EffectSlot",
                         "explicit_false_before_later_true": "reject_before_preview_or_write",
-                        "omitted_predecessors": "derive_visible_true_from_actual_state_or_fresh_class_default",
+                        "omitted_predecessors": "derive_visible_true_from_live_state_or_fresh_class_default",
                         "verification": "complete_stored_slot_state_not_rendered_audio",
                         "bypass": "preserve_stored_flags; Bypass takes precedence during processing",
                         "clearing_before_retained_true": ("derive_visible_false_for_retained_successors; exact_complete_chain_verification"
@@ -347,17 +378,17 @@ def object_graph_business_contract_data(
                 "graph_plugin": {"types": {"effect": "effect_Type_Handle", "source": "source_Type_Handle"},
                     "plugin_placement": {"effect": ["shareset", "owner"], "source": ["owner"]},
                     "shareset_parent": "bound_Effects_WorkUnit_or_fresh_source_proven_Folder",
-                    "source_parent": "bound_existing_Sound_or_Voice_or_planned_result_handle; ordinary_child_not_Effect_slot",
-                    "source_language": "separate_from_Voice_construction_context; exact_selected_Project_language_on_actual_Boolean_Voice_owner",
+                    "source_parent": "bound_or_planned_Sound_or_Voice; ordinary_child_not_Effect_slot",
+                    "source_language": "exact_Project_language_on_Boolean_Voice_owner; independent_of_Voice_construction_context",
                     "existing_source_owner": {"target": "exact_bound_Sound_GUID_and_class",
                         "Voice_flag": "actual_live_Boolean_preserved; change_in_separate_verified_Preview",
-                        "retained_children": "complete_GUID_childset_plus_observed_plugin_and_file_Source_class_notes_language_original_path_and_live_discovered_fields_preserved",
-                        "retained_field_reads": "all_discovered_fields_in_Gateway_bounded_projection_pages; existing_result_bytes_and_deadline_limits_apply",
-                        "explicit_locale": "nonSFX_Project_locale_requires_actual_Voice; explicit_SFX_is_not_an_admitted_declaration",
+                        "retained_children": "preserve_complete_GUID_childset_and_Source_class_notes_language_original_path_and_discovered_fields",
+                        "retained_field_reads": "page_all_discovered_fields_within_result_byte_and_deadline_limits",
+                        "explicit_locale": "nonSFX_Project_locale_requires_Voice; explicit_SFX_forbidden",
                         "name_conflict": {"fail": "absent_exact_name", "rename": "fresh_native_named_GUID_and_preserved_collision",
                             "merge": "same_exact_class_GUID_and_selected_language; unselected_fields_preserved",
-                            "replace": "exact_old_subtree_absent; fresh_GUID_selected_language_and_other_children_preserved; existing_collision_language_may_differ"}},
-                    "source_verification": "actual_graph_GUID_class_parent_owner_fields_and_requested_language; closed_declared_childset",
+                            "replace": "old_subtree_absent; fresh_GUID_and_selected_language; preserve_other_children; old_language_may_differ"}},
+                    "source_verification": "actual_GUID_class_parent_owner_fields_language_and_closed_declared_childset",
                     "native_class_id": "Gateway_owned_from_Type_Handle"},
                 "optional_fields": [
                     "field_values",
@@ -393,7 +424,7 @@ def object_graph_business_contract_data(
                 },
                 "field_semantics": ACTION_DURATION_SEMANTICS,
                 "existing_target_choices": {
-                    "new_name": "exact_requested_name_of_bound_existing_GUID;_known_collisions_reject_before_preview;_no_creation_suffix_substitution",
+                    "new_name": "exact_requested_bound_GUID_name; reject_known_collisions_before_preview; never_substitute_suffix",
                     "name_conflict": ["fail", "rename", "merge", "replace"],
                     "scope": "new_children_and_list_members_of_this_existing_target",
                     "overrides": "batch_name_conflict",
@@ -406,7 +437,7 @@ def object_graph_business_contract_data(
                 "required_fields": ["declaration_id", "object_handle", "field_handle", "curve_points"],
                 "optional_fields": ["mode", "notes"],
                 "owner": "bound_existing_object_or_same_Draft_new_result_handle",
-                "property": "object_scoped_Field_Handle_for_existing_owner;_matching_class_Field_Handle_for_planned_owner",
+                "property": "existing_owner_object_Field_Handle; planned_owner_matching_class_Field_Handle",
                 "control_input": "exactly_one_bound_existing_input_or_new_owned_Modulator",
                 "new_control_input": object_graph_business_contract_data("object.setRTPC", version)["declaration"]["new_control_input"],
                 "identity": "unique_property_and_ControlInput_pair;_never_empty_name_matching",
@@ -415,20 +446,19 @@ def object_graph_business_contract_data(
                 "existing_pair_update": "exact_actual_RTPC_GUID_row_in_same_object_set;_no_name_merge",
                 "replace_all": "complete_selected_list_contains_only_declared_pairs;_old_pairs_are_removed",
                 "result": "stable_same_Draft_result_handle_bound_to_actual_GUID_class_owner_and_pair",
-                "equivalent_new_outcomes": "full_input_platform_fields_and_derived_fields_RTPC_notes_Curve_points_match_independently;_identical_undistinguished_outcomes_use_canonical_GUID_occurrence_bijection_without_native_order_assumption",
+                "equivalent_new_outcomes": "independently_match_input_platform_fields_derived_fields_RTPC_notes_Curve_points; identical_outcomes_use_canonical_GUID_occurrence_bijection_without_native_order",
                 "points": {"fields": ["x", "y", "shape"], "limit": 256, "shape_semantics": "outgoing_segment",
                     "point_shapes": sorted(RTPC_POINT_SHAPES), "terminal_shape": "gateway_normalized_to_Linear"},
                 "native_fragments": "forbidden", "unrequested_state": "preserve_other_lists_children_fields_and_append_mode_old_curves",
-                "2021.1": {"status": "version_boundary", "reason": "constructor_introduced_2022.1", "scope": "this_property_bound_constructor_only"},
             },
             "object_list_declaration": {
                 "member_fields": {
                     "object_list": "selected_List_Field_Handle_or_exact_source_proven_alias_for_this_owner",
                     "list_behavior": ["append", "replace-all"],
                 },
-                "recursive_placement": "bound_or_planned_parent_handles;_ordinary_children_and_owned_lists_may_nest",
-                "planned_binding": "stable_declaration_result_handle_and_normalized_owner_path_plus_exact_class_source;_actual_GUID_class_owner_membership_verified_after_write",
-                "list_behavior_scope": "one_inherited_existing_target_row;_conflicting_descendant_choices_are_rejected",
+                "recursive_placement": "bound_or_planned_parents; children_and_owned_lists_may_nest",
+                "planned_binding": "stable_result_handle_normalized_owner_path_exact_class_source; verify_actual_GUID_class_owner_membership",
+                "list_behavior_scope": "inherited_existing_target_row; reject_descendant_conflicts",
                 "clear_subcommand": "draft-clear-object-list",
                 "clear_fields": [
                     "declaration_id",
@@ -460,13 +490,13 @@ def object_graph_business_contract_data(
                 "list_behavior": ["append", "replace-all"],
                 "voice_source_completion": {"choices": ["separate-previews", "atomic-required"],
                     "configure": "draft-business-configure --voice-source-completion separate-previews",
-                    "scope": "one_new_fail_mode_Voice_root_and_one_localized_Source; complete_declarations_preserved",
-                    "previews": "Voice_creation_then_Source_on_verified_existing_Voice; separate_authorization",
+                    "scope": "one_fail_mode_new_Voice_and_one_localized_Source; preserve_complete_declarations",
+                    "previews": "Voice_then_Source_on_verified_Voice; authorize_each",
                     "default_atomic_boundary": {"host": "wwise-console", "build": "2025.1.7.9143",
-                        "Source_class_id": 6684674, "shape": "one_new_fail_mode_Voice_and_one_explicitly_localized_Source",
-                        "view": "no_explicit_platform_on_batch_target_Voice_Source_or_plugin; default_source_control",
-                        "outcome": "prewrite_staged_choice; atomic_request_unresolved",
-                        "other_hosts_builds_classes_views_graphs": "admitted_without_atomic_classification"},
+                        "Source_class_id": 6684674, "shape": "one_fail_mode_new_Voice_and_one_explicitly_localized_Source",
+                        "view": "no_explicit_batch_target_Voice_Source_plugin_platform; default_source_control",
+                        "outcome": "choose_staging_before_write; atomic_unresolved",
+                        "other_hosts_builds_classes_views_graphs": "admitted; atomic_unclassified"},
                     "older_atomic_native_behavior": "unobserved; no_native_absence_claim",
                     "continuation": "continue-voice-source VERIFIED_CREATION_TRANSACTION; no_recipe_or_target_input",
                     "failure": "Voice_created_Source_incomplete; never_repeat_creation_or_indeterminate_Source"},
@@ -504,15 +534,15 @@ def object_graph_business_contract_data(
                     "target": "exact_existing_RTPC_and_its_ControlInput_Reference_Field_Handle",
                     "required": ["object_handle", "field_handle", "new_control_input_kind_Type_Handle", "new_control_input_name"],
                     "optional": ["new_control_input_notes", "new_control_input_class_Field_Handle_scalar_values"],
-                    "current_input": "native_proven_shared_target_or_exact_owned_Modulator_with_selected_RTPC_owner",
-                    "preservation": "same_RTPC_GUID_owner_PropertyName_Curve_GUID_points_notes_complete_owning_list_and_old_shared_fields;_previous_custom_must_be_absent",
+                    "current_input": "native_proven_shared_target_or_selected_RTPC_owned_Modulator",
+                    "preservation": "preserve_RTPC_GUID_owner_PropertyName_Curve_GUID_points_notes_complete_list_old_shared_fields; old_custom_absent",
                     "new_input": object_graph_business_contract_data("object.setRTPC", version)["declaration"]["new_control_input"],
                     "native_fragments": "forbidden",
                 },
-                "array_requires": "documented_List_Field_Handle_for_exact_owner_class_and_version; scalar_Reference_metadata_is_insufficient",
+                "array_requires": "exact_owner_class_version_List_Field_Handle; scalar_Reference_metadata_insufficient",
                 "verification": "ordered_canonical_GUIDs_or_native_null_from_exact_field_readback",
-                "planned_target": "Gateway_derives_native_path_from_exact_root_and_normalized_graph_occurrence;_verify_actual_result_GUID_and_independent_class_parent_readback",
-                "planned_target_rename": "Gateway_discloses_a_proved_unoccupied_candidate_name_for_referenced_rename_collisions;_native_rename_policy_preserved_and_collision_state_revalidated",
+                "planned_target": "derive_path_from_exact_root_and_normalized_occurrence; verify_result_GUID_and_independent_class_parent",
+                "planned_target_rename": "disclose_proved_unoccupied_name_for_referenced_rename_collisions; preserve_native_rename_policy_and_revalidate_collisions",
             },
             "creation_boundaries": {"ControlSurface": control_surface_contract(version), "Action": dict(ACTION_CREATION_BOUNDARY),
                 **saved_constructor_contract(version)},

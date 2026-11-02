@@ -10882,6 +10882,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 spec.name,
                 request_version
             )
+            if spec.name == "object.set":
+                # Both declarations use the identical owned-input contract.
+                # Disclose it once and use an exact response-local JSON Pointer
+                # for the replacement form, preserving the complete rules.
+                business_contract["reference_values"]["replace_owned_control_input"]["new_input"] = {
+                    "$ref": "#/business_adapter/rtpc_declaration/new_control_input"
+                }
             start = dict(business_contract["start"])
             gateway_argv = start.pop("gateway_argv", None)
             if gateway_argv is not None:

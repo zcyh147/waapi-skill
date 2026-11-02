@@ -921,7 +921,9 @@ def test_older_playlist_discovery_explains_exact_native_version_boundary(tmp_pat
     assert boundary['source']['member_sha256'] == '84371706b26f09b7ddd83c68b6022d2107f8bd24c92e8185d38a865f7d5206bc'
     assert boundary['observation']['original_verdict'] == 'SKIP' and boundary['observation']['project_mutation_count'] == 0
     assert result['native_unavailability_proven'] is False
-    assert [row['name'] for row in result['items']] == ([] if version == '2021.1' else ['Metadata', 'RTPC'])
+    # The pinned 2021 installed WObjects overlay proves Metadata membership
+    # independently of the unavailable Playlist constructor.
+    assert [row['name'] for row in result['items']] == (['Metadata'] if version == '2021.1' else ['Metadata', 'RTPC'])
     assert not any(uri.endswith(('object.create', 'object.set', 'object.setReference')) for uri, _, _ in task.calls)
 
 

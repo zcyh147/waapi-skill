@@ -980,7 +980,14 @@ def test_selected_rejects_malformed_success_shapes(
     )
 
     assert exit_code == 2
-    assert payload["error_code"] == "INVALID_SELECTION_RESULT"
+    if selected_result is None:
+        # WaapiClient's None means missing acknowledgement, not JSON null.
+        assert payload["call"]["error_code"] == "WAAPI_RESPONSE_MISSING"
+        assert payload["call"]["details"] == {"response_received": False, "effects_unknown": True}
+        assert payload["count"] is None and payload["objects"] is None
+        assert payload["agent_result"] is None
+    else:
+        assert payload["error_code"] == "INVALID_SELECTION_RESULT"
 
 
 def test_selected_does_not_swallow_network_unavailable_errors_in_headless_mode(tmp_path: Path) -> None:
@@ -1160,6 +1167,26 @@ def test_main_prints_object_set_business_schema_as_bounded_compact_json(
         "draft-start",
         "object.set",
     ]
+    adapter = parsed["business_adapter"]
+    replacement = adapter["reference_values"]["replace_owned_control_input"]
+    assert replacement["new_input"] == {
+        "$ref": "#/business_adapter/rtpc_declaration/new_control_input"
+    }
+    referred_contract = parsed
+    for component in replacement["new_input"]["$ref"].removeprefix("#/").split("/"):
+        referred_contract = referred_contract[component]
+    standalone = waapi_gateway.operation_business_contract("object.setRTPC", "2025.1")
+    assert referred_contract == standalone["declaration"]["new_control_input"]
+    assert referred_contract["required"] == ["kind_handle", "name"]
+    assert referred_contract["types"] == ["ModulatorLfo", "ModulatorEnvelope", "ModulatorTime"]
+    assert referred_contract["time_axis"]["normalization"] == "never_change_points_or_Duration"
+    anonymous = adapter["declaration"]["anonymous_list_member"]
+    assert anonymous["on_name_conflict"]["supported"] == ["fail", "rename", "merge", "replace"]
+    assert anonymous["on_name_conflict"]["list_modes"] == ["append", "replaceAll"]
+    assert anonymous["profiles"]["manual_marker"]["source"]["member_sha256"] == (
+        "a7c04d8f33f174e65dcce126fda7c15e076aa4f5e9bcc70be000031bad4c53cc"
+    )
+    assert anonymous["profiles"]["media_pool_directory"]["directory"]["maximum_utf8_bytes"] == 4096
     assert stdout.count("\n") == 1
     assert stdout == (
         json.dumps(
@@ -3534,9 +3561,15 @@ def test_query_object_rejects_malformed_success_result_shape(
     )
 
     assert exit_code == 2
-    assert payload["error_code"] == "INVALID_QUERY_RESULT"
-    assert expected_message in payload["message"]
-    assert payload["details"]["command"] == "query-object"
+    if response is None:
+        assert payload["call"]["error_code"] == "WAAPI_RESPONSE_MISSING"
+        assert payload["call"]["details"] == {"response_received": False, "effects_unknown": True}
+        assert payload["count"] is None and payload["objects"] is None
+        assert payload["agent_result"] is None
+    else:
+        assert payload["error_code"] == "INVALID_QUERY_RESULT"
+        assert expected_message in payload["message"]
+        assert payload["details"]["command"] == "query-object"
     assert [call[0] for call in client.calls] == [
         "ak.wwise.core.getInfo",
         "ak.wwise.core.object.get",
@@ -4927,7 +4960,7 @@ def test_documented_single_quoted_path_reaches_preview_with_single_separators(
     command = next(
         line
         for line in query_reference.read_text(encoding="utf-8").splitlines()
-        if "gateway.py query-object --path-segment 'Events'" in line
+        if "gateway.py query-object --path-segment 'Actor-Mixer Hierarchy'" in line
     )
     tokens = shlex.split(command)
     argv = tokens[tokens.index("gateway.py") + 1 :]
@@ -4948,13 +4981,22 @@ def test_documented_single_quoted_path_reaches_preview_with_single_separators(
     assert argv == [
         "query-object",
         "--path-segment",
-        "Events",
+        "Actor-Mixer Hierarchy",
         "--path-segment",
         "Default Work Unit",
+        "--path-segment",
+        "Combat",
+        "--relationship",
+        "descendants",
+        "--predicate",
+        "kind-is",
+        "all-sounds",
+        "--max-results",
+        "24",
     ]
     assert "semantic_preview" not in payload
     assert client.calls[-1][1] == {
-        "waql": r'from object "\Events\Default Work Unit"'
+        "waql": r'from object "\Actor-Mixer Hierarchy\Default Work Unit\Combat" select descendants where type = "Sound" take 24'
     }
 
 
