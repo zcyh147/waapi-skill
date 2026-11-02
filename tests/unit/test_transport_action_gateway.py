@@ -9,6 +9,8 @@ from tests.unit.test_runtime_business_gateway import (
 )
 
 
+# The native request contract remains five-version; common drift, lifecycle and
+# observation failures use one representative lane rather than a version cross product.
 ACTION = "ak.wwise.core.transport.executeAction"
 STATE = "ak.wwise.core.transport.getState"
 
@@ -108,7 +110,8 @@ def test_transport_list_read_failure_defers_only_verification_and_allows_manual_
     state_dir = tmp_path / "state"
     declaration = ("--audition-action", "stop", "--transport-scope", scope)
     if scope == "one-transport":
-        handle = create_handle(tmp_path, client, state_dir)
+        handle = _issue_transport_handle(state_dir, project_path=client.project_file,
+            version=client.version, transport_id=client.rows[0]["transport"])
         declaration += ("--transport-handle", handle)
     preview, invoke = _public_runtime_preview(tmp_path, client, state_dir, ACTION, declaration)
     executed = invoke(["execute", preview["transaction_id"]])
@@ -144,13 +147,13 @@ def test_observed_malformed_transport_list_fails_verification_instead_of_deferri
     assert failed["verification"]["verification_scope"]["observation"]["membership_matches"] is False
     assert sum(uri == ACTION for uri, _, _ in client.calls) == 1
 
-
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_stop_verification_discloses_one_observation_and_rejects_wrong_state(tmp_path: Path, version: str) -> None:
     client = TransportActionClient(tmp_path, version=version)
     client.after = "playing"
     state_dir = tmp_path / "state"
-    handle = create_handle(tmp_path, client, state_dir)
+    handle = _issue_transport_handle(state_dir, project_path=client.project_file,
+        version=client.version, transport_id=client.rows[0]["transport"])
     preview, invoke = _public_runtime_preview(tmp_path, client, state_dir, ACTION,
         ("--audition-action", "stop", "--transport-scope", "one-transport", "--transport-handle", handle))
     executed = invoke(["execute", preview["transaction_id"]])
@@ -182,6 +185,21 @@ VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 
 
 @pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("action,native", (
+    ("play", "play"), ("stop", "stop"), ("pause", "pause"),
+    ("toggle-play-stop", "playStop"), ("play-directly", "playDirectly"),
+))
+def test_transport_action_business_contract_compiles_in_each_pinned_lane(version, action, native):
+    from tests.unit.test_core_business_adapter import _session
+    from wwise_waapi.runtime_inspection_business import materialize_runtime_control_business_request
+    session, _, _ = _session(version)
+    request = materialize_runtime_control_business_request(ACTION,
+        session.with_settings({"runtime_control_plan": {"audition_action": action, "transport_scope": "all-active"}}))
+    assert request == {"contract": "waapi-skill.operation-request/v1", "version": version,
+        "operation": "waapi.call", "arguments": {"api": ACTION, "args": {"action": native}, "options": {}}}
+
+
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("action,before,after,expected,outcome", (
     ("stop", "stopped", "stopped", True, "matched"),
     ("play", "stopped", "playing", True, "matched"),
@@ -201,31 +219,36 @@ VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     ("play-directly", "paused", "playing", True, "matched"),
 ))
 def test_actions_observe_only_source_supported_postconditions(
-    tmp_path: Path, version: str, action: str, before: str, after: str, expected: bool, outcome: str,
+    version: str, action: str, before: str, after: str, expected: bool, outcome: str,
 ) -> None:
-    client = TransportActionClient(tmp_path, version=version)
-    state_dir = tmp_path / "state"
-    handle = create_handle(tmp_path, client, state_dir)
-    client.state, client.after = before, after
-    preview, invoke = _public_runtime_preview(tmp_path, client, state_dir, ACTION,
-        ("--audition-action", action, "--transport-scope", "one-transport", "--transport-handle", handle))
-    executed = invoke(["execute", preview["transaction_id"]])
-    before_verify = len(client.calls)
-    code, verified = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
-        env=_env(tmp_path, version=version), client_factory=lambda _: client)
-    assert code == (2 if outcome == "different_state" else 0), verified
-    assert verified["verified"] is expected
-    assert verified["verification"]["business_state_verified"] is expected
-    assert verified["verification"]["verification_scope"]["observation"]["targets"][0]["outcome"] == outcome
-    assert sum(uri == STATE for uri, _, _ in client.calls[before_verify:]) == 1
-    assert sum(uri == ACTION for uri, _, _ in client.calls) == 1
-    code, repeated = gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
-        env=_env(tmp_path, version=version), client_factory=lambda _: client)
-    assert code == 2, repeated
-    assert sum(uri == ACTION for uri, _, _ in client.calls) == 1
+    from wwise_waapi.operation_registry import PREPARED_OPERATION_CONTRACT, verify_prepared_operation
 
+    # State semantics belong to this business verifier; the public transaction
+    # tests above retain authorization, handle lifetime and single execution.
+    native_action = {"toggle-play-stop": "playStop", "play-directly": "playDirectly"}.get(action, action)
+    target = {"transport": 74, "object": _RuntimeControlDraftClient.target_id, "gameObject": 1}
+    calls = []
+    def read(uri, args, options):
+        calls.append((uri, args, options))
+        if uri == "ak.wwise.core.transport.getList":
+            return {"list": [target]}
+        assert uri == STATE and args == {"transport": 74} and options == {}
+        return {"state": after}
 
-@pytest.mark.parametrize("version", VERSIONS)
+    result = verify_prepared_operation({
+        "contract": PREPARED_OPERATION_CONTRACT, "operation": "waapi.call", "pre_state": {},
+        "verification_plan": {"kind": "transport-action-state", "uri": ACTION, "version": version,
+            "action": native_action, "transport_id": 74,
+            "before": {"scope": "one-transport", "targets": [{**target, "state": before}]}},
+    }, execution_result={"result": {}}, read_call=read)
+    assert result.business_state_verified is expected
+    assert result.status == ("verification_failed" if outcome == "different_state" else
+        "verified" if expected else "result_schema_checked")
+    observation = next(row for row in result.readbacks if row.get("kind") == "transport-action-observation")
+    assert observation["targets"][0]["outcome"] == outcome
+    assert sum(uri == STATE for uri, _, _ in calls) == 1
+
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("intervention", ("none", "before-membership", "after-membership", "before-state", "after-state"))
 def test_all_scope_binds_membership_and_toggle_prestate(tmp_path: Path, version: str, intervention: str) -> None:
     client = TransportActionClient(tmp_path, version=version)
@@ -267,8 +290,7 @@ def test_all_scope_binds_membership_and_toggle_prestate(tmp_path: Path, version:
         assert [row["outcome"] for row in observation["targets"]] == ["matched", "matched"]
     assert sum(uri == ACTION for uri, _, _ in client.calls) == 1
 
-
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("target_count", (0, 2, 64, 65))
 def test_all_stop_has_bounded_targets_and_no_vacuous_state_proof(tmp_path: Path, version: str, target_count: int) -> None:
     client = TransportActionClient(tmp_path, version=version)
@@ -291,13 +313,13 @@ def test_all_stop_has_bounded_targets_and_no_vacuous_state_proof(tmp_path: Path,
     import json
     assert len(json.dumps(verified, ensure_ascii=False).encode()) < gateway.MAX_GATEWAY_RESULT_JSON_BYTES
 
-
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_one_transport_can_observe_zero_id_among_more_than_64_unrelated_transports(tmp_path: Path, version: str) -> None:
     client = TransportActionClient(tmp_path, version=version)
     client.rows = [{"transport": i, "object": client.target_id, "gameObject": 1} for i in range(65)]
     state_dir = tmp_path / "state"
-    handle = create_handle(tmp_path, client, state_dir)
+    handle = _issue_transport_handle(state_dir, project_path=client.project_file,
+        version=client.version, transport_id=client.rows[0]["transport"])
     preview, invoke = _public_runtime_preview(tmp_path, client, state_dir, ACTION,
         ("--audition-action", "stop", "--transport-scope", "one-transport", "--transport-handle", handle))
     executed = invoke(["execute", preview["transaction_id"]])
@@ -306,13 +328,13 @@ def test_one_transport_can_observe_zero_id_among_more_than_64_unrelated_transpor
     assert verified["verified"] is True
     assert [args for uri, args, _ in client.calls[before_verify:] if uri == STATE] == [{"transport": 0}]
 
-
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("intervention", ("missing", "duplicate", "object", "game-object", "prestate"))
 def test_one_scope_rejects_identity_and_prestate_drift_before_mutation(tmp_path: Path, version: str, intervention: str) -> None:
     client = TransportActionClient(tmp_path, version=version)
     state_dir = tmp_path / "state"
-    handle = create_handle(tmp_path, client, state_dir)
+    handle = _issue_transport_handle(state_dir, project_path=client.project_file,
+        version=client.version, transport_id=client.rows[0]["transport"])
     preview, _ = _public_runtime_preview(tmp_path, client, state_dir, ACTION,
         ("--audition-action", "pause", "--transport-scope", "one-transport", "--transport-handle", handle))
     if intervention == "missing":
@@ -330,13 +352,13 @@ def test_one_scope_rejects_identity_and_prestate_drift_before_mutation(tmp_path:
     assert code == 2 and rejected["status"] == "repreview_required", rejected
     assert not any(uri == ACTION for uri, _, _ in client.calls)
 
-
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("intervention", ("unavailable", "non-object", "malformed-state", "missing-state", "wrong-association"))
 def test_executed_stop_keeps_failed_or_unavailable_observation_distinct(tmp_path: Path, version: str, intervention: str) -> None:
     client = TransportActionClient(tmp_path, version=version)
     state_dir = tmp_path / "state"
-    handle = create_handle(tmp_path, client, state_dir)
+    handle = _issue_transport_handle(state_dir, project_path=client.project_file,
+        version=client.version, transport_id=client.rows[0]["transport"])
     preview, invoke = _public_runtime_preview(tmp_path, client, state_dir, ACTION,
         ("--audition-action", "stop", "--transport-scope", "one-transport", "--transport-handle", handle))
     executed = invoke(["execute", preview["transaction_id"]])

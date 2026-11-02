@@ -54,6 +54,8 @@ from wwise_waapi.transactions import TransactionStore  # noqa: E402
 from wwise_waapi.execution_contracts import ExecutionContractRegistry  # noqa: E402
 
 
+# Keep exact versioned native contracts below. Shared malformed-input, handle
+# lifetime and concurrency behavior needs one public chain per business failure.
 EXPECTED_DIRECT_READ_ROWS = {
     LOG_GET_URI: ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
     "ak.wwise.core.profiler.getAudioObjects": ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
@@ -634,7 +636,7 @@ def test_profiler_explicit_projection_omits_unselected_and_unreported_native_fie
     ]
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("operation,name_field,value_field", (
     (GET_VOICES_URI, "objectName", "baseVolume"),
     (GET_BUSSES_URI, "objectName", "volume"),
@@ -756,7 +758,7 @@ def test_profiler_explicit_field_pages_retain_configuration_version_and_lifetime
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 @pytest.mark.parametrize("operation", (GET_VOICES_URI, GET_BUSSES_URI, GET_AUDIO_OBJECTS_URI))
 @pytest.mark.parametrize("view", (None, "summary", "identity"))
-def test_profiler_existing_summary_identity_and_omitted_selection_keep_native_presets(tmp_path, version, operation, view):
+def test_profiler_existing_summary_identity_and_omitted_selection_keep_native_presets(version, operation, view):
     summaries = {
         GET_VOICES_URI: ["pipelineID", "objectName", "gameObjectName", "baseVolume", "isStarted", "isVirtual", "objectGUID", "gameObjectID"],
         GET_BUSSES_URI: ["pipelineID", "objectName", "gameObjectName", "volume", "downstreamGain", "voiceCount", "depth", "objectGUID", "gameObjectID"],
@@ -767,12 +769,12 @@ def test_profiler_existing_summary_identity_and_omitted_selection_keep_native_pr
         GET_BUSSES_URI: ["pipelineID", "objectGUID", "objectName", "gameObjectID", "gameObjectName"],
         GET_AUDIO_OBJECTS_URI: ["audioObjectID", "audioObjectName", "busPipelineID", "busGUID", "busName", "gameObjectID", "gameObjectName", "instigatorPipelineID"],
     }
-    read, calls, _state, _env_value = _profiler_field_read(tmp_path, operation, [], version=version)
-    code, payload = read(*(["--result-view", view] if view is not None else []))
-    assert code == 0, payload
-    assert next(options for uri, _args, options in calls if uri == operation) == {
+    from wwise_waapi.runtime_inspection_business import materialize_runtime_inspection_business_request
+    request, _, _ = materialize_runtime_inspection_business_request(operation, version,
+        log_channel=None, max_results=None, profiler_position="123", result_view=view)
+    assert request == {"api": operation, "args": {"time": 123}, "options": {
         "return": identities[operation] if view == "identity" else summaries[operation],
-    }
+    }}
 
 
 def test_profiler_voice_schema_exposes_position_view_bound_and_handle_only(
@@ -1214,7 +1216,7 @@ def _public_runtime_preview(tmp_path, client, state_dir, operation, declaration=
 
 
 @pytest.mark.parametrize("intervention", ("replacement", "destroy"))
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_transport_late_creation_verification_cannot_resurrect_prior_lifetime(tmp_path: Path, intervention: str, version: str) -> None:
     client = _RuntimeControlDraftClient(tmp_path, version=version)
     original = client.call
@@ -1347,18 +1349,12 @@ def test_profiler_diagnostics_requests_every_pinned_native_projection_field(tmp_
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 @pytest.mark.parametrize("view,expected", (("capture-defaults", {}), ("empty-selection", {"return": []})))
 @pytest.mark.parametrize("operation", (GET_VOICES_URI, "ak.wwise.core.profiler.getBusses", "ak.wwise.core.profiler.getAudioObjects"))
-def test_profiler_native_default_and_explicit_empty_projection_remain_distinct(tmp_path: Path, version: str, view: str, expected: dict, operation: str) -> None:
-    client = _RuntimeControlDraftClient(tmp_path, version=version)
-    original = client.call
-    calls = []
-    def call(uri, args=None, options=None):
-        calls.append((uri, args, options))
-        return {"return": []} if uri == operation else original(uri, args, options)
-    client.call = call
-    code, payload = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), "core-call", operation,
-        "--profiler-position", "123", "--result-view", view], env=_env(tmp_path, version=version), client_factory=lambda _url: client)
-    assert code == 0, payload
-    assert next(options for uri, _args, options in calls if uri == operation) == expected
+def test_profiler_native_default_and_explicit_empty_projection_remain_distinct(version: str, view: str, expected: dict, operation: str) -> None:
+    from wwise_waapi.runtime_inspection_business import materialize_runtime_inspection_business_request
+    request, limit, _ = materialize_runtime_inspection_business_request(operation, version,
+        log_channel=None, max_results=None, profiler_position="123", result_view=view)
+    assert request == {"api": operation, "args": {"time": 123}, "options": expected}
+    assert limit > 0
 
 
 def test_transport_preview_cannot_transfer_to_recycled_identical_native_row(tmp_path: Path) -> None:
@@ -1816,9 +1812,10 @@ class _RemoteLifecycleClient(_RuntimeControlDraftClient):
 
 
 @pytest.mark.parametrize("version,observation", [
-    (version, observation) for version in ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"]
-    for observation in ["exact", "wrong-host", "wrong-app", "exact-port", "wrong-port", "ambiguous-port", "hostname-alias", "missing-console", "connection-drift"]
-] + [(version, "host-port") for version in ["2022.1", "2023.1", "2024.1", "2025.1"]])
+    (version, "exact") for version in ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"]
+] + [("2025.1", observation) for observation in ["wrong-host", "wrong-app", "exact-port", "wrong-port",
+    "ambiguous-port", "hostname-alias", "missing-console", "connection-drift", "host-port"]]
+  + [("2021.1", "exact-port"), ("2021.1", "wrong-port"), ("2022.1", "host-port")])
 def test_remote_public_lifecycle_verifies_the_requested_host_and_application(tmp_path: Path, version: str, observation: str) -> None:
     client = _RemoteLifecycleClient(tmp_path, version=version, observation=observation)
     state = tmp_path / "remote-state"
@@ -1877,7 +1874,7 @@ def test_remote_public_lifecycle_verifies_the_requested_host_and_application(tmp
     assert len([call for call in client.calls if call[0] == "ak.wwise.core.remote.connect"]) == 1
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("drift", [False, True])
 def test_remote_disconnect_public_preview_preserves_connection_identity(tmp_path: Path, version: str, drift: bool) -> None:
     client = _RemoteLifecycleClient(tmp_path, version=version, observation="exact")
@@ -2134,7 +2131,7 @@ def test_log_add_verifies_new_identical_item_through_public_transaction(tmp_path
     assert sum(uri == "ak.wwise.core.log.addItem" for uri, _, _ in client.calls) == 1
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("remaining", ("empty", "competing", "identical"))
 def test_log_clear_observes_prior_channel_contents_without_promising_empty_forever(
     tmp_path: Path, version: str, remaining: str,
@@ -2178,7 +2175,7 @@ def test_log_add_preexisting_or_competing_content_does_not_prove_a_new_matching_
 @pytest.mark.parametrize("operation,declaration", [
     ("ak.wwise.core.log.clear", ("--log-channel", "general")),
 ])
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_log_console_empty_observation_never_proves_the_effect(tmp_path: Path, operation: str, declaration: tuple, version: str) -> None:
     client = _LogControlClient(tmp_path, version=version)
     client.console = True
@@ -2201,7 +2198,7 @@ def test_log_controls_preserve_older_packaged_route_boundary(tmp_path: Path, ope
     assert result["error_code"] == "TypedRequestError"
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("severity,native", (("message", "Message"), ("warning", "Warning"), ("error", "Error"), ("fatal", "Fatal Error")))
 def test_log_add_native_severity_and_optional_result_fields_are_verified(tmp_path: Path, version: str, severity: str, native: str) -> None:
     client = _LogControlClient(tmp_path, version=version)
@@ -2306,7 +2303,7 @@ def test_log_invalid_native_shapes_cannot_verify_effect(tmp_path: Path, stage: s
     assert verified["automatic_retry"] is False
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("invalid", ({"severity": "fatal"}, {"time": True}, {"parameters": [42]}))
 def test_log_referenced_native_definition_rejects_wrong_enum_and_nested_types(tmp_path: Path, version: str, invalid: dict) -> None:
     client = _LogControlClient(tmp_path, version=version)
@@ -3040,7 +3037,7 @@ class _TransportCreateAssociationClient(_RuntimeControlDraftClient):
         return super().call(uri, args, options)
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_transport_create_wrong_object_cannot_publish_handle(tmp_path: Path, version: str) -> None:
     client = _TransportCreateAssociationClient(tmp_path, version=version,
         observed_object=_RuntimeControlDraftClient.meter_id)
@@ -3068,7 +3065,7 @@ def test_transport_create_wrong_object_cannot_publish_handle(tmp_path: Path, ver
     assert sum(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls) == 1
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_transport_create_wrong_explicit_game_object_cannot_publish_handle(tmp_path: Path, version: str) -> None:
     client = _TransportCreateAssociationClient(tmp_path, version=version,
         observed_object=_RuntimeControlDraftClient.target_id)
@@ -3090,7 +3087,7 @@ def test_transport_create_wrong_explicit_game_object_cannot_publish_handle(tmp_p
     assert sum(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls) == 1
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("game_object_id", (None, 0, 18446744073709551615), ids=("native-default", "explicit-zero", "explicit-uint64-max"))
 def test_transport_create_matching_association_publishes_usable_zero_id_handle(
     tmp_path: Path, version: str, game_object_id: int | None,
@@ -3138,7 +3135,7 @@ class _ProfilerEnableDataClient(_RuntimeControlDraftClient):
         return super().call(uri, args, options)
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("declaration,rows", [
     (("--capture-data-empty",), []),
     (("--capture-data", "voices", "enable", "--capture-data", "voices", "enable"),
@@ -3240,7 +3237,7 @@ def test_profiler_signed_cursor_input_uses_returned_time_verifier_without_sentin
     assert sum(uri == PROFILER_SET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("declaration,parser_error", [
     ((), False),
     (("--capture-data-empty", "--capture-data", "voices", "enable"), True),
@@ -3375,7 +3372,7 @@ def test_profiler_signed_cursor_unavailable_or_changed_result_remains_unverified
     assert sum(uri == PROFILER_SET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
 
 
-@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize('console', (False, True), ids=('authoring', 'console'))
 def test_log_add_preserves_empty_and_edge_whitespace_through_once_public_transaction(tmp_path, version, console):
     from tests.unit.test_console_log_observer_gateway import ConsoleLogClient
@@ -3423,7 +3420,7 @@ def test_log_message_schema_discloses_exact_string_resource_bounds(tmp_path, ver
         'empty_string_allowed': True, 'whitespace': 'preserve_exactly', 'nul_allowed': False}
 
 
-@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_log_message_missing_oversized_or_nul_is_rejected_before_preview(tmp_path, version):
     for ordinal, declaration in enumerate(((), ('--message', '界' * 5462), ('--message', 'a\x00b'))):
         client_root = tmp_path / ('client-' + str(ordinal))
