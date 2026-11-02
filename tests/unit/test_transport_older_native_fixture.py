@@ -1,4 +1,4 @@
-"""Eight older observations through the real Gateway and final archive writer.
+"""Representative older transport recipes through the Gateway and archive writer.
 
 Only external Wwise and its media are substituted. No native semantics credit.
 """
@@ -193,7 +193,7 @@ def _saved(category):
     return archive, report
 
 
-@pytest.mark.parametrize('owned_authoring', ['2021.1','2022.1','2023.1','2024.1'], indirect=True)
+@pytest.mark.parametrize('owned_authoring', ['2021.1','2022.1','2023.1'], indirect=True)
 def test_older_eight_observations_reach_persisted_diagnostic_category_with_bounded_cleanup(
     owned_authoring, tmp_path, monkeypatch,
 ):

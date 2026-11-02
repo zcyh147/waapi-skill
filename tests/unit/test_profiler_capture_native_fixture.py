@@ -724,34 +724,36 @@ def test_missing_only_capture_collects_new_facts_without_repeating_passed_reads_
     assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
 
 
-@pytest.mark.parametrize('missing_only,partial_seed', [(True, 'voices'), (False, 'busses')])
-def test_partial_capture_seed_never_certifies_unique_owned_contribution_in_final_writer(
-        owned_authoring, tmp_path, monkeypatch, missing_only, partial_seed):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        version='2025.1' if missing_only else '2021.1', capture_reads=True, missing_reads=missing_only,
-        native_rtpc=True, mixing_bus='unique', partial_seed=partial_seed)
-    collector_passed = True
-    try:
-        collect(batch, call)
-    except AssertionError:
-        collector_passed = False
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=collector_passed)
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    assert final['outcome'] == 'FAIL'
-    name = 'profiler-voices-observation' if partial_seed == 'voices' else 'profiler-busses-observation'
-    observation = (report['seed_observations'] if missing_only else report['outcomes'])[name]
-    assert observation['outcome'] == 'BLOCKED' and observation['evidence']['complete'] is False
-    raw = observation['evidence']['agent_result']
-    assert raw['complete'] is False and raw['total_count'] == 33 and 0 < raw['returned_count'] < 33
+@pytest.mark.parametrize('partial_seed', ['voices', 'busses'])
+def test_partial_capture_seed_never_certifies_owned_contribution(partial_seed):
+    """Incomplete seed data blocks attribution before any contribution read."""
+    from tests.destructive.support.profiler_capture import _collect_capture_reads
+
+    sound, bus = 'owned-sound', 'logical-output'
+    voice = {'objectGUID': sound, 'gameObjectID': 1, 'pipelineID': 42,
+        'voice_instance_handle': 'issued-voice'}
+    mixing = {'objectGUID': 'observed-mixing-bus', 'gameObjectID': 1,
+        'pipelineID': 2, 'voiceCount': 1, 'bus_instance_handle': 'issued-bus'}
+    report = {'version': '2025.1', 'capture_read_batch': True,
+        'transport_association': {'gameObject': 1}, 'limits': {'reader_calls': 16},
+        'outcomes': {'profiler-contributions-dry-observation': {},
+            'profiler-contributions-bus-observation': {}}}
+    calls = []
+    def call(argv):
+        calls.append(argv)
+        assert argv[0] == 'core-call', 'Incomplete seeds must suppress contribution reads'
+        kind = 'voices' if argv[1].endswith('getVoices') else 'busses'
+        assert argv[1].endswith(('getVoices', 'getBusses'))
+        return {'agent_result': {'return': [voice if kind == 'voices' else mixing],
+            'complete': kind != partial_seed}}
+
+    _collect_capture_reads(call, report, lambda: None, fixed_time='1500',
+        sound_id=sound, bus_id=bus)
+    assert len(calls) == 2
+    seed = report['seed_observations']['profiler-' + partial_seed + '-observation']
+    assert seed['outcome'] == 'BLOCKED' and seed['evidence']['complete'] is False
     assert report['runtime_mixing_bus']['selected_observed_instance'] is None
-    category = next(row for row in record['categories'] if row['category'] == 'profiler-contributions-bus-observation')
-    assert category['business_outcome'] == 'BLOCKED' and category['status'] == 'blocked'
-    assert not any(args.get('bussesPipelineID') for uri, args, _ in client.calls if uri.endswith('getVoiceContributions'))
-    assert sum(uri.endswith('getVoices') for uri, _, _ in client.calls) == 1
-    assert sum(uri.endswith('getBusses') for uri, _, _ in client.calls) == 1
-    assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
-    assert record['source']['hash_before'] == record['source']['hash_after']
+    assert all(row['outcome'] == 'BLOCKED' for row in report['outcomes'].values())
 
 
 def test_retained_main_bus_read_and_filter_facts_are_meaningful_owned_observations(

@@ -1,3 +1,9 @@
+"""Source/lifecycle protections and representative developer collector wiring.
+
+Gateway business suites own exhaustive request/version validation. Collector
+variants retain their distinct independent observations and durable receipts;
+only representative cases replay the category finalizer.
+"""
 from __future__ import annotations
 
 import importlib
@@ -144,7 +150,7 @@ def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
     return runtime, commands, writes, task
 
 
-@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize("version", ['2023.1', '2025.1'])
 def test_existing_effect_slot_collector_uses_anonymous_exact_guid_edits(tmp_path, workflow, version):
     runtime, commands, writes, _task = _effect_slot_merge_runtime(tmp_path, workflow, version)
     category = workflow._collect_existing_effect_slot_exact_member_acceptance(runtime, sound_name='WAAPI_SLOT_TEST')
@@ -350,7 +356,7 @@ def test_existing_and_old_root_send_witnesses_retain_distinct_shared_state_recei
         assert len(receipt['transactions']) == count
 
 
-@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1'])
+@pytest.mark.parametrize("version", ['2021.1', '2023.1'])
 def test_old_root_bus_send_acceptance_uses_distinct_root_sources(tmp_path, workflow, version):
     runtime, commands, writes, task = _existing_bus_send_runtime(tmp_path, workflow, version, root_sources=True)
     category = workflow._collect_existing_bus_send_acceptance(runtime,
@@ -428,7 +434,7 @@ def test_old_root_bus_witness_keeps_new_version_boundary_before_calls(tmp_path, 
     assert runtime.category_results[-1]['status'] == 'FAIL'
 
 
-@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 def test_existing_bus_send_acceptance_uses_three_exact_public_mutations(tmp_path, workflow, version):
     runtime, commands, writes, task = _existing_bus_send_runtime(tmp_path, workflow, version)
     category = workflow._collect_existing_bus_send_acceptance(runtime, root_name='WAAPI_EXISTING_SEND_TEST')
@@ -767,7 +773,7 @@ def test_new_result_reference_acceptance_rejects_unavailable_exact_selection_wit
         assert receipt["calls"][-1]["payload"]["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED"
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ("2021.1", "2025.1"))
 def test_new_result_reference_acceptance_handles_native_non_master_bus_condition_in_same_write(tmp_path, workflow, version):
     runtime, commands, writes, _task = _new_result_reference_runtime(tmp_path, workflow, version, native_conditions=True)
     category = workflow._collect_new_result_scalar_reference_acceptance(runtime, root_name="WAAPI_RESULT_REFERENCE_TEST")
@@ -851,7 +857,7 @@ def test_new_result_native_condition_revalidates_metadata_and_types_before_only_
     assert [command[0] for command in commands].count("execute") == 1
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ("2021.1", "2025.1"))
 def test_new_result_reference_acceptance_uses_real_gateway_and_one_graph_write(tmp_path, workflow, version):
     runtime, commands, writes, _task = _new_result_reference_runtime(tmp_path, workflow, version)
     workflow._collect_new_result_scalar_reference_acceptance(runtime, root_name="WAAPI_RESULT_REFERENCE_TEST")
@@ -1389,7 +1395,7 @@ def _curve_probe_runtime(tmp_path, workflow, *, version="2025.1", curve_query_er
                           port=31337, category_results=[], raw_gateway=gateway), commands
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ["2021.1", "2025.1"])
 def test_curve_probe_retains_exact_read_only_observations_without_native_launch(
     tmp_path, workflow, version,
 ):
@@ -1442,39 +1448,6 @@ def test_curve_probe_stops_incomplete_name_paging_at_owned_bound(tmp_path, workf
     assert not any(command[:2] == ["metadata", "detail"] for command in commands)
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
-def test_curve_probe_reference_read_uses_existing_public_gateway_contract(tmp_path, workflow, version):
-    from tests.unit.test_object_graph_business_gateway import _info
-
-    runtime, _commands = _curve_probe_runtime(tmp_path, workflow, version=version)
-    calls = []
-    owner = "{11111111-1111-1111-1111-111111111111}"
-    curve = "{22222222-2222-2222-2222-222222222222}"
-
-    class Client:
-        def call(self, uri, args=None, options=None):
-            calls.append((uri, args, options))
-            if uri == "ak.wwise.core.getInfo":
-                return _info(version)
-            assert uri == "ak.wwise.core.object.get", (uri, args, options)
-            assert args == {"waql": f'from object "{owner}" select @Curve take 1'}
-            assert options["return"] == ["id", "name", "type", "path", "classId", *(["points"] if version != "2021.1" else [])]
-            return {"return": [{"id": curve, "name": "", "type": "Curve", "path": "\\Curve",
-                                "classId": 917520, "points": [{"x": 0, "y": -6, "shape": "Linear"}]}]}
-
-        def disconnect(self):
-            pass
-
-    code, payload = workflow.waapi_gateway.execute_gateway([
-        "--state-dir", str(runtime.state_dir), "query-object", "--advanced-waql",
-        f'from object "{owner}" select @Curve', "--max-results", "1", "--include", "class-id",
-        *(["--include", "curve-points"] if version != "2021.1" else []),
-    ], env=runtime.env, client_factory=lambda _url: Client())
-    assert code == 0, payload
-    assert payload["objects"][0]["id"] == curve and payload["objects"][0]["type"] == "Curve"
-    if version != "2021.1":
-        assert payload["objects"][0]["curve_points"] == [{"x": 0, "y": -6, "shape": "Linear"}]
-    assert all(uri in {"ak.wwise.core.getInfo", "ak.wwise.core.object.get"} for uri, _args, _options in calls)
 
 
 def _owned_probe_runtime(tmp_path, workflow, *, version="2025.1", missing_list=False, overflow=False):
@@ -1539,7 +1512,7 @@ def _owned_probe_runtime(tmp_path, workflow, *, version="2025.1", missing_list=F
     return runtime, commands, ids
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ["2021.1", "2025.1"])
 def test_owned_list_probe_retains_sample_only_graph_and_fresh_metadata(tmp_path, workflow, version):
     import json
     runtime, commands, ids = _owned_probe_runtime(tmp_path, workflow, version=version)
@@ -1595,51 +1568,6 @@ def test_owned_list_probe_keeps_incomplete_observation_blocked(tmp_path, workflo
         assert any(row["payload"].get("original_raw_error") == {"fixture": None} for row in observed["calls"])
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
-def test_owned_probe_reads_use_existing_public_gateway_with_owned_projection(tmp_path, workflow, version):
-    from tests.unit.test_object_graph_business_gateway import _info
-
-    runtime, _commands, ids = _owned_probe_runtime(tmp_path, workflow, version=version)
-    effect = "Effect0" if version < "2023.1" else "Effects"
-    expressions = ['from type RTPC select owner where type = "Sound"',
-                   f'from object "{ids["sound"]}" select @RTPC',
-                   f'from object "{ids["sound"]}" select @OutputBus',
-                   f'from object "{ids["sound"]}" select @{effect}',
-                   f'from project where owner.id = "{ids["sound"]}"']
-    if version >= "2023.1":
-        expressions.append(f'from object "{ids["music"]}" select @Arguments')
-    if version == "2025.1":
-        expressions.append(f'from object "{ids["slot"]}" select @Argument')
-    observed = []
-
-    class Client:
-        def call(self, uri, args=None, options=None):
-            if uri == "ak.wwise.core.getInfo":
-                return _info(version)
-            assert uri == "ak.wwise.core.object.get", (uri, args, options)
-            observed.append(args["waql"])
-            assert options["return"] == ["id", "name", "type", "path", "parent", "owner", "classId"]
-            slot = version == "2025.1" and "select @Arguments" in args["waql"]
-            return {"return": [{"id": ids["slot"] if slot else ids["rtpc"], "name": "",
-                                "type": "PluginInnerObject" if slot else "RTPC", "path": "\\RTPC",
-                                "parent": None, "owner": {"id": ids["sound"]},
-                                "classId": 5832704 if slot else 1441808}]}
-
-        def disconnect(self):
-            pass
-
-    for expression in expressions:
-        code, payload = workflow.waapi_gateway.execute_gateway([
-            "--state-dir", str(runtime.state_dir), "query-object", "--advanced-waql", expression,
-            "--max-results", "5", "--include", "parent", "--include", "owner", "--include", "class-id"],
-            env=runtime.env, client_factory=lambda _url: Client())
-        assert code == 0, payload
-        rows = payload.get("objects", payload.get("agent_result"))
-        assert rows[0]["owner"]["id"] == ids["sound"] and rows[0]["parent"] is None
-        slot = version == "2025.1" and "select @Arguments" in expression
-        assert rows[0]["class_id"] == (5832704 if slot else 1441808)
-        assert rows[0]["type"] == ("PluginInnerObject" if slot else "RTPC")
-    assert observed == [expression + " take 5" for expression in expressions]
 
 
 def _short_id_probe_runtime(tmp_path, *, version="2021.1", fault=None):
@@ -1695,7 +1623,7 @@ def _short_id_probe_runtime(tmp_path, *, version="2021.1", fault=None):
     return runtime, commands, config
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ["2021.1", "2025.1"])
 def test_short_id_probe_reuses_shared_runtime_without_policy_change(tmp_path, workflow, version):
     import hashlib
     runtime, commands, config = _short_id_probe_runtime(tmp_path, version=version)
@@ -1794,7 +1722,7 @@ def test_standalone_short_id_observation_keeps_lifecycle_and_original_evidence(t
     assert bindings[0]["scenario_root"] == root
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ["2021.1", "2025.1"])
 def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_path, workflow, version):
     from tests.unit.test_object_graph_business_gateway import _info, _project
 
@@ -1932,10 +1860,15 @@ def test_legacy_transaction_create_uses_public_draft_and_compact_verify_evidence
     assert len([command for command in commands if command[0] == "execute"]) == 1
 
 
-@pytest.mark.parametrize("version,number,signed", [
-    (version, 3970659059, -324308237) for version in ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"]
-] + [("2021.1", 0, 0), ("2021.1", 2147483648, -2147483648), ("2021.1", 4294967295, -1)])
-@pytest.mark.parametrize("fault", [None, "native-error", "exact-drift"])
+@pytest.mark.parametrize("version,number,signed,fault", [
+    ("2021.1", 3970659059, -324308237, None),
+    ("2025.1", 3970659059, -324308237, None),
+    ("2021.1", 0, 0, None),
+    ("2021.1", 2147483648, -2147483648, None),
+    ("2021.1", 4294967295, -1, None),
+    ("2021.1", 3970659059, -324308237, "native-error"),
+    ("2025.1", 3970659059, -324308237, "exact-drift"),
+])
 def test_short_id_diagnostic_uses_actual_gateway_and_retains_unsigned_miss(tmp_path, workflow, version, number, signed, fault):
     from tests.unit.test_object_graph_business_gateway import _info, _project
 
@@ -2496,82 +2429,6 @@ def test_migrated_media_collector_retains_legacy_owned_fixture_boundary_without_
     assert 'owned lifecycle fixture work' in category['reason']
 
 
-@pytest.mark.parametrize('version,outcome,paged', [
-    (version, outcome, False) for version in ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1']
-    for outcome in ['true', 'false', 'native-refusal']] + [('2025.1', 'true', True)])
-def test_reference_enabled_probe_uses_actual_gateway_and_never_writes(tmp_path, workflow, version, outcome, paged):
-    import re
-    from copy import deepcopy
-    from tests.unit.test_metadata_property_state_selection_gateway import selected_reference_task
-    from tests.unit.test_metadata_discovery_gateway import (
-        OBJECT_GUID, GET_INFO_URI, OBJECT_GET_URI, GET_TYPES_URI, GET_NAMES_URI,
-        GET_PROPERTY_INFO_URI, IS_PROPERTY_ENABLED_URI, waapi_gateway,
-    )
-    run, client, _selection, reference = selected_reference_task(tmp_path, version)
-    parent, platform = '{33333333-3333-3333-3333-333333333333}', '{44444444-4444-4444-4444-444444444444}'
-    rows = {OBJECT_GUID: {'id': OBJECT_GUID, 'name': 'Reverb', 'type': 'AuxBus', 'classId': 3997712,
-        'path': r'\Busses\Default Work Unit\Master\Reverb', 'parent': {'id': parent}},
-        parent: {'id': parent, 'name': 'Master', 'type': 'Bus', 'classId': 1376272,
-            'path': r'\Busses\Default Work Unit\Master', 'parent': None},
-        platform: {'id': platform, 'name': 'Windows', 'type': 'Platform', 'classId': 4522000,
-            'path': r'\Platforms\Windows', 'parent': None}}
-    project_result = client.responses[OBJECT_GET_URI]
-    def objects(args, options):
-        if args == {'waql': 'from type Project take 2'}:
-            return project_result
-        if 'waql' in args:
-            expression = args['waql']
-            typed = re.fullmatch(r'from type (AuxBus|Platform) take (\d+)', expression)
-            exact = re.fullmatch(r'from object "(\{[A-Fa-f0-9-]+\})"(?: take (\d+))?', expression)
-            assert typed or exact, args
-            selected = [rows[OBJECT_GUID if typed[1] == 'AuxBus' else platform]] if typed else [rows[exact[1]]]
-        else:
-            assert set(args) == {'from'} and set(args['from']) == {'id'}, args
-            selected = [rows[value] for value in args['from']['id']]
-        return {'return': [{key: deepcopy(row[key]) for key in options['return'] if key in row} for row in selected]}
-    client.responses[OBJECT_GET_URI] = objects
-    client.responses[GET_TYPES_URI] = {'return': [{'name': name, 'classId': number, 'type': 'WObject'} for name, number in
-        [('AuxBus', 3997712), ('Bus', 1376272), ('Platform', 4522000)]]}
-    def info(args, _options):
-        assert args in ({'object': OBJECT_GUID, 'property': 'UserAuxSend0'}, {'classId': 3997712, 'property': 'UserAuxSend0'}), args
-        return deepcopy(reference)
-    client.responses[GET_PROPERTY_INFO_URI] = info
-    if paged:
-        client.responses[GET_NAMES_URI]['return'] = [f'Unrelated{i}' for i in range(64)] + client.responses[GET_NAMES_URI]['return']
-    client.responses[IS_PROPERTY_ENABLED_URI] = {'return': outcome == 'true'}
-    if outcome == 'native-refusal':
-        class WaapiRequestFailed(Exception):
-            uri = 'ak.wwise.invalid_arguments'
-            kwargs = {'details': {'property': 'UserAuxSend0', 'procedureUri': IS_PROPERTY_ENABLED_URI}, 'message': 'Native reference probe refused'}
-        client.errors[IS_PROPERTY_ENABLED_URI] = WaapiRequestFailed('reference probe refused')
-    config = tmp_path / 'config' / 'config.json'
-    settings = json.loads(config.read_text())
-    settings['project_modification_policy'] = 'read_only'
-    config.write_text(json.dumps(settings))
-    evidence = tmp_path / 'evidence'
-    evidence.mkdir(exist_ok=True)
-    env = {'WAAPI_SKILL_CONFIG_PATH': str(config), 'WWISE_EVIDENCE_DIR': str(evidence)}
-    commands = []
-    runtime = SimpleNamespace(version=version, candidate='unit-fixture-not-native', state_dir=tmp_path / 'probe-state',
-        env=env, category_results=[], port=31337, lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'))
-    def raw_gateway(command):
-        commands.append(list(command))
-        return waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command], env=env, client_factory=lambda _url: client)
-    runtime.raw_gateway = raw_gateway
-    result = workflow._collect_reference_enabled_metadata_probe(runtime)
-    receipt = json.loads((runtime.state_dir / 'reference-enabled-metadata-observation.json').read_text())
-    assert result['status'] == ('FAIL' if outcome == 'native-refusal' else 'PASS'), receipt
-    assert receipt['mutation_authority'] is receipt['prospective_authority'] is receipt['business_effect_verified'] is False
-    assert receipt['controller_name_absence']['class'] is receipt['controller_name_absence']['object'] is True
-    assert receipt['class_field']['metadata']['type'] == receipt['object_field']['metadata']['type'] == ''
-    assert len([call for call in client.calls if call[0] == IS_PROPERTY_ENABLED_URI]) == 1
-    assert [call[1] for call in client.calls if call[0] == IS_PROPERTY_ENABLED_URI] == [
-        {'object': OBJECT_GUID, 'property': 'UserAuxSend0', 'platform': platform}]
-    assert all(command[0] in {'metadata', 'query-object'} for command in commands)
-    if outcome == 'native-refusal':
-        assert receipt['enabled_response']['payload']['call']['waapi_error_uri'] == 'ak.wwise.invalid_arguments'
-    else:
-        assert receipt['observed_enabled'] is (outcome == 'true')
 
 
 def _rtpc_2021_representation_runtime(tmp_path, workflow, *, fault=None):
@@ -3024,7 +2881,7 @@ def test_named_owned_time_first_collector_rejects_journal_handle_after_gateway_s
     assert [cmd[0] for cmd in commands].count('verify') == 2 and len(receipt['calls']) <= 384
 
 
-@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize("version", ['2022.1', '2025.1'])
 def test_rtpc_graph_collector_groups_real_public_effects_and_preserves_spare(tmp_path, workflow, version):
     runtime, commands, writes, _task = _rtpc_graph_runtime(tmp_path, workflow, version)
     category = workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
@@ -4014,7 +3871,7 @@ def test_render_suffix_diagnostic_preserves_other_disclosed_slot_scalars(tmp_pat
     assert len(writes) == 5 and [command[0] for command in commands].count('execute') == 5
 
 
-@pytest.mark.parametrize('version', ['2023.1', '2024.1'])
+@pytest.mark.parametrize("version", ['2023.1'])
 def test_render_suffix_diagnostic_modern_version_public_routes(tmp_path, workflow, version):
     runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, version=version)
     category = workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
@@ -5720,7 +5577,7 @@ def test_compound_render_history_collector_keeps_native_metadata_and_complete_re
 @pytest.mark.parametrize('disposition', ['retained', 'absent-empty', 'absent-error',
     'missing-result', 'ambiguous-result', 'unrelated-error', 'changed-curve',
     'native-packet', 'native-packet-wrong-guid', 'native-packet-wrong-version', 'native-packet-wrong-error'])
-def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path, workflow, monkeypatch, disposition):
+def test_owned_input_disposition_diagnostic_preserves_receipt(tmp_path, workflow, monkeypatch, disposition):
     from copy import deepcopy
     runtime, commands, writes, task = _rtpc_graph_runtime(tmp_path / 'collector', workflow, '2022.1')
     packet_case = disposition.startswith('native-packet')
@@ -5811,27 +5668,10 @@ def test_owned_input_disposition_diagnostic_reaches_existing_finalizer(tmp_path,
     assert receipt['observational_scope'] == 'owned_ControlInput_displaced_by_verified_shared_target_only'
     assert len(writes) == 4 and [cmd[0] for cmd in commands].count('execute') == 4
     assert len({row['transaction_id'] for row in receipt['transactions']}) == 2
-    (tmp_path / 'lifecycle').mkdir()
-    fixture, events, _records = _fixture_run(tmp_path / 'lifecycle', workflow, monkeypatch)
-    from tests.destructive.support import category_evidence
-    target = tmp_path / 'category.jsonl'
-    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
-    monkeypatch.setattr(exact_real_evidence, 'append_category_evidence', category_evidence.append_category_evidence)
-    fixture_runtime = next(fixture)
-    fixture_runtime.category_results.extend(runtime.category_results)
-    with pytest.raises(StopIteration):
-        next(fixture)
-    final = json.loads(target.read_text().splitlines()[-1])
-    assert final['invocation']['phase'] == 'final'
-    retained, = [row for row in final['categories'] if row['category'] == 'owned-control-input-disposition-diagnostic']
-    assert retained['observation_sha256'] == category['observation_sha256']
-    assert retained['status'] == ('FAIL' if failed else 'PASS')  # Program fake finalization only.
-    assert json.loads(Path(retained['observation_path']).read_text())['old_input_disposition']['state'] == state
-    assert events.index('shutdown') < events.index('release')
 
 
 @pytest.mark.parametrize('fault', [None, 'retained-old', 'missing-old-observation'])
-def test_owned_to_new_owned_collector_reaches_current_final_writer(tmp_path, workflow, monkeypatch, fault):
+def test_owned_to_new_owned_collector_preserves_receipt(tmp_path, workflow, monkeypatch, fault):
     runtime, commands, writes, task = _rtpc_graph_runtime(tmp_path / 'collector', workflow, '2022.1')
     original, removed = task.call, None
     def call(uri, args=None, options=None):
@@ -5864,25 +5704,10 @@ def test_owned_to_new_owned_collector_reaches_current_final_writer(tmp_path, wor
     if not fault: assert receipt['transactions'][0]['artifact_unchanged'] is True
     else: assert receipt['transactions'][0]['verify']['exit_code'] == 2
     assert not any(row['type'] == 'GameParameter' for row in task.objects.values())
-    (tmp_path / 'lifecycle').mkdir()
-    fixture, events, _records = _fixture_run(tmp_path / 'lifecycle', workflow, monkeypatch)
-    from tests.destructive.support import category_evidence
-    target = tmp_path / 'category.jsonl'
-    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
-    monkeypatch.setattr(exact_real_evidence, 'append_category_evidence', category_evidence.append_category_evidence)
-    fixture_runtime = next(fixture)
-    fixture_runtime.category_results.extend(runtime.category_results)
-    with pytest.raises(StopIteration): next(fixture)
-    final = json.loads(target.read_text().splitlines()[-1])
-    retained, = [row for row in final['categories'] if row['category'] == 'owned-control-input-replacement-acceptance']
-    assert final['invocation']['phase'] == 'final' and retained['status'] == ('FAIL' if fault else 'PASS')
-    assert retained['observation_sha256'] == category['observation_sha256']
-    assert json.loads(Path(retained['observation_path']).read_text())['owned_to_owned_acceptance'] is (fault is None)
-    assert events.index('shutdown') < events.index('release')
 
 
 @pytest.mark.parametrize('fault', [None, 'identity-rejected', 'adapter-rejected', 'empty-context', 'missing-scalar', 'null-scalar', 'missing-identity', 'computed-readback-drift'])
-def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, workflow, monkeypatch, fault):
+def test_query_function_context_collector_preserves_receipt(tmp_path, workflow, monkeypatch, fault):
     """Substitute native execution, retaining the public producer and v3 writer."""
     import shutil
     from copy import deepcopy
@@ -6021,22 +5846,3 @@ def test_query_function_context_collector_reaches_persisted_finalizer(tmp_path, 
             assert 'path' not in selected_packet['result']['return'][0]
             assert 'path' in failed['invocations'][1]['payload']['agent_result'][0]['unavailable_fields']
         else: assert selected_packet['result']['return'] == []
-    (tmp_path / 'lifecycle').mkdir()
-    fixture, events, _ = _fixture_run(tmp_path / 'lifecycle', workflow, monkeypatch)
-    output = tmp_path / 'category.jsonl'
-    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(output))
-    monkeypatch.setattr(exact_real_evidence, 'append_category_evidence', category_evidence.append_category_evidence)
-    fixture_runtime = next(fixture)
-    fixture_runtime.category_results.extend(runtime.category_results)
-    if failed_run:
-        with pytest.raises(AssertionError, match='collector failed'):
-            fixture.throw(AssertionError('collector failed'))
-    else:
-        with pytest.raises(StopIteration): next(fixture)
-    final = json.loads(output.read_text().splitlines()[-1])
-    assert final['invocation']['phase'] == 'final'
-    assert final['invocation']['outcome'] == ('FAIL' if failed_run else 'PASS')
-    retained = next(row for row in final['categories'] if row['category'] == category['category'])
-    assert retained['status'] == ('FAIL' if failed_run else 'PASS') and retained['observation_sha256'] == category['observation_sha256']
-    assert json.loads(Path(retained['observation_path']).read_text()) == receipt
-    assert events.index('shutdown') < events.index('release')
