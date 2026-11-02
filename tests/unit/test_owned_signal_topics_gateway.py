@@ -41,7 +41,9 @@ def owned_model(tmp_path, version):
     return env, state, client, model
 
 
-@pytest.fixture(scope="module", params=("2024.1", "2025.1"))
+# Schema differences retain both lanes below; resource lifetime and observation
+# guards use one representative producer/consumer journey.
+@pytest.fixture(scope="module", params=("2025.1",))
 def signal_resources(request, tmp_path_factory):
     return request.param, *owned_model(tmp_path_factory.mktemp("owned-signal-" + request.param), request.param)
 

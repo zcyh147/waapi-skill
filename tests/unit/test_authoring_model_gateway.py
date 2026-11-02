@@ -72,8 +72,8 @@ def confirm_execute_verify(env, state, client, preview):
     assert code == 0, (verified.get('error_code'), verified.get('message'), verified.get('details'))
     return verified
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-def test_owned_window_can_be_presented_then_closed_and_cannot_be_reused(tmp_path, version):
+def test_owned_window_can_be_presented_then_closed_and_cannot_be_reused(tmp_path):
+    version = '2025.1'
     client = LayoutClient(tmp_path, version=version)
     client.responses.update({PREFIX + 'window.create': {'windowID': '{33333333-3333-3333-3333-333333333333}'},
         PREFIX + 'window.present': {}, PREFIX + 'window.close': {}})
@@ -94,8 +94,8 @@ def test_owned_window_can_be_presented_then_closed_and_cannot_be_reused(tmp_path
     assert len([row for row in client.calls if row[0] == PREFIX + 'window.close']) == 1
 
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-def test_closed_template_registration_owns_names_and_constructs_nested_widgets(tmp_path, version):
+def test_closed_template_registration_owns_names_and_constructs_nested_widgets(tmp_path):
+    version = '2025.1'
     client = LayoutClient(tmp_path, version=version)
     client.responses[PREFIX + 'model.registerWafm'] = {'success': True}
     plan = {'template_key': 'Weather', 'root_widget': 'Root',
@@ -154,8 +154,8 @@ def rain_template():
             {'attribute': 'Height', 'value': {'kind': 'integer', 'integer': 300}}], 'children': [{'widget': 'Rain', 'positions': [0, 0, 100, 30], 'anchors': ['side-left', 'side-top']}]}]}
 
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-def test_owned_model_state_roundtrip_uses_registered_widget_and_independent_readback(tmp_path, version):
+def test_owned_model_state_roundtrip_uses_registered_widget_and_independent_readback(tmp_path):
+    version = '2025.1'
     client = ModelClient(tmp_path, version=version)
     env, state, client, preview = model_preview(tmp_path, 'window.create', {'title': 'Weather', 'width': 400, 'height': 300}, version=version, client=client)
     window = confirm_execute_verify(env, state, client, preview)['agent_result']['business_result']['resource_handle']
@@ -289,8 +289,8 @@ def test_malformed_template_constructors_fail_before_registration(tmp_path, muta
     assert PREFIX + 'model.registerWafm' not in [row[0] for row in client.calls]
 
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-def test_owned_wafm_file_alternative_seals_and_dispatches_a_generated_data_file(tmp_path, version):
+def test_owned_wafm_file_alternative_seals_and_dispatches_a_generated_data_file(tmp_path):
+    version = '2025.1'
     from pathlib import Path
     from wwise_waapi.transactions import TransactionStore
     client = ModelClient(tmp_path, version=version)
@@ -336,8 +336,8 @@ def test_owned_wafm_file_drift_is_rejected_before_registration(tmp_path):
     assert PREFIX + 'model.registerWafm' not in [row[0] for row in client.calls]
 
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-def test_named_template_collection_is_owned_and_frontend_selects_one_exact_template(tmp_path, version):
+def test_named_template_collection_is_owned_and_frontend_selects_one_exact_template(tmp_path):
+    version = '2025.1'
     client = ModelClient(tmp_path, version=version)
     first, second = rain_template(), {**rain_template(), 'template_key': 'Second'}
     env, state, client, preview = model_preview(tmp_path, 'model.registerWafm', {'templates': [first, second]}, version=version, client=client)

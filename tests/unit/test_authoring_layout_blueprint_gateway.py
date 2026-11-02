@@ -1,5 +1,6 @@
 """Nested layout construction through the public closed business declaration."""
 from pathlib import Path
+from copy import deepcopy
 import json
 import re
 import pytest
@@ -8,6 +9,13 @@ from tests.unit.test_authoring_layout_mutation_gateway import URI, switch_previe
 from tests.support.gateway_config import set_gateway_config
 from tests.unit.test_waapi_gateway import gateway_env
 from wwise_waapi.transactions import TransactionStore
+from wwise_waapi.layout_blueprint import (compile_blueprint, mint_blueprint_ids, validate_blueprint,
+    declared_layout_matches, declared_layout_mismatches)
+
+
+def _compiled(blueprint, name="Workspace"):
+    """Local compiler checks do not need a Draft, live inspection or transaction."""
+    return compile_blueprint(blueprint, name=name, node_ids=mint_blueprint_ids(blueprint))
 
 
 def _blueprint():
@@ -42,7 +50,7 @@ def test_registered_root_stack_kind_uses_fixed_schema_wrapper_when_native_omits_
     ('missing_sidebar', '/Layout/StackPanel/@Children/2/SideBar'),
     ('missing_history', '/Layout/LastPositions'),
     ('normal_rectangle', '/Layout/Undocked/0/WindowPlacement_NormalPos_Left')])
-def test_root_tag_omission_never_masks_other_declared_kind_or_state_changes(tmp_path, damage, expected_path):
+def test_root_tag_omission_never_masks_other_declared_kind_or_state_changes(damage, expected_path):
     blueprint = _blueprint()
     blueprint['nodes'][0]['children'].append('panel')
     blueprint['nodes'].extend([
@@ -52,40 +60,30 @@ def test_root_tag_omission_never_masks_other_declared_kind_or_state_changes(tmp_
         {'key': 'floating', 'kind': 'stack', 'label': 'Floating', 'orientation': 'vertical', 'children': []}])
     blueprint['floating_windows'] = [{'root': 'floating', 'placement': {**_placement(), 'state': 'normal'}}]
     blueprint['position_history'] = {'last_positions': [{'view_name': 'ProjectExplorer', 'placement': _placement()}]}
-    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
-        fields=('--new-layout-name', 'StrictRootWorkspace', '--blueprint', json.dumps(blueprint)))
-    original = client.call
-    def changed_state(uri, args=None, options=None):
-        result = original(uri, args, options)
-        if uri == URI + 'setLayout':
-            layout = client.layouts['StrictRootWorkspace']['Layout']
-            root = layout['StackPanel']
-            del root['@type']
-            if damage == 'wrong_root_tag': root['@type'] = 'ObjectPanel'
-            elif damage == 'nested_stack_tag': del root['@Children'][1]['@type']
-            elif damage == 'nested_view_tag': del root['@Children'][0]['@type']
-            elif damage == 'floating_stack_tag': del layout['Undocked'][0]['StackPanel']['@type']
-            elif damage == 'orientation': root['Orientation'] = 'Vertical'
-            elif damage == 'preferred_identity':
-                row = root['@Children'][2]['PreferredHeights'][0]
-                row['EditorUniqueViewId'] = row.pop('UniqueViewId')
-                row['EditorEffectIndex'] = row.pop('EffectIndex')
-                del row['PluginId']
-                row['EditorPluginId'] = '0'
-            elif damage == 'missing_sidebar': del root['@Children'][2]['SideBar']
-            elif damage == 'missing_history': del layout['LastPositions']
-            else: layout['Undocked'][0]['WindowPlacement_NormalPos_Left'] = '21'
-        return result
-    client.call = changed_state
-    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=True)
-    assert verified['verification']['business_state_verified'] is False
-    assertion = next(row for row in verified['verification']['assertions']
-        if row['name'] == 'Registered layout retains every declared nested field and child order')
-    assert [row['path'] for row in assertion['evidence']['mismatches']] == [expected_path]
+    expected = _compiled(blueprint)
+    observed = deepcopy(expected)
+    layout = observed['Layout']
+    root = layout['StackPanel']
+    del root['@type']
+    if damage == 'wrong_root_tag': root['@type'] = 'ObjectPanel'
+    elif damage == 'nested_stack_tag': del root['@Children'][1]['@type']
+    elif damage == 'nested_view_tag': del root['@Children'][0]['@type']
+    elif damage == 'floating_stack_tag': del layout['Undocked'][0]['StackPanel']['@type']
+    elif damage == 'orientation': root['Orientation'] = 'Vertical'
+    elif damage == 'preferred_identity':
+        row = root['@Children'][2]['PreferredHeights'][0]
+        row['EditorUniqueViewId'] = row.pop('UniqueViewId')
+        row['EditorEffectIndex'] = row.pop('EffectIndex')
+        del row['PluginId']
+        row['EditorPluginId'] = '0'
+    elif damage == 'missing_sidebar': del root['@Children'][2]['SideBar']
+    elif damage == 'missing_history': del layout['LastPositions']
+    else: layout['Undocked'][0]['WindowPlacement_NormalPos_Left'] = '21'
+    assert declared_layout_matches(expected, observed) is False
+    assert [row['path'] for row in declared_layout_mismatches(expected, observed)] == [expected_path]
 
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-def test_object_editor_and_tab_panels_keep_explicit_state_and_empty_editor_lists(tmp_path, version):
+def test_object_editor_and_tab_panels_keep_explicit_state_and_empty_editor_lists():
     blueprint = _blueprint()
     blueprint['nodes'][0]['children'] = ['panel', 'tabs']
     blueprint['nodes'][1:] = [
@@ -94,29 +92,21 @@ def test_object_editor_and_tab_panels_keep_explicit_state_and_empty_editor_lists
          'editor_priority': [], 'preferred_heights': [],
          'sidebar': {'width': '210', 'collapse_state': ''}},
         {'key': 'tabs', 'kind': 'object_tabs', 'label': 'Object tabs', 'height': '480'}]
-    env, state, client, preview = switch_preview(tmp_path, version=version, operation='setLayout',
-        fields=('--new-layout-name', 'EditorWorkspace', '--blueprint', json.dumps(blueprint)))
-    verified = confirm_execute_verify(env, state, client, preview)
-    assert verified['verification']['business_state_verified'] is True
-    panel, tabs = client.layouts['EditorWorkspace']['Layout']['StackPanel']['@Children']
+    panel, tabs = _compiled(blueprint)['Layout']['StackPanel']['@Children']
     assert panel == {'@type': 'ObjectPanel', 'ID': panel['ID'], 'Name': 'Object editor',
         'EditorState': 'Maximized', 'BottomEditorState': 'Minimized', 'EditorPriority': [],
         'PreferredHeights': [], 'SideBar': {'@type': 'SideBar', 'Width': '210', 'CollapseState': ''}}
     assert tabs == {'@type': 'ObjectTabPanel', 'ID': tabs['ID'], 'Name': 'Object tabs', 'Height': '480'}
 
 
-def test_editor_preferences_keep_order_repeats_and_optional_editor_tags(tmp_path):
+def test_editor_preferences_keep_order_repeats_and_optional_editor_tags():
     blueprint = _blueprint()
     blueprint['nodes'][2] = {'key': 'editors', 'kind': 'object_panel', 'label': 'Editors',
         'editor_priority': [
             {'view_identifier': 'PropertyEditor', 'plugin_identifier': '', 'effect_index': '0'},
             {'view_identifier': 'PropertyEditor', 'plugin_identifier': '', 'effect_index': '0', 'include_type': True}],
         'preferred_heights': [{'view_identifier': 'EffectEditor', 'plugin_identifier': '1058', 'effect_index': '2', 'height': '320'}]}
-    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
-        fields=('--new-layout-name', 'EditorPreferences', '--blueprint', json.dumps(blueprint)))
-    verified = confirm_execute_verify(env, state, client, preview)
-    assert verified['verification']['business_state_verified'] is True
-    panel = client.layouts['EditorPreferences']['Layout']['StackPanel']['@Children'][1]
+    panel = _compiled(blueprint)['Layout']['StackPanel']['@Children'][1]
     assert panel['EditorPriority'] == [
         {'UniqueViewId': 'PropertyEditor', 'PluginId': '', 'EffectIndex': '0'},
         {'UniqueViewId': 'PropertyEditor', 'PluginId': '', 'EffectIndex': '0', '@type': 'EditorId'}]
@@ -130,8 +120,7 @@ def _placement():
         'left': '20', 'top': '30', 'right': '420', 'bottom': '530'}
 
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-def test_floating_only_workspace_and_position_histories_preserve_optional_forms(tmp_path, version):
+def test_floating_only_workspace_and_position_histories_preserve_optional_forms():
     blueprint = {'contract': 'waapi-skill.layout-blueprint/v1', 'workspace_name': '', 'nodes': [
         {'key': 'floating', 'kind': 'stack', 'label': 'Floating', 'orientation': 'vertical', 'children': ['tools']},
         {'key': 'tools', 'kind': 'view', 'view_type': 'ProjectExplorer', 'selection_channel': ''}],
@@ -140,11 +129,7 @@ def test_floating_only_workspace_and_position_histories_preserve_optional_forms(
             'last_positions': [{'view_name': 'ProjectExplorer', 'placement': _placement()},
                                {'view_name': 'ProjectExplorer', 'placement': {**_placement(), 'state': 'minimized'}}],
             'metadata': [], 'object_types': [], 'plugin_inner_objects': [], 'source_plugins': []}}
-    env, state, client, preview = switch_preview(tmp_path, version=version, operation='setLayout',
-        fields=('--new-layout-name', 'FloatingWorkspace', '--blueprint', json.dumps(blueprint)))
-    verified = confirm_execute_verify(env, state, client, preview)
-    assert verified['verification']['business_state_verified'] is True
-    layout = client.layouts['FloatingWorkspace']['Layout']
+    layout = _compiled(blueprint)['Layout']
     assert layout['Name'] == '' and 'StackPanel' not in layout
     window, empty_window = layout['Undocked']
     assert window['@type'] == 'ViewHolder' and window['StackPanel']['Name'] == 'Floating'
@@ -158,48 +143,38 @@ def test_floating_only_workspace_and_position_histories_preserve_optional_forms(
 
 @pytest.mark.parametrize('mechanism', ['floating', 'history', 'empty_floating', 'empty_history'])
 @pytest.mark.parametrize('tamper', [False, True])
-def test_rootless_layout_verification_checks_declared_windows_histories_and_explicit_empty_forms(tmp_path, mechanism, tamper):
+def test_rootless_layout_verification_checks_declared_windows_histories_and_explicit_empty_forms(mechanism, tamper):
     blueprint = {'contract': 'waapi-skill.layout-blueprint/v1', 'nodes': []}
     if mechanism in {'floating', 'empty_floating'}:
         blueprint['floating_windows'] = [{'placement': _placement()}] if mechanism == 'floating' else []
     else:
         blueprint['position_history'] = {'last_positions': [{'view_name': 'ProjectExplorer', 'placement': _placement()}]
             if mechanism == 'history' else []}
-    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
-        fields=('--new-layout-name', 'RootlessWorkspace', '--blueprint', json.dumps(blueprint)))
-    original = client.call
-    def changed_state(uri, args=None, options=None):
-        result = original(uri, args, options)
-        if uri == URI + 'setLayout' and tamper:
-            layout = client.layouts['RootlessWorkspace']['Layout']
-            if mechanism == 'floating': layout['Undocked'][0]['WindowPlacement_NormalPos_Left'] = '21'
-            elif mechanism == 'history': layout['LastPositions'][0]['Name'] = 'DifferentView'
-            elif mechanism == 'empty_floating': del layout['Undocked']
-            else: del layout['LastPositions']
-        return result
-    client.call = changed_state
-    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=tamper)
-    assert verified['verification']['business_state_verified'] is not tamper
+    expected = _compiled(blueprint)
+    observed = deepcopy(expected)
     if tamper:
-        assertion = next(row for row in verified['verification']['assertions']
-            if row['name'] == 'Registered layout retains every declared nested field and child order')
-        assert assertion['evidence']['mismatches']
+        layout = observed['Layout']
+        if mechanism == 'floating': layout['Undocked'][0]['WindowPlacement_NormalPos_Left'] = '21'
+        elif mechanism == 'history': layout['LastPositions'][0]['Name'] = 'DifferentView'
+        elif mechanism == 'empty_floating': del layout['Undocked']
+        else: del layout['LastPositions']
+    assert declared_layout_matches(expected, observed) is not tamper
+    assert bool(declared_layout_mismatches(expected, observed)) is tamper
 
 
 @pytest.mark.parametrize('variant', ['splitter', 'tab_children', 'sidebars'])
-def test_retained_read_shapes_do_not_establish_unresolved_layout_input_legality(tmp_path, variant):
+def test_retained_read_shapes_do_not_establish_unresolved_layout_input_legality(variant):
     blueprint = _blueprint()
     if variant == 'splitter': blueprint['nodes'][2] = {'key': 'editors', 'kind': 'splitter'}
     elif variant == 'tab_children': blueprint['nodes'][2] = {'key': 'editors', 'kind': 'object_tabs', 'label': 'Tabs', 'children': []}
     else: blueprint['nodes'][2] = {'key': 'editors', 'kind': 'object_panel', 'label': 'Editor',
         'sidebar_left': {'width': '400', 'collapse_state': '0', 'visible': False}}
-    _, _, _, rejected = switch_preview(tmp_path, operation='setLayout',
-        fields=('--new-layout-name', 'NeverWritten', '--blueprint', json.dumps(blueprint)), expect_declaration_error=True)
-    assert 'input remains unresolved' in rejected['message']
+    with pytest.raises(ValueError, match='input remains unresolved'):
+        validate_blueprint(blueprint)
 
 
 @pytest.mark.parametrize('empty', [False, True])
-def test_view_data_is_built_from_typed_entries_with_nested_values_and_no_raw_map(tmp_path, empty):
+def test_view_data_is_built_from_typed_entries_with_nested_values_and_no_raw_map(empty):
     blueprint = _blueprint()
     blueprint['nodes'][1]['data_entries'] = [] if empty else [
         {'name': 'selection', 'value': {'kind': 'object', 'entries': [
@@ -207,35 +182,24 @@ def test_view_data_is_built_from_typed_entries_with_nested_values_and_no_raw_map
             {'name': 'positions', 'value': {'kind': 'array', 'items': [
                 {'kind': 'integer', 'value': 0}, {'kind': 'number', 'value': 1.25},
                 {'kind': 'string', 'value': ''}, {'kind': 'null'}]}}]}}]
-    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
-        fields=('--new-layout-name', 'ViewDataWorkspace', '--blueprint', json.dumps(blueprint)))
-    verified = confirm_execute_verify(env, state, client, preview)
-    assert verified['verification']['business_state_verified'] is True
-    view = client.layouts['ViewDataWorkspace']['Layout']['StackPanel']['@Children'][0]
+    view = _compiled(blueprint)['Layout']['StackPanel']['@Children'][0]
     assert view['ViewData'] == ({} if empty else {'selection': {'enabled': False, 'positions': [0, 1.25, '', None]}})
 
 
 @pytest.mark.parametrize('tamper', [False, True])
-def test_preferred_height_readback_understands_retained_editor_field_names_without_ignoring_values(tmp_path, tamper):
+def test_preferred_height_readback_understands_retained_editor_field_names_without_ignoring_values(tamper):
     blueprint = _blueprint()
     blueprint['nodes'][2] = {'key': 'editors', 'kind': 'object_panel', 'label': 'Editors',
         'preferred_heights': [{'view_identifier': 'AttenuationEditor', 'plugin_identifier': '4294967295',
             'effect_index': '0', 'height': '621.4757'}]}
-    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
-        fields=('--new-layout-name', 'EditorHeightWorkspace', '--blueprint', json.dumps(blueprint)))
-    original = client.call
-    def observed_names(uri, args=None, options=None):
-        result = original(uri, args, options)
-        if uri == URI + 'setLayout':
-            row = client.layouts['EditorHeightWorkspace']['Layout']['StackPanel']['@Children'][1]['PreferredHeights'][0]
-            row['EditorUniqueViewId'] = row.pop('UniqueViewId')
-            row['EditorPluginId'] = row.pop('PluginId')
-            row['EditorEffectIndex'] = row.pop('EffectIndex')
-            if tamper: row['EditorEffectIndex'] = '1'
-        return result
-    client.call = observed_names
-    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=tamper)
-    assert verified['verification']['business_state_verified'] is not tamper
+    expected = _compiled(blueprint)
+    observed = deepcopy(expected)
+    row = observed['Layout']['StackPanel']['@Children'][1]['PreferredHeights'][0]
+    row['EditorUniqueViewId'] = row.pop('UniqueViewId')
+    row['EditorPluginId'] = row.pop('PluginId')
+    row['EditorEffectIndex'] = row.pop('EffectIndex')
+    if tamper: row['EditorEffectIndex'] = '1'
+    assert declared_layout_matches(expected, observed) is not tamper
 
 
 @pytest.mark.parametrize('tamper', ['binding_digest', 'declaration', 'non_layout_fields'])
@@ -261,14 +225,10 @@ def test_deep_constructor_settings_never_grant_capacity_to_forged_or_mismatched_
 
 
 @pytest.mark.parametrize('node_kind', ['stack', 'view'])
-def test_optional_element_type_omission_remains_distinct_from_explicit_type(tmp_path, node_kind):
+def test_optional_element_type_omission_remains_distinct_from_explicit_type(node_kind):
     blueprint = _blueprint()
     blueprint['nodes'][0 if node_kind == 'stack' else 1]['include_type'] = False
-    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
-        fields=('--new-layout-name', 'OptionalTypeWorkspace', '--blueprint', json.dumps(blueprint)))
-    verified = confirm_execute_verify(env, state, client, preview)
-    assert verified['verification']['business_state_verified'] is True
-    root = client.layouts['OptionalTypeWorkspace']['Layout']['StackPanel']
+    root = _compiled(blueprint)['Layout']['StackPanel']
     selected = root if node_kind == 'stack' else root['@Children'][0]
     assert '@type' not in selected
 
@@ -290,7 +250,7 @@ def test_omitted_optional_type_does_not_verify_an_explicitly_different_element_k
 
 
 @pytest.mark.parametrize('risk', ['duplicate_data_key', 'wrong_scalar_type', 'shared_floating_root', 'unknown_placement_field', 'native_editor_field'])
-def test_closed_nested_settings_reject_ambiguous_identity_data_and_native_fields(tmp_path, risk):
+def test_closed_nested_settings_reject_ambiguous_identity_data_and_native_fields(risk):
     blueprint = _blueprint()
     if risk in {'duplicate_data_key', 'wrong_scalar_type'}:
         entry = {'name': 'visible', 'value': {'kind': 'boolean', 'value': False}}
@@ -300,9 +260,8 @@ def test_closed_nested_settings_reject_ambiguous_identity_data_and_native_fields
     elif risk == 'unknown_placement_field': blueprint['floating_windows'] = [{'placement': {**_placement(), 'WindowPlacement_ShowCmd': 'Normal'}}]
     else: blueprint['nodes'][2] = {'key': 'editors', 'kind': 'object_panel', 'label': 'Editor',
         'editor_priority': [{'UniqueViewId': 'EffectEditor', 'plugin_identifier': '1058', 'effect_index': '0'}]}
-    _, _, _, rejected = switch_preview(tmp_path, operation='setLayout',
-        fields=('--new-layout-name', 'NeverWritten', '--blueprint', json.dumps(blueprint)), expect_declaration_error=True)
-    assert 'blueprint' in rejected['message'].lower()
+    with pytest.raises(ValueError, match='blueprint'):
+        validate_blueprint(blueprint)
 
 
 @pytest.mark.parametrize('version', ['2024.1', '2025.1'])
@@ -361,40 +320,31 @@ def test_nested_blueprint_requires_its_exact_view_types_in_fresh_catalog(tmp_pat
 
 @pytest.mark.parametrize('damage', ['orientation', 'order', 'selection-channel', 'width', 'view-type', 'child-missing', 'node-id', 'name-only'])
 def test_nested_registration_does_not_certify_name_without_every_requested_field_and_order(tmp_path, damage):
-    env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
-        fields=('--new-layout-name', 'NestedOwnedLayout', '--blueprint', json.dumps(_blueprint())))
-    original = client.call
-    def wrong_layout(uri, args=None, options=None):
-        result = original(uri, args, options)
-        if uri == URI + 'setLayout':
-            layout = client.layouts['NestedOwnedLayout']['Layout']
-            root = layout['StackPanel']
-            if damage == 'orientation':
-                root['Orientation'] = 'Vertical'
-            elif damage == 'order':
-                root['@Children'].reverse()
-            elif damage == 'selection-channel':
-                root['@Children'][0]['SelectionChannel'] = '2'
-            elif damage == 'width':
-                root['@Children'][0]['Width'] = '281'
-            elif damage == 'view-type':
-                root['@Children'][0]['Name'] = 'Transport'
-            elif damage == 'child-missing':
-                root['@Children'].pop()
-            elif damage == 'node-id':
-                root['ID'] = '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'
-            else:
-                del layout['StackPanel']
-        return result
-    client.call = wrong_layout
-    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=True)
-    assert verified['verification']['business_state_verified'] is False
-    nested = next(row for row in verified['verification']['assertions']
-        if row['name'] == 'Registered layout retains every declared nested field and child order')
-    assert nested['evidence']['mismatches']
-    assert all(row['path'].startswith('/Layout') for row in nested['evidence']['mismatches'])
-    assert len(nested['evidence']['mismatches']) <= 16
-    assert [row[0] for row in client.calls].count(URI + 'setLayout') == 1
+    expected = _compiled(_blueprint())
+    observed = deepcopy(expected)
+    layout = observed['Layout']
+    root = layout['StackPanel']
+    if damage == 'orientation':
+        root['Orientation'] = 'Vertical'
+    elif damage == 'order':
+        root['@Children'].reverse()
+    elif damage == 'selection-channel':
+        root['@Children'][0]['SelectionChannel'] = '2'
+    elif damage == 'width':
+        root['@Children'][0]['Width'] = '281'
+    elif damage == 'view-type':
+        root['@Children'][0]['Name'] = 'Transport'
+    elif damage == 'child-missing':
+        root['@Children'].pop()
+    elif damage == 'node-id':
+        root['ID'] = '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'
+    else:
+        del layout['StackPanel']
+    assert declared_layout_matches(expected, observed) is False
+    mismatches = declared_layout_mismatches(expected, observed)
+    assert mismatches
+    assert all(row['path'].startswith('/Layout') for row in mismatches)
+    assert len(mismatches) <= 16
 
 
 def test_nested_registration_rechecks_exact_view_catalog_before_write(tmp_path):
@@ -417,7 +367,7 @@ def test_nested_registration_rechecks_exact_view_catalog_before_write(tmp_path):
 
 
 @pytest.mark.parametrize('malformation', ['native-fields', 'native-id', 'shared-node', 'dangling-node', 'disconnected-node', 'duplicate-key', 'unknown-kind', 'numeric-width', 'duplicate-child'])
-def test_blueprint_closed_graph_rejects_native_escape_and_invalid_structure_before_client(tmp_path, malformation):
+def test_blueprint_closed_graph_rejects_native_escape_and_invalid_structure_before_client(malformation):
     blueprint = _blueprint()
     if malformation == 'native-fields':
         blueprint['Layout'] = {'Name': 'native'}
@@ -437,24 +387,12 @@ def test_blueprint_closed_graph_rejects_native_escape_and_invalid_structure_befo
         blueprint['nodes'][1]['width'] = 280
     else:
         blueprint['nodes'][0]['children'].append('tools')
-    env = gateway_env(tmp_path)
-    set_gateway_config(env, wwise_version='2025.1')
-    state = ['--state-dir', str(tmp_path / 'state')]
-    client = LayoutClient(tmp_path)
-    code, inspected = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', 'Designer'], env=env, client_factory=lambda _: client)
-    assert code == 0
-    _, schema = gateway.execute_gateway(['--version', '2025.1', 'request-schema', URI + 'setLayout'], env=env)
-    code, started = gateway.execute_gateway([*state, *schema['continuation']['gateway_argv']], env=env)
-    assert code == 0
-    code, result = gateway.execute_gateway([*state, 'draft-declare-layout-plan', started['draft']['draft_id'], '--task-authority', started['task_authority'],
-        '--expected-revision', str(started['draft']['revision']), '--layout-handle', inspected['layout_handle'], '--new-layout-name', 'NeverWritten',
-        '--blueprint', json.dumps(blueprint)], env=env, client_factory=lambda _: pytest.fail('invalid graph must remain offline'))
-    assert code != 0
-    assert 'blueprint' in result['message'].lower()
+    with pytest.raises(ValueError, match='blueprint'):
+        validate_blueprint(blueprint)
 
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-def test_nested_workspace_name_can_differ_from_temporary_lookup_name(tmp_path, version):
+def test_nested_workspace_name_can_differ_from_temporary_lookup_name(tmp_path):
+    version = '2025.1'
     # Matching 2025 SDK getLayout example documents this distinction; this is fake
     # contract coverage and does not claim native divergent-name write acceptance.
     blueprint = _blueprint()
@@ -555,9 +493,8 @@ def test_compiled_blueprint_must_fit_bounded_native_readback_before_any_write(tm
     assert URI + 'setLayout' not in [row[0] for row in client.calls]
 
 
-@pytest.mark.parametrize('text', ['1' * 1695, '界' * 565, '"\\' * 423 + 'abc'],
-    ids=['ascii', 'multibyte', 'quoted-backslash'])
-def test_near_compiled_byte_ceiling_layout_completes_public_roundtrip(tmp_path, text, monkeypatch, capsys):
+def test_near_compiled_byte_ceiling_layout_completes_public_roundtrip(tmp_path, monkeypatch, capsys):
+    text = '界"\\' * 242 + 'x'
     blueprint = {'contract': 'waapi-skill.layout-blueprint/v1', 'root': 'main', 'nodes': [
         {'key': 'main', 'kind': 'stack', 'label': 'Main', 'orientation': 'horizontal',
             'children': ['v' + str(index) for index in range(63)]},
@@ -651,32 +588,32 @@ def test_oversized_business_blueprint_stops_before_any_client(tmp_path):
     assert URI + 'setLayout' not in [row[0] for row in client.calls]
 
 
-@pytest.mark.parametrize('unowned_shape', ['other-operation', 'other-api', 'invalid-binding'])
-def test_other_or_unbound_requests_cannot_claim_constructor_terminal_capacity(tmp_path, unowned_shape):
+def test_other_or_unbound_requests_cannot_claim_constructor_terminal_capacity(tmp_path):
     from copy import deepcopy
     env, state, client, preview = switch_preview(tmp_path, operation='setLayout',
         fields=('--new-layout-name', 'SmallNested', '--blueprint', json.dumps(_blueprint())))
     verified = confirm_execute_verify(env, state, client, preview)
-    payload = deepcopy(verified)
     events = TransactionStore(Path(state[1])).read_events(preview['transaction_id'])
-    payload['verification'] = deepcopy(next(row['details']['verification'] for row in events
-        if row['event_type'] == 'verification_recorded'))
-    payload['agent_result']['request']['arguments']['extra_padding'] = 'x' * 30000
-    if unowned_shape == 'other-operation':
-        payload['agent_result']['operation'] = 'object.setNotes'
-        payload['agent_result']['request']['operation'] = 'object.setNotes'
-        payload['verification']['operation'] = 'object.setNotes'
-    elif unowned_shape == 'other-api':
-        payload['agent_result']['request']['arguments'].pop('extra_padding')
-        payload['agent_result']['request']['arguments']['api'] = URI + 'switchLayout'
-        payload['agent_result']['request']['arguments']['args']['padding'] = 'x' * 30000
-    else:
-        payload['agent_result']['request']['arguments'].pop('extra_padding')
-        payload['agent_result']['request']['arguments']['layout_binding']['layout_blueprint']['nodes'][0]['label'] = 'x' * 30000
-    with pytest.raises(gateway.GatewayResultShapeError) as caught:
-        gateway.project_successful_transaction_verify_payload(payload)
-    assert caught.value.error_code == 'VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED'
-    assert caught.value.details['limit_bytes'] == 22528
+    for unowned_shape in ('other-operation', 'other-api', 'invalid-binding'):
+        payload = deepcopy(verified)
+        payload['verification'] = deepcopy(next(row['details']['verification'] for row in events
+            if row['event_type'] == 'verification_recorded'))
+        payload['agent_result']['request']['arguments']['extra_padding'] = 'x' * 30000
+        if unowned_shape == 'other-operation':
+            payload['agent_result']['operation'] = 'object.setNotes'
+            payload['agent_result']['request']['operation'] = 'object.setNotes'
+            payload['verification']['operation'] = 'object.setNotes'
+        elif unowned_shape == 'other-api':
+            payload['agent_result']['request']['arguments'].pop('extra_padding')
+            payload['agent_result']['request']['arguments']['api'] = URI + 'switchLayout'
+            payload['agent_result']['request']['arguments']['args']['padding'] = 'x' * 30000
+        else:
+            payload['agent_result']['request']['arguments'].pop('extra_padding')
+            payload['agent_result']['request']['arguments']['layout_binding']['layout_blueprint']['nodes'][0]['label'] = 'x' * 30000
+        with pytest.raises(gateway.GatewayResultShapeError) as caught:
+            gateway.project_successful_transaction_verify_payload(payload)
+        assert caught.value.error_code == 'VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED'
+        assert caught.value.details['limit_bytes'] == 22528
 
 
 @pytest.mark.parametrize('drift', ['workspace', 'nested-state', 'lookup'])

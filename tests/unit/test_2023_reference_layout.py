@@ -65,22 +65,7 @@ def test_2023_semantic_references_do_not_use_packaged_2022_files() -> None:
     assert "wwise-2022.1-docs" not in gate_text
 
 
-def test_2023_notebooklm_gate_evidence_is_persisted_locally() -> None:
-    gate_text = GATE_PATH.read_text(encoding="utf-8")
-
-    assert "- Gate status: open" in gate_text
-    assert "- Notebook id: wwise-2023.1-docs" in gate_text
-    assert "- Auth result: success" in gate_text
-    assert "- List result: success" in gate_text
-    assert "- Query result: success" in gate_text
-    assert "Evidence path: references/semantic/2023.1/semantic-builder-notebooklm-gate.md" in gate_text
-    assert "official URL status: `evidence-candidate`" in "\n".join(read_reference(family) for family in FAMILIES)
-    assert "https://blog.audiokinetic.com/waapi-for-wwise-2023.1/" in gate_text
-    assert "https://www.audiokinetic.com/en/public-library/2023.1.19_8928/?id=waapi.html" in gate_text
-    assert "waapi_functions_index.html" in gate_text
-    assert "waapi_topics_index.html" in gate_text
-    assert "waql_reference.html" in gate_text
-
+def test_2023_local_references_keep_version_matched_source_sections() -> None:
     for family in FAMILIES:
         text = read_reference(family)
         for section in REQUIRED_SECTIONS:

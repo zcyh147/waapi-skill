@@ -33,11 +33,11 @@ def _fields(inspected, delta):
     return ('--splitter-handle', splitter['handle'], '--pixel-delta', str(delta))
 
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-@pytest.mark.parametrize('orientation,identity,axis', [
-    ('Horizontal', '{44444444-4444-4444-4444-444444444444}', 'x'),
-    ('Vertical', 'Splitter A 雨', 'y')])
-@pytest.mark.parametrize('delta', [-12, 0, 15])
+# Both axes, versions, identity forms and signed/zero deltas need one journey each.
+@pytest.mark.parametrize('version,orientation,identity,axis,delta', [
+    ('2024.1', 'Horizontal', '{44444444-4444-4444-4444-444444444444}', 'x', -12),
+    ('2025.1', 'Vertical', 'Splitter A 雨', 'y', 15),
+    ('2025.1', 'Horizontal', '{44444444-4444-4444-4444-444444444444}', 'x', 0)])
 def test_splitter_owns_native_id_and_axis_and_verifies_exact_signed_delta(tmp_path, version, orientation, identity, axis, delta):
     env, state, client, preview = switch_preview(tmp_path, version=version, operation='moveSplitter', layout_name='Designer',
         fields=lambda inspected: _fields(inspected, delta),

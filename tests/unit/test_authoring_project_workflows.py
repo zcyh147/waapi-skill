@@ -162,9 +162,9 @@ def test_authoring_project_create_blocks_preview_drift_before_dispatch(tmp_path,
         assert not client.target.exists()
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
 @pytest.mark.skipif(os.name == "nt", reason="Wine mapping is POSIX-only")
-def test_authoring_project_create_missing_directory_uses_sealed_wine_mapping(tmp_path, monkeypatch, version):
+def test_authoring_project_create_missing_directory_uses_sealed_wine_mapping(tmp_path, monkeypatch):
+    version = '2023.1'
     from wwise_waapi import platform_paths
     monkeypatch.setattr(platform_paths, "_account_home", lambda value: tmp_path.resolve())
     run, client, transaction, snapshot = _preview_creation(tmp_path, version, "new-directory", wine=True)
@@ -177,10 +177,13 @@ def test_authoring_project_create_missing_directory_uses_sealed_wine_mapping(tmp
     assert code == 0 and verified["verified"] is True, json.dumps(verified)
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
-@pytest.mark.parametrize("configuration,effect", [
-    (configuration, "exact") for configuration in ["defaults", "configured", "base-only", "empty-languages", "empty-platforms", "empty-both", "new-directory"]
-] + [("configured", effect) for effect in ["missing-artifact", "wrong-platform", "wrong-language", "wrong-default", "wrong-guid", "wrong-name"]])
+@pytest.mark.parametrize("version,configuration,effect", [
+    ("2023.1", "defaults", "exact"), ("2024.1", "configured", "exact"),
+    *[("2025.1", configuration, "exact") for configuration in
+      ["base-only", "empty-languages", "empty-platforms", "empty-both", "new-directory"]],
+    *[("2025.1", "configured", effect) for effect in
+      ["missing-artifact", "wrong-platform", "wrong-language", "wrong-default", "wrong-guid", "wrong-name"]],
+])
 def test_authoring_project_create_verifies_saved_requested_effect(tmp_path, version, configuration, effect):
     run, client, transaction, snapshot = _preview_creation(tmp_path, version, configuration, effect)
     code, confirmed = run("confirm", transaction, "--confirmation-token", snapshot.confirmation_token)

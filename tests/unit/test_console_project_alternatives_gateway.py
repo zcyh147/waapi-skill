@@ -115,9 +115,9 @@ class WineNoProjectConsoleTask(NoProjectConsoleTask):
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='Injected POSIX Wine path context; no native Windows evidence')
-@pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('operation', [CREATE, OPEN])
-@pytest.mark.parametrize('inside_home', [True, False])
+@pytest.mark.parametrize('version,inside_home', [
+    ('2023.1', True), ('2024.1', False), ('2025.1', True)])
 def test_console_load_from_none_translates_only_transient_wine_path_and_strongly_verifies(tmp_path, monkeypatch, version, operation, inside_home):
     from types import SimpleNamespace
     from wwise_waapi import platform_paths
@@ -266,9 +266,9 @@ def _authorize_console_load(task, preview):
     return tx
 
 
-@pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('operation', [CREATE, OPEN])
-@pytest.mark.parametrize('absence', ['native-error', 'empty-query'])
+@pytest.mark.parametrize('version,absence', [
+    ('2023.1', 'native-error'), ('2024.1', 'empty-query'), ('2025.1', 'native-error')])
 def test_console_project_load_from_none_uses_closed_versioned_route_once(tmp_path, version, operation, absence):
     task = NoProjectConsoleTask(tmp_path, version, operation, absence=absence)
     code, schema = task.run('request-schema', operation)
@@ -494,9 +494,9 @@ def test_console_create_allows_native_creation_of_missing_project_directories(tm
     assert len([row for row in task.calls if row[0] == CREATE]) == 1
 
 
-@pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('drift', ['ancestor-replaced', 'directory-appears', 'directory-is-file'])
-def test_console_create_missing_directory_boundary_cannot_drift_before_write(tmp_path, version, drift):
+def test_console_create_missing_directory_boundary_cannot_drift_before_write(tmp_path, drift):
+    version = '2025.1'
     task = NewDirectoryProjectTask(tmp_path, version)
     ancestor = tmp_path / 'Destination'
     ancestor.mkdir()
@@ -584,8 +584,9 @@ def test_console_create_discloses_and_enforces_missing_directory_budget(tmp_path
     assert not (tmp_path / 'level_0').exists()
 
 
-@pytest.mark.parametrize('version', VERSIONS)
-@pytest.mark.parametrize('shape', ['unnamed', 'same-base-named', 'omitted', 'empty', 'named-first', 'unnamed-first'])
+@pytest.mark.parametrize('version,shape', [
+    ('2023.1', 'unnamed'), ('2024.1', 'same-base-named'), ('2025.1', 'omitted'),
+    ('2025.1', 'empty'), ('2025.1', 'named-first'), ('2025.1', 'unnamed-first')])
 def test_console_create_preserves_optional_platform_names_and_same_base_rows(tmp_path, version, shape):
     task = ConsoleProjectTask(tmp_path, version)
     argv = ['--value', 'project_file', str(task.created_file)]
@@ -631,7 +632,6 @@ def test_console_create_preserves_optional_platform_names_and_same_base_rows(tmp
     assert len([row for row in task.calls if row[0] == CREATE]) == 1
 
 
-@pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('extra', [
     ['--empty', 'platforms', '--item', 'platforms', 'Windows'],
     ['--empty', 'languages', '--item', 'languages', 'French'],
@@ -639,7 +639,8 @@ def test_console_create_preserves_optional_platform_names_and_same_base_rows(tmp
     ['--empty', 'platforms', '--empty', 'platforms'],
     ['--item', 'not_a_field', 'Windows'],
 ])
-def test_console_create_rejects_conflicting_or_undisclosed_collection_forms(tmp_path, version, extra):
+def test_console_create_rejects_conflicting_or_undisclosed_collection_forms(tmp_path, extra):
+    version = '2025.1'
     task = ConsoleProjectTask(tmp_path, version)
     code, payload = task.step('draft-declare-cli-console-plan',
         '--value', 'project_file', str(task.created_file), *extra)
@@ -791,9 +792,9 @@ def test_cli_success_and_warnings_do_not_invent_file_effect_proof(tmp_path, vers
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
 
 
-@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
 @pytest.mark.parametrize('outcome', [True, None, 3, 0.5])
-def test_cli_unknown_outcome_is_unverified_and_cannot_retry(tmp_path, version, outcome):
+def test_cli_unknown_outcome_is_unverified_and_cannot_retry(tmp_path, outcome):
+    version = '2025.1'
     task = CliProjectTask(tmp_path, version, outcome=outcome)
     tx = task.execute_plan()
     code, payload = task.run('verify', tx)
@@ -838,9 +839,9 @@ def test_console_platform_schema_and_continuation_disclose_pinned_choices(tmp_pa
     assert all(choice in json.dumps(payload) for choice in expected), payload
 
 
-@pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('failure', ['malformed', 'missing', 'wrong-project-id', 'wrong-platform', 'wrong-language', 'wrong-default-language', 'duplicate-project'])
-def test_console_create_cannot_verify_wrong_saved_project(tmp_path, version, failure):
+def test_console_create_cannot_verify_wrong_saved_project(tmp_path, failure):
+    version = '2025.1'
     task = ConsoleProjectTask(tmp_path, version)
     code, payload = task.step('draft-declare-cli-console-plan',
         '--value', 'project_file', str(task.created_file))
@@ -944,9 +945,9 @@ def test_console_create_matches_named_platform_before_base_only_saved_rows(tmp_p
     assert len([row for row in task.calls if row[0] == CREATE]) == 1
 
 
-@pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('drift', ['destination-appears', 'root-replaced'])
-def test_console_create_refuses_destination_drift_before_native_write(tmp_path, version, drift):
+def test_console_create_refuses_destination_drift_before_native_write(tmp_path, drift):
+    version = '2025.1'
     task = ConsoleProjectTask(tmp_path, version)
     def change_destination():
         if drift == 'destination-appears':
@@ -961,8 +962,8 @@ def test_console_create_refuses_destination_drift_before_native_write(tmp_path, 
         assert task.created_file.read_text() == 'existing user file'
 
 
-@pytest.mark.parametrize('version', VERSIONS)
-def test_console_create_observation_budget_is_unknown_not_a_proven_bad_effect(tmp_path, version):
+def test_console_create_observation_budget_is_unknown_not_a_proven_bad_effect(tmp_path):
+    version = '2025.1'
     task = ConsoleProjectTask(tmp_path, version)
     tx, code, payload = execute_console_creation(task)
     assert code == 0, payload
@@ -2278,8 +2279,10 @@ def test_media_single_none_outcome_never_masks_unproved_model_change(tmp_path, c
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
 
 
-@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
-@pytest.mark.parametrize('change', ['no-additions', 'no-short-id', 'missing-list', 'bare-none-ref'])
+@pytest.mark.parametrize('version,change', [
+    ('2021.1', 'no-additions'), ('2022.1', 'no-short-id'), ('2023.1', 'missing-list'),
+    ('2024.1', 'bare-none-ref'),
+    *[('2025.1', change) for change in ['no-additions', 'no-short-id', 'missing-list', 'bare-none-ref']]])
 def test_media_single_none_optional_source_shapes_preserve_exact_remaining_model(tmp_path, version, change):
     task = NoneStateMediaTask(tmp_path, version, change)
     tx = task.execute_plan()

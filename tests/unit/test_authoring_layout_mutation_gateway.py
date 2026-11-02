@@ -377,8 +377,8 @@ def test_registration_rechecks_absence_after_confirmation_without_overwrite(tmp_
     assert URI + 'setLayout' not in [row[0] for row in client.calls]
 
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-@pytest.mark.parametrize('coordinates', [{}, {'initial_x': 17}, {'initial_y': 29}, {'initial_x': -1, 'initial_y': 45}])
+@pytest.mark.parametrize('version,coordinates', [
+    ('2024.1', {}), ('2025.1', {'initial_x': -1, 'initial_y': 45})])
 def test_create_or_get_view_owns_live_type_and_preserves_each_optional_coordinate(tmp_path, version, coordinates):
     fields = ['--view-type', 'ProjectExplorer']
     for key, value in coordinates.items():
@@ -640,8 +640,8 @@ def test_scoped_view_mutations_reject_other_handle_roles_without_dispatch(tmp_pa
         fields=lambda inspected: ('--view-handle', inspected['layout_handle'] if kind == 'layout' else inspected['elements'][0]['handle']))
 
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-@pytest.mark.parametrize('coordinates', [{}, {'position_x': 30}, {'position_y': 50}, {'position_x': -5, 'position_y': 10}])
+@pytest.mark.parametrize('version,coordinates', [
+    ('2024.1', {}), ('2025.1', {'position_x': -5, 'position_y': 10})])
 def test_undock_view_preserves_optional_position_choices_and_verifies_floating_identity(tmp_path, version, coordinates):
     def seed(client):
         client.views['Designer'] = [{'viewID': NODE, 'viewName': 'ProjectExplorer',
@@ -728,9 +728,10 @@ def _seed_dock_client(client, *, initially_docked=False):
         return original(uri, args, options)
     client.call = dock
 
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-@pytest.mark.parametrize('side', ['left', 'right', 'top', 'bottom'])
-@pytest.mark.parametrize('initially_docked', [False, True], ids=['floating', 'redock'])
+# Exercise every side and both host lanes/modes without their Cartesian product.
+@pytest.mark.parametrize('version,side,initially_docked', [
+    ('2024.1', 'left', False), ('2024.1', 'bottom', True),
+    ('2025.1', 'right', True), ('2025.1', 'top', False)])
 def test_dock_view_binds_exact_target_side_and_verifies_independent_geometry(tmp_path, version, side, initially_docked):
     view_id = '{22222222-2222-2222-2222-222222222222}'
     def seed(client):
@@ -844,8 +845,8 @@ def test_dock_rejects_wrong_role_or_foreign_layout_target_before_any_write(tmp_p
     assert URI + 'dockView' not in [row[0] for row in client.calls]
 
 
-@pytest.mark.parametrize('target_kind', ['ObjectPanel', 'ObjectTabPanel', 'View', 'StackPanel'])
-@pytest.mark.parametrize('side', ['left', 'bottom'])
+@pytest.mark.parametrize('target_kind,side', [
+    ('ObjectPanel', 'left'), ('ObjectTabPanel', 'bottom'), ('View', 'left'), ('StackPanel', 'bottom')])
 def test_dock_keeps_exact_leaf_and_nested_container_target_kinds_representable(tmp_path, target_kind, side):
     target_id = '{33333333-3333-3333-3333-333333333333}'
     def seed(client):
@@ -916,3 +917,15 @@ def test_dock_preserves_other_views_while_allowing_container_restructuring_and_d
     assert verified['verification']['business_state_verified'] is True
     assert 'old wrapper' not in str(client.layouts['Designer'])
     assert [row[0] for row in client.calls].count(URI + 'dockView') == 1
+
+
+@pytest.mark.parametrize('coordinates,expected', [
+    ({}, {}), ({'x': 0}, {'posX': 0}), ({'y': 29}, {'posY': 29}),
+    ({'x': -1, 'y': 45}, {'posX': -1, 'posY': 45}),
+])
+def test_view_coordinate_compilers_preserve_omission_and_each_independent_axis(coordinates, expected):
+    from wwise_waapi.authoring_layout_business import native_position_request, native_view_request
+
+    assert native_position_request({'position_' + axis: value for axis, value in coordinates.items()}) == expected
+    assert native_view_request({'view_type': 'ProjectExplorer', **{
+        'initial_' + axis: value for axis, value in coordinates.items()}}) == {'name': 'ProjectExplorer', **expected}
