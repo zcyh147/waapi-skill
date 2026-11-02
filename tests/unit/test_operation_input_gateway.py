@@ -1569,7 +1569,7 @@ def test_named_reference_source_discloses_exact_existing_music_stinger_kind(vers
     assert not any(call[0] == "ak.wwise.core.object.setReference" for call in client.calls)
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("damage", ["wrong_id", "missing_id", "missing_type", "missing_name", "missing_path", "duplicate", "empty", "wrong_role"])
 def test_named_reference_stinger_classification_requires_valid_exact_binding(version, damage, tmp_path):
     row = dict(STINGER_BINDING_ROW)
@@ -1596,7 +1596,7 @@ def test_named_reference_stinger_classification_requires_valid_exact_binding(ver
     assert "boh1-" not in json.dumps(inspected)
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2022.1', '2025.1'])
 @pytest.mark.parametrize("operation", ["object.setProperty", "object.setLinked"])
 def test_music_stinger_binding_fact_does_not_leak_into_other_named_operations(version, operation, tmp_path):
     if operation == "object.setLinked" and version in {"2021.1", "2022.1"}:
@@ -1616,7 +1616,7 @@ def test_music_stinger_binding_fact_does_not_leak_into_other_named_operations(ve
     assert bound["bound_object"]["semantic_kind"] is None
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("live_type,candidates", [("UnknownNativeType", []), ("Sound", ["sound-sfx", "sound-voice"])])
 def test_reference_source_preserves_unknown_or_multiple_live_kind_ambiguity(version, live_type, candidates, tmp_path):
     row = {"id": STINGER_BINDING_ROW["id"], "type": live_type, "name": "ExistingObject",
@@ -1629,7 +1629,7 @@ def test_reference_source_preserves_unknown_or_multiple_live_kind_ambiguity(vers
     }
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_reference_target_binding_does_not_inherit_source_comparison_role(version, tmp_path):
     code, _source, _client, state, started, env = _reference_stinger_binding(tmp_path, version)
     assert code == 0

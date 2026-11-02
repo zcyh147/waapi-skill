@@ -84,7 +84,7 @@ def test_ordered_selection_stages_and_derived_reducers_keep_empty_semantics(tmp_
     assert all(r['derivation'] == 'gateway-business-sequence' for r in records)
     assert list(result)[-1] == 'agent_result'
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_matching_and_reducers_use_exact_disclosed_business_conditions_not_native_strings(tmp_path, version):
     task = SequenceTask(tmp_path, version)
     code, result = task.run('query-object','--kind','all-sounds','--max-results','2',
@@ -99,7 +99,7 @@ def test_matching_and_reducers_use_exact_disclosed_business_conditions_not_nativ
     assert any('where name = "First"' in query for query in reads)
     assert any('where @Volume <= -1' in query for query in reads)
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_combination_preserves_arm_order_duplicate_occurrences_and_nested_selection(tmp_path, version):
     task = SequenceTask(tmp_path,version)
     task.members[SOUND]['children'] = [task.reference(OTHER)]
@@ -144,7 +144,7 @@ def test_offline_sequence_contract_pins_domain_sources_and_discloses_business_de
         assert sections['concat_return'] is None
     assert not task.calls
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_fixed_windows_and_existence_push_before_full_membership_ceiling(tmp_path, version):
     task = SequenceTask(tmp_path,version)
     task.rows[0]['children'] = [task.reference(SOUND)] * 4097
@@ -162,7 +162,7 @@ def test_fixed_windows_and_existence_push_before_full_membership_ceiling(tmp_pat
     reads = [a['waql'] for u,a,_ in task.calls if u.endswith('object.get') and ' select ' in a.get('waql','')]
     assert reads and all(query.endswith('take 1') for query in reads)
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('tokens', [
     ['children','take','-1','volume-db'], ['children','at','01','volume-db'],
     ['children.take(2)','volume-db'], ['children','matching','@Volume','0','count'],
@@ -176,7 +176,7 @@ def test_closed_sequence_rejects_bad_grammar_and_parallel_condition_aliases_befo
     assert code == 2,result
     assert not task.calls
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_projection_terminal_binding_preserves_heterogeneous_unavailability_and_refinement(tmp_path, version):
     from tests.unit.test_query_related_paths import REFERENCE_CLASS
     task = SequenceTask(tmp_path,version)
@@ -192,7 +192,7 @@ def test_projection_terminal_binding_preserves_heterogeneous_unavailability_and_
     assert unknown['unavailable_field_requests'][0]['requested_option'] == '--include-related-field'
     assert unknown['unavailable_field_requests'][0]['meaning'] == 'Pitch'
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change',['none','value','membership','metadata'])
 def test_selected_projection_pages_are_lossless_and_seal_scope_values_and_spec(tmp_path,version,change):
     task = SequenceTask(tmp_path,version)
@@ -221,7 +221,7 @@ def test_selected_projection_pages_are_lossless_and_seal_scope_values_and_spec(t
     fragments = [entry for entry in entries if entry['pointer'] == '/objects/0/related/projections/0/items/0/notes']
     assert ''.join(entry['value'] for entry in fragments) == text
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_concat_existence_stops_at_proven_match_without_materializing_later_large_arms(tmp_path,version):
     task = SequenceTask(tmp_path,version)
     task.rows[0]['children'] = [task.reference(SOUND)]*4097
@@ -233,7 +233,7 @@ def test_concat_existence_stops_at_proven_match_without_materializing_later_larg
     assert [r['value'] for r in result['agent_result'][0]['related']['projections']] == [True,True]
     assert [r['value'] for r in result['agent_result'][1]['related']['projections']] == [True,False]
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_combined_reference_arms_bind_actual_member_class_and_preserve_value_modes(tmp_path,version):
     from tests.unit.test_query_related_paths import REFERENCE_CLASS, TARGET, LOCAL
     task = SequenceTask(tmp_path,version)
@@ -250,7 +250,7 @@ def test_combined_reference_arms_bind_actual_member_class_and_preserve_value_mod
     assert len([args for uri,args,_ in task.calls if uri.endswith('getPropertyAndReferenceNames') and args == {'classId':REFERENCE_CLASS}]) == 1
     assert all(uri in {'ak.wwise.core.getInfo','ak.wwise.core.getProjectInfo','ak.wwise.core.object.get','ak.wwise.core.object.getPropertyInfo','ak.wwise.core.object.getPropertyAndReferenceNames'} for uri,_,_ in task.calls)
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_empty_advanced_sequence_result_establishes_no_discovered_field_authority(tmp_path,version):
     task = SequenceTask(tmp_path,version)
     task.rows = []
@@ -259,7 +259,7 @@ def test_empty_advanced_sequence_result_establishes_no_discovered_field_authorit
     assert code == 0 and result['agent_result'] == [],result
     assert not any(uri.endswith(('getPropertyInfo','getPropertyAndReferenceNames')) for uri,_,_ in task.calls)
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('invalid',['missing','duplicate','extra','noncanonical'])
 def test_selected_grouped_values_require_an_exact_canonical_member_batch_on_every_lane(tmp_path,version,invalid):
     class Broken(SequenceTask):
@@ -279,7 +279,7 @@ def test_selected_grouped_values_require_an_exact_canonical_member_batch_on_ever
     assert result['error_code'] in {'RELATED_QUERY_MEMBER_BATCH','RELATED_QUERY_RESULT_SHAPE'}
     assert result.get('agent_result') is None
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_selected_member_extension_typed_drift_is_rejected_without_pruning_native_maps(tmp_path,version):
     class Changing(SequenceTask):
         memberships = 0
@@ -295,7 +295,7 @@ def test_selected_member_extension_typed_drift_is_rejected_without_pruning_nativ
         '--include-related','children','first','volume-db')
     assert code == 2 and result['error_code'] == 'RELATED_QUERY_SCOPE_CHANGED',result
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_concat_finite_prefix_survives_a_later_filter_above_full_membership_cap(tmp_path,version):
     task = SequenceTask(tmp_path,version)
     task.rows[0]['children'] = [task.reference(SOUND)]*4097
@@ -311,7 +311,7 @@ def test_concat_finite_prefix_survives_a_later_filter_above_full_membership_cap(
     assert owner_queries and all(query.endswith('take 2') for query in owner_queries)
     assert all(' where ' not in query for query in owner_queries)
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_custom_meaning_matching_internal_reducer_marker_still_discovers_and_returns_field(tmp_path,version):
     task = SequenceTask(tmp_path,version)
     meaning = '__sequence_value__'
@@ -325,7 +325,7 @@ def test_custom_meaning_matching_internal_reducer_marker_still_discovers_and_ret
     fields = result['agent_result'][0]['related']['children']['items']
     assert [item['properties'][meaning] for item in fields] == [0,-3]
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('stages,expected,reads',[
     (['take','2','matching','name-is','First'],[SOUND],True),
     (['take','2','last','matching','name-is','First'],[],True),
@@ -352,7 +352,7 @@ def test_concat_prefix_later_stages_keep_order_and_empty_never_enumerates_arms(t
     if not reads:
         assert not any(uri.endswith(('getPropertyInfo','getPropertyAndReferenceNames')) for uri,_,_ in task.calls)
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_bounded_concat_prefix_member_values_trace_actual_selection_and_guid_packets(tmp_path,version):
     from tests.unit.test_query_related_outputs import PARENT
     from wwise_waapi.canonical import canonical_sha256

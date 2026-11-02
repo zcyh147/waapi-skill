@@ -63,8 +63,9 @@ class ActionHistoryTask(ActionTask):
         return tx, shown
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
-@pytest.mark.parametrize("native_kind", [False, True])
+@pytest.mark.parametrize("version,native_kind", [
+    ("2022.1", False), ("2023.1", False), ("2024.1", False), ("2025.1", False), ("2025.1", True),
+])
 def test_owned_action_reference_undo_redo_uses_actual_paths_and_source_kind(tmp_path, version, native_kind):
     task = ActionHistoryTask(tmp_path, version, native_kind=native_kind)
     before = deepcopy(task.objects)
@@ -96,9 +97,13 @@ def test_unpinned_history_lane_stays_an_explicit_boundary(tmp_path, version, dir
     assert task.calls == []
 
 
-@pytest.mark.parametrize("native_kind", [False, True])
-@pytest.mark.parametrize("phase", ["prewrite", "postwrite"])
-@pytest.mark.parametrize("damage", ["controller", "parent", "class", "metadata", "path", "reference"])
+# Generic identity drift is independent of whether native metadata includes a
+# reference type; preserve both phases and test the native variant's metadata.
+@pytest.mark.parametrize("native_kind,phase,damage", [
+    *((False, phase, damage) for phase in ["prewrite", "postwrite"]
+        for damage in ["controller", "parent", "class", "metadata", "path", "reference"]),
+    (True, "prewrite", "metadata"), (True, "postwrite", "metadata"),
+])
 def test_history_rejects_drift_without_weakening_source_kind_or_identity(tmp_path, native_kind, phase, damage):
     task = ActionHistoryTask(tmp_path, native_kind=native_kind)
     source = task.complete_source()

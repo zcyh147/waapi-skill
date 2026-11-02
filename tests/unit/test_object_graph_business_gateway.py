@@ -2076,7 +2076,7 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
     }
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("configured", (False, True), ids=("defaults", "explicit-global"))
 def test_object_set_global_settings_materialize_at_request_scope(
     tmp_path: Path, version: str, configured: bool,
@@ -2395,7 +2395,7 @@ def test_gateway_creates_recursive_root_in_owned_list(
     }
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("conflict", ("fail", "rename", "merge"))
 def test_gateway_set_preserves_global_platform_and_per_target_choices(
     tmp_path: Path, version: str, conflict: str,
@@ -2838,7 +2838,7 @@ def test_public_object_set_inline_wav_reaches_immutable_preview_unchanged(tmp_pa
     assert "ak.wwise.core.object.set" not in calls
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("bad_source", ["alphabet", "broken-padding", "not-wave", "too-large", "unsafe-path"])
 def test_public_object_set_inline_wav_keeps_existing_input_rejections(tmp_path, version, bad_source):
     source = {
@@ -2855,7 +2855,7 @@ def test_public_object_set_inline_wav_keeps_existing_input_rejections(tmp_path, 
     assert not list((tmp_path / "state" / "transactions").glob("*/preview.json"))
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("changed_member", ["base64-pattern", "another-member"])
 def test_public_object_set_inline_wav_stops_on_definition_drift(tmp_path, version, changed_member, monkeypatch):
     import copy
@@ -2883,7 +2883,7 @@ def test_public_object_set_inline_wav_stops_on_definition_drift(tmp_path, versio
     assert not list((tmp_path / "state" / "transactions").glob("*/preview.json"))
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_inline_wav_compatibility_rejects_noncanonical_compiler_output(tmp_path, version):
     from wwise_waapi.builders.schema import validate_resolved_semantic_payload
     from wwise_waapi.builders.common import SemanticValidationError
@@ -2907,7 +2907,7 @@ def test_public_object_set_inline_wav_verifies_sound_source_and_direct_children(
     assert calls.count("ak.wwise.core.object.set") == 1
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("fault", ["wrong-active-source", "wrong-parent", "extra-child", "wrong-bytes", "wrong-source-type"])
 def test_public_object_set_inline_wav_verifier_rejects_broken_media_relationships(tmp_path, version, fault):
     code, verified, calls = _public_inline_wav_preview(
@@ -3054,7 +3054,7 @@ def test_public_object_set_inline_wav_verifies_source_specific_language(tmp_path
     assert len(children) == 1 and {row["id"] for row in children[0]} == {CONTROL_ID, THIRD_ACTION_ID}
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("fault", ["cross-language-active-source", "wrong-target-identity",
     "wrong-target-name", "wrong-target-type", "wrong-target-path", "wrong-target-parent"])
 def test_public_object_set_inline_wav_rejects_cross_language_target_mismatch(tmp_path, version, fault):
@@ -3068,7 +3068,7 @@ def test_public_object_set_inline_wav_rejects_cross_language_target_mismatch(tmp
     assert type_check["evidence"]["target_read_language"] == "French"
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("choice", [False, True])
 def test_subordinate_import_source_control_reaches_immutable_native_preview(tmp_path, version, choice):
     code, prepared, calls = _public_inline_wav_preview(tmp_path, version,

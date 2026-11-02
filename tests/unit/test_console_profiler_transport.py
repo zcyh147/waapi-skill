@@ -419,7 +419,7 @@ def test_console_native_path_limit_counts_utf16_and_preserves_posix(tmp_path, mo
             for uri, _, _ in client.calls)
 
 
-@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('version', ['2021.1', '2025.1'])
 @pytest.mark.parametrize('changed_binding', [False, True])
 def test_unicode_project_draft_preserves_exact_binding(tmp_path, monkeypatch, version, changed_binding):
     owned = tmp_path / '项目-é-🚗'

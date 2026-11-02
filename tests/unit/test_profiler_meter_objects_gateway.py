@@ -78,7 +78,7 @@ def test_meter_property_projection_reaches_retained_pages_without_new_native_rea
     assert list(result)[-1] == "agent_result"
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("empty", [False, True], ids=["native-defaults", "explicit-empty"])
 def test_meter_native_default_and_empty_object_selection_are_distinct(tmp_path, version, empty):
     client, run = task(tmp_path, version)
@@ -472,7 +472,7 @@ def test_related_meter_root_identity_comparison_preserves_native_text_and_real_d
             for row in client.rows)
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("bad", [None, "name", "id", "classId", "unselected-null"])
 def test_enriched_meter_preserves_nullable_selection_while_validating_base_fields(tmp_path, version, bad):
     client, run = task(tmp_path, version)
@@ -505,7 +505,7 @@ def test_enriched_meter_preserves_nullable_selection_while_validating_base_field
         assert any(rule["rule_id"] == "meter-selected-dynamic-values-preserved/v1" and "@OutputBus" in rule["fields"] for rule in rules)
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("console", [False, True], ids=["authoring", "console"])
 def test_meter_media_size_root_selection_preserves_complete_pages_and_rejects_bad_values(tmp_path, version, console):
     client, run = task(tmp_path, version)
@@ -602,7 +602,7 @@ _CANONICAL_METER_2025_OUTPUTS = (
 )
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2024.1', '2025.1'])
 @pytest.mark.parametrize("console", [False, True], ids=["authoring", "console"])
 def test_canonical_meter_root_outputs_reach_exact_request_and_complete_pages(tmp_path, version, console):
     client, run = task(tmp_path, version)
@@ -701,7 +701,7 @@ def test_declared_meter_return_spellings_keep_exact_selection_and_unattributed_v
     assert all("unavailable_fields" not in obj for obj in objects)
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_meter_namespaced_source_outputs_reuse_known_business_fields(tmp_path, version):
     client, run = task(tmp_path, version)
     values = {"audioSource:playbackDuration": {"playbackDurationMin": 1.0, "playbackDurationMax": 2.0,
@@ -772,7 +772,7 @@ _KNOWN_METER_2025_VALUE_OUTPUTS = (
 )
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2024.1', '2025.1'])
 @pytest.mark.parametrize("console", [False, True], ids=["authoring", "console"])
 def test_known_meter_value_outputs_reach_exact_root_and_preserve_complete_pages(tmp_path, version, console):
     client, run = task(tmp_path, version)

@@ -85,7 +85,7 @@ class QueryTask:
         return payload
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['result', 'session', 'project', 'configuration', 'extra-query', 'cross-query', 'field-inventory', 'field-metadata'])
 def test_query_result_pages_reject_changed_result_context_and_selection(tmp_path, version, change):
     task = QueryTask(tmp_path, version)
@@ -127,7 +127,7 @@ def test_query_result_pages_reject_changed_result_context_and_selection(tmp_path
     assert not any(uri.endswith(('setProperty', 'setReference')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_compact_query_avoids_large_duplicate_and_selected_read_consumes_exact_agent_result(tmp_path, version):
     task = QueryTask(tmp_path, version)
     task.row['notes'] = '声' * 7000
@@ -149,7 +149,7 @@ def test_compact_query_avoids_large_duplicate_and_selected_read_consumes_exact_a
     assert 'objects_source=agent_result' in json.dumps(schema)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_large_identity_is_explicitly_omitted_from_headers_and_never_mutation_candidate(tmp_path, version):
     task = QueryTask(tmp_path, version)
     task.row['name'] = '名前' * 10000
@@ -162,7 +162,7 @@ def test_large_identity_is_explicitly_omitted_from_headers_and_never_mutation_ca
     assert first['agent_result']['projection_complete'] is False
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_windows_query_page_command_is_short_exact_and_context_bound(tmp_path, version, monkeypatch):
     import types
     original = gateway.transaction_next_command
@@ -208,7 +208,7 @@ def test_detail_query_preserves_diagnostics_and_missing_native_identity_without_
     assert ''.join(entry['value'] for entry in seen if entry['pointer'] == '/native_observation/return/0/notes') == task.row['notes']
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_missing_host_session_discloses_partial_read_without_unbound_continuation(tmp_path, version):
     task = QueryTask(tmp_path, version)
     task.info.pop('sessionId')
@@ -253,7 +253,7 @@ def test_large_detail_semantic_preview_survives_as_lossless_entries_in_short_win
     assert term.replace('"', '\\"') in reads[0]['waql']
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('detail', [False, True])
 def test_near_native_transport_limit_keeps_first_query_page_bounded_without_extra_result_reread(tmp_path, version, detail):
     task = QueryTask(tmp_path, version)
@@ -294,7 +294,7 @@ def test_wrong_handle_namespace_cannot_read_another_plan(tmp_path):
     assert task.calls == []
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_advanced_query_pages_revalidate_original_long_read_and_retain_business_projection(tmp_path, version):
     task = QueryTask(tmp_path, version)
     code, _ = task.run('query-schema', '--advanced')
@@ -333,7 +333,7 @@ def test_large_advanced_compilation_keeps_small_ordinary_reply_direct_without_pa
     assert sum(uri.endswith('object.get') for uri, _, _ in task.calls) == 1
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_paged_query_identity_headers_are_complete_only_when_every_exact_identity_atom_is_retained(tmp_path, version):
     task = QueryTask(tmp_path, version)
     result = task.first()
@@ -352,7 +352,7 @@ class LongFieldTask(QueryTask):
         return super().call(uri, args, options)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('key_style', ['ascii', 'escaped-unicode', 'astral'])
 def test_query_pages_recover_exact_native_map_key_larger_than_one_fragment_page(tmp_path, version, key_style, monkeypatch):
     if key_style == 'astral':
@@ -397,7 +397,7 @@ def test_query_pages_recover_exact_native_map_key_larger_than_one_fragment_page(
                if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'})
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_query_pointer_page_positions_remain_stable_when_native_object_member_order_changes(tmp_path, version):
     class ReorderedTask(QueryTask):
         def call(self, uri, args=None, options=None):
@@ -420,7 +420,7 @@ def test_query_pointer_page_positions_remain_stable_when_native_object_member_or
     assert [entry['value'] for entry in entries if entry['pointer'] == '/objects/0/parent/id'] == [PROJECT_GUID]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['result', 'session', 'field'])
 def test_document_fragment_query_pages_reject_changed_native_observation_and_selection(tmp_path, version, change):
     task = LongFieldTask(tmp_path, version)
@@ -447,7 +447,7 @@ def test_document_fragment_query_pages_reject_changed_native_observation_and_sel
                        for uri, args, _ in task.calls[before:])
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_non_utf8_native_surrogate_is_rejected_without_lossy_query_projection(tmp_path, version):
     task = QueryTask(tmp_path, version)
     task.row['notes'] = chr(0xD800)

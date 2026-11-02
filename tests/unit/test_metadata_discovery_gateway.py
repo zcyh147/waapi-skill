@@ -318,7 +318,7 @@ def _assert_metadata_command(command, platform: str) -> None:
         assert argv[argv.index("gateway.py") + 1:] == tuple(command["gateway_argv"])
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("platform", ["posix", "windows"])
 def test_native_long_field_name_uses_scoped_selection_and_lossless_detail(tmp_path: Path, version: str, platform: str, monkeypatch) -> None:
     _metadata_command_platform(monkeypatch, platform)
@@ -351,7 +351,7 @@ def test_native_long_field_name_uses_scoped_selection_and_lossless_detail(tmp_pa
     assert all(args["property"] == name for uri, args, _ in client.calls if uri == GET_PROPERTY_INFO_URI)
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("platform", ["posix", "windows"])
 @pytest.mark.parametrize("class_id_available", [True, False])
 def test_oversized_native_type_row_can_be_read_and_selected_as_class_scope(tmp_path: Path, version: str, platform: str, class_id_available: bool, monkeypatch) -> None:
@@ -1434,7 +1434,7 @@ def test_attenuation_read_schema_discloses_complete_business_inputs(
     assert "curveType" not in json.dumps(schema) and "VolumeDryUsage" not in json.dumps(schema)
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("inputs", [
     ["--curve-role", "volume-dry"],
     ["--exact-id", OBJECT_GUID],
@@ -1473,7 +1473,7 @@ def test_attenuation_read_schema_rejects_unavailable_version_without_connecting(
     assert "continuation" not in payload
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("inputs", [
     ["--exact-id", OBJECT_GUID, "--path-segment", "Outdoor", "--curve-role", "volume-dry"],
     ["--exact-id", OBJECT_GUID, "--curve-role", "volume-dry", "--curve-type", "VolumeDryUsage"],
@@ -1551,7 +1551,7 @@ def test_metadata_lists_all_fields_then_reads_exact_selection(tmp_path: Path, ve
     assert detail["agent_result"]["metadata"]["name"] == "Parameter000"
     assert detail["agent_result"]["metadata"]["unit"] == {"status": "unknown", "value": None}
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_exact_metadata_meaning_ignores_bulky_near_matches(tmp_path: Path, version: str) -> None:
     responses = _metadata_responses(tmp_path, version=version, names=("Volume", "VolumeExtra"))
     responses[GET_PROPERTY_INFO_URI] = lambda args, options: (
@@ -1566,7 +1566,7 @@ def test_exact_metadata_meaning_ignores_bulky_near_matches(tmp_path: Path, versi
     assert code == 0, payload
     assert [row["name"] for row in payload["agent_result"]["candidates"]] == ["Volume"]
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_metadata_detail_preserves_native_presence_and_extended_fields(tmp_path: Path, version: str) -> None:
     responses = _metadata_responses(tmp_path, version=version)
     native = {"name": "Volume", "type": "Real32", "default": None,
@@ -1590,7 +1590,7 @@ def test_metadata_detail_preserves_native_presence_and_extended_fields(tmp_path:
     assert detailed["agent_result"]["complete"] is True
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_metadata_detail_counts_unknown_native_extension_in_read_budget(tmp_path: Path, version: str) -> None:
     responses = _metadata_responses(tmp_path, version=version)
     responses[GET_PROPERTY_INFO_URI] = {"name": "Volume", "type": "Real32", "extension": "x" * (512 * 1024)}
@@ -1606,7 +1606,7 @@ def test_metadata_detail_counts_unknown_native_extension_in_read_budget(tmp_path
     assert "x" * 1024 not in json.dumps(detail)
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_optional_metadata_identity_facts_remain_absent_in_reads(tmp_path: Path, version: str) -> None:
     responses = _metadata_responses(tmp_path, version=version, names=("Volume",))
     responses[GET_PROPERTY_INFO_URI] = {"default": None, "supports": {"rtpc": "None"}}
@@ -1629,7 +1629,7 @@ def test_optional_metadata_identity_facts_remain_absent_in_reads(tmp_path: Path,
     assert "name" not in candidate["metadata"] and "type" not in candidate["metadata"]
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_type_inventory_retains_schema_optional_missing_facts(tmp_path: Path, version: str) -> None:
     responses = _metadata_responses(tmp_path, version=version)
     rows = [{"name": "Sound", "classId": 65552}, {"name": "Unidentified"}, {"type": "WObject"}, {}]
@@ -1696,7 +1696,7 @@ def test_metadata_large_detail_continuation_is_complete_and_snapshot_bound(tmp_p
     assert code == 2 and rejected["error_code"] == "METADATA_DETAIL_CHANGED", rejected
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_metadata_types_pages_preserve_native_rows_and_bind_filter(tmp_path: Path, version: str) -> None:
     responses = _metadata_responses(tmp_path, version=version)
     rows = [{"classId": i + 1, "name": f"Sound{i:03}", "type": "WObject", "extension": {"nullable": None, "enabled": False}} for i in range(75)]

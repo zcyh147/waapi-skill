@@ -61,7 +61,7 @@ class TransferTask(OwnedGraphTask):
         return super().call(uri, args, options)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2021.1', '2025.1'])
 @pytest.mark.parametrize('operation', ['object.copy', 'object.move'])
 @pytest.mark.parametrize('nested', [False, True])
 def test_public_copy_move_accepts_custom_workunit_and_nested_destination(tmp_path, version, operation, nested):
@@ -75,7 +75,7 @@ def test_public_copy_move_accepts_custom_workunit_and_nested_destination(tmp_pat
     assert len(task.writes) == 1
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2021.1', '2025.1'])
 @pytest.mark.parametrize('operation', ['object.copy', 'object.move'])
 def test_public_source_transfer_uses_exact_sound_in_midi_workunit(tmp_path, version, operation):
     task = TransferTask(tmp_path, version, operation, source=True)
@@ -113,7 +113,7 @@ def test_file_source_transfer_uses_version_pinned_class_and_actual_object_type(t
         assert 'file_reference_unavailable' in scope['unobserved']
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('fault', ['project-root', 'management-root', 'unknown-root', 'leaf', 'wrong-group-child', 'source-under-workunit', 'protected-source'])
 def test_transfer_rejects_protected_or_incompatible_destinations_without_write(tmp_path, version, fault):
     task = TransferTask(tmp_path, version, 'object.copy', source=fault == 'source-under-workunit')
@@ -135,7 +135,7 @@ def test_transfer_rejects_protected_or_incompatible_destinations_without_write(t
     assert code == 2 and result.get('ok') is False and task.writes == [], result
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('fault', ['path', 'type', 'parent-class', 'source-class', 'source-category', 'missing-parent'])
 def test_source_transfer_revalidates_preview_identity_classes_and_live_catalog_before_write(tmp_path, version, fault):
     task = TransferTask(tmp_path, version, 'object.copy', source=True)

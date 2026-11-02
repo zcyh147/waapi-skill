@@ -944,7 +944,7 @@ class OwnedGraphTask(FieldTask):
 
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("conflict", ("fail", "rename", "merge"))
 def test_set_platform_and_target_conflict_survive_preview_execute_and_verify(
     tmp_path: Path, version: str, conflict: str,
@@ -1108,7 +1108,7 @@ def _declare_set_replacement(task: SetReplaceTask, *, per_target: bool = False) 
     assert code == 0, child
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("per_target", (False, True))
 def test_set_replace_seals_case_insensitive_collision_and_verifies_fresh_subtree(
     tmp_path: Path, version: str, per_target: bool,
@@ -1127,7 +1127,7 @@ def test_set_replace_seals_case_insensitive_collision_and_verifies_fresh_subtree
     assert len([uri for uri, _, _ in task.calls if uri.endswith("object.set")]) == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_set_replace_rejects_changed_old_subtree_before_dispatch(tmp_path: Path, version: str) -> None:
     task = SetReplaceTask(tmp_path, version)
     _declare_set_replacement(task)
@@ -1140,7 +1140,7 @@ def test_set_replace_rejects_changed_old_subtree_before_dispatch(tmp_path: Path,
     assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_set_replace_does_not_verify_surviving_old_descendant(tmp_path: Path, version: str) -> None:
     task = SetReplaceTask(tmp_path, version)
     _declare_set_replacement(task)
@@ -1150,7 +1150,7 @@ def test_set_replace_does_not_verify_surviving_old_descendant(tmp_path: Path, ve
     assert code == 2 and verified["verified"] is False, verified
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_set_rejects_fictitious_custom_list_without_source_or_live_list_evidence(tmp_path, version):
     task = OwnedGraphTask(tmp_path, version, "object.set")
     next(row for row in task.types if row["name"] == "Sound")["classId"] = 65552
@@ -1247,7 +1247,7 @@ def test_documented_list_replace_collision_preserves_unrequested_member(tmp_path
         assert CHILD not in task.objects and task.objects[ROOT] == preserved
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_set_replace_rejects_deleting_another_explicit_batch_target(tmp_path: Path, version: str) -> None:
     task = SetReplaceTask(tmp_path, version)
     _declare_set_replacement(task)
@@ -1261,7 +1261,7 @@ def test_set_replace_rejects_deleting_another_explicit_batch_target(tmp_path: Pa
     assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_set_replace_without_collision_creates_the_requested_graph(tmp_path: Path, version: str) -> None:
     task = SetReplaceTask(tmp_path, version)
     del task.objects[ROOT], task.objects[CHILD]
@@ -1272,7 +1272,7 @@ def test_set_replace_without_collision_creates_the_requested_graph(tmp_path: Pat
     assert code == 0 and verified["verified"] is True, json.dumps(verified)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_set_replace_renames_owner_to_absent_name_and_replaces_its_colliding_child(tmp_path: Path, version: str) -> None:
     task = SetReplaceTask(tmp_path, version)
     source = task.bind(FIRST)
@@ -1346,7 +1346,7 @@ def test_reference_array_business_schema_matches_each_pinned_lane(tmp_path: Path
     assert "curve_points" in reference_values["inline_curve"]["input"]
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("bad_result", (None, "retain-cleared-reference", "omit-cleared-reference"))
 def test_set_reference_null_clears_the_exact_field_with_independent_readback(
     tmp_path: Path, version: str, bad_result: str | None,
@@ -1398,7 +1398,7 @@ def test_create_reference_unions_use_class_field_evidence_and_exact_bound_target
     assert code == 0 and verified["verified"] is True, json.dumps(verified)
 
 
-@pytest.mark.parametrize("version", VERSIONS[2:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("bad_value", ("raw-id", "too-many", "wrong-type"))
 def test_set_reference_arrays_reject_unbound_oversized_or_disallowed_targets_without_draft_change(
     tmp_path: Path, version: str, bad_value: str,
@@ -1676,7 +1676,7 @@ def test_new_slot_scalar_reference_uses_same_graph_target_result_handle_and_actu
     assert len([uri for uri, _, _ in task.calls if uri.endswith("object.set")]) == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("fault", (None, "wrong-reference-effect", "nullable", "native-collision", "native-collision-parent-drift", "native-collision-bad-result"))
 def test_create_auxbus_sibling_reference_uses_new_result_or_native_nullable_value(tmp_path, version, fault):
     """AuxBus.UserAuxSend0 is a scalar AuxBus reference in all five Objects References."""

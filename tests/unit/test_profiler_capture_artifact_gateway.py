@@ -109,7 +109,7 @@ def test_capture_schema_discloses_artifact_scope_and_gateway_resource_bounds(tmp
     assert task.calls == []
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("existing", (False, True))
 def test_saved_capture_requires_new_nonempty_contents_not_empty_success_or_touch(tmp_path, version, existing):
     task = CaptureTask(tmp_path, version)

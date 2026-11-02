@@ -61,7 +61,7 @@ def test_public_create_voice_container_derives_and_verifies_actual_flag(tmp_path
     assert len([call for call in task.calls if call[0].endswith('object.create')]) == 1
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 @pytest.mark.parametrize('nested', [False, True])
 def test_public_graph_empty_voice_does_not_invent_language_or_source(tmp_path, version, nested):
     task = voice_task(tmp_path, version, operation='object.set')

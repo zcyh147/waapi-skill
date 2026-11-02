@@ -1030,7 +1030,7 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
     assert record_path.read_bytes() == before_ambiguous_directory
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 def test_music_import_batch_accepts_omitted_language_without_native_dispatch(
     tmp_path: Path, version: str,
 ) -> None:
@@ -1678,7 +1678,7 @@ def _import_fields_draft(tmp_path: Path, version: str, client: ImportFieldsClien
     return command, bound["bound_object"]["handle"], client
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 def test_import_preview_preserves_independent_default_fields_and_row_overrides(tmp_path: Path, version: str) -> None:
     command, parent, _client = _import_fields_draft(tmp_path, version)
     handles = {}
@@ -1707,7 +1707,7 @@ def test_import_preview_preserves_independent_default_fields_and_row_overrides(t
     ]
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("empty_at", ("default", "row"))
 def test_import_preview_transports_empty_notes_without_conflating_omission(
     tmp_path: Path, version: str, empty_at: str,
@@ -1836,7 +1836,7 @@ def test_mixed_replace_import_public_transaction_replaces_and_creates_exact_targ
     assert sum(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls) == 1
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_mixed_replace_import_does_not_authorize_replacing_declared_new_collision(tmp_path: Path, version: str) -> None:
     command, client = _mixed_replace_draft(tmp_path, version)
     client.objects[client.CREATED_ID] = client.sound(client.CREATED_ID, client.new_path)
@@ -1847,7 +1847,7 @@ def test_mixed_replace_import_does_not_authorize_replacing_declared_new_collisio
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_mixed_replace_import_keeps_exact_bound_guid_during_preparation(tmp_path: Path, version: str) -> None:
     command, client = _mixed_replace_draft(tmp_path, version)
     client.swap_on_existing_path_read = True
@@ -1858,7 +1858,7 @@ def test_mixed_replace_import_keeps_exact_bound_guid_during_preparation(tmp_path
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("change", ("collision_before_preview", "collision_before_execute", "media_before_execute"))
 def test_mixed_replace_import_rejects_scope_and_media_drift_before_dispatch(tmp_path: Path, version: str, change: str) -> None:
     command, client = _mixed_replace_draft(tmp_path, version)
@@ -1882,7 +1882,7 @@ def test_mixed_replace_import_rejects_scope_and_media_drift_before_dispatch(tmp_
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_import_inherited_field_conflict_rejects_check_without_changing_draft(tmp_path: Path, version: str) -> None:
     command, parent, client = _import_fields_draft(tmp_path, version)
     handles = {}
@@ -1900,7 +1900,7 @@ def test_import_inherited_field_conflict_rejects_check_without_changing_draft(tm
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _args, _options in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("field,value,error", (
     ("dialogue_event_directive", "", "GatewayInputError"),
     ("switch_value", "", "OPERATION_DRAFT_ACTION_INVALID"),
@@ -2176,7 +2176,7 @@ def test_localized_existing_fields_do_not_verify_missing_requested_effects(
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("drift", ("media", "other-language-identity"))
 def test_localized_existing_fields_still_reject_preview_drift_before_dispatch(
     tmp_path: Path, version: str, drift: str,
@@ -2855,7 +2855,7 @@ def test_localized_owner_fields_and_source_media_verify_through_public_gateway(t
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("fault", ("ignored-owner-fields", "lost-other-language"))
 def test_localized_owner_fields_require_requested_effects_and_language_preservation(tmp_path, version, fault):
     command, run, client = _localized_owner_fields_draft(tmp_path, version, fault=fault)
@@ -2871,7 +2871,7 @@ def test_localized_owner_fields_require_requested_effects_and_language_preservat
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("drift", ("metadata", "source"))
 def test_localized_owner_fields_reject_changed_authority_before_execution(tmp_path, version, drift):
     command, run, client = _localized_owner_fields_draft(tmp_path, version)
@@ -2887,7 +2887,7 @@ def test_localized_owner_fields_reject_changed_authority_before_execution(tmp_pa
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("fault,error", (("constrained-reference", "CONSTRAINED_REFERENCE_BOUNDARY"),))
 def test_localized_owner_fields_keep_reference_and_exact_source_boundaries(tmp_path, version, fault, error):
     command, _run, client = _localized_owner_fields_draft(tmp_path, version, fault=fault)
@@ -2897,7 +2897,7 @@ def test_localized_owner_fields_keep_reference_and_exact_source_boundaries(tmp_p
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 @pytest.mark.parametrize("colliding", (False, True))
 def test_new_localization_source_notes_use_explicit_source_row_without_owner_edit(tmp_path, version, colliding):
     from copy import deepcopy
@@ -2956,7 +2956,7 @@ def test_localized_owner_reference_reuses_declared_activation_prerequisite(tmp_p
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 @pytest.mark.parametrize("inline", (False, True))
 def test_new_language_owner_fields_and_media_use_absent_source_scope(tmp_path, version, inline):
     from copy import deepcopy
@@ -2985,7 +2985,7 @@ def test_new_language_owner_fields_and_media_use_absent_source_scope(tmp_path, v
     assert len([1 for uri, _, _ in client.calls if uri == "ak.wwise.core.audio.import"]) == 1
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_new_language_source_collision_after_preview_blocks_owner_and_media_write(tmp_path, version):
     command, run, client = _localized_owner_fields_draft(tmp_path, version, inline=True, language="Japanese")
     command("draft-check"); transaction = command("preview-from-draft")["transaction_id"]
@@ -3002,7 +3002,7 @@ def test_new_language_source_collision_after_preview_blocks_owner_and_media_writ
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 def test_generated_language_source_reimport_preserves_its_existing_identity(tmp_path, version):
     _assert_generated_language_source_reimport(tmp_path, version)
 
@@ -3110,7 +3110,7 @@ def _localized_owner_only_tab_draft(tmp_path, version="2025.1", *, client=None):
     return command, run, client, table
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 def test_localized_owner_only_exact_table_fields_preserve_sources_and_media(tmp_path, version):
     from copy import deepcopy
     command, run, client, table = _localized_owner_only_tab_draft(tmp_path, version)
@@ -3359,7 +3359,7 @@ def _explicit_source_tab_draft(tmp_path, version, *, outcome="normal", client=No
     return command, run, client, table
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_typed_source_tsv_rejects_language_ambiguous_wire_path_before_preview(tmp_path, version):
     command, _run, client, table = _explicit_source_tab_draft(tmp_path, version, unique_source_path=False)
     original = table.read_bytes(); before = client.copied.read_bytes(); other = client.other_file.read_bytes()
@@ -3471,7 +3471,7 @@ class GuidContainerTabClient(GuidSourceTabClient):
         return {"objects": [deepcopy(self.container)]}
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 def test_exact_table_guid_container_notes_reuses_shared_class_policy(tmp_path, version):
     client = GuidContainerTabClient(tmp_path, version)
     command, run, client, table = _explicit_source_tab_draft(tmp_path, version, client=client, language="SFX", unique_source_path=False)

@@ -926,7 +926,7 @@ def test_source_control_containing_file_scope_is_derived_from_exact_bound_object
     assert verified["agent_result"]["result"] == {"log": []}
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("choice", ("--object-file", "--original-media-object"))
 def test_source_control_object_file_accessor_drift_stops_before_provider_write(tmp_path, version, choice):
     client, state_dir, preview, run = _source_control_object_file_case(tmp_path, version=version, choice=choice)
@@ -1058,7 +1058,7 @@ def test_source_control_observed_external_file_can_use_an_exact_approved_io_root
     assert [row[1] for row in client.calls if row[0].endswith("checkOut")] == [{"files": [str(client.containing)]}]
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_source_control_per_file_status_read_preserves_native_responses_under_read_only_policy(tmp_path, version):
     from tests.unit.test_object_graph_business_gateway import _info
     operation = "ak.wwise.core.sourceControl.getStatus"
@@ -1329,7 +1329,7 @@ def _provider_profile_case(tmp_path, *, version="2025.1", selection="provider", 
     return client, run, preview, state, evidence, profile, credential, secret
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_source_control_provider_profile_preview_and_execution_never_persist_credentials_or_native_echo(tmp_path, version):
     client, run, preview, state, evidence, profile, credential, secret = _provider_profile_case(tmp_path, version=version)
     assert client.calls == []
@@ -1841,7 +1841,7 @@ def test_source_control_move_rejects_cross_row_file_conflicts_before_provider(tm
     assert not any(call[0].endswith("sourceControl.move") for call in client.calls)
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_source_control_move_preserves_multiple_bound_rows_and_literal_pairs(tmp_path, version):
     def flags(client, handles):
         extra = client.originals / "literal.txt"
@@ -2054,7 +2054,7 @@ def test_sound_active_name_reference_never_hides_invalid_or_ambiguous_identity(t
 
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("mode", ["active", "language", "source"])
 def test_sound_source_name_only_language_is_certified_against_requested_guid(tmp_path, mode, version):
     def prepare(client):

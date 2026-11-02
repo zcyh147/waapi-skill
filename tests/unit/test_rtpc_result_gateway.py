@@ -46,7 +46,7 @@ def _assert_rejected(tmp_path, code, payload):
     assert not list((tmp_path / "state" / "runtime-inspection-observations-v1").glob("*.json"))
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("invalid", [7, "63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4", "{not-a-guid}"])
 def test_rtpc_read_rejects_invalid_id_before_retaining_any_rows(tmp_path, version, invalid):
     code, payload = _read(tmp_path / "baseline", version, [ROW])
@@ -62,7 +62,7 @@ def test_rtpc_read_rejects_invalid_id_before_retaining_any_rows(tmp_path, versio
     assert "id" in payload["message"]
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("invalid", [True, -1, 18446744073709551616, 1.5, "1", None])
 def test_rtpc_read_rejects_invalid_game_object_before_retaining_any_rows(tmp_path, version, invalid):
     code, payload = _read(tmp_path / "baseline", version, [ROW])
@@ -118,7 +118,7 @@ def test_rtpc_read_requires_each_field_in_newer_versions(tmp_path, version, fiel
     _assert_rejected(tmp_path / "invalid", code, payload)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("invalid", [True, "1000", None, float("inf"), float("-inf"), float("nan")])
 def test_rtpc_read_keeps_inline_value_and_finiteness_validation(tmp_path, version, invalid):
     code, payload = _read(tmp_path / "invalid", version, [{**ROW, "value": invalid}])

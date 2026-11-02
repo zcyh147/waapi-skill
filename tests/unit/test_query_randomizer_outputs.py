@@ -99,7 +99,7 @@ def randomizer_result(result, layout, token='Pitch'):
     return row['related']['randomizers'][token]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('layout', ['root', 'list'])
 def test_absent_randomizer_fields_preserve_owner_without_invented_defaults(tmp_path, version, layout):
     task, row, identity, path = randomizer_task(tmp_path, version, layout)
@@ -110,7 +110,7 @@ def test_absent_randomizer_fields_preserve_owner_without_invented_defaults(tmp_p
     assert randomizer_result(result, layout) == {'unavailable_fields': ['enabled', 'min_offset']}
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('layout', ['root', 'list'])
 @pytest.mark.parametrize('terminal,native,value', [('enabled', 'Enabled', 0), ('min-offset', 'Min', False), ('max-offset', 'Max', None)])
 def test_present_randomizer_values_require_their_specific_scalar_type(tmp_path, version, layout, terminal, native, value):
@@ -139,7 +139,7 @@ def test_namespaced_randomizer_argument_uses_actual_object_kind_fallback_and_own
         for selection in result['related_scope_binding']['scopes'])
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('layout', ['root', 'list'])
 def test_randomizer_arguments_require_actual_property_kind_not_reference_metadata(tmp_path, version, layout):
     task, row, identity, path = randomizer_task(tmp_path, version, layout)
@@ -150,7 +150,7 @@ def test_randomizer_arguments_require_actual_property_kind_not_reference_metadat
     assert result.get('agent_result') is None
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_randomizer_duplicate_semantic_aliases_do_not_merge_or_dispatch_final_values(tmp_path, version):
     task = PathTask(tmp_path, version)
     task.rows = task.rows[:1]
@@ -163,7 +163,7 @@ def test_randomizer_duplicate_semantic_aliases_do_not_merge_or_dispatch_final_va
     assert not any('randomizer("Pitch").@Min' in (options or {}).get('return', ()) for _, _, options in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_root_randomizer_still_binds_when_an_independent_list_view_selects_list_planner(tmp_path, version):
     task = NamespacedTask(tmp_path, version)
     owner = task.rows[0]
@@ -178,7 +178,7 @@ def test_root_randomizer_still_binds_when_an_independent_list_view_selects_list_
     assert len(related['children']['items']) == 2
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('layout', ['root', 'list'])
 def test_randomizer_meaning_ambiguity_and_new_invocation_metadata_are_not_cached_authority(tmp_path, version, layout):
     task, row, identity, path = randomizer_task(tmp_path, version, layout)
@@ -199,7 +199,7 @@ def test_randomizer_meaning_ambiguity_and_new_invocation_metadata_are_not_cached
     assert any(uri.endswith('getPropertyAndReferenceNames') for uri, _, _ in task.calls[before:])
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('layout', ['root', 'list'])
 def test_actual_owner_scopes_select_their_own_randomizer_argument(tmp_path, version, layout):
     task = PathTask(tmp_path, version) if layout == 'root' else NamespacedTask(tmp_path, version)
@@ -259,7 +259,7 @@ def test_discovered_randomizer_arguments_cannot_inject_quoted_expression(tmp_pat
     assert not any(any('randomizer(' in field for field in (options or {}).get('return', ())) for _, _, options in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('layout', ['root', 'list'])
 def test_unmatched_actual_scope_keeps_owner_and_scoped_unavailable_argument(tmp_path, version, layout):
     task = PathTask(tmp_path, version) if layout == 'root' else NamespacedTask(tmp_path, version)

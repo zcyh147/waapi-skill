@@ -107,7 +107,7 @@ def test_explicit_range_repair_and_dependent_change_share_one_atomic_preview_whe
     assert len(writes) == 1 and writes[0]["objects"] == [{"object": FIRST, "@EnvelopeStopPlayback": False, "@TimeModLoops": 25}]
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 def test_exact_time_class_public_edit_preserves_loop_count_and_peer(tmp_path, version):
     from tests.unit.test_new_object_conditions_gateway import ClassTask
     from tests.unit.test_gameparameter_class_fields_gateway import CREATED

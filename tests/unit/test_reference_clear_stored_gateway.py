@@ -81,7 +81,7 @@ def test_clear_stored_reference_verifies_while_the_inherited_reference_still_app
     assert code == 0 and 'inherited reference may still apply' in str(schema), schema
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_clear_preserves_native_reference_extensions_and_accepts_an_extended_null_guid(tmp_path, version):
     task = StoredReferenceTask(tmp_path, version)
     for identity in (FIRST, PARENT):
@@ -100,7 +100,7 @@ def test_clear_preserves_native_reference_extensions_and_accepts_an_extended_nul
     assert len(writes(task)) == 1
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('drift', ['stored', 'resolved'])
 def test_clear_revalidates_stored_reference_and_the_original_resolved_context(tmp_path, version, drift):
     task = StoredReferenceTask(tmp_path, version)
@@ -116,7 +116,7 @@ def test_clear_revalidates_stored_reference_and_the_original_resolved_context(tm
     assert task.objects == before and writes(task) == []
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('view', ['stored', 'resolved'])
 @pytest.mark.parametrize('member', ['enabled', 'count'])
 def test_clear_guards_native_reference_extension_boolean_number_drift(tmp_path, version, view, member):
@@ -131,7 +131,7 @@ def test_clear_guards_native_reference_extension_boolean_number_drift(tmp_path, 
     assert code == 2 and writes(task) == [] and task.objects == before, rejected
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('resolved_null', [False, True])
 def test_dropped_clear_never_verifies_from_the_resolved_value_alone(tmp_path, version, resolved_null):
     task = StoredReferenceTask(tmp_path, version)

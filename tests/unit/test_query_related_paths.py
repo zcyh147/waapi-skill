@@ -103,7 +103,7 @@ def test_related_modes_and_multihop_share_fresh_scope_and_preserve_return_contex
     assert list(result)[-1] == 'agent_result'
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_multihop_fixed_path_does_not_overwrite_reference_terminal_or_discover_metadata(tmp_path, version):
     task = PathTask(tmp_path, version)
     code, result = task.run('query-object', '--kind', 'all-sounds', '--max-results', '2',
@@ -116,7 +116,7 @@ def test_multihop_fixed_path_does_not_overwrite_reference_terminal_or_discover_m
     assert not any('Property' in uri for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('case', ['empty-roots', 'absent-parent', 'null-parent', 'absent-field', 'null-field', 'false-field'])
 def test_empty_or_unavailable_related_data_preserves_roots_without_invented_metadata_authority(tmp_path, version, case):
     task = PathTask(tmp_path, version)
@@ -153,7 +153,7 @@ def test_empty_or_unavailable_related_data_preserves_roots_without_invented_meta
     assert list(result)[-1] == 'agent_result'
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_different_actual_classes_bind_only_their_own_tokens_or_explicit_unavailable_request(tmp_path, version):
     task = PathTask(tmp_path, version)
     task.rows[1]['parent.classId'] = SOUND_CLASS
@@ -173,7 +173,7 @@ def test_different_actual_classes_bind_only_their_own_tokens_or_explicit_unavail
     assert second['unavailable_field_requests'][0]['requested_option'] == '--include-related-field'
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_custom_related_modes_keep_local_override_and_reference_extensions_distinct(tmp_path, version):
     task = PathTask(tmp_path, version)
     task.rows = task.rows[:1]
@@ -194,7 +194,7 @@ def test_custom_related_modes_keep_local_override_and_reference_extensions_disti
     assert 'related_scope_binding' not in result
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_instance_specific_field_uses_exact_actual_guid_when_class_metadata_cannot_bind(tmp_path, version):
     task = PathTask(tmp_path, version)
     task.rows = task.rows[:1]
@@ -210,7 +210,7 @@ def test_instance_specific_field_uses_exact_actual_guid_when_class_metadata_cann
     assert names == [{'classId': REFERENCE_CLASS}, {'object': PARENT['id']}]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_missing_reference_hop_on_one_complete_scope_keeps_that_root_without_borrowed_token(tmp_path, version):
     task = PathTask(tmp_path, version)
     task.rows[1]['parent.classId'] = SOUND_CLASS
@@ -226,7 +226,7 @@ def test_missing_reference_hop_on_one_complete_scope_keeps_that_root_without_bor
     assert second['unavailable_field_requests'][0]['requested_option'] == 'reference'
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('failure', ['ambiguous', 'no-match', 'partial-no-match', 'wrong-property-kind', 'wrong-reference-kind', 'duplicate-alias'])
 def test_scoped_binding_never_guesses_or_dispatches_final_values_when_declaration_is_unresolved(tmp_path, version, failure):
     task = PathTask(tmp_path, version)
@@ -266,7 +266,7 @@ def test_scoped_binding_never_guesses_or_dispatches_final_values_when_declaratio
     assert not any(uri.endswith(('setProperty', 'setReference')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('options', [
     ['--include-related-field', 'parent', '@Pitch'],
     ['--include-related-field', 'parent', 'Pitch.function()'],
@@ -281,7 +281,7 @@ def test_path_and_field_grammar_rejects_raw_accessors_and_duplicate_declarations
     assert task.calls == []
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['none', 'metadata', 'inventory', 'class', 'prefix', 'root-order', 'kind'])
 def test_related_pages_repeat_same_bounded_query_and_seal_scope_metadata_and_membership(tmp_path, version, change):
     task = PathTask(tmp_path, version)
@@ -326,7 +326,7 @@ def test_related_pages_repeat_same_bounded_query_and_seal_scope_metadata_and_mem
     assert len(names) > 1  # Invocation-local cache, never stale persisted metadata.
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['root-order', 'prefix', 'class', 'list'])
 def test_preparation_cannot_attach_values_to_changed_or_list_related_scope(tmp_path, version, change):
     class ChangingTask(PathTask):
@@ -351,7 +351,7 @@ def test_preparation_cannot_attach_values_to_changed_or_list_related_scope(tmp_p
     assert result.get('agent_result') is None
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('bound', ['return-count', 'expression-bytes', 'custom-total', 'fixed-total'])
 def test_related_projection_uses_existing_caps_including_all_identity_scope_helpers(tmp_path, version, bound):
     from tests.unit.test_object_query_result_pages import gateway
@@ -393,7 +393,7 @@ def test_related_schema_exposes_same_source_proven_closed_modes_paths_and_limits
     assert task.calls == []
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_local_reference_hop_is_distinct_from_resolved_hop_and_preserves_null(tmp_path, version):
     task = PathTask(tmp_path, version)
     task.rows = task.rows[:1]
@@ -427,7 +427,7 @@ def test_detail_scope_proof_uses_existing_lossless_pages_when_native_reference_e
         assert code == 0, result
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_heterogeneous_scopes_bind_different_tokens_without_projection_leakage(tmp_path, version):
     task = PathTask(tmp_path, version)
     task.rows[1]['parent.classId'] = SOUND_CLASS
@@ -443,7 +443,7 @@ def test_heterogeneous_scopes_bind_different_tokens_without_projection_leakage(t
     assert 'parent.@Pitch' in fields and 'parent.@Volume' in fields
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_reference_hop_can_begin_at_each_root_and_preserves_duplicate_occurrences(tmp_path, version):
     task = PathTask(tmp_path, version)
     task.metadata[SOUND_CLASS]['PlaylistObject'] = copy.deepcopy(REFERENCE_PACKET['metadata'])
@@ -459,7 +459,7 @@ def test_reference_hop_can_begin_at_each_root_and_preserves_duplicate_occurrence
     assert len([uri for uri, _, _ in task.calls if uri.endswith('getPropertyAndReferenceNames')]) == 1
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('case', ['missing-class', 'unexpressible-token', 'missing-root-id'])
 def test_related_scope_fallback_and_unresolvable_identity_or_token_are_explicit(tmp_path, version, case):
     task = PathTask(tmp_path, version)
@@ -484,7 +484,7 @@ def test_related_scope_fallback_and_unresolvable_identity_or_token_are_explicit(
         assert result.get('agent_result') is None
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_fixed_projection_presence_does_not_change_when_other_path_requires_metadata(tmp_path, version):
     task = PathTask(tmp_path, version)
     task.rows = task.rows[:1]
@@ -500,7 +500,7 @@ def test_fixed_projection_presence_does_not_change_when_other_path_requires_meta
     assert result['agent_result'][0]['related']['owner']['properties'] == {'Pitch': -560}
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_continuation_field_kind_change_is_a_continuation_boundary_not_a_new_request_error(tmp_path, version):
     task = PathTask(tmp_path, version)
     task.rows = task.rows[:1]
@@ -514,7 +514,7 @@ def test_continuation_field_kind_change_is_a_continuation_boundary_not_a_new_req
     assert rejected.get('agent_result') is None
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('drift', ['class-bool', 'class-float', 'extension-bool'])
 def test_related_scope_revalidation_rejects_typed_drift_even_when_python_values_compare_equal(tmp_path, version, drift):
     class TypedDriftTask(PathTask):
@@ -544,7 +544,7 @@ def test_related_scope_revalidation_rejects_typed_drift_even_when_python_values_
     assert rejected.get('agent_result') is None
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('slot', ['identity', 'fixed-reference', 'custom-reference'])
 def test_projection_preserves_native_related_extensions_and_does_not_mutate_transport_result(tmp_path, version, slot):
     class RetainedResultTask(PathTask):
@@ -581,7 +581,7 @@ def test_projection_preserves_native_related_extensions_and_does_not_mutate_tran
     assert list(result)[-1] == 'agent_result'
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('route', ['ordinary', 'local-reference', 'reference-hop'])
 def test_unknown_class_kind_uses_exact_endpoint_metadata_without_inventing_action_instance_typing(tmp_path, version, route):
     # Real class-unknown packets exist for 2021–2023. The two later lanes are

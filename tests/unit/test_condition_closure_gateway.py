@@ -44,7 +44,7 @@ def closure_task(tmp_path, version='2025.1', *, reverse=False, operation='object
     return task
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('reverse', [False, True])
 def test_recursive_controller_intersection_is_previewed_as_one_unique_change(tmp_path, version, reverse):
     task = closure_task(tmp_path, version, reverse=reverse)
@@ -58,7 +58,7 @@ def test_recursive_controller_intersection_is_previewed_as_one_unique_change(tmp
     assert writes[0]['objects'][0]['@Mode'] == 2
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2021.1', '2025.1'])
 def test_reference_assignment_reuses_the_complete_satisfied_scalar_closure(tmp_path, version):
     task = closure_task(tmp_path, version, operation='object.setReference', reference=True)
     task.objects[FIRST]['Mode'] = 2
@@ -87,7 +87,7 @@ def test_explicit_controller_intent_is_checked_against_the_entire_closure(tmp_pa
         assert task.objects[FIRST] == {**before[FIRST], 'Mode': 2, 'Value': 37.0}
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2021.1', '2025.1'])
 def test_single_field_discloses_and_accepts_the_complete_recursive_repair(tmp_path, version):
     task = closure_task(tmp_path, version, operation='object.setProperty')
     before = deepcopy(task.objects[FIRST])

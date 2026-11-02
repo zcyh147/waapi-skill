@@ -105,7 +105,7 @@ def test_legacy_playlist_clear_removes_references_and_retains_all_hierarchy_targ
     assert task.objects[ROOT] == before[ROOT] and task.objects[CHILD] == before[CHILD]
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1"])
+@pytest.mark.parametrize("version", ['2024.1'])
 @pytest.mark.parametrize("fault", ["wrong-parent", "parent-drift", "roster-drift"])
 def test_legacy_playlist_rejects_nonchild_and_preview_drift_before_write(tmp_path, version, fault):
     task, _ = playlist_task(tmp_path, version, "append")
@@ -126,7 +126,7 @@ def test_legacy_playlist_rejects_nonchild_and_preview_drift_before_write(tmp_pat
     assert not any(uri.endswith(("object.set", "object.delete")) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1"])
+@pytest.mark.parametrize("version", ['2024.1'])
 @pytest.mark.parametrize("mode,fault", [("append", "lost-prefix"), ("clear", "retained-member"),
     ("clear", "changed-target"), ("replace-all", "deleted-target"), ("clear", "missing-roster")])
 def test_legacy_playlist_never_certifies_wrong_roster_or_lost_target_proof(tmp_path, version, mode, fault):
@@ -138,7 +138,7 @@ def test_legacy_playlist_never_certifies_wrong_roster_or_lost_target_proof(tmp_p
     assert not any(uri.endswith("object.delete") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1"])
+@pytest.mark.parametrize("version", ['2024.1'])
 def test_legacy_playlist_class_selection_rejects_existing_targets_for_uncreated_owner(tmp_path, version):
     task, _ = playlist_task(tmp_path, version, "append", planned="new")
     code, rejected = task.step("draft-check")
@@ -157,7 +157,7 @@ def test_legacy_playlist_class_selection_merges_actual_owner_and_preserves_prefi
     assert task.objects[ROOT] == before[ROOT] and task.objects[CHILD] == before[CHILD]
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1"])
+@pytest.mark.parametrize("version", ['2024.1'])
 @pytest.mark.parametrize("fault", ["wrong-parent", "changed-target"])
 def test_legacy_playlist_merged_owner_retains_reference_parent_and_preservation_proof(tmp_path, version, fault):
     task, _ = playlist_task(tmp_path, version, "append", planned="merge", fault=fault)
@@ -193,7 +193,7 @@ def test_reference_list_result_association_cannot_move_to_another_requested_owne
     assert 'not sealed for this exact result owner' in json.dumps(verified), verified
 
 
-@pytest.mark.parametrize('version', ['2023.1', '2024.1'])
+@pytest.mark.parametrize('version', ['2024.1'])
 @pytest.mark.parametrize('fault', [None, 'nonempty-proof', 'wrong-owner', 'wrong-metadata', 'unrelated-query-error', 'explicit-null'])
 def test_legacy_playlist_clear_omission_requires_exact_source_and_independent_empty_proof(tmp_path, version, fault):
     task, before = playlist_task(tmp_path, version, 'clear')

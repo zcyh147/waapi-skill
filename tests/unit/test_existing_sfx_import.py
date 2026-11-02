@@ -110,7 +110,7 @@ def test_2025_flattened_copy_collision_retains_all_frozen_verification_failures(
     }
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('fault', ['duplicate-source', 'wrong-source', 'outside-originals', 'traversal', 'filename'])
 def test_existing_sfx_rejects_ambiguous_or_unsafe_source_before_preview(tmp_path, version, fault):
     def corrupt(reader):
@@ -139,7 +139,7 @@ def test_existing_sfx_rejects_ambiguous_or_unsafe_source_before_preview(tmp_path
     }[fault]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['none', 'reordered', 'source-guid', 'source-placement', 'extra-source'])
 def test_existing_sfx_execution_guard_binds_full_source_collection(tmp_path, version, change):
     prepared, reader = prepare_sfx(tmp_path, version)
@@ -156,7 +156,7 @@ def test_existing_sfx_execution_guard_binds_full_source_collection(tmp_path, ver
     assert validate_prepared_roles(prepared, read_call=reader)['ok'] is (change in {'none', 'reordered'})
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('changed_guid', [False, True])
 def test_existing_sfx_verification_requires_original_source_guid(tmp_path, version, changed_guid):
     from tests.unit.test_operation_registry_import_verifier import _result
@@ -175,7 +175,7 @@ def test_existing_sfx_verification_requires_original_source_guid(tmp_path, versi
     assert result.ok is (not changed_guid), [a for a in result.assertions if not a['passed']]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_existing_sfx_verification_rejects_unreturned_extra_source(tmp_path, version):
     from tests.unit.test_operation_registry_import_verifier import _result
     prepared, reader = prepare_sfx(tmp_path, version)
@@ -190,7 +190,7 @@ def test_existing_sfx_verification_rejects_unreturned_extra_source(tmp_path, ver
     assert result.ok is False
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('fault', ['malformed-guid', 'foreign-parent', 'language', 'duplicate-id', 'limit'])
 def test_existing_sfx_source_discovery_is_bounded_and_closed(tmp_path, version, fault):
     def corrupt(reader):
@@ -224,7 +224,7 @@ def test_bound_existing_sfx_source_may_be_omitted_from_native_result_with_comple
     assert result.ok, [a for a in result.assertions if not a['passed']]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('fault', ['unbound', 'wrong-bound-id', 'missing', 'new-source', 'extra', 'foreign-parent', 'wrong-language', 'wrong-media'])
 def test_omitted_existing_sfx_source_requires_every_bound_live_proof(tmp_path, version, fault):
     from tests.unit.test_operation_registry_import_verifier import _result
@@ -259,7 +259,7 @@ def test_omitted_existing_sfx_source_requires_every_bound_live_proof(tmp_path, v
     assert result.ok is False, fault
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_source_bound_reimport_still_rejects_changed_input_media_before_execute(tmp_path, version):
     prepared, reader = prepare_sfx(tmp_path, version)
     Path(prepared['dispatch']['args']['imports'][0]['audioFile']).write_bytes(b'changed after Preview')

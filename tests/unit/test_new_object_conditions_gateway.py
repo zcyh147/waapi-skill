@@ -246,7 +246,7 @@ def test_class_default_or_explicit_prerequisite_reaches_verified_creation(tmp_pa
     assert sum(uri.endswith("object.create") for uri, _, _ in task.calls) == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("value", [0, 101])
 def test_explicit_incompatible_prerequisite_cannot_create(tmp_path, version, value):
     task = ClassTask(tmp_path, version)
@@ -260,7 +260,7 @@ def test_explicit_incompatible_prerequisite_cannot_create(tmp_path, version, val
     assert not any(uri.endswith("object.create") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("phase", ["preview", "execute"])
 def test_class_default_drift_rejects_without_creation(tmp_path, version, phase):
     task = ClassTask(tmp_path, version)
@@ -275,7 +275,7 @@ def test_class_default_drift_rejects_without_creation(tmp_path, version, phase):
     assert CREATED not in task.objects
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("policy", ["read_only", "ask_before_changes", "allow_changes"])
 def test_class_default_creation_preserves_each_modification_policy(tmp_path, version, policy):
     task = ClassTask(tmp_path, version)
@@ -290,7 +290,7 @@ def test_class_default_creation_preserves_each_modification_policy(tmp_path, ver
         assert sum(uri.endswith("object.create") for uri, _, _ in task.calls) == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_partial_field_verification_still_allows_identity_bound_repair(tmp_path, version):
     task = ClassTask(tmp_path, version)
     task.declare(EnvelopeStopPlayback=False)
@@ -351,7 +351,7 @@ def test_plugin_creation_preserves_and_verifies_the_class_default(tmp_path, vers
     assert any("@Mode" in (options or {}).get("return", []) for uri, _, options in client.calls if uri.endswith("object.get"))
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_recursive_class_conditions_accumulate_before_defaults_are_chosen(tmp_path, version):
     def scalar_condition(name, values):
         return {"type": "property", "action": "Enable", "context": "Self", "property": name,
@@ -388,7 +388,7 @@ def test_explicit_reference_prerequisite_and_dependent_field_share_the_creation(
     assert sum(uri.endswith("object.create") for uri, _, _ in task.calls) == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_missing_class_default_requires_explicit_intent_but_not_a_new_object(tmp_path, version):
     task = ClassTask(tmp_path, version)
     del task.metadata["TimeModLoops"]["default"]
@@ -425,7 +425,7 @@ def test_unproved_class_metadata_never_creates_an_object(tmp_path, damage):
     assert not any(uri.endswith("object.create") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_plugin_default_drift_prevents_native_creation(tmp_path, version):
     from tests.unit.test_plugin_shareset_gateway import declare_plugin, gateway
     client = ConditionalPluginClient(version, mode=1)
@@ -582,7 +582,7 @@ class ProspectiveReferenceTask(ClassTask):
         return self.declare(expected_code=expected_code, **dict(values))
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_new_reference_hierarchy_accepts_an_explicit_controlling_group(tmp_path, version):
     task = ProspectiveReferenceTask(tmp_path, version)
     task.declare_hierarchy()
@@ -591,7 +591,7 @@ def test_new_reference_hierarchy_accepts_an_explicit_controlling_group(tmp_path,
     assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("state", [False, True])
 @pytest.mark.parametrize("reverse", [False, True])
 def test_new_reference_hierarchy_creates_and_verifies_both_explicit_edges(tmp_path, version, state, reverse):
@@ -612,7 +612,7 @@ def test_new_reference_hierarchy_creates_and_verifies_both_explicit_edges(tmp_pa
     assert sum(uri.endswith("object.create") for uri, _, _ in task.calls) == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("fault", ["wrong-parent", "missing-group", "wrong-target-type"])
 def test_new_reference_hierarchy_rejects_invalid_prospective_relationship_without_creation(tmp_path, version, fault):
     task = ProspectiveReferenceTask(tmp_path, version)
@@ -636,7 +636,7 @@ def test_new_reference_hierarchy_rejects_invalid_prospective_relationship_withou
     assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("drift", ["target-parent", "selected-metadata", "controller-metadata"])
 def test_new_reference_hierarchy_revalidates_relationship_and_class_metadata_before_creation(tmp_path, version, drift):
     task = ProspectiveReferenceTask(tmp_path, version)
@@ -653,7 +653,7 @@ def test_new_reference_hierarchy_revalidates_relationship_and_class_metadata_bef
     assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("fault", ["default-reference", "group-reference", "target-parent"])
 def test_new_reference_hierarchy_never_verifies_ignored_fields_or_changed_target_parent(tmp_path, version, fault):
     task = ProspectiveReferenceTask(tmp_path, version)

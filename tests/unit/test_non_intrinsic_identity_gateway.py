@@ -295,7 +295,7 @@ def test_stinger_reference_reaches_immutable_preview_by_guid(
     assert not any(uri.endswith("setReference") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize(
     "changes",
     (

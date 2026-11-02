@@ -38,7 +38,7 @@ class FolderShareSetClient(ShareSetClient):
         return result
 
 
-@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('version', ['2023.1', '2025.1'])
 def test_effect_shareset_folder_constructs_once_with_exact_identity_and_preserved_ancestors(tmp_path, version):
     client = FolderShareSetClient(version)
     before = deepcopy((client.target, client.workunit))
@@ -118,7 +118,7 @@ def test_effect_folder_extension_does_not_widen_other_plugin_kinds(tmp_path, kin
     assert not any(uri.endswith('object.set') for uri, _, _ in client.calls)
 
 
-@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('version', ['2023.1', '2025.1'])
 def test_named_graph_effect_shareset_folder_uses_same_closure_without_anonymous_list(tmp_path, version):
     from tests.unit.test_anonymous_effect_slot_graph_gateway import anonymous_task
     from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT_PARENT

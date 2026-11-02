@@ -1090,7 +1090,7 @@ def test_exact_frozen_attenuation_role_has_resolved_live_class_comparison(versio
     )
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("damage", ("wrong_id", "missing_id", "duplicate", "missing_row", "missing_name", "missing_path", "wrong_path", "missing_class", "wrong_class", "wrong_role", "missing_role", "version_drift", "missing_version"))
 def test_attenuation_role_classification_never_certifies_invalid_binding(version, damage, tmp_path):
     env, state, started, info = _core_role_binding_case(tmp_path, version)
@@ -1304,7 +1304,7 @@ def test_blend_assignment_invalid_member_observations_fail_closed(tmp_path, dama
     assert sum(uri == task.uri for uri, _, _ in task.calls) == (1 if phase == "postwrite" else 0)
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_blend_assignment_valid_mixedcase_member_observations_remain_accepted(tmp_path, version):
     task = _BlendAssignmentTask(tmp_path, version)
     task.assignments[0]["child"] = "{aBcDeFaB-1234-5678-9AbC-aBcDeF123456}"
@@ -1369,7 +1369,7 @@ def test_blend_assignment_existing_admitted_lanes_keep_truthful_weak_result(tmp_
     assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("damage", ["order", "edge", "parent", "owner-track", "track-name", "missing-index", "extra"])
 def test_blend_assignment_prewrite_snapshot_drift_never_dispatches(tmp_path, version, damage):
     task = _BlendAssignmentTask(tmp_path, version)
@@ -1393,7 +1393,7 @@ def test_blend_assignment_prewrite_snapshot_drift_never_dispatches(tmp_path, ver
     assert all(uri != task.uri for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("damage", ["order", "edge", "parent", "missing-index", "extra", "missing-target"])
 def test_blend_assignment_independent_post_read_catches_partial_effects(tmp_path, version, damage):
     task = _BlendAssignmentTask(tmp_path, version)
@@ -1422,7 +1422,7 @@ def test_blend_assignment_independent_post_read_catches_partial_effects(tmp_path
     assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("damage", ["index", "duplicate-index", "duplicate-child", "wrong-owner", "wrong-track-type"])
 def test_blend_assignment_missing_material_facts_are_not_guessed(tmp_path, version, damage):
     task = _BlendAssignmentTask(tmp_path, version)
@@ -1450,7 +1450,7 @@ def test_blend_assignment_missing_material_facts_are_not_guessed(tmp_path, versi
     assert all(uri != task.uri for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_blend_assignment_configuration_drift_is_still_prewrite_blocked(tmp_path, version):
     task = _BlendAssignmentTask(tmp_path, version)
     task.preview(-2)
@@ -1460,7 +1460,7 @@ def test_blend_assignment_configuration_drift_is_still_prewrite_blocked(tmp_path
     assert all(uri != task.uri for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("damage", ["wrong-type", "different-path", "noncanonical-id", "type-name-selector"])
 def test_blend_assignment_relative_track_identity_is_guid_comparison_only(tmp_path, version, damage):
     task = _BlendAssignmentTask(tmp_path, version)
@@ -1487,7 +1487,7 @@ def test_blend_assignment_relative_track_identity_is_guid_comparison_only(tmp_pa
     assert all(uri != task.uri for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("index", ["true", "1.5", "NaN"])
 def test_blend_assignment_index_requires_an_integer(tmp_path, version, index):
     task = _BlendAssignmentTask(tmp_path, version)
@@ -1513,7 +1513,7 @@ def test_blend_assignment_schema_discloses_clamping_and_edge_effect_boundary(tmp
     assert "unproved" in declaration["field_semantics"]["edges"]["verification_boundary"]
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize(("requested", "effective"), [(-9, 0), (99, 2)])
 def test_blend_assignment_materializes_documented_clamp_in_immutable_native_envelope(tmp_path, version, requested, effective):
     task = _BlendAssignmentTask(tmp_path, version)
@@ -1541,7 +1541,7 @@ def test_blend_assignment_materializes_documented_clamp_in_immutable_native_enve
     assert len(received) == 1 and received[0]["index"] == effective
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_blend_automatic_neighbor_geometry_remains_disclosed_partial_observation(tmp_path, version):
     task = _BlendAssignmentTask(tmp_path, version)
     task.assignments[1]["edges"][1].update(

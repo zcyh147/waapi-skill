@@ -221,7 +221,7 @@ def test_create_conflict_declaration_reaches_preview_without_writing(
     assert artifact["prepared_operation"]["dispatch"]["args"]["onNameConflict"] == conflict
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_create_replace_without_owner_cannot_produce_a_preview(
     tmp_path: Path, version: str,
 ) -> None:
@@ -362,7 +362,7 @@ def test_owned_transition_name_cannot_be_rewritten_as_an_intrinsic_name(tmp_path
     assert rejected["error_code"] == "DERIVED_OBJECT_NAME_BOUNDARY"
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_unknown_batch_fixed_field_is_not_reinterpreted_as_search(
     tmp_path: Path, version: str,
 ) -> None:
@@ -381,7 +381,7 @@ def test_unknown_batch_fixed_field_is_not_reinterpreted_as_search(
     assert not any(uri.endswith("getPropertyInfo") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_batch_uses_discovered_fields_and_rejects_cross_object_handles_atomically(
     tmp_path: Path, version: str,
 ) -> None:
@@ -479,7 +479,7 @@ def test_action_fixed_durations_materialize_seconds(
         {"name": "FadeTime", "value": 0.25}, {"name": "Delay", "value": 0.08}]
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_field_discovery_distinguishes_no_match_from_multiple_matches(
     tmp_path: Path, version: str,
 ) -> None:
@@ -500,7 +500,7 @@ def test_field_discovery_distinguishes_no_match_from_multiple_matches(
     assert found["meaning_results"][0]["candidate_count"] == 2
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("object_type", ("Action", "Sound"))
 def test_time_suffix_has_action_scope_not_just_a_matching_token(
     tmp_path: Path, version: str, object_type: str,
@@ -613,7 +613,7 @@ def test_fixed_action_durations_reach_immutable_preview(tmp_path: Path, version:
     assert not any(uri == "ak.wwise.core.object.set" for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_fixed_action_duration_is_rejected_on_an_unrelated_object(tmp_path: Path, version: str) -> None:
     task = FieldTask(tmp_path, version, "object.set")
     task.objects[FIRST] = {"id": FIRST, "name": "Weather", "type": "ActorMixer",

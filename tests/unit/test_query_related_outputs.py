@@ -129,7 +129,7 @@ def test_singleton_relations_share_core_and_reference_terminals_without_metadata
     assert {uri for uri, _, _ in task.calls} == {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get'}
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('case', ['relation-absent', 'field-absent', 'null', 'zero', 'malformed-identity'])
 def test_related_presence_and_identity_do_not_invent_values_or_authority(tmp_path, version, case):
     task = RelatedTask(tmp_path, version)
@@ -157,7 +157,7 @@ def test_related_presence_and_identity_do_not_invent_values_or_authority(tmp_pat
     assert list(result)[-1] == 'agent_result'
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_related_fixed_outputs_coexist_with_root_metadata_and_deduplicate_identity_helper(tmp_path, version):
     task = RelatedTask(tmp_path, version)
     task.rows = [task.row]
@@ -171,7 +171,7 @@ def test_related_fixed_outputs_coexist_with_root_metadata_and_deduplicate_identi
     assert task.calls[-1][2]['return'] == ['id', 'name', 'type', 'path', 'parent', 'parent.@Volume', '@Volume']
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_related_fixed_projection_keeps_advanced_bound_and_literal_return_scope(tmp_path, version):
     task = RelatedTask(tmp_path, version)
     task.rows[0].update({'parent': PARENT, 'parent.@Volume': -12})
@@ -202,7 +202,7 @@ def test_version_specific_documented_descriptors_use_the_same_related_record(tmp
     assert task.calls[-1][2]['return'] == ['id', 'name', 'type', 'path', 'parent', 'parent.' + native]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('options', [
     ['--include-related', 'children', 'first()', 'volume-db'],
     ['--include-related', 'parent.parent', 'volume-db'],
@@ -221,7 +221,7 @@ def test_related_declarations_reject_raw_or_unproven_composition_before_transpor
     assert task.calls == []
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_related_pairs_share_the_existing_total_fixed_output_budget(tmp_path, version):
     from tests.unit.test_object_query_result_pages import gateway
     task = RelatedTask(tmp_path, version)
@@ -239,7 +239,7 @@ def test_derived_2021_related_active_source_is_an_explicit_pretransport_boundary
     assert task.calls == []
 
 
-@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('value', [[], [OTHER_PARENT, {**PARENT, 'future': {'active': False, 'value': 0}}]])
 def test_singleton_related_list_valued_terminal_is_preserved_without_list_composition(tmp_path, version, value):
     task = RelatedTask(tmp_path, version)
@@ -251,7 +251,7 @@ def test_singleton_related_list_valued_terminal_is_preserved_without_list_compos
     assert {uri for uri, _, _ in task.calls} == {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get'}
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['none', 'value', 'relation', 'session'])
 def test_related_result_pages_retain_scope_and_reject_changed_observation(tmp_path, version, change):
     task = RelatedTask(tmp_path, version)

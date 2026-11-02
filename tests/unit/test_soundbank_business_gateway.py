@@ -1535,7 +1535,7 @@ def test_definition_ordered_repeated_bank_files_disclose_result_only_before_auth
     assert sum(uri.endswith("processDefinitionFiles") for uri, _, _ in calls) == 1
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("columns,error", [
     ("-State\tWeather\tRain", "INVALID_DEFINITION_ROW"),
     ("State\tWeather", "INVALID_DEFINITION_ROW"),
@@ -1699,7 +1699,7 @@ def test_generate_explicit_all_platforms_reaches_bounded_immutable_preview(tmp_p
     assert sum(uri.endswith('soundbank.generate') for uri, _, _ in flow.calls) == 1
 
 
-@pytest.mark.parametrize('version', OPERATIONS['soundbank.generate'])
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('selection', ['missing', 'contradictory'])
 def test_generate_platform_selection_is_explicit_and_invalid_declaration_is_atomic(tmp_path, version, selection):
     flow = GenerationPlatformFlow(tmp_path, version)

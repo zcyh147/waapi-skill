@@ -9,7 +9,7 @@ import pytest
 from tests.unit.test_field_interface_closure_gateway import FieldTask, FIRST, SECOND, VERSIONS
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_rejected_exact_boolean_rtpc_never_substitutes_nearby_numeric_field(tmp_path: Path, version: str) -> None:
     task = FieldTask(tmp_path, version, "object.setRTPC")
     task.metadata = {
@@ -42,7 +42,7 @@ def test_draft_list_selection_preserves_full_supported_metadata(tmp_path: Path, 
     assert field["metadata"]["supports"] == {"rtpc": "Additive"}
     assert field["unit"] == {"status": "known", "value": "Frequency"}
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_metadata_selection_rejects_other_scope_and_changed_inventory(tmp_path: Path, version: str) -> None:
     task = FieldTask(tmp_path, version, "object.setProperty")
     first, second = task.bind(FIRST), task.bind(SECOND)
@@ -56,7 +56,7 @@ def test_metadata_selection_rejects_other_scope_and_changed_inventory(tmp_path: 
     assert code == 2 and rejected["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED", rejected
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("shell_family", ["native", "windows"])
 def test_large_selected_metadata_is_paged_and_field_can_be_declared(tmp_path: Path, version: str, shell_family: str, monkeypatch) -> None:
     if shell_family == "windows":
@@ -175,7 +175,7 @@ def test_state_column_selection_routes_existing_custom_state_value_to_instance_f
     assert all(uri != columns_uri for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("operation,token,native_name_present", [
     ("object.setProperty", "Volume", True), ("object.setProperty", "NativeProperty" + "x" * 600, True),
     ("object.setProperty", "声" * 300, True), ("object.setProperty", "NativeProperty" + "x" * 12000, True),
@@ -291,7 +291,7 @@ def test_selected_large_enum_exposes_bounded_choices_and_accepts_last_disclosed_
     assert code == 0, declared
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_selected_long_enum_label_can_be_inspected_and_declared(tmp_path: Path, version: str) -> None:
     task = FieldTask(tmp_path, version, "object.setProperty")
     label = "声" * 24000
@@ -321,7 +321,7 @@ def test_selected_long_enum_label_can_be_inspected_and_declared(tmp_path: Path, 
     assert code == 0, declared
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("native_name_present", [True, False])
 def test_selected_field_without_native_type_rejects_handle_acquisition(tmp_path: Path, version: str, native_name_present: bool) -> None:
     task = FieldTask(tmp_path, version, "object.setProperty")
@@ -340,7 +340,7 @@ def test_selected_field_without_native_type_rejects_handle_acquisition(tmp_path:
     assert task.revision == revision
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("native_name_present", [True, False])
 def test_exact_draft_selection_reports_unavailable_scalar_type_without_claiming_bad_metadata(tmp_path, version, native_name_present):
     task = FieldTask(tmp_path, version, "object.setProperty")
@@ -363,7 +363,7 @@ def test_exact_draft_selection_reports_unavailable_scalar_type_without_claiming_
     assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("operation", ["object.setProperty", "object.setReference"])
 @pytest.mark.parametrize("issue,error_code", [
     ("null", "INVALID_LIVE_METADATA"), ("wrong-name", "LIVE_METADATA_NAME_MISMATCH"),

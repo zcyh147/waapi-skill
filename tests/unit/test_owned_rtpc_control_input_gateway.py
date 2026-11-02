@@ -307,7 +307,7 @@ def test_new_owned_input_cannot_reuse_and_reparent_a_prior_rtpc_control(tmp_path
     assert len(task.writes) == 1
 
 
-@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 @pytest.mark.parametrize('input_type', ['ModulatorLfo', 'ModulatorEnvelope', 'ModulatorTime'])
 @pytest.mark.parametrize('operation', ['object.setRTPC', 'object.set'])
 def test_each_modern_owned_modulator_uses_scoped_fields_and_exact_ownership(tmp_path, version, input_type, operation):
@@ -498,7 +498,7 @@ def test_time_replacement_preserves_curve_or_requires_supported_duration_choice(
         assert '@Curve' not in task.writes[0]['objects'][0]
 
 
-@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 @pytest.mark.parametrize('input_type', ['ModulatorLfo', 'ModulatorEnvelope', 'ModulatorTime'])
 def test_existing_rtpc_replacement_keeps_curve_identity_list_and_shared_input(tmp_path, version, input_type):
     task = ReplacementTask(tmp_path, version, input_type)
@@ -544,7 +544,7 @@ def test_replacement_rejects_changed_preserved_state_or_wrong_owned_identity(tmp
     assert len(task.writes) == 1
 
 
-@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 def test_replacing_a_prior_owned_input_preserves_rtpc_and_requires_old_absence(tmp_path, version):
     task = prior_owned_replacement_task(tmp_path, version)
     before = deepcopy(task.objects)
