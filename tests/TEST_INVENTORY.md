@@ -5,6 +5,35 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-11-02 focused test-cost reduction
+
+The preceding complete Non-live run on `d66e9b66a` finished with **33,057 passed,
+136 failed, 169 skipped and 47 deselected in 14,858.23s**. All 95 previously
+repaired cases passed in that run. It remains a failed gate.
+
+The user authorized lightweight optimization followed by a pause, not another
+full gate. `e03aae33f` removes the redundant release-report generator/tests and
+historical bookkeeping assertions, trims repeated model/layout/profiler fixture
+flows, and reuses composed Authoring resources only within one Gateway command.
+Live state and execution-time integrity checks remain fresh. The runtime change
+passed 11 focused checks across two runs (1.18s and 5.94s). One unchanged window
+lifecycle case fell from 3.86s to 0.59s call time. A separate cProfile diagnostic
+triggered a deadline failure and is not passing evidence.
+
+The three heavy files retain 81 cases, down from 143. Their summed JUnit times
+fell from **2,168.084s to 634.749s** (70.72%); both code optimization and test
+consolidation contribute. Model: 505.575s to 71.950s; layout: 502.611s to 83.280s;
+profiler: 1,159.898s to 479.519s. These files report **78 passed and the same
+3 baseline failures**. Including 16 selected inventory/launcher checks, the
+initial run reported 92 passed and 5 failed in 674.66s. `9d7c8da08` restores a
+path constant accidentally removed from two retained tests; only those two
+were rerun, **2 passed in 18.60s**. The original result is preserved.
+
+This is focused evidence, not a new complete gate or proof of a 15-minute full
+suite. No Wwise or Fresh process ran. Original logs, JUnit and comparison are
+retained locally under `/tmp/waapi-195-test-optimization/`. Pause after this
+report; another full run requires the user's direction.
+
 ## 2026-11-01 focused repair of the 95 retained failures
 
 The user resumed the existing Goal and authorized focused repairs before the
@@ -5075,7 +5104,7 @@ for the precise candidate/run scope and subsequent focused validation.
 
 | Scope | Type | Files / Nodes | What it verifies | Real Wwise required |
 | --- | --- | --- | --- | --- |
-| Focused pure-program gate | Unit, contract, and fake gateway | `ci/test.sh --mode program` | Runs the five-version public-route coverage contract, all 808 default-profile version/API program cases, the deterministic 824-row full-surface release report, the separate Authoring-overlay/resource contracts, negative gateway contracts, isolated-I/O confinement tests, named object/plug-in/import/SoundBank/debug/Lua/UI-command operation contracts and verifiers, RTPC capacity boundaries, the optional registry-integrity file when present, and the selected complete fake preview/confirm/execute/verify chains | No |
+| Focused pure-program gate | Unit, contract, and fake gateway | `ci/test.sh --mode program` | Runs the five-version public-route coverage contract, all 808 default-profile version/API program cases, the separate Authoring-overlay/resource contracts, negative gateway contracts, isolated-I/O confinement tests, named object/plug-in/import/SoundBank/debug/Lua/UI-command operation contracts and verifiers, RTPC capacity boundaries, the optional registry-integrity file when present, and the selected complete fake preview/confirm/execute/verify chains | No |
 | Default non-live suite | Unit and contract | `ci/test.sh --mode nonlive`, equivalent to `poetry run python -m pytest -m "not live and not destructive"` | Fast checks for dispatcher behavior, manifest resources, semantic builders, safety gates, docs contracts, and planning resources | No |
 | Full local suite | Unit plus strict real matrix | `ci/test.sh --version all --mode all -- -q -ra` | Runs the non-live suite first, then the strict real matrix across 2021.1, 2022.1, 2023.1, 2024.1, and 2025.1 | Yes for the matrix half |
 | Full strict real matrix | Live plus destructive | `ci/test.sh --version all --mode matrix -- -q -ra` | Sequential real Wwise coverage for 2021.1, 2022.1, 2023.1, 2024.1, and 2025.1 focused live and destructive nodes | Yes |
