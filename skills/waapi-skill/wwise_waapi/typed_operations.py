@@ -723,7 +723,9 @@ def _compound_child_typed_schema(value: object) -> object:
 
     if not isinstance(value, dict):
         return value
-    projected = deepcopy(value)
+    # Both public entry points already own a deep copy. Copy only this node so
+    # annotations sharing a semantic child retain their unprojected contents.
+    projected = dict(value)
     properties = projected.get("properties")
     if isinstance(properties, dict):
         projected["properties"] = {
