@@ -8,7 +8,6 @@ from pathlib import Path
 
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_registry import OPERATION_SPECS
-from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 from tests.maintenance.interface_depth_inventory import (
     INVENTORY_DOC_PATH,
@@ -20,7 +19,6 @@ from tests.maintenance.interface_depth_inventory import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-REVIEW_POLICY_PATH = REPO_ROOT / "docs" / "interface-depth-review-policy.json"
 
 
 def _inventory() -> dict[str, object]:
@@ -57,19 +55,6 @@ def test_generated_inventory_is_current_and_exactly_covers_both_surfaces() -> No
     assert len(operations) == 153
     assert {(row["operation"], row["version"]) for row in operations} == expected_operations
     assert INVENTORY_DOC_PATH.read_text(encoding="utf-8") == render_interface_depth_inventory(inventory)
-
-
-def test_compound_undo_retains_a_permanent_closed_child_boundary() -> None:
-    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding="utf-8"))
-    compound = next(
-        row
-        for row in policy["named_operation_groups"]
-        if row["id"] == "named-compound-undo"
-    )
-    evidence = compound["audit_evidence"]
-    assert "#57 migration" not in evidence
-    assert "generic typed children remain prohibited" in evidence
-    assert "no shallow fallback exists" in evidence
 
 
 def test_maintenance_entrypoint_runs_directly_from_the_repository_root() -> None:
@@ -332,157 +317,6 @@ def test_continuation_and_shell_mechanics_are_detected_per_exact_lane() -> None:
     )
 
 
-def test_every_already_deep_or_prohibited_family_has_explicit_audit_evidence() -> None:
-    inventory = _inventory()
-    reviewed = [
-        row for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
-        if row["disposition"] != "migration_required"
-    ]
-    assert reviewed
-    assert all(isinstance(row["audit_evidence"], str) and row["audit_evidence"] for row in reviewed)
-    report = INVENTORY_DOC_PATH.read_text(encoding="utf-8")
-    for classification in {row["classification"] for row in reviewed}:
-        assert f"`{classification}`" in report
-
-
-def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
-    inventory = _inventory()
-    tickets = {
-        row: family["id"]
-        for family in inventory["ticket_families"]
-        for row in family["rows"]
-    }
-    expected = {
-        f"{row['version']}|{row['item_type']}|{row['uri']}"
-        for row in inventory["native_lanes"]
-        if row["disposition"] == "migration_required"
-    } | {
-        f"{row['version']}|operation|{row['operation']}"
-        for row in inventory["operation_lanes"]
-        if row["disposition"] == "migration_required"
-    }
-    assert set(tickets) == expected
-    assert all(
-        row["owner_issue"] in {family["github_issue"] for family in inventory["ticket_families"]}
-        for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
-        if row["disposition"] == "migration_required"
-    )
-    assert {188, 189}.isdisjoint(family["github_issue"] for family in inventory["ticket_families"])
-    assert inventory["summary"]["unowned_migration_rows"] == 0
-
-
-def test_completed_core_family_retains_the_authoritative_issue_84_row_seal() -> None:
-    inventory = _inventory()
-    completed = {
-        family["id"]: family
-        for family in inventory["completed_family_seals"]
-    }
-    core = completed["generic-core-project-object"]
-
-    assert core["github_issue"] == 84
-    assert core["row_count"] == len(core["rows"]) == 55
-    assert core["rows_sha256"] == (
-        "caf467378cbabccb637cd93d18cc4e87e"
-        "5356d409ce110da1f040825af4245ed"
-    )
-
-    media = completed["generic-core-media-build"]
-    assert media["github_issue"] == 85
-    assert media["row_count"] == len(media["rows"]) == 16
-    assert media["rows_sha256"] == (
-        "eb0692ad57f0a504bf110f38355997bb"
-        "9abca7519ed412c4ed97c223a6a0decf"
-    )
-    sealed_rows = set(media["rows"])
-    actual_rows = {
-        f"{row['version']}|{row['item_type']}|{row['uri']}": row
-        for row in inventory["native_lanes"]
-        if f"{row['version']}|{row['item_type']}|{row['uri']}" in sealed_rows
-    }
-    assert set(actual_rows) == sealed_rows
-    assert all(
-        row["classification"] == "generic-core-media-build"
-        and row["disposition"] == "already_deep"
-        and row["owner_issue"] is None
-        and row["route"] == "bounded_call"
-        for row in actual_rows.values()
-    )
-
-
-def test_completed_runtime_inspection_family_retains_issue_87_row_seal() -> None:
-    inventory = _inventory()
-    completed = {
-        family["id"]: family
-        for family in inventory["completed_family_seals"]
-    }
-    runtime = completed["generic-core-runtime-inspection"]
-
-    assert runtime["github_issue"] == 87
-    assert runtime["row_count"] == len(runtime["rows"]) == 96
-    assert runtime["rows_sha256"] == "44fc01c03475484a8a6cf302e2563f08d07338c0a27d807d741ee6bd56f83e7c"
-    baseline = [row for row in runtime["rows"] if row not in {
-        "2024.1|function|ak.wwise.core.remote.connect",
-        "2025.1|function|ak.wwise.core.remote.connect",
-    }]
-    assert len(baseline) == 94
-    assert canonical_sha256(baseline) == (
-        "b66b1f4d66d8d77b456b98041c7e14fa"
-        "2d383e02bae02b4a17fabfb85261d593"
-    )
-    sealed_rows = set(runtime["rows"])
-    actual_rows = {
-        f"{row['version']}|{row['item_type']}|{row['uri']}": row
-        for row in inventory["native_lanes"]
-        if f"{row['version']}|{row['item_type']}|{row['uri']}" in sealed_rows
-    }
-    assert set(actual_rows) == sealed_rows
-    assert all(
-        row["classification"] == "generic-core-runtime-inspection"
-        and row["disposition"] == "already_deep"
-        and row["owner_issue"] is None
-        and row["leaked_mechanics"] == []
-        for row in actual_rows.values()
-    )
-
-
-def test_completed_topic_family_preserves_issue_91_baseline_with_authoring_additions() -> None:
-    inventory = _inventory()
-    completed = {
-        family["id"]: family
-        for family in inventory["completed_family_seals"]
-    }
-    topics = completed["generic-topics"]
-
-    assert topics["github_issue"] == 91
-    assert topics["row_count"] == len(topics["rows"]) == 160
-    added = {
-        f"{version}|topic|{uri}"
-        for version in ("2024.1", "2025.1")
-        for uri in ("ak.wwise.ui.selectionChanged", "ak.wwise.ui.signal.click", "ak.wwise.ui.signal.toggle")
-    }
-    assert added <= set(topics["rows"])
-    baseline = sorted(set(topics["rows"]) - added)
-    assert len(baseline) == 154
-    assert canonical_sha256(baseline) == (
-        "48f62fffb957f2ed581bee75cb11ddd6"
-        "624411b77fc307813d1984b5ce015982"
-    )
-    sealed_rows = set(topics["rows"])
-    actual_rows = {
-        f"{row['version']}|{row['item_type']}|{row['uri']}": row
-        for row in inventory["native_lanes"]
-        if f"{row['version']}|{row['item_type']}|{row['uri']}" in sealed_rows
-    }
-    assert set(actual_rows) == sealed_rows
-    assert all(
-        row["classification"] == "generic-topics"
-        and row["disposition"] == "already_deep"
-        and row["owner_issue"] is None
-        and row["leaked_mechanics"] == []
-        for row in actual_rows.values()
-    )
-
-
 def test_every_supported_named_operation_uses_or_migrates_to_the_business_path() -> None:
     inventory = _inventory()
     assert inventory["summary"]["operation_dispositions"] == {
@@ -599,18 +433,6 @@ def test_fixed_commands_are_audited_from_their_actual_public_parameters() -> Non
     for row in inventory["native_lanes"]:
         if row["classification"] == "generic-fixed-command-audited-deep":
             assert _model_values(inventory, row) == []
-
-
-def test_historical_construction_baseline_is_preserved_without_depth_claim() -> None:
-    baseline = _inventory()["historical_baseline"]
-    assert baseline == {
-        "contract": "waapi-skill.typed-request-surface/v1",
-        "total_lanes": 897,
-        "construction_coverage_is_depth_evidence": False,
-    }
-    assert set(SUPPORTED_WWISE_VERSION_KEYS) == {
-        row["version"] for row in _inventory()["native_lanes"]
-    }
 
 
 def test_parser_seal_includes_root_options_and_offline_version_alias():
@@ -737,17 +559,3 @@ def test_completed_layout_wrapper_has_its_own_exact_seal_without_historical_cred
     historical = next(item for item in inventory['completed_family_seals']
                       if item['id'] == 'generic-host-ui-debug-waapi')
     assert set(family['rows']).isdisjoint(historical['rows'])
-
-
-def test_active_layout_routes_have_one_exact_completed_wrapper_review():
-    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
-    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS
-    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding='utf-8'))
-    rules = [row for row in policy['native_lane_rules'] if row['id'] == 'authoring-layout-partial']
-    assert len(rules) == 1
-    assert set(rules[0]['match']) == {'uris'}
-    assert set(rules[0]['match']['uris']) == LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS
-    assert rules[0]['disposition'] == 'already_deep'
-    assert rules[0]['owner_issue'] is None
-    assert policy['completed_family_seals']['authoring-layout-partial']['github_issue'] == 188
-    assert 'authoring-layout-partial' not in policy['ticket_blueprints']

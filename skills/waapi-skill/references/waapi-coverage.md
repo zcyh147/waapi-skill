@@ -188,12 +188,6 @@ The catalog and execution registry are tied to an immutable per-version
 inventory digest. A URI addition, removal, or same-count substitution fails
 closed until the packaged contract is reviewed and updated.
 
-The deterministic [full-surface release report](../../../docs/full-surface-release-report.json)
-binds the exact 849-lane inventory digest to its zero/inline/draft/Topic
-construction totals, host overlays, execution routes, public continuations,
-blocked fields, duplicate-lane audit, schema keywords, and references. It is a
-code-only construction report, not real-host or Fresh Agent evidence.
-
 ## Verification scope
 
 The Program gate exercises

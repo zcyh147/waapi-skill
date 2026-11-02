@@ -1,5 +1,24 @@
 # Eliminate Skill-origin WAAPI coverage gaps across Wwise 2021.1–2025.1
 
+## Current authorization — lightweight test optimization (2026-11-02)
+
+The completed Non-live run took 14,858.23 seconds and reported 136 failures.
+The user authorized simplifying redundant full-workflow tests and repeated
+Gateway initialization, prioritizing important business behavior and necessary
+glue over exhaustive Wwise parameter combinations. Keep the five-version
+interface differences and representative public Gateway flows. Test local
+business checks directly; remove bookkeeping-only report and historical-ticket
+assertions rather than hiding them behind a new test mode. Preserve configuration,
+authorization, drift, single-execution and cleanup protections and raw evidence.
+
+Use existing focused tests and selected heavy groups to measure the changes.
+Approximately 15 minutes is the eventual full Non-live target, not a measured
+result. Do not create another ledger, test runner or coverage quota. After this
+optimization and focused review, pause the existing Goal and report the changes
+and measured timings. A complete Program/Non-live run, Wwise/Fresh execution,
+publication or ticket closure is not authorized in this step. This stop rule
+supersedes the older final-regression instructions below.
+
 ## Repair authorization after ledger removal — 2026-11-01
 
 The user has resumed the existing Goal and authorized repair of the remaining
