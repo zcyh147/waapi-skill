@@ -5,6 +5,41 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-11-02 all remaining test modules assessed
+
+The user required all remaining non-live modules to be handled, not another
+prioritized subset. All 561 assigned files have source/dependency assessments:
+92 changed and 469 explicitly retained as lightweight business or necessary-glue
+checks. Business: 62/198; UI/configuration: 17/58; harness: 13/213. No production
+code, new test framework or alternate slow gate was added. Actual version
+differences and material authorization, identity, bounds and cleanup checks remain.
+
+UI/configuration's 15-file selection passed **823 tests in 364.65s**. Two further
+prose files initially reported 22 passed and one obsolete wording failure;
+removing that redundant phrase assertion passed the sole affected rerun. All 23
+retained tests have passing latest results. The nine historical wording failures
+are test-expectation corrections, not business fixes. Raw failed results remain.
+
+The 62-file business run lost its execution session near 35%, with no final exit
+code or JUnit; the termination cause is unavailable. It remains interrupted.
+Its 2,155 success marks, unchanged candidate, identical recollection/file order
+and matching progress percentages locate 23 completed files (2,121 cases) before
+the partial boundary file. This is a conservative progress inference, not final
+JUnit or full-gate passing evidence. The boundary file was repeated in full;
+the remaining 39 files ran in five root-owned batches with verbose per-case logs
+and separate exit/JUnit files. Those report **3,710 passed and one unchanged
+historical failure**, totalling 909.691s of case time versus 2,049.924s previously.
+The retained failure is the 2025.1 Japanese Voice creation case with `nested=False`.
+The original prefix has no new per-case timing credit.
+
+Harness's 13 affected files passed **85 tests in 178.40s**; their case times sum
+to 176.617s versus 627.624s historically. Four obsolete failing collector tests
+were explicitly retired, not repaired. Standards and Spec reviews are clear.
+Original and recovery evidence, exact file accounting and summaries remain in
+`/tmp/waapi-195-test-optimization-r3/`. No full Program/Nonlive gate, native Wwise,
+Fresh Agent or remote publication ran. Whole-suite runtime and the roughly
+15-minute target remain unverified. Pause after reporting to the user.
+
 ## 2026-11-02 remaining test-cost reduction
 
 The user authorized the same lightweight approach for the remaining expensive
