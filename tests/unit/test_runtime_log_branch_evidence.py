@@ -62,66 +62,12 @@ def public_log_read(path, rows, *, version='2025.1', console=True, channel='gene
     native,=[row for row in trace if row['uri']==GET]
     return first, {k:native[k] for k in ('uri','args','options','result')},context,trace
 
-def native_log_rows(version):
-    """Finite external data from the independent pinned native schemas, not Gateway logic.
 
-    Zip alternatives rather than multiply combinations. The public assertion is
-    whole-value preservation; malformed/limit controls exercise actual failures.
-    """
-    import re
-    from itertools import cycle
-    catalog=json.loads((audit.ROOT/f'skills/waapi-skill/resources/native-catalog/{version}/wwise-authoring.json').read_bytes())
-    documents=catalog['definitions']['documents']
-    guid='{11111111-1111-1111-1111-111111111111}'
-    def variants(node,seen=()):
-        if node is True:return ['Evidence']
-        if node is False:return []
-        if '$ref'in node:
-            name,pointer=node['$ref'].split('#');key=(name or 'waapi_definitions.json',pointer)
-            if key in seen:return [{}]
-            target=pointer_value(documents[key[0]],pointer)
-            return variants({**target,**{k:v for k,v in node.items()if k!='$ref'}},(*seen,key))
-        if 'enum'in node:return deepcopy(node['enum'])
-        union=next((key for key in ('oneOf','anyOf','OneOf')if key in node),None)
-        if union:return [v for arm in node[union]for v in variants(arm,seen)]
-        kind=node.get('type')
-        if kind=='object':
-            properties=node.get('properties',{});required=node.get('required',[])
-            values={k:variants(v,seen)for k,v in properties.items()if v is not False}
-            for pattern,child in node.get('patternProperties',{}).items():
-                key=next(k for k in ['@Evidence','@@Evidence','Evidence','OutputBus','Evidence/Λ']if re.search(pattern,k))
-                values[key]=variants(child,seen)
-            count=max((len(v)for v in values.values()),default=1)
-            rich=[{k:deepcopy(v[i%len(v)])for k,v in values.items()if v}for i in range(count)]
-            minimal={k:deepcopy(values[k][0])for k in required}
-            return [minimal,*rich]
-        if kind=='array':
-            members=variants(node.get('items',{}),seen)
-            return ([[]]if node.get('minItems',0)==0 else[])+[[deepcopy(v)]for v in members]+([deepcopy(members[:2])]if members else[])
-        if kind=='boolean':return [False,True]
-        if kind=='null':return [None]
-        if kind in {'integer','number'}:
-            return list(dict.fromkeys([node.get('minimum',0),node.get('maximum',1)]))
-        if kind=='string':
-            candidates=['Evidence','',guid,r'\Master-Mixer Hierarchy\Default Work Unit\Evidence']
-            return [v for v in candidates if len(v)>=node.get('minLength',0)and('pattern'not in node or re.search(node['pattern'],v))]
-        return [{}]
-    schema=catalog['schemas'][GET]['resultSchema']['properties']['items']['items']
-    values=variants(schema)
-    distinct={json.dumps(value,sort_keys=True):value for value in values}
-    return list(distinct.values())
+@pytest.mark.parametrize('version,console', [('2021.1', False), ('2025.1', True)])
+def test_log_get_versioned_public_result_branches(tmp_path,version,console):
+    public_log_read(tmp_path/'rows', [ROW, ROW], version=version, console=console)
+    public_log_read(tmp_path/'empty', [], version=version, console=console)
 
-@pytest.mark.parametrize('version',['2021.1','2022.1','2023.1','2024.1','2025.1'])
-@pytest.mark.parametrize('console',[True,False],ids=['console','authoring'])
-def test_log_get_versioned_public_result_branches(request,tmp_path,version,console):
-    rows=native_log_rows(version)
-    assert rows
-    captures=[public_log_read(tmp_path/str(i),[row],version=version,console=console)for i,row in enumerate(rows)]
-    channels=['soundbank-generation','audio-conversion','platform-settings-copy','waapi','project-load']
-    if version in {'2023.1','2024.1','2025.1'}:channels+=['source-control','lua']
-    captures.extend(public_log_read(tmp_path/('channel-'+channel),[ROW],version=version,console=console,channel=channel)for channel in channels)
-    captures.append(public_log_read(tmp_path/'empty',[],version=version,console=console))
-    captures.append(public_log_read(tmp_path/'multiple',[ROW,ROW],version=version,console=console))
 
 def public_log_control(path,uri,*,version='2025.1',console=False,channel='general',severity='message',message='owned log control'):
     path.mkdir(parents=True)

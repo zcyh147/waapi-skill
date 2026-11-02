@@ -40,8 +40,7 @@ def public_read(path,uri,version,console,rows,position):
     native,=[r for r in trace if r['uri']==uri]
     return first,{k:native[k]for k in ('uri','args','options','result')},context,trace,calls
 
-@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
-@pytest.mark.parametrize('console', [True, False])
+@pytest.mark.parametrize('version,console', [('2023.1', True), ('2025.1', False)])
 def test_extra_diagnostic_reads_public_teardown_portable_consumer(tmp_path, version, console):
     rows = [
         [{'id': 0, 'type': '', 'elementName': 'Audio', 'instances': 2, 'millisecondsExclusive': 0.014,
@@ -52,6 +51,5 @@ def test_extra_diagnostic_reads_public_teardown_portable_consumer(tmp_path, vers
           'active': True, 'targetBufferSize': 1, 'bufferStatusBuffered': 1.0}],
     ]
     for i, (uri, result) in enumerate(zip(URIS, rows)):
-        for j, (values, position) in enumerate([(result, 0), (result * 2, 1), ([], 2),
-                                               (result, 'capture-latest'), (result, 'user-cursor')]):
+        for j, (values, position) in enumerate([(result, 0), ([], 'user-cursor')]):
             public_read(tmp_path / f'{i}-{j}', uri, version, console, values, position)

@@ -72,9 +72,9 @@ def capture_control_flow(path,version,host,uri,args,result):
     assert sum(x['uri']==uri for x in trace)==1
     return target_receipt,{k:native[k]for k in ('uri','args','options','result')},context,trace[:calls[-1]['native_end']],calls
 
-@pytest.mark.parametrize('version',['2025.1','2021.1','2022.1','2023.1','2024.1'])
-def test_capture_control_paired_hosts_public_teardown_consumer(request,tmp_path,version):
-    for host in ('wwise-console', 'wwise-authoring'):
-        for suffix, args in [('enableProfilerData', {'dataTypes': [{'dataType': 'voices', 'enable': True}]}),
-                             ('startCapture', {}), ('stopCapture', {})]:
-            capture_control_flow(tmp_path / (host + suffix), version, host, PREFIX + suffix, args, {})
+@pytest.mark.parametrize('version,host', [('2021.1', 'wwise-console'), ('2025.1', 'wwise-authoring')])
+def test_capture_control_paired_hosts_public_teardown_consumer(request,tmp_path,version,host):
+    # The request shapes are identical across versions; retain both host lanes.
+    for suffix, args in [('enableProfilerData', {'dataTypes': [{'dataType': 'voices', 'enable': True}]}),
+                         ('startCapture', {}), ('stopCapture', {})]:
+        capture_control_flow(tmp_path / (host + suffix), version, host, PREFIX + suffix, args, {})

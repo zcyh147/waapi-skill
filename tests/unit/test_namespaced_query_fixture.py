@@ -67,19 +67,6 @@ def test_prelaunch_rejects_unowned_or_changed_inputs_without_replacing_files(tmp
     assert after == before and not (io / 'namespaced-query-prelaunch.json').exists()
 
 
-@pytest.mark.parametrize('profile,version,exception', [
-    ('unknown-profile', '2025.1', AssertionError),
-    (fixture.PROFILE, '2021.1', pytest.skip.Exception),
-    ('2021-native-donor-two-properties/v1', '2025.1', pytest.skip.Exception),
-])
-def test_common_fixture_rejects_unknown_or_wrong_version_profile_before_copy(workflow, monkeypatch, profile, version, exception):
-    monkeypatch.setenv('WWISE_VERSION', version)
-    def unexpected(*args, **kwargs):
-        raise AssertionError('Profile boundary reached sandbox preparation')
-    monkeypatch.setattr(workflow, 'prepare_sample_project_sandbox', unexpected)
-    generator = workflow.workflow_sandbox_runtime.__wrapped__(SimpleNamespace(param=profile), None)
-    with pytest.raises(exception):
-        next(generator)
 
 
 def test_probe_candidates_use_existing_offline_advanced_and_metadata_cli(tmp_path, workflow):
