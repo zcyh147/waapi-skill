@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Protocol
+from typing import Any, Iterator, Mapping, Protocol
 
 from .authoring_ui_commands_manifest import (
     AUTHORING_HOST_SURFACE,
@@ -26,6 +28,23 @@ DEFAULT_INVENTORY_SOURCE = "live-reflection"
 LOCAL_PATH_PATTERN = re.compile(
     r"(?:/(?:Applications|Users|Volumes|private|tmp)/[^\n\r\t\"'<>]+)|(?:[A-Za-z]:\\[^\n\r\t\"'<>]+)"
 )
+
+# Only a Gateway invocation owns this snapshot. Serialized JSON keeps mutable
+# schemas returned to different consumers independent; no live facts or runtime
+# guard hashes enter it. Standalone ManifestStore users retain fresh loads.
+_COMMAND_PROFILES: ContextVar[dict[tuple[Path, str, str], str] | None] = ContextVar(
+    "waapi_command_manifest_profiles", default=None,
+)
+
+
+@contextmanager
+def command_manifest_resources() -> Iterator[None]:
+    """Reuse composed packaged profiles until this command exits, even on error."""
+    token = _COMMAND_PROFILES.set({})
+    try:
+        yield
+    finally:
+        _COMMAND_PROFILES.reset(token)
 
 
 class WaapiCaller(Protocol):
@@ -299,6 +318,11 @@ class ManifestStore:
 
     def load_authoring_ui_profile(self, version: str) -> dict[str, Any]:
         """Compose only the separately reviewed Authoring supplements."""
+        snapshots = _COMMAND_PROFILES.get()
+        key = (self.root, version, "wwise-authoring-ui") if self.root is not None and not self.versions else None
+        if snapshots is not None and key is not None and key in snapshots:
+            return json.loads(snapshots[key])
+
         from .authoring_ui_topics_manifest import merge_authoring_ui_topics
         from .authoring_core_manifest import merge_authoring_core
 
@@ -307,11 +331,14 @@ class ManifestStore:
 
         from .authoring_model_business import merge_authoring_models
 
-        return merge_authoring_models(merge_layout_mutations(merge_authoring_layout_reads(merge_authoring_core(
+        result = merge_authoring_models(merge_layout_mutations(merge_authoring_layout_reads(merge_authoring_core(
             merge_authoring_ui_topics(
                 self.load_with_authoring_ui_commands(version), root=self.root, version=version,
             ), root=self.root, version=version,
         ), root=self.root, version=version), root=self.root, version=version), root=self.root, version=version)
+        if snapshots is not None and key is not None:
+            snapshots[key] = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+        return result
 
     def load_authoring_ui_commands_supplement(
         self,

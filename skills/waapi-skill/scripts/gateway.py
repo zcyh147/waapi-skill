@@ -63,6 +63,7 @@ from wwise_waapi.builders.common import (  # noqa: E402  # pyright: ignore[repor
     SemanticPreview,
     SemanticValidationError,
 )
+from wwise_waapi.manifest import command_manifest_resources  # noqa: E402
 from wwise_waapi.wal_read_continuation import wal_read_contract  # noqa: E402
 from wwise_waapi.builders.debug_lua import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DebugLuaContractError,
@@ -3610,12 +3611,13 @@ def execute_gateway(
     client_factory: ClientFactory | None = None,
     stream_sink: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> tuple[int, dict[str, Any]]:
-    exit_code, payload = _execute_gateway_unconstrained(
-        argv,
-        env=env,
-        client_factory=client_factory,
-        stream_sink=stream_sink,
-    )
+    with command_manifest_resources():
+        exit_code, payload = _execute_gateway_unconstrained(
+            argv,
+            env=env,
+            client_factory=client_factory,
+            stream_sink=stream_sink,
+        )
     if payload.get("command") in OFFLINE_COMMANDS:
         return exit_code, payload
     result_limit = (
