@@ -1,5 +1,22 @@
 # Eliminate Skill-origin WAAPI coverage gaps across Wwise 2021.1–2025.1
 
+## Current authorization — repair 62 cases and run one regression (2026-11-03)
+
+The user resumed the existing Goal and authorized repairing all 62 failed cases
+from the supplemental Non-live timing run. Preserve those original cases and
+prove that every one passes; distinguish product defects from outdated test
+fixtures or expectations using the accepted contracts and versioned definitions.
+During development, run only failed and directly affected tests. Do not delete,
+skip, or weaken a failed case to make the count pass.
+
+After focused repairs and review, freeze the combined candidate and run the
+existing complete Non-live gate **once**. It already includes the Program
+selection; do not run an overlapping full Program gate. When that regression
+ends, preserve and report its results and timing, then **pause the Goal and wait
+for the user's decision regardless of the result**. No automatic repair or rerun
+follows it. This supersedes the focused-only stop rule below; it does not
+authorize Wwise/Fresh execution, publication, ticket closure, or merging to main.
+
 ## Current authorization — lightweight test optimization (2026-11-02)
 
 The user subsequently required **all remaining non-live test modules** to be
