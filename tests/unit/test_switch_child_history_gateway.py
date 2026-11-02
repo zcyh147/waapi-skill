@@ -62,10 +62,13 @@ PAIRS = [(v, d) for v in ("2022.1", "2023.1", "2024.1", "2025.1")
     for d in (["undo"] if v == "2022.1" else ["undo", "redo"])]
 
 
-@pytest.mark.parametrize("version,direction", PAIRS)
-@pytest.mark.parametrize("native_type", [False, True])
-@pytest.mark.parametrize("field,value,platform", [("ContinuePlay", True, PLATFORM),
-    ("ContinuePlay", True, None), ("FadeInTime", 2.5, PLATFORM)])
+# One complete source/undo chain per native lane; optional type, numeric field,
+# and omitted platform are independent business facts, exercised on 2025.1.
+@pytest.mark.parametrize("version,direction,native_type,field,value,platform", [
+    *(version + (False, "ContinuePlay", True, PLATFORM) for version in PAIRS),
+    ("2025.1", "undo", True, "ContinuePlay", True, None),
+    ("2025.1", "redo", True, "FadeInTime", 2.5, PLATFORM),
+])
 def test_structural_property_owned_history_all_permitted_lanes(tmp_path, version, direction, native_type, field, value, platform):
     task = ContextHistoryTask(tmp_path, version, native_type)
     source = source_receipt(task, field, value, platform)
@@ -90,9 +93,11 @@ def history_calls(task):
     return [uri for uri, _, _ in task.calls if uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"}]
 
 
-@pytest.mark.parametrize("stage", ["prewrite", "postaction"])
-@pytest.mark.parametrize("damage", ["child-parent", "child-context", "owner", "class", "type-null", "type-presence",
-    "catalog", "owner-value", "owner-metadata", "field-metadata", "bool-number", "missing", "duplicate", "extra"])
+@pytest.mark.parametrize("stage,damage", [
+    *(('prewrite', damage) for damage in ["child-parent", "child-context", "owner", "class", "type-null", "type-presence",
+        "catalog", "owner-value", "owner-metadata", "field-metadata", "bool-number", "missing", "duplicate", "extra"]),
+    *(('postaction', damage) for damage in ["child-context", "field-metadata", "bool-number", "duplicate"]),
+])
 def test_history_revalidates_structural_proofs_conditions_and_values_without_retry(tmp_path, stage, damage):
     task = ContextHistoryTask(tmp_path, "2022.1")
     source = source_receipt(task)

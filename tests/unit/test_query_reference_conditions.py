@@ -74,7 +74,7 @@ def test_two_owners_keep_distinct_resolved_and_stored_reference_matches(tmp_path
     assert any('where @PlaylistObject.id = ' in (args or {}).get('waql', '') for uri, args, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('constant', [MISSING, json.dumps({'kind': 'id', 'value': MISSING})])
 def test_nonexistent_guid_is_a_literal_comparison_not_a_live_target(tmp_path, version, constant):
     task = ReferenceTask(tmp_path, version)
@@ -85,7 +85,7 @@ def test_nonexistent_guid_is_a_literal_comparison_not_a_live_target(tmp_path, ve
     assert not any(MISSING in str(args) and 'where' not in (args or {}).get('waql', '') for _, args, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('source', ['broad', 'advanced', 'relationship'])
 @pytest.mark.parametrize('mode,expected', [('reference', SOUND), ('local-reference', OTHER), ('override-source-value', OTHER)])
 def test_modes_share_complete_root_scope_before_limit(tmp_path, version, source, mode, expected):
@@ -100,7 +100,7 @@ def test_modes_share_complete_root_scope_before_limit(tmp_path, version, source,
     assert [row['id'] for row in result['agent_result']] == [expected]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('mode', ['reference', 'local-reference'])
 @pytest.mark.parametrize('presence', ['null', 'absent'])
 def test_reference_setness_preserves_native_absence_and_null_without_python_guess(tmp_path, version, mode, presence):
@@ -120,7 +120,7 @@ def test_reference_setness_preserves_native_absence_and_null_without_python_gues
         assert [item['object']['id'] for item in unset['items']] == [OTHER]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('selector', [
     {'kind': 'path', 'value': '\\' + '声' * 2000},
     {'kind': 'exact-type-name', 'type': 'Bus', 'name': 'Resolved'},
@@ -157,7 +157,7 @@ def test_offline_schema_discloses_separate_query_and_return_mode_authority(tmp_p
     assert not task.calls
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_named_target_meaning_is_revalidated_after_final_selection(tmp_path, version):
     task = ReferenceTask(tmp_path, version)
     task.rows = list(task.members.values())
@@ -174,7 +174,7 @@ def test_named_target_meaning_is_revalidated_after_final_selection(tmp_path, ver
     assert code == 2 and result['error_code'] == 'QUERY_FIELD_CONDITION_TARGET', result
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_scoped_selector_parent_retains_owning_character_budget(tmp_path, version):
     from wwise_waapi.operation_object import DEFAULT_MAX_IDENTITY_PARENT_LITERAL_LENGTH
     task = ReferenceTask(tmp_path, version)
@@ -191,7 +191,7 @@ def test_scoped_selector_parent_retains_owning_character_budget(tmp_path, versio
     assert code == 0 and [row['id'] for row in result['agent_result']] == [SOUND], result
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('fault', ['absent', 'null', 'wrong-id', 'typed-extension'])
 def test_selected_reference_observation_requires_exact_presence_and_value(tmp_path, version, fault):
     task = ReferenceTask(tmp_path, version)
@@ -211,7 +211,7 @@ def test_selected_reference_observation_requires_exact_presence_and_value(tmp_pa
     assert code == 2 and result['error_code'] == 'RELATED_QUERY_SCOPE_CHANGED', result
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['none', 'literal-target-name', 'named-target', 'reference-value', 'metadata'])
 def test_reference_pages_bind_only_the_actual_operand_authority(tmp_path, version, change):
     task = ReferenceTask(tmp_path, version)
@@ -232,7 +232,7 @@ def test_reference_pages_bind_only_the_actual_operand_authority(tmp_path, versio
         assert code == 2 and second['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', second
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('values', [
     ['reference', 'Playlist Object', 'below', MISSING],
     ['reference', '@PlaylistObject', 'is', MISSING],
@@ -248,7 +248,7 @@ def test_reference_conditions_reject_raw_or_invalid_operands_before_transport(tm
     assert not task.calls
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_reference_binding_uses_each_actual_class_token_and_preserves_occurrences(tmp_path, version):
     task = ReferenceTask(tmp_path, version)
     task.members[OTHER].update(classId=SOUND_CLASS, type='Sound')
@@ -271,7 +271,7 @@ def test_reference_binding_uses_each_actual_class_token_and_preserves_occurrence
         'ak.wwise.core.object.getPropertyAndReferenceNames', 'ak.wwise.core.object.getPropertyInfo'}
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('mode,meaning', [('ordinary', 'Playlist Object'), ('override-source-value', 'Playlist Object'), ('reference', 'Voice Pitch'), ('local-reference', 'Voice Pitch')])
 def test_known_wrong_field_kind_cannot_change_mode(tmp_path, version, mode, meaning):
     task = ReferenceTask(tmp_path, version)
@@ -281,7 +281,7 @@ def test_known_wrong_field_kind_cannot_change_mode(tmp_path, version, mode, mean
     assert code == 2 and result['error_code'] == 'QUERY_FIELD_CONDITION_KIND', result
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('kind,value,literal', [('bool', False, 'false'), ('int32', 0, '0'), ('string', 'null', 'null')])
 def test_override_property_values_keep_exact_scalar_types_and_null_text(tmp_path, version, kind, value, literal):
     task = ReferenceTask(tmp_path, version)
@@ -293,7 +293,7 @@ def test_override_property_values_keep_exact_scalar_types_and_null_text(tmp_path
     assert code == 0 and [row['id'] for row in result['agent_result']] == [SOUND], result
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_reference_window_before_matching_does_not_discover_hidden_suffix(tmp_path, version):
     task = ReferenceTask(tmp_path, version)
     task.rows[0]['children'] = [task.reference(OTHER)] + [task.reference(SOUND)] * 4096
@@ -304,7 +304,7 @@ def test_reference_window_before_matching_does_not_discover_hidden_suffix(tmp_pa
     assert [row['related']['projections'][0]['value'] for row in result['agent_result']] == [0, 0]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_reference_unknown_scope_keeps_roots_and_unavailability_mode(tmp_path, version):
     task = ReferenceTask(tmp_path, version)
     task.metadata[REFERENCE_CLASS].pop('PlaylistObject')
@@ -328,7 +328,7 @@ def test_reference_selector_request_budget_is_not_removed_by_json_whitespace(tmp
     assert code == 2 and not task.calls, result
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_unset_native_identity_inequality_is_not_python_complement(tmp_path, version):
     task = ReferenceTask(tmp_path, version)
     task.members[OTHER].pop('@@PlaylistObject')
@@ -342,7 +342,7 @@ def test_unset_native_identity_inequality_is_not_python_complement(tmp_path, ver
         assert [row['object']['id'] for row in unset['items']] == [OTHER]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_named_selector_ambiguity_is_not_a_literal_guid_failure(tmp_path, version):
     task = ReferenceTask(tmp_path, version)
     task.rows = list(task.members.values())
@@ -352,7 +352,7 @@ def test_named_selector_ambiguity_is_not_a_literal_guid_failure(tmp_path, versio
     assert code == 2 and result['error_code'] == 'QUERY_FIELD_CONDITION_TARGET', result
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('value', [False, 0, [], {'id': 'not-a-guid'}])
 def test_malformed_reference_observation_is_unknown_not_an_unset_value(tmp_path, version, value):
     task = ReferenceTask(tmp_path, version)

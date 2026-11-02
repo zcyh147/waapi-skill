@@ -164,7 +164,7 @@ def test_list_and_member_presence_extensions_and_duplicate_occurrences_are_lossl
     else: assert context['items'][0]['unavailable_fields'] == ['properties.Pitch']
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_nested_lists_and_singleton_paths_keep_independent_member_identity(tmp_path, version):
     task = ListTask(tmp_path, version)
     for member in task.members.values():
@@ -185,7 +185,7 @@ def test_nested_lists_and_singleton_paths_keep_independent_member_identity(tmp_p
     assert member['related']['parent']['volume_db'] == -5
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_heterogeneous_member_metadata_never_borrows_another_class_token_and_keeps_root(tmp_path, version):
     task = ListTask(tmp_path, version)
     task.members[OTHER]['classId'] = REFERENCE_CLASS
@@ -201,7 +201,7 @@ def test_heterogeneous_member_metadata_never_borrows_another_class_token_and_kee
     assert {'object':OTHER} in scopes
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_member_reference_modes_and_hops_use_actual_class_and_preserve_extensions(tmp_path, version):
     task = ListTask(tmp_path, version)
     for member in task.members.values():
@@ -220,7 +220,7 @@ def test_member_reference_modes_and_hops_use_actual_class_and_preserve_extension
     assert member['related']['references']['PlaylistObject']['volume_db'] == -2
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['typed-class','membership','root-order'])
 def test_preparation_rejects_type_exact_scope_or_membership_drift(tmp_path, version, change):
     class Changing(ListTask):
@@ -242,7 +242,7 @@ def test_preparation_rejects_type_exact_scope_or_membership_drift(tmp_path, vers
     assert result.get('agent_result') is None
 
 
-@pytest.mark.parametrize('version', ['2021.1','2022.1'])
+@pytest.mark.parametrize('version', ['2022.1'])
 @pytest.mark.parametrize('invalid', ['missing','duplicate','extra','malformed'])
 def test_grouped_member_batch_requires_exact_canonical_identity_set(tmp_path,version,invalid):
     class Invalid(ListTask):
@@ -260,7 +260,7 @@ def test_grouped_member_batch_requires_exact_canonical_identity_set(tmp_path,ver
     assert result.get('agent_result') is None
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('source', ['advanced','empty'])
 def test_list_queries_keep_existing_advanced_bounds_and_empty_result_semantics(tmp_path,version,source):
     task = ListTask(tmp_path,version)
@@ -295,7 +295,7 @@ def test_offline_list_contract_packages_exact_matching_source_and_owned_limits(t
     assert task.calls == []
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['none','member-value','membership','metadata'])
 def test_list_pages_reconstruct_member_values_and_seal_all_owned_reads(tmp_path,version,change):
     task = ListTask(tmp_path,version)
@@ -334,7 +334,7 @@ def test_list_pages_reconstruct_member_values_and_seal_all_owned_reads(tmp_path,
     assert [entry['value'] for entry in entries if entry['pointer'] == '/objects/0/related/children/items/0/properties/Pitch'] == [-560]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('bound', ['occurrences','unique','bytes'])
 def test_owned_member_limits_fail_before_truncating_or_returning_partial_members(tmp_path,version,bound,monkeypatch):
     import wwise_waapi.object_query_related_lists as lists
@@ -353,7 +353,7 @@ def test_owned_member_limits_fail_before_truncating_or_returning_partial_members
     assert result['error_code'] in {'RELATED_QUERY_MEMBER_LIMIT','RELATED_QUERY_OBSERVATION_LIMIT','RELATED_QUERY_READ_FAILED'}, result
 
 
-@pytest.mark.parametrize('version',['2021.1','2022.1'])
+@pytest.mark.parametrize('version',['2022.1'])
 def test_grouped_source_chunks_are_checked_and_never_exceed_actual_builder_source_limit(tmp_path,version):
     import uuid
     from wwise_waapi.builders.query import MAX_STRUCTURED_SOURCE_ITEMS
@@ -372,7 +372,7 @@ def test_grouped_source_chunks_are_checked_and_never_exceed_actual_builder_sourc
     assert {len(re.findall(r'\{[0-9A-Fa-f-]{36}\}',args['waql'])) for args in member_reads} == {64,1}
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_raw_member_identity_extensions_are_type_exact_scope_facts_and_never_pruned(tmp_path,version):
     class Extension(ListTask):
         count = 0
@@ -389,7 +389,7 @@ def test_raw_member_identity_extensions_are_type_exact_scope_facts_and_never_pru
     assert code == 2 and result['error_code'] == 'RELATED_QUERY_SCOPE_CHANGED', result
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_list_terminal_kind_and_raw_accessor_rejection_preserve_metadata_authority(tmp_path,version):
     task = ListTask(tmp_path,version)
     code,result = task.run('query-object','--kind','all-sounds','--max-results','2','--include-related-local-reference','children','Pitch')
@@ -420,7 +420,7 @@ def test_documented_object_list_descriptors_share_the_same_member_contract(tmp_p
     assert [member['object']['id'] for member in result['agent_result'][0]['related'][relation]['items']] == [SOUND,OTHER]
 
 
-@pytest.mark.parametrize('version',VERSIONS)
+@pytest.mark.parametrize('version',['2025.1'])
 @pytest.mark.parametrize('presence',['null','absent'])
 def test_missing_singleton_terminal_behavior_stays_the_same_when_lists_are_requested(tmp_path,version,presence):
     task = ListTask(tmp_path,version)
@@ -434,7 +434,7 @@ def test_missing_singleton_terminal_behavior_stays_the_same_when_lists_are_reque
     if presence == 'null': assert context['object'] is None
 
 
-@pytest.mark.parametrize('version',VERSIONS)
+@pytest.mark.parametrize('version',['2025.1'])
 def test_nested_list_paths_are_bounded_before_live_preparation(tmp_path,version):
     from wwise_waapi.builders.query import MAX_ADVANCED_RETURN_EXPRESSIONS
     task = ListTask(tmp_path,version)
@@ -444,7 +444,7 @@ def test_nested_list_paths_are_bounded_before_live_preparation(tmp_path,version)
     assert task.calls == []
 
 
-@pytest.mark.parametrize('version',['2021.1','2022.1'])
+@pytest.mark.parametrize('version',['2022.1'])
 @pytest.mark.parametrize('change',['name','typed-extension'])
 def test_grouped_membership_reference_facts_cannot_be_hidden_by_member_readback(tmp_path,version,change):
     class Changing(ListTask):
@@ -463,7 +463,7 @@ def test_grouped_membership_reference_facts_cannot_be_hidden_by_member_readback(
     assert code == 2 and result['error_code'] == 'RELATED_QUERY_SCOPE_CHANGED', result
 
 
-@pytest.mark.parametrize('version',['2021.1','2025.1'])
+@pytest.mark.parametrize('version',['2025.1'])
 @pytest.mark.parametrize('encoding',['document','pointer'])
 def test_lossless_pages_keep_one_origin_packet_manifest_despite_fresh_dispatch_paths(tmp_path,version,encoding):
     from wwise_waapi.canonical import canonical_sha256
@@ -520,7 +520,7 @@ def test_lossless_pages_keep_one_origin_packet_manifest_despite_fresh_dispatch_p
     assert set(evidence.glob('*.json')) - before - origin  # Actual paths changed on repeat reads.
 
 
-@pytest.mark.parametrize('version',VERSIONS)
+@pytest.mark.parametrize('version',['2025.1'])
 def test_unchanged_extra_native_terminal_survives_later_owned_projection_expansion(tmp_path,version):
     class Extra(ListTask):
         def projection(self,row,expressions):

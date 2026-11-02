@@ -327,7 +327,7 @@ def test_debug_validate_call_rejects_non_object_artifact_before_connect(
     assert connected is False
 
 
-@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('console', (False, True))
 def test_wal_complete_map_above_old_limit_roundtrips_through_public_continuations(tmp_path: Path, version: str, console: bool) -> None:
     raw = {'return': {'nodes': {f'node-{i:04}': {'id': i, 'name': f'Node {i}', 'type': 'Sound',

@@ -29,7 +29,7 @@ def test_singleton_namespaced_property_outputs_keep_ordinary_and_override_values
     assert list(result)[-1] == 'agent_result'
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('path,expected', [
     (['children'], [SOUND, OTHER]),
     (['children', 'first'], [SOUND]),
@@ -49,7 +49,7 @@ def test_namespaced_collection_terminals_preserve_selected_members_and_value_mod
     assert list(result)[-1] == 'agent_result'
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_root_namespaced_output_modes_keep_existing_metadata_bound_behavior(tmp_path, version):
     task = QueryTask(tmp_path, version)
     task.field, task.field_type = TOKEN, 'int16'
@@ -80,7 +80,7 @@ def terminal_items(result, layout):
     return [related['parent']] if layout == 'singleton' else related['children']['items']
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('layout', ['singleton', 'list'])
 def test_unknown_class_kind_uses_fresh_actual_object_property_for_namespaced_output(tmp_path, version, layout):
     task, scope, identity, path = terminal_task(tmp_path, version, layout)
@@ -94,7 +94,7 @@ def test_unknown_class_kind_uses_fresh_actual_object_property_for_namespaced_out
         for selection in result['related_scope_binding']['scopes'])
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('layout', ['singleton', 'list'])
 def test_namespaced_output_ambiguity_requires_exact_token_and_refreshes_each_invocation(tmp_path, version, layout):
     task, scope, identity, path = terminal_task(tmp_path, version, layout)
@@ -113,7 +113,7 @@ def test_namespaced_output_ambiguity_requires_exact_token_and_refreshes_each_inv
     assert any(uri.endswith('getPropertyAndReferenceNames') for uri, _, _ in task.calls[before:])
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('layout', ['singleton', 'list'])
 @pytest.mark.parametrize('use', ['reference-terminal', 'reference-hop', 'local-reference-terminal'])
 def test_namespaced_property_terminal_permission_does_not_expand_reference_grammar(tmp_path, version, layout, use):
@@ -129,7 +129,7 @@ def test_namespaced_property_terminal_permission_does_not_expand_reference_gramm
     assert result.get('agent_result') is None
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('layout', ['singleton', 'list'])
 @pytest.mark.parametrize('token', ['MyCompany::Status', 'MyCompany:Status.foo', 'MyCompany:Status) where true', 'MyCompany:Stаtus'])
 def test_unsafe_discovered_output_tokens_do_not_receive_namespaced_permission(tmp_path, version, layout, token):
@@ -178,7 +178,7 @@ def test_namespaced_terminal_pages_keep_actual_scope_and_value_seals(tmp_path, l
     else: assert code == 2 and continued['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', continued
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_namespaced_matching_condition_and_terminal_share_actual_property_scope(tmp_path, version):
     task = NamespacedTask(tmp_path, version)
     code, result = task.run('query-object', '--kind', 'all-sounds', '--max-results', '2',

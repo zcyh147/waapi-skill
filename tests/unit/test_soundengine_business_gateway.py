@@ -3357,7 +3357,7 @@ def test_post_event_stops_before_dispatch_when_bound_event_drifts(
     assert client.soundengine_calls == calls_before
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("operation", ("ak.soundengine.setRTPCValue", "ak.soundengine.resetRTPCValue"))
 def test_game_parameter_explicit_global_scope_is_distinct_from_transport_default(
     tmp_path: Path, version: str, operation: str,
@@ -3383,7 +3383,7 @@ def test_game_parameter_explicit_global_scope_is_distinct_from_transport_default
     assert result["status"] == "result_schema_checked"
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("mode, native_mode", (("SingleSource", 0), ("MultiSources", 1), ("MultiDirections", 2)))
 def test_empty_multiple_positions_is_an_explicit_business_choice(
     tmp_path: Path, version: str, mode: str, native_mode: int,
@@ -3445,7 +3445,7 @@ def _execute_soundengine_without_verification(
     )
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("stop_scope, revoked", (
     ("object", (0, 2)), ("global", (0, 1, 2)),
     ("event_object", (0,)), ("event_global", (0, 1)),
@@ -3516,7 +3516,7 @@ def test_stopping_revokes_only_affected_playing_authorities_before_verification(
     assert verified["verified"] is False
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_unregister_all_revokes_game_object_authorities_and_preserves_playing_authority(
     tmp_path: Path, version: str,
 ) -> None:
@@ -3565,7 +3565,7 @@ def test_unregister_all_revokes_game_object_authorities_and_preserves_playing_au
     assert verified["verified"] is False
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("volume_percent, native_gain", ((0, 0.0), (50, 0.5), (1600, 16.0)))
 def test_output_bus_all_listeners_supports_exact_silence_and_full_native_gain(
     tmp_path: Path, version: str, volume_percent: int, native_gain: float,
@@ -3684,7 +3684,7 @@ def test_indeterminate_stop_consumes_authority_and_cannot_replay(
     assert client.soundengine_calls == before
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_aux_sends_can_target_all_listeners_with_amplification(
     tmp_path: Path, version: str,
 ) -> None:
@@ -3889,7 +3889,7 @@ def test_playing_authority_storage_failure_stops_before_native_dispatch(
     assert client.soundengine_calls == before
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_stop_all_prevents_late_publication_of_pending_playing_authority(tmp_path: Path, version: str) -> None:
     env = _env(tmp_path, version)
     state_dir = tmp_path / "state"

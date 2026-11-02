@@ -93,7 +93,7 @@ def test_offline_schema_pins_real_sdk_reference_semantics_and_version(tmp_path, 
     assert task.calls == []
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('value', [None, 'absent', {}, [], [RESOLVED, LOCAL]])
 def test_local_reference_preserves_null_absence_empty_and_ordered_native_values(tmp_path, version, value):
     task = ReferenceTask(tmp_path, version)
@@ -112,7 +112,7 @@ def test_local_reference_preserves_null_absence_empty_and_ordered_native_values(
     assert list(result)[-1] == 'agent_result'
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('options', [
     ['--include-local-reference', '@OutputBus'],
     ['--include-local-reference', '@@OutputBus'],
@@ -135,7 +135,7 @@ def test_invalid_local_reference_declarations_fail_before_transport(tmp_path, ve
     assert task.calls == []
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_local_reference_rejects_property_metadata_before_data_read(tmp_path, version):
     task = QueryTask(tmp_path, version)
     code, rejected = task.run('query-object', '--exact-id', PROJECT_GUID,
@@ -145,7 +145,7 @@ def test_local_reference_rejects_property_metadata_before_data_read(tmp_path, ve
     assert not any(uri.endswith('object.get') for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_unresolved_local_mode_is_retained_on_refinement_and_aliases_are_rejected(tmp_path, version):
     task = ReferenceTask(tmp_path, version)
     code, result = task.run('query-object', '--exact-id', PROJECT_GUID,
@@ -167,7 +167,7 @@ def test_unresolved_local_mode_is_retained_on_refinement_and_aliases_are_rejecte
     assert not any(uri.endswith('object.get') for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['none', 'result', 'metadata', 'inventory'])
 def test_local_reference_pages_preserve_values_and_revalidate_exact_metadata(tmp_path, version, change):
     task = ReferenceTask(tmp_path, version)

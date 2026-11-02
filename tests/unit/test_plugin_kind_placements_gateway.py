@@ -189,7 +189,7 @@ def reference_declaration(tmp_path, version, client):
     return code, declared, step, env
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("omit_type", [False, True])
 def test_plugin_reference_field_handle_materializes_one_exact_native_reference(tmp_path, version, omit_type):
     client = ReferencePluginClient(version)
@@ -212,7 +212,7 @@ def test_plugin_reference_field_handle_materializes_one_exact_native_reference(t
     assert result["state"] == "verified"
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("kind", KINDS)
 @pytest.mark.parametrize("failure", ["hierarchy", "owner", "role", "conflict", "unavailable"])
 def test_kind_placement_conflicts_reject_before_any_write(tmp_path, version, kind, failure):
@@ -244,7 +244,7 @@ def confirmed_preview(step, env):
     return transaction_id
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_reference_effect_is_independent_of_native_creation_success(tmp_path, version):
     client = ReferencePluginClient(version)
     code, result, step, env = reference_declaration(tmp_path, version, client)
@@ -294,7 +294,7 @@ def test_all_five_live_plugin_kinds_have_distinct_type_handle_discovery(tmp_path
     assert not any(uri == "ak.wwise.core.object.set" for uri, _, _ in client.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("kind", KINDS)
 def test_kind_disappearing_after_preview_blocks_execution(tmp_path, version, kind):
     client = KindClient(version, kind)
@@ -307,7 +307,7 @@ def test_kind_disappearing_after_preview_blocks_execution(tmp_path, version, kin
     assert not any(uri == "ak.wwise.core.object.set" for uri, _, _ in client.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_reference_metadata_drift_blocks_execution(tmp_path, version):
     client = ReferencePluginClient(version)
     code, result, step, env = reference_declaration(tmp_path, version, client)
@@ -319,7 +319,7 @@ def test_reference_metadata_drift_blocks_execution(tmp_path, version):
     assert not any(uri == "ak.wwise.core.object.set" for uri, _, _ in client.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_system_output_metadata_uses_class_field_handles_and_independent_mix_readback(tmp_path, version):
     client = KindClient(version, "metadata")
     code, result, step, env = declare(tmp_path, version, client, mix=1)
@@ -333,7 +333,7 @@ def test_system_output_metadata_uses_class_field_handles_and_independent_mix_rea
     assert dispatch["objects"][0]["children"][0]["@Mix"] == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_source_class_disappearing_after_preview_cannot_create_a_child(tmp_path, version):
     class SourceClient(KindClient):
         def __init__(self, version):

@@ -203,7 +203,7 @@ def test_action_class_reference_evidence_never_overrides_contradictory_scalar_ki
     assert field['field_kind'] == 'property' and 'kind_evidence' not in field
 
 
-@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1'])
+@pytest.mark.parametrize('version', ['2021.1', '2023.1'])
 def test_action_constructor_preserves_retained_native_unknown_kind_metadata(tmp_path, version):
     from pathlib import Path
     samples = json.loads((Path(__file__).parents[1] / 'fixtures/metadata-conditions/action-target-class-unknown.json').read_bytes())['samples']

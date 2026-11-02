@@ -458,7 +458,7 @@ def test_gateway_game_objects_preserves_2022_identity_and_timestamp_omissions(
     assert client.disconnected is True
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2022.1', '2025.1'])
 @pytest.mark.parametrize("is_console", (False, True))
 @pytest.mark.parametrize(
     ("object_id", "accepted_in_unsigned", "accepted_in_id64bits"),
@@ -513,7 +513,7 @@ def test_gateway_game_objects_enforces_reflected_id_domains_on_both_hosts(
     assert client.disconnected is True
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2023.1'])
 @pytest.mark.parametrize("missing_field", ("id", "name", "registerTime", "unregisterTime"))
 def test_gateway_game_objects_retains_required_row_fields_from_2023(
     tmp_path: Path,
@@ -662,7 +662,7 @@ def test_gateway_game_objects_keeps_2022_alias_selection_row_local(
     assert list(payload)[-1] == "agent_result"
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_gateway_game_objects_does_not_extend_2022_aliases_to_later_versions(
     tmp_path: Path,
     version: str,

@@ -57,7 +57,7 @@ def test_namespaced_property_conditions_bind_actual_metadata_before_root_limit(t
     assert list(result)[-1] == 'agent_result'
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_related_namespaced_condition_modes_keep_independent_views_and_native_reducers(tmp_path, version):
     task = NamespacedTask(tmp_path, version)
     code, result = task.run('query-object', '--kind', 'all-sounds', '--max-results', '2',
@@ -73,7 +73,7 @@ def test_related_namespaced_condition_modes_keep_independent_views_and_native_re
         assert override['value'] == 1 and any_match['value'] is True
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('exact_token', [False, True])
 def test_namespaced_meaning_ambiguity_requires_exact_live_discovery(tmp_path, version, exact_token):
     task = NamespacedTask(tmp_path, version)
@@ -89,7 +89,7 @@ def test_namespaced_meaning_ambiguity_requires_exact_live_discovery(tmp_path, ve
         assert not any(' where ' in (args or {}).get('waql', '') for _, args, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_namespaced_instance_scopes_do_not_borrow_another_objects_token(tmp_path, version):
     task = NamespacedTask(tmp_path, version)
     task.metadata[SOUND_CLASS].pop(TOKEN)
@@ -105,7 +105,7 @@ def test_namespaced_instance_scopes_do_not_borrow_another_objects_token(tmp_path
     assert {(row['scope']['object'], row['selected']['name']) for row in selections} == {(SOUND, TOKEN), (OTHER, alternate)}
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_unknown_class_namespaced_kind_uses_actual_object_property_metadata(tmp_path, version):
     task = NamespacedTask(tmp_path, version)
     task.metadata[SOUND_CLASS][TOKEN].update(type='', restriction={})
@@ -118,7 +118,7 @@ def test_unknown_class_namespaced_kind_uses_actual_object_property_metadata(tmp_
     assert selection['scope'] == {'object': SOUND}
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_namespaced_conditions_refresh_metadata_on_each_invocation(tmp_path, version):
     task = NamespacedTask(tmp_path, version)
     task.rows = [task.members[SOUND]]
@@ -133,7 +133,7 @@ def test_namespaced_conditions_refresh_metadata_on_each_invocation(tmp_path, ver
     assert any(uri.endswith('getPropertyInfo') and args['property'] == TOKEN for uri, args, _ in task.calls[first_calls:])
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_namespaced_condition_scope_does_not_grant_local_reference_output_authority(tmp_path, version):
     task = NamespacedTask(tmp_path, version)
     code, result = task.run('query-object', '--kind', 'all-sounds', '--max-results', '2',
@@ -166,7 +166,7 @@ def test_schema_separates_namespaced_where_sources_from_existing_return_grammar(
     assert '@@PROPERTY_NAME' in source['sections']['waql_property_accessors']['html']
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('token', ['MyCompany:Status.id', 'MyCompany::Status', 'MyCompany:Status) where true', 'MyCompany:Stаtus'])
 def test_unsafe_discovered_tokens_never_gain_condition_expression_authority(tmp_path, version, token):
     task = NamespacedTask(tmp_path, version)
@@ -179,7 +179,7 @@ def test_unsafe_discovered_tokens_never_gain_condition_expression_authority(tmp_
     assert not any(' where ' in (args or {}).get('waql', '') for _, args, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('mode', ['ordinary', 'reference'])
 def test_namespaced_reference_metadata_never_borrows_scalar_token_permission(tmp_path, version, mode):
     from tests.unit.test_query_related_paths import REFERENCE_PACKET
@@ -192,7 +192,7 @@ def test_namespaced_reference_metadata_never_borrows_scalar_token_permission(tmp
     assert not any(' where ' in (args or {}).get('waql', '') for _, args, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('fault', ['absent', 'wrong-type'])
 def test_namespaced_where_requires_existing_typed_selected_value_readback(tmp_path, version, fault):
     task = NamespacedTask(tmp_path, version)

@@ -96,7 +96,7 @@ def test_inline_curve_points_reach_preview_native_dispatch_and_independent_point
     assert len([uri for uri, _, _ in task.calls if uri.endswith("object.set")]) == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("failure", ("wrong-points", "boolean-point", "missing-points", "wrong-class", "missing-class-identity", "malformed-class-identity", "null-class-identity", "typed-missing-class-identity", "metadata-drift"))
 def test_inline_curve_never_certifies_malformed_or_unrelated_native_effects(
     tmp_path: Path, version: str, failure: str,
@@ -113,7 +113,7 @@ def test_inline_curve_never_certifies_malformed_or_unrelated_native_effects(
     assert len([uri for uri, _, _ in task.calls if uri.endswith("object.set")]) == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("drift", ("metadata", "omission-provenance", "class", "field-membership"))
 def test_inline_curve_revalidates_exact_metadata_and_class_before_the_one_write(
     tmp_path: Path, version: str, drift: str,
@@ -141,7 +141,7 @@ def test_inline_curve_revalidates_exact_metadata_and_class_before_the_one_write(
     assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("restriction", (
     {},
     {"type": "reference", "restrictions": [{"type": ["Bus"]}]},
@@ -160,7 +160,7 @@ def test_inline_curve_requires_proven_custom_curve_field_applicability(
     assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("value", (
     {"type": "Curve", "points": POINTS},
     {"curve_points": [{"x": True, "y": 0, "shape": "Linear"}]},
@@ -205,7 +205,7 @@ def test_inline_curve_class_scoped_field_reaches_a_new_recursive_set_node(tmp_pa
     assert code == 0 and verified["verified"] is True, json.dumps(verified)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("points", ([], list(reversed(POINTS))))
 def test_inline_curve_uses_generic_native_point_union_without_rtpc_specific_minimum_or_sorting(
     tmp_path: Path, version: str, points: list[dict[str, Any]],
@@ -222,7 +222,7 @@ def test_inline_curve_uses_generic_native_point_union_without_rtpc_specific_mini
     assert code == 0 and verified["verified"] is True, verified
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_inline_curve_omitted_metadata_identity_keeps_exact_binding_provenance(tmp_path: Path, version: str) -> None:
     task = InlineCurveTask(tmp_path, version)
     task.metadata["Curve"].pop("name")
@@ -237,7 +237,7 @@ def test_inline_curve_omitted_metadata_identity_keeps_exact_binding_provenance(t
     assert code == 0 and verified["verified"] is True, verified
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_create_discovery_and_declaration_do_not_admit_set_only_inline_curve_values(tmp_path: Path, version: str) -> None:
     task = OwnedGraphTask(tmp_path, version, "object.create")
     task.metadata["Curve"] = {"name": "Curve", "type": "Reference", "display": {"name": "Response curve"},

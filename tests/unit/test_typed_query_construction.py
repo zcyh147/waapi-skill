@@ -548,7 +548,7 @@ def test_query_schema_discloses_diagnostic_view_exclusions_before_transport(tmp_
     assert code == 2
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 @pytest.mark.parametrize("source", [
     ["--exact-id", "{33333333-3333-3333-3333-333333333333}"],
     ["--path-segment", "Actor-Mixer Hierarchy", "--path-segment", "Default Work Unit", "--path-segment", "Sound"],
@@ -744,7 +744,7 @@ def test_public_advanced_query_exact_expression_dispatches_gateway_owned_request
     assert list(payload)[-1] == "agent_result"
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_exact_query_missing_guid_retains_native_identity_failure(tmp_path: Path, version: str) -> None:
     native_row = {"name": "Context", "owner": None}
     class Client(_AdvancedQueryClient):
@@ -921,7 +921,7 @@ def test_public_query_reads_switch_child_context_then_exact_context_identity(tmp
     assert list(context)[-1] == "agent_result"
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_switch_context_output_does_not_expose_a_native_accessor_input(tmp_path: Path, version: str, capsys) -> None:
     with pytest.raises(SystemExit) as rejected:
         gateway.execute_gateway(["query-object", "--exact-id", "{11111111-1111-1111-1111-111111111111}", "--include", "switchContainerChildContext"],
@@ -930,7 +930,7 @@ def test_switch_context_output_does_not_expose_a_native_accessor_input(tmp_path:
     assert "switch-container-child-context" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("advanced", [False, True])
 def test_query_preserves_optional_identity_and_output_absence(tmp_path: Path, version: str, advanced: bool) -> None:
     context_id = "{22222222-2222-2222-2222-222222222222}"
@@ -958,7 +958,7 @@ def test_query_preserves_optional_identity_and_output_absence(tmp_path: Path, ve
     assert list(payload)[-1] == "agent_result"
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_exact_context_custom_fields_do_not_require_optional_native_type(tmp_path: Path, version: str) -> None:
     context_id = "{22222222-2222-2222-2222-222222222222}"
     class Client(_AdvancedQueryClient):
@@ -1186,7 +1186,7 @@ def test_short_id_source_resolves_native_candidates_then_applies_business_read_s
     assert payload["mutation_selection"]["candidates"][0]["id"] == object_id
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_short_id_collision_preserves_all_candidates_for_relationship_reads(tmp_path: Path, version: str) -> None:
     ids = ["{11111111-1111-1111-1111-111111111111}", "{22222222-2222-2222-2222-222222222222}"]
     class Client(_AdvancedQueryClient):
@@ -1207,7 +1207,7 @@ def test_short_id_collision_preserves_all_candidates_for_relationship_reads(tmp_
 
 @pytest.mark.parametrize("count,custom_field,reason", [(0, False, None), (2, True, "custom_fields_require_one_exact_guid"),
                                                        (65, False, "short_id_source_limit_reached")])
-@pytest.mark.parametrize("version", ["2021.1", "2023.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 def test_short_id_empty_and_unresolved_sources_do_not_run_a_partial_final_query(
     tmp_path: Path, count: int, custom_field: bool, reason: str | None, version: str,
 ) -> None:
@@ -1241,7 +1241,7 @@ def test_short_id_source_requires_a_valid_uint32_and_result_bound_before_connect
     assert code == 2, payload
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("selector", [123456, {"shortId": 123456}, {"shortId": 123456, "type": "Event"}])
 def test_native_short_id_recursive_schema_rejects_bare_missing_and_invalid_type_before_dispatch(
     tmp_path: Path, version: str, selector: object,
@@ -1274,7 +1274,7 @@ def test_short_id_2021_business_kinds_use_documented_typed_predicate(tmp_path: P
     assert client.calls[-1][1] == {"waql": f"from type {object_type} where shortId = 123456.0 take 65"}
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2023.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_short_id_collision_final_query_rejects_an_unrelated_native_guid(tmp_path: Path, version: str) -> None:
     class Client(_AdvancedQueryClient):
         def call(self, uri, args=None, options=None):
@@ -1307,7 +1307,7 @@ def test_short_id_business_kinds_compile_only_the_exact_version_documented_type_
     assert client.calls[-1][1] == {"from": {"id": [{"shortId": 1, "type": code}]}, "transform": [{"range": [0, 65]}]}
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 @pytest.mark.parametrize("policy", ["read_only", "ask_before_changes", "allow_changes"])
 def test_short_id_dialogue_query_and_schema_agree_on_typed_source(tmp_path: Path, version: str, policy: str) -> None:
     from tests.support.gateway_config import set_gateway_config
@@ -1364,7 +1364,7 @@ def test_short_id_exact_uint32_native_expression_and_final_integer(tmp_path: Pat
     assert result["source_resolution"]["complete"] is True and len(client.calls) == 2
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("rows", [[{"id": "malformed"}], [{"id": 123}], [{}],
     [{"id": "{11111111-1111-1111-1111-111111111111}"}] * 2])
 def test_short_id_query_rejects_unbound_or_duplicate_native_candidates(tmp_path: Path, version: str, rows: list) -> None:

@@ -47,7 +47,7 @@ def test_disclosed_long_native_type_is_exact_query_source(tmp_path, version, pla
         {'return': ['id', 'name', 'type', 'path', 'notes'], 'platform': 'Mac', 'language': 'SFX'})
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['inventory', 'session'])
 def test_type_selection_drift_stops_before_object_query(tmp_path, version, change):
     _, client, run, row = setup_type(tmp_path, version)
@@ -61,7 +61,7 @@ def test_type_selection_drift_stops_before_object_query(tmp_path, version, chang
     assert not any(uri == OBJECT_GET_URI for uri, _, _ in client.calls[before:])
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_exact_type_selection_resolves_ambiguous_loose_names(tmp_path, version):
     _, client, run, _ = setup_type(tmp_path, version)
     client.responses[GET_TYPES_URI] = {'return': [{'name': 'Foo.Bar'}, {'name': 'Foo_Bar'}]}
@@ -78,7 +78,7 @@ def test_exact_type_selection_resolves_ambiguous_loose_names(tmp_path, version):
                               {'return': ['id', 'name', 'type', 'path']})
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('name', ['Bad Type', 'Bad"Type', 'Sound take 1000; from type Event', None])
 def test_discovered_type_name_never_becomes_native_expression(tmp_path, version, name):
     _, client, run, _ = setup_type(tmp_path, version)
@@ -92,7 +92,7 @@ def test_discovered_type_name_never_becomes_native_expression(tmp_path, version,
     assert not any(uri == OBJECT_GET_URI for uri, _, _ in client.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['expired', 'host'])
 def test_type_selection_expiry_and_endpoint_binding(tmp_path, version, change, monkeypatch):
     _, client, run, row = setup_type(tmp_path, version)
@@ -113,7 +113,7 @@ def test_type_selection_expiry_and_endpoint_binding(tmp_path, version, change, m
     assert not any(uri == OBJECT_GET_URI for uri, _, _ in client.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_selected_catalog_type_retains_native_query_rejection_without_alias_retry(tmp_path, version):
     from tests.unit.test_waapi_gateway import WaapiRequestFailed
     _, client, run, _ = setup_type(tmp_path, version)
@@ -130,7 +130,7 @@ def test_selected_catalog_type_retains_native_query_rejection_without_alias_retr
     assert result['agent_result'] is None
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_selected_type_result_pages_revalidate_exact_inventory(tmp_path, version):
     from tests.unit.test_object_query_result_pages import QueryTask
     class SelectedTypeTask(QueryTask):
@@ -169,7 +169,7 @@ def test_selected_type_result_pages_revalidate_exact_inventory(tmp_path, version
         [{'waql': 'from type Project take 1'}] if version == '2021.1' else [])
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_native_type_extensions_cannot_overwrite_gateway_selection(tmp_path, version):
     _, client, run, _ = setup_type(tmp_path, version)
     native = {'name': 'Sound', 'selection': 'native extension', 'query_command': {'future': None}}

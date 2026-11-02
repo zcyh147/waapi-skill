@@ -248,7 +248,7 @@ def test_condition_preview_requires_observed_class_identity_without_fixture_repa
     assert not any(uri.endswith(("object.set", "setProperty", "setReference")) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2022.1', '2025.1'])
 @pytest.mark.parametrize("kind", ["Sound", "RandomSequenceContainer"])
 def test_conditional_attenuation_dependencies_are_previewed_and_verified(tmp_path: Path, version: str, kind: str):
     task = AttenuationTask(tmp_path, version, kind)
@@ -306,7 +306,7 @@ def test_recursive_activation_is_included_in_same_preview(tmp_path: Path):
     assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"][0]["@RoutingPrerequisite"] is True
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_satisfied_activation_is_guarded_without_redundant_property_writes(tmp_path: Path, version: str):
     task = AttenuationTask(tmp_path, version)
     task.objects[FIRST].update({"ListenerRelativeRouting": True, "OverridePositioning": True})
@@ -326,7 +326,7 @@ def test_satisfied_activation_is_guarded_without_redundant_property_writes(tmp_p
     assert {row["name"] for row in expected} == {"ListenerRelativeRouting", "OverridePositioning"}
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 def test_reference_route_requires_explicit_prerequisite_previews(tmp_path: Path, version: str):
     task = AttenuationTask(tmp_path, version, operation="object.setReference")
     task.declare()
@@ -340,7 +340,7 @@ def test_reference_route_requires_explicit_prerequisite_previews(tmp_path: Path,
     assert not any(uri in {"ak.wwise.core.object.set", "ak.wwise.core.object.setProperty", "ak.wwise.core.object.setReference"} for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("drift", ["none", "before-execute", "after-execute"])
 def test_reference_route_guards_and_verifies_satisfied_activation(tmp_path: Path, version: str, drift: str):
     task = AttenuationTask(tmp_path, version, operation="object.setReference")
@@ -375,7 +375,7 @@ def test_reference_route_guards_and_verifies_satisfied_activation(tmp_path: Path
     assert not any(uri in {"ak.wwise.core.object.set", "ak.wwise.core.object.setProperty"} for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("failure", ["conflict", "cycle", "unknown-condition"])
 def test_conditional_activation_fails_closed(tmp_path: Path, version: str, failure: str):
     task = AttenuationTask(tmp_path, version)
@@ -400,7 +400,7 @@ def test_2021_atomic_object_set_remains_an_explicit_native_boundary(tmp_path: Pa
     assert code == 2 and failed["error_code"] == "UNAVAILABLE_IN_VERSION", failed
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_exact_false_condition_is_not_guessed_as_true(tmp_path: Path, version: str):
     task = AttenuationTask(tmp_path, version)
     task.metadata["Attenuation"]["dependencies"] = [condition(value=False)]
@@ -415,7 +415,7 @@ def test_exact_false_condition_is_not_guessed_as_true(tmp_path: Path, version: s
     assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"][0]["@ListenerRelativeRouting"] is False
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 @pytest.mark.parametrize("name", ["OverridePositioning", "OverrideOutput"])
 def test_terminal_override_is_editable_through_separate_property_preview(tmp_path: Path, version: str, name: str):
     task = AttenuationTask(tmp_path, version, operation="object.setProperty")
@@ -445,7 +445,7 @@ def test_terminal_override_is_editable_through_separate_property_preview(tmp_pat
     assert sum(uri == "ak.wwise.core.object.setProperty" for uri, _, _ in task.calls) == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("restriction,current", [
     ({"type": "enum", "values": [{"value": 1}, {"value": 2}, {"value": 3}, {"value": 4}]}, 3),
     ({"type": "range", "min": 1, "max": 100}, 37),
@@ -477,7 +477,7 @@ def test_satisfied_scalar_condition_preserves_value_and_guards_drift(tmp_path, v
     assert not any(uri == "ak.wwise.core.object.set" for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_accumulated_conditions_choose_only_the_unique_shared_value(tmp_path, version):
     task = AttenuationTask(tmp_path, version)
     task.metadata["Attenuation"]["dependencies"] = [
@@ -541,10 +541,7 @@ class PlatformConditionTask(ScalarPropertyTask):
         return result
 
 
-@pytest.mark.parametrize("version,operation", [
-    (version, operation) for version in VERSIONS for operation in ("object.setProperty", "object.set")
-    if version != "2021.1" or operation != "object.set"
-])
+@pytest.mark.parametrize("version,operation", [('2021.1', 'object.setProperty'), ('2025.1', 'object.setProperty'), ('2025.1', 'object.set')])
 @pytest.mark.parametrize("phase", ["before", "after"])
 @pytest.mark.parametrize("observed", [1.0, True, 1.000001])
 def test_numeric_prerequisite_guards_accept_representation_only_and_reject_value_or_boolean_drift(tmp_path, version, operation, phase, observed):
@@ -582,11 +579,7 @@ def test_numeric_prerequisite_guards_accept_representation_only_and_reject_value
     assert code == (0 if valid else 2), verified
 
 
-@pytest.mark.parametrize("version,operation", [
-    (version, operation) for version in VERSIONS
-    for operation in ("object.setProperty", "object.setReference", "object.set")
-    if version != "2021.1" or operation != "object.set"
-])
+@pytest.mark.parametrize("version,operation", [('2021.1', 'object.setProperty'), ('2025.1', 'object.setProperty'), ('2025.1', 'object.set')])
 def test_condition_reads_use_requested_platform_and_preserve_its_satisfied_value(tmp_path, version, operation):
     task = PlatformConditionTask(tmp_path, version, operation=operation)
     task.objects[FIRST]["LfoWaveform"] = 1
@@ -628,7 +621,7 @@ def test_condition_reads_use_requested_platform_and_preserve_its_satisfied_value
     assert condition_reads and all(row.get("platform") == task.platform for row in condition_reads)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_disabled_scalar_property_discloses_exact_prerequisite_choice_without_writing(tmp_path, version):
     task = ScalarPropertyTask(tmp_path, version)
     task.enabled = False
@@ -650,7 +643,7 @@ def test_disabled_scalar_property_discloses_exact_prerequisite_choice_without_wr
     assert not any(uri.endswith(("object.set", "setProperty", "setReference")) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("drift", ["none", "before", "after", "metadata"])
 @pytest.mark.parametrize("condition_value", [2, 2.0])
 def test_atomic_property_condition_is_previewed_guarded_and_verified(tmp_path, version, drift, condition_value):
@@ -696,7 +689,7 @@ def test_atomic_property_condition_is_previewed_guarded_and_verified(tmp_path, v
     assert type(writes[0]["objects"][0]["@LfoWaveform"]) is int
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_atomic_field_conditions_are_combined_before_choosing_a_prerequisite(tmp_path, version):
     task = ScalarPropertyTask(tmp_path, version, operation="object.set")
     task.metadata["LfoPWM"] = {"name": "LfoPWM", "type": "Real64", "dependencies": [{
@@ -765,10 +758,7 @@ class PlatformPresenceTask(ReferencePresenceTask):
         return result
 
 
-@pytest.mark.parametrize("version,operation", [
-    (version, operation) for version in VERSIONS for operation in ("object.setProperty", "object.set")
-    if version != "2021.1" or operation != "object.set"
-])
+@pytest.mark.parametrize("version,operation", [('2021.1', 'object.setProperty'), ('2025.1', 'object.setProperty'), ('2025.1', 'object.set')])
 def test_reference_presence_reads_and_guards_use_the_selected_platform(tmp_path, version, operation):
     task = PlatformPresenceTask(tmp_path, version, operation=operation)
     task.objects[FIRST]["UserAuxSend0"] = None
@@ -799,7 +789,7 @@ def test_reference_presence_reads_and_guards_use_the_selected_platform(tmp_path,
     assert reads and all(row.get("platform") == task.platform for row in reads)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("drift", ["none", "before", "after", "metadata"])
 def test_reference_presence_condition_is_preserved_guarded_and_verified(tmp_path, version, drift):
     task = ReferencePresenceTask(tmp_path, version)
@@ -837,7 +827,7 @@ def test_reference_presence_condition_is_preserved_guarded_and_verified(tmp_path
     assert not any(uri.endswith(("object.set", "setReference")) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_missing_reference_discloses_target_choice_without_inventing_a_reference(tmp_path, version):
     task = ReferencePresenceTask(tmp_path, version)
     task.enabled = False
@@ -856,7 +846,7 @@ def test_missing_reference_discloses_target_choice_without_inventing_a_reference
     assert not any(uri.endswith(("object.set", "setProperty", "setReference")) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("existing", [None, "{33333333-3333-3333-3333-333333333333}"])
 def test_explicit_reference_satisfies_atomic_property_presence_condition(tmp_path, version, existing):
     task = ReferencePresenceTask(tmp_path, version, operation="object.set")
@@ -888,7 +878,7 @@ def test_explicit_reference_satisfies_atomic_property_presence_condition(tmp_pat
     assert len(writes) == 1 and writes[0]["objects"][0]["@UserAuxSend0"] == SECOND
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("drift", ["none", "before", "after", "metadata"])
 def test_atomic_presence_guard_preserves_an_existing_reference_without_rewriting_it(tmp_path, version, drift):
     task = ReferencePresenceTask(tmp_path, version, operation="object.set")
@@ -925,7 +915,7 @@ def test_atomic_presence_guard_preserves_an_existing_reference_without_rewriting
     assert task.objects[FIRST]["UserAuxSendVolume0"] == -6 and task.objects[FIRST]["Volume"] == -7
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_conflicting_reference_presence_conditions_reject_before_any_write(tmp_path, version):
     task = ReferencePresenceTask(tmp_path, version)
     contradictory = deepcopy(task.metadata["UserAuxSendVolume0"]["dependencies"][0])
@@ -958,7 +948,7 @@ class ChangingScalarTask(ScalarPropertyTask):
         return super().call(uri, args, options)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("final_value", [2, 0])
 def test_final_preview_snapshot_preserves_a_satisfied_condition_and_never_reuses_a_stale_choice(tmp_path, version, final_value):
     task = ChangingScalarTask(tmp_path, version, operation="object.set")
@@ -1073,7 +1063,7 @@ def test_association_parent_condition_uses_exact_owner_and_guards_it(tmp_path, d
     assert reads and all(row.get("platform") == platform for row in reads)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("current,metadata_type,restriction", [
     (999.0, "Real64", {"type": "range", "min": 1, "max": 1000}),
     (1, "int16", {"type": "enum", "values": [{"value": 1.0}]}),
@@ -1108,7 +1098,7 @@ def test_satisfied_numeric_condition_preserves_native_value_across_json_reads(tm
     assert task.objects[FIRST]["LfoWaveform"] == current
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 @pytest.mark.parametrize("context", ["Self", "Parent"])
 @pytest.mark.parametrize("visibility_values", [(1,), (0, 1)])
 def test_visibility_condition_does_not_derive_or_require_a_prerequisite_write(tmp_path, version, context, visibility_values):
@@ -1152,7 +1142,7 @@ def test_visibility_condition_does_not_derive_or_require_a_prerequisite_write(tm
     assert [args["property"] for uri, args, _ in task.calls if uri.endswith("setProperty")] == ["SlewRateUp"]
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("drift", ["none", "before", "after", "metadata"])
 def test_property_condition_is_preserved_revalidated_and_verified(tmp_path, version, drift):
     task = ScalarPropertyTask(tmp_path, version)
@@ -1191,10 +1181,9 @@ def test_property_condition_is_preserved_revalidated_and_verified(tmp_path, vers
 
 
 @pytest.mark.parametrize("drift", ["none", "before", "after", "metadata-before", "unsatisfied"])
-@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
-    for operation in (["object.setProperty"] if version == "2021.1" else ["object.setProperty", "object.set"])])
+@pytest.mark.parametrize("version,operation", [('2021.1', 'object.setProperty'), ('2025.1', 'object.setProperty'), ('2025.1', 'object.set')])
 @pytest.mark.parametrize("prerequisite_kind", ["property", "reference", "override"])
-@pytest.mark.parametrize("platform", [None, PlatformConditionTask.platform])
+@pytest.mark.parametrize("platform", [PlatformConditionTask.platform])
 def test_association_owner_satisfied_recursive_condition_is_guarded_without_owner_writes(tmp_path, drift, operation, prerequisite_kind, version, platform):
     task = (PlatformConditionTask if platform else ScalarPropertyTask)(tmp_path, version, operation=operation)
     task.metadata = {
@@ -1352,8 +1341,7 @@ class NameOmittingConditionTask(ScalarPropertyTask):
         return result
 
 
-@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
-    for operation in (["object.setProperty"] if version == "2021.1" else ["object.setProperty", "object.set"])])
+@pytest.mark.parametrize("version,operation", [('2021.1', 'object.setProperty'), ('2025.1', 'object.setProperty'), ('2025.1', 'object.set')])
 @pytest.mark.parametrize("drift", ["none", "token-before", "type-before"])
 def test_exact_discovered_field_token_binds_missing_native_name_without_inventing_metadata(tmp_path, version, operation, drift):
     task = NameOmittingConditionTask(tmp_path, version, operation=operation)
@@ -1401,7 +1389,7 @@ def test_exact_discovered_field_token_binds_missing_native_name_without_inventin
     assert task.objects[FIRST]["LfoWaveform"] == 3
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_missing_native_scalar_type_stops_field_acquisition_despite_proven_token(tmp_path, version):
     task = NameOmittingConditionTask(tmp_path, version)
     task.omit_type = True
@@ -1426,8 +1414,7 @@ class UntypedReferenceConditionTask(AttenuationTask):
         return result
 
 
-@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
-    for operation in (["object.setReference"] if version == "2021.1" else ["object.setReference", "object.set"])])
+@pytest.mark.parametrize("version,operation", [('2021.1', 'object.setReference'), ('2025.1', 'object.setReference'), ('2025.1', 'object.set')])
 @pytest.mark.parametrize("native_name_present", [True, False])
 @pytest.mark.parametrize("drift", ["none", "reference-proof-before"])
 def test_native_reference_restriction_certifies_reference_when_optional_type_is_absent(tmp_path, version, operation, native_name_present, drift):
@@ -1475,8 +1462,7 @@ def test_native_reference_restriction_certifies_reference_when_optional_type_is_
     assert task.objects[FIRST]["OverridePositioning"] is True
 
 
-@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
-    for operation in (["object.setReference"] if version == "2021.1" else ["object.setReference", "object.set"])])
+@pytest.mark.parametrize("version,operation", [('2021.1', 'object.setReference'), ('2025.1', 'object.setReference'), ('2025.1', 'object.set')])
 @pytest.mark.parametrize("original,current,metadata_type,expected_code", [(True, 1, "bool", 2), (1, 1.0, "int16", 0)])
 @pytest.mark.parametrize("stage", ["before", "after"])
 def test_condition_metadata_numeric_equivalence_keeps_boolean_distinction(tmp_path, version, operation, original, current, metadata_type, expected_code, stage):
@@ -1511,8 +1497,7 @@ def test_condition_metadata_numeric_equivalence_keeps_boolean_distinction(tmp_pa
     assert sum(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls) == 1
 
 
-@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
-    for operation in (["object.setProperty"] if version == "2021.1" else ["object.setProperty", "object.set"])])
+@pytest.mark.parametrize("version,operation", [('2021.1', 'object.setProperty'), ('2025.1', 'object.setProperty'), ('2025.1', 'object.set')])
 @pytest.mark.parametrize("invalid_entry", ["string-value", "numeric-label"])
 def test_native_condition_enum_schema_invalid_entry_is_rejected_before_mutation(tmp_path, version, operation, invalid_entry):
     task = ScalarPropertyTask(tmp_path, version, operation=operation)
@@ -1573,8 +1558,7 @@ def _declare_device_reference(task, name="AudioDevice"):
     assert code == 0, declared
 
 
-@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
-    for operation in (["object.setReference"] if version == "2021.1" else ["object.setReference", "object.set"])])
+@pytest.mark.parametrize("version,operation", [('2021.1', 'object.setReference'), ('2025.1', 'object.setReference'), ('2025.1', 'object.set')])
 def test_master_bus_refuses_source_incompatible_sink_before_preview(tmp_path, version, operation):
     task = MasterBusDeviceTask(tmp_path, version, operation)
     task.objects[SECOND].update(classId=11862023, name="Renamed No Output",

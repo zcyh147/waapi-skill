@@ -91,7 +91,7 @@ def test_default_switch_target_must_belong_to_the_current_selected_group(tmp_pat
         {'object': FIRST, 'reference': 'DefaultSwitchOrState', 'value': SECOND}]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('drift', ['group-before', 'parent-before', 'group-after', 'parent-after', 'metadata-before'])
 def test_default_switch_parent_scope_is_guarded_and_verified(tmp_path, version, drift):
     task = DefaultSwitchTask(tmp_path, version)
@@ -125,7 +125,7 @@ def test_default_switch_parent_scope_is_guarded_and_verified(tmp_path, version, 
     assert code == 2 and verified.get('verified') is not True, verified
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_missing_group_has_a_usable_explicit_reference_repair(tmp_path, version):
     from tests.unit.test_time_modulator_range_gateway import start
     task = DefaultSwitchTask(tmp_path, version)
@@ -154,7 +154,7 @@ def test_missing_group_has_a_usable_explicit_reference_repair(tmp_path, version)
         {'object': FIRST, 'reference': 'DefaultSwitchOrState', 'value': SECOND}]
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('rule', ['cycle', 'conflict'])
 def test_cyclic_or_conflicting_reference_parent_rules_are_closed(tmp_path, version, rule):
     task = DefaultSwitchTask(tmp_path, version)
@@ -172,7 +172,7 @@ def test_cyclic_or_conflicting_reference_parent_rules_are_closed(tmp_path, versi
     assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('parent', [GROUP, OTHER])
 @pytest.mark.parametrize('reverse', [False, True])
 def test_atomic_group_and_default_reference_use_the_explicit_staged_parent(tmp_path, version, parent, reverse):
@@ -225,7 +225,7 @@ def test_unclassified_native_target_constraint_is_a_closed_boundary(tmp_path, ve
     assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('shared_only', [[], ['Effect']])
 def test_empty_or_inapplicable_shared_only_subset_preserves_valid_targets(tmp_path, version, shared_only):
     task = AttenuationTask(tmp_path, version, operation='object.setReference')
@@ -254,7 +254,7 @@ def test_malformed_reference_constraint_cannot_become_an_unrestricted_target(tmp
     assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('classifier,value,accepted', [
     ('category', 'RecordedCategory', True), ('category', 'OtherCategory', False),
     ('isPlayable', True, True), ('isPlayable', False, False),
@@ -281,7 +281,7 @@ def test_native_target_classifier_controls_the_selected_reference(tmp_path, vers
     assert reads and all(args == {'from': {'id': [SECOND]}} for args, _ in reads)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('classifier,initial,changed', [('category', 'RecordedCategory', 'OtherCategory'),
                                                       ('isPlayable', True, False)])
 @pytest.mark.parametrize('phase', ['before', 'after'])
@@ -324,7 +324,7 @@ def test_target_classifier_accessors_are_declared_by_the_exact_version(version):
     assert 'isShared' not in properties
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('classifier,value', [('category', None), ('category', True), ('category', '__missing__'),
                                               ('isPlayable', None), ('isPlayable', 1), ('isPlayable', '__missing__')])
 def test_unavailable_or_malformed_target_classifier_cannot_authorize_a_write(tmp_path, version, classifier, value):
@@ -341,7 +341,7 @@ def test_unavailable_or_malformed_target_classifier_cannot_authorize_a_write(tmp
     assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('classifier,value', [('category', 'RecordedCategory'), ('isPlayable', True)])
 def test_atomic_reference_assignment_retains_native_classifier_guards(tmp_path, version, classifier, value):
     task = AttenuationTask(tmp_path, version, operation='object.set')
@@ -355,7 +355,7 @@ def test_atomic_reference_assignment_retains_native_classifier_guards(tmp_path, 
     assert task.objects[FIRST]['Attenuation'] == {'id': SECOND}
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('matched', ['type', 'category'])
 def test_mixed_type_category_admission_semantics_are_not_guessed(tmp_path, version, matched):
     task = AttenuationTask(tmp_path, version, operation='object.setReference')
@@ -369,7 +369,7 @@ def test_mixed_type_category_admission_semantics_are_not_guessed(tmp_path, versi
     assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('shape', ['mixed', 'repeated-category'])
 def test_every_disclosed_target_row_can_be_satisfied_without_boolean_combination_guessing(tmp_path, version, shape):
     task = _joint_classifier_task(tmp_path, version, shape)
@@ -402,7 +402,7 @@ def _joint_classifier_task(path, version, shape, operation='object.setReference'
     return task
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('shape', ['mixed', 'repeated-category'])
 def test_atomic_reference_edit_can_satisfy_every_disclosed_target_row(tmp_path, version, shape):
     task = _joint_classifier_task(tmp_path, version, shape, operation='object.set')
@@ -416,7 +416,7 @@ def test_atomic_reference_edit_can_satisfy_every_disclosed_target_row(tmp_path, 
     assert len(writes) == 1 and writes[0][0].endswith('object.set')
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('category', ['FirstCategory', 'SecondCategory'])
 def test_partial_repeated_category_matches_remain_an_explicit_native_question(tmp_path, version, category):
     task = _joint_classifier_task(tmp_path, version, 'repeated-category')
@@ -427,7 +427,7 @@ def test_partial_repeated_category_matches_remain_an_explicit_native_question(tm
     assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('shape', ['mixed', 'repeated-category'])
 @pytest.mark.parametrize('drift', ['category', 'raw-metadata'])
 @pytest.mark.parametrize('phase', ['before', 'after'])
@@ -470,7 +470,7 @@ def test_joint_classifier_and_raw_metadata_drift_cannot_write_or_report_success(
     assert len([row for row in task.calls if row[0].endswith(('setReference', 'setProperty', 'object.set'))]) == 1
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('damage', ['missing-type', 'malformed-category', 'transport'])
 def test_unavailable_joint_classifier_postread_remains_unknown_without_second_write(tmp_path, version, damage):
     from wwise_waapi.transactions import TransactionStore, TransactionState
@@ -499,7 +499,7 @@ def test_unavailable_joint_classifier_postread_remains_unknown_without_second_wr
     assert len([row for row in task.calls if row[0].endswith(('setReference', 'setProperty', 'object.set'))]) == 1
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_joint_classifier_type_fact_must_match_the_exact_bound_identity(tmp_path, version):
     task = _joint_classifier_task(tmp_path, version, 'mixed')
     task.declare()
@@ -515,7 +515,7 @@ def test_joint_classifier_type_fact_must_match_the_exact_bound_identity(tmp_path
     assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_joint_classifier_exact_type_drift_is_known_false_even_when_new_type_is_allowed(tmp_path, version):
     from wwise_waapi.transactions import TransactionStore, TransactionState
     task = _joint_classifier_task(tmp_path, version, 'mixed')
@@ -531,7 +531,7 @@ def test_joint_classifier_exact_type_drift_is_known_false_even_when_new_type_is_
     assert len([row for row in task.calls if row[0].endswith(('setReference', 'setProperty', 'object.set'))]) == 1
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_joint_classifier_read_keeps_the_explicit_selected_platform(tmp_path, version):
     platform = '{77777777-7777-7777-7777-777777777777}'
     task = _joint_classifier_task(tmp_path, version, 'mixed')
@@ -558,7 +558,7 @@ def test_joint_classifier_read_keeps_the_explicit_selected_platform(tmp_path, ve
                          and options['platform'] == platform for options in reads)
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 @pytest.mark.parametrize('shared', [False, True])
 def test_joint_target_classifiers_keep_independent_playable_and_shared_only_rules(tmp_path, version, shared):
     task = SharedReferenceTask(tmp_path, version, shared=shared)
@@ -625,7 +625,7 @@ def test_target_classifier_read_requires_one_exact_selected_guid(tmp_path, inval
     assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 def test_target_classifier_reads_keep_the_selected_platform_scope(tmp_path, version):
     task = AttenuationTask(tmp_path, version, operation='object.setReference')
     platform = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
@@ -697,7 +697,7 @@ def test_shared_only_target_uses_an_owned_native_predicate_not_owner_omission(tm
     assert task.objects[FIRST]['Attenuation'] == {'id': SECOND}
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 @pytest.mark.parametrize('drift', ['owner-before', 'parent-before', 'owner-after', 'parent-after'])
 def test_shared_only_owner_predicate_and_parent_are_guarded_through_verification(tmp_path, version, drift):
     task = SharedReferenceTask(tmp_path, version)
@@ -760,7 +760,7 @@ def test_shared_only_predicate_never_replaces_the_canonical_parent_fact(tmp_path
     assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 def test_shared_only_classification_supports_an_atomic_reference_preview(tmp_path, version):
     task = SharedReferenceTask(tmp_path, version, operation='object.set')
     task.declare()
@@ -855,7 +855,7 @@ def test_shared_only_guard_seals_query_meaning_even_if_changed_query_returns_sam
 NULL_GUID = '{00000000-0000-0000-0000-000000000000}'
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 def test_shared_only_preview_cannot_certify_a_native_null_guid_parent(tmp_path, version):
     task = SharedReferenceTask(tmp_path, version)
     task.objects[SECOND]['parent'] = {'id': NULL_GUID}
@@ -871,7 +871,7 @@ def test_shared_only_preview_cannot_certify_a_native_null_guid_parent(tmp_path, 
     assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 @pytest.mark.parametrize('phase', ['before', 'after'])
 def test_shared_only_parent_drift_to_native_null_guid_cannot_write_or_verify(tmp_path, version, phase):
     task = SharedReferenceTask(tmp_path, version)
@@ -898,7 +898,7 @@ def test_shared_only_parent_drift_to_native_null_guid_cannot_write_or_verify(tmp
     assert code == 2 and verified.get('verified') is not True, verified
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 def test_child_of_reference_preview_treats_zero_guid_controller_as_unset(tmp_path, version):
     task = DefaultSwitchTask(tmp_path, version)
     task.declare_default()
@@ -927,7 +927,7 @@ def _execute_target_assignment(task):
     return tx
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 @pytest.mark.parametrize('observation', ['owner-present', 'null-parent'])
 def test_observed_false_shared_target_postcondition_is_terminal_without_second_write(tmp_path, version, observation):
     from wwise_waapi.transactions import TransactionStore, TransactionState

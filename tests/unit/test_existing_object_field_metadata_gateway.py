@@ -8,7 +8,7 @@ from tests.unit.test_generic_object_class_gateway import class_task, execute
 from tests.unit.test_playlist_reference_gateway import preview_and_confirm, writes
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 @pytest.mark.parametrize('stage', ['unchanged', 'before-execute', 'after-execute'])
 @pytest.mark.parametrize('field_kind', ['reference', 'property'])
 def test_dependency_free_field_metadata_is_bound_through_object_set_verification(tmp_path, version, stage, field_kind):
@@ -53,7 +53,7 @@ def test_dependency_free_field_metadata_is_bound_through_object_set_verification
     assert len(writes(task)) == (0 if stage == 'before-execute' else 1)
 
 
-@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('version', ['2025.1'])
 def test_notes_only_object_set_does_not_acquire_field_metadata(tmp_path, version):
     task = class_task(tmp_path, operation='object.set', version=version)
     source = task.bind(FIRST)

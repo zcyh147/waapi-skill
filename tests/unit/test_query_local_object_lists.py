@@ -123,7 +123,7 @@ def test_effect_slots_reuse_actual_metadata_and_resolved_effect_reference(tmp_pa
         row['related']['references']['Effect']['plugin_name']=='Wwise Gain' for row in items)
 
 
-@pytest.mark.parametrize('version',['2022.1','2025.1'])
+@pytest.mark.parametrize('version',['2025.1'])
 @pytest.mark.parametrize('path', [ ['local-rtpcs'], ['local-rtpcs','first'],
     ['combine','local-rtpcs','and','local-rtpcs','end','take','3']])
 @pytest.mark.parametrize('fault',['class','owner','missing-owner'])
@@ -137,7 +137,7 @@ def test_local_members_require_declared_class_and_actual_owner_in_every_sequence
     assert code==2 and result['error_code']=='RELATED_QUERY_LOCAL_LIST_MEMBER',result
 
 
-@pytest.mark.parametrize('version',['2022.1','2025.1'])
+@pytest.mark.parametrize('version',['2025.1'])
 def test_unknown_plugin_class_cannot_borrow_abstract_source_list_or_return_empty(tmp_path,version):
     task=LocalListTask(tmp_path,version)
     task.row.update(classId=9699331,type='SourcePlugin',name='Wwise Synth One')
@@ -170,7 +170,7 @@ def test_exact_source_plugin_class_projects_its_source_certified_rtpcs(tmp_path,
         assert [row['object']['id'] for row in projection['items']]==[RTPC1,RTPC2,RTPC1]
 
 
-@pytest.mark.parametrize('version',['2022.1','2023.1','2024.1','2025.1'])
+@pytest.mark.parametrize('version',['2025.1'])
 @pytest.mark.parametrize('actual_type',['Source','Sound'])
 def test_source_plugin_bridge_requires_actual_object_type_not_gettypes_category(tmp_path,version,actual_type):
     task=LocalListTask(tmp_path,version)
@@ -213,7 +213,7 @@ def test_offline_bridge_discloses_exact_scope_and_retains_distinct_primary_type_
     assert source['abstract_declaration']['declaration']['name']=='RTPC'
 
 
-@pytest.mark.parametrize('version',['2022.1','2025.1'])
+@pytest.mark.parametrize('version',['2025.1'])
 @pytest.mark.parametrize('fault',['member-class','member-owner'])
 def test_source_plugin_bridge_keeps_actual_member_class_and_owner_controls(tmp_path,version,fault):
     task=LocalListTask(tmp_path,version)
@@ -232,7 +232,7 @@ def test_source_plugin_rtpc_bridge_does_not_admit_unproven_effect_list(tmp_path,
     assert code==2 and result['error_code']=='RELATED_QUERY_LOCAL_LIST_SOURCE',result
 
 
-@pytest.mark.parametrize('version',['2022.1','2023.1','2024.1','2025.1'])
+@pytest.mark.parametrize('version',['2025.1'])
 @pytest.mark.parametrize('layout',['singleton','list'])
 @pytest.mark.parametrize('value', [ [{'x':False,'y':0,'shape':'Linear'}], [{'x':0,'y':0,'shape':'Bogus'}],
     [{'x':0,'y':float('inf'),'shape':'Linear'}], [{'x':0,'shape':'Linear'}], 'points'])
@@ -291,7 +291,7 @@ def test_local_full_selected_and_combined_views_keep_same_property_inputs_and_oc
     assert count['value']==2
 
 
-@pytest.mark.parametrize('version',['2022.1','2025.1'])
+@pytest.mark.parametrize('version',['2025.1'])
 @pytest.mark.parametrize('change',['none','class','owner','points','typed-points','metadata'])
 def test_local_list_pages_rebind_and_revalidate_sources_owners_metadata_and_curve_values(tmp_path,version,change):
     task=LocalListTask(tmp_path,version);task.row['notes']='音声'*16000

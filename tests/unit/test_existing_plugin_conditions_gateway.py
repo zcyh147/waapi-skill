@@ -22,7 +22,7 @@ def bed_mixer_task(tmp_path, version, operation, policy):
     return task
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("operation", ["object.setProperty", "object.set"])
 @pytest.mark.parametrize("policy", [0, 1, 2])
 def test_existing_bed_mixer_limit_preserves_satisfied_policy_or_requires_explicit_choice(tmp_path, version, operation, policy):

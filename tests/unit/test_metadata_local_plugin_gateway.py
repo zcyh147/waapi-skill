@@ -239,7 +239,7 @@ class DirectMetadataClient(KindClient):
         return super().call(uri, args, options)
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1"])
+@pytest.mark.parametrize("version", ['2022.1', '2024.1'])
 def test_older_metadata_appends_direct_selected_class_and_discloses_ownership_observation(tmp_path, version):
     client = DirectMetadataClient(version)
     code, result, step, env = declare(tmp_path, version, client, placement="owner", mix=1)

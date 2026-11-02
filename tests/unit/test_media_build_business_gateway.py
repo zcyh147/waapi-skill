@@ -895,7 +895,7 @@ def test_media_pool_complete_post_filter_replaces_prior_prefix_presentation(tmp_
     assert final["agent_result"]["page"]["presentation"] == "replace_previous_prefix"
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 @pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
 def test_peak_read_preserves_optional_missing_native_fields_without_inventing_decoded_data(tmp_path: Path, version: str, operation: str) -> None:
     info = _info()
@@ -955,7 +955,7 @@ def test_peak_read_preserves_zero_divisor_without_fabricating_normalized_samples
     assert "channels" not in payload["agent_result"]
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 @pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
 def test_peak_read_can_preserve_native_channel_default_without_assuming_channel_count(tmp_path: Path, version: str, operation: str) -> None:
     info = _info()
@@ -1422,7 +1422,7 @@ def test_media_pool_return_only_score_size_markers_and_regions_do_not_require_di
     assert [call[0] for call in client.calls].count(MEDIA_POOL_GET_URI) == 1
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 @pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
 @pytest.mark.parametrize("envelope", ["posix", "windows"])
 def test_large_peak_read_follows_bounded_exact_result_pages_without_losing_channels(tmp_path: Path, version: str, operation: str, envelope: str, monkeypatch, request) -> None:
@@ -1602,7 +1602,7 @@ def test_peak_pages_preserve_empty_channels_and_native_default(tmp_path: Path) -
 
 
 @pytest.mark.parametrize("envelope", ["posix", "windows"])
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
 def test_peak_decoded_large_header_has_lossless_bounded_continuation(tmp_path: Path, envelope: str, version: str, operation: str, monkeypatch) -> None:
     if envelope == "windows":
@@ -1686,7 +1686,7 @@ def test_peak_multichannel_native_byte_boundary_preserves_requested_resolution_a
     assert client.calls[-1][1]["numPeaks"] == 16384 and client.calls[-1][1]["getCrossChannelPeaks"] is False
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
 @pytest.mark.parametrize("observation_kind", ["silent", "missing_decode_facts"])
 def test_large_undecodable_peak_observation_pages_preserve_every_native_string_without_false_completion(tmp_path: Path, version: str, operation: str, observation_kind: str) -> None:

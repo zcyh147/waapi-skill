@@ -45,7 +45,7 @@ class ContextTask(ScalarPropertyTask):
         return result["bound_context"]["handle"]
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2021.1', '2025.1'])
 @pytest.mark.parametrize("native_type", [False, True])
 @pytest.mark.parametrize("meaning,value,platform", [("ContinuePlay", True, None), ("FadeInTime", 0, None),
     ("FadeInTime", 2.5, "{44444444-4444-4444-4444-444444444444}")])

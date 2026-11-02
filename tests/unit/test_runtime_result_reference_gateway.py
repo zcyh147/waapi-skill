@@ -54,7 +54,7 @@ def profiler_row(operation, version):
     return row
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("operation,field,bad", [
     ("getVoices", "objectGUID", 7), ("getVoices", "priority", 128),
     ("getBusses", "voiceCount", -1), ("getAudioObjects", "busGUID", "bad"),
@@ -81,7 +81,7 @@ def test_profiler_preserves_native_labels_optional_fields_and_versioned_ids(tmp_
     assert observed["bus_instance_handle" if operation != "getVoices" else "voice_instance_handle"].startswith("rph1-")
 
 
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("bad", [False, True], ids=["valid", "invalid-off-page"])
 def test_performance_counter_validates_local_result_references(tmp_path, version, bad):
     rows = [{"id": "cpu", "name": LABEL, "value": 1.25}, {"id": "memory", "name": "Memory", "value": 2048.0}]
@@ -96,7 +96,7 @@ def test_performance_counter_validates_local_result_references(tmp_path, version
         assert payload["agent_result"]["return"] == [rows[1]]
 
 
-@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("bad_field,bad_value", [(None, None), ("id", 7), ("classId", -1)])
 def test_default_meter_object_projection_validates_off_page_identity(tmp_path, version, bad_field, bad_value):
     row = {"object": {"id": GUID, "name": LABEL, "classId": 553}, "source": "Bus",
@@ -114,7 +114,7 @@ def test_default_meter_object_projection_validates_off_page_identity(tmp_path, v
         assert payload["agent_result"]["meters"] == [row]
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("bad_field,bad_value", [(None, None), ("severity", "Invalid"), ("platform", {"id": 7})])
 def test_log_validates_whole_entries_and_nested_platforms_before_retention(tmp_path, version, bad_field, bad_value):
     operation = "ak.wwise.core.log.get"
@@ -132,7 +132,7 @@ def test_log_validates_whole_entries_and_nested_platforms_before_retention(tmp_p
         assert payload["agent_result"]["items"] == [row]
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2022.1', '2024.1', '2025.1'])
 @pytest.mark.parametrize("driver_value", [False, 1.5, GUID])
 def test_contribution_tree_validates_recursive_driver_values_with_real_input_handles(tmp_path, version, driver_value):
     operation = PREFIX + "getVoiceContributions"

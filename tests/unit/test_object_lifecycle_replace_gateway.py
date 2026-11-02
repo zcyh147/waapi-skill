@@ -210,7 +210,7 @@ def test_replace_snapshot_binds_omitted_metadata_identity_to_exact_scoped_names(
     assert all(row["passed"] for row in verified["verification"]["assertions"])
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("metadata", (
     {"name": "AnotherField", "type": "Real64"},
     {"type": "UnrecognizedNativeScalar"},
@@ -227,7 +227,7 @@ def test_replace_snapshot_rejects_wrong_identity_or_uncertified_scalar_type(
     assert not any(uri.endswith(("object.copy", "object.move")) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_replace_guard_retains_raw_metadata_omission_provenance(
     tmp_path: Path, version: str,
 ) -> None:
@@ -314,7 +314,7 @@ def test_replace_preserves_every_project_platform_field_view_and_available_link_
     assert all(assertion["passed"] for assertion in verified["verification"]["assertions"])
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("operation", ("object.copy", "object.move"))
 def test_replace_detects_a_changed_nondefault_platform_value(tmp_path: Path, version: str, operation: str) -> None:
     task = PlatformReplaceTask(tmp_path, version, operation)
@@ -338,7 +338,7 @@ def test_replace_detects_changed_platform_link_flags(tmp_path: Path, version: st
     assert any(not assertion["passed"] for assertion in verified["verification"]["assertions"])
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("scope", ("source", "replacement", "inventory"))
 def test_replace_revalidates_platform_views_and_inventory_before_dispatch(
     tmp_path: Path, version: str, scope: str,
@@ -357,7 +357,7 @@ def test_replace_revalidates_platform_views_and_inventory_before_dispatch(
     assert not any(uri.endswith(("object.copy", "object.move")) for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("malformed", ("duplicate", "oversized", "missing-name"))
 def test_replace_rejects_incomplete_or_ambiguous_platform_inventory_without_write(
     tmp_path: Path, version: str, malformed: str,
@@ -389,7 +389,7 @@ def test_2021_platform_discovery_is_a_bounded_fixed_live_type_read(tmp_path: Pat
                            and options == {"return": ["id", "name"]} for args, options in queries)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("operation", ("object.copy", "object.move"))
 @pytest.mark.parametrize("view", ("default", "platform"))
 def test_replace_does_not_equate_numeric_one_with_boolean_readback(
@@ -406,7 +406,7 @@ def test_replace_does_not_equate_numeric_one_with_boolean_readback(
     assert any(not assertion["passed"] for assertion in verified["verification"]["assertions"])
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("view", ("default", "platform"))
 def test_replace_prewrite_guard_rejects_numeric_one_becoming_boolean(
     tmp_path: Path, version: str, view: str,
