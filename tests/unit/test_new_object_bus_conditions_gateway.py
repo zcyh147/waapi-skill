@@ -179,7 +179,13 @@ def test_new_non_bus_visibility_never_accepts_unproved_class_or_wrong_created_cl
         if fault == 'wrong-class': next(row for row in task.types if row['name'] == 'Sound')['classId'] = 65553
         else: task.metadata['Attenuation']['dependencies'][0]['value'] = True
         code, rejected = task.step('draft-check')
-        assert code == 2 and rejected['error_code'] == ('FIELD_HANDLE_STALE' if fault == 'master-predicate' else 'NEW_OBJECT_DEPENDENCY_UNSUPPORTED'), rejected
+        # A true master predicate needs exact existing-object ancestry. This
+        # reference was discovered in class scope for a prospective Sound, so
+        # revalidation rejects that unsupported scope before digest comparison.
+        assert code == 2 and rejected['error_code'] == ('FIELD_OBJECT_SCOPE_REQUIRED' if fault == 'master-predicate' else 'NEW_OBJECT_DEPENDENCY_UNSUPPORTED'), rejected
+        if fault == 'master-predicate':
+            assert rejected['details']['repair']['field'] == 'Attenuation'
+            assert rejected['details']['repair']['draft_changed'] is False
         assert writes == []
         return
     tx, shown = task.preview()

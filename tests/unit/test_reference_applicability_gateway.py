@@ -18,7 +18,11 @@ class StructuralMasterTask(MasterBusDeviceTask):
         root = "Busses" if version == "2025.1" else "Master-Mixer Hierarchy"
         self.objects[FIRST].update(classId=1376272, path="\\" + root + "\\Default Work Unit\\Main Mix",
             parent={"id": WORKUNIT, "name": "Default Work Unit"})
-        self.objects[SECOND].update(classId=11862023, name="No_Output", path=r"\Audio Devices\Default Work Unit\No_Output")
+        # Object names may differ, but getTypes describes the installed plug-in
+        # class: System/11403271/AudioDevice in both matching native catalogs.
+        # No Output explicitly cannot be a Master Sink, so it is not a valid
+        # target for this structural-visibility success fixture.
+        self.objects[SECOND].update(classId=11403271, name="Selected System", path=r"\Audio Devices\Default Work Unit\Selected System")
         self.objects[SYSTEM] = {"id": SYSTEM, "name": "System", "type": "AudioDevice", "classId": 11403271,
             "path": r"\Audio Devices\Default Work Unit\System"}
         self.objects[FIRST]["AudioDevice"] = {"id": SYSTEM}
@@ -27,7 +31,7 @@ class StructuralMasterTask(MasterBusDeviceTask):
         # A hierarchy root is an observed read-only boundary, not a guessed class.
         self.objects[ROOT] = {"id": ROOT, "name": root, "path": "\\" + root}
         self.types = [{"classId": 1376272, "name": "Bus", "type": "WObject"},
-            {"classId": 11862023, "name": "AudioDevice", "type": "WObject"},
+            {"classId": 11403271, "name": "System", "type": "AudioDevice"},
             {"classId": 1638416, "name": "WorkUnit", "type": "WObject"},
             {"classId": 131088, "name": "Folder", "type": "WObject"}]
         # Literal R75 R1/R2 metadata shape; empty type and spaced target label.
@@ -227,6 +231,11 @@ def test_structural_proof_cannot_hide_a_dropped_reference_write(tmp_path):
 @pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1"])
 def test_unpinned_master_descriptor_cannot_create_reference_authority(tmp_path, version):
     task = StructuralMasterTask(tmp_path, version)
+    # Replay the newer descriptor explicitly: the older native metadata has
+    # no such dependency and must not accidentally turn this into its valid
+    # dependency-free discovery path. Only 2024.1/2025.1 have a pinned proof.
+    task.metadata["AudioDevice"]["dependencies"] = [
+        {"type": "isMasterBus", "value": True, "action": "Show", "context": "Self"}]
     source = task.bind(FIRST)
     code, result = task.step("draft-discover-fields", "--object-handle", source, "--meaning", "AudioDevice")
     assert code == 2, result
