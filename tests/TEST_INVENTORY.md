@@ -5,6 +5,41 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-11-02 remaining test-cost reduction
+
+The user authorized the same lightweight approach for the remaining expensive
+groups, with focused validation followed by a pause. Command-local schema lookup
+and one-copy compound schema projection preserve fresh reads between commands
+and independent returned objects. The same complex case's cProfile call time
+fell from 37.281s to 13.889s to 8.958s; these are instrumented comparisons,
+not ordinary full-suite timings. Focused runtime sets passed 47 and 81 tests.
+
+The three business files retain 1,051 cases instead of 1,403. Initial selection
+reported 1,021 passed and 30 failed in 654.87s: a test moved below the Gateway
+lost its necessary identity enrichment. Restoring that test's Gateway path
+passed all 45 affected cases in 3.06s. Latest-per-case results all pass and sum
+to 655.060s versus 1,736.354s historically; this is cumulative evidence, not a
+single final-candidate batch. The later one-copy change received its own focused
+checks and one representative compound execution, without repeating this batch.
+
+The first collector selection reported 416 passed and 43 historical failures
+in 1,522.75s, with no new failures. A final structural reduction removes
+redundant fake-world/report rehearsals, retaining source safety, imported product
+helpers and representative collector wiring. All 57 historical source-guard
+failures and three Profiler failures are explicitly **retired, not fixed**.
+Retained unchanged source-guard/Profiler functions have 17 and 15 passing nodes
+in that run, summing to 17.416s and 129.460s. These are reused measurements, not
+new complete file runs. Collection of both files and four import consumers
+passed (118 nodes); three fresh representative checks passed in 24.30s.
+Unchanged demo, older transport and metadata-boundary selections passed 18, 19
+and 29 cases respectively. Two changed protocol files passed 52 tests in 338.30s.
+
+Across the principal groups, retained measured case time sums to about 24m41s
+versus 71m20s in previous records. This does not establish the roughly 15-minute
+whole-suite target. Both independent review axes are clear. Raw initial results,
+follow-ups and comparison notes remain in `/tmp/waapi-195-test-optimization-r2/`.
+No full Program/Nonlive gate, Wwise or Fresh run was started; pause for user review.
+
 ## 2026-11-02 focused test-cost reduction
 
 The preceding complete Non-live run on `d66e9b66a` finished with **33,057 passed,
