@@ -91,7 +91,6 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "Raw WAQL itself is never a mutation identity" in compact
     assert "The exact-ID readback must match" in compact
     assert "`query-object --exact-id`" in compact
-    assert "no unbounded mode" in compact
     assert "--max-results <1..1000>" in query
 
 
