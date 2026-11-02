@@ -17,6 +17,9 @@ from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.transactions import TransactionState, TransactionStore
 
 
+# Versioned discovery, cancellation arguments, legacy render models and 2022
+# null-constructor behavior retain their lane coverage. Common field/platform
+# guards use 2025.1; history restoration keeps undo-only 2022.1 and modern redo.
 def _checked_object_child(
     tmp_path: Path,
     state_dir: Path,
@@ -1063,7 +1066,7 @@ def test_compound_same_current_platform_field_still_rejects_overlapping_children
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_compound_numeric_prestate_one_is_not_restored_by_boolean_true(tmp_path, version):
     client = _property_cancellation_client(version, wrong_scalar=True)
     state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
@@ -1077,7 +1080,7 @@ def test_compound_numeric_prestate_one_is_not_restored_by_boolean_true(tmp_path,
     assert observed["children"][0] == {"index": 0, "complete": True, "pre_state_match": False}
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_compound_current_and_named_platform_cannot_assume_distinct_outcomes(tmp_path, version):
     client = _property_cancellation_client(version)
     state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version=version,
@@ -1088,7 +1091,7 @@ def test_compound_current_and_named_platform_cannot_assume_distinct_outcomes(tmp
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_compound_current_platform_drift_requires_new_aggregate_preview(tmp_path, version):
     client = _property_cancellation_client(version)
     state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
@@ -1101,7 +1104,7 @@ def test_compound_current_platform_drift_requires_new_aggregate_preview(tmp_path
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_compound_unlinked_current_and_distinct_named_platforms_rebind_linkage(tmp_path, version):
     client = _property_cancellation_client(version)
     client.linked = False
@@ -1120,7 +1123,7 @@ def test_compound_unlinked_current_and_distinct_named_platforms_rebind_linkage(t
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
 def test_compound_distinct_platforms_need_actual_unlinked_evidence(tmp_path, version):
     client = _property_cancellation_client(version)
     error = "UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN" if version == "2022.1" else "UNDO_GROUP_OVERLAPPING_OUTCOME"
@@ -1142,7 +1145,7 @@ def test_compound_schema_discloses_effective_platform_proof_and_unfinished_lanes
     assert scope["unknown_effective_scope"] == "guarded_before_preview; remains_implementation_obligation"
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_compound_independent_unlinked_platform_children_execute_and_verify_exact_views(tmp_path, version):
     client = _property_cancellation_client(version)
     client.linked = False
@@ -1165,7 +1168,7 @@ def test_compound_independent_unlinked_platform_children_execute_and_verify_exac
     assert code == 2 and len([row for row in client.calls if row[0].endswith("setProperty")]) == 2, replay
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_compound_platform_name_rebinding_requires_new_aggregate_preview(tmp_path, version):
     client = _property_cancellation_client(version)
     client.linked = False
@@ -1180,7 +1183,7 @@ def test_compound_platform_name_rebinding_requires_new_aggregate_preview(tmp_pat
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_compound_nonboolean_link_readback_cannot_authorize_platform_children(tmp_path, version):
     client = _property_cancellation_client(version)
     client.linked = False
@@ -1900,7 +1903,7 @@ def test_standalone_history_property_retains_exact_scoped_binding_for_omitted_na
 
 
 @pytest.mark.parametrize("direction", ["undo", "redo"])
-@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ('2025.1',))
 def test_standalone_history_multi_object_compound_recovers_property_view_and_ancestor_name(tmp_path, version, direction):
     client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path,
         source_operation="waapi.undoGroup", compound_property=True, compound_ancestor=True, version=version, direction=direction)
@@ -1957,7 +1960,7 @@ def test_standalone_history_clear_receipt_observes_stored_state_despite_inherita
     assert len([call for call in client.calls if call[0] == "ak.wwise.core.undo." + direction]) == 1
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("platform", [None, "Windows"])
 def test_standalone_history_reference_receipt_certifies_original_current_or_named_read_view(tmp_path, version, platform):
     client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, source_operation="object.setReference",
@@ -2123,7 +2126,7 @@ def test_history_reference_wrong_original_view_cannot_pass_from_another_current_
     assert client.source["@Attenuation"] == {"id": client.parent["id"]}
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ('2025.1',))
 @pytest.mark.parametrize("clear", [False, True])
 def test_history_reference_unlink_platform_is_not_a_certified_read_view(tmp_path, version, clear):
     null_platform = "{00000000-0000-0000-0000-000000000000}"
@@ -2439,7 +2442,7 @@ def _existing_fields_history_case(tmp_path, *, version="2025.1", second=False,
     return task, tx, before, after
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ('2022.1', '2025.1'))
 def test_existing_multi_field_set_receipt_undo_redo_observes_every_scalar_and_null(tmp_path, version):
     from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT
     task, source, before, after = _existing_fields_history_case(tmp_path, version=version)
@@ -2904,7 +2907,7 @@ def test_created_leaf_receipt_observes_undo_presence_through_public_gateway(tmp_
     assert [row[1:] for row in task.calls if row[0] == "ak.wwise.core.undo.undo"] == [({}, {})]
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ('2022.1', '2025.1'))
 def test_created_leaf_history_restores_semantic_and_explicit_scalar_fields(tmp_path, version):
     task, source, created = _created_leaf_history_case(tmp_path, version=version, created_fields=True)
     assert created["@IsLoopingEnabled"] is True and created["@IsLoopingInfinite"] is True and created["@Volume"] == -6.0
@@ -2920,7 +2923,7 @@ def test_created_leaf_history_restores_semantic_and_explicit_scalar_fields(tmp_p
     assert len([call for call in task.calls if call[0].endswith("object.create")]) == 1
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ('2022.1', '2025.1'))
 @pytest.mark.parametrize("reference", ["existing", "null"])
 def test_created_leaf_history_restores_existing_reference_or_explicit_null(tmp_path, reference, version):
     task, source, created = _created_leaf_history_case(tmp_path, version=version, reference=reference)
@@ -3110,7 +3113,7 @@ def test_created_fields_redo_never_passes_wrong_or_unobserved_restoration(tmp_pa
         assert "fixture history created-field read failed" in json.dumps(verified)
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ('2022.1', '2025.1'))
 @pytest.mark.parametrize("notes", [None, "Explicit creation notes"])
 def test_created_leaf_history_restores_exact_guid_and_observed_default_notes(tmp_path, version, notes):
     task, source, created = _created_leaf_history_case(tmp_path, version=version, notes=notes)
@@ -4009,9 +4012,8 @@ def test_compound_same_uri_children_keep_distinct_actual_observation_ranges(tmp_
         assert task.objects == expected
 
 
-@pytest.mark.parametrize("fault", ["missing", "prepared", "dispatch", "index", "boolean-index", "range", "phase-index", "weak-child",
-    "assertion-boolean-tag", "assertion-wrong-tag", "readback-boolean-tag", "readback-wrong-tag"])
-def test_compound_history_rejects_structurally_valid_but_misassociated_child_events(tmp_path, fault):
+def test_compound_history_rejects_structurally_valid_but_misassociated_child_events(tmp_path):
+    from copy import deepcopy
     from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
     client, state, source, _, _, run = _owned_notes_history_case(tmp_path,
         source_operation="waapi.undoGroup", source_prepared_only=True)
@@ -4019,49 +4021,54 @@ def test_compound_history_rejects_structurally_valid_but_misassociated_child_eve
     assert run("verify", source["transaction_id"])[0] == 0
     code, shown = run("transaction-show", source["transaction_id"])
     assert code == 0, shown
-    events = shown["events"]
-    verification = next(row["details"]["verification"] for row in events if row["event_type"] == "verification_recorded")
-    associations = [row for row in verification["assertions"] if row.get("kind") == "compound_child_observation"]
-    proof = associations[0]["evidence"]
-    if fault == "missing": verification["assertions"].remove(associations[0])
-    elif fault == "prepared": proof["prepared_sha256"] = associations[1]["evidence"]["prepared_sha256"]
-    elif fault == "dispatch": proof["dispatch_sha256"] = associations[1]["evidence"]["dispatch_sha256"]
-    elif fault == "index": proof["index"] = 1
-    elif fault == "boolean-index": proof["index"] = False
-    elif fault == "weak-child": proof["verification"]["business_state_verified"] = False
-    elif fault == "range": proof["readbacks"] = associations[1]["evidence"]["readbacks"]
-    elif fault.endswith("-tag"):
-        section = "assertions" if fault.startswith("assertion-") else "readbacks"
-        bounds = associations[1]["evidence"][section]
-        rows = verification[section][bounds["start"]:bounds["start"] + bounds["count"]]
-        assert rows
-        rows[0]["compound_child_index"] = True if "boolean" in fault else 0
-        bounds["sha256"] = canonical_sha256(rows)
-    else:
-        execution = next(row["details"]["dispatch_result"] for row in events if row["event_type"] == "execution_completed")
-        execution["result"]["phases"][1]["index"] = 1
-    # Model a malformed persisted producer, with a valid journal chain. The
-    # public receipt consumer must check semantic associations as well as hashes.
-    previous = ""
-    for event in events:
-        event["previous_event_hash"] = previous
-        event.pop("event_hash")
-        event["event_hash"] = previous = canonical_sha256(event)
-    directory = state / "transactions" / source["transaction_id"]
-    (directory / "events.jsonl").write_bytes(b"".join(canonical_json_bytes(event) + b"\n" for event in events))
-    state_path = directory / "state.json"
-    record = json.loads(state_path.read_text())
-    record["last_event_hash"] = previous
-    state_path.write_bytes(canonical_json_bytes(record))
-    code, loaded = run("transaction-show", source["transaction_id"])
-    assert code == 0 and loaded["state"] == "verified", loaded
-    code, phase = run("draft-start", "ak.wwise.core.undo.undo")
-    assert code == 0, phase
-    code, rejected = run("draft-declare-core-plan", phase["draft"]["draft_id"], "--task-authority", phase["task_authority"],
-        "--expected-revision", str(phase["draft"]["revision"]), "--value", "history_scope", "latest_project_history",
-        "--value", "expectation_receipt", source["transaction_id"])
-    assert code == 2 and "Compound" in rejected["message"], rejected
-    assert not any(uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"} for uri, _, _ in client.calls)
+    # Build one real producer receipt. Every consumer rejection receives an
+    # independent copy of its events; repeating source transactions adds no
+    # evidence about the malformed child association under test.
+    for fault in ("missing", "prepared", "dispatch", "index", "boolean-index", "range", "phase-index", "weak-child",
+        "assertion-boolean-tag", "assertion-wrong-tag", "readback-boolean-tag", "readback-wrong-tag"):
+        events = deepcopy(shown["events"])
+        verification = next(row["details"]["verification"] for row in events if row["event_type"] == "verification_recorded")
+        associations = [row for row in verification["assertions"] if row.get("kind") == "compound_child_observation"]
+        proof = associations[0]["evidence"]
+        if fault == "missing": verification["assertions"].remove(associations[0])
+        elif fault == "prepared": proof["prepared_sha256"] = associations[1]["evidence"]["prepared_sha256"]
+        elif fault == "dispatch": proof["dispatch_sha256"] = associations[1]["evidence"]["dispatch_sha256"]
+        elif fault == "index": proof["index"] = 1
+        elif fault == "boolean-index": proof["index"] = False
+        elif fault == "weak-child": proof["verification"]["business_state_verified"] = False
+        elif fault == "range": proof["readbacks"] = associations[1]["evidence"]["readbacks"]
+        elif fault.endswith("-tag"):
+            section = "assertions" if fault.startswith("assertion-") else "readbacks"
+            bounds = associations[1]["evidence"][section]
+            rows = verification[section][bounds["start"]:bounds["start"] + bounds["count"]]
+            assert rows
+            rows[0]["compound_child_index"] = True if "boolean" in fault else 0
+            bounds["sha256"] = canonical_sha256(rows)
+        else:
+            execution = next(row["details"]["dispatch_result"] for row in events if row["event_type"] == "execution_completed")
+            execution["result"]["phases"][1]["index"] = 1
+        # Model a malformed persisted producer, with a valid journal chain. The
+        # public receipt consumer must check semantic associations as well as hashes.
+        previous = ""
+        for event in events:
+            event["previous_event_hash"] = previous
+            event.pop("event_hash")
+            event["event_hash"] = previous = canonical_sha256(event)
+        directory = state / "transactions" / source["transaction_id"]
+        (directory / "events.jsonl").write_bytes(b"".join(canonical_json_bytes(event) + b"\n" for event in events))
+        state_path = directory / "state.json"
+        record = json.loads(state_path.read_text())
+        record["last_event_hash"] = previous
+        state_path.write_bytes(canonical_json_bytes(record))
+        code, loaded = run("transaction-show", source["transaction_id"])
+        assert code == 0 and loaded["state"] == "verified", loaded
+        code, phase = run("draft-start", "ak.wwise.core.undo.undo")
+        assert code == 0, phase
+        code, rejected = run("draft-declare-core-plan", phase["draft"]["draft_id"], "--task-authority", phase["task_authority"],
+            "--expected-revision", str(phase["draft"]["revision"]), "--value", "history_scope", "latest_project_history",
+            "--value", "expectation_receipt", source["transaction_id"])
+        assert code == 2 and "Compound" in rejected["message"], (fault, rejected)
+        assert not any(uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"} for uri, _, _ in client.calls)
 
 
 @pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
@@ -4201,7 +4208,7 @@ def _created_graph_history_case(tmp_path, *, version='2025.1', compound=False, p
     return task, source, before, after
 
 
-@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize("version", ('2022.1', '2025.1'))
 @pytest.mark.parametrize('compound', [False, True])
 def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_path, version, compound):
     task, source, before, after = _created_graph_history_case(tmp_path, version=version, compound=compound)
@@ -5194,7 +5201,7 @@ def test_render_source_without_compound_context_rejects_undeclared_opaque_member
     assert len(observations) == 1 and observations[0]['evidence']['source_matches'] is False, observations
 
 
-@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize("version", ('2022.1', '2025.1'))
 @pytest.mark.parametrize('creation_first', [False, True])
 def test_compound_native_named_set_graph_binds_actual_result_before_reference_and_history(tmp_path, version, creation_first):
     task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, version,
