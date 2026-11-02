@@ -19,6 +19,7 @@ from tests.maintenance.interface_depth_inventory import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+REVIEW_POLICY_PATH = REPO_ROOT / "docs" / "interface-depth-review-policy.json"
 
 
 def _inventory() -> dict[str, object]:
