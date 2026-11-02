@@ -438,7 +438,9 @@ def created_row() -> dict[str, Any]:
     return {
         "id": CREATED_GUID,
         "name": "CreatedByGateway",
-        "type": "PropertyContainer",
+        # create_request and its live class catalog belong to Wwise 2022.1.
+        "type": "ActorMixer",
+        "classId": 1,
         "path": PARENT_PATH + r"\CreatedByGateway",
         "parent": {"id": PARENT_GUID},
         "notes": "created in transaction test",
@@ -1670,8 +1672,14 @@ def test_compact_operations_reconstructs_detailed_directory_without_loss(
         assert observed == expected
         assert expected
     assert reconstructed["ak.wwise.core.getInfo"]["next_command"] == ["status"]
-    assert "static schema-command templates" in compact["directory_reading"]
-    assert "typed continuations" in compact["directory_reading"]
+    reading = compact["directory_reading"]
+    for template in (
+        "operation_schema_command_template",
+        "request_schema_command_template",
+    ):
+        assert template in reading
+    assert "not typed continuations" in reading
+    assert "copy typed continuations exactly" in reading
     assert waapi_gateway.gateway_json_document_size(compact) < 26 * 1024
     # Exercise the terminal CLI serializer, not only the execute_gateway result.
     monkeypatch.setattr(waapi_gateway, "execute_gateway", lambda argv: (code, compact))
@@ -2035,7 +2043,11 @@ def test_object_set_operation_schema_owns_target_and_metadata_scope(
         "fields": "live_discovered_field_handles",
         "long_tail_types": "live_discovered_type_handles",
     }
-    assert adapter["settings"]["name_conflict"] == ["fail", "rename", "merge"]
+    # The closed object.set contract includes native child/list replacement;
+    # target and field authority still comes from bound Gateway handles.
+    assert adapter["settings"]["name_conflict"] == [
+        "fail", "rename", "merge", "replace",
+    ]
     assert adapter["legacy_shallow_composer_public"] is False
     assert "composer" not in payload
     assert default_work_unit_path
@@ -2082,8 +2094,15 @@ def test_soundbank_generate_operation_schema_closes_batch_language_scope(
     assert fields["soundbanks"]["maxItems"] == 64
     assert fields["platforms"]["maxItems"] == 16
     assert fields["languages"]["maxItems"] == 64
-    assert "skip_languages" not in fields
-    assert "write_to_disk" not in fields
+    # All five reflected generate schemas expose skipLanguages/writeToDisk.
+    # The business interface owns their spelling and permits explicit omission
+    # through the closed native-default choice, alongside either boolean.
+    for field in ("skip_languages", "write_to_disk"):
+        assert fields[field]["oneOf"] == [
+            {"type": "boolean"}, {"const": "native-default"},
+        ]
+    assert fields["write_to_disk"]["default"] is True
+    assert declaration["schema"]["additionalProperties"] is False
     bank_fields = fields["soundbanks"]["items"]["properties"]
     assert bank_fields["artifact_expectation"]["enum"] == [
         "nonlocalized",
@@ -4372,6 +4391,7 @@ def test_create_execute_persists_result_and_verify_reads_back_returned_guid(tmp_
                 {"return": []},
                 {"return": []},
             ],
+            "ak.wwise.core.object.getTypes": [create_type_catalog()],
             "ak.wwise.core.object.create": [
                 {"id": CREATED_GUID, "name": "CreatedByGateway"}
             ],
@@ -4393,6 +4413,9 @@ def test_create_execute_persists_result_and_verify_reads_back_returned_guid(tmp_
     }
     mutation_calls = [call for call in execute_client.calls if call[0] == "ak.wwise.core.object.create"]
     assert len(mutation_calls) == 1
+    assert [call[0] for call in execute_client.calls].count(
+        "ak.wwise.core.object.getTypes"
+    ) == 1
     assert mutation_calls[0][1] == {
         "parent": PARENT_GUID,
         "type": "ActorMixer",
@@ -4407,6 +4430,7 @@ def test_create_execute_persists_result_and_verify_reads_back_returned_guid(tmp_
             "ak.wwise.core.getInfo": [live_info()],
             "ak.wwise.core.getProjectInfo": [project()],
             "ak.wwise.core.object.get": [{"return": [created_row()]}],
+            "ak.wwise.core.object.getTypes": [create_type_catalog()],
         }
     )
     exit_code, verified = execute(
@@ -4444,6 +4468,9 @@ def test_create_execute_persists_result_and_verify_reads_back_returned_guid(tmp_
     }
     readback = next(call for call in verify_client.calls if call[0] == "ak.wwise.core.object.get")
     assert readback[1] == {"from": {"id": [CREATED_GUID]}}
+    assert [call[0] for call in verify_client.calls].count(
+        "ak.wwise.core.object.getTypes"
+    ) == 1
     assert TransactionStore(state_dir).load(transaction["transaction_id"]).state is TransactionState.VERIFIED
 
 
@@ -4477,8 +4504,15 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
         prepared: Mapping[str, Any],
         *,
         read_call: Any,
+        history_resolver: Any = None,
+        copy_proof_context: Any = None,
     ) -> dict[str, Any]:
-        result = dict(real_validate_roles(prepared, read_call=read_call))
+        result = dict(real_validate_roles(
+            prepared,
+            read_call=read_call,
+            history_resolver=history_resolver,
+            copy_proof_context=copy_proof_context,
+        ))
         assert result["ok"] is True
         assertions = list(result.get("assertions", []))
         readbacks = list(result.get("readbacks", []))
@@ -4516,6 +4550,7 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
                     {"return": []},
                     {"return": []},
                 ],
+                "ak.wwise.core.object.getTypes": [create_type_catalog()],
                 "ak.wwise.core.object.create": [
                     {"id": CREATED_GUID, "name": "CreatedByGateway"}
                 ],
@@ -4593,6 +4628,7 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
                     }
                 ],
                 "ak.wwise.core.object.get": [{"return": [created_row()]}],
+                "ak.wwise.core.object.getTypes": [create_type_catalog()],
             }
         ),
     )
@@ -7302,7 +7338,7 @@ def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
     )
     stored = TransactionStore(state_dir).load_preview(transaction["transaction_id"])
     prepared = stored.artifact["prepared_operation"]
-    host_args = prepared["dispatch"]["args"]
+    host_args = json.loads(json.dumps(prepared["dispatch"]["args"]))
     io_audit = prepared["pre_state"]["soundbank_guard"]["io_audit"]
     assert {
         row["json_path"] for row in io_audit["paths"]
@@ -7340,9 +7376,11 @@ def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
             {
                 "sources": [
                     {
-                        "input": expected_wine_dispatch_path(source_list, account_home=account_home),
+                        # The live project fixture explicitly reports Z:. That
+                        # sealed anchor wins even when the path is below home.
+                        "input": z_wire_path(source_list),
                         "platform": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
-                        "output": expected_wine_dispatch_path(io_root / "external-output", account_home=account_home),
+                        "output": z_wire_path(io_root / "external-output"),
                     }
                 ]
             },
@@ -7350,6 +7388,7 @@ def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
         )
     ]
     assert execute_payload["wire_path_adaptation"]["mode"] == "local_posix_wine"
+    assert execute_payload["wire_path_adaptation"]["mapping"]["anchor_drive"] == "Z"
     assert execute_payload["wire_path_adaptation"]["translated_path_count"] == 2
     assert prepared["dispatch"]["args"] == host_args
 
@@ -7899,11 +7938,24 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     is_command_line = not api.startswith("ak.wwise.ui.")
     state_dir = tmp_path / "state"
     io_root = (tmp_path / ("TargetProject" if api in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"} else "io-root")).resolve()
-    if api in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"}:
-        # Native creation requires a matching folder/file basename. The owned
-        # existing directory and saved artifact are independent of transition.
+    if guard_mode == PROJECT_GUARD_TRANSITION_TO_PATH:
+        # Console open also requires an existing isolated I/O authority root.
+        # Creation keeps its matching folder/file basename and absent target.
         io_root.mkdir()
     target_path = io_root / "TargetProject.wproj"
+    if api == "ak.wwise.console.project.open":
+        # Console open binds the saved project's GUID/name before transition;
+        # a generic XML placeholder cannot establish that source identity.
+        schema_version = {"2023.1": 119, "2024.1": 123, "2025.1": 133}[version]
+        target_path.write_text(
+            f'<WwiseDocument Type="Project" SchemaVersion="{schema_version}" '
+            f'WwiseVersion="v{version}.0" WwiseBuild="1">'
+            f'<ProjectInfo><Project Name="TargetProject" ID="{PROJECT_GUID}" />'
+            '</ProjectInfo></WwiseDocument>',
+            encoding="utf-8",
+        )
+    elif api.endswith(".open"):
+        target_path.write_text("<Project/>", encoding="utf-8")
     current_path = (tmp_path / "current-project" / "CurrentProject.wproj").resolve()
     contract = ExecutionContractRegistry().authoring_ui_describe(version, api)
     call_args: dict[str, Any] = {}
