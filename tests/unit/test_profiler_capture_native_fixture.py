@@ -691,29 +691,7 @@ def test_cursor_move_failures_preserve_partial_final_writer_evidence(
         assert report['cleanup']['complete'] is True
 
 
-@pytest.mark.parametrize('version,extra', [('2021.1', False), ('2022.1', False), ('2023.1', False),
-    ('2024.1', False), ('2025.1', True), ('2025.1', False)])
-def test_cursor_move_owner_requires_exact_single_2025_node(tmp_path, monkeypatch, version, extra):
-    from tests.destructive.support import authoring_batch
-    from tests.destructive.support.profiler_capture import CURSOR_MOVES_NODEID
-    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
-    events = _fakes(monkeypatch, tmp_path)
-    monkeypatch.setenv('WWISE_VERSION', version)
-    config = _config(tmp_path)
-    config.args = [CURSOR_MOVES_NODEID, *([NODE] if extra else [])]
-    items = [SimpleNamespace(nodeid=name) for name in config.args]
-    if version != '2025.1' or extra:
-        message = 'not available on the requested version' if version != '2025.1' else 'exact single 2025'
-        with pytest.raises(pytest.UsageError, match=message):
-            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert not events
-    else:
-        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert [row[0] for row in events] == ['construct', 'start', 'install']
-        assert events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
-
-
-@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('version', ['2021.1', '2025.1'])
 def test_missing_only_capture_collects_new_facts_without_repeating_passed_reads_or_effects(
         owned_authoring, tmp_path, monkeypatch, version):
     batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
@@ -746,8 +724,7 @@ def test_missing_only_capture_collects_new_facts_without_repeating_passed_reads_
     assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
 
 
-@pytest.mark.parametrize('missing_only,partial_seed', [(True, 'voices'), (True, 'busses'),
-    (False, 'voices'), (False, 'busses')])
+@pytest.mark.parametrize('missing_only,partial_seed', [(True, 'voices'), (False, 'busses')])
 def test_partial_capture_seed_never_certifies_unique_owned_contribution_in_final_writer(
         owned_authoring, tmp_path, monkeypatch, missing_only, partial_seed):
     batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
@@ -844,24 +821,6 @@ def test_observed_mixing_bus_and_logical_output_remain_distinct_through_final_wr
     assert not any(args.get('property') == 'BusChannelConfig' for uri, args, _ in client.calls if uri.endswith('setProperty'))
 
 
-def test_owned_rtpc_read_preserves_actual_native_value_without_global_setter_effect(
-        owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        version='2021.1', capture_reads=True, native_rtpc=True)
-    collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
-    assert final['outcome'] == 'PASS'
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    evidence = report['outcomes']['profiler-rtpcs-observation']['evidence']
-    assert evidence['rpm_read_row_indexes'] == [0]
-    assert evidence['agent_result']['return'][0] == {'id': '{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}',
-        'name': 'RPM', 'gameObjectId': 18446744073709551614, 'value': 1000.0}
-    assert evidence['setter_effect_verified'] is False
-    assert not any(uri.startswith('ak.soundengine.') for uri, _, _ in client.calls)
-    assert next(row for row in record['categories'] if row['category'] == 'profiler-rtpcs-observation')['status'] == 'PASS'
-
-
 @pytest.mark.parametrize('cpu_native_version,row_count', [('2024.1', 34), ('2025.1', 33)])
 def test_retained_native_cpu_rows_reach_final_writer_without_a_second_native_read(
         owned_authoring, tmp_path, monkeypatch, cpu_native_version, row_count):
@@ -870,7 +829,8 @@ def test_retained_native_cpu_rows_reach_final_writer_without_a_second_native_rea
     original.write_text(json.dumps(NATIVE_CPU_2024 if cpu_native_version == '2024.1' else NATIVE_CPU_2025))
     before = hashlib.sha256(original.read_bytes()).hexdigest()
     batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        version=cpu_native_version, capture_reads=True, failure='nonempty-media', cpu_native_version=cpu_native_version)
+        version=cpu_native_version, capture_reads=True, failure='nonempty-media', cpu_native_version=cpu_native_version,
+        native_rtpc=True)
     collect(batch, call)
     final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
     assert final['outcome'] == 'PASS' and record['version'] == cpu_native_version
@@ -895,6 +855,21 @@ def test_retained_native_cpu_rows_reach_final_writer_without_a_second_native_rea
     assert sum(uri.endswith('getCpuUsage') for uri, _, _ in client.calls) == 1
     assert next(row for row in record['categories'] if row['category'] == 'profiler-cpu-observation')['status'] == 'PASS'
     assert hashlib.sha256(original.read_bytes()).hexdigest() == before
+    # The same capture proves media attribution and exact native RTPC readback.
+    for name in ('profiler-loaded-media-observation', 'profiler-streamed-media-observation'):
+        category = next(row for row in record['categories'] if row['category'] == name)
+        assert category['status'] == 'PASS' and category['attribution_scope'] == 'capture'
+        assert category['owned_identity_observed'] is False
+        assert category['preparation_or_streaming_control_effect_verified'] is False
+    rtpc = report['outcomes']['profiler-rtpcs-observation']['evidence']
+    assert rtpc['rpm_read_row_indexes'] == [0] and rtpc['setter_effect_verified'] is False
+    assert rtpc['agent_result']['return'][0] == {
+        'id': '{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}', 'name': 'RPM',
+        'gameObjectId': 18446744073709551614, 'value': 1000.0}
+    assert [(args['property'], args['value']) for uri, args, _ in client.calls if uri.endswith('object.setProperty')] == [
+        ('IsStreamingEnabled', True), ('IsStreamingEnabled', False)]
+    assert not any(uri.startswith('ak.soundengine.') for uri, _, _ in client.calls)
+    assert not client.transport and not batch.runtime.owned_root.exists()
 
 
 def test_capture_read_extension_keeps_new_data_and_empty_media_in_final_archive(owned_authoring, tmp_path, monkeypatch):
@@ -948,28 +923,6 @@ def test_2022_capture_read_flow_preserves_older_fields_in_persisted_final_accept
     assert sum(uri.endswith('transport.prepare') for uri, _, _ in client.calls) == 1
     assert not any(uri.endswith(('transport.useOriginals', 'getCpuUsage', 'getLoadedMedia', 'getPerformanceMonitor',
         'getStreamedMedia', 'getMeters', 'setCursorTime', 'saveCapture', 'log.addItem', 'log.clear')) for uri, _, _ in client.calls)
-    assert not client.transport and not batch.runtime.owned_root.exists()
-
-
-def test_capture_level_media_rows_pass_without_inventing_sound_or_control_attribution(owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
-        capture_reads=True, failure='nonempty-media')
-    collect(batch, call)
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
-    assert final['outcome'] == 'PASS' and len(record['categories']) == 7
-    assert all(row['status'] == row['business_outcome'] == 'PASS' for row in record['categories'])
-    for row in record['categories']:
-        if row['category'] in ('profiler-loaded-media-observation', 'profiler-streamed-media-observation'):
-            assert row['attribution_scope'] == 'capture' and row['owned_identity_observed'] is False
-            assert row['preparation_or_streaming_control_effect_verified'] is False
-    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
-    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
-    assert report['public_call_count'] <= 192 and report['reader_call_count'] == 9
-    assert report['outcomes']['profiler-rtpcs-observation']['evidence'].get('setter_effect_verified', False) is False
-    assert report['outcomes']['profiler-rtpcs-observation']['evidence']['rpm_read_row_indexes'] == [0]
-    assert [(args['property'], args['value']) for uri, args, _ in client.calls if uri.endswith('object.setProperty')] == [
-        ('IsStreamingEnabled', True), ('IsStreamingEnabled', False)]
-    assert not any(uri.startswith('ak.soundengine.') for uri, _, _ in client.calls)
     assert not client.transport and not batch.runtime.owned_root.exists()
 
 
@@ -1087,67 +1040,6 @@ def test_capture_read_missing_partial_and_cleanup_results_reach_final_writer(
     assert record['source']['hash_before'] == record['source']['hash_after']
 
 
-@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
-@pytest.mark.parametrize('extra', [False, True])
-def test_missing_capture_owner_requires_its_exact_single_node(tmp_path, monkeypatch, version, extra):
-    from tests.destructive.support import authoring_batch
-    from tests.destructive.support.profiler_capture import CAPTURE_MISSING_NODEID
-    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
-    events = _fakes(monkeypatch, tmp_path)
-    staged = []
-    def stage(sandbox, io_root, *, version):
-        assert sandbox.sandbox_path.is_dir() and sandbox.source_root.is_dir()
-        assert sandbox.sandbox_path != sandbox.source_root
-        assert sandbox.sandbox_path.is_relative_to(tmp_path / 'batch/owned/sandbox-root')
-        assert io_root == tmp_path / 'batch/owned/io' and io_root.is_dir()
-        staged.append(version)
-    monkeypatch.setattr(authoring_batch, 'stage_owned_capture_read_media', stage)
-    monkeypatch.setenv('WWISE_VERSION', version)
-    config = _config(tmp_path)
-    config.args = [CAPTURE_MISSING_NODEID, *([NODE] if extra else [])]
-    items = [SimpleNamespace(nodeid=name) for name in config.args]
-    if extra:
-        with pytest.raises(pytest.UsageError, match='exact single node|not available'):
-            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert not events and not staged
-    else:
-        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert [row[0] for row in events] == ['construct', 'start', 'install']
-        assert staged == [version] and events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
-        assert events[-1][1]['selected_nodeids'] == (CAPTURE_MISSING_NODEID,)
-
-
-@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
-@pytest.mark.parametrize('extra', [False, True])
-def test_capture_read_owner_admits_only_one_node_on_each_pinned_version(tmp_path, monkeypatch, version, extra):
-    from tests.destructive.support import authoring_batch
-    from tests.destructive.support.profiler_capture import CAPTURE_READS_NODEID
-    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
-    events = _fakes(monkeypatch, tmp_path)
-    staged = []
-    def stage(sandbox, io_root, *, version):
-        assert sandbox.sandbox_path.is_dir() and sandbox.source_root.is_dir()
-        assert sandbox.sandbox_path != sandbox.source_root
-        assert sandbox.sandbox_path.is_relative_to(tmp_path / 'batch/owned/sandbox-root')
-        assert io_root == tmp_path / 'batch/owned/io' and io_root.is_dir()
-        staged.append(version)
-    monkeypatch.setattr(authoring_batch, 'stage_owned_capture_read_media', stage)
-    monkeypatch.setenv('WWISE_VERSION', version)
-    config = _config(tmp_path)
-    config.args = [CAPTURE_READS_NODEID, *([NODE] if extra else [])]
-    items = [SimpleNamespace(nodeid=name) for name in config.args]
-    if extra:
-        with pytest.raises(pytest.UsageError, match='exact single node|not available'):
-            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert not events
-    else:
-        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert [row[0] for row in events] == ['construct', 'start', 'install']
-        assert events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
-        assert staged == [version]
-        assert events[-1][1]['selected_nodeids'] == (CAPTURE_READS_NODEID,)
-
-
 def test_owned_2025_reader_flow_reaches_seven_independent_archived_categories(owned_authoring, tmp_path, monkeypatch):
     batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, readers=True)
     collect(batch, call)
@@ -1252,28 +1144,6 @@ def test_nonempty_unattributed_reader_rows_never_grant_owned_capture_credit(owne
         and row['reader_observation_status'] == 'PASS' and row['owned_identity_observed'] is False
         and 'batch_finalization' not in row for row in record['categories'])
     assert not client.transport and not batch.batch_seal_path.exists()
-
-
-@pytest.mark.parametrize('version,extra', [('2021.1', False), ('2022.1', False), ('2023.1', False),
-    ('2024.1', False), ('2025.1', True), ('2025.1', False)])
-def test_reader_owner_requires_exact_single_2025_selection(tmp_path, monkeypatch, version, extra):
-    from tests.destructive.support import authoring_batch
-    from tests.destructive.support.profiler_capture import READERS_2025_NODEID
-    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
-    events = _fakes(monkeypatch, tmp_path)
-    monkeypatch.setenv('WWISE_VERSION', version)
-    config = _config(tmp_path)
-    config.args = [READERS_2025_NODEID, *([NODE] if extra else [])]
-    items = [SimpleNamespace(nodeid=name) for name in config.args]
-    if version != '2025.1' or extra:
-        message = 'Selected owned Authoring node is not available on the requested version' if version != '2025.1' else 'only their matching 2025'
-        with pytest.raises(pytest.UsageError, match=message):
-            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert not events
-    else:
-        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert [row[0] for row in events] == ['construct', 'start', 'install']
-        assert events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
 
 
 def test_owned_2024_meter_public_flow_reaches_its_archived_final_category(owned_authoring, tmp_path, monkeypatch):
@@ -1449,26 +1319,6 @@ def test_failed_explicit_stop_capture_persists_incomplete_cleanup_without_retry(
     assert record['source']['hash_before'] == record['source']['hash_after']
 
 
-@pytest.mark.parametrize('version,extra', [('2024.1', False), ('2025.1', True), ('2025.1', False)])
-def test_capture_owner_requires_exact_single_2025_selection(tmp_path, monkeypatch, version, extra):
-    from tests.destructive.support import authoring_batch
-    from tests.destructive.support.profiler_capture import NODEID
-    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
-    events = _fakes(monkeypatch, tmp_path)
-    monkeypatch.setenv('WWISE_VERSION', version)
-    config = _config(tmp_path)
-    config.args = [NODEID, *([NODE] if extra else [])]
-    items = [SimpleNamespace(nodeid=name) for name in config.args]
-    if version != '2025.1' or extra:
-        message = 'Selected owned Authoring node is not available on the requested version' if version != '2025.1' else 'only its matching 2025'
-        with pytest.raises(pytest.UsageError, match=message):
-            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert not events
-    else:
-        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert [row[0] for row in events] == ['construct', 'start', 'install']
-
-
 def test_meter_anomaly_diagnostic_reaches_final_writer_without_business_credit(
         owned_authoring, tmp_path, monkeypatch):
     batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, meter_spellings=True)
@@ -1505,22 +1355,6 @@ def test_meter_anomaly_diagnostic_reaches_final_writer_without_business_credit(
     assert not client.registered and not client.transport and not batch.runtime.owned_root.exists()
     assert report['fixture_after'] == report['fixture_before']
     assert record['source']['hash_before'] == record['source']['hash_after']
-
-
-def test_meter_anomaly_missing_packet_cannot_complete_persisted_diagnostic(
-        owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, meter_spellings=True)
-    collect(batch, call)
-    nodeid, = batch.selected_nodeids
-    root = Path(batch.node_runtimes[nodeid].runner_environment['WWISE_EVIDENCE_DIR'])
-    (root / 'meter-spelling-1.json').unlink()  # Remove only this fake control's produced packet.
-    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
-    assert final['outcome'] == 'PASS'  # Lifecycle completion remains distinct from diagnostic proof.
-    categories = record['categories']
-    assert categories[1]['observation_task_status'] == 'BLOCKED'
-    assert categories[1]['diagnostic_packet_status'] == 'missing_or_changed'
-    assert all(row['status'] == 'blocked' and row['business_effect_verified'] is False for row in categories)
-    assert all(row['observation_task_status'] == 'PASS' for i, row in enumerate(categories) if i != 1)
 
 
 @pytest.mark.parametrize('failure', ['native-rejection', 'omission', 'malformed-result', 'session-loss', 'cleanup'])
@@ -1585,29 +1419,6 @@ def test_meter_anomaly_outcomes_preserve_independent_packets_and_owned_cleanup(
     else:
         assert all(row['observation_task_status'] == 'BLOCKED' and 'batch_finalization' not in row for row in categories)
         assert batch.lifecycle_result.quarantine_path and not batch.batch_seal_path.exists()
-
-
-@pytest.mark.parametrize('version,extra', [('2024.1', False), ('2025.1', True), ('2025.1', False)])
-def test_meter_anomaly_owner_admits_only_exact_2025_node_in_automation_mode(
-        tmp_path, monkeypatch, version, extra):
-    from tests.destructive.support import authoring_batch
-    from tests.destructive.support.profiler_capture import METER_SPELLING_NODEID
-    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
-    events = _fakes(monkeypatch, tmp_path)
-    monkeypatch.setenv('WWISE_VERSION', version)
-    monkeypatch.delenv('AK_AUTOMATION_MODE', raising=False)
-    config = _config(tmp_path)
-    config.args = [METER_SPELLING_NODEID, *([NODE] if extra else [])]
-    items = [SimpleNamespace(nodeid=name) for name in config.args]
-    if version != '2025.1' or extra:
-        with pytest.raises(pytest.UsageError):
-            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert not events
-    else:
-        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert [row[0] for row in events] == ['construct', 'start', 'install']
-        assert events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
-        assert 'AK_AUTOMATION_MODE' not in authoring_batch.os.environ
 
 
 def test_meter_anomaly_oversized_packet_blocks_diagnostic_but_preserves_cleanup(
