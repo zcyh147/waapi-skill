@@ -87,23 +87,15 @@ def _public_layout_receipts(tmp_path: Path, *, inspect_draft: bool = False):
 
 
 def test_public_layout_declaration_is_a_closed_formal_draft_protocol(tmp_path):
-    steps, _records, _state = _public_layout_receipts(tmp_path)
-    validate_operation_draft_protocol_steps(steps)
-
-
-@pytest.mark.parametrize("index,value", [(0, "forged-draft"), (2, "forged-authority"), (4, "1")])
-def test_public_layout_protocol_keeps_issued_identity_authority_revision(tmp_path, index, value):
-    steps, _records, _state = _public_layout_receipts(tmp_path)
-    declaration = steps[3]
-    arguments = list(declaration.arguments)
-    arguments[index] = value
-    corrupt = (*steps[:3], replace(declaration, arguments=tuple(arguments)), *steps[4:])
-    with pytest.raises(ValueError):
-        validate_operation_draft_protocol_steps(corrupt)
-
-
-def test_public_layout_original_draft_audit_replays(tmp_path):
     steps, records, state = _public_layout_receipts(tmp_path)
+    validate_operation_draft_protocol_steps(steps)
+    declaration = steps[3]
+    for index, value in ((0, "forged-draft"), (2, "forged-authority"), (4, "1")):
+        arguments = list(declaration.arguments)
+        arguments[index] = value
+        corrupt = (*steps[:3], replace(declaration, arguments=tuple(arguments)), *steps[4:])
+        with pytest.raises(ValueError):
+            validate_operation_draft_protocol_steps(corrupt)
     evidence = validate_typed_draft_evidence(
         state_directory=state, steps=steps, broker_records=records
     )
@@ -198,8 +190,7 @@ def _layout_broker_steps(blueprint):
     )
 
 
-@pytest.mark.parametrize("text", ["1" * 1695, "界" * 565, '"\\' * 423 + "abc"],
-    ids=["ascii", "multibyte", "quoted-backslash"])
+@pytest.mark.parametrize("text", ['界"\\' * 242 + "a"], ids=["mixed-utf8-quoted-backslash"])
 @pytest.mark.skipif(os.name == "nt", reason="POSIX TCP and archive proof; Windows projection has separate controls")
 def test_near_capacity_public_layout_survives_authenticated_broker_and_archive(tmp_path, text, monkeypatch):
     """Production Gateway and TCP Broker proof; starts neither Codex nor Wwise."""
