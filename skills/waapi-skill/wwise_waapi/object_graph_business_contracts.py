@@ -76,10 +76,20 @@ def _anonymous_list_profiles(version):
     """
     marker = manual_marker_profile(version)
     if marker is not None:
+        manual_mode = marker["sdk_example"]["marker_input_mode"]
         marker = {key: value for key, value in marker.items()
                   if key not in {"sdk_example", "list_source", "source_sha256"}}
         marker["source"] = {key: value for key, value in marker["source"].items()
                             if key in {"build", "member", "member_sha256"}}
+        marker["owner_prerequisite"] = {
+            "field_meaning": "marker input mode",
+            "field_scope": "bound_AudioFileSource_owner",
+            "field_input": "selected_owner_Field_Handle",
+            "required_choice": {"meaning": "manual", "value": manual_mode},
+            "when_unsatisfied": "draft-declare-existing_in_same_Draft",
+            "already_satisfied": "preserve",
+            "derived_write": False,
+        }
     directory = media_pool_database_authority(version)
     if directory is not None:
         directory = {key: value for key, value in directory.items()

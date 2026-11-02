@@ -162,8 +162,16 @@ def test_older_inner_marker_is_not_admitted_as_modern_anonymous_wobject(tmp_path
     assert task.writes == []
 
 
-@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', *VERSIONS])
 def test_manual_marker_schema_and_draft_continuation_disclose_exact_matching_profile(tmp_path, version):
+    if version == '2021.1':
+        from tests.unit.test_object_graph_business_gateway import gateway
+        code, schema = gateway.execute_gateway(
+            ['--version', version, 'operation-schema', 'object.set'], env={})
+        assert code == 0, schema
+        assert schema['operation']['availability']['status'] == 'unsupported_version'
+        assert 'business_adapter' not in schema
+        return
     task = marker_task(tmp_path, version)
     code, schema = task.run('operation-schema', 'object.set'); assert code == 0, schema
     def profile(value):
@@ -178,9 +186,22 @@ def test_manual_marker_schema_and_draft_continuation_disclose_exact_matching_pro
                 if found is not None: return found
     contract = profile(schema)
     marker = contract['profiles']['manual_marker']
+    if version == '2022.1':
+        assert marker is None
+        assert contract['versions'] == list(VERSIONS)
+        return
     assert (marker['version'], marker['owner_class_id'], marker['collection'], marker['element_class_id']) == (version, 16, 'Markers', 5373968)
     assert marker['native_name'] == '' and marker['element_type'] == 'Marker'
     assert marker['source']['member'] == 'ak_wwise_core_object_set_example_adding_a_marker_to_an_audio_source.html'
+    assert marker['owner_prerequisite'] == {
+        'field_meaning': 'marker input mode',
+        'field_scope': 'bound_AudioFileSource_owner',
+        'field_input': 'selected_owner_Field_Handle',
+        'required_choice': {'meaning': 'manual', 'value': 2},
+        'when_unsatisfied': 'draft-declare-existing_in_same_Draft',
+        'already_satisfied': 'preserve',
+        'derived_write': False,
+    }
     assert contract['on_name_conflict']['supported'] == ['fail', 'rename', 'merge', 'replace']
     assert contract['on_name_conflict']['list_modes'] == ['append', 'replaceAll']
     task.bind(FIRST)
