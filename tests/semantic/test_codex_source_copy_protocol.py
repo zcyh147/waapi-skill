@@ -145,6 +145,7 @@ def test_dirty_source_copy_generated_children_and_parent_cas_replay_same_broker_
         else:
             altered[issue]['aggregated_output'] = ''
         assert gateway_continuation_binding_errors(altered, evidence.records, platform_name='posix'), fault
+    _assert_source_result_replay(tmp_path, protocol, responses, prompts, flow_count=3)
 
 
 @pytest.mark.parametrize('stage', ['baseline', 'final'])
@@ -183,6 +184,7 @@ def test_source_decline_uses_earlier_authenticated_choice_and_explicit_user_turn
     bound = _bind_gateway_prefix_reconciliation(raw, command_records=commands, broker_evidence=evidence,
         platform_name='posix', source_copy_protocol=protocol, source_copy_user_prompts=prompts)
     assert bound.passed, bound.errors
+    _assert_source_result_replay(tmp_path, protocol, responses, prompts, flow_count=2)
 
 
 def test_generated_save_cannot_claim_another_public_parent(tmp_path, monkeypatch):
@@ -210,6 +212,8 @@ def test_later_turn_reuses_retained_accept_frame_and_same_unattempted_child(tmp_
     replay(prompts)
     with pytest.raises(CampaignEvidenceError):
         replay(['Confirm the current Preview.'] * len(prompts))
+    if stage == 'baseline':
+        _assert_source_result_replay(tmp_path, protocol, responses, prompts, flow_count=3)
 
 
 @pytest.mark.parametrize('policy', ['read_only', 'allow_changes'])
@@ -256,18 +260,14 @@ def test_source_protocol_rejects_unknown_command_role_fields_and_unpinned_versio
             build_source_copy_saved_proof_protocol({**source_request(), 'version': version})
 
 
-@pytest.mark.parametrize('branch', ['dirty', 'baseline_decline', 'final_decline', 'resume'])
-def test_mandatory_task_result_composer_consumer_seals_source_chains(tmp_path, monkeypatch, branch):
+def _assert_source_result_replay(tmp_path, protocol, responses, prompts, *, flow_count):
+    """Check the archive from an existing business flow without replaying its writes."""
     from tests.semantic.support.codex_typed_draft_evidence_v3 import validate_typed_draft_evidence, TypedDraftEvidenceError
-    protocol, evidence, commands, responses, writes, prompts = run_source_protocol(tmp_path, monkeypatch,
-        dirty=branch in {'dirty', 'baseline_decline', 'resume'},
-        decline_stage={'baseline_decline': 'baseline', 'final_decline': 'final'}.get(branch),
-        resume_stage='baseline' if branch == 'resume' else None)
     arguments = dict(state_directory=tmp_path / 'broker/state', steps=protocol.steps,
         broker_records=json.loads((tmp_path / 'original-broker.json').read_text())['records'],
         user_prompts=prompts, turn_prefix_counts=protocol.turn_prefix_counts)
     sealed = validate_typed_draft_evidence(**arguments)
-    assert sealed['flow_count'] == (3 if branch in {'dirty', 'resume'} else 2)
+    assert sealed['flow_count'] == flow_count
     assert sealed == validate_typed_draft_evidence(**arguments, allow_cleaned_file_evidence=True)
     changed = deepcopy(arguments['broker_records'])
     child = next(index for index, step in enumerate(protocol.steps)

@@ -2,6 +2,12 @@
 
 ## Current authorization — lightweight test optimization (2026-11-02)
 
+After reviewing the first focused results, the user resumed the same Goal and
+authorized applying the approach to the remaining tests. Continue with expensive
+business chains, collector/harness repetition and measured shared initialization
+costs. The same focused-only validation and pause-for-report boundary applies;
+this continuation does not authorize a complete regression run.
+
 The completed Non-live run took 14,858.23 seconds and reported 136 failures.
 The user authorized simplifying redundant full-workflow tests and repeated
 Gateway initialization, prioritizing important business behavior and necessary
