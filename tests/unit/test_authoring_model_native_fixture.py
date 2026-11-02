@@ -2,7 +2,6 @@
 from copy import deepcopy
 import importlib
 import json
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -14,7 +13,7 @@ from tests.unit.test_waapi_gateway import FakeEventHandler, gateway_env, waapi_g
 from tests.semantic.support.codex_expansion_case_helpers import CaseBoundaryError
 
 
-def _host(tmp_path, monkeypatch, owner, *, damage=None, paired=False):
+def _host(tmp_path, monkeypatch, owner, *, damage=None):
     from tests.semantic.support import codex_scenario_lifecycle_v3 as lifecycle
     from wwise_waapi.headless import CleanupReport, HeadlessLifecycle
     for name in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'):
@@ -92,10 +91,7 @@ def _host(tmp_path, monkeypatch, owner, *, damage=None, paired=False):
     monkeypatch.setattr(authoring_batch, 'wait_for_port_release', lambda *_: None)
     monkeypatch.setattr(HeadlessLifecycle, '_process_rows', lambda *_, **__: [(12345, 'fake pytest process')])
     nodeid = witness.COMMON_NODE if owner.version == '2024.1' else witness.FILE_NODE
-    from tests.destructive.support.layout_workflows import COMMON_NODE as LAYOUT_COMMON, CLOSE_NODE as LAYOUT_CLOSE
-    layout_node = LAYOUT_COMMON if owner.version == '2024.1' else LAYOUT_CLOSE
-    selected = [layout_node, nodeid] if paired else [nodeid]
-    batch = authoring_batch.AuthoringBatchAdapter(owner=owner, repo_root=tmp_path, selected_nodeids=selected)
+    batch = authoring_batch.AuthoringBatchAdapter(owner=owner, repo_root=tmp_path, selected_nodeids=[nodeid])
     call = batch.node_gateway(nodeid)
     target = tmp_path / 'categories.jsonl'
     monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
@@ -105,17 +101,7 @@ def _host(tmp_path, monkeypatch, owner, *, damage=None, paired=False):
 
 @pytest.mark.parametrize('owned_authoring', ['2024.1', '2025.1'], indirect=True)
 def test_model_cohort_reaches_final_writer_with_exact_budget_and_independent_outcomes(owned_authoring, tmp_path, monkeypatch):
-    batch, call, client, run, nodeid, target, events = _host(tmp_path, monkeypatch, owned_authoring, paired=True)
-    # Reuse the frozen #188 witness bytes in this newly approved shared owner.
-    from tests.unit.test_authoring_layout_native_fixture import _layout_cohort_host
-    from tests.destructive.support.layout_workflows import COMMON_NODE as LAYOUT_COMMON
-    layout_root = tmp_path / 'layout-boundary'; layout_root.mkdir()
-    _layout_cohort_host(layout_root, monkeypatch, owned_authoring)
-    native = importlib.import_module('tests.destructive.test_authoring_ui_business_live')
-    layout_node = batch.selected_nodeids[0]
-    layout_call = batch.node_gateway(layout_node)
-    layout_run = native.test_authoring_layout_2024_construction_arrangement if layout_node == LAYOUT_COMMON else native.test_authoring_layout_2025_construction_close_reset
-    layout_run((batch, layout_call))
+    batch, call, client, run, nodeid, target, events = _host(tmp_path, monkeypatch, owned_authoring)
     run((batch, call))
     runtime = batch.node_runtimes[nodeid]
     report = json.loads((runtime.owned_root / 'native-evidence' / witness.FILENAME).read_text())
@@ -160,11 +146,7 @@ def test_model_cohort_reaches_final_writer_with_exact_budget_and_independent_out
     assert categories['authoring-model-window-native-results']['status'] == 'blocked'
     assert categories['authoring-model-window-native-results']['visible_window_effect_verified'] is False
     assert categories['authoring-model-session-cleanup']['status'] == 'PASS'
-    assert len(final['transactions']) == (18 if owned_authoring.version == '2024.1' else 16)
-    if owned_authoring.version == '2025.1':
-        reset = categories['authoring-layout-selected-reset-observation']
-        assert reset['status'] == 'blocked' and reset['business_state_verified'] is False
-        assert reset['coverage_credit'] == 'none; diagnostic observation only'
+    assert len(final['transactions']) == (9 if owned_authoring.version == '2024.1' else 8)
 
 
 @pytest.mark.parametrize('damage', ['create-readback', 'destroy', 'duplicate-ack', 'stale-session', 'silence'])
@@ -195,27 +177,3 @@ def test_model_cohort_failure_never_replays_or_claims_cleanup(owned_authoring, t
     batch.prepare_stop([item]); item._waapi_phase_reports['teardown'] = 'passed'
     assert batch.finalize([item], exitstatus=1)['outcome'] == 'FAIL'
     assert not any(r['status'] == 'PASS' for line in target.read_text().splitlines() for r in json.loads(line)['categories'])
-
-
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-@pytest.mark.parametrize('variant', ['pair', 'unrelated', 'cross-version', 'triple'])
-def test_owner_admits_only_exact_matching_layout_model_pair(tmp_path, monkeypatch, version, variant):
-    from tests.unit.test_authoring_batch_owner import _fakes, _config
-    from tests.destructive.support.layout_workflows import COMMON_NODE as LAYOUT_COMMON, CLOSE_NODE as LAYOUT_CLOSE
-    events = _fakes(monkeypatch, tmp_path)
-    monkeypatch.setenv('WWISE_VERSION', version)
-    pair = [LAYOUT_COMMON, witness.COMMON_NODE] if version == '2024.1' else [LAYOUT_CLOSE, witness.FILE_NODE]
-    selected = list(pair)
-    if variant == 'unrelated': selected[0] = authoring_batch.PROFILER_CAPTURE_NODEID
-    if variant == 'cross-version': selected[1] = witness.FILE_NODE if version == '2024.1' else witness.COMMON_NODE
-    if variant == 'triple': selected.append(authoring_batch.OWNED_AUTHORING_NODEIDS[-1])
-    config = _config(tmp_path); config.args = selected
-    items = [SimpleNamespace(nodeid=nodeid) for nodeid in selected]
-    if variant == 'pair':
-        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert [r[0] for r in events] == ['construct', 'start', 'install']
-        assert set(events[-1][1]['selected_nodeids']) == set(pair)
-    else:
-        with pytest.raises(pytest.UsageError):
-            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert events == []

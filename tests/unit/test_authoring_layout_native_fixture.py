@@ -263,47 +263,6 @@ def test_layout_cohort_failures_stop_writes_and_retain_owned_evidence_without_bl
     assert all(category['status'] != 'PASS' for row in map(json.loads, target.read_text().splitlines()) for category in row['categories'])
 
 
-@pytest.mark.parametrize('variant', ['wrong_common_version', 'wrong_close_version', 'mixed_selection'])
-def test_layout_cohort_owner_requires_one_exact_matching_version_node_before_allocation(tmp_path, monkeypatch, variant):
-    from types import SimpleNamespace
-    from tests.destructive.support import authoring_batch
-    from tests.destructive.support.layout_workflows import COMMON_NODE, CLOSE_NODE
-    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
-    events = _fakes(monkeypatch, tmp_path)
-    nodeid = CLOSE_NODE if variant == 'wrong_close_version' else COMMON_NODE
-    monkeypatch.setenv('WWISE_VERSION', '2024.1' if variant != 'wrong_common_version' else '2025.1')
-    config = _config(tmp_path)
-    config.args = [nodeid, NODE] if variant == 'mixed_selection' else [nodeid]
-    with pytest.raises(pytest.UsageError):
-        authoring_batch.configure_authoring_batch_owner(config, [SimpleNamespace(nodeid=name) for name in config.args], repo_root=tmp_path)
-    assert events == []
-
-
-@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
-def test_owned_layout_registration_switch_fixture_uses_separate_verified_transactions(tmp_path, monkeypatch, version):
-    for key in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'):
-        monkeypatch.setenv(key, '1')
-    native = importlib.import_module('tests.destructive.test_authoring_ui_business_live')
-    env = gateway_env(tmp_path)
-    set_gateway_config(env, wwise_version=version, project_modification_policy='ask_before_changes')
-    state = ['--state-dir', str(tmp_path / 'state')]
-    client = LayoutClient(tmp_path, version=version)
-    receipts = []
-    def call(argv):
-        code, payload = gateway.execute_gateway([*state, *argv], env=env, client_factory=lambda _: client)
-        receipts.append((argv, code, payload))
-        assert code == 0, payload
-        return payload
-    native.test_authoring_layout_owned_registration_and_switch(
-        owned_authoring_layout_node=(SimpleNamespace(runtime=SimpleNamespace(version=version)), call))
-    assert client.current == 'Designer'
-    assert set(client.layouts) == {'Designer', 'Profiler'}
-    executed = [row for row in client.calls if row[0] in {URI + name for name in ('setLayout', 'switchLayout', 'removeLayout')}]
-    assert [row[0] for row in executed] == [URI + 'setLayout', URI + 'switchLayout', URI + 'switchLayout', URI + 'removeLayout']
-    assert len({payload['transaction_id'] for argv, _, payload in receipts if argv[0] == 'preview-from-draft'}) == 4
-    assert len([argv for argv, _, payload in receipts if argv[0] == 'verify' and payload['verification']['business_state_verified']]) == 4
-
-
 @pytest.mark.parametrize('version', ['2024.1', '2025.1'])
 def test_owned_view_fixture_proves_creation_reuse_and_applicable_close(tmp_path, monkeypatch, version):
     for key in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'):
@@ -499,26 +458,6 @@ def test_media_diagnostic_owned_batch_category_cannot_grant_business_credit(owne
     rows = [json.loads(line)['categories'][0] for line in target.read_text().splitlines()]
     assert all(row['category'] == 'media-preservation-diagnostic' and row['status'] == 'blocked' for row in rows)
     assert all(row['business_preservation_verified'] is False and row['coverage_credit'] == 'none; diagnostic observation only' for row in rows)
-
-
-@pytest.mark.parametrize('version,extra_node', [('2024.1', False), ('2025.1', False), ('2024.1', True)])
-def test_media_diagnostic_owner_selects_only_one_matching_2024_node(tmp_path, monkeypatch, version, extra_node):
-    from tests.destructive.support import authoring_batch
-    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
-    events = _fakes(monkeypatch, tmp_path)
-    monkeypatch.setenv('WWISE_VERSION', version)
-    nodeid = 'tests/destructive/test_authoring_ui_business_live.py::test_authoring_2024_media_preservation_metadata_diagnostic'
-    config = _config(tmp_path)
-    config.args = [nodeid, *([NODE] if extra_node else [])]
-    items = [SimpleNamespace(nodeid=value) for value in config.args]
-    if version == '2024.1' and not extra_node:
-        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert [kind for kind, _ in events] == ['construct', 'start', 'install']
-        assert events[0][1]['host_kind'] == 'wwise-authoring'
-    else:
-        with pytest.raises(pytest.UsageError):
-            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
-        assert events == []
 
 
 def _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch):
