@@ -2,6 +2,13 @@
 
 ## Current authorization — lightweight test optimization (2026-11-02)
 
+The user subsequently required **all remaining non-live test modules** to be
+assessed and handled, rather than stopping after prioritized slow groups. Split
+the remaining files among execution agents; simplify redundant work and explicitly
+retain already-lightweight business and necessary-glue tests. This is not an
+instruction to rewrite every file or start a complete regression. The existing
+focused-validation and pause-for-report boundary remains in force.
+
 After reviewing the first focused results, the user resumed the same Goal and
 authorized applying the approach to the remaining tests. Continue with expensive
 business chains, collector/harness repetition and measured shared initialization
