@@ -104,7 +104,7 @@ class SemanticSchemaValidator:
             self.manifest_loader.load_manifest(self.version)
 
     def schema_for(self, uri: str) -> Mapping[str, Any]:
-        self.require_supported_version()
+        # Both lookup paths already reject unavailable version resources.
         if self.authoring_ui_profile:
             return self.manifest_loader.authoring_ui_schema_for(
                 uri,

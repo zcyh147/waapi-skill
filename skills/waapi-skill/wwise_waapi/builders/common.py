@@ -12,7 +12,7 @@ from wwise_waapi.authoring_ui_commands_manifest import (
     AuthoringUiCommandsSupplementError,
     AuthoringUiCommandsSupplementMissingError,
 )
-from wwise_waapi.manifest import ManifestResourceMissingError, ManifestStore
+from wwise_waapi.manifest import ManifestResourceMissingError, ManifestStore, command_schema_for
 
 
 DEFAULT_MANIFEST_ROOT = Path(__file__).resolve().parents[2] / "resources" / "manifest"
@@ -238,20 +238,21 @@ class ManifestSchemaLoader:
         return manifest
 
     def schema_for(self, uri: str, version: str = DEFAULT_WWISE_VERSION) -> Mapping[str, Any]:
-        manifest = self.load_manifest(version)
         from ..authoring_core_manifest import requires_core_supplement
 
-        if requires_core_supplement(version, uri):
+        authoring = requires_core_supplement(version, uri)
+        if authoring:
             # Schema availability is not host authorization. Live Gateway routes
             # separately require an attested Authoring process before dispatch.
-            manifest = self.load_authoring_ui_manifest(version)
-        for entry in manifest.get("schemas", []):
-            if not isinstance(entry, Mapping) or entry.get("uri") != uri:
-                continue
-            schema = entry.get("schema")
-            if isinstance(schema, Mapping):
-                return schema
-            break
+            loader = lambda: self.load_authoring_ui_manifest(version)
+        else:
+            loader = lambda: self.load_manifest(version)
+        schema = command_schema_for(
+            self.manifest_store, version,
+            "wwise-authoring-ui" if authoring else "wwise-console", uri, loader,
+        )
+        if schema is not None:
+            return schema
         raise SemanticValidationError(
             SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
             f"No usable schema for WAAPI URI {uri!r} in manifest {version}",
@@ -313,14 +314,10 @@ class ManifestSchemaLoader:
     ) -> Mapping[str, Any]:
         """Resolve schemas only from the explicit Authoring UI profile."""
 
-        manifest = self.load_authoring_ui_manifest(version)
-        for entry in manifest.get("schemas", []):
-            if not isinstance(entry, Mapping) or entry.get("uri") != uri:
-                continue
-            schema = entry.get("schema")
-            if isinstance(schema, Mapping):
-                return schema
-            break
+        schema = command_schema_for(self.manifest_store, version, "wwise-authoring-ui", uri,
+                                    lambda: self.load_authoring_ui_manifest(version))
+        if schema is not None:
+            return schema
         raise SemanticValidationError(
             SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
             f"No usable Authoring UI schema for WAAPI URI {uri!r} "

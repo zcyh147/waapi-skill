@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Protocol
+from typing import Any, Callable, Iterator, Mapping, Protocol
 
 from .authoring_ui_commands_manifest import (
     AUTHORING_HOST_SURFACE,
@@ -35,16 +35,50 @@ LOCAL_PATH_PATTERN = re.compile(
 _COMMAND_PROFILES: ContextVar[dict[tuple[Path, str, str], str] | None] = ContextVar(
     "waapi_command_manifest_profiles", default=None,
 )
+_COMMAND_SCHEMAS: ContextVar[dict[tuple[Path, str, str], dict[str, str | None]] | None] = ContextVar(
+    "waapi_command_manifest_schemas", default=None,
+)
 
 
 @contextmanager
 def command_manifest_resources() -> Iterator[None]:
     """Reuse composed packaged profiles until this command exits, even on error."""
     token = _COMMAND_PROFILES.set({})
+    schema_token = _COMMAND_SCHEMAS.set({})
     try:
         yield
     finally:
+        _COMMAND_SCHEMAS.reset(schema_token)
         _COMMAND_PROFILES.reset(token)
+
+
+def command_schema_for(
+    store: ManifestStore,
+    version: str,
+    profile: str,
+    uri: str,
+    load_manifest: Callable[[], Mapping[str, Any]],
+) -> Mapping[str, Any] | None:
+    """Reuse only packaged schemas within one command, returning independent JSON."""
+    snapshots = _COMMAND_SCHEMAS.get()
+    key = (store.root, version, profile) if store.root is not None and not store.versions else None
+    if snapshots is None or key is None:
+        for entry in load_manifest().get("schemas", []):
+            if isinstance(entry, Mapping) and entry.get("uri") == uri:
+                schema = entry.get("schema")
+                return schema if isinstance(schema, Mapping) else None
+        return None
+    if key not in snapshots:
+        schemas: dict[str, str | None] = {}
+        for entry in load_manifest().get("schemas", []):
+            if not isinstance(entry, Mapping) or not isinstance(entry.get("uri"), str):
+                continue
+            schema = entry.get("schema")
+            schemas.setdefault(entry["uri"], json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
+                               if isinstance(schema, Mapping) else None)
+        snapshots[key] = schemas
+    encoded = snapshots[key].get(uri)
+    return json.loads(encoded) if encoded is not None else None
 
 
 class WaapiCaller(Protocol):
