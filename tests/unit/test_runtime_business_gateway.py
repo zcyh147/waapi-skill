@@ -758,7 +758,7 @@ def test_profiler_explicit_field_pages_retain_configuration_version_and_lifetime
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 @pytest.mark.parametrize("operation", (GET_VOICES_URI, GET_BUSSES_URI, GET_AUDIO_OBJECTS_URI))
 @pytest.mark.parametrize("view", (None, "summary", "identity"))
-def test_profiler_existing_summary_identity_and_omitted_selection_keep_native_presets(version, operation, view):
+def test_profiler_existing_summary_identity_and_omitted_selection_keep_native_presets(tmp_path, version, operation, view):
     summaries = {
         GET_VOICES_URI: ["pipelineID", "objectName", "gameObjectName", "baseVolume", "isStarted", "isVirtual", "objectGUID", "gameObjectID"],
         GET_BUSSES_URI: ["pipelineID", "objectName", "gameObjectName", "volume", "downstreamGain", "voiceCount", "depth", "objectGUID", "gameObjectID"],
@@ -769,12 +769,12 @@ def test_profiler_existing_summary_identity_and_omitted_selection_keep_native_pr
         GET_BUSSES_URI: ["pipelineID", "objectGUID", "objectName", "gameObjectID", "gameObjectName"],
         GET_AUDIO_OBJECTS_URI: ["audioObjectID", "audioObjectName", "busPipelineID", "busGUID", "busName", "gameObjectID", "gameObjectName", "instigatorPipelineID"],
     }
-    from wwise_waapi.runtime_inspection_business import materialize_runtime_inspection_business_request
-    request, _, _ = materialize_runtime_inspection_business_request(operation, version,
-        log_channel=None, max_results=None, profiler_position="123", result_view=view)
-    assert request == {"api": operation, "args": {"time": 123}, "options": {
+    read, calls, _state, _env_value = _profiler_field_read(tmp_path, operation, [], version=version)
+    code, payload = read(*(["--result-view", view] if view is not None else []))
+    assert code == 0, payload
+    assert next(options for uri, _args, options in calls if uri == operation) == {
         "return": identities[operation] if view == "identity" else summaries[operation],
-    }}
+    }
 
 
 def test_profiler_voice_schema_exposes_position_view_bound_and_handle_only(
