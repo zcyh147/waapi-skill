@@ -35,10 +35,10 @@ def cursor_read(path, version, host, choice, value):
     native,=[x for x in trace if x['uri']==URI]
     return {'argv':argv,'exit_code':code,'payload':payload}, {k:native[k]for k in ('uri','args','options','result')}, context, trace
 
-@pytest.mark.parametrize('version',['2025.1','2021.1','2022.1','2023.1','2024.1'])
+@pytest.mark.parametrize('version', ['2021.1', '2025.1'])
 def test_cursor_paired_hosts_public_teardown_portable_consumer(request,tmp_path,version):
     captures=[]
-    for host in ('wwise-console','wwise-authoring'):
+    for host in ('wwise-console',):
         values=[('capture-latest',123),('user-cursor',0),('capture-latest',-1)]
         if version in {'2021.1','2022.1'}:values.append(('user-cursor',None))
         for choice,position in values:

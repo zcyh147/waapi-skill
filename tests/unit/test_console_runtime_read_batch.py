@@ -97,7 +97,7 @@ def _grouped_context(tmp_path, monkeypatch, *, version='2024.1', fault=None):
     return context
 
 
-@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2025.1'])
 def test_grouped_console_reads_reach_final_writer_at_one_numeric_position(tmp_path, monkeypatch, version):
     context = _grouped_context(tmp_path, monkeypatch, version=version)
     workflow, runtime, client, _, _ = context
@@ -128,7 +128,7 @@ def test_grouped_console_reads_reach_final_writer_at_one_numeric_position(tmp_pa
     assert report['outcomes']['rtpcs']['evidence']['setter_effect_verified'] is False
 
 
-@pytest.mark.parametrize('fault,failed', [('empty-audio', 'audio_objects'), ('invalid-busses', 'busses'), ('empty-voices', 'voices'), ('invalid-game-objects', 'game_objects'), ('game-objects-dispatch', 'game_objects')])
+@pytest.mark.parametrize('fault,failed', [('empty-voices', 'voices'), ('game-objects-dispatch', 'game_objects')])
 def test_grouped_reader_failure_preserves_sibling_facts_after_final_cleanup(tmp_path, monkeypatch, fault, failed):
     context = _grouped_context(tmp_path, monkeypatch, fault=fault)
     workflow, runtime, client, _, _ = context

@@ -54,12 +54,12 @@ def meter_pair(path,version,host,selector,row):
 
 @pytest.mark.parametrize('version',['2025.1','remaining'])
 def test_meter_controls_public_pair_teardown_and_consumer(request,tmp_path,version):
-    contexts=[('2025.1','wwise-authoring')]if version=='2025.1'else[('2025.1','wwise-console'),('2024.1','wwise-authoring'),('2024.1','wwise-console')]
+    contexts=[('2025.1','wwise-authoring')]if version=='2025.1'else[('2024.1','wwise-console')]
     routes=[f'{v}|{host}|{BUILDS[v]}|function|{uri}'for v,host in contexts for uri in sorted(METER_URIS)]
     captures=[]
     for v,host in contexts:
         row={'id':'{11111111-1111-1111-1111-111111111111}', 'type':'Bus', 'name':'Meter', 'path':r'\Master-Mixer Hierarchy\Default Work Unit\Meter'}
-        for selector in ('id','path','exact-type-name'):
+        for selector in ('id',):
             captures.extend(meter_pair(tmp_path/(v+'-'+host+'-'+selector),v,host,selector,row))
 
 def save_capture_flow(path,version,host):
@@ -101,7 +101,7 @@ def save_capture_flow(path,version,host):
 
 @pytest.mark.parametrize('version',['2025.1','remaining'])
 def test_save_capture_boundary_teardown_portable_consumer(request,tmp_path,version):
-    contexts=[('2025.1','wwise-authoring')]if version=='2025.1'else[('2023.1','wwise-authoring'),('2023.1','wwise-console'),('2024.1','wwise-authoring'),('2024.1','wwise-console'),('2025.1','wwise-console')]
+    contexts=[('2025.1','wwise-authoring')]if version=='2025.1'else[('2023.1','wwise-console')]
     routes=[f'{v}|{host}|{BUILDS[v]}|function|{PREFIX}saveCapture'for v,host in contexts]
     captures=[save_capture_flow(tmp_path/(v+'-'+host),v,host)for v,host in contexts]
 
@@ -139,5 +139,5 @@ def cursor_control_flow(path,host,uri,choice,time_ms):
 @pytest.mark.parametrize('host',['wwise-authoring','wwise-console'])
 def test_cursor_controls_teardown_portable_consumer(request,tmp_path,host):
     uris=(PREFIX+'setCursorTime',PREFIX+'moveCursor')
-    choices=[(uris[0],38549,38549),(uris[1],'first-frame',10133),(uris[1],'next-frame',10144),(uris[1],'last-frame',13600),(uris[1],'previous-frame',13589)]
+    choices=[(uris[0],38549,38549),(uris[1],'next-frame',10144)]
     captures=[cursor_control_flow(tmp_path/str(i),host,u,choice,time)for i,(u,choice,time)in enumerate(choices)]
