@@ -340,11 +340,23 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         for operation in ("audio.import", "audio.importTabDelimited")
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     } <= non_object_set_digests.keys()
+    assert canonical_sha256(non_object_set_digests) == "2cc8e791d9680757a4b594da4f4d897a3afbb371f79a27c9d28032cadcfe6b5f"
+    # Saved Source proof adds only one optional Gateway-owned Boolean to copy.
+    # Reconstruct the prior seal without changing native arguments or other rows.
+    def before_saved_copy_proof(operation, version):
+        contract = operation_request_machine_contract(operation, version)
+        if operation == "object.copy":
+            assert contract["argument_contract"]["properties"].pop("verify_saved_source") == {"type": "boolean"}
+            contract["argument_contract"]["optional"].remove("verify_saved_source")
+            contract["optional_arguments"].remove("verify_saved_source")
+        return contract
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.copy@{version}"] = canonical_sha256(before_saved_copy_proof("object.copy", version))
     # Control Surface construction adds only these two typed parent relations
     # to the five create contracts; live role admission remains a separate gate.
     assert canonical_sha256(non_object_set_digests) == "d24d5eab62367ec9f14a3cca0bd258b2755c8cffc9ff4f972e779a729617f394"
     def before_control_surface_parents(operation, version):
-        contract = operation_request_machine_contract(operation, version)
+        contract = before_saved_copy_proof(operation, version)
         if operation == "object.create":
             assert contract["parent_child_contract"].pop("ControlSurfaceSession") == ["ControlSurfaceBindingGroup"]
             assert contract["parent_child_contract"].pop("ControlSurfaceBindingGroup") == [

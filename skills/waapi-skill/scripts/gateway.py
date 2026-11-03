@@ -16749,6 +16749,9 @@ def dispatch_command(
         validations = result.get("topic_event_validations") if result.get("ok") else None
         if result.get("ok") and (not isinstance(validations, list) or len(validations) != args.event_count):
             raise GatewayResultShapeError("Dispatcher did not return the matched Topic validation reports.",
+                details={"topic": args.api, "expected_count": args.event_count,
+                    "validation_count": len(validations) if isinstance(validations, list) else None,
+                    "validation_type": type(validations).__name__, "cleanup": cleanup},
                 error_code="INVALID_TOPIC_RESULT")
         if args.event_count == 1:
             payload["event"] = normalize_topic_event_result(result, expected_topic=args.api) if result.get("ok") else None
