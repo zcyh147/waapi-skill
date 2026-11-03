@@ -491,3 +491,8 @@ only these ten description changes. The reviewed continuation seal is
 `e57d81f879a6566faf8c24994e60496068dc9255fee604c32a95fbde6b47526d`.
 The native surface, operation and parser seals remain unchanged. This records
 the approved contract change, not new live-Wwise or Fresh Agent evidence.
+
+The follow-up at `f02cab608` explicitly binds the first observation to matching
+opening and closing context before retaining it. Only the same ten continuation
+descriptions change; their final reviewed seal is
+`64c2da75a72d1e2be2db552446d45e3da4d74284b466d459772c6c941ebe2d57`.
